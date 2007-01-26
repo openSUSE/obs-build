@@ -1,0 +1,41 @@
+#! /bin/bash
+#
+
+function Usage () {
+    echo "Usage: $(basename $0) [-v] rpm-files...";
+    echo "Unpack rpm files in current directory.";
+    exit 1
+}
+
+CPIO_OPTS="--extract --unconditional --preserve-modification-time --make-directories"
+
+FILES=""
+VERBOSE=false
+QUIET=false
+
+for i in $* ; do
+    case "$i" in
+      -v)
+        VERBOSE=true
+        ;;
+      -q)
+        QUIET=true
+        ;;
+      *)
+        FILES="$FILES $i"
+        ;;
+    esac
+done
+
+
+test "$VERBOSE" = "true" && CPIO_OPTS="$CPIO_OPTS --verbose"
+test "$QUIET" = "true" && CPIO_OPTS="$CPIO_OPTS --quiet"
+
+test -z "$FILES" && Usage
+
+for f in $FILES; do
+    if test "$QUIET" = "false" ; then
+        echo -ne "$f:\t"
+    fi
+    rpm2cpio $f | cpio ${CPIO_OPTS}
+done
