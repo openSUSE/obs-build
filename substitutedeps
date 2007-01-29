@@ -46,13 +46,10 @@ my $cf = Build::read_config_dist($dist, $archs, $configdir);
 
 #######################################################################
 
-my ($packname, $packvers, $subpacks, @packdeps);
-$subpacks = [];
-
 my $xspec = [];
-($packname, $packvers, $subpacks, @packdeps) = Build::read_spec($cf, $spec, $xspec);
-my @sdeps = @packdeps;
-my @neg = map {substr($_, 1)} grep {/^-/} @packdeps;
+my $d = Build::read_spec($cf, $spec, $xspec) || {};
+my @sdeps = @{$d->{'deps'} || []};
+my @neg = map {substr($_, 1)} grep {/^-/} @{$d->{'deps'} || []};
 my %neg = map {$_ => 1} @neg;
 @sdeps = grep {!$neg{$_}} @sdeps;
 @sdeps = Build::do_subst($cf, @sdeps);
