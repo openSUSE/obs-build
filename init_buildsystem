@@ -104,6 +104,7 @@ function preinstall {
 	fi
     fi
     if test -n "$2" ; then
+	chroot $BUILD_ROOT /sbin/ldconfig 2>/dev/null
         for PKG in $PACKAGES_TO_RUNSCRIPTS ; do
             if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre" ; then
                 echo "running $PKG preinstall script"
@@ -349,6 +350,7 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
     mkdir -p $BUILD_ROOT/var/lib/rpm || cleanup_and_exit 1
     mkdir -p $BUILD_ROOT/usr/src/packages/SOURCES || cleanup_and_exit 1
     mkdir -p $BUILD_ROOT/etc || cleanup_and_exit 1
+    mkdir -p $BUILD_ROOT/proc || cleanup_and_exit 1
     test -f $BUILD_ROOT/etc/HOSTNAME || hostname -f > $BUILD_ROOT/etc/HOSTNAME
     if test $PSUF = deb ; then
 	mkdir -p $BUILD_ROOT/var/lib/dpkg
@@ -366,6 +368,7 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
 	preinstall ${PKG##*/}
     done
     test -c $BUILD_ROOT/dev/null || create_devs
+    test -e $BUILD_ROOT/etc/ld.so.conf || cp $BUILD_ROOT/etc/ld.so.conf.in $BUILD_ROOT/etc/ld.so.conf
     if test -z "$PREPARE_XEN" ; then
 	preinstall '' true
 	init_db
@@ -391,10 +394,6 @@ fi
 mkdir -p $BUILD_ROOT/proc
 mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
 PROC_IS_MOUNTED=true
-
-test -e $BUILD_ROOT/etc/ld.so.conf || \
-    cp $BUILD_ROOT/etc/ld.so.conf.in $BUILD_ROOT/etc/ld.so.conf
-chroot $BUILD_ROOT /sbin/ldconfig 2> /dev/null
 
 #
 # get list and ids of already installed rpms

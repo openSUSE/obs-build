@@ -8,7 +8,7 @@ use strict;
 
 use Build;
 
-my ($dist, $rpmdeps, $archs, $configdir, $release);
+my ($dist, $rpmdeps, $archs, $configdir, $release, $changelog);
 
 while (@ARGV)  {
   if ($ARGV[0] eq '--dist') {
@@ -29,6 +29,11 @@ while (@ARGV)  {
   if ($ARGV[0] eq '--release') {
     shift @ARGV;
     $release = shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--changelog') {
+    shift @ARGV;
+    $changelog = shift @ARGV;
     next;
   }
   last;
@@ -56,27 +61,36 @@ my %sdeps = map {$_ => 1} @sdeps;
 
 open(F, '>', $newspec) || die("$newspec: $!\n");
 
+my $used;
+my $inchangelog = 0;
 for my $l (@$xspec) {
-  if (!ref($l)) {
-    $l =~ s/^(Release:\s*).*/$1$release/i if $release;
-    if ($l !~ /^BuildRequires:/i) {
-      print F "$l\n";
-      next;
-    }
-    $l = [$l, $l];
-  } else {
+  $used = 1;
+  if (ref($l)) {
     if (!defined($l->[1])) {
-      $l->[0] =~ s/^(Release:\s*).*/$1$release/i if $release;
-      print F "$l->[0]\n";
-      next;
-    }
-    $l->[1] =~ s/^(Release:\s*).*/$1$release/i if $release;
-    if ($l->[1] !~ /^BuildRequires:/i) {
-      print F "$l->[1]\n";
-      next;
+      $used = 0;
+      $l = $l->[0];
+    } else {
+      $l = $l->[1];
     }
   }
-  my $r = $l->[1];
+
+  if ($inchangelog) {
+    $inchangelog = 0 if $l =~ /^\s*%[^%]/;
+    next if $inchangelog;
+  }
+  if ($changelog && ($l =~ /\s*\%changelog\b/)) {
+    $inchangelog = 1;
+    next;
+  }
+
+  $l =~ s/^(Release:\s*).*/$1$release/i if $release;
+
+  if (!$used || ($l !~ /^BuildRequires:/i)) {
+    print F "$l\n";
+    next;
+  }
+
+  my $r = $l;
   $r =~ s/^[^:]*:\s*//;
   my @deps = $r =~ /([^\s\[\(,]+)(\s+[<=>]+\s+[^\s\[,]+)?[\s,]*/g;
   my @ndeps = ();
@@ -102,9 +116,20 @@ for my $l (@$xspec) {
   if ($replace) {
     print F "BuildRequires:  ".join(' ', @ndeps)."\n" if @ndeps;
   } else {
-    print F "$l->[1]\n";
+    print F "$l\n";
   }
 }
+
+if ($changelog) {
+  print F "%changelog\n";
+  if (open(CF, '<', $changelog)) {
+    while(<CF>) {
+      print F $_;
+    }
+    close CF;
+  }
+}
+
 close(F) || die("close: $!\n");
 
 exit(0);

@@ -178,6 +178,7 @@ REASON=
 NOROOTFORBUILD=
 LOGFILE=
 KILL=
+CHANGELOG=
 
 if test "$0" = "/.build/build" ; then
     BUILD_ROOT=/
@@ -322,6 +323,9 @@ while test -n "$1"; do
         echo "$ARG does not take an argument"
         cleanup_and_exit
       ;;
+      *-changelog)
+        CHANGELOG=true
+      ;;
       -*)
         echo Unknown Option "$PARAM". Exit.
         cleanup_and_exit 1
@@ -359,10 +363,10 @@ if test -n "$KILL" ; then
 fi
 
 case $BUILD_ARCH in
-i686) BUILD_ARCH="i686:i586:i486:i386" ;;
-i586) BUILD_ARCH="i586:i486:i386" ;;
-i486) BUILD_ARCH="i486:i386" ;;
-x86_64) BUILD_ARCH="x86_64:i686:i586:i486:i386" ;;
+  i686) BUILD_ARCH="i686:i586:i486:i386" ;;
+  i586) BUILD_ARCH="i586:i486:i386" ;;
+  i486) BUILD_ARCH="i486:i386" ;;
+  x86_64) BUILD_ARCH="x86_64:i686:i586:i486:i386" ;;
 esac
 if test "$BUILD_ARCH" != "${BUILD_ARCH#i686}" ; then
     cpuflags=`grep ^flags /proc/cpuinfo`
@@ -527,6 +531,13 @@ for SPECFILE in $SPECFILES ; do
         DO_INIT=true
     fi
 
+    if test -n "$CHANGELOG" ; then
+	rm -f $BUILD_ROOT/.build-changelog
+	if test "$SPECFILE" = "${SPECFILE%.dsc}" ; then
+	    $BUILD_DIR/changelog2spec --spec "$MYSRCDIR/$SPECFILE" > $BUILD_ROOT/.build-changelog || rm -f $BUILD_ROOT/.build-changelog
+	fi
+    fi
+
     if test -n "$XENIMAGE" ; then
 	# do fist stage of init_buildsystem
         echo init_buildsystem $USEUSEDFORBUILD $RPMLIST $SPECFILE $ADDITIONAL_PACKS ...
@@ -657,7 +668,9 @@ for SPECFILE in $SPECFILES ; do
 
     if test "$SPECFILE" = "${SPECFILE%.dsc}" ; then
 	# do buildrequires/release substitution
-	substitutedeps $RELEASE --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$BUILD_DIR/configs" "$BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE" "$BUILD_ROOT/.spec.new" || cleanup_and_exit 1
+	CHANGELOGARGS=
+	test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" && CHANGELOGARGS="--changelog $BUILD_ROOT/.build-changelog"
+	substitutedeps $RELEASE --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$BUILD_DIR/configs" $CHANGELOGARGS "$BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE" "$BUILD_ROOT/.spec.new" || cleanup_and_exit 1
 	# extract macros from configuration
 	getmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$BUILD_DIR/configs" > $BUILD_ROOT/root/.rpmmacros
 	test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/.rpmmacros $BUILD_ROOT/home/abuild/.rpmmacros

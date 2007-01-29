@@ -1,0 +1,90 @@
+#!/usr/bin/perl -w
+
+#
+# Convert a SUSE changelog file to rpm format
+#
+
+use Date::Parse;
+use Time::Zone;
+
+use strict;
+
+my @wday = qw{Sun Mon Tue Wed Thu Fri Sat};
+my @mon = qw{Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec};
+
+if (@ARGV == 2 && $ARGV[0] eq '--spec') {
+  die("bad --spec arg\n") unless $ARGV[1] =~ /^(.*)\/([^\/]+)\.spec$/;
+  my ($dir, $spec) = ($1, $2);
+  opendir(D, $dir) || die("$dir: $!\n");
+  my @changes = grep {/\.changes$/} readdir(D);
+  closedir(D);
+  @changes = sort {length($a) <=> length($b) || $a cmp $b} @changes;
+  exit(1) unless @changes;
+  if (@changes > 1) {
+    while ($spec ne '') {
+      my @c = grep {/\Q$spec\E/} @changes;
+      if (@c) {
+	@changes = @c;
+	last;
+      }
+      last unless $spec =~ s/[-.][^-.]*$//;
+    }
+  }
+  @ARGV = ("$dir/$changes[0]");
+}
+
+my $ok;
+my $zone;
+while (<>) {
+  chomp;
+  next if (/^--------------/);
+  next if (/^========================/);
+  if (/^(?:\* )?([A-Za-z]+\s+[A-Za-z]+\s+[0-9].*[0-9][0-9][0-9][0-9])(.*\@.*$)/) {
+    my $dt = $1;
+    my $who = $2;
+    $dt = lc($dt);
+    $who =~ s/^\s+//;
+    $who =~ s/^-\s*//;
+    $dt =~ /([0-9][0-9][0-9][0-9])/;
+    my $year = $1;
+    if (!defined($zone) && $dt =~ /\s([a-z]{3,4})(dst)?\s[0-9]{4}/) {
+      my $dst = $2;
+      $zone = tz_offset($1);
+      $zone += 3600 if defined($zone) && $dst;
+    }
+    my $tdt = str2time($dt);
+    $dt =~ /([0-9]+)/;
+    my $day = $1;
+    if (!$tdt) {
+      if ($dt =~ /([a-z]{3})\s+([a-z]{3})/) {
+        $tdt = str2time("$1 $2 $day $year");
+      }
+    }
+    if (!$tdt) {
+      if ($dt =~ /([a-z]{3})/) {
+        $tdt = str2time("$1 $day $year");
+      }
+    }
+    if (!$tdt) {
+      $tdt = str2time("$year-1-1");
+    }
+    $tdt += 12 * 3600 unless $dt =~ /\d:\d/;	# 12:00 if not specified
+    my @gm = gmtime($tdt + ($zone || 0));
+    printf("* %s %s %2d %4d %s\n", $wday[$gm[6]], $mon[$gm[4]], $gm[3], $gm[5] + 1900, $who);
+    $ok = 1;
+    next;
+  }
+  next unless $ok;
+  s/\s+$//;
+  next if $_ eq '';
+  s/%/%%/g;
+  s/^(\s*)(\#\d*)/$1\[$2\]/;	# lines starting with hash are a comment
+  s/^\s*-/-/ if $ok == 1;	# obsolete?
+  s/^\s*\*\s*/  * /;
+  if (!/^-/) {
+    s/^\s+-\s*/  - /;
+    s/^\s*/  / unless s/^    \s*/    /;
+  }
+  $ok = 2;
+  print "$_\n";
+}
