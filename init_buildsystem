@@ -338,8 +338,10 @@ else
 	test "$PACKAGES_TO_PREINSTALL" = "${PACKAGES_TO_PREINSTALL/util-linux}" && PACKAGES_TO_PREINSTALL="$PACKAGES_TO_PREINSTALL util-linux"
 	test "$PACKAGES_TO_PREINSTALL" = "${PACKAGES_TO_PREINSTALL/perl}" && PACKAGES_TO_PREINSTALL="$PACKAGES_TO_PREINSTALL perl"
 	test "$PACKAGES_TO_PREINSTALL" = "${PACKAGES_TO_PREINSTALL/libvolume_id}" -a "$PACKAGES_TO_INSTALL" != "${PACKAGES_TO_INSTALL/libvolume_id}" && PACKAGES_TO_PREINSTALL="$PACKAGES_TO_PREINSTALL libvolume_id"
+	test "$PACKAGES_TO_PREINSTALL" = "${PACKAGES_TO_PREINSTALL/device-mapper}" -a "$PACKAGES_TO_INSTALL" != "${PACKAGES_TO_INSTALL/device-mapper}" && PACKAGES_TO_PREINSTALL="$PACKAGES_TO_PREINSTALL device-mapper"
 	test $PSUF = deb -a "$PACKAGES_TO_PREINSTALL" = "${PACKAGES_TO_PREINSTALL/binutils}" && PACKAGES_TO_PREINSTALL="$PACKAGES_TO_PREINSTALL binutils"
 	test $PSUF = deb -a "$PACKAGES_TO_PREINSTALL" = "${PACKAGES_TO_PREINSTALL/mount}" && PACKAGES_TO_PREINSTALL="$PACKAGES_TO_PREINSTALL mount"
+	test "$PACKAGES_TO_PREINSTALL" = "${PACKAGES_TO_PREINSTALL/mount}" -a "$PACKAGES_TO_INSTALL" != "${PACKAGES_TO_INSTALL/ mount }" && PACKAGES_TO_PREINSTALL="$PACKAGES_TO_PREINSTALL mount"
     fi
 fi
 
@@ -355,11 +357,12 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
     if test $PSUF = deb ; then
 	mkdir -p $BUILD_ROOT/var/lib/dpkg
 	mkdir -p $BUILD_ROOT/var/log
-	mkdir -p $BUILD_ROOT/etc
+	mkdir -p $BUILD_ROOT/etc/default
 	:> $BUILD_ROOT/var/lib/dpkg/status
 	:> $BUILD_ROOT/var/lib/dpkg/available
 	:> $BUILD_ROOT/var/log/dpkg.log
 	:> $BUILD_ROOT/etc/ld.so.conf
+	:> $BUILD_ROOT/etc/default/rcS
     fi
     for PKG in $PACKAGES_TO_RUNSCRIPTS ; do
 	: > $BUILD_ROOT/.init_b_cache/scripts/$PKG.run
@@ -368,6 +371,7 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
 	preinstall ${PKG##*/}
     done
     test -c $BUILD_ROOT/dev/null || create_devs
+    test -e $BUILD_ROOT/etc/fstab || touch $BUILD_ROOT/etc/fstab
     test -e $BUILD_ROOT/etc/ld.so.conf || cp $BUILD_ROOT/etc/ld.so.conf.in $BUILD_ROOT/etc/ld.so.conf
     if test -z "$PREPARE_XEN" ; then
 	preinstall '' true
@@ -378,15 +382,22 @@ fi
 
 if test -n "$PREPARE_XEN" ; then
     mkdir -p $BUILD_ROOT/.build
-    echo "PACKAGES_TO_INSTALL='${PACKAGES_TO_INSTALL//\'/\'\\\'\'}'" > $BUILD_ROOT/.build/init_buildsystem.data
-    echo "PACKAGES_TO_RUNSCRIPTS='${PACKAGES_TO_RUNSCRIPTS//\'/\'\\\'\'}'" >> $BUILD_ROOT/.build/init_buildsystem.data
-    echo "PSUF='$PSUF'" >> $BUILD_ROOT/.build/init_buildsystem.data
     echo "copying packages..."
     for PKG in $PACKAGES_TO_INSTALL ; do
 	rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
 	cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
 	ln -s -f ../$PKG.$PSUF $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF
     done
+    # alreadyinstalled check will not work, but we have to live with
+    # that...
+    echo -n 'reordering...'
+    REORDER_MISSED=
+    PACKAGES_TO_INSTALL=`reorder $PACKAGES_TO_INSTALL`
+    echo 'done'
+    test -n "$REORDER_MISSED" && echo "WARNING: reorder missed$REORDER_MISSED"
+    echo "PACKAGES_TO_INSTALL='${PACKAGES_TO_INSTALL//\'/\'\\\'\'}'" > $BUILD_ROOT/.build/init_buildsystem.data
+    echo "PACKAGES_TO_RUNSCRIPTS='${PACKAGES_TO_RUNSCRIPTS//\'/\'\\\'\'}'" >> $BUILD_ROOT/.build/init_buildsystem.data
+    echo "PSUF='$PSUF'" >> $BUILD_ROOT/.build/init_buildsystem.data
     rm -f $BUILD_IS_RUNNING
     exit 0
 fi
@@ -408,14 +419,16 @@ if test -f $BUILD_ROOT/var/lib/rpm/packages.rpm -o -f $BUILD_ROOT/var/lib/rpm/Pa
 fi
 
 #
-# reorder packages
+# reorder packages (already done in XEN continuation)
 #
-echo -n 'reordering...'
-REORDER_MISSED=
-PACKAGES_TO_INSTALL_FIRST=`reorder $PACKAGES_TO_INSTALL_FIRST`
-PACKAGES_TO_INSTALL=`reorder $PACKAGES_TO_INSTALL`
-echo 'done'
-test -n "$REORDER_MISSED" && echo "WARNING: reorder missed$REORDER_MISSED"
+if ! test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
+    echo -n 'reordering...'
+    REORDER_MISSED=
+    PACKAGES_TO_INSTALL_FIRST=`reorder $PACKAGES_TO_INSTALL_FIRST`
+    PACKAGES_TO_INSTALL=`reorder $PACKAGES_TO_INSTALL`
+    echo 'done'
+    test -n "$REORDER_MISSED" && echo "WARNING: reorder missed$REORDER_MISSED"
+fi
 
 #
 # delete all packages we don't want
@@ -631,6 +644,15 @@ done
 
 if test -e $BUILD_ROOT/usr/share/zoneinfo/UTC ; then
     chroot $BUILD_ROOT zic -l UTC
+fi
+
+HOST=`hostname`
+if ! grep -F "127.0.0.1 $HOST" $BUILD_ROOT/etc/hosts ; then
+    # this makes a reverse lookup on 127.0.0.1 return the host name,
+    # which is bad, but 127.0.0.2 does not work on all unix systems
+    echo "127.0.0.1 $HOST" > $BUILD_ROOT/etc/hosts.new
+    test -f $BUILD_ROOT/etc/hosts && cat $BUILD_ROOT/etc/hosts >> $BUILD_ROOT/etc/hosts.new
+    mv $BUILD_ROOT/etc/hosts.new $BUILD_ROOT/etc/hosts
 fi
 
 if test -x $BUILD_ROOT/bin/rpm -a ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rpm/Packages ; then

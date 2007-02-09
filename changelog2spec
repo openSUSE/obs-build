@@ -35,6 +35,12 @@ if (@ARGV == 2 && $ARGV[0] eq '--spec') {
 
 my $ok;
 my $zone;
+my $test;
+if ($ARGV[0] eq '--test') {
+  $test = 1;
+  shift @ARGV;
+}
+my $lastt;
 while (<>) {
   chomp;
   next if (/^--------------/);
@@ -69,7 +75,13 @@ while (<>) {
       $tdt = str2time("$year-1-1");
     }
     $tdt += 12 * 3600 unless $dt =~ /\d:\d/;	# 12:00 if not specified
-    my @gm = gmtime($tdt + ($zone || 0));
+    $tdt += ($zone || 0);
+    if (defined($lastt) && $lastt < $tdt) {
+      die("changes file not incremental: $_\n") if $test;
+      warn("changes file not incremental: $_\n");
+    }
+    $lastt = $tdt;
+    my @gm = gmtime($tdt);
     printf("* %s %s %2d %4d %s\n", $wday[$gm[6]], $mon[$gm[4]], $gm[3], $gm[5] + 1900, $who);
     $ok = 1;
     next;

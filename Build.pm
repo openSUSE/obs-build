@@ -582,7 +582,7 @@ sub read_spec {
     my $expandedline = '';
     if (!$skip) {
       my $tries = 0;
-      while ($line =~ /^(.*?)%(\{([^\}]+)\}|[0-9a-zA-Z_]+|%|\()(.*?)$/) {
+      while ($line =~ /^(.*?)%(\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\()(.*?)$/) {
 	if ($tries++ > 1000) {
 	  $line = 'MACRO';
 	  last;

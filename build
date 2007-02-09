@@ -212,6 +212,7 @@ if test "$0" = "/.build/build" ; then
 	swapon -v "$XENSWAP" || exit 1
     fi
     set "/.build-srcdir/$SPECFILE"
+    HOST="$MYHOSTNAME"
 fi
 
 while test -n "$1"; do
@@ -479,6 +480,7 @@ fi
 #
 # say hello
 #
+test -z "$HOST" && HOST=`hostname`
 echo $HOST started \"build $SPECFILES\" at `date`.
 echo
 test -n "$REASON" && echo "$REASON"
@@ -567,7 +569,13 @@ for SPECFILE in $SPECFILES ; do
 	echo "CREATE_BASELIBS='$CREATE_BASELIBS'" >> $BUILD_ROOT/.build/build.data
 	echo "REASON='${REASON//\'/$Q}'" >> $BUILD_ROOT/.build/build.data
 	test -n "$XENSWAP" && echo "XENSWAP='/dev/hda2'" >> $BUILD_ROOT/.build/build.data
-	PERSONALITY=`perl -e 'print syscall(135, 0)."\n"'`
+	PERSONALITY_SYSCALL=
+	PERSONALITY=0
+	case `perl -V:archname` in
+	    *x86_64*) PERSONALITY_SYSCALL=135 ;;
+	    *i?86*)   PERSONALITY_SYSCALL=136 ;;
+	esac
+	test -n "$PERSONALITY_SYSCALL" && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
 	echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
 	echo "MYHOSTNAME='`hostname`'" >> $BUILD_ROOT/.build/build.data
 	umount $BUILD_ROOT
@@ -584,7 +592,7 @@ for SPECFILE in $SPECFILES ; do
 	XENID="${XENID##*/}"
 	if test "$PERSONALITY" != 0 ; then
 	    # have to switch back to PER_LINUX to make xm work
-	    perl -e 'syscall(135, 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' xm create -c $BUILD_DIR/xen.conf name="build:$XENID" $XENMEMORY $XMROOT $XMSWAP extra="init=/.build/build panic=1"
+	    perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' xm create -c $BUILD_DIR/xen.conf name="build:$XENID" $XENMEMORY $XMROOT $XMSWAP extra="init=/.build/build panic=1"
 	else
 	    xm create -c $BUILD_DIR/xen.conf name="build:$XENID" $XENMEMORY $XMROOT $XMSWAP extra="init=/.build/build panic=1"
 	fi
@@ -632,10 +640,12 @@ for SPECFILE in $SPECFILES ; do
     # check if we want to build with the abuild user
     #
     BUILD_USER=root
-    test -n "$NOROOTFORBUILD" && BUILD_USER=abuild
-    if egrep '^#[       ]*norootforbuild[       ]*$' >/dev/null <$SPECFILE; then
-        BUILD_USER=abuild
+    if test "$BUILD_USER" = abuild ; then
+	egrep '^#[       ]*needsrootforbuild[       ]*$' >/dev/null <$SPECFILE && BUILD_USER=root
+    else
+	egrep '^#[       ]*norootforbuild[       ]*$' >/dev/null <$SPECFILE && BUILD_USER=abuild
     fi
+    test -n "$NOROOTFORBUILD" && BUILD_USER=abuild
     if test $BUILD_USER = abuild ; then
         if ! egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
             echo 'abuild::99:99:Autobuild:/home/abuild:/bin/bash' >>$BUILD_ROOT/etc/passwd
@@ -643,6 +653,7 @@ for SPECFILE in $SPECFILES ; do
             mkdir -p $BUILD_ROOT/home/abuild
             chown 99:99 $BUILD_ROOT/home/abuild
         fi
+	sed -e "s@^root::@root:*:@" < $BUILD_ROOT/etc/shadow > $BUILD_ROOT/etc/shadow.t && mv $BUILD_ROOT/etc/shadow.t $BUILD_ROOT/etc/shadow
     else
         if egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
             egrep -v '^abuild:' <$BUILD_ROOT/etc/passwd >$BUILD_ROOT/etc/passwd.new
