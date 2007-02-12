@@ -592,9 +592,9 @@ for SPECFILE in $SPECFILES ; do
 	XENID="${XENID##*/}"
 	if test "$PERSONALITY" != 0 ; then
 	    # have to switch back to PER_LINUX to make xm work
-	    perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' xm create -c $BUILD_DIR/xen.conf name="build:$XENID" $XENMEMORY $XMROOT $XMSWAP extra="init=/.build/build panic=1"
+	    perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' xm create -c $BUILD_DIR/xen.conf name="build:$XENID" $XENMEMORY $XMROOT $XMSWAP extra="init=/.build/build panic=1 console=ttyS0"
 	else
-	    xm create -c $BUILD_DIR/xen.conf name="build:$XENID" $XENMEMORY $XMROOT $XMSWAP extra="init=/.build/build panic=1"
+	    xm create -c $BUILD_DIR/xen.conf name="build:$XENID" $XENMEMORY $XMROOT $XMSWAP extra="init=/.build/build panic=1 console=ttyS0"
 	fi
 	if test -n "$XENSWAP" ; then
 	    BUILDSTATUS=`dd if="$XENSWAP" bs=12 count=1 2>/dev/null`

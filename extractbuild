@@ -33,7 +33,7 @@ if ($0 ne '/.build/extractbuild') {
   my $xmswap= "disk=file:$xenswap,hda2,w";
   $xmswap= "disk=phy:$xen,hda2,w" if $xenswap =~ /^\/dev\//;
   syscall(135, 0);	# switch back to PER_LINUX to make xm work
-  system('xm', 'create', '-c', "$builddir/xen.conf", "name=build:$xenname", $xmroot, $xmswap, "extra=init=/.build/extractbuild panic=1") && die("xm call failed: $?\n");
+  system('xm', 'create', '-c', "$builddir/xen.conf", "name=build:$xenname", $xmroot, $xmswap, "extra=init=/.build/extractbuild panic=1 console=ttyS0") && die("xm call failed: $?\n");
   exit(0);
 }
 
