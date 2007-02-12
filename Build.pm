@@ -281,6 +281,13 @@ sub readrpmdeps {
   for my $p (keys %prov) {
     push @{$provides{$_}}, $p for unify(@{$prov{$p}});
   }
+  my @ors = grep {/\|/} map {@$_} values %requires;
+  @ors = unify(@ors) if @ors > 1;
+  for my $or (@ors) {
+    my @p = map {@{$provides{$_} || []}} split(/\|/, $or);
+    @p = unify(@p) if @p > 1;
+    $provides{$or} = \@p;
+  }
   $config->{'providesh'} = \%provides;
   $config->{'requiresh'} = \%requires;
 }
@@ -358,6 +365,17 @@ sub expand {
 	  } elsif (@pq == 1) {
 	    @q = @pq;
 	  }
+	}
+	if (@q > 1 && $r =~ /\|/) {
+	    # choice op, implicit prefer of first match...
+	    my %pq = map {$_ => 1} @q;
+	    for my $rr (split(/\|/, $r)) {
+		next unless $provides->{$rr};
+		my @pq = grep {$pq{$_}} @{$provides->{$rr}};
+		next unless @pq;
+		@q = @pq;
+		last;
+	    }
 	}
 	if (@q > 1) {
 	  if ($r ne $p) {

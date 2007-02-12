@@ -82,6 +82,9 @@ while (<>) {
     }
     $lastt = $tdt;
     my @gm = gmtime($tdt);
+    # rpm can't hande dates < 1997, so we fold everything to
+    # Thu Jan 02 1997
+    @gm = (0, 0, 0, 2, 0, 97, 4) if $gm[5] < 97 || ($gm[5] == 97 && $gm[3] <= 1);
     printf("* %s %s %2d %4d %s\n", $wday[$gm[6]], $mon[$gm[4]], $gm[3], $gm[5] + 1900, $who);
     $ok = 1;
     next;
