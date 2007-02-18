@@ -76,7 +76,7 @@ my $specfile = $vars{'SPECFILE'};
 die("no specfile/dscfile\n") unless $specfile;
 my $topdir = '/usr/src/packages';
 my $psuf = 'deb';
-my @dirs = ($topdir);
+my @dirs = ("$topdir/DEBS");
 if ($specfile =~ /\.spec$/) {
   $topdir = `rpm --eval '%_topdir'`;
   chomp $topdir;

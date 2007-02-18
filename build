@@ -116,7 +116,7 @@ cleanup_and_exit () {
     test -z "$1" && set 0
     if test -n "$RUNNING_IN_XEN" ; then
 	cd /
-	if test -n "$XENSWAP" ; then
+	if test -n "$XENSWAP" -a -e "$XENSWAP" ; then
 	    swapoff "$XENSWAP"
 	    echo -n "BUILDSTATUS$1" >"$XENSWAP"
 	fi
@@ -189,7 +189,7 @@ if test "$0" = "/.build/build" ; then
 	export PERSONALITY_SET=true
 	echo "switching personality to $PERSONALITY..."
 	# this is 32bit perl/glibc, thus the 32bit syscall number
-	exec perl -e 'syscall(136, '$PERSONALITY') == -1 && warn("personality: $!\n");exec "/.build/build" || die("/.build/build: $!")'
+	exec perl -e 'syscall(136, '$PERSONALITY') == -1 && warn("personality: $!\n");exec "/.build/build" || die("/.build/build: $!\n")'
     fi
     PATH=$BUILD_DIR:$PATH
     RUNNING_IN_XEN=true
@@ -203,12 +203,13 @@ if test "$0" = "/.build/build" ; then
 	    sleep 1
 	done
 	test $i = 1 || echo
-	cp -a "$XENSWAP" /.build/swapdev
     fi
     umount -l /dev 2>/dev/null
     if test -n "$XENSWAP" ; then
 	rm -f "$XENSWAP"
-	cp -a /.build/swapdev "$XENSWAP"
+	umask 027
+	mknod "$XENSWAP" b 3 2
+	umask 022
 	swapon -v "$XENSWAP" || exit 1
     fi
     set "/.build-srcdir/$SPECFILE"
@@ -664,6 +665,9 @@ for SPECFILE in $SPECFILES ; do
         fi
     fi
 
+    mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
+    mount -n -tdevpts none $BUILD_ROOT/dev/pts 2> /dev/null
+
     #
     # now clean up RPM building directories
     #
@@ -720,8 +724,6 @@ for SPECFILE in $SPECFILES ; do
     fi
     echo -----------------------------------------------------------------
     echo -----------------------------------------------------------------
-    mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
-    mount -n -tdevpts none $BUILD_ROOT/dev/pts 2> /dev/null
     test -n "$RUNNING_IN_XEN" && ifconfig lo 127.0.0.1 up
     test -n "$RUNNING_IN_XEN" -a -n "$MYHOSTNAME" && hostname "$MYHOSTNAME"
 

@@ -4,6 +4,7 @@ package Build;
 our $expand_dbg;
 
 use strict;
+use Digest::MD5;
 
 my $std_macros = q{
 %define ix86 i386 i486 i586 i686 athlon
@@ -315,14 +316,14 @@ sub expand {
 
   my %aconflicts;
   for my $p (keys %p) {
+    next unless exists $conflicts->{$p};
     $aconflicts{$_} = 1 for @{$conflicts->{$p} || []};
   }
 
+  my @pamb = ();
+  my $doamb = 0;
   while (@p) {
-    my $didsomething = 0;
     my @error = ();
-    my @uerror = ();
-    my @usolve = ();
     my @rerror = ();
     for my $p (splice @p) {
       for my $r (@{$requires->{$p} || [$p]}) {
@@ -341,18 +342,9 @@ sub expand {
 	  }
 	  next;
 	}
-	if (@q > 1 && grep {$conflicts->{$_}} @q) {
-	  # delay this one as some conflict later on might
-	  # clear things up
-	  push @p, $p unless @p && $p[-1] eq $p;
+	if (@q > 1 && !$doamb) {
+	  push @pamb, $p unless @pamb && $pamb[-1] eq $p;
 	  print "undecided about $p:$r: @q\n" if $expand_dbg;
-	  if ($r ne $p) {
-	    push @uerror, "have choice for $r needed by $p: @q";
-	  } else {
-	    push @uerror, "have choice for $r: @q";
-	  }
-	  push @usolve, @q;
-	  push @usolve, map {"$p:$_"} @q;
 	  next;
 	}
 	if (@q > 1) {
@@ -383,41 +375,29 @@ sub expand {
           } else {
 	    push @error, "have choice for $r: @q";
           }
-	  push @p, $p unless @p && $p[-1] eq $p;
+	  push @pamb, $p unless @pamb && $pamb[-1] eq $p;
 	  next;
 	}
 	push @p, $q[0];
 	print "added $q[0] because of $p:$r\n" if $expand_dbg;
 	$p{$q[0]} = 1;
 	$aconflicts{$_} = 1 for @{$conflicts->{$q[0]} || []};
-	$didsomething = 1;
 	@error = ();
+	$doamb = 0;
       }
     }
-    if (@rerror) {
-      return undef, @rerror;
+    return undef, @rerror if @rerror;
+    next if @p;		# still work to do
+
+    # only ambig stuff left
+    if (@pamb && !$doamb) {
+      @p = @pamb;
+      @pamb = ();
+      $doamb = 1;
+      print "now doing undecided dependencies\n" if $expand_dbg;
+      next;
     }
-    if (!$didsomething && @error) {
-      return undef, @error;
-    }
-    if (!$didsomething && @usolve) {
-      # only conflicts left
-      print "looking at conflicts: @usolve\n" if $expand_dbg;
-      @usolve = grep {$prefer->{$_}} @usolve;
-      if (@usolve > 1) {
-        my %usolve = map {$_ => 1} @usolve;
-        @usolve  = (grep {$usolve{$_}} @{$config->{'prefer'}})[0];
-      }
-      if (@usolve) {
-	$usolve[0] =~ s/:.*//;
-        push @p, $usolve[0];
-        print "added $usolve[0]\n" if $expand_dbg;
-        $p{$usolve[0]} = 1;
-        $aconflicts{$_} = 1 for @{$conflicts->{$usolve[0]} || []};
-	next;
-      }
-      return undef, @uerror;
-    }
+    return undef, @error if @error;
   }
   return 1, (sort keys %p);
 }
@@ -883,76 +863,136 @@ sub read_dsc {
 
 ###########################################################################
 
+my %rpmstag = (
+  "SIGTAG_SIZE"    => 1000,     # /*!< internal Header+Payload size in bytes. */
+  "SIGTAG_MD5"     => 1004,     # /*!< internal MD5 signature. */
+  "NAME"           => 1000,
+  "VERSION"        => 1001,
+  "RELEASE"        => 1002,
+  "EPOCH"          => 1003,
+  "ARCH"           => 1022,
+  "OLDFILENAMES"   => 1027,
+  "SOURCERPM"      => 1044,
+  "PROVIDENAME"    => 1047,
+  "REQUIREFLAGS"   => 1048,
+  "REQUIRENAME"    => 1049,
+  "REQUIREVERSION" => 1050,
+  "NOSOURCE"       => 1051,
+  "NOPATCH"        => 1052,
+  "PROVIDEFLAGS"   => 1112,
+  "PROVIDEVERSION" => 1113,
+  "DIRINDEXES"     => 1116,
+  "BASENAMES"      => 1117,
+  "DIRNAMES"       => 1118,
+);
+
 sub rpmq {
-  my $rpm = shift;
-  my @stags = @_;
-  my %stags = map {0+$_ => $_} @stags; 
+  my ($rpm, @stags) = @_;
+
+  my @sigtags = grep {/^SIGTAG_/} @stags;
+  @stags = grep {!/^SIGTAG_/} @stags;
+  my $dosigs = @sigtags && !@stags;
+  @stags = @sigtags if $dosigs;
+
+  my $need_filenames = grep { $_ eq 'FILENAMES' } @stags;
+  push @stags, 'BASENAMES', 'DIRNAMES', 'DIRINDEXES', 'OLDFILENAMES' if $need_filenames;
+  @stags = grep { $_ ne 'FILENAMES' } @stags if $need_filenames;
+
+  my %stags = map {0 + ($rpmstag{$_} || $_) => $_} @stags; 
 
   my ($magic, $sigtype, $headmagic, $cnt, $cntdata, $lead, $head, $index, $data, $tag, $type, $offset, $count);
 
   local *RPM;
-  if (ref($rpm) eq 'GLOB') {
-    *RPM = $rpm;
-  } elsif (!open(RPM, '<', $rpm)) {
-    warn("$rpm: $!\n");
-    return ();
+  if (ref($rpm) eq 'ARRAY') {
+    ($headmagic, $cnt, $cntdata) = unpack('N@8NN', $rpm->[0]);
+    if ($headmagic != 0x8eade801) {
+      warn("Bad rpm\n");
+      return ();
+    }
+    if (length($rpm->[0]) < 16 + $cnt * 16 + $cntdata) {
+      warn("Bad rpm\n");
+      return ();
+    }
+    $index = substr($rpm->[0], 16, $cnt * 16);
+    $data = substr($rpm->[0], 16 + $cnt * 16, $cntdata);
+  } else {
+    if (ref($rpm) eq 'GLOB') {
+      *RPM = *$rpm;
+    } elsif (!open(RPM, '<', $rpm)) {
+      warn("$rpm: $!\n");
+      return ();
+    }
+    if (read(RPM, $lead, 96) != 96) {
+      warn("Bad rpm $rpm\n");
+      close RPM unless ref($rpm);
+      return ();
+    }
+    ($magic, $sigtype) = unpack('N@78n', $lead);
+    if ($magic != 0xedabeedb || $sigtype != 5) {
+      warn("Bad rpm $rpm\n");
+      close RPM unless ref($rpm);
+      return ();
+    }
+    if (read(RPM, $head, 16) != 16) {
+      warn("Bad rpm $rpm\n");
+      close RPM unless ref($rpm);
+      return ();
+    }
+    ($headmagic, $cnt, $cntdata) = unpack('N@8NN', $head);
+    if ($headmagic != 0x8eade801) {
+      warn("Bad rpm $rpm\n");
+      close RPM unless ref($rpm);
+      return ();
+    }
+    if (read(RPM, $index, $cnt * 16) != $cnt * 16) {
+      warn("Bad rpm $rpm\n");
+      close RPM unless ref($rpm);
+      return ();
+    }
+    $cntdata = ($cntdata + 7) & ~7;
+    if (read(RPM, $data, $cntdata) != $cntdata) {
+      warn("Bad rpm $rpm\n");
+      close RPM unless ref($rpm);
+      return ();
+    }
   }
-  if (read(RPM, $lead, 96) != 96) {
-    warn("Bad rpm $rpm\n");
-    close RPM;
-    return ();
-  }
-  ($magic, $sigtype) = unpack('N@78n', $lead);
-  if ($magic != 0xedabeedb || $sigtype != 5) {
-    warn("Bad rpm $rpm\n");
-    close RPM;
-    return ();
-  }
-  if (read(RPM, $head, 16) != 16) {
-    warn("Bad rpm $rpm\n");
-    close RPM;
-    return ();
-  }
-  ($headmagic, $cnt, $cntdata) = unpack('N@8NN', $head);
-  if ($headmagic != 0x8eade801) {
-    warn("Bad rpm $rpm\n");
-    close RPM;
-    return ();
-  }
-  if (read(RPM, $index, $cnt * 16) != $cnt * 16) {
-    warn("Bad rpm $rpm\n");
-    close RPM;
-    return ();
-  }
-  $cntdata = ($cntdata + 7) & ~7;
-  if (read(RPM, $data, $cntdata) != $cntdata) {
-    warn("Bad rpm $rpm\n");
-    close RPM;
-    return ();
-  }
-  if (read(RPM, $head, 16) != 16) {
-    warn("Bad rpm $rpm\n");
-    close RPM;
-    return ();
-  }
-  ($headmagic, $cnt, $cntdata) = unpack('N@8NN', $head);
-  if ($headmagic != 0x8eade801) {
-    warn("Bad rpm $rpm\n");
-    close RPM;
-    return ();
-  }
-  if (read(RPM, $index, $cnt * 16) != $cnt * 16) {
-    warn("Bad rpm $rpm\n");
-    close RPM;
-    return ();
-  }
-  if (read(RPM, $data, $cntdata) != $cntdata) {
-    warn("Bad rpm $rpm\n");
-    close RPM;
-    return ();
-  }
-  close RPM;
+
   my %res = ();
+  if (@sigtags && !$dosigs) {
+    %res = &rpmq(["$head$index$data"], @sigtags);
+  }
+  if (ref($rpm) eq 'ARRAY' && !$dosigs && @stags && @$rpm > 1) {
+    my %res2 = &rpmq([ $rpm->[1] ], @stags);
+    %res = (%res, %res2);
+    return %res;
+  }
+  if (ref($rpm) ne 'ARRAY' && !$dosigs && @stags) {
+    if (read(RPM, $head, 16) != 16) {
+      warn("Bad rpm $rpm\n");
+      close RPM unless ref($rpm);
+      return ();
+    }
+    ($headmagic, $cnt, $cntdata) = unpack('N@8NN', $head);
+    if ($headmagic != 0x8eade801) {
+      warn("Bad rpm $rpm\n");
+      close RPM unless ref($rpm);
+      return ();
+    }
+    if (read(RPM, $index, $cnt * 16) != $cnt * 16) {
+      warn("Bad rpm $rpm\n");
+      close RPM unless ref($rpm);
+      return ();
+    }
+    if (read(RPM, $data, $cntdata) != $cntdata) {
+      warn("Bad rpm $rpm\n");
+      close RPM unless ref($rpm);
+      return ();
+    }
+  }
+  close RPM unless ref($rpm);
+
+  return %res unless @stags;
+
   while($cnt-- > 0) {
     ($tag, $type, $offset, $count, $index) = unpack('N4a*', $index);
     $tag = 0+$tag;
@@ -989,6 +1029,16 @@ sub rpmq {
       }
     }
   }
+
+  if ($need_filenames) {
+    if ($res{'OLDFILENAMES'}) {
+      $res{'FILENAMES'} = [ @{$res{'OLDFILENAMES'}} ];
+    } else {
+      my $i = 0;
+      $res{'FILENAMES'} = [ map {"$res{'DIRNAMES'}->[$res{'DIRINDEXES'}->[$i++]]$_"} @{$res{'BASENAMES'}} ];
+    }
+  }
+
   return %res;
 }
 
@@ -1108,22 +1158,22 @@ sub ungzip {
 sub debq {
   my ($fn) = @_;
 
-  local *F;
+  local *DEBF;
   if (ref($fn) eq 'GLOB') {
-      *F = $fn;
-  } elsif (!open(F, '<', $fn)) {
+      *DEBF = *$fn;
+  } elsif (!open(DEBF, '<', $fn)) {
     warn("$fn: $!\n");
     return ();
   }
   my $data = '';
-  sysread(F, $data, 4096);
+  sysread(DEBF, $data, 4096);
   if (length($data) < 8+60) {
     warn("$fn: not a debian package\n");
-    close F unless ref $fn;
+    close DEBF unless ref $fn;
     return ();
   }
   if (substr($data, 0, 8+16) ne "!<arch>\ndebian-binary   ") {
-    close F unless ref $fn;
+    close DEBF unless ref $fn;
     return ();
   }
   my $len = substr($data, 8+48, 10);
@@ -1131,29 +1181,30 @@ sub debq {
   if (length($data) < 8+60+$len+60) {
     my $r = 8+60+$len+60 - length($data);
     $r -= length($data);
-    if ((sysread(F, $data, $r < 4096 ? 4096 : $r, length($data)) || 0) < $r) {
+    if ((sysread(DEBF, $data, $r < 4096 ? 4096 : $r, length($data)) || 0) < $r) {
       warn("$fn: unexpected EOF\n");
-      close F unless ref $fn;
+      close DEBF unless ref $fn;
       return ();
     }
   }
   $data = substr($data, 8 + 60 + $len);
   if (substr($data, 0, 16) ne 'control.tar.gz  ') {
     warn("$fn: control.tar.gz is not second ar entry\n");
-    close F unless ref $fn;
+    close DEBF unless ref $fn;
     return ();
   }
   $len = substr($data, 48, 10);
   if (length($data) < 60+$len) {
     my $r = 60+$len - length($data);
-    if ((sysread(F, $data, $r, length($data)) || 0) < $r) {
+    if ((sysread(DEBF, $data, $r, length($data)) || 0) < $r) {
       warn("$fn: unexpected EOF\n");
-      close F unless ref $fn;
+      close DEBF unless ref $fn;
       return ();
     }
   }
-  close F;
+  close DEBF unless ref($fn);
   $data = substr($data, 60, $len);
+  my $controlmd5 = Digest::MD5::md5_hex($data);	# our header signature
   if ($have_zlib) {
     $data = Compress::Zlib::memGunzip($data);
   } else {
@@ -1194,7 +1245,76 @@ sub debq {
     $data =~ s/\s+$//s;
     $res{$tag} = $data;
   }
+  $res{'CONTROL_MD5'} = $controlmd5;
   return %res;
+}
+
+###########################################################################
+
+sub querybinary {
+  my ($binname, $withevra) = @_;
+  my $handle = $binname;
+  if (ref($binname) eq 'ARRAY') {
+    $handle = $binname->[1];
+    $binname = $binname->[0];
+  }
+  if ($binname =~ /\.rpm$/) {
+    my %res = rpmq($handle, qw{NAME SOURCERPM NOSOURCE NOPATCH SIGTAG_MD5 PROVIDENAME PROVIDEFLAGS PROVIDEVERSION REQUIRENAME REQUIREFLAGS REQUIREVERSION}, ($withevra ? qw{EPOCH VERSION RELEASE ARCH}: ()));
+    return undef unless %res;
+    my $src = $res{'SOURCERPM'}->[0];
+    $src = '' unless defined $src;
+    $src =~ s/-[^-]*-[^-]*\.[^\.]*\.rpm//;
+    my $data = {
+      name => $res{'NAME'}->[0],
+      hdrmd5 => unpack('H32', $res{'SIGTAG_MD5'}->[0]),
+      provides => [ grep {!/^rpmlib\(/ && !/^\//} @{$res{'PROVIDENAME'} || []} ],
+      requires => [ grep {!/^rpmlib\(/ && !/^\//} @{$res{'REQUIRENAME'} || []} ],
+    };
+    $data->{'source'} = $src if $src ne '';
+    if ($withevra) {
+      my $arch = $res{'ARCH'}->[0];
+      $arch = $res{'NOSOURCE'} || $res{'NOPATCH'} ? 'nosrc' : 'src' unless $src ne '';
+      $data->{'version'} = $res{'VERSION'}->[0];
+      $data->{'release'} = $res{'RELEASE'}->[0];
+      $data->{'arch'} = $arch;
+      $data->{'epoch'} = $res{'EPOCH'}->[0] if exists $res{'EPOCH'};
+    }
+    return $data;
+  } elsif ($binname =~ /\.deb$/) {
+    my %res = debq($handle);
+    return undef unless %res;
+    my $name = $res{'PACKAGE'};
+    my $src = $name;
+    $src = $res{'SOURCE'} if $res{'SOURCE'};
+    my @provides = split(',\s*', $res{'PROVIDES'} || '');
+    s/\s.*// for @provides;	#for now
+    push @provides, $name unless grep {$_ eq $name} @provides;
+    my @depends = split(',\s*', $res{'DEPENDS'} || '');
+    my @predepends = split(',\s*', $res{'PRE-DEPENDS'} || '');
+    push @depends, @predepends;
+    s/\s.*// for @provides;	#for now
+    s/\|\s*/\|/g for @depends;	#for now
+    s/\s[^\|]*//g for @depends;	#for now
+    my $data = {
+      name => $name,
+      hdrmd5 => $res{'CONTROL_MD5'},
+      provides => \@provides,
+      requires => \@depends,
+    };
+    $data->{'source'} = $src if $src ne '';
+    if ($withevra) {
+      if ($res{'VERSION'} =~ /^(.*)-(.*?)$/) {
+        $data->{'version'} = $1;
+        $data->{'release'} = $2;
+      } else {
+        $data->{'version'} = $res{'VERSION'};
+      }
+      $data->{'arch'} = $res{'ARCHITECTURE'};
+    }
+    return $data;
+  } else {
+    return undef;
+  }
 }
 
 1;
