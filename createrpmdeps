@@ -153,10 +153,10 @@ while ($redo) {
     for my $known (@todo) {
       my $path = $known2path{$known};
       if ($path =~ /\.rpm$/) {
-        my %res = Build::rpmq($path, 1000, 1022, 1047, 1049, 1048, 1050, 1112, 1113);
+        my %res = Build::Rpm::rpmq($path, 1000, 1022, 1047, 1049, 1048, 1050, 1112, 1113);
         next unless %res;
-        Build::rpmq_add_flagsvers(\%res, 1047, 1112, 1113);
-        Build::rpmq_add_flagsvers(\%res, 1049, 1048, 1050);
+        Build::Rpm::rpmq_add_flagsvers(\%res, 1047, 1112, 1113);
+        Build::Rpm::rpmq_add_flagsvers(\%res, 1049, 1048, 1050);
         my $id = $known;
         $id =~ s/.*-//;
         if ($known ne "$res{1000}->[0].$res{1022}->[0]-$id") {
@@ -169,7 +169,7 @@ while ($redo) {
         $newp{$known} = "P:$known: ".join(' ', @{$res{1047} || []});
         $newr{$known} = "R:$known: ".join(' ', @{$res{1049} || []});
       } else {
-        my %res = Build::debq($path);
+        my %res = Build::Deb::debq($path);
         next unless %res;
 	my ($dn, $da) = ($res{'PACKAGE'}, $res{'ARCHITECTURE'});
 	$da = 'noarch' if $da eq 'all';

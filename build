@@ -354,8 +354,8 @@ if test -n "$KILL" ; then
     else
 	XENID="${XENIMAGE%/root}"
 	XENID="${XENID##*/}"
-	if xm list "$XENID" >/dev/null 2>&1 ; then
-	    if ! xm destroy "$XENID" ; then
+	if xm list "build:$XENID" >/dev/null 2>&1 ; then
+	    if ! xm destroy "build:$XENID" ; then
 		echo "could not kill xen build $XENID"
 		exit 1
 	    fi

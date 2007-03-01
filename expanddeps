@@ -153,12 +153,7 @@ my ($packname, $packvers, $subpacks, @packdeps);
 $subpacks = [];
 
 if ($spec) {
-  my $d;
-  if ($spec =~ /\.dsc$/) {
-    $d = Build::read_dsc($cf, $spec);
-  } else {
-    $d = Build::read_spec($cf, $spec);
-  }
+  my $d = Build::parse($cf, $spec);
   $packname = $d->{'name'};
   $packvers = $d->{'version'};
   $subpacks = $d->{'subpacks'};
@@ -195,7 +190,7 @@ for my $pack (keys %packs) {
   $r->{'requires'} = \@re;
   $repo{$pack} = $r;
 }
-Build::readrpmdeps($cf, undef, \%repo);
+Build::readdeps($cf, undef, \%repo);
 
 #######################################################################
 

@@ -24,7 +24,9 @@ USE_FORCE=false
 
 BUILD_IS_RUNNING=$BUILD_ROOT/not-ready
 TMPFILE=$BUILD_ROOT/tmpfile
-RPMIDFMT="%{NAME}-%{VERSION}-%{RELEASE} %{BUILDHOST}-%{BUILDTIME}\n"
+#buildhost removed so that id can be generated from repo files
+#RPMIDFMT="%{NAME}-%{VERSION}-%{RELEASE} %{BUILDHOST}-%{BUILDTIME}\n"
+RPMIDFMT="%{NAME}-%{VERSION}-%{RELEASE} %{BUILDTIME}\n"
 
 PREPARE_XEN=
 USEUSEDFORBUILD=
@@ -257,6 +259,9 @@ fi
 mkdir -p $BUILD_ROOT
 touch $BUILD_IS_RUNNING
 
+if test -n "$PREPARE_XEN" ; then
+    rm -f $BUILD_ROOT/.build/init_buildsystem.data
+fi
 if test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
     # xen continuation
     . $BUILD_ROOT/.build/init_buildsystem.data
@@ -297,6 +302,7 @@ else
 	   test "$PKG" = "preinstall:" && continue
 	   test "$PKG" = "runscripts:" && continue
 	   test "$PKG" = "dist:" && continue
+	   test "$PKG" = "rpmid:" && continue
 	   echo "${SRC##*/}"
 	done < $BUILD_ROOT/.init_b_cache/rpmlist
 	rm -rf $BUILD_ROOT/.init_b_cache
@@ -321,6 +327,10 @@ else
 	fi
 	if test "$PKG" = "dist:" ; then
 	    GUESSED_DIST=$SRC
+	    continue
+	fi
+	if test "$PKG" = "rpmid:" ; then
+	    echo "${SRC#*:}" > $BUILD_ROOT/.init_b_cache/rpm/${SRC%%:*}.id
 	    continue
 	fi
 	ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRC##*.}"
@@ -486,11 +496,22 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
 
     test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm || continue
 
+    if test -f $BUILD_ROOT/.init_b_cache/rpms/$PKG.id -a -f $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG ; then
+        read PKGID < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
+	read OLDPKGID < $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG
+	if test "$PKGID" = "$OLDPKGID" ; then
+	    echo "keeping ${PKGID%% *}"
+	    echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
+	    continue
+	fi
+    fi
+
     PKGID=`rpm -qp --qf "$RPMIDFMT" $RPMCHECKOPTS_HOST $BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm`
 
     if test -f $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG ; then
-	if test "$PKGID" != "`cat $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG`" ; then
-	    echo deleting unwanted `sed -e 's/ .*//' < $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG`
+	read OLDPKGID < $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG
+	if test "$PKGID" != "$OLDPKGID" ; then
+	    echo deleting unwanted ${OLDPKGID%% *}
 	    chroot $BUILD_ROOT rpm --nodeps -e $PKG 2>&1 | \
 		grep -v -e "^r.*failed: No such file or directory" -e "^error: failed to stat .*: No such file or directory"
 	elif test "$VERIFY_BUILD_SYSTEM" = true ; then
@@ -523,6 +544,7 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
 		$ADDITIONAL_PARAMS .init_b_cache/$PKG.rpm 2>&1 || \
 	  touch $BUILD_ROOT/exit ) | \
 	      grep -v "^warning:.*saved as.*rpmorig$"
+    # delete link so package is only installed once
     rm -f $BUILD_ROOT/.init_b_cache/$PKG.rpm
     test -e $BUILD_ROOT/exit && cleanup_and_exit 1
     echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
@@ -651,7 +673,7 @@ fi
 
 HOST=`hostname`
 test -e $BUILD_ROOT/etc/hosts || echo "127.0.0.1 localhost" > $BUILD_ROOT/etc/hosts
-if ! grep -F "127.0.0.1 $HOST" $BUILD_ROOT/etc/hosts ; then
+if ! grep -F "127.0.0.1 $HOST" $BUILD_ROOT/etc/hosts > /dev/null ; then
     # this makes a reverse lookup on 127.0.0.1 return the host name,
     # which is bad, but 127.0.0.2 does not work on all unix systems
     echo "127.0.0.1 $HOST" > $BUILD_ROOT/etc/hosts.new
