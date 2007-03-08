@@ -1,0 +1,258 @@
+#!/usr/bin/perl -w
+
+use strict;
+use Digest::MD5;
+
+sub parsedsc {
+  my ($fn) = @_;
+  my @control;
+  local *F;
+  open(F, '<', $fn) || die("$fn: $!\n");
+  @control = <F>;
+  close F;
+  chomp @control;
+  splice(@control, 0, 3) if @control > 3 && $control[0] =~ /^-----BEGIN/;
+  my @seq = ();
+  my %tag;
+  while (@control) {
+    my $c = shift @control;
+    last if $c eq '';   # new paragraph
+    my ($tag, $data) = split(':', $c, 2);
+    next unless defined $data;
+    push @seq, $tag;
+    $tag = uc($tag);
+    while (@control && $control[0] =~ /^\s/) {
+      $data .= "\n".substr(shift @control, 1);
+    }
+    $data =~ s/^\s+//s;
+    $data =~ s/\s+$//s;
+    $tag{$tag} = $data;
+  }
+  $tag{'__seq'} = \@seq;
+  return \%tag;
+}
+
+sub writedsc {
+  my ($fn, $tags) = @_;
+  open(F, '>', $fn) || die("$fn: $!\n");
+  my @seq = @{$tags->{'__seq'} || []};
+  my %seq = map {uc($_) => 1} @seq;
+  for (sort keys %$tags) {
+    push @seq, ucfirst(lc($_)) unless $seq{$_};
+  }
+  for my $seq (@seq) {
+    my $ucseq = uc($seq);
+    my $d = $tags->{$ucseq};
+    next unless defined $d;
+    $d =~ s/\n/\n /sg;
+    print F "$seq: $d\n";
+  }
+  print F "\n";
+  close F;
+}
+
+sub listtar {
+  my ($tar) = @_;
+  local *F;
+  my @c;
+  open(F, '-|', 'tar', '--numeric-owner', '-tvf', $tar) || die("tar: $!\n");
+  while(<F>) {
+    next unless /^([-dlbcp])(.........)\s+\d+\/\d+\s+(\S+) \d\d\d\d-\d\d-\d\d \d\d:\d\d(?::\d\d)? (.*)$/;
+    my ($type, $mode, $size, $name) = ($1, $2, $3, $4);
+    next if $type eq 'd';
+    die("debian tar contains link: $name\n") if $type eq 'l';
+    die("debian tar contains unexpected file type: $name\n") if $type ne '-';
+    $name =~ s/^\.\///;
+    $name =~ s/^debian\///;
+    push @c, {'name' => $name, 'size' => $size};
+  }
+  close(F) || die("tar: $!\n");
+  return @c;
+}
+
+sub dotar {
+  my ($tar, $tardir, @c) = @_;
+  local *F;
+  open(F, '-|', 'tar', '-xOf', $tar) || die("tar: $!\n");
+  for my $c (@c) {
+    my $s = $c->{'size'};
+    my $file = '';
+    while ($s > 0) {
+      my $l = sysread(F, $file, $s, length($file));
+      die("tar read error\n") unless $l;
+      $s -= $l;
+    }
+    my @file = split("\n", $file);
+    print DIFF "--- $tardir.orig/debian/$c->{'name'}\n";
+    print DIFF "+++ $tardir/debian/$c->{'name'}\n";
+    next unless @file;
+    print DIFF "\@\@ -0,0 +1,".scalar(@file)." \@\@\n";
+    print DIFF "+$_\n" for @file;
+  }
+  close(F);
+}
+
+sub dofile {
+  my ($file, $tardir, $dfile) = @_;
+  local *F;
+  if (!defined($dfile)) {
+    $dfile = $file;
+    $dfile =~ s/.*\///;
+    $dfile =~ s/\./\//;
+  }
+  open(F, '<', $file) || die("$file: $!\n");
+  my @file = <F>;
+  close F;
+  chomp(@file);
+  print DIFF "--- $tardir.orig/$dfile\n";
+  print DIFF "+++ $tardir/$dfile\n";
+  return unless @file;
+  print DIFF "\@\@ -0,0 +1,".scalar(@file)." \@\@\n";
+  print DIFF "+$_\n" for @file;
+}
+
+sub doseries {
+  my ($series, $tardir) = @_;
+  my $dir = $series;
+  $dir =~ s/[^\/]+$//;
+  $dir =~ s/\/+$//;
+  $dir = '.' if $dir eq '';
+  local *F;
+  open(F, '<', $series) || die("$series: $!\n");
+  my @series = <F>;
+  close F;
+  chomp(@series);
+  for my $patch (@series) {
+    $patch =~ s/(^|\s+)#.*//;
+    next if $patch =~ /^\s*$/;
+    my $level = 1;
+    $level = $1 if $patch =~ /\s.*-p\s*(\d+)/;
+    $patch =~ s/\s.*//;
+    open(F, '<', "$dir/$patch") || die("$dir/$patch: $!\n");
+    while(<F>) {
+      chomp;
+      if ((/^--- ./ || /^\+\+\+ ./) && !/^... \/dev\/null/) {
+        my $start = substr($_, 0, 4);
+        $_ = substr($_, 4);
+        my $l = $level;
+        while ($l > 0) {
+	  last unless s/.*?\///;
+	  $l--;
+	}
+        if ($start eq '--- ') {
+          print DIFF "$start$tardir.orig/$_\n";
+	} else {
+          print DIFF "$start$tardir/$_\n";
+	}
+	next;
+      }
+      print DIFF "$_\n";
+    }
+    close F;
+  }
+}
+
+sub addfile {
+  my ($file) = @_;
+  my $base = $file;
+  $base =~ s/.*\///;
+  local *F;
+  open(F, '<', $file) || die("$file: $!\n");
+  my $size = -s F;
+  my $ctx = Digest::MD5->new;
+  $ctx->addfile(*F);
+  close F;
+  my $md5 = $ctx->hexdigest();
+  return "$md5 $size $base";
+}
+
+my $changelog;
+
+if (@ARGV > 1 && $ARGV[0] eq '--changelog') {
+  shift @ARGV;
+  $changelog = shift @ARGV;
+}
+die("usage: debtransform [--changelog <changelog>] <srcdir> <dscfile> <outdir>\n") unless @ARGV == 3;
+
+my $dir = $ARGV[0];
+my $dsc = $ARGV[1];
+my $out = $ARGV[2];
+
+die("$out: $!\n") unless -d $out;
+
+opendir(D, $dir) || die("$dir: $!\n");
+my @dir = grep {$_ ne '.' && $_ ne '..'} readdir(D);
+closedir(D);
+my %dir = map {$_ => 1} @dir;
+
+my @tars = grep {/\.tar(?:\.gz|\.bz2)?$/} @dir;
+my @debtars = grep {/^debian\.tar(?:\.gz|\.bz2)?$/} @tars;
+@tars = grep {!/^debian\.tar(?:\.gz|\.bz2)?$/} @tars;
+die("package contains no tar file\n") unless @tars;
+die("package contains more than one tar file: @tars\n") if @tars > 1;
+die("package contains more than one debian tar file\n") if @debtars > 1;
+my $tarfile = $tars[0];
+my $debtarfile = $debtars[0];
+
+my $tags = parsedsc($dsc);
+my $name = $tags->{'SOURCE'};
+die("dsc file contains no source\n") unless defined($name);
+my $version = $tags->{'VERSION'};
+die("dsc file contains no version\n") unless defined($version);
+
+my $tardir = $tarfile;
+$tardir =~ s/\.orig\.tar/\.tar/;
+$tardir =~ s/\.tar.*?$//;
+
+my @files;
+my $v = $version;
+$v =~ s/-[^-]*$//;
+$tarfile =~ /.*(\.tar.*?)$/;
+my $ntarfile = "${name}_$v.orig$1";
+link("$dir/$tarfile", "$out/$ntarfile") || die("link $dir/$tarfile $out/$ntarfile: $!\n");
+push @files, addfile("$out/$ntarfile");
+
+open(DIFF, '>', "$out/${name}_$version.diff") || die("$out/${name}_$version.diff: $!\n");
+
+undef $changelog if $dir{'debian.changelog'};
+
+if ($debtarfile) {
+  my @c = listtar($debtarfile);
+  for (@c) {
+    die("debian tar and directory both contain '$_->{'name'}'\n") if $dir{"debian.$_->{'name'}"};
+    undef $changelog if $_->{'name'} eq 'changelog';
+  }
+  dofile($changelog, $tardir, "debian/changelog") if defined $changelog;
+  undef $changelog;
+  dotar($debtarfile, $tardir, @c);
+}
+
+dofile($changelog, $tardir, "debian/changelog") if defined $changelog;
+
+for my $file (grep {/^debian\./} @dir) {
+  next if $file =~ /^debian\.tar/;
+  next if $file eq 'debian.series';
+  dofile("$dir/$file", $tardir);
+}
+
+if ($dir{"debian.series"}) {
+  doseries("$dir/debian.series", $tardir);
+} elsif ($dir{"patches.series"}) {
+  doseries("$dir/patches.series", $tardir);
+}
+
+close(DIFF);
+
+if (! -s "$out/${name}_$version.diff") {
+  unlink("$out/${name}_$version.diff");
+} else {
+  system('gzip', '-9', "$out/${name}_$version.diff");
+  if (-f "$out/${name}_$version.diff.gz") {
+    push @files, addfile("$out/${name}_$version.diff.gz");
+  } else {
+    push @files, addfile("$out/${name}_$version.diff");
+  }
+}
+
+$tags->{'FILES'} = "\n".join("\n", @files);
+writedsc("$out/${name}_$version.dsc", $tags);

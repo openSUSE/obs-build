@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 #
-# Convert a SUSE changelog file to rpm format
+# Convert a SUSE or Debian changelog file to rpm format
 #
 
 use Date::Parse;
@@ -12,39 +12,212 @@ use strict;
 my @wday = qw{Sun Mon Tue Wed Thu Fri Sat};
 my @mon = qw{Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec};
 
-if (@ARGV == 2 && $ARGV[0] eq '--spec') {
-  die("bad --spec arg\n") unless $ARGV[1] =~ /^(.*)\/([^\/]+)\.spec$/;
-  my ($dir, $spec) = ($1, $2);
+
+my $ok;
+my $zone;
+my $test;
+my $printtype;
+my $input = '';
+my $target = 'rpm';
+
+while (@ARGV) {
+  if ($ARGV[0] eq '--test') {
+    $test = 1;
+    shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--type') {
+    $printtype = 1;
+    shift @ARGV;
+    next;
+  }
+  if (@ARGV > 1 && $ARGV[0] eq '--target') {
+    shift @ARGV;
+    $target = shift @ARGV;
+    next;
+  }
+  last;
+}
+
+if (@ARGV == 2 && $ARGV[0] eq '--file') {
+  die("bad --file arg\n") unless $ARGV[1] =~ /^(.*)\/([^\/]+)$/;
+  my ($dir, $file) = ($1, $2);
+  $file =~ s/\.(?:spec|dsc)$//;
   opendir(D, $dir) || die("$dir: $!\n");
   my @changes = grep {/\.changes$/} readdir(D);
   closedir(D);
   @changes = sort {length($a) <=> length($b) || $a cmp $b} @changes;
-  exit(1) unless @changes;
+  exit(1) unless @changes;	# nothing to do
   if (@changes > 1) {
-    while ($spec ne '') {
-      my @c = grep {/\Q$spec\E/} @changes;
+    while ($file ne '') {
+      my @c = grep {/\Q$file\E/} @changes;
       if (@c) {
 	@changes = @c;
 	last;
       }
-      last unless $spec =~ s/[-.][^-.]*$//;
+      last unless $file =~ s/[-.][^-.]*$//;
     }
   }
   @ARGV = ("$dir/$changes[0]");
 }
 
-my $ok;
-my $zone;
-my $test;
-if ($ARGV[0] eq '--test') {
-  $test = 1;
-  shift @ARGV;
+sub parse_suse {
+  $_ = $_[0];
+
+  my $dline;
+  die("bad changelog heading\n") unless /^(?:\* )?([A-Za-z]+\s+[A-Za-z]+\s+[0-9].*[0-9][0-9][0-9][0-9])(.*\@.*$)/;
+  my $dt = $1;
+  my $who = $2;
+  $dt = lc($dt);
+  $who =~ s/^\s+//;
+  $who =~ s/^-\s*//;
+  $dt =~ /([0-9][0-9][0-9][0-9])/;
+  $dline = $_;
+  my $year = $1;
+  if (!defined($zone) && $dt =~ /\s([a-z]{3,4})(dst)?\s[0-9]{4}/) {
+    my $dst = $2;
+    $zone = tz_offset($1);
+    $zone += 3600 if defined($zone) && $dst;
+  }
+  my $tdt = str2time($dt);
+  $dt =~ /([0-9]+)/;
+  my $day = $1;
+  if (!$tdt) {
+    if ($dt =~ /([a-z]{3})\s+([a-z]{3})/) {
+      $tdt = str2time("$1 $2 $day $year");
+    }
+  }
+  if (!$tdt) {
+    if ($dt =~ /([a-z]{3})/) {
+      $tdt = str2time("$1 $day $year");
+    }
+  }
+  if (!$tdt) {
+    $tdt = str2time("$year-1-1");
+  }
+  $tdt += 12 * 3600 unless $dt =~ /\d:\d/;	# 12:00 if not specified
+  $tdt += ($zone || 0);
+  my $ok = 1;
+  my $change = '';
+  while(<>) {
+    chomp;
+    last if /^(?:\* )?([A-Za-z]+\s+[A-Za-z]+\s+[0-9].*[0-9][0-9][0-9][0-9])(.*\@.*$)/;
+    next if (/^--------------/);
+    next if (/^========================/);
+    s/\s+$//;
+    next if $_ eq '';
+    s/^\s*-/-/ if $ok == 1;	# obsolete?
+    s/^\s*\*\s*/  * /;
+    if (!/^-/) {
+      s/^\s+-\s*/  - /;
+      s/^\s*/  / unless s/^    \s*/    /;
+    }
+    $change .= "$_\n";
+    $ok = 2;
+  }
+  return ($_, $tdt, $dline, $who, $change);
 }
-my $lastt;
+
+sub parse_debian {
+  $_ = $_[0];
+  
+  die("bad line: $_\n") unless /^(\w[-+0-9a-z.]*) \(([^\(\) \t]+)\)((\s+[-+0-9a-z.]+)+)\;.*$/;
+  my $package = $1;
+  my $version = $2;
+  my $distribution = $3;
+  my $who;
+  my $date;
+  my $changes = "- version $version\n";
+  while(<>) {
+    chomp;
+    s/\s+$//;
+    next if $_ eq '';
+    if (/^ --/) {
+      die("bad maintainer line\n") unless /^ \-\- (.* <.*>)  (.*)$/;
+      $who = $1;
+      $date = $2;
+      last;
+    }
+    die("bad change details line: $_\n") unless s/^  //;
+    s/^\*/-/;
+    s/\s*\(closes:\s*(?:bug)?\#?\s?\d+(?:,\s*(?:bug)?\#?\s?\d+)*\)//i;
+    s/\s+$//;
+    next if $_ eq '';
+    $changes .= "$_\n";
+  }
+  die("no maintainer line in last entry\n") unless defined $date;
+  if (!defined($zone) && ($date =~ /([-+])(\d\d)(\d\d)$/)) {
+    $zone = 60 * ($3 + 60 * $2);
+    $zone = -$zone if $1 eq '-';
+  }
+  my $tdt = str2time($date);
+  return ('', $tdt, $_, $who, $changes);
+}
+
+my $format;
 while (<>) {
   chomp;
+  next if /^\s*$/;
   next if (/^--------------/);
   next if (/^========================/);
+  if (/^(?:\* )?([A-Za-z]+\s+[A-Za-z]+\s+[0-9].*[0-9][0-9][0-9][0-9])(.*\@.*$)/) {
+    $format = 'suse';
+    
+  } elsif (/^(\w[-+0-9a-z.]*) \(([^\(\) \t]+)\)((\s+[-+0-9a-z.]+)+)\;.*$/) {
+    $format = 'debian';
+  } else {
+    die("unknown changelog format\n");
+  }
+  last;
+}
+exit(0) unless $format;
+
+if ($printtype) {
+  print "$format\n";
+  exit(0);
+}
+
+if ($target eq $format) {
+  print "$_\n";
+  while (<>) {
+    print $_;
+  }
+  exit(0);
+}
+
+die("don't know how to convert changelog to format '$target'\n") if $target ne 'rpm';
+
+my ($lastt, $t, $dline, $who, $changes);
+while(defined($_)) {
+  if (/^\s*$/) {
+    $_ = <>;
+    last unless $_;
+    chomp;
+    next;
+  }
+  if ($format eq 'suse') {
+    ($_, $t, $dline, $who, $changes) = parse_suse($_);
+  } elsif ($format eq 'debian') {
+    ($_, $t, $dline, $who, $changes) = parse_debian($_);
+  }
+  if (defined($lastt) && $lastt < $t) {
+    die("changes file not incremental: $dline\n") if $test;
+    warn("changes file not incremental: $dline\n");
+  }
+  $lastt = $t;
+  my @gm = gmtime($t);
+  @gm = (0, 0, 0, 2, 0, 97, 4) if $gm[5] < 97 || ($gm[5] == 97 && $gm[3] <= 1);
+  printf("* %s %s %2d %4d %s\n", $wday[$gm[6]], $mon[$gm[4]], $gm[3], $gm[5] + 1900, $who);
+  $changes =~ s/%/%%/g;
+  $changes =~ s/^(\s*)(\#\d*)/$1\[$2\]/mg;
+  $changes =~ s/^\*/  */mg;
+  print $changes;
+}
+exit(0);
+
+
+while (<>) {
+  chomp;
   if (/^(?:\* )?([A-Za-z]+\s+[A-Za-z]+\s+[0-9].*[0-9][0-9][0-9][0-9])(.*\@.*$)/) {
     my $dt = $1;
     my $who = $2;
@@ -90,6 +263,8 @@ while (<>) {
     next;
   }
   next unless $ok;
+  next if (/^--------------/);
+  next if (/^========================/);
   s/\s+$//;
   next if $_ eq '';
   s/%/%%/g;

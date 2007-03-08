@@ -671,7 +671,7 @@ if test -e $BUILD_ROOT/usr/share/zoneinfo/UTC ; then
     chroot $BUILD_ROOT zic -l UTC
 fi
 
-HOST=`hostname`
+test -e $BUILD_ROOT/.build/init_buildsystem.data || HOST=`hostname`
 test -e $BUILD_ROOT/etc/hosts || echo "127.0.0.1 localhost" > $BUILD_ROOT/etc/hosts
 if ! grep -F "127.0.0.1 $HOST" $BUILD_ROOT/etc/hosts > /dev/null ; then
     # this makes a reverse lookup on 127.0.0.1 return the host name,

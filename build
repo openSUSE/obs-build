@@ -214,6 +214,7 @@ if test "$0" = "/.build/build" ; then
     fi
     set "/.build-srcdir/$SPECFILE"
     HOST="$MYHOSTNAME"
+    export HOST
 fi
 
 while test -n "$1"; do
@@ -534,10 +535,15 @@ for SPECFILE in $SPECFILES ; do
         DO_INIT=true
     fi
 
-    if test -n "$CHANGELOG" ; then
+    if test -n "$CHANGELOG" -a -z "$RUNNING_IN_XEN" ; then
 	rm -f $BUILD_ROOT/.build-changelog
-	if test "$SPECFILE" = "${SPECFILE%.dsc}" ; then
-	    $BUILD_DIR/changelog2spec --spec "$MYSRCDIR/$SPECFILE" > $BUILD_ROOT/.build-changelog || rm -f $BUILD_ROOT/.build-changelog
+	case $SPECFILE in
+	  *.dsc) CFFORMAT=debian ;;
+	  *) CFFORMAT=rpm ;;
+	esac
+	echo "running changelog2spec --target $CFFORMAT --file $MYSRCDIR/$SPECFILE"
+	if ! $BUILD_DIR/changelog2spec --target $CFFORMAT --file "$MYSRCDIR/$SPECFILE" > $BUILD_ROOT/.build-changelog ; then
+	    rm -f $BUILD_ROOT/.build-changelog
 	fi
     fi
 
@@ -569,6 +575,7 @@ for SPECFILE in $SPECFILES ; do
 	echo "NOROOTFORBUILD='${NOROOTFORBUILD//\'/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "CREATE_BASELIBS='$CREATE_BASELIBS'" >> $BUILD_ROOT/.build/build.data
 	echo "REASON='${REASON//\'/$Q}'" >> $BUILD_ROOT/.build/build.data
+	echo "CHANGELOG='${CHANGELOG//\'/$Q}'" >> $BUILD_ROOT/.build/build.data
 	test -n "$XENSWAP" && echo "XENSWAP='/dev/hda2'" >> $BUILD_ROOT/.build/build.data
 	PERSONALITY_SYSCALL=
 	PERSONALITY=0
@@ -654,7 +661,9 @@ for SPECFILE in $SPECFILES ; do
             mkdir -p $BUILD_ROOT/home/abuild
             chown 99:99 $BUILD_ROOT/home/abuild
         fi
-	sed -e "s@^root::@root:*:@" < $BUILD_ROOT/etc/shadow > $BUILD_ROOT/etc/shadow.t && mv $BUILD_ROOT/etc/shadow.t $BUILD_ROOT/etc/shadow
+	if test -f $BUILD_ROOT/etc/shadow ; then
+	    sed -e "s@^root::@root:*:@" < $BUILD_ROOT/etc/shadow > $BUILD_ROOT/etc/shadow.t && mv $BUILD_ROOT/etc/shadow.t $BUILD_ROOT/etc/shadow
+	fi
     else
         if egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
             egrep -v '^abuild:' <$BUILD_ROOT/etc/passwd >$BUILD_ROOT/etc/passwd.new
@@ -681,10 +690,11 @@ for SPECFILE in $SPECFILES ; do
     cp -p $MYSRCDIR/* $BUILD_ROOT$TOPDIR/SOURCES/
     test $MYSRCDIR = $BUILD_ROOT/.build-srcdir && rm -rf $MYSRCDIR
 
+    CHANGELOGARGS=
+    test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" && CHANGELOGARGS="--changelog $BUILD_ROOT/.build-changelog"
+
     if test "$SPECFILE" = "${SPECFILE%.dsc}" ; then
 	# do buildrequires/release substitution
-	CHANGELOGARGS=
-	test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" && CHANGELOGARGS="--changelog $BUILD_ROOT/.build-changelog"
 	substitutedeps $RELEASE --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$BUILD_DIR/configs" $CHANGELOGARGS "$BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE" "$BUILD_ROOT/.spec.new" || cleanup_and_exit 1
 	# extract macros from configuration
 	getmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$BUILD_DIR/configs" > $BUILD_ROOT/root/.rpmmacros
@@ -707,7 +717,18 @@ for SPECFILE in $SPECFILES ; do
     if test "$SPECFILE" != "${SPECFILE%.dsc}" ; then
 	rm -rf $BUILD_ROOT$TOPDIR/BUILD
 	test $BUILD_USER = abuild && chown 99:99 $BUILD_ROOT$TOPDIR
-	chroot $BUILD_ROOT su -c "dpkg-source -x $TOPDIR/SOURCES/$SPECFILE $TOPDIR/BUILD" - $BUILD_USER
+	DEB_TRANSFORM=
+	for f in $TOPDIR/SOURCES/debian.* ; do
+	    test -f $f && DEB_TRANSFORM=true
+	done
+	if test -n $DEB_TRANSFORM ; then
+	    mkdir -p $TOPDIR/SOURCES.DEB
+            debtransform $CHANGELOGARGS $TOPDIR/SOURCES $TOPDIR/SOURCES/$SPECFILE $TOPDIR/SOURCES.DEB
+	    chroot $BUILD_ROOT su -c "dpkg-source -x $TOPDIR/SOURCES.DEB/*.dsc $TOPDIR/BUILD" - $BUILD_USER
+	    rm -rf $TOPDIR/SOURCES.DEB
+        else
+	    chroot $BUILD_ROOT su -c "dpkg-source -x $TOPDIR/SOURCES/$SPECFILE $TOPDIR/BUILD" - $BUILD_USER
+        fi
     fi
     if test $BUILD_USER = abuild ; then
         chown -R 99:99 $BUILD_ROOT$TOPDIR/*

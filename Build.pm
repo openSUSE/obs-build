@@ -9,6 +9,7 @@ use Digest::MD5;
 use Build::Rpm;
 use Build::Deb;
 
+
 my $std_macros = q{
 %define ix86 i386 i486 i586 i686 athlon
 %define arm armv4l armv4b armv5l armv5b armv5tel armv5teb
@@ -73,6 +74,7 @@ sub read_config {
   my @spec;
   Build::Rpm::parse($config, \@newconfig, \@spec);
   $config->{'preinstall'} = [];
+  $config->{'vminstall'} = [];
   $config->{'runscripts'} = [];
   $config->{'required'} = [];
   $config->{'support'} = [];
@@ -96,7 +98,7 @@ sub read_config {
       $config->{'rawmacros'} .= $l;
       next;
     }
-    if ($l0 eq 'preinstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:') {
+    if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:') {
       push @{$config->{substr($l0, 0, -1)}}, @l;
     } elsif ($l0 eq 'substitute:') {
       next unless @l;
@@ -112,7 +114,7 @@ sub read_config {
       warn("unknown keyword in config: $l0\n");
     }
   }
-  for my $l (qw{preinstall required support keep runscripts repotype}) {
+  for my $l (qw{preinstall vminstall required support keep runscripts repotype}) {
     $config->{$l} = [ unify(@{$config->{$l}}) ];
   }
   for my $l (keys %{$config->{'substitute'}}) {
@@ -220,6 +222,11 @@ sub get_deps {
 sub get_preinstalls {
   my ($config) = @_;
   return @{$config->{'preinstall'}};
+}
+
+sub get_vminstalls {
+  my ($config) = @_;
+  return @{$config->{'vminstall'}};
 }
 
 sub get_runscripts {
