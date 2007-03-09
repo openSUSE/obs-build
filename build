@@ -718,14 +718,14 @@ for SPECFILE in $SPECFILES ; do
 	rm -rf $BUILD_ROOT$TOPDIR/BUILD
 	test $BUILD_USER = abuild && chown 99:99 $BUILD_ROOT$TOPDIR
 	DEB_TRANSFORM=
-	for f in $TOPDIR/SOURCES/debian.* ; do
+	for f in $BUILD_ROOT$TOPDIR/SOURCES/debian.* ; do
 	    test -f $f && DEB_TRANSFORM=true
 	done
 	if test -n $DEB_TRANSFORM ; then
-	    mkdir -p $TOPDIR/SOURCES.DEB
-            debtransform $CHANGELOGARGS $TOPDIR/SOURCES $TOPDIR/SOURCES/$SPECFILE $TOPDIR/SOURCES.DEB
+	    mkdir -p $BUILD_ROOT$TOPDIR/SOURCES.DEB
+            debtransform $CHANGELOGARGS $BUILD_ROOT$TOPDIR/SOURCES $BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE $BUILD_ROOT$TOPDIR/SOURCES.DEB
 	    chroot $BUILD_ROOT su -c "dpkg-source -x $TOPDIR/SOURCES.DEB/*.dsc $TOPDIR/BUILD" - $BUILD_USER
-	    rm -rf $TOPDIR/SOURCES.DEB
+	    rm -rf $BUILD_ROOT$TOPDIR/SOURCES.DEB
         else
 	    chroot $BUILD_ROOT su -c "dpkg-source -x $TOPDIR/SOURCES/$SPECFILE $TOPDIR/BUILD" - $BUILD_USER
         fi
