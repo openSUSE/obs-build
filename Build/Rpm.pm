@@ -576,7 +576,7 @@ sub rpmq {
   return %res;
 }
 
-sub rpmq_add_flagsvers {
+sub add_flagsvers {
   my $res = shift;
   my $name = shift;
   my $flags = shift;
@@ -629,7 +629,7 @@ sub verscmp_part {
       return -1 if $x1 eq '' || $x2 eq '';
       $r = $x1 cmp $x2;
     }
-    return $r if $r;
+    return $r > 0 ? 1 : -1 if $r;
     if ($s1 eq '') {
       return $s2 eq '' ? 0 : -1;
     }
@@ -638,23 +638,25 @@ sub verscmp_part {
 }
 
 sub verscmp {
-  my ($s1, $s2) = @_;
+  my ($s1, $s2, $dtest) = @_;
 
   return 0 if $s1 eq $s2;
   my ($e1, $v1, $r1) = $s1 =~ /^(?:(\d+):)?(.*?)(?:-([^-]*))?$/s;
   $e1 = 0 unless defined $e1;
-  $r1 = '' unless defined $r1;
   my ($e2, $v2, $r2) = $s2 =~ /^(?:(\d+):)?(.*?)(?:-([^-]*))?$/s;
   $e2 = 0 unless defined $e2;
-  $r2 = '' unless defined $r2;
   if ($e1 ne $e2) {
     my $r = verscmp_part($e1, $e2);
     return $r if $r;
   }
+  return 0 if $dtest && ($v1 eq '' || $v2 eq '');
   if ($v1 ne $v2) {
     my $r = verscmp_part($v1, $v2);
     return $r if $r;
   }
+  $r1 = '' unless defined $r1;
+  $r2 = '' unless defined $r2;
+  return 0 if $dtest && ($r1 eq '' || $r2 eq '');
   if ($r1 ne $r2) {
     return verscmp_part($r1, $r2);
   }
@@ -669,6 +671,8 @@ sub query {
   my $src = $res{'SOURCERPM'}->[0];
   $src = '' unless defined $src;
   $src =~ s/-[^-]*-[^-]*\.[^\.]*\.rpm//;
+  add_flagsvers(\%res, 'PROVIDENAME', 'PROVIDEFLAGS', 'PROVIDEVERSION');
+  add_flagsvers(\%res, 'REQUIRENAME', 'REQUIREFLAGS', 'REQUIREVERSION');
   my $data = {
     name => $res{'NAME'}->[0],
     hdrmd5 => unpack('H32', $res{'SIGTAG_MD5'}->[0]),

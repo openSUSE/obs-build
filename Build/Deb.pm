@@ -185,14 +185,16 @@ sub query {
   my $src = $name;
   $src = $res{'SOURCE'} if $res{'SOURCE'};
   my @provides = split(',\s*', $res{'PROVIDES'} || '');
-  s/\s.*// for @provides;	#for now
-  push @provides, $name unless grep {$_ eq $name} @provides;
+  push @provides, "$name = $res{'VERSION'}" unless grep {/^\Q$name\E(?: |$)/} @provides;
   my @depends = split(',\s*', $res{'DEPENDS'} || '');
   my @predepends = split(',\s*', $res{'PRE-DEPENDS'} || '');
   push @depends, @predepends;
-  s/\s.*// for @provides;	#for now
-  s/\|\s*/\|/g for @depends;	#for now
-  s/\s[^\|]*//g for @depends;	#for now
+  s/ \(([^\)]*)\)/ $1/g for @provides;
+  s/ \(([^\)]*)\)/ $1/g for @depends;
+  s/>>/>/g for @provides;
+  s/<</</g for @provides;
+  s/>>/>/g for @depends;
+  s/<</</g for @depends;
   my $data = {
     name => $name,
     hdrmd5 => $res{'CONTROL_MD5'},

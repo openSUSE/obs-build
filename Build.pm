@@ -239,14 +239,14 @@ sub get_runscripts {
 sub readdeps {
   my ($config, $pkgidp, @depfiles) = @_;
 
-  my %provides = ();
+  my %rprovides = ();
   my %requires = ();
   local *F;
-  my %prov;
+  my %provides;
   for my $depfile (@depfiles) {
     if (ref($depfile) eq 'HASH') {
       for my $rr (keys %$depfile) {
-	$prov{$rr} = $depfile->{$rr}->{'provides'};
+	$provides{$rr} = $depfile->{$rr}->{'provides'};
 	$requires{$rr} = $depfile->{$rr}->{'requires'};
       }
       next;
@@ -269,6 +269,7 @@ sub readdeps {
 	}
 	push @ss, shift @s;
 	if (@s && $s[0] =~ /^[<=>]/) {
+	  $ss[-1] .= " $s[0] $s[1]";
 	  shift @s;
 	  shift @s;
 	}
@@ -278,7 +279,7 @@ sub readdeps {
       if ($s =~ s/^P:(.*):$/$1/) {
 	my $pkgid = $s;
 	$s =~ s/-[^-]+-[^-]+-[^-]+$//;
-	$prov{$s} = \@ss; 
+	$provides{$s} = \@ss; 
 	$pkgidp->{$s} = $pkgid if $pkgidp;
       } elsif ($s =~ s/^R:(.*):$/$1/) {
 	my $pkgid = $s;
@@ -289,24 +290,76 @@ sub readdeps {
     }
     close F;
   }
-  for my $p (keys %prov) {
-    push @{$provides{$_}}, $p for unify(@{$prov{$p}});
-  }
-  my @ors = grep {/\|/} map {@$_} values %requires;
-  @ors = unify(@ors) if @ors > 1;
-  for my $or (@ors) {
-    my @p = map {@{$provides{$_} || []}} split(/\|/, $or);
-    @p = unify(@p) if @p > 1;
-    $provides{$or} = \@p;
+  for my $p (keys %provides) {
+    my @pp = @{$provides{$p}};
+    s/[ <=>].*// for @pp;
+    push @{$rprovides{$_}}, $p for unify(@pp);
   }
   $config->{'providesh'} = \%provides;
+  $config->{'rprovidesh'} = \%rprovides;
   $config->{'requiresh'} = \%requires;
 }
 
 sub forgetdeps {
   my $config;
   delete $config->{'providesh'};
+  delete $config->{'rprovidesh'};
   delete $config->{'requiresh'};
+}
+
+my %addproviders_fm = (
+  '>'  => 1,
+  '='  => 2,
+  '>=' => 3,
+  '<'  => 4,
+  '<=' => 6,
+);
+
+sub addproviders {
+  my ($config, $r) = @_;
+
+  my @p;
+  my $rprovides = $config->{'rprovidesh'};
+  $rprovides->{$r} = \@p;
+  if ($r =~ /\|/) {
+    for my $or (split(/\s*\|\s*/, $r)) {
+      push @p, @{$rprovides->{$or} || addproviders($config, $or)};
+    }
+    @p = unify(@p) if @p > 1;
+    return \@p;
+  }
+  return \@p if $r !~ /^(.*?)\s*([<=>]{1,2})\s*(.*?)$/;
+  my $rn = $1;
+  my $rv = $3;
+  my $rf = $addproviders_fm{$2};
+  return \@p unless $rf;
+  my $provides = $config->{'providesh'};
+  my @rp = @{$rprovides->{$rn} || []};
+  for my $rp (@rp) {
+    for my $pp (@{$provides->{$rp} || []}) {
+      if ($pp eq $rn) {
+	push @p, $rp;
+	last;
+      }
+      next unless $pp =~ /^\Q$rn\E\s*([<=>]{1,2})\s*(.*?)$/;
+      my $pv = $2;
+      my $pf = $addproviders_fm{$1};
+      next unless $pf;
+      if ($pf & $rf & 5) {
+	push @p, $rp;
+	last;
+      }
+      my $rr = $rf == 2 ? $pf : ($rf ^ 5);
+      $rr &= 5 unless $pf & 2;
+      my $vv = Build::Rpm::verscmp($pv, $rv, 1);
+      if ($rr & (1 << ($vv + 1))) {
+	push @p, $rp;
+	last;
+      }
+    }
+  }
+  @p = unify(@p) if @p > 1;
+  return \@p;
 }
 
 sub expand {
@@ -316,7 +369,7 @@ sub expand {
   my $prefer = $config->{'preferh'};
   my $ignore = $config->{'ignoreh'};
 
-  my $provides = $config->{'providesh'};
+  my $rprovides = $config->{'rprovidesh'};
   my $requires = $config->{'requiresh'};
 
   my %xignore = map {substr($_, 1) => 1} grep {/^-/} @p;
@@ -337,9 +390,10 @@ sub expand {
     my @rerror = ();
     for my $p (splice @p) {
       for my $r (@{$requires->{$p} || [$p]}) {
-	next if $ignore->{"$p:$r"} || $xignore{"$p:$r"};
-	next if $ignore->{$r} || $xignore{$r};
-	my @q = @{$provides->{$r} || []};
+        my $ri = (split(/[ <=>]/, $r, 2))[0];
+	next if $ignore->{"$p:$ri"} || $xignore{"$p:$ri"};
+	next if $ignore->{$ri} || $xignore{$ri};
+	my @q = @{$rprovides->{$r} || addproviders($config, $r)};
 	next if grep {$p{$_}} @q;
 	next if grep {$xignore{$_}} @q;
 	next if grep {$ignore->{"$p:$_"} || $xignore{"$p:$_"}} @q;
@@ -371,9 +425,9 @@ sub expand {
 	if (@q > 1 && $r =~ /\|/) {
 	    # choice op, implicit prefer of first match...
 	    my %pq = map {$_ => 1} @q;
-	    for my $rr (split(/\|/, $r)) {
-		next unless $provides->{$rr};
-		my @pq = grep {$pq{$_}} @{$provides->{$rr}};
+	    for my $rr (split(/\s*\|\s*/, $r)) {
+		next unless $rprovides->{$rr};
+		my @pq = grep {$pq{$_}} @{$rprovides->{$rr}};
 		next unless @pq;
 		@q = @pq;
 		last;
@@ -414,12 +468,13 @@ sub expand {
 
 sub add_all_providers {
   my ($config, @p) = @_;
-  my $provides = $config->{'providesh'};
+  my $rprovides = $config->{'rprovidesh'};
   my $requires = $config->{'requiresh'};
   my %a;
   for my $p (@p) {
     for my $r (@{$requires->{$p} || [$p]}) {
-      $a{$_} = 1 for @{$provides->{$r} || []};
+      my $rn = (split(' ', $r, 2))[0];
+      $a{$_} = 1 for @{$rprovides->{$rn} || []};
     }
   }
   push @p, keys %a;
