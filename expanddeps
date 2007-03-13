@@ -142,6 +142,7 @@ if ($useusedforbuild) {
     print "$_ $fn{$packs{$_}}\n";
   }
   print "preinstall: @{$cf->{'preinstall'} || []}\n";
+  print "vminstall: @{$cf->{'vminstall'} || []}\n";
   print "runscripts: @{$cf->{'runscripts'} || []}\n";
   print "dist: $dist\n" if defined $dist;
   exit(0);

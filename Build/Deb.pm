@@ -14,6 +14,20 @@ sub parse {
   my ($bconf, $fn) = @_;
   my $ret;
   my @control;
+
+  # get arch and os from macros
+  my ($arch, $os);
+  for (@{$bconf->{'macros'} || []}) {
+    $arch = $1 if /^%define _target_cpu (\S+)/;
+    $os = $1 if /^%define _target_os (\S+)/;
+  }
+  # map to debian names
+  $os = 'linux' if !defined($os);
+  $arch = 'all' if !defined($arch) || $arch eq 'noarch';
+  $arch = 'i386' if $arch =~ /^i[456]86$/;
+  $arch = 'powerpc' if $arch eq 'ppc';
+  $arch = 'amd64' if $arch eq 'x86_64';
+
   if (ref($fn) eq 'ARRAY') {
     @control = @$fn;
   } else {
@@ -46,14 +60,36 @@ sub parse {
       $version =~ s/-[^-]+$//;
     } elsif ($tag eq 'SOURCE') {
       $name = $data;
-    } elsif ($tag eq 'BUILD-DEPENDS') {
+    } elsif ($tag eq 'BUILD-DEPENDS' || $tag eq 'BUILD-CONFLICTS' || $tag eq 'BUILD-IGNORE') {
       my @d = split(/,\s*/, $data);
-      s/\s.*// for @d;
-      push @deps, @d;
-    } elsif ($tag eq 'BUILD-CONFLICTS' || $tag eq 'BUILD-IGNORE') {
-      my @d = split(/,\s*/, $data);
-      s/\s.*// for @d;
-      push @deps, map {"-$_"} @d;
+      for my $d (@d) {
+        if ($d =~ /^(.*?)\s*\[(.*)\]$/) {
+	  $d = $1;
+	  my $isneg = 0;
+          my $bad;
+          for my $q (split('[\s,]', $2)) {
+            $isneg = 1 if $q =~ s/^\!//;
+            $bad = 1 if !defined($bad) && !$isneg;
+            if ($isneg) {
+              if ($q eq $arch || $q eq "$os-$arch") {
+		$bad = 1;
+		last;
+	      }
+	    } elsif ($q eq $arch || $q eq "$os-$arch") {
+	      $bad = 0;
+	    }
+	  }
+	  next if $bad;
+	}
+	$d =~ s/ \(([^\)]*)\)/ $1/g;
+	$d =~ s/>>/>/g;
+	$d =~ s/<</</g;
+	if ($tag eq 'BUILD-DEPENDS') {
+          push @deps, $d;
+	} else {
+          push @deps, "-$d";
+	}
+      }
     }
   }
   $ret->{'name'} = $name;

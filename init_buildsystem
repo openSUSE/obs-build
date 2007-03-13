@@ -301,6 +301,7 @@ else
 	while read PKG SRC ; do
 	   test "$PKG" = "preinstall:" && continue
 	   test "$PKG" = "runscripts:" && continue
+	   test "$PKG" = "vminstall:" && continue
 	   test "$PKG" = "dist:" && continue
 	   test "$PKG" = "rpmid:" && continue
 	   echo "${SRC##*/}"
@@ -312,12 +313,17 @@ else
     PACKAGES_TO_INSTALL=
     PACKAGES_TO_PREINSTALL=
     PACKAGES_TO_RUNSCRIPTS=
+    PACKAGES_TO_VMINSTALL=
     RUNSCRIPTS_SEEN=
     GUESSED_DIST=unknown
     mkdir -p $BUILD_ROOT/.init_b_cache/rpms
     while read PKG SRC ; do
 	if test "$PKG" = "preinstall:" ; then
 	    PACKAGES_TO_PREINSTALL=$SRC
+	    continue
+	fi
+	if test "$PKG" = "vminstall:" ; then
+	    PACKAGES_TO_VMINSTALL=$SRC
 	    continue
 	fi
 	if test "$PKG" = "runscripts:" ; then
@@ -343,7 +349,7 @@ else
     echo "$GUESSED_DIST" > $BUILD_ROOT/.guessed_dist
     PSUF=rpm
     test -L $BUILD_ROOT/.init_b_cache/rpms/rpm.rpm || PSUF=deb
-    if test -n "$PREPARE_XEN" ; then
+    if test -n "$PREPARE_XEN" -a -z "$PACKAGES_TO_VMINSTALL" ; then
 	# add util-linux/perl/binutils/mount to preinstall list
 	test "$PACKAGES_TO_PREINSTALL" = "${PACKAGES_TO_PREINSTALL/util-linux}" && PACKAGES_TO_PREINSTALL="$PACKAGES_TO_PREINSTALL util-linux"
 	test "$PACKAGES_TO_PREINSTALL" = "${PACKAGES_TO_PREINSTALL/perl}" && PACKAGES_TO_PREINSTALL="$PACKAGES_TO_PREINSTALL perl"
@@ -383,6 +389,11 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
     for PKG in $PACKAGES_TO_PREINSTALL ; do
 	preinstall ${PKG##*/}
     done
+    if test -n "$PREPARE_XEN" ; then
+	for PKG in $PACKAGES_TO_VMINSTALL ; do
+	    preinstall ${PKG##*/}
+	done
+    fi
     test -c $BUILD_ROOT/dev/null || create_devs
     test -e $BUILD_ROOT/etc/fstab || touch $BUILD_ROOT/etc/fstab
     test -e $BUILD_ROOT/etc/ld.so.conf || cp $BUILD_ROOT/etc/ld.so.conf.in $BUILD_ROOT/etc/ld.so.conf

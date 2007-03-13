@@ -374,13 +374,28 @@ sub expand {
 
   my %xignore = map {substr($_, 1) => 1} grep {/^-/} @p;
   @p = grep {!/^-/} @p;
- 
-  my %p = map {$_ => 1} grep {$requires->{$_}} @p;
 
-  my %aconflicts;
-  for my $p (keys %p) {
-    next unless exists $conflicts->{$p};
-    $aconflicts{$_} = 1 for @{$conflicts->{$p} || []};
+  my %p;		# expanded packages
+  my %aconflicts;	# packages we are conflicting with
+
+  # add direct dependency packages. this is different from below, 
+  # because we add packages even if to dep is already provided and
+  # we break ambiguities if the name is an exact match.
+  for my $p (splice @p) {
+    my @q = @{$rprovides->{$p} || addproviders($config, $p)};
+    if (@q > 1) {
+      my $pn = $p;
+      $pn =~ s/ .*//;
+      @q = grep {$_ eq $pn} @q;
+    }
+    if (@q != 1) {
+      push @p, $p;
+      next;
+    }
+    print "added $q[0] because of $p (direct dep)\n" if $expand_dbg;
+    push @p, $q[0];
+    $p{$q[0]} = 1;
+    $aconflicts{$_} = 1 for @{$conflicts->{$q[0]} || []};
   }
 
   my @pamb = ();

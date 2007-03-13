@@ -337,7 +337,8 @@ sub parse {
 	  }
 	  next if $bad;
 	}
-	push @ndeps, $pack;
+	$vers = '' unless defined $vers;
+	push @ndeps, "$pack$vers";
       }
 
       $replace = 1 if grep {/^-/} @ndeps;
