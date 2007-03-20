@@ -182,7 +182,7 @@ sub parse {
 	  $mactest = 1;
 	}
 	$macname =~ s/^[\!\?]+//;
-	$macname =~ s/ .*//;
+	$macname =~ s/^([^:\s]*)\s.*/$1/;
 	my $macalt;
 	($macname, $macalt) = split(':', $macname, 2);
 	if ($macname eq '%') {
@@ -191,7 +191,7 @@ sub parse {
 	} elsif ($macname eq '(') {
 	  $line = 'MACRO';
 	  last;
-	} elsif ($macname eq 'define') {
+	} elsif ($macname eq 'define' || $macname eq 'global') {
 	  if ($line =~ /^\s*([0-9a-zA-Z_]+)(\([^\)]*\))?\s*(.*?)$/) {
 	    my $macname = $1;
 	    my $macargs = $2;
