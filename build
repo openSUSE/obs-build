@@ -646,14 +646,17 @@ for SPECFILE in $SPECFILES ; do
 
     #
     # check if we want to build with the abuild user
+    # build as root per default, unless option --norootforbuild was given
+    # override with "needsrootforbuild" or "norootforbuild" in the spec file
     #
     BUILD_USER=root
+    test -n "$NOROOTFORBUILD" && BUILD_USER=abuild
     if test "$BUILD_USER" = abuild ; then
 	egrep '^#[       ]*needsrootforbuild[       ]*$' >/dev/null <$SPECFILE && BUILD_USER=root
     else
 	egrep '^#[       ]*norootforbuild[       ]*$' >/dev/null <$SPECFILE && BUILD_USER=abuild
     fi
-    test -n "$NOROOTFORBUILD" && BUILD_USER=abuild
+
     if test $BUILD_USER = abuild ; then
         if ! egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
             echo 'abuild::99:99:Autobuild:/home/abuild:/bin/bash' >>$BUILD_ROOT/etc/passwd
