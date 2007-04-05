@@ -1,13 +1,26 @@
 
 package Build;
 
-our $expand_dbg;
-
 use strict;
 use Digest::MD5;
-
 use Build::Rpm;
-use Build::Deb;
+
+our $expand_dbg;
+our $strip_versions;
+
+our $do_rpm;
+our $do_deb;
+
+sub import {
+  for (@_) {
+    $do_rpm = 1 if $_ eq ':rpm';
+    $do_deb = 1 if $_ eq ':deb';
+  }
+  $do_rpm = $do_deb = 1 if !$do_rpm && !$do_deb;
+  if ($do_deb) {
+    require Build::Deb;
+  }
+}
 
 
 my $std_macros = q{
@@ -269,7 +282,7 @@ sub readdeps {
 	}
 	push @ss, shift @s;
 	if (@s && $s[0] =~ /^[<=>]/) {
-	  $ss[-1] .= " $s[0] $s[1]";
+	  $ss[-1] .= " $s[0] $s[1]" unless $strip_versions;
 	  shift @s;
 	  shift @s;
 	}
@@ -500,8 +513,8 @@ sub add_all_providers {
 
 sub parse {
   my ($cf, $fn, @args) = @_;
-  return Build::Rpm::parse($cf, $fn, @args) if $fn =~ /\.spec$/;
-  return Build::Deb::parse($cf, $fn, @args) if $fn =~ /\.dsc$/;
+  return Build::Rpm::parse($cf, $fn, @args) if $do_rpm && $fn =~ /\.spec$/;
+  return Build::Deb::parse($cf, $fn, @args) if $do_deb && $fn =~ /\.dsc$/;
   return undef;
 }
 
@@ -512,15 +525,15 @@ sub query {
     $handle = $binname->[1];
     $binname = $binname->[0];
   }
-  return Build::Rpm::query($handle, $withevra) if $binname =~ /\.rpm$/;
-  return Build::Deb::query($handle, $withevra) if $binname =~ /\.deb$/;
+  return Build::Rpm::query($handle, $withevra) if $do_rpm && $binname =~ /\.rpm$/;
+  return Build::Deb::query($handle, $withevra) if $do_deb && $binname =~ /\.deb$/;
   return undef;
 }
 
 sub queryhdrmd5 {
   my ($binname) = @_;
-  return Build::Rpm::queryhdrmd5($binname) if $binname =~ /\.rpm$/;
-  return Build::Deb::queryhdrmd5($binname) if $binname =~ /\.deb$/;
+  return Build::Rpm::queryhdrmd5($binname) if $do_rpm && $binname =~ /\.rpm$/;
+  return Build::Deb::queryhdrmd5($binname) if $do_deb && $binname =~ /\.deb$/;
   return undef;
 }
 

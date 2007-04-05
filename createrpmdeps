@@ -155,8 +155,8 @@ while ($redo) {
       if ($path =~ /\.rpm$/) {
         my %res = Build::Rpm::rpmq($path, 1000, 1022, 1047, 1049, 1048, 1050, 1112, 1113);
         next unless %res;
-        Build::Rpm::rpmq_add_flagsvers(\%res, 1047, 1112, 1113);
-        Build::Rpm::rpmq_add_flagsvers(\%res, 1049, 1048, 1050);
+        Build::Rpm::add_flagsvers(\%res, 1047, 1112, 1113);
+        Build::Rpm::add_flagsvers(\%res, 1049, 1048, 1050);
         my $id = $known;
         $id =~ s/.*-//;
         if ($known ne "$res{1000}->[0].$res{1022}->[0]-$id") {
