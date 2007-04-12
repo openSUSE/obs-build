@@ -166,7 +166,7 @@ $PKG.rpm"
     fi
     # manifest must be at least 96 bytes...
     echo "################################################################################################" "$REORDER_HAVE" > $BUILD_ROOT/.reorder/MANIFEST.rpm
-    bash -c "cd $BUILD_ROOT/.init_b_cache/rpms && rpm -Uvv --dbpath $BUILD_ROOT/.reorder/.db --nosuggest --nodigest --nosignature --ignoresize --force --nodeps --test $BUILD_ROOT/.reorder/MANIFEST.rpm" 2>&1 | sed -n -e 's/-[^- ]*-[^- ]* / /' -e 's/^D:   install: \([^ ]*\) .*/\1/p' > $BUILD_ROOT/.reorder/.list
+    bash -c "cd $BUILD_ROOT/.init_b_cache/rpms && rpm -Uvv --root $BUILD_ROOT --dbpath /.reorder/.db --nosuggest --nodigest --nosignature --ignoresize --force --nodeps --test $BUILD_ROOT/.reorder/MANIFEST.rpm" 2>&1 | sed -n -e 's/-[^- ]*-[^- ]* / /' -e 's/^D:   install: \([^ ]*\) .*/\1/p' > $BUILD_ROOT/.reorder/.list
     rm -f $BUILD_ROOT/.reorder/MANIFEST.rpm
     REORDER_HAVE=
     for PKG in `cat $BUILD_ROOT/.reorder/.list`; do
