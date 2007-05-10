@@ -507,7 +507,7 @@ for SPECFILE in $SPECFILES ; do
 
     if test "$SPECFILE" != "${SPECFILE%.src.rpm}" ; then
 	echo processing src rpm `pwd`/$SPECFILE...
-	TOPDIR=`chroot $BUILD_ROOT rpm --eval '%_topdir'`
+	TOPDIR=`rpm --eval '%_topdir'`
 	rm -rf $BUILD_ROOT$TOPDIR
 	mkdir -p $BUILD_ROOT$TOPDIR/SOURCES $BUILD_ROOT$TOPDIR/SPECS
 	rpm -i --nodigest --nosignature --root $BUILD_ROOT $SPECFILE || {

@@ -112,7 +112,16 @@ sub read_config {
       next;
     }
     if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:') {
-      push @{$config->{substr($l0, 0, -1)}}, @l;
+      my $t = substr($l0, 0, -1);
+      for my $l (@l) {
+	if ($l eq '!*') {
+	  $config->{$t} = [];
+	} elsif ($l =~ /^!/) {
+	  $config->{$t} = [ grep {"!$_" ne $l} @{$config->{$t}} ];
+	} else {
+	  push @{$config->{$t}}, $l;
+	}
+      }
     } elsif ($l0 eq 'substitute:') {
       next unless @l;
       $ll = shift @l;
@@ -364,7 +373,7 @@ sub addproviders {
       }
       my $rr = $rf == 2 ? $pf : ($rf ^ 5);
       $rr &= 5 unless $pf & 2;
-      my $vv = Build::Rpm::verscmp($pv, $rv, 1);
+      my $vv = Build::Rpm::verscmp($pv, $rv, $config->{'type'} eq 'spec' ? 1 : 0);
       if ($rr & (1 << ($vv + 1))) {
 	push @p, $rp;
 	last;
