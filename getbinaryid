@@ -1,0 +1,58 @@
+#!/usr/bin/perl
+
+BEGIN {
+  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+}
+
+use Build;
+use strict;
+
+my $createmeta;
+my $manifest;
+
+while (@ARGV) {
+  if ($ARGV[0] eq '--createmeta')
+    {
+      shift @ARGV;
+      $createmeta = 1;
+      next;
+    }
+  if ($ARGV[0] eq '--manifest')
+    {
+      shift @ARGV;
+      $manifest = shift @ARGV;
+      next;
+    }
+  last;
+}
+
+my @files;
+if ($manifest) {
+  if ($manifest eq '-') {
+    @files = <STDIN>;
+  } else {
+    local *F;
+    open(F, '<', $manifest) || die("$manifest: $!\n");
+    @files = <F>;
+    close F;
+  }
+  chomp @files;
+}
+push @files, @ARGV;
+
+for my $file (@files) {
+  my $sig = Build::queryhdrmd5($file);
+  die("$file: no signature available\n") unless $sig;
+  if ($createmeta) {
+    local *F;
+    my $mf = $file;
+    $mf =~ s/\.[^\.]*$//;
+    $mf .= ".meta";
+    open(F, '>', $mf) || die("$mf: $!\n");
+    print F "$sig  sigmd5\n";
+    close(F) || die("$mf: $!\n");
+  } else {
+    print "$sig\n";
+  }
+}
+

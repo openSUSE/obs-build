@@ -721,7 +721,7 @@ for SPECFILE in $SPECFILES ; do
 	for f in $BUILD_ROOT$TOPDIR/SOURCES/debian.* ; do
 	    test -f $f && DEB_TRANSFORM=true
 	done
-	if test -n $DEB_TRANSFORM ; then
+	if test -n "$DEB_TRANSFORM" ; then
 	    mkdir -p $BUILD_ROOT$TOPDIR/SOURCES.DEB
             debtransform $CHANGELOGARGS $BUILD_ROOT$TOPDIR/SOURCES $BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE $BUILD_ROOT$TOPDIR/SOURCES.DEB
 	    chroot $BUILD_ROOT su -c "dpkg-source -x $TOPDIR/SOURCES.DEB/*.dsc $TOPDIR/BUILD" - $BUILD_USER
