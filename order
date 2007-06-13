@@ -1,0 +1,57 @@
+#!/usr/bin/perl -w
+
+BEGIN {
+  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+}
+
+use Build;
+use strict;
+
+my $manifest;
+
+if (@ARGV && $ARGV[0] eq '--manifest') {
+  shift @ARGV;
+  $manifest = shift @ARGV;
+}
+
+die("usage: order [--manifest manifest] cachedir [packages...]\n") unless @ARGV;
+my $cachedir = shift @ARGV;
+
+my @p;
+if ($manifest) {
+  if ($manifest eq '-') {
+    @p = <STDIN>;
+  } else {
+    local *F;
+    open(F, '<', $manifest) || die("$manifest: $!\n");
+    @p = <F>;
+    close F;
+  }
+  chomp @p;
+}
+
+push @p, @ARGV;
+
+# dummy config is enough for sorting purposes
+my $config = Build::read_config('noarch');
+
+my %deps;
+my %bins;
+
+for my $p (@p) {
+  my $q;
+  for my $suf ('rpm', 'deb') {
+    next unless -f "$cachedir/$p.$suf";
+    $q = Build::query("$cachedir/$p.$suf", undef, 1);
+    die("bad binary: $p.$suf\n") unless $q;
+    push @{$q->{'provides'}}, @{$q->{'filelist'}} if $suf eq 'rpm' && $q->{'filelist'};
+    delete $q->{'filelist'};
+    last;
+  }
+  die("binary not found: $p\n") unless $q;
+  $deps{$p} = $q;
+}
+
+Build::readdeps($config, undef, \%deps);
+@p = Build::order($config, @p);
+print "@p\n";
