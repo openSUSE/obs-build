@@ -692,9 +692,15 @@ sub query {
   my $data = {
     name => $res{'NAME'}->[0],
     hdrmd5 => unpack('H32', $res{'SIGTAG_MD5'}->[0]),
-    provides => [ grep {!/^rpmlib\(/ && !/^\//} @{$res{'PROVIDENAME'} || []} ],
-    requires => [ grep {!/^rpmlib\(/ && !/^\//} @{$res{'REQUIRENAME'} || []} ],
   };
+  # XXX hack, make this another option!
+  if ($withfilelist) {
+    $data->{'provides'} = [ @{$res{'PROVIDENAME'} || []} ];
+    $data->{'requires'} = [ @{$res{'REQUIRENAME'} || []} ];
+  } else {
+    $data->{'provides'} = [ grep {!/^rpmlib\(/ && !/^\//} @{$res{'PROVIDENAME'} || []} ];
+    $data->{'requires'} = [ grep {!/^rpmlib\(/ && !/^\//} @{$res{'REQUIRENAME'} || []} ];
+  }
   $data->{'source'} = $src if $src ne '';
   if ($withevra) {
     my $arch = $res{'ARCH'}->[0];
