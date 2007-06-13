@@ -112,6 +112,7 @@ sub parse {
   my $exclarch;
   my @subpacks;
   my @packdeps;
+  my @prereqs;
   my $hasnfb;
   my %macros;
   my $ret = {};
@@ -306,6 +307,16 @@ sub parse {
       $exclarch ||= [];
       push @$exclarch, split(' ', $1);
     }
+    if ($line =~ /^PreReq:\s*(\S.*)$/i) {
+      my $deps = $1;
+      my @deps = $deps =~ /([^\s\[\(,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
+      while (@deps) {
+	my ($pack, $vers, $qual) = splice(@deps, 0, 3);
+	next if $pack =~ /\//;
+	push @prereqs, $pack unless grep {$_ eq $pack} @prereqs;
+      }
+      next;
+    }
     if ($main_preamble && ($line =~ /^(BuildRequires|BuildConflicts|\#\!BuildIgnore):\s*(\S.*)$/i)) {
       my $what = $1;
       my $deps = $2;
@@ -392,6 +403,7 @@ sub parse {
   $ret->{'subpacks'} = \@subpacks;
   $ret->{'exclarch'} = $exclarch if defined $exclarch;
   $ret->{'deps'} = \@packdeps;
+  $ret->{'prereqs'} = \@prereqs if @prereqs;
   $ret->{'configdependent'} = 1 if $ifdeps;
   return $ret;
 }
@@ -665,9 +677,12 @@ sub verscmp {
 }
 
 sub query {
-  my ($handle, $withevra) = @_;
+  my ($handle, $withevra, $withfilelist) = @_;
 
-  my %res = rpmq($handle, qw{NAME SOURCERPM NOSOURCE NOPATCH SIGTAG_MD5 PROVIDENAME PROVIDEFLAGS PROVIDEVERSION REQUIRENAME REQUIREFLAGS REQUIREVERSION}, ($withevra ? qw{EPOCH VERSION RELEASE ARCH}: ()));
+  my @tags = qw{NAME SOURCERPM NOSOURCE NOPATCH SIGTAG_MD5 PROVIDENAME PROVIDEFLAGS PROVIDEVERSION REQUIRENAME REQUIREFLAGS REQUIREVERSION};
+  push @tags, qw{EPOCH VERSION RELEASE ARCH} if $withevra;
+  push @tags, qw{FILENAMES} if $withfilelist;
+  my %res = rpmq($handle, @tags);
   return undef unless %res;
   my $src = $res{'SOURCERPM'}->[0];
   $src = '' unless defined $src;
@@ -688,6 +703,9 @@ sub query {
     $data->{'release'} = $res{'RELEASE'}->[0];
     $data->{'arch'} = $arch;
     $data->{'epoch'} = $res{'EPOCH'}->[0] if exists $res{'EPOCH'};
+  }
+  if ($withfilelist) {
+    $data->{'filelist'} = $res{'FILENAMES'};
   }
   return $data;
 }

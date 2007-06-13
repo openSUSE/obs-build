@@ -82,24 +82,28 @@ for my $l (@$xspec) {
 
   $l =~ s/^(Release:\s*).*/$1$release/i if $release;
 
-  if (!$used || ($l !~ /^BuildRequires:/i)) {
+  if (!$used || ($l !~ /^(?:Build)?Requires:/i)) {
     print F "$l\n";
     next;
   }
 
+  my $isbuildrequires = 0;
+  $isbuildrequires = 1 if $l =~ /^BuildRequires:/i;
   my $r = $l;
   $r =~ s/^[^:]*:\s*//;
   my @deps = $r =~ /([^\s\[\(,]+)(\s+[<=>]+\s+[^\s\[,]+)?[\s,]*/g;
   my @ndeps = ();
   my $replace = 0;
-  my %f2 = @deps;
-  my @f2 = Build::do_subst($cf, grep {!/^-/} keys %f2);
-  %f2 = map {$_ => 1} @f2;
-  delete $f2{$_} for @neg;
+  my @f2 = Build::do_subst_vers($cf, @deps);
+  my %f2 = @f2;
+  if ($isbuildrequires) {
+    delete $f2{$_} for @neg;
+    delete $f2{$_} for grep {/^-/} keys %f2;
+  }
   while (@deps) {
     my ($pack, $vers) = splice(@deps, 0, 2);
     $vers = '' unless defined $vers;
-    if ($sdeps{$pack}) {
+    if (($isbuildrequires && $sdeps{$pack}) || exists($f2{$pack})) {
       push @ndeps, "$pack$vers";
       delete $f2{$pack};
     } else {
@@ -107,11 +111,17 @@ for my $l (@$xspec) {
     }
   }
   if (%f2) {
-    push @ndeps, sort keys %f2;
+    while (@f2) {
+      my ($pack, $vers) = splice(@f2, 0, 2);
+      next unless exists $f2{$pack};
+      $vers = '' unless defined $vers;
+      push @ndeps, "$pack$vers";
+    }
     $replace = 1
   }
   if ($replace) {
-    print F "BuildRequires:  ".join(' ', @ndeps)."\n" if @ndeps;
+    $l =~ /^(.*?:\s*)/;
+    print F $1.join(' ', @ndeps)."\n" if @ndeps;
   } else {
     print F "$l\n";
   }

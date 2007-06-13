@@ -145,42 +145,13 @@ function init_db {
 }
 
 function reorder {
-    REORDER_HAVE=
-    if test $PSUF = deb ; then
-	$BUILD_DIR/debsort $BUILD_ROOT/.init_b_cache/rpms "$@"
-	return
-    fi
-    rm -rf $BUILD_ROOT/.reorder
-    mkdir -p $BUILD_ROOT/.reorder/.db
-    rpm --initdb --dbpath $BUILD_ROOT/.reorder/.db
+    test -z "$*" && return
+    rm -f $BUILD_ROOT/.init_b_cache/order.manifest
     for PKG in "$@" ; do
-        touch $BUILD_ROOT/.reorder/$PKG
-        test -e $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG && continue
-        test -f $BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm && REORDER_HAVE="$REORDER_HAVE
-$PKG.rpm"
+	echo "$PKG" >> $BUILD_ROOT/.init_b_cache/order.manifest
     done
-    if test -z "$REORDER_HAVE"; then
-        rm -rf $BUILD_ROOT/.reorder
-        echo "$@"
-        return
-    fi
-    # manifest must be at least 96 bytes...
-    echo "################################################################################################" "$REORDER_HAVE" > $BUILD_ROOT/.reorder/MANIFEST.rpm
-    bash -c "cd $BUILD_ROOT/.init_b_cache/rpms && rpm -Uvv --root $BUILD_ROOT --dbpath /.reorder/.db --nosuggest --nodigest --nosignature --ignoresize --force --nodeps --test $BUILD_ROOT/.reorder/MANIFEST.rpm" 2>&1 | sed -n -e 's/-[^- ]*-[^- ]* / /' -e 's/^D:   install: \([^ ]*\) .*/\1/p' > $BUILD_ROOT/.reorder/.list
-    rm -f $BUILD_ROOT/.reorder/MANIFEST.rpm
-    REORDER_HAVE=
-    for PKG in `cat $BUILD_ROOT/.reorder/.list`; do
-        test -e $BUILD_ROOT/.reorder/$PKG || continue
-        REORDER_HAVE="$REORDER_HAVE $PKG"
-        rm $BUILD_ROOT/.reorder/$PKG
-    done
-    for PKG in "$@" ; do
-        test -e $BUILD_ROOT/.reorder/$PKG || continue
-        REORDER_HAVE="$REORDER_HAVE $PKG"
-	REORDER_MISSED="$REORDER_MISSED $PKG"
-        rm $BUILD_ROOT/.reorder/$PKG
-    done
-    echo $REORDER_HAVE
+    $BUILD_DIR/order --manifest $BUILD_ROOT/.init_b_cache/order.manifest $BUILD_ROOT/.init_b_cache/rpms
+    rm -f $BUILD_ROOT/.init_b_cache/order.manifest
 }
 
 function create_devs {
@@ -415,10 +386,8 @@ if test -n "$PREPARE_XEN" ; then
     # alreadyinstalled check will not work, but we have to live with
     # that...
     echo -n 'reordering...'
-    REORDER_MISSED=
     PACKAGES_TO_INSTALL=`reorder $PACKAGES_TO_INSTALL`
     echo 'done'
-    test -n "$REORDER_MISSED" && echo "WARNING: reorder missed$REORDER_MISSED"
     echo "PACKAGES_TO_INSTALL='${PACKAGES_TO_INSTALL//\'/\'\\\'\'}'" > $BUILD_ROOT/.build/init_buildsystem.data
     echo "PACKAGES_TO_RUNSCRIPTS='${PACKAGES_TO_RUNSCRIPTS//\'/\'\\\'\'}'" >> $BUILD_ROOT/.build/init_buildsystem.data
     echo "PSUF='$PSUF'" >> $BUILD_ROOT/.build/init_buildsystem.data
@@ -447,11 +416,9 @@ fi
 #
 if ! test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
     echo -n 'reordering...'
-    REORDER_MISSED=
     PACKAGES_TO_INSTALL_FIRST=`reorder $PACKAGES_TO_INSTALL_FIRST`
     PACKAGES_TO_INSTALL=`reorder $PACKAGES_TO_INSTALL`
     echo 'done'
-    test -n "$REORDER_MISSED" && echo "WARNING: reorder missed$REORDER_MISSED"
 fi
 
 #

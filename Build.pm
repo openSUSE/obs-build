@@ -96,8 +96,10 @@ sub read_config {
   $config->{'ignore'} = [];
   $config->{'conflict'} = [];
   $config->{'substitute'} = {};
+  $config->{'substitute_vers'} = {};
   $config->{'optflags'} = {};
   $config->{'rawmacros'} = '';
+  $config->{'release'} = '<CI_CNT>.<B_CNT>';
   $config->{'repotype'} = [];
   for my $l (@spec) {
     $l = $l->[1] if ref $l;
@@ -132,6 +134,8 @@ sub read_config {
       $config->{'optflags'}->{$ll} = join(' ', @l);
     } elsif ($l0 eq 'repotype:') {
       $config->{'repotype'} = [ @l ];
+    } elsif ($l0 eq 'release:') {
+      $config->{'release'} = $l[0];
     } elsif ($l0 !~ /^[#%]/) {
       warn("unknown keyword in config: $l0\n");
     }
@@ -140,7 +144,9 @@ sub read_config {
     $config->{$l} = [ unify(@{$config->{$l}}) ];
   }
   for my $l (keys %{$config->{'substitute'}}) {
+    $config->{'substitute_vers'}->{$l} = [ map {/^(.*?)(=)?$/g} unify(@{$config->{'substitute'}->{$l}}) ];
     $config->{'substitute'}->{$l} = [ unify(@{$config->{'substitute'}->{$l}}) ];
+    s/=$// for @{$config->{'substitute'}->{$l}};
   }
   $config->{'preferh'} = { map {$_ => 1} @{$config->{'prefer'}} };
   my %ignore;
@@ -192,6 +198,25 @@ sub do_subst {
       push @res, $d if grep {$_ eq $d} @{$subst->{$d}};
     } else {
       push @res, $d;
+    }
+    $done{$d} = 1;
+  }
+  return @res;
+}
+
+sub do_subst_vers {
+  my ($config, @deps) = @_;
+  my @res;
+  my %done;
+  my $subst = $config->{'substitute_vers'};
+  while (@deps) {
+    my ($d, $dv) = splice(@deps, 0, 2);
+    next if $done{$d};
+    if ($subst->{$d}) {
+      unshift @deps, map {defined($_) && $_ eq '=' ? $dv : $_} @{$subst->{$d}};
+      push @res, $d, $dv if grep {defined($_) && $_ eq $d} @{$subst->{$d}};
+    } else {
+      push @res, $d, $dv;
     }
     $done{$d} = 1;
   }
@@ -261,7 +286,7 @@ sub get_runscripts {
 sub readdeps {
   my ($config, $pkgidp, @depfiles) = @_;
 
-  my %rprovides = ();
+  my %whatprovides = ();
   my %requires = ();
   local *F;
   my %provides;
@@ -315,17 +340,17 @@ sub readdeps {
   for my $p (keys %provides) {
     my @pp = @{$provides{$p}};
     s/[ <=>].*// for @pp;
-    push @{$rprovides{$_}}, $p for unify(@pp);
+    push @{$whatprovides{$_}}, $p for unify(@pp);
   }
   $config->{'providesh'} = \%provides;
-  $config->{'rprovidesh'} = \%rprovides;
+  $config->{'whatprovidesh'} = \%whatprovides;
   $config->{'requiresh'} = \%requires;
 }
 
 sub forgetdeps {
   my $config;
   delete $config->{'providesh'};
-  delete $config->{'rprovidesh'};
+  delete $config->{'whatprovidesh'};
   delete $config->{'requiresh'};
 }
 
@@ -341,11 +366,11 @@ sub addproviders {
   my ($config, $r) = @_;
 
   my @p;
-  my $rprovides = $config->{'rprovidesh'};
-  $rprovides->{$r} = \@p;
+  my $whatprovides = $config->{'whatprovidesh'};
+  $whatprovides->{$r} = \@p;
   if ($r =~ /\|/) {
     for my $or (split(/\s*\|\s*/, $r)) {
-      push @p, @{$rprovides->{$or} || addproviders($config, $or)};
+      push @p, @{$whatprovides->{$or} || addproviders($config, $or)};
     }
     @p = unify(@p) if @p > 1;
     return \@p;
@@ -356,7 +381,7 @@ sub addproviders {
   my $rf = $addproviders_fm{$2};
   return \@p unless $rf;
   my $provides = $config->{'providesh'};
-  my @rp = @{$rprovides->{$rn} || []};
+  my @rp = @{$whatprovides->{$rn} || []};
   for my $rp (@rp) {
     for my $pp (@{$provides->{$rp} || []}) {
       if ($pp eq $rn) {
@@ -368,6 +393,11 @@ sub addproviders {
       my $pf = $addproviders_fm{$1};
       next unless $pf;
       if ($pf & $rf & 5) {
+	push @p, $rp;
+	last;
+      }
+      if ($pv eq $rv) {
+	next unless $pf & $rf & 2;
 	push @p, $rp;
 	last;
       }
@@ -391,7 +421,7 @@ sub expand {
   my $prefer = $config->{'preferh'};
   my $ignore = $config->{'ignoreh'};
 
-  my $rprovides = $config->{'rprovidesh'};
+  my $whatprovides = $config->{'whatprovidesh'};
   my $requires = $config->{'requiresh'};
 
   my %xignore = map {substr($_, 1) => 1} grep {/^-/} @p;
@@ -404,7 +434,7 @@ sub expand {
   # because we add packages even if to dep is already provided and
   # we break ambiguities if the name is an exact match.
   for my $p (splice @p) {
-    my @q = @{$rprovides->{$p} || addproviders($config, $p)};
+    my @q = @{$whatprovides->{$p} || addproviders($config, $p)};
     if (@q > 1) {
       my $pn = $p;
       $pn =~ s/ .*//;
@@ -430,7 +460,7 @@ sub expand {
         my $ri = (split(/[ <=>]/, $r, 2))[0];
 	next if $ignore->{"$p:$ri"} || $xignore{"$p:$ri"};
 	next if $ignore->{$ri} || $xignore{$ri};
-	my @q = @{$rprovides->{$r} || addproviders($config, $r)};
+	my @q = @{$whatprovides->{$r} || addproviders($config, $r)};
 	next if grep {$p{$_}} @q;
 	next if grep {$xignore{$_}} @q;
 	next if grep {$ignore->{"$p:$_"} || $xignore{"$p:$_"}} @q;
@@ -463,8 +493,8 @@ sub expand {
 	    # choice op, implicit prefer of first match...
 	    my %pq = map {$_ => 1} @q;
 	    for my $rr (split(/\s*\|\s*/, $r)) {
-		next unless $rprovides->{$rr};
-		my @pq = grep {$pq{$_}} @{$rprovides->{$rr}};
+		next unless $whatprovides->{$rr};
+		my @pq = grep {$pq{$_}} @{$whatprovides->{$rr}};
 		next unless @pq;
 		@q = @pq;
 		last;
@@ -503,15 +533,99 @@ sub expand {
   return 1, (sort keys %p);
 }
 
+sub order {
+  my ($config, @p) = @_;
+
+  my $requires = $config->{'requiresh'};
+  my $whatprovides = $config->{'whatprovidesh'};
+  my %deps;
+  my %rdeps;
+  my %needed;
+  my %p = map {$_ => 1} @p;
+  for my $p (@p) {
+    my @r;
+    for my $r (@{$requires->{$p} || []}) {
+      my @q = @{$whatprovides->{$r} || addproviders($config, $r)};
+      push @r, grep {$_ ne $p && $p{$_}} @q;
+    }
+    @r = unify(@r);
+    $deps{$p} = \@r;
+    $needed{$p} = @r;
+    push @{$rdeps{$_}}, $p for @r;
+  }
+  @p = sort {$needed{$a} <=> $needed{$b} || $a cmp $b} @p;
+  my @good;
+  my @res;
+  # the big sort loop
+  while (@p) {
+    @good = grep {$needed{$_} == 0} @p;
+    if (@good) {
+      @p = grep {$needed{$_}} @p;
+      push @res, @good;
+      for my $p (@good) {
+        $needed{$_}-- for @{$rdeps{$p}};
+      }
+      next;
+    }
+    # uh oh, cycle alert. find and remove all cycles.
+    my %notdone = map {$_ => 1} @p;
+    $notdone{$_} = 0 for @res;  # already did those
+    my @todo = @p;
+    while (@todo) {
+      my $v = shift @todo;
+      if (ref($v)) {
+        $notdone{$$v} = 0;      # finished this one
+        next;   
+      }
+      my $s = $notdone{$v};
+      next unless $s;
+      my @e = grep {$notdone{$_}} @{$deps{$v}};
+      if (!@e) {
+        $notdone{$v} = 0;       # all deps done, mark as finished
+        next;
+      }
+      if ($s == 1) {
+        $notdone{$v} = 2;       # now under investigation
+        unshift @todo, @e, \$v;
+        next;
+      }
+      # reached visited package, found a cycle!
+      my @cyc = ();
+      my $cycv = $v;
+      # go back till $v is reached again
+      while(1) {
+        die unless @todo;
+        $v = shift @todo;
+        next unless ref($v);
+        $v = $$v;
+        $notdone{$v} = 1 if $notdone{$v} == 2;
+        unshift @cyc, $v;
+        last if $v eq $cycv;
+      }
+      unshift @todo, $cycv;
+      print STDERR "cycle: ".join(' -> ', @cyc)."\n";
+      my $breakv = (sort {$needed{$a} <=> $needed{$b} || $a cmp $b} @cyc)[0];
+      push @cyc, $cyc[0];
+      shift @cyc while $cyc[0] ne $breakv;
+      $v = $cyc[1];
+      print STDERR "  breaking with $breakv -> $v\n";
+      $deps{$breakv} = [ grep {$_ ne $v} @{$deps{$breakv}} ];
+      $rdeps{$v} = [ grep {$_ ne $breakv} @{$rdeps{$v}} ];
+      $needed{$breakv}--;
+    }
+  }
+  return @res;
+}
+
 sub add_all_providers {
   my ($config, @p) = @_;
-  my $rprovides = $config->{'rprovidesh'};
+  my $whatprovides = $config->{'whatprovidesh'};
   my $requires = $config->{'requiresh'};
   my %a;
   for my $p (@p) {
     for my $r (@{$requires->{$p} || [$p]}) {
       my $rn = (split(' ', $r, 2))[0];
-      $a{$_} = 1 for @{$rprovides->{$rn} || []};
+      $a{$_} = 1 for @{$whatprovides->{$rn} || []};
     }
   }
   push @p, keys %a;
@@ -528,14 +642,14 @@ sub parse {
 }
 
 sub query {
-  my ($binname, $withevra) = @_;
+  my ($binname, $withevra, $withfilelist) = @_;
   my $handle = $binname;
   if (ref($binname) eq 'ARRAY') {
     $handle = $binname->[1];
     $binname = $binname->[0];
   }
-  return Build::Rpm::query($handle, $withevra) if $do_rpm && $binname =~ /\.rpm$/;
-  return Build::Deb::query($handle, $withevra) if $do_deb && $binname =~ /\.deb$/;
+  return Build::Rpm::query($handle, $withevra, $withfilelist) if $do_rpm && $binname =~ /\.rpm$/;
+  return Build::Deb::query($handle, $withevra, $withfilelist) if $do_deb && $binname =~ /\.deb$/;
   return undef;
 }
 

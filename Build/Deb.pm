@@ -213,7 +213,7 @@ sub debq {
 }
 
 sub query {
-  my ($handle, $withevra) = @_;
+  my ($handle, $withevra, $withfilelist) = @_;
 
   my %res = debq($handle);
   return undef unless %res;
