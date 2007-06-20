@@ -35,6 +35,36 @@ sub unify {
   return grep(delete($h{$_}), @_);
 }
 
+sub init_helper_hashes {
+  my ($config) = @_;
+
+  $config->{'preferh'} = { map {$_ => 1} @{$config->{'prefer'}} };
+
+  my %ignore;
+  for (@{$config->{'ignore'}}) {
+    if (!/:/) {
+      $ignore{$_} = 1;
+      next;
+    }
+    my @s = split(/[,:]/, $_);
+    my $s = shift @s;
+    $ignore{"$s:$_"} = 1 for @s;
+  }
+  $config->{'ignoreh'} = \%ignore;
+
+  my %conflicts;
+  for (@{$config->{'conflict'}}) {
+    my @s = split(/[,:]/, $_);
+    my $s = shift @s;
+    push @{$conflicts{$s}}, @s;
+    push @{$conflicts{$_}}, $s for @s;
+  }
+  for (keys %conflicts) {
+    $conflicts{$_} = [ unify(@{$conflicts{$_}}) ]
+  }
+  $config->{'conflicth'} = \%conflicts;
+}
+
 sub read_config_dist {
   my ($dist, $archpath, $configdir) = @_;
 
@@ -85,7 +115,9 @@ sub read_config {
     }
   }
   my @spec;
+  $config->{'save_expanded'} = 1;
   Build::Rpm::parse($config, \@newconfig, \@spec);
+  delete $config->{'save_expanded'};
   $config->{'preinstall'} = [];
   $config->{'vminstall'} = [];
   $config->{'runscripts'} = [];
@@ -148,29 +180,7 @@ sub read_config {
     $config->{'substitute'}->{$l} = [ unify(@{$config->{'substitute'}->{$l}}) ];
     s/=$// for @{$config->{'substitute'}->{$l}};
   }
-  $config->{'preferh'} = { map {$_ => 1} @{$config->{'prefer'}} };
-  my %ignore;
-  for (@{$config->{'ignore'}}) {
-    if (!/:/) {
-      $ignore{$_} = 1;
-      next;
-    }
-    my @s = split(/[,:]/, $_);
-    my $s = shift @s;
-    $ignore{"$s:$_"} = 1 for @s;
-  }
-  $config->{'ignoreh'} = \%ignore;
-  my %conflicts;
-  for (@{$config->{'conflict'}}) {
-    my @s = split(/[,:]/, $_);
-    my $s = shift @s;
-    push @{$conflicts{$s}}, @s;
-    push @{$conflicts{$_}}, $s for @s;
-  }
-  for (keys %conflicts) {
-    $conflicts{$_} = [ unify(@{$conflicts{$_}}) ]
-  }
-  $config->{'conflicth'} = \%conflicts;
+  init_helper_hashes($config);
   $config->{'type'} = (grep {$_ eq 'rpm'} @{$config->{'preinstall'} || []}) ? 'spec' : 'dsc';
   # add rawmacros to our macro list
   if ($config->{'rawmacros'} ne '') {
@@ -347,8 +357,15 @@ sub readdeps {
   $config->{'requiresh'} = \%requires;
 }
 
+sub setdeps {
+  my ($config, $provides, $whatprovides, $requires) = @_;
+  $config->{'providesh'} = $provides;
+  $config->{'whatprovidesh'} = $whatprovides;
+  $config->{'requiresh'} = $requires;
+}
+
 sub forgetdeps {
-  my $config;
+  my ($config) = @_;
   delete $config->{'providesh'};
   delete $config->{'whatprovidesh'};
   delete $config->{'requiresh'};
@@ -604,7 +621,7 @@ sub order {
       }
       unshift @todo, $cycv;
       print STDERR "cycle: ".join(' -> ', @cyc)."\n";
-      my $breakv = (sort {$needed{$a} <=> $needed{$b} || $a cmp $b} @cyc)[0];
+      my $breakv = (sort {$needed{$a} <=> $needed{$b} || $a cmp $b} @cyc)[-1];
       push @cyc, $cyc[0];
       shift @cyc while $cyc[0] ne $breakv;
       $v = $cyc[1];

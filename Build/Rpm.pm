@@ -114,6 +114,7 @@ sub parse {
   my @packdeps;
   my @prereqs;
   my $hasnfb;
+  my $nfbline;
   my %macros;
   my $ret = {};
   my $ifdeps;
@@ -157,8 +158,12 @@ sub parse {
     }
     push @$xspec, $line if $inspec && $xspec;
     if ($line =~ /^#\s*neededforbuild\s*(\S.*)$/) {
-      next if defined $hasnfb;
+      if (defined $hasnfb) {
+        $xspec->[-1] = [ $xspec->[-1], undef ] if $inspec && $xspec;
+	next;
+      }
       $hasnfb = $1;
+      $nfbline = \$xspec->[-1] if $inspec && $xspec;
       next;
     }
     if ($line =~ /^\s*#/) {
@@ -389,11 +394,18 @@ sub parse {
     if ($line =~ /^\s*%(package|prep|build|install|check|clean|preun|postun|pretrans|posttrans|pre|post|files|changelog|description|triggerpostun|triggerun|triggerin|trigger|verifyscript)/) {
       $main_preamble = 0;
     }
+
+    # do this always?
+    if ($xspec && @$xspec && $config->{'save_expanded'}) {
+      $xspec->[-1] = [ $xspec->[-1], $line ];
+    }
   }
   close SPEC unless ref $specfile;
   if (defined($hasnfb)) {
     if (!@packdeps) {
       @packdeps = split(' ', $hasnfb);
+    } elsif ($nfbline) {
+      $$nfbline = [$$nfbline, undef ];
     }
   }
   unshift @subpacks, $packname;

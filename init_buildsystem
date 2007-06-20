@@ -424,7 +424,12 @@ fi
 #
 # delete all packages we don't want
 #
-cp -a $BUILD_ROOT/.init_b_cache/alreadyinstalled $BUILD_ROOT/.init_b_cache/todelete
+mkdir -p $BUILD_ROOT/.init_b_cache/todelete
+for PKG in $BUILD_ROOT/.init_b_cache/alreadyinstalled/* ; do
+    PKG=${PKG##*/}
+    test "$PKG" = "*" && continue
+    touch $BUILD_ROOT/.init_b_cache/todelete/$PKG
+done
 for PKG in $PACKAGES_TO_INSTALL_FIRST $PACKAGES_TO_INSTALL ; do
     rm -f $BUILD_ROOT/.init_b_cache/todelete/$PKG
 done

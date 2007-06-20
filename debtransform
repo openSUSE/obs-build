@@ -180,25 +180,37 @@ my $out = $ARGV[2];
 
 die("$out: $!\n") unless -d $out;
 
+my $tags = parsedsc($dsc);
+
 opendir(D, $dir) || die("$dir: $!\n");
 my @dir = grep {$_ ne '.' && $_ ne '..'} readdir(D);
 closedir(D);
 my %dir = map {$_ => 1} @dir;
 
-my @tars = grep {/\.tar(?:\.gz|\.bz2)?$/} @dir;
-my @debtars = grep {/^debian\.tar(?:\.gz|\.bz2)?$/} @tars;
-@tars = grep {!/^debian\.tar(?:\.gz|\.bz2)?$/} @tars;
-die("package contains no tar file\n") unless @tars;
-die("package contains more than one tar file: @tars\n") if @tars > 1;
-die("package contains more than one debian tar file\n") if @debtars > 1;
-my $tarfile = $tars[0];
-my $debtarfile = $debtars[0];
+my $tarfile = $tags->{'DEBTRANSFORM-TAR'};
+my $debtarfile = $tags->{'DEBTRANSFORM-FILES-TAR'};
 
-my $tags = parsedsc($dsc);
+if (!$tarfile || !$debtarfile) {
+  my @tars = grep {/\.tar(?:\.gz|\.bz2)?$/} @dir;
+  my @debtars = grep {/^debian\.tar(?:\.gz|\.bz2)?$/} @tars;
+  if (!$tarfile) {
+    @tars = grep {!/^debian\.tar(?:\.gz|\.bz2)?$/} @tars;
+    @tars = grep {$_ ne $debtarfile} @tars if $debtarfile;
+    die("package contains no tar file\n") unless @tars;
+    die("package contains more than one tar file: @tars\n") if @tars > 1;
+    $tarfile = $tars[0];
+  }
+  if (!exists($tags->{'DEBTRANSFORM-FILES-TAR'})) {
+    die("package contains more than one debian tar file\n") if @debtars > 1;
+    $debtarfile = $debtars[0];
+  }
+}
+
 my $name = $tags->{'SOURCE'};
 die("dsc file contains no source\n") unless defined($name);
 my $version = $tags->{'VERSION'};
 die("dsc file contains no version\n") unless defined($version);
+$version =~ s/^\d+://;	# no epoch in version, please
 
 my $tardir = $tarfile;
 $tardir =~ s/\.orig\.tar/\.tar/;
@@ -230,12 +242,15 @@ if ($debtarfile) {
 dofile($changelog, $tardir, "debian/changelog") if defined $changelog;
 
 for my $file (grep {/^debian\./} @dir) {
-  next if $file =~ /^debian\.tar/;
   next if $file eq 'debian.series';
+  next if $file =~ /\.tar$/;
+  next if $file =~ /\.tar\./;
   dofile("$dir/$file", $tardir);
 }
 
-if ($dir{"debian.series"}) {
+if ($tags->{'DEBTRANSFORM-SERIES'}) {
+  doseries("$dir/$tags->{'DEBTRANSFORM-SERIES'}", $tardir);
+} elsif ($dir{"debian.series"}) {
   doseries("$dir/debian.series", $tardir);
 } elsif ($dir{"patches.series"}) {
   doseries("$dir/patches.series", $tardir);
@@ -255,4 +270,8 @@ if (! -s "$out/${name}_$version.diff") {
 }
 
 $tags->{'FILES'} = "\n".join("\n", @files);
+delete $tags->{'DEBTRANSFORM-SERIES'};
+delete $tags->{'DEBTRANSFORM-TAR'};
+delete $tags->{'DEBTRANSFORM-FILES-TAR'};
 writedsc("$out/${name}_$version.dsc", $tags);
+exit(0);
