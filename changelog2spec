@@ -206,7 +206,9 @@ while(defined($_)) {
   }
   $lastt = $t;
   my @gm = gmtime($t);
-  @gm = (0, 0, 0, 2, 0, 97, 4) if $gm[5] < 97 || ($gm[5] == 97 && $gm[3] <= 1);
+  # silly rpm can't hande dates < 1997, so we fold everything to
+  # Thu Jan 02 1997
+  @gm = (0, 0, 0, 2, 0, 97, 4) if $gm[5] < 97 || ($gm[5] == 97 && $gm[4] == 0 && $gm[3] <= 1);
   printf("* %s %s %2d %4d %s\n", $wday[$gm[6]], $mon[$gm[4]], $gm[3], $gm[5] + 1900, $who);
   $changes =~ s/%/%%/g;
   $changes =~ s/^(\s*)(\#\d*)/$1\[$2\]/mg;
@@ -214,67 +216,3 @@ while(defined($_)) {
   print $changes;
 }
 exit(0);
-
-
-while (<>) {
-  chomp;
-  if (/^(?:\* )?([A-Za-z]+\s+[A-Za-z]+\s+[0-9].*[0-9][0-9][0-9][0-9])(.*\@.*$)/) {
-    my $dt = $1;
-    my $who = $2;
-    $dt = lc($dt);
-    $who =~ s/^\s+//;
-    $who =~ s/^-\s*//;
-    $dt =~ /([0-9][0-9][0-9][0-9])/;
-    my $year = $1;
-    if (!defined($zone) && $dt =~ /\s([a-z]{3,4})(dst)?\s[0-9]{4}/) {
-      my $dst = $2;
-      $zone = tz_offset($1);
-      $zone += 3600 if defined($zone) && $dst;
-    }
-    my $tdt = str2time($dt);
-    $dt =~ /([0-9]+)/;
-    my $day = $1;
-    if (!$tdt) {
-      if ($dt =~ /([a-z]{3})\s+([a-z]{3})/) {
-        $tdt = str2time("$1 $2 $day $year");
-      }
-    }
-    if (!$tdt) {
-      if ($dt =~ /([a-z]{3})/) {
-        $tdt = str2time("$1 $day $year");
-      }
-    }
-    if (!$tdt) {
-      $tdt = str2time("$year-1-1");
-    }
-    $tdt += 12 * 3600 unless $dt =~ /\d:\d/;	# 12:00 if not specified
-    $tdt += ($zone || 0);
-    if (defined($lastt) && $lastt < $tdt) {
-      die("changes file not incremental: $_\n") if $test;
-      warn("changes file not incremental: $_\n");
-    }
-    $lastt = $tdt;
-    my @gm = gmtime($tdt);
-    # rpm can't hande dates < 1997, so we fold everything to
-    # Thu Jan 02 1997
-    @gm = (0, 0, 0, 2, 0, 97, 4) if $gm[5] < 97 || ($gm[5] == 97 && $gm[3] <= 1);
-    printf("* %s %s %2d %4d %s\n", $wday[$gm[6]], $mon[$gm[4]], $gm[3], $gm[5] + 1900, $who);
-    $ok = 1;
-    next;
-  }
-  next unless $ok;
-  next if (/^--------------/);
-  next if (/^========================/);
-  s/\s+$//;
-  next if $_ eq '';
-  s/%/%%/g;
-  s/^(\s*)(\#\d*)/$1\[$2\]/;	# lines starting with hash are a comment
-  s/^\s*-/-/ if $ok == 1;	# obsolete?
-  s/^\s*\*\s*/  * /;
-  if (!/^-/) {
-    s/^\s+-\s*/  - /;
-    s/^\s*/  / unless s/^    \s*/    /;
-  }
-  $ok = 2;
-  print "$_\n";
-}
