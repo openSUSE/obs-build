@@ -150,7 +150,7 @@ function reorder {
     for PKG in "$@" ; do
 	echo "$PKG" >> $BUILD_ROOT/.init_b_cache/order.manifest
     done
-    $BUILD_DIR/order --manifest $BUILD_ROOT/.init_b_cache/order.manifest $BUILD_ROOT/.init_b_cache/rpms
+    $BUILD_DIR/order --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir $BUILD_DIR/configs --manifest $BUILD_ROOT/.init_b_cache/order.manifest $BUILD_ROOT/.init_b_cache/rpms
     rm -f $BUILD_ROOT/.init_b_cache/order.manifest
 }
 

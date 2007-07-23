@@ -213,7 +213,7 @@ sub debq {
 }
 
 sub query {
-  my ($handle, $withevra, $withfilelist) = @_;
+  my ($handle, %opts) = @_;
 
   my %res = debq($handle);
   return undef unless %res;
@@ -238,7 +238,7 @@ sub query {
     requires => \@depends,
   };
   $data->{'source'} = $src if $src ne '';
-  if ($withevra) {
+  if ($opts{'evra'}) {
     if ($res{'VERSION'} =~ /^(.*)-(.*?)$/) {
       $data->{'version'} = $1;
       $data->{'release'} = $2;
@@ -246,6 +246,9 @@ sub query {
       $data->{'version'} = $res{'VERSION'};
     }
     $data->{'arch'} = $res{'ARCHITECTURE'};
+  }
+  if ($opts{'description'}) {
+    $data->{'description'} = $res{'DESCRIPTION'};
   }
   return $data;
 }

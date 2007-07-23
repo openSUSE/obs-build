@@ -314,7 +314,7 @@ sub parse {
     }
     if ($line =~ /^PreReq:\s*(\S.*)$/i) {
       my $deps = $1;
-      my @deps = $deps =~ /([^\s\[\(,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
+      my @deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
       while (@deps) {
 	my ($pack, $vers, $qual) = splice(@deps, 0, 3);
 	next if $pack =~ /\//;
@@ -326,7 +326,7 @@ sub parse {
       my $what = $1;
       my $deps = $2;
       $ifdeps = 1 if $hasif;
-      my @deps = $deps =~ /([^\s\[\(,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
+      my @deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
       my $replace = 0;
       my @ndeps = ();
       while (@deps) {
@@ -358,7 +358,7 @@ sub parse {
       }
 
       $replace = 1 if grep {/^-/} @ndeps;
-      if ($what ne 'BuildRequires') {
+      if (lc($what) ne 'buildrequires') {
 	push @packdeps, map {"-$_"} @ndeps;
 	next;
       }
@@ -375,7 +375,7 @@ sub parse {
       if ($replace) {
 	my @cndeps = grep {!/^-/} @ndeps;
 	if (@cndeps) {
-          $xspec->[-1] = [ $xspec->[-1], "BuildRequires:  ".join(' ', @cndeps) ];
+          $xspec->[-1] = [ $xspec->[-1], "$what:  ".join(' ', @cndeps) ];
 	} else {
           $xspec->[-1] = [ $xspec->[-1], ''];
 	}
@@ -429,6 +429,8 @@ my %rpmstag = (
   "VERSION"        => 1001,
   "RELEASE"        => 1002,
   "EPOCH"          => 1003,
+  "SUMMARY"        => 1004,
+  "DESCRIPTION"    => 1005,
   "ARCH"           => 1022,
   "OLDFILENAMES"   => 1027,
   "SOURCERPM"      => 1044,
@@ -689,11 +691,12 @@ sub verscmp {
 }
 
 sub query {
-  my ($handle, $withevra, $withfilelist) = @_;
+  my ($handle, %opts) = @_;
 
   my @tags = qw{NAME SOURCERPM NOSOURCE NOPATCH SIGTAG_MD5 PROVIDENAME PROVIDEFLAGS PROVIDEVERSION REQUIRENAME REQUIREFLAGS REQUIREVERSION};
-  push @tags, qw{EPOCH VERSION RELEASE ARCH} if $withevra;
-  push @tags, qw{FILENAMES} if $withfilelist;
+  push @tags, qw{EPOCH VERSION RELEASE ARCH} if $opts{'evra'};
+  push @tags, qw{FILENAMES} if $opts{'filelist'};
+  push @tags, qw{SUMMARY DESCRIPTION} if $opts{'description'};
   my %res = rpmq($handle, @tags);
   return undef unless %res;
   my $src = $res{'SOURCERPM'}->[0];
@@ -705,8 +708,7 @@ sub query {
     name => $res{'NAME'}->[0],
     hdrmd5 => unpack('H32', $res{'SIGTAG_MD5'}->[0]),
   };
-  # XXX hack, make this another option!
-  if ($withfilelist) {
+  if ($opts{'alldeps'}) {
     $data->{'provides'} = [ @{$res{'PROVIDENAME'} || []} ];
     $data->{'requires'} = [ @{$res{'REQUIRENAME'} || []} ];
   } else {
@@ -714,7 +716,7 @@ sub query {
     $data->{'requires'} = [ grep {!/^rpmlib\(/ && !/^\//} @{$res{'REQUIRENAME'} || []} ];
   }
   $data->{'source'} = $src if $src ne '';
-  if ($withevra) {
+  if ($opts{'evra'}) {
     my $arch = $res{'ARCH'}->[0];
     $arch = $res{'NOSOURCE'} || $res{'NOPATCH'} ? 'nosrc' : 'src' unless $src ne '';
     $data->{'version'} = $res{'VERSION'}->[0];
@@ -722,8 +724,12 @@ sub query {
     $data->{'arch'} = $arch;
     $data->{'epoch'} = $res{'EPOCH'}->[0] if exists $res{'EPOCH'};
   }
-  if ($withfilelist) {
+  if ($opts{'filelist'}) {
     $data->{'filelist'} = $res{'FILENAMES'};
+  }
+  if ($opts{'description'}) {
+    $data->{'summary'} = $res{'SUMMARY'}->[0];
+    $data->{'description'} = $res{'DESCRIPTION'}->[0];
   }
   return $data;
 }

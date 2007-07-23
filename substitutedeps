@@ -91,7 +91,7 @@ for my $l (@$xspec) {
   $isbuildrequires = 1 if $l =~ /^BuildRequires:/i;
   my $r = $l;
   $r =~ s/^[^:]*:\s*//;
-  my @deps = $r =~ /([^\s\[\(,]+)(\s+[<=>]+\s+[^\s\[,]+)?[\s,]*/g;
+  my @deps = $r =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?[\s,]*/g;
   my @ndeps = ();
   my $replace = 0;
   my @f2 = Build::do_subst_vers($cf, @deps);

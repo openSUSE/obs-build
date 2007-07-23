@@ -130,9 +130,11 @@ sub read_config {
   $config->{'substitute'} = {};
   $config->{'substitute_vers'} = {};
   $config->{'optflags'} = {};
+  $config->{'order'} = {};
   $config->{'rawmacros'} = '';
   $config->{'release'} = '<CI_CNT>.<B_CNT>';
   $config->{'repotype'} = [];
+  $config->{'patterntype'} = [];
   for my $l (@spec) {
     $l = $l->[1] if ref $l;
     next unless defined $l;
@@ -159,20 +161,26 @@ sub read_config {
     } elsif ($l0 eq 'substitute:') {
       next unless @l;
       $ll = shift @l;
-      push @{$config->{'substitute'}->{$ll}}, @l;
+      $config->{'substitute'}->{$ll} = [ @l ];
     } elsif ($l0 eq 'optflags:') {
       next unless @l;
       $ll = shift @l;
       $config->{'optflags'}->{$ll} = join(' ', @l);
+    } elsif ($l0 eq 'order:') {
+      for (@l) {
+        $config->{'order'}->{$_} = 1;
+      }
     } elsif ($l0 eq 'repotype:') {
       $config->{'repotype'} = [ @l ];
+    } elsif ($l0 eq 'patterntype:') {
+      $config->{'patterntype'} = [ @l ];
     } elsif ($l0 eq 'release:') {
       $config->{'release'} = $l[0];
     } elsif ($l0 !~ /^[#%]/) {
       warn("unknown keyword in config: $l0\n");
     }
   }
-  for my $l (qw{preinstall vminstall required support keep runscripts repotype}) {
+  for my $l (qw{preinstall vminstall required support keep runscripts repotype patterntype}) {
     $config->{$l} = [ unify(@{$config->{$l}}) ];
   }
   for my $l (keys %{$config->{'substitute'}}) {
@@ -565,6 +573,9 @@ sub order {
       my @q = @{$whatprovides->{$r} || addproviders($config, $r)};
       push @r, grep {$_ ne $p && $p{$_}} @q;
     }
+    if (%{$config->{'order'} || {}}) {
+      push @r, grep {$_ ne $p && $config->{'order'}->{"$_:$p"}} @p;
+    }
     @r = unify(@r);
     $deps{$p} = \@r;
     $needed{$p} = @r;
@@ -621,11 +632,21 @@ sub order {
       }
       unshift @todo, $cycv;
       print STDERR "cycle: ".join(' -> ', @cyc)."\n";
-      my $breakv = (sort {$needed{$a} <=> $needed{$b} || $a cmp $b} @cyc)[-1];
-      push @cyc, $cyc[0];
+      my $breakv;
+      my @breakv = (@cyc, $cyc[0]);
+      while (@breakv > 1) {
+	last if $config->{'order'}->{"$breakv[0]:$breakv[1]"};
+        shift @breakv;
+      }
+      if (@breakv > 1) {
+        $breakv = $breakv[0];
+      } else {
+        $breakv = (sort {$needed{$a} <=> $needed{$b} || $a cmp $b} @cyc)[-1];
+      }
+      push @cyc, $cyc[0];	# make it loop
       shift @cyc while $cyc[0] ne $breakv;
       $v = $cyc[1];
-      print STDERR "  breaking with $breakv -> $v\n";
+      print STDERR "  breaking dependency $breakv -> $v\n";
       $deps{$breakv} = [ grep {$_ ne $v} @{$deps{$breakv}} ];
       $rdeps{$v} = [ grep {$_ ne $breakv} @{$rdeps{$v}} ];
       $needed{$breakv}--;
@@ -659,14 +680,14 @@ sub parse {
 }
 
 sub query {
-  my ($binname, $withevra, $withfilelist) = @_;
+  my ($binname, %opts) = @_;
   my $handle = $binname;
   if (ref($binname) eq 'ARRAY') {
     $handle = $binname->[1];
     $binname = $binname->[0];
   }
-  return Build::Rpm::query($handle, $withevra, $withfilelist) if $do_rpm && $binname =~ /\.rpm$/;
-  return Build::Deb::query($handle, $withevra, $withfilelist) if $do_deb && $binname =~ /\.deb$/;
+  return Build::Rpm::query($handle, %opts) if $do_rpm && $binname =~ /\.rpm$/;
+  return Build::Deb::query($handle, %opts) if $do_deb && $binname =~ /\.deb$/;
   return undef;
 }
 
