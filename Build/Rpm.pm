@@ -133,6 +133,7 @@ sub parse {
   my @macros = @{$config->{'macros'}};
   my $skip = 0;
   my $main_preamble = 1;
+  my $preamble = 1;
   my $inspec = 0;
   my $hasif = 0;
   while (1) {
@@ -322,7 +323,7 @@ sub parse {
       }
       next;
     }
-    if ($main_preamble && ($line =~ /^(BuildRequires|BuildConflicts|\#\!BuildIgnore):\s*(\S.*)$/i)) {
+    if ($preamble && ($line =~ /^(BuildRequires|BuildConflicts|\#\!BuildIgnore):\s*(\S.*)$/i)) {
       my $what = $1;
       my $deps = $2;
       $ifdeps = 1 if $hasif;
@@ -389,10 +390,12 @@ sub parse {
       } else {
 	push @subpacks, "$packname-$2" if defined $packname;
       }
+      $preamble = 1;
     }
 
     if ($line =~ /^\s*%(package|prep|build|install|check|clean|preun|postun|pretrans|posttrans|pre|post|files|changelog|description|triggerpostun|triggerun|triggerin|trigger|verifyscript)/) {
       $main_preamble = 0;
+      $preamble = 0;
     }
 
     # do this always?

@@ -144,7 +144,11 @@ sub read_config {
     my $l0 = lc($ll);
     if ($l0 eq 'macros:') {
       $l =~ s/.*?\n//s;
-      $config->{'rawmacros'} .= $l;
+      if ($l =~ /^!\n/s) {
+        $config->{'rawmacros'} = substr($l, 2);
+      } else {
+        $config->{'rawmacros'} .= $l;
+      }
       next;
     }
     if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:') {
@@ -161,14 +165,26 @@ sub read_config {
     } elsif ($l0 eq 'substitute:') {
       next unless @l;
       $ll = shift @l;
-      $config->{'substitute'}->{$ll} = [ @l ];
+      if ($ll eq '!*') {
+        $config->{'substitute'} = {};
+      } elsif ($ll =~ /^!(.*)$/) {
+        delete $config->{'substitute'}->{$1};
+      } else {
+        $config->{'substitute'}->{$ll} = [ @l ];
+      }
     } elsif ($l0 eq 'optflags:') {
       next unless @l;
       $ll = shift @l;
       $config->{'optflags'}->{$ll} = join(' ', @l);
     } elsif ($l0 eq 'order:') {
-      for (@l) {
-        $config->{'order'}->{$_} = 1;
+      for my $l (@l) {
+	if ($l eq '!*') {
+          $config->{'order'} = {};
+	} elsif ($l =~ /^!(.*)$/) {
+          delete $config->{'order'}->{$1};
+	} else {
+          $config->{'order'}->{$l} = 1;
+	}
       }
     } elsif ($l0 eq 'repotype:') {
       $config->{'repotype'} = [ @l ];
