@@ -15,6 +15,8 @@ test -z "$BUILD_ARCH" && {
 }
 export BUILD_ARCH BUILD_ROOT BUILD_DIR
 
+ccache=0
+icecream=0
 definesnstuff=()
 repos=()
 
@@ -101,6 +103,12 @@ Known Parameters:
   --define 'X Y'
               define macro X with value Y
 
+  --ccache
+              use ccache to speed up rebuilds
+
+  --icecream N
+              use N parallel build jobs with icecream
+
 Remember to have fun!
 
 [*] Maximum RPM: http://www.rpm.org/max-rpm/
@@ -159,6 +167,88 @@ toshellscript()
 	echo -n exec
 	shellquote "$@"
 	echo
+}
+
+setupccache()
+{
+    if [ "$ccache" = 1 ]; then
+	if mkdir -p $BUILD_ROOT/var/lib/build/ccache/bin; then
+	    for i in gcc g++ cc c++; do
+#		ln -sf /usr/bin/ccache $BUILD_ROOT/var/lib/build/ccache/bin/$i
+		rm -f $BUILD_ROOT/var/lib/build/ccache/bin/$i
+		test -e $BUILD_ROOT/usr/bin/$i || continue
+		echo '#! /bin/sh' > $BUILD_ROOT/var/lib/build/ccache/bin/$i
+		echo "test -e /usr/bin/$i || exit 1" > $BUILD_ROOT/var/lib/build/ccache/bin/$i
+	        echo 'export PATH=/opt/icecream/bin:/usr/bin:$PATH' >> $BUILD_ROOT/var/lib/build/ccache/bin/$i
+		echo "ccache $i \"\$@\"" >> $BUILD_ROOT/var/lib/build/ccache/bin/$i
+		chmod 755 $BUILD_ROOT/var/lib/build/ccache/bin/$i
+		echo "Installed ccache wrapper as $BUILD_ROOT/var/lib/build/ccache/bin/$i"
+	    done
+	fi
+	mkdir -p "$BUILD_ROOT"/.ccache
+	chroot "$BUILD_ROOT" chown -R "$BUILD_USER" "/.ccache"
+	echo "export CCACHE_DIR=/.ccache" > "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
+	echo 'export PATH=/var/lib/build/ccache/bin:$PATH' >> "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
+    else
+	rm -f "$BUILD_ROOT$builduserhome"/bin/{gcc,g++,cc,c++}
+	rm -f "$BUILD_ROOT"/var/lib/build/ccache/bin/{gcc,g++,cc,c++}
+    fi
+}
+
+setupicecream()
+{
+    if [ "$icecream" -eq 0 ]; then
+	rm -rf "$BUILD_ROOT"/var/run/icecream
+	rm -f "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
+	return
+    fi
+
+    if ! chroot "$BUILD_ROOT" rpm -q icecream >/dev/null 2>/dev/null; then
+	echo "*** icecream package not installed ***"
+	false
+	return
+    fi
+
+    echo "using icecream with $icecream jobs"
+
+    if [ "$ccache" -ne 1 ]; then
+	echo 'export PATH=/opt/icecream/bin:$PATH' > "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
+    else
+	echo 'export CCACHE_PATH=/opt/icecream/bin' > "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
+    fi
+
+    local icecc_vers=(`shopt -s nullglob; echo $BUILD_ROOT/var/run/icecream/*.tar.{bz2,gz}`)
+    icecc_vers=${icecc_vers//$BUILD_ROOT/}
+
+    # XXX use changelog like autobuild does instead?
+    # only run create-env if compiler or glibc changed
+    if [ -z "$icecc_vers" \
+	-o ! -e "$BUILD_ROOT/$icecc_vers" \
+	-o "$BUILD_ROOT/usr/bin/gcc" -nt "$BUILD_ROOT/$icecc_vers" \
+	-o "$BUILD_ROOT/usr/bin/g++" -nt "$BUILD_ROOT/$icecc_vers" \
+	-o "$BUILD_ROOT/usr/bin/as" -nt "$BUILD_ROOT/$icecc_vers" \
+	-o "$BUILD_ROOT/lib/libc.so.6" -nt "$BUILD_ROOT/$icecc_vers" ]
+    then
+	rm -rf $BUILD_ROOT/var/run/icecream
+	mkdir -p $BUILD_ROOT/var/run/icecream
+	if [ -e "$BUILD_ROOT"/usr/bin/create-env ]; then
+	  createenv=/usr/bin/create-env
+	elif [ -e "$BUILD_ROOT"/usr/lib/icecc/icecc-create-env ]; then
+	  createenv="/usr/lib/icecc/icecc-create-env /usr/bin/gcc /usr/bin/g++" # XXX
+	else
+	  echo "create-env not found"
+	  false
+	  return
+	fi
+	chroot $BUILD_ROOT bash -c "cd /var/run/icecream; $createenv"
+	icecc_vers=(`shopt -s nullglob; echo $BUILD_ROOT/var/run/icecream/*.tar.{bz2,gz}`)
+	icecc_vers=${icecc_vers//$BUILD_ROOT/}
+    else
+	echo "reusing existing icecream environment $icecc_vers"
+    fi
+    if [ -n "$icecc_vers" ]; then
+      echo "export ICECC_VERSION=$icecc_vers" >> "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
+    fi
 }
 
 function create_baselibs {
@@ -367,6 +457,19 @@ while test -n "$1"; do
         repos[${#repos[@]}]="$PARAM";
         repos[${#repos[@]}]="$ARG";
         shift
+      ;;
+      --icecream)
+        if [ -z "$ARG" ] ; then
+          echo "--icecream needs an argument" >&2
+          echo_help
+          cleanup_and_exit 1
+        fi
+        icecream="$ARG"
+        BUILD_JOBS="$ARG"
+        shift
+      ;;
+      --ccache)
+        ccache=1
       ;;
       ----noarg)
         echo "$ARG does not take an argument"
@@ -578,6 +681,8 @@ for SPECFILE in $SPECFILES ; do
     ADDITIONAL_PACKS=""
     test -n "$BUILD_EXTRA_PACKS" && ADDITIONAL_PACKS="$ADDITIONAL_PACKS $BUILD_EXTRA_PACKS"
     test -n "$CREATE_BASELIBS" && ADDITIONAL_PACKS="$ADDITIONAL_PACKS build"
+    test "$ccache" = '1' && ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
+    test "$icecream" -gt 1 && ADDITIONAL_PACKS="$ADDITIONAL_PACKS icecream gcc-c++"
 
     if test "$CLEAN_BUILD" = true ; then
         clean_build_root
@@ -732,6 +837,9 @@ for SPECFILE in $SPECFILES ; do
     mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
     mount -n -tdevpts none $BUILD_ROOT/dev/pts 2> /dev/null
 
+    setupicecream
+
+    setupccache
     #
     # now clean up RPM building directories
     #
