@@ -251,6 +251,25 @@ setupicecream()
     fi
 }
 
+setmemorylimit()
+{
+    if [ -n "$RUNNING_IN_XEN" ]; then
+	return
+    fi
+    local mem
+    while read mem; do
+	case "$mem" in
+	    MemTotal:*)
+		set -- $mem
+		eval "mem=\$(($2/3*2))"
+		ulimit -v $mem
+		echo "Memory limit set to ${mem}KB"
+		break;
+	    ;;
+	esac
+    done < <(cat /proc/meminfo) # cat for proc stuff
+}
+
 function create_baselibs {
     echo "... creating baselibs"
     BRPMS=
@@ -630,6 +649,8 @@ if test -n "$LOGFILE" ; then
 	exec 1> >(exec -a 'build logging tee' tee -a $LOGFILE) 2>&1
     fi
 fi
+
+setmemorylimit
 
 #
 # say hello
