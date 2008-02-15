@@ -514,7 +514,7 @@ test -z "$LIST_STATE" -a "$UID" != 0 && {
 }
 
 repos=("${repos[@]}" ${BUILD_RPMS//:/ /})
-: ${repos:=("/media/dvd/suse")}
+: ${repos:=("--repository" "/media/dvd/suse")}
 
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
