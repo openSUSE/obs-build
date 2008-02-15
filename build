@@ -16,6 +16,8 @@ test -z "$BUILD_ARCH" && {
 }
 export BUILD_ARCH BUILD_ROOT BUILD_RPMS BUILD_DIR
 
+definesnstuff=()
+
 export PATH=$BUILD_DIR:$PATH
 
 # This is for insserv
@@ -127,6 +129,27 @@ cleanup_and_exit () {
 	halt -f
     fi
     exit $1
+}
+
+shellquote()
+{
+    for arg; do
+	arg=${arg/\$/\\\$}
+	arg=${arg/\"/\\\"}
+	arg=${arg/\`/\\\`}
+	arg=${arg/\\/\\\\}
+	echo -n " \"$arg\""
+    done
+}
+
+# create a shell script from command line. Used for preserving arguments
+# through /bin/su -c
+toshellscript()
+{
+	echo "#!/bin/sh -x"
+	echo -n exec
+	shellquote "$@"
+	echo
 }
 
 function create_baselibs {
@@ -322,6 +345,11 @@ while test -n "$1"; do
       *-list*state)
 	LIST_STATE=true
       ;;
+      --define|--with|--without)
+        definesnstuff[${#definesnstuff[@]}]="$PARAM";
+        definesnstuff[${#definesnstuff[@]}]="$ARG";
+        shift
+      ;;
       ----noarg)
         echo "$ARG does not take an argument"
         cleanup_and_exit
@@ -423,7 +451,7 @@ if test -n "$LIST_STATE" ; then
        }
        for SPECFILE in $BUILD_ROOT/usr/src/packages/SPECS/*.spec ; do : ; done
     fi
-    init_buildsystem --list-state $USEUSEDFORBUILD $SPECFILE $BUILD_EXTRA_PACKS
+    init_buildsystem --list-state "${definesnstuff[@]}" $USEUSEDFORBUILD $SPECFILE $BUILD_EXTRA_PACKS
     ERR=$?
     rm -rf $BUILD_ROOT
     cleanup_and_exit $ERR
@@ -550,7 +578,7 @@ for SPECFILE in $SPECFILES ; do
     if test -n "$XENIMAGE" ; then
 	# do fist stage of init_buildsystem
         echo init_buildsystem $USEUSEDFORBUILD $RPMLIST $SPECFILE $ADDITIONAL_PACKS ...
-        init_buildsystem --prepare $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS || cleanup_and_exit 1
+        init_buildsystem --prepare "${definesnstuff[@]}" $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS || cleanup_and_exit 1
 	# start up xen, rerun ourself
 	mkdir -p $BUILD_ROOT/.build
 	cp -a $BUILD_DIR/. $BUILD_ROOT/.build
@@ -586,6 +614,9 @@ for SPECFILE in $SPECFILES ; do
 	test -n "$PERSONALITY_SYSCALL" && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
 	echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
 	echo "MYHOSTNAME='`hostname`'" >> $BUILD_ROOT/.build/build.data
+	echo -n "definesnstuff=(" >> $BUILD_ROOT/.build/build.data
+	shellquote "${definesnstuff[@]}" >> $BUILD_ROOT/.build/build.data
+	echo ")" >> $BUILD_ROOT/.build/build.data
 	umount $BUILD_ROOT
 	XMROOT=file:$XENIMAGE
 	XMROOT=${XMROOT/#file:\/dev/phy:}
@@ -618,7 +649,7 @@ for SPECFILE in $SPECFILES ; do
     fi
 
     if test "$DO_INIT" = true ; then
-        echo init_buildsystem $USEUSEDFORBUILD $RPMLIST $SPECFILE $ADDITIONAL_PACKS ...
+        echo init_buildsystem "${definesnstuff[@]}" $USEUSEDFORBUILD $RPMLIST $SPECFILE $ADDITIONAL_PACKS ...
         $BUILD_INIT_BUILDSYSTEM $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS || cleanup_and_exit 1
     fi
 
@@ -757,13 +788,27 @@ for SPECFILE in $SPECFILES ; do
     if test "$SPECFILE" = "${SPECFILE%.dsc}" ; then
 	test -z "$BUILD_RPM_BUILD_STAGE" && BUILD_RPM_BUILD_STAGE=-ba
 
-	BUILD_PARAMETERS="$BUILD_RPM_BUILD_STAGE"
-	test -n "$ABUILD_TARGET_ARCH" && BUILD_PARAMETERS="$BUILD_PARAMETERS --target=\"$ABUILD_TARGET_ARCH\""
-	test -n "$BUILD_JOBS" && BUILD_PARAMETERS="$BUILD_PARAMETERS --eval \"%define jobs \\\"$BUILD_JOBS\\\"\""
-	test root != "$BUILD_USER" && BUILD_PARAMETERS="$BUILD_PARAMETERS --eval \"%define _srcdefattr (-,root,root)\""
-	RPMBUILD=rpmbuild
-	test -x $BUILD_ROOT/usr/lib/rpm/rpmi || RPMBUILD=rpm
-	chroot $BUILD_ROOT su -c "$RPMBUILD $BUILD_PARAMETERS $TOPDIR/SOURCES/$SPECFILE" - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
+	# XXX: move _srcdefattr to macro file?
+	rpmbopts=("$BUILD_RPM_BUILD_STAGE" "--eval" "%define _srcdefattr (-,root,root)")
+	if [ -n "$ABUILD_TARGET_ARCH" ]; then
+		rpmbopts[${#rpmbopts[@]}]="--target=$ABUILD_TARGET_ARCH"
+	fi
+	if [ -n "$BUILD_JOBS" ]; then
+		rpmbopts[${#rpmbopts[@]}]='--eval'
+		rpmbopts[${#rpmbopts[@]}]="%define jobs $BUILD_JOBS"
+	fi
+	rpmbuild=rpmbuild
+
+	test -x $BUILD_ROOT/usr/lib/rpm/rpmi || rpmbuild=rpm
+	# su involves a shell which would require even more
+	# complicated quoting to bypass than this
+	toshellscript $rpmbuild \
+		"${definesnstuff[@]}" \
+		"${rpmbopts[@]}" \
+		"$TOPDIR/SOURCES/$SPECFILE" \
+		> $BUILD_ROOT/.build.command
+	chmod 755 $BUILD_ROOT/.build.command
+	chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
     else
 	chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && dpkg-buildpackage -us -uc -rfakeroot" - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
 	mkdir -p $BUILD_ROOT/$TOPDIR/DEBS

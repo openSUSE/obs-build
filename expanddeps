@@ -36,6 +36,24 @@ while (@ARGV)  {
     $useusedforbuild = 1;
     next;
   }
+  if ($ARGV[0] eq '--define') {
+    shift @ARGV;
+    my $def = shift @ARGV;
+    Build::define($def);
+    next;
+  }
+  if ($ARGV[0] eq '--with') {
+    shift @ARGV;
+    my $def = shift @ARGV;
+    Build::define("_with_$def --with-$def");
+    next;
+  }
+  if ($ARGV[0] eq '--without') {
+    shift @ARGV;
+    my $def = shift @ARGV;
+    Build::define("_without_$def --without-$def");
+    next;
+  }
   last;
 }
 $configdir = '.' unless defined $configdir;

@@ -29,10 +29,17 @@ my $std_macros = q{
 %define arml armv4l armv5l armv5tel
 %define armb armv4b armv5b armv5teb
 };
+my $extra_macros = '';
 
 sub unify {
   my %h = map {$_ => 1} @_;
   return grep(delete($h{$_}), @_);
+}
+
+sub define($)
+{
+	my $def = shift;
+	$extra_macros .= '%define '.$def."\n";
 }
 
 sub init_helper_hashes {
@@ -88,7 +95,7 @@ sub read_config_dist {
 
 sub read_config {
   my ($arch, $cfile) = @_;
-  my @macros = split("\n", $std_macros);
+  my @macros = split("\n", $std_macros.$extra_macros);
   push @macros, "%define _target_cpu $arch";
   push @macros, "%define _target_os linux";
   my $config = {'macros' => \@macros};

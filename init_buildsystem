@@ -18,6 +18,7 @@ export DEBIAN_FRONTEND=noninteractive
 export DEBIAN_PRIORITY=critical
 export BUILD_DIR=${BUILD_DIR:-/usr/lib/build}
 PROC_IS_MOUNTED=
+definesnstuff=()
 
 # should RPMs be installed with --force ?
 USE_FORCE=false
@@ -52,6 +53,11 @@ while test -n "$1" ; do
 	    RPMLIST=$1
 	    shift
 	    ;;
+	--define|--with|--without)
+	    definesnstuff[${#definesnstuff[@]}]="$1";
+	    definesnstuff[${#definesnstuff[@]}]="$2";
+	    shift 2
+	;;
 	*)
 	    break
 	    ;;
@@ -261,7 +267,7 @@ else
 	#
 	RPMLIST=$BUILD_ROOT/.init_b_cache/rpmlist
 	test -z "$LIST_STATE" && echo "expanding package dependencies..."
-	if ! expanddeps $USEUSEDFORBUILD --dist "$BUILD_DIST" --depfile "$CACHE_FILE" --archpath "$BUILD_ARCH" --configdir $BUILD_DIR/configs $PKGS > $RPMLIST ; then
+	if ! $BUILD_DIR/expanddeps $USEUSEDFORBUILD "${definesnstuff[@]}" --dist "$BUILD_DIST" --depfile "$CACHE_FILE" --archpath "$BUILD_ARCH" --configdir $BUILD_DIR/configs $PKGS > $RPMLIST ; then
 	    rm -f $BUILD_IS_RUNNING
 	    cleanup_and_exit 1
 	fi
