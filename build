@@ -9,14 +9,14 @@
 
 test -z "$BUILD_DIR" && BUILD_DIR=/usr/lib/build
 test -z "$BUILD_ROOT" && BUILD_ROOT=/var/tmp/build-root
-test -z "$BUILD_RPMS" && BUILD_RPMS=/media/dvd/suse
 test -z "$BUILD_ARCH" && {
     BUILD_ARCH=`uname -m`
     test i686 = "$BUILD_ARCH" && BUILD_ARCH=i586
 }
-export BUILD_ARCH BUILD_ROOT BUILD_RPMS BUILD_DIR
+export BUILD_ARCH BUILD_ROOT BUILD_DIR
 
 definesnstuff=()
+repos=()
 
 export PATH=$BUILD_DIR:$PATH
 
@@ -348,6 +348,15 @@ while test -n "$1"; do
       --define|--with|--without)
         definesnstuff[${#definesnstuff[@]}]="$PARAM";
         definesnstuff[${#definesnstuff[@]}]="$ARG";
+	shift
+      ;;
+      --repository)
+        if [ -z "$ARG" ] ; then
+          echo_help
+          cleanup_and_exit
+        fi
+        repos[${#repos[@]}]="$PARAM";
+        repos[${#repos[@]}]="$ARG";
         shift
       ;;
       ----noarg)
@@ -372,6 +381,9 @@ test -z "$LIST_STATE" -a "$UID" != 0 && {
     echo You have to be root to use $0. Exit.
     cleanup_and_exit 1
 }
+
+repos=("${repos[@]}" ${BUILD_RPMS//:/ /})
+: ${repos:=("/media/dvd/suse")}
 
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
@@ -451,7 +463,7 @@ if test -n "$LIST_STATE" ; then
        }
        for SPECFILE in $BUILD_ROOT/usr/src/packages/SPECS/*.spec ; do : ; done
     fi
-    init_buildsystem --list-state "${definesnstuff[@]}" $USEUSEDFORBUILD $SPECFILE $BUILD_EXTRA_PACKS
+    init_buildsystem --list-state "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $SPECFILE $BUILD_EXTRA_PACKS
     ERR=$?
     rm -rf $BUILD_ROOT
     cleanup_and_exit $ERR
@@ -577,8 +589,8 @@ for SPECFILE in $SPECFILES ; do
 
     if test -n "$XENIMAGE" ; then
 	# do fist stage of init_buildsystem
-        echo init_buildsystem $USEUSEDFORBUILD $RPMLIST $SPECFILE $ADDITIONAL_PACKS ...
-        init_buildsystem --prepare "${definesnstuff[@]}" $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS || cleanup_and_exit 1
+        echo init_buildsystem  --prepare "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $RPMLIST $SPECFILE $ADDITIONAL_PACKS ...
+        init_buildsystem --prepare "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS || cleanup_and_exit 1
 	# start up xen, rerun ourself
 	mkdir -p $BUILD_ROOT/.build
 	cp -a $BUILD_DIR/. $BUILD_ROOT/.build
@@ -591,7 +603,6 @@ for SPECFILE in $SPECFILES ; do
 	echo "SPECFILE='${SPECFILE//\'/$Q}'" > $BUILD_ROOT/.build/build.data
 	echo "BUILD_JOBS='${BUILD_JOBS//\'/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "BUILD_ARCH='${BUILD_ARCH//\'/$Q}'" >> $BUILD_ROOT/.build/build.data
-	echo "BUILD_RPMS='${BUILD_RPMS//\'/$Q}'" >> $BUILD_ROOT/.build/build.data
 	case $BUILD_DIST in
 	    */*)
 		cp $BUILD_DIST $BUILD_ROOT/.build/build.dist
@@ -616,6 +627,9 @@ for SPECFILE in $SPECFILES ; do
 	echo "MYHOSTNAME='`hostname`'" >> $BUILD_ROOT/.build/build.data
 	echo -n "definesnstuff=(" >> $BUILD_ROOT/.build/build.data
 	shellquote "${definesnstuff[@]}" >> $BUILD_ROOT/.build/build.data
+	echo ")" >> $BUILD_ROOT/.build/build.data
+	echo -n "repos=(" >> $BUILD_ROOT/.build/build.data
+	shellquote "${repos[@]}" >> $BUILD_ROOT/.build/build.data
 	echo ")" >> $BUILD_ROOT/.build/build.data
 	umount $BUILD_ROOT
 	XMROOT=file:$XENIMAGE
@@ -649,8 +663,8 @@ for SPECFILE in $SPECFILES ; do
     fi
 
     if test "$DO_INIT" = true ; then
-        echo init_buildsystem "${definesnstuff[@]}" $USEUSEDFORBUILD $RPMLIST $SPECFILE $ADDITIONAL_PACKS ...
-        $BUILD_INIT_BUILDSYSTEM $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS || cleanup_and_exit 1
+        echo init_buildsystem "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $RPMLIST $SPECFILE $ADDITIONAL_PACKS ...
+        $BUILD_INIT_BUILDSYSTEM "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS || cleanup_and_exit 1
     fi
 
     if test -z "$BUILD_DIST" -a -e "$BUILD_ROOT/.guessed_dist" ; then

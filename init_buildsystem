@@ -19,6 +19,7 @@ export DEBIAN_PRIORITY=critical
 export BUILD_DIR=${BUILD_DIR:-/usr/lib/build}
 PROC_IS_MOUNTED=
 definesnstuff=()
+repos=()
 
 # should RPMs be installed with --force ?
 USE_FORCE=false
@@ -35,7 +36,7 @@ LIST_STATE=
 RPMLIST=
 
 while test -n "$1" ; do
-    case $1 in
+    case "$1" in
 	--prepare)
 	    shift
 	    PREPARE_XEN=true
@@ -57,13 +58,20 @@ while test -n "$1" ; do
 	    definesnstuff[${#definesnstuff[@]}]="$1";
 	    definesnstuff[${#definesnstuff[@]}]="$2";
 	    shift 2
-	;;
+	    ;;
+	--repository)
+	    repos[${#repos[@]}]="$2";
+	    shift 2;
+	    ;;
 	*)
 	    break
 	    ;;
     esac
 done
 PKGS="$*"
+
+# for backward compatability
+repos=("${repos[@]}" ${BUILD_RPMS//:/ /})
 
 #
 # needed functions
@@ -191,21 +199,21 @@ DEVLIST
 }
 
 function validate_cache_file {
-    test "$BUILD_RPMS" != "$(cat $CACHE_FILE.id 2>/dev/null)" && rm -f $CACHE_FILE.id
+    test "${repos[*]}" != "$(cat $CACHE_FILE.id 2>/dev/null)" && rm -f $CACHE_FILE.id
     test -f $CACHE_FILE || rm -f $CACHE_FILE.id
-    for SRC in ${BUILD_RPMS//:/ } ; do
+    for SRC in "${repos[@]}" ; do
 	test -z "$SRC" && SRC=.
-	test $SRC -nt $CACHE_FILE && rm -f $CACHE_FILE.id
+	test "$SRC" -nt $CACHE_FILE && rm -f $CACHE_FILE.id
     done
     if ! test -f $CACHE_FILE.id ; then
 	test -z "$LIST_STATE" && echo initializing $CACHE_FILE with find command...
-	for SRC in ${BUILD_RPMS//:/ } ; do
+	for SRC in "${repos[@]}" ; do
 	    test -z "$SRC" && SRC=.
-	    find $SRC -type f -name packages -print -o -follow -type f \( -name "*.rpm" -o -name "*.deb" \) -a ! -name "*src.rpm" -printf '%T@/%s/%i %p\n'
+	    find "$SRC" -type f -name packages -print -o -follow -type f \( -name "*.rpm" -o -name "*.deb" \) -a ! -name "*src.rpm" -printf '%T@/%s/%i %p\n'
 	    echo
 	done | createrpmdeps $CACHE_FILE > $CACHE_FILE.new
 	mv $CACHE_FILE.new $CACHE_FILE
-	echo "$BUILD_RPMS" > $CACHE_FILE.id
+	echo "${repos[*]}" > $CACHE_FILE.id
     fi
 }
 
