@@ -92,6 +92,15 @@ Known Parameters:
               List rpms that would be used to create a fresh build root.
               Does not create the build root or perform a build.
 
+  --with X
+              enable feature X for build
+
+  --without X
+              disable feature X for build
+
+  --define 'X Y'
+              define macro X with value Y
+
 Remember to have fun!
 
 [*] Maximum RPM: http://www.rpm.org/max-rpm/
