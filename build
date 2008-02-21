@@ -513,8 +513,17 @@ test -z "$LIST_STATE" -a "$UID" != 0 && {
     cleanup_and_exit 1
 }
 
-repos=("${repos[@]}" ${BUILD_RPMS//:/ /})
-: ${repos:=("--repository" "/media/dvd/suse")}
+if [ -z "$RPMLIST" ]; then
+    for i in ${BUILD_RPMS//:/ /}; do
+	repos[${#repos[@]}]='--repository';
+	repos[${#repos[@]}]="$i";
+    done
+    if [ -z "$repos" ]; then
+	repos=("--repository" "/media/dvd/suse")
+    fi
+else
+    repos=()
+fi
 
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
