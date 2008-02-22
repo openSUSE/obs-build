@@ -773,6 +773,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	mkdir -p $BUILD_ROOT/.build
 	cp -a $BUILD_DIR/. $BUILD_ROOT/.build
 	if ! test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
+	    rm -rf $BUILD_ROOT/.build-srcdir
 	    mkdir $BUILD_ROOT/.build-srcdir
 	    cp -p "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
 	    MYSRCDIR=$BUILD_ROOT/.build-srcdir
