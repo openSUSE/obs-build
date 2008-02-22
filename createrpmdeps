@@ -11,6 +11,8 @@ use strict;
 
 my $rpmdepfile = $ARGV[0];
 
+my %tag;
+
 my %oldp;
 my %oldr;
 if (defined($rpmdepfile) && open(F, '<', $rpmdepfile)) {
@@ -26,24 +28,16 @@ if (defined($rpmdepfile) && open(F, '<', $rpmdepfile)) {
 }
 
 my $redo = 1;
-while ($redo) {
+foreach my $dir (@ARGV) {
   $redo = 0;
-  my $packages;
   my @known;
   my %known2fn;
   my %known2path;
   my %fnsize2id;
-  while (<STDIN>) {
+  my $cmd = "find $dir -follow -type f \\( -name \"*.rpm\" -o -name \"*.deb\" \\) -a ! -name \"*src.rpm\" -printf '\%T@/\%s/\%i \%p\\n'";
+  open(F, '-|', $cmd) or next;
+  while (<F>) {
     chomp;
-    if ($_ eq '') {
-      # next block;
-      $redo = 1;
-      last;
-    }
-    if (/\/packages$/) {
-      $packages = $_;
-      next;
-    }
     next unless /^(\d+\/\d+\/\d+) (.*)$/;
     my $id = $1;
     my $path = $2;
@@ -74,6 +68,8 @@ while ($redo) {
     $fnsize2id{"$fn-$size"} = $id;
   }
 
+  close F;
+
   my %newp;
   my %newr;
   for (@known) {
@@ -82,78 +78,11 @@ while ($redo) {
   }
 
   my @todo = grep {!($newp{$_} && $newr{$_})} @known;
-  if (@todo && $packages && open(F, '<', $packages)) {
-    my ($pack, $vers, $rel, $btime, $arch, $loc, $id, $size);
-    my ($req, $prv);
-    while (<F>) {
-      chomp;
-      next unless /^[=+]/;
-      my ($tag, $data);
-      if (/^\+(.*)$/) {
-	$tag = $1;
-	$data = '';
-	while (<F>) {
-	  chomp;
-	  last if $_ eq "-$tag";
-	  $data .= "$_\n";
-	}
-	chop $data;
-      } else {
-	($tag, $data) = split(' ', $_, 2);
-	$tag = substr($tag, 1);
-      }
-      if ($tag eq 'Pkg:') {
-	if ($pack && $loc && $size) {
-	  my $id = $fnsize2id{"$loc-$size"};
-	  if ($id && $known2path{"$pack.$arch-$id"}) {
-	    $prv = "$pack = $vers-$rel" unless defined $prv;
-	    $req = '' unless defined $req;
-	    $newp{"$pack.$arch-$id"} = "P:$pack.$arch-$id: $prv";
-	    $newr{"$pack.$arch-$id"} = "R:$pack.$arch-$id: $req";
-	  }
-	}
-	($pack, $vers, $rel, $arch) = split(' ', $data);
-	undef $req;
-	undef $prv;
-	undef $btime;
-	undef $size;
-	undef $loc;
-	undef $pack if $arch && ($arch eq 'src' || $arch eq 'nosrc');
-      } elsif ($tag eq 'Req:') {
-	next unless $pack;
-	$data =~ s/\n/ /gs;
-	$req = $data;
-      } elsif ($tag eq 'Prv:') {
-	next unless $pack;
-	# add self provides for old rpm versions
-	$data = "$pack = $vers-$rel\n$data" unless "\n$data" =~ /\n\Q$pack\E =/s;
-	$data =~ s/\n/ /gs;
-	$prv = $data;
-      } elsif ($tag eq 'Tim:') {
-	$btime = $data;
-      } elsif ($tag eq 'Loc:') {
-	my @data = split(' ', $data);
-	$loc = $data[1];
-      } elsif ($tag eq 'Siz:') {
-	my @data = split(' ', $data);
-	$size = $data[0];
-      }
-    }
-    close F;
-    if ($pack && $loc && $size) {
-      my $id = $fnsize2id{"$loc-$size"};
-      if ($id && $known2path{"$pack.$arch-$id"}) {
-	$newp{"$pack.$arch-$id"} = "P:$pack.$arch-$id: $prv";
-	$newr{"$pack.$arch-$id"} = "R:$pack.$arch-$id: $req";
-      }
-    }
-    @todo = grep {!($newp{$_} && $newr{$_})} @known;
-  }
   if (@todo) {
     for my $known (@todo) {
       my $path = $known2path{$known};
       if ($path =~ /\.rpm$/) {
-        my %res = Build::Rpm::rpmq($path, 1000, 1022, 1047, 1049, 1048, 1050, 1112, 1113);
+        my %res = Build::Rpm::rpmq($path, 1000, 1001, 1002, 1006, 1022, 1047, 1049, 1048, 1050, 1112, 1113);
         next unless %res;
         Build::Rpm::add_flagsvers(\%res, 1047, 1112, 1113);
         Build::Rpm::add_flagsvers(\%res, 1049, 1048, 1050);
@@ -168,6 +97,8 @@ while ($redo) {
         }
         $newp{$known} = "P:$known: ".join(' ', @{$res{1047} || []});
         $newr{$known} = "R:$known: ".join(' ', @{$res{1049} || []});
+	#$tag{$known} = $res{1000}->[0]."-".$res{1001}->[0]."-".$res{1002}->[0]." ".$res{1007}->[0]."-".$res{1006}->[0];
+	$tag{$known} = $res{1000}->[0]."-".$res{1001}->[0]."-".$res{1002}->[0]." ".$res{1006}->[0];
       } else {
         my %res = Build::Deb::debq($path);
         next unless %res;
@@ -200,5 +131,6 @@ while ($redo) {
     print "F:$_: $known2path{$_}\n";
     print "$newp{$_}\n";
     print "$newr{$_}\n";
+    print "I:$_: $tag{$_}\n" if exists $tag{$_};
   }
 }

@@ -1,0 +1,413 @@
+#!/usr/bin/perl -w
+
+BEGIN {
+  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+}
+
+use strict;
+use XML::Parser;
+use Data::Dumper;
+use Getopt::Long;
+use Build::Rpm;
+Getopt::Long::Configure("no_ignore_case");
+
+my @parent = [];
+my @primaryfiles = ();
+my @packages = ();
+
+my $baseurl; # current url
+
+my $opt_dump;
+my $opt_old;
+my $opt_nosrc;
+my $opt_bc;
+
+my $old_seen = ();
+
+my $repomdparser = {
+	repomd => {
+		data => {
+			_start => \&repomd_handle_data_start,
+			location => {
+				_start => \&repomd_handle_location,
+			},
+		},
+	},
+};
+
+my $primaryparser = {
+	metadata => {
+		'package' => {
+			_start => \&primary_handle_package_start,
+			_end => \&primary_handle_package_end,
+			name => { _text => \&primary_collect_text, _end => \&primary_store_text },
+			arch => { _text => \&primary_collect_text, _end => \&primary_store_text },
+			version => { _start => \&primary_handle_version },
+			'time' => { _start => \&primary_handle_time },
+			format => {
+				'rpm:provides' => { 'rpm:entry' => { _start => \&primary_handle_package_provides }, },
+				'rpm:requires' => { 'rpm:entry' => { _start => \&primary_handle_package_requires }, },
+				'rpm:conflicts' => { 'rpm:entry' => { _start => \&primary_handle_package_conflicts }, },
+				'rpm:obsoletes' => { 'rpm:entry' => { _start => \&primary_handle_package_obsoletes }, },
+				'rpm:buildhost' => { _text => \&primary_collect_text, _end => \&primary_store_text },
+				'rpm:sourcerpm' => { _text => \&primary_collect_text, _end => \&primary_store_text },
+				file => {
+					_start => \&primary_handle_file_start,
+					_text => \&primary_collect_text,
+					_end => \&primary_handle_file_end
+				},
+			},
+			location => { _start => \&primary_handle_package_location },
+		},
+	},
+};
+
+# [ [tag, \%], ... ]
+my @cursor = ();
+
+sub repomd_handle_data_start
+{
+	my $p = shift;
+	my $el = shift;
+
+	my $attr = map_attrs(@_);
+	if($attr->{'type'} ne 'primary') {
+		pop @cursor;
+	}
+}
+
+sub repomd_handle_location
+{
+	my $p = shift;
+	my $el = shift;
+
+	my $attr = map_attrs(@_);
+	if(exists $attr->{'href'}) {
+		push @primaryfiles, { location => $attr->{'href'} };
+	}
+}
+
+sub generic_handle_start
+{
+	my $p = shift;
+	my $el = shift;
+
+	if(exists $cursor[-1]->[1]->{$el})
+	{
+		my $h = $cursor[-1]->[1]->{$el};
+		push @cursor, [$el, $h];
+		if(exists $h->{'_start'}) {
+			&{$h->{'_start'}}($p, $el, @_);
+		}
+	}
+}
+
+sub generic_handle_char
+{
+	my $p = shift;
+	my $text = shift;
+
+	my $h = $cursor[-1]->[1];
+
+	if(exists $h->{'_text'}) {
+		&{$h->{'_text'}}($p, $text);
+	}
+}
+
+sub generic_handle_end
+{
+	my $p = shift;
+	my $el = shift;
+
+	if(!defined $cursor[-1]->[0] || $cursor[-1]->[0] eq $el)
+	{
+		my $h = $cursor[-1]->[1];
+
+		if(exists $h->{'_end'}) {
+			&{$h->{'_end'}}($p, $el);
+		}
+
+		pop @cursor;
+	}
+}
+
+sub map_attrs
+{
+	my %h;
+	while(@_) {
+		my $k = shift;
+		$h{$k} = shift;
+	}
+
+	return \%h;
+}
+
+# expat does not guarantee that character data doesn't get split up
+# between multiple calls
+my $textbuf = '';
+sub primary_collect_text
+{
+	my $p = shift;
+	my $text = shift;
+
+	$textbuf .= $text;
+}
+
+sub primary_store_text
+{
+    my $p = shift;
+    my $el = shift;
+
+    $packages[-1]->{$cursor[-1]->[0]} = $textbuf;
+    $textbuf = '';
+}
+
+sub primary_handle_package_start
+{
+	my $p = shift;
+	my $el = shift;
+
+	my $attr = map_attrs(@_);
+
+	push @packages, { type => $attr->{'type'}, baseurl => $baseurl };
+}
+
+sub primary_handle_package_end
+{
+	my $p = shift;
+	my $el = shift;
+
+	if($opt_bc) {
+	    printasbuildcachefile(@packages);
+	    shift @packages;
+	} elsif ($opt_old) {
+	    foreach my $pkg (@packages) {
+		my $arch = $pkg->{'arch'};
+		$arch = 'src' if $pkg->{'arch'} eq 'nosrc';
+		next if ($arch eq 'src' && $opt_nosrc);
+		if(exists($old_seen->{$pkg->{'name'}}->{$arch})) {
+		    my $pv = $old_seen->{$pkg->{'name'}}->{$arch}->{'ver'};
+		    my $rv = $pkg->{'ver'}.'-'.$pkg->{'rel'};
+		    my $vv = Build::Rpm::verscmp($pv, $rv, 0);
+		    if($vv < 0)
+		    {
+			print $old_seen->{$pkg->{'name'}}->{$arch}->{'loc'}."\n";
+			$old_seen->{$pkg->{'name'}}->{$arch}->{'ver'} = $pkg->{'ver'}.'-'.$pkg->{'rel'};
+			$old_seen->{$pkg->{'name'}}->{$arch}->{'loc'} = $pkg->{'baseurl'} . $pkg->{'location'};
+		    } else {
+			print $pkg->{'baseurl'} . $pkg->{'location'}."\n";
+		    }
+		} else {
+		    $old_seen->{$pkg->{'name'}}->{$arch}->{'ver'} = $pkg->{'ver'}.'-'.$pkg->{'rel'};
+		    $old_seen->{$pkg->{'name'}}->{$arch}->{'loc'} = $pkg->{'baseurl'} . $pkg->{'location'};
+		}
+	    }
+	    shift @packages;
+	}
+}
+
+sub primary_handle_version
+{
+	my $p = shift;
+	my $el = shift;
+
+	my $attr = map_attrs(@_);
+	$packages[-1]->{'ver'} = $attr->{'ver'};
+	$packages[-1]->{'rel'} = $attr->{'rel'};
+}
+
+sub primary_handle_time
+{
+	my $p = shift;
+	my $el = shift;
+
+	my $attr = map_attrs(@_);
+	$packages[-1]->{'filetime'} = $attr->{'file'};
+	$packages[-1]->{'buildtime'} = $attr->{'build'};
+}
+
+sub primary_handle_package_location
+{
+	my $p = shift;
+	my $el = shift;
+
+	my $attr = map_attrs(@_);
+	$packages[-1]->{'location'} = $attr->{'href'};
+}
+
+sub primary_handle_file_start
+{
+	my $p = shift;
+	my $el = shift;
+
+	my $attr = map_attrs(@_);
+	if(exists $attr->{'type'}) {
+		pop @cursor;
+	}
+}
+
+sub primary_handle_file_end
+{
+	my $p = shift;
+	my $text = shift;
+
+	primary_handle_package_deps('provides', 'name', $textbuf);
+	$textbuf = '';
+}
+
+my %flagmap = (
+	EQ => '=',
+	LE => '<=',
+	GE => '>=',
+	GT => '>',
+	LT => '<',
+	NE => '!=',
+);
+
+sub primary_handle_package_deps
+{
+	my $dep = shift;
+	my $attr = map_attrs(@_);
+
+	if(exists $attr->{'flags'}) {
+		if(!exists($flagmap{$attr->{'flags'}})) {
+			print STDERR "bogus relation: ", $attr->{'flags'}, "\n";
+			return;
+		}
+		$attr->{'flags'} = $flagmap{$attr->{'flags'}};
+	}
+	return if($attr->{'name'} =~ /^rpmlib\(/);
+	push @{$packages[-1]->{$dep}}, $attr;
+
+}
+
+sub primary_handle_package_conflicts
+{
+	shift;shift; primary_handle_package_deps('conflicts', @_);
+}
+
+sub primary_handle_package_obsoletes
+{
+	shift;shift; primary_handle_package_deps('obsoletes', @_);
+}
+
+sub primary_handle_package_requires
+{
+	shift;shift; primary_handle_package_deps('requires', @_);
+}
+sub primary_handle_package_provides
+{
+	shift;shift; primary_handle_package_deps('provides', @_);
+}
+
+sub deps2string
+{
+	return join(' ', map {
+				my $s = $_->{'name'};
+				if(exists $_->{'flags'}) {
+					$s .= ' '.$_->{'flags'}.' ';
+					$s .= $_->{'epoch'}.':' if(exists $_->{'epoch'} && $_->{'epoch'} != 0);
+					$s .= $_->{'ver'};
+					$s .= '-'.$_->{'rel'} if exists $_->{'rel'};
+				}
+				$s
+			} @_);
+}
+
+sub printasbuildcachefile(@)
+{
+	foreach my $pkg (@_) {
+		next if $pkg->{'arch'} eq 'src' || $pkg->{'arch'} eq 'nosrc';
+		my $id = sprintf("%s.%s-%d/%d/%d: ",
+			$pkg->{'name'},
+			$pkg->{'arch'},
+			$pkg->{'buildtime'},
+			$pkg->{'filetime'},
+			0);
+		print "F:".$id. $pkg->{'baseurl'} . $pkg->{'location'} . "\n";
+
+		my $deps = deps2string(@{$pkg->{'provides'}});
+		print "P:$id$deps\n";
+
+		$deps = deps2string(@{$pkg->{'requires'}});
+		print "R:$id$deps\n";
+
+		my $tag = sprintf("%s-%s-%s %s",
+			$pkg->{'name'},
+			$pkg->{'ver'},
+			$pkg->{'rel'},
+#			$pkg->{'rpm:buildhost'},
+			$pkg->{'buildtime'});
+		print "I:$id$tag\n";
+	}
+}
+
+
+### main
+
+GetOptions (
+    "nosrc"   => \$opt_nosrc,
+    "dump"   => \$opt_dump,
+    "old"   => \$opt_old,
+    ) or exit(1);
+
+$opt_bc = 1 unless ($opt_dump || $opt_old);
+
+my $p = new XML::Parser(
+	Handlers => {
+		Start => \&generic_handle_start,
+		End => \&generic_handle_end,
+		Char => \&generic_handle_char
+	});
+
+#my $url = '/mounts/mirror/SuSE/ftp.suse.com/pub/suse/update/10.1/';
+foreach my $url (@ARGV) {
+	$url .= '/' unless $url =~ /\/$/;
+
+	$baseurl = $url;
+	@primaryfiles = ();
+	@cursor = ([undef, $repomdparser]);
+
+	$p->parsefile($url . 'repodata/repomd.xml');
+
+#	print Dumper(\@primaryfiles);
+
+	foreach my $f (@primaryfiles) {
+		@cursor = ([undef, $primaryparser]);
+
+		my $u = $url . $f->{'location'};
+		$u = 'gzip -cd ' . $u . '|' if ($u =~ /\.gz$/); # XXX
+
+		my $fh;
+		open($fh, $u) or next;
+		$p->parse($fh);
+		close($fh);
+	}
+}
+
+if ($opt_dump) {
+    print Data::Dumper->Dump([\@packages], ['packages']); # caution: excessive memory consumption!
+}
+
+#if($rpmdepdump) {
+#    my %amap = map { $_ => 1 } @archs;
+#    my $packages = do $rpmdepdump or die $!;
+#
+#    foreach my $pkg (@$packages) {
+#	next if exists $packs{$pkg->{'name'}};
+#	next unless exists $amap{$pkg->{'arch'}};
+#	next if $pkg->{'arch'} eq 'src' || $pkg->{'arch'} eq 'nosrc';
+#	next if $pkg->{'location'} =~ /\.(?:patch|delta)\.rpm$/;
+#
+#	my $pa = $pkg->{'name'}.'.'.$pkg->{'arch'};
+#	$packs{$pkg->{'name'}} = $pa;
+#	$fn{$pa} = $pkg->{'baseurl'}.$pkg->{'location'};
+#	my $r = {};
+#	# flags and version ignored
+#	my @pr = map { $_->{'name'} } @{$pkg->{'provides'}};
+#	my @re = map { $_->{'name'} } @{$pkg->{'requires'}};
+#	$r->{'provides'} = \@pr;
+#	$r->{'requires'} = \@re;
+#	$repo{$pkg->{'name'}} = $r;
+#    }
+#}

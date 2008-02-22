@@ -70,8 +70,12 @@ push @archs, 'noarch' unless grep {$_ eq 'noarch'} @archs;
 
 my (%fn, %prov, %req);
 
-open(F, '<', $rpmdeps) || die("$rpmdeps: $!\n");
+my %packs;
+my %repo;
+my %ids;
+
 my %packs_arch;
+open(F, '<', $rpmdeps) || die("$rpmdeps: $!\n");
 while(<F>) {
   chomp;
   if (/^F:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
@@ -86,13 +90,45 @@ while(<F>) {
   } elsif (/^R:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
     next if $req{$1};
     $req{$1} = $2;
+  } elsif (/^I:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
+    next if $ids{$1};
+    $ids{$1} = $2;
   }
 }
 close F;
 
-my %packs;
 for my $arch (@archs) {
   $packs{$_} ||= "$_.$arch" for @{$packs_arch{$arch} || []};
+}
+
+for my $pack (keys %packs) {
+  my $r = {};
+  my (@s, $s, @pr, @re);
+  @s = split(' ', $prov{$packs{$pack}});
+  while (@s) {
+    $s = shift @s;
+    next if $s =~ /^\//;
+    if ($s =~ /^rpmlib\(/) {
+      splice(@s, 0, 2);
+      next;
+    }
+    push @pr, $s;
+    splice(@s, 0, 2) if @s && $s[0] =~ /^[<=>]/;
+  }
+  @s = split(' ', $req{$packs{$pack}});
+  while (@s) {
+    $s = shift @s;
+    next if $s =~ /^\//;
+    if ($s =~ /^rpmlib\(/) {
+      splice(@s, 0, 2);
+      next;
+    }
+    push @re, $s;
+    splice(@s, 0, 2) if @s && $s[0] =~ /^[<=>]/;
+  }
+  $r->{'provides'} = \@pr;
+  $r->{'requires'} = \@re;
+  $repo{$pack} = $r;
 }
 
 if (!defined($dist) || $dist eq '') {
@@ -179,36 +215,6 @@ if ($spec) {
   @packdeps = @{$d->{'deps'} || []};
 }
 
-my %repo;
-for my $pack (keys %packs) {
-  my $r = {};
-  my (@s, $s, @pr, @re);
-  @s = split(' ', $prov{$packs{$pack}});
-  while (@s) {
-    $s = shift @s;
-    next if $s =~ /^\//;
-    if ($s =~ /^rpmlib\(/) {
-      splice(@s, 0, 2);
-      next;
-    }
-    push @pr, $s;
-    splice(@s, 0, 2) if @s && $s[0] =~ /^[<=>]/;
-  }
-  @s = split(' ', $req{$packs{$pack}});
-  while (@s) {
-    $s = shift @s;
-    next if $s =~ /^\//;
-    if ($s =~ /^rpmlib\(/) {
-      splice(@s, 0, 2);
-      next;
-    }
-    push @re, $s;
-    splice(@s, 0, 2) if @s && $s[0] =~ /^[<=>]/;
-  }
-  $r->{'provides'} = \@pr;
-  $r->{'requires'} = \@re;
-  $repo{$pack} = $r;
-}
 Build::readdeps($cf, undef, \%repo);
 
 #######################################################################
@@ -223,6 +229,7 @@ if (!shift @bdeps) {
 
 for (@bdeps) {
   print "$_ $fn{$packs{$_}}\n";
+  print "rpmid: $_:$ids{$packs{$_}}\n" if exists $ids{$packs{$_}};
 }
 print "preinstall: @{$cf->{'preinstall'} || []}\n";
 print "runscripts: @{$cf->{'runscripts'} || []}\n";

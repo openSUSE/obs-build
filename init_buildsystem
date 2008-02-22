@@ -206,12 +206,23 @@ function validate_cache_file {
 	test "$SRC" -nt $CACHE_FILE && rm -f $CACHE_FILE.id
     done
     if ! test -f $CACHE_FILE.id ; then
-	test -z "$LIST_STATE" && echo initializing $CACHE_FILE with find command...
+	test -z "$LIST_STATE" && echo initializing $CACHE_FILE ...
 	for SRC in "${repos[@]}" ; do
-	    test -z "$SRC" && SRC=.
-	    find "$SRC" -type f -name packages -print -o -follow -type f \( -name "*.rpm" -o -name "*.deb" \) -a ! -name "*src.rpm" -printf '%T@/%s/%i %p\n'
-	    echo
-	done | createrpmdeps $CACHE_FILE > $CACHE_FILE.new
+	    test -z "$SRC" && SRC=`pwd`
+	    if [ ! -e "$SRC" ]; then
+		echo "*** $SRC does not exist" >&2
+		cleanup_and_exit 1
+	    elif [ -e "$SRC"/suse/setup/descr/packages -o -e "$SRC"/suse/setup/descr/packages.gz ]; then
+		set -- $BUILD_DIR/createyastdeps "$SRC"
+	    elif [ -e "$SRC"/repodata/repomd.xml ]; then
+		set -- $BUILD_DIR/createrepomddeps "$SRC"
+	    else
+		set -- $BUILD_DIR/createrpmdeps "$SRC"
+	    fi
+	    echo "$@" >&2
+	    "$@" || cleanup_and_exit 1
+	done > $CACHE_FILE.new
+
 	mv $CACHE_FILE.new $CACHE_FILE
 	echo "${repos[*]}" > $CACHE_FILE.id
     fi
@@ -321,7 +332,7 @@ else
 	    continue
 	fi
 	if test "$PKG" = "rpmid:" ; then
-	    echo "${SRC#*:}" > $BUILD_ROOT/.init_b_cache/rpm/${SRC%%:*}.id
+	    echo "${SRC#*:}" > $BUILD_ROOT/.init_b_cache/rpms/${SRC%%:*}.id
 	    continue
 	fi
 	ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRC##*.}"

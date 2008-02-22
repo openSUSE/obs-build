@@ -1,0 +1,141 @@
+#!/usr/bin/perl -w
+
+BEGIN {
+  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+}
+
+use Build;
+use strict;
+
+sub print_pkg($)
+{
+  my $pkg = shift;
+
+  return if $pkg->{'arch'} eq 'src' || $pkg->{'arch'} eq 'nosrc';
+  my $id = sprintf("%s.%s-%d/%d/%d: ",
+	  $pkg->{'name'},
+	  $pkg->{'arch'},
+	  $pkg->{'buildtime'},
+	  0,
+	  0);
+  print sprintf('F:%s%ssuse/%s/%s',$id,$pkg->{'baseurl'},
+    $pkg->{'arch'}, $pkg->{'location'}), "\n";
+
+  if(!$pkg->{'provides'}) # happens in 8.1 packages file
+  {
+    $pkg->{'provides'} = sprintf("%s = %s-%s", $pkg->{'name'}, $pkg->{'ver'}, $pkg->{'rel'});
+  }
+
+  print "P:$id".$pkg->{'provides'}."\n";
+  print "R:$id".$pkg->{'requires'}."\n";
+
+  my $tag = sprintf("%s-%s-%s %s",
+	  $pkg->{'name'},
+	  $pkg->{'ver'},
+	  $pkg->{'rel'},
+#			$pkg->{'rpm:buildhost'},
+	  $pkg->{'buildtime'});
+  print "I:$id$tag\n";
+}
+
+while (@ARGV)
+{
+  my $url = shift;
+  $url .= '/' unless $url =~ /\/$/;
+
+# a really fucked up system
+#  if (-e $url."/yast/order") {
+#    if(open(F, '<', $url."/yast/order")) {
+#      my $found_products;
+#      while(<F>) {
+#	chomp;
+#	my ($a, $b) = split(/ /);
+#	$a =~ s/^\///;
+#	if(-e $url.$a)
+#	{
+#	  push @ARGV, $url.$a;
+#	  $found_products = 1;
+#	  print STDERR "$url -> $url$a\n";
+#	}
+#      }
+#      close(F);
+#      next if $found_products;
+#    }
+#  }
+  # XXX: location is actually defined in content file
+  my $packages = $url.'suse/setup/descr/packages';
+
+  if(!open(F, '<', $packages)) {
+    if(!open(F, '-|', "gzip -dc $packages".'.gz')) {
+      die "$packages: $!";
+    }
+  }
+
+  {
+    my $pkg;
+    my ($req, $prv);
+    while (<F>) {
+      chomp;
+      next unless /^[=+]/;
+      my ($tag, $data);
+      if (/^\+(.*)$/) {
+	$tag = $1;
+	$data = '';
+	while (<F>) {
+	  chomp;
+	  last if $_ eq "-$tag";
+	  $data .= "$_\n";
+	}
+	chop $data;
+      } else {
+	($tag, $data) = split(' ', $_, 2);
+	$tag = substr($tag, 1);
+      }
+      if ($tag eq 'Pkg:') {
+	if($pkg) {
+	  print_pkg($pkg);
+	  undef $pkg;
+	}
+	my ($name, $vers, $rel, $arch) = split(' ', $data);
+	$pkg = {};
+	$pkg->{'name'} = $name;
+	$pkg->{'ver'} = $vers;
+	$pkg->{'rel'} = $rel;
+	$pkg->{'arch'} = $arch;
+	$pkg->{'baseurl'} = $url;
+      } elsif ($tag eq 'Req:') {
+	next unless $pkg;
+	$data =~ s/\n/ /gs;
+	$pkg->{'requires'} = $data;
+      } elsif ($tag eq 'Prv:') {
+	next unless $pkg;
+	# add self provides for old rpm versions
+	my $name = $pkg->{'name'};
+	$data = sprintf("%s = %s-%s",
+	  $name,
+	  $pkg->{'ver'},
+	  $pkg->{'rel'}) ."\n".$data unless "\n$data" =~ /\n\Q$name\E =/s;
+	$data =~ s/\n/ /gs;
+	$pkg->{'provides'} = $data;
+      } elsif ($tag eq 'Tim:') {
+	$pkg->{'buildtime'} = $data;
+      } elsif ($tag eq 'Loc:') {
+	my @data = split(' ', $data);
+	# multi cd support hack
+	my $num = $data[0];
+	if($pkg->{'baseurl'} =~ /1\/$/ && $num ne 0) {
+	  $pkg->{'baseurl'} =~ s/1\//$num\//;
+	}
+	$pkg->{'location'} = $data[1];
+      } elsif ($tag eq 'Siz:') {
+	my @data = split(' ', $data);
+	$pkg->{'size'} = $data[0];
+      }
+    }
+    close F;
+
+    print_pkg($pkg) if $pkg;
+  }
+}
+
+# vim: sw=2
