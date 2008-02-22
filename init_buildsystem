@@ -68,7 +68,7 @@ while test -n "$1" ; do
 	    ;;
     esac
 done
-PKGS="$*"
+PKGS=("$@")
 
 # for backward compatability
 repos=("${repos[@]}" ${BUILD_RPMS//:/ /})
@@ -275,7 +275,7 @@ else
 	#
 	RPMLIST=$BUILD_ROOT/.init_b_cache/rpmlist
 	test -z "$LIST_STATE" && echo "expanding package dependencies..."
-	if ! $BUILD_DIR/expanddeps $USEUSEDFORBUILD "${definesnstuff[@]}" --dist "$BUILD_DIST" --depfile "$CACHE_FILE" --archpath "$BUILD_ARCH" --configdir $BUILD_DIR/configs $PKGS > $RPMLIST ; then
+	if ! $BUILD_DIR/expanddeps $USEUSEDFORBUILD "${definesnstuff[@]}" --dist "$BUILD_DIST" --depfile "$CACHE_FILE" --archpath "$BUILD_ARCH" --configdir $BUILD_DIR/configs "${PKGS[@]}" > $RPMLIST ; then
 	    rm -f $BUILD_IS_RUNNING
 	    cleanup_and_exit 1
 	fi

@@ -19,6 +19,7 @@ repos=()
 
 DO_INIT=true
 CLEAN_BUILD=false
+SPECFILES=()
 SRCDIR=
 BUILD_JOBS=
 ABUILD_TARGET_ARCH=
@@ -382,6 +383,43 @@ set_build_arch()
     fi
 }
 
+find_spec_files()
+{
+    local spec files
+    if [ -z "$SPECFILES" ]; then
+	set -- "`pwd`"
+    else
+	set -- "${SPECFILES[@]}"
+    fi
+    SPECFILES=()
+    for spec in "$@"; do
+	if [ "$spec" = "${spec#/}" ]; then
+	    spec="`pwd`/$spec"
+	fi
+
+	if [ -d "$spec" ]; then
+	    specs=("$spec"/*.spec)
+	    if [ -n "$specs" ]; then
+		SPECFILES=("${SPECFILES[@]}" "${specs[@]}")
+	    else
+		specs=("$spec"/*.spec)
+		if [ -n "$specs" ]; then
+		    SPECFILES=("${SPECFILES[@]}" "${specs[@]}")
+		fi
+	    fi
+	else
+	    SPECFILES[${#SPECFILES[@]}]="$spec";
+	fi
+    done
+
+    if test -z "$SPECFILES"; then
+	echo no spec files or src rpms found in $@. exit...
+	cleanup_and_exit 1
+    fi
+}
+
+shopt -s nullglob
+
 if detect_xen_2nd_stage; then
     set "/.build-srcdir/$SPECFILE"
 else
@@ -532,8 +570,7 @@ while test -n "$1"; do
         cleanup_and_exit 1
       ;;
       *)
-        test -n "$SRCDIR" && usage
-        SRCDIR="$PARAM"
+        SPECFILES[${#SPECFILES[@]}]="$PARAM";
       ;;
     esac
 done
@@ -577,39 +614,12 @@ if test -n "$KILL" ; then
     exit 0
 fi
 
-if test "`echo $SRCDIR | cut -c 1`" != "/" ; then
-    SRCDIR=`pwd`/$SRCDIR
-fi
-
-if test -f $SRCDIR ; then
-    SPECFILES=`basename $SRCDIR`
-    SRCDIR=`dirname $SRCDIR`
-else
-    SPECFILES=""
-    for i in $SRCDIR/*.spec ; do
-        SPECFILES="$SPECFILES `basename $i`"
-    done
-    test -z "$SPECFILES" && {
-	for i in $SRCDIR/*.src.rpm ; do
-	    SPECFILES="$SPECFILES `basename $i`"
-	done
-    }
-fi
-
-test -z "$SPECFILES" && {
-    echo no spec files and src rpms found in $SRCDIR. exit...
-    cleanup_and_exit 1
-}
-
-if test -z "$SRCDIR" -o ! -d "$SRCDIR" ; then
-    echo Usage: $0 \<src-dirctory\>
-    cleanup_and_exit 1
-fi
+find_spec_files
 
 if test -n "$LIST_STATE" ; then
     BUILD_ROOT=`mktemp -d /var/tmp/build-list-state-XXXXXX`
     test -d "$BUILD_ROOT" || exit 1
-    SPECFILE=$SRCDIR/$SPECFILES
+    SPECFILE=$SPECFILES # only one specified anyways
     if test "$SPECFILE" != "${SPECFILE%.src.rpm}" ; then
        rm -rf $BUILD_ROOT/usr/src/packages
        mkdir -p $BUILD_ROOT/usr/src/packages/SOURCES $BUILD_ROOT/usr/src/packages/SPECS
@@ -682,9 +692,6 @@ setmemorylimit
 # say hello
 #
 test -z "$HOST" && HOST=`hostname`
-echo $HOST started \"build $SPECFILES\" at `date`.
-echo
-test -n "$REASON" && echo "$REASON"
 echo Using BUILD_ROOT=$BUILD_ROOT
 test -n "$BUILD_RPMS" && echo Using BUILD_RPMS=$BUILD_RPMS
 echo Using BUILD_ARCH=$BUILD_ARCH
@@ -693,15 +700,25 @@ echo
 
 test "$BUILD_ARCH" = all && BUILD_ARCH=
 
-cd $SRCDIR
+for SPECFILE in "${SPECFILES[@]}" ; do
 
-for SPECFILE in $SPECFILES ; do
+    SRCDIR="${SPECFILE%/*}"
+    SPECFILE="${SPECFILE##*/}"
+
+    cd "$SRCDIR"
+
+    echo
+    echo "$HOST started \"build $SPECFILE\" at `date`."
+    echo
+    test -n "$REASON" && echo "$REASON"
+    echo
+
     #
     # first setup building directory...
     #
-    test -s $SPECFILE || {
-       echo $SPECFILE is empty.  This should not happen...
-       continue
+    test -s "$SPECFILE" || {
+       echo "$SPECFILE" is empty.  This should not happen...
+       cleanup_and_exit 1
     }
 
     if test "$SPECFILE" != "${SPECFILE%.src.rpm}" ; then
@@ -711,7 +728,7 @@ for SPECFILE in $SPECFILES ; do
 	mkdir -p $BUILD_ROOT$TOPDIR/SOURCES $BUILD_ROOT$TOPDIR/SPECS
 	rpm -i --nodigest --nosignature --root $BUILD_ROOT $SPECFILE || {
 	    echo "could not install $SPECFILE."
-	    continue
+	    cleanup_and_exit 1
 	}
 	rm -rf $BUILD_ROOT/.build-srcdir
 	mkdir -p $BUILD_ROOT/.build-srcdir
@@ -722,7 +739,7 @@ for SPECFILE in $SPECFILES ; do
 	for SPECFILE in *.spec ; do : ; done
     else
 	echo processing specfile `pwd`/$SPECFILE...
-	MYSRCDIR=$SRCDIR
+	MYSRCDIR="$SRCDIR"
     fi
 
     ADDITIONAL_PACKS=""
@@ -755,9 +772,9 @@ for SPECFILE in $SPECFILES ; do
 	# start up xen, rerun ourself
 	mkdir -p $BUILD_ROOT/.build
 	cp -a $BUILD_DIR/. $BUILD_ROOT/.build
-	if ! test $MYSRCDIR = $BUILD_ROOT/.build-srcdir ; then
+	if ! test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
 	    mkdir $BUILD_ROOT/.build-srcdir
-	    cp -p $MYSRCDIR/* $BUILD_ROOT/.build-srcdir
+	    cp -p "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
 	    MYSRCDIR=$BUILD_ROOT/.build-srcdir
 	fi
 	Q="'\''"
@@ -897,8 +914,8 @@ for SPECFILE in $SPECFILES ; do
     done
     test -e $BUILD_ROOT/exit && cleanup_and_exit
     mkdir -p $BUILD_ROOT$TOPDIR/SOURCES
-    cp -p $MYSRCDIR/* $BUILD_ROOT$TOPDIR/SOURCES/
-    test $MYSRCDIR = $BUILD_ROOT/.build-srcdir && rm -rf $MYSRCDIR
+    cp -p "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+    test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir && rm -rf "$MYSRCDIR"
 
     CHANGELOGARGS=
     test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" && CHANGELOGARGS="--changelog $BUILD_ROOT/.build-changelog"
