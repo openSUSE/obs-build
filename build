@@ -9,10 +9,7 @@
 
 test -z "$BUILD_DIR" && BUILD_DIR=/usr/lib/build
 test -z "$BUILD_ROOT" && BUILD_ROOT=/var/tmp/build-root
-test -z "$BUILD_ARCH" && {
-    BUILD_ARCH=`uname -m`
-    test i686 = "$BUILD_ARCH" && BUILD_ARCH=i586
-}
+
 export BUILD_ARCH BUILD_ROOT BUILD_DIR
 
 ccache=0
@@ -362,6 +359,29 @@ detect_xen_2nd_stage()
     return 0
 }
 
+set_build_arch()
+{
+    if [ -z "$BUILD_ARCH" ]; then
+	BUILD_ARCH=`uname -m`
+	test i686 = "$BUILD_ARCH" && BUILD_ARCH=i586 # XXX: why?
+    fi
+
+    case $BUILD_ARCH in
+      i686) BUILD_ARCH="i686:i586:i486:i386" ;;
+      i586) BUILD_ARCH="i586:i486:i386" ;;
+      i486) BUILD_ARCH="i486:i386" ;;
+      x86_64) BUILD_ARCH="x86_64:i686:i586:i486:i386" ;;
+    esac
+    if test "$BUILD_ARCH" != "${BUILD_ARCH#i686}" ; then
+	cpuflags=`grep ^flags /proc/cpuinfo`
+	cpuflags="$cpuflags "
+	test "$cpuflags" = "${cpuflags/ cx8 /}" -o "$cpuflags" = "${cpuflags/ cmov /}" && {
+	    echo "Your cpu doesn't support i686 rpms. Exit."
+	    exit 1
+	}
+    fi
+}
+
 if detect_xen_2nd_stage; then
     set "/.build-srcdir/$SPECFILE"
 else
@@ -535,6 +555,8 @@ else
     repos=()
 fi
 
+set_build_arch
+
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
     if test -z "$XENIMAGE" ; then
@@ -553,21 +575,6 @@ if test -n "$KILL" ; then
 	fi
     fi
     exit 0
-fi
-
-case $BUILD_ARCH in
-  i686) BUILD_ARCH="i686:i586:i486:i386" ;;
-  i586) BUILD_ARCH="i586:i486:i386" ;;
-  i486) BUILD_ARCH="i486:i386" ;;
-  x86_64) BUILD_ARCH="x86_64:i686:i586:i486:i386" ;;
-esac
-if test "$BUILD_ARCH" != "${BUILD_ARCH#i686}" ; then
-    cpuflags=`grep ^flags /proc/cpuinfo`
-    cpuflags="$cpuflags "
-    test "$cpuflags" = "${cpuflags/ cx8 /}" -o "$cpuflags" = "${cpuflags/ cmov /}" && {
-	echo "Your cpu doesn't support i686 rpms. Exit."
-	exit 1
-    }
 fi
 
 if test "`echo $SRCDIR | cut -c 1`" != "/" ; then
