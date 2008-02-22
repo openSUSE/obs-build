@@ -31,7 +31,6 @@ LIST_STATE=
 XENIMAGE=
 XENSWAP=
 XENMEMORY=
-BUILD_INIT_BUILDSYSTEM=init_buildsystem
 RUNNING_IN_XEN=
 RPMLIST=
 RELEASE=
@@ -819,7 +818,7 @@ for SPECFILE in $SPECFILES ; do
 
     if test "$DO_INIT" = true ; then
         echo init_buildsystem "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $RPMLIST $SPECFILE $ADDITIONAL_PACKS ...
-        $BUILD_INIT_BUILDSYSTEM "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS || cleanup_and_exit 1
+        init_buildsystem "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS || cleanup_and_exit 1
     fi
 
     if test -z "$BUILD_DIST" -a -e "$BUILD_ROOT/.guessed_dist" ; then
