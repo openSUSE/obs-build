@@ -321,7 +321,12 @@ LOGFILE=
 KILL=
 CHANGELOG=
 
-if test "$0" = "/.build/build" ; then
+detect_xen_2nd_stage()
+{
+    if ! test "$0" = "/.build/build" ; then
+	return 1
+    fi
+    echo "XEN 2nd stage started"
     BUILD_ROOT=/
     BUILD_DIR=/.build
     . $BUILD_DIR/build.data
@@ -353,8 +358,14 @@ if test "$0" = "/.build/build" ; then
 	umask 022
 	swapon -v "$XENSWAP" || exit 1
     fi
-    set "/.build-srcdir/$SPECFILE"
     HOST="$MYHOSTNAME"
+
+    return 0
+}
+
+if detect_xen_2nd_stage; then
+    set "/.build-srcdir/$SPECFILE"
+else
     export HOST
 fi
 
