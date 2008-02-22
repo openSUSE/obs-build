@@ -10,7 +10,7 @@
 test -z "$BUILD_DIR" && BUILD_DIR=/usr/lib/build
 test -z "$BUILD_ROOT" && BUILD_ROOT=/var/tmp/build-root
 
-export BUILD_ARCH BUILD_ROOT BUILD_DIR
+export BUILD_ARCH BUILD_ROOT BUILD_RPMS BUILD_DIR
 
 ccache=0
 icecream=0
@@ -581,12 +581,8 @@ test -z "$LIST_STATE" -a "$UID" != 0 && {
 }
 
 if [ -z "$RPMLIST" ]; then
-    for i in ${BUILD_RPMS//:/ /}; do
-	repos[${#repos[@]}]='--repository';
-	repos[${#repos[@]}]="$i";
-    done
-    if [ -z "$repos" ]; then
-	repos=("--repository" "/media/dvd/suse")
+    if [ -z "$repos" -a -z "$BUILD_RPMS" ]; then
+	BUILD_RPMS="/media/dvd/suse"
     fi
 else
     repos=()
@@ -782,6 +778,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "SPECFILE='${SPECFILE//\'/$Q}'" > $BUILD_ROOT/.build/build.data
 	echo "BUILD_JOBS='${BUILD_JOBS//\'/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "BUILD_ARCH='${BUILD_ARCH//\'/$Q}'" >> $BUILD_ROOT/.build/build.data
+	echo "BUILD_RPMS='${BUILD_RPMS//\'/$Q}'" >> $BUILD_ROOT/.build/build.data
 	case $BUILD_DIST in
 	    */*)
 		cp $BUILD_DIST $BUILD_ROOT/.build/build.dist

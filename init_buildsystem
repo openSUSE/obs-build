@@ -70,9 +70,6 @@ while test -n "$1" ; do
 done
 PKGS=("$@")
 
-# for backward compatability
-repos=("${repos[@]}" ${BUILD_RPMS//:/ /})
-
 #
 # needed functions
 #
@@ -199,22 +196,27 @@ DEVLIST
 }
 
 function validate_cache_file {
-    test "${repos[*]}" != "$(cat $CACHE_FILE.id 2>/dev/null)" && rm -f $CACHE_FILE.id
+    local findonly=''
+    test "${repos[*]} ${BUILD_RPMS//:/ /}" != "$(cat $CACHE_FILE.id 2>/dev/null)" && rm -f $CACHE_FILE.id
     test -f $CACHE_FILE || rm -f $CACHE_FILE.id
-    for SRC in "${repos[@]}" ; do
+    for SRC in "${repos[@]}" ${BUILD_RPMS//:/ /}; do
 	test -z "$SRC" && SRC=.
 	test "$SRC" -nt $CACHE_FILE && rm -f $CACHE_FILE.id
     done
     if ! test -f $CACHE_FILE.id ; then
 	test -z "$LIST_STATE" && echo initializing $CACHE_FILE ...
-	for SRC in "${repos[@]}" ; do
+	for SRC in "${repos[@]}" -- ${BUILD_RPMS//:/ /}; do
+	    if test "$SRC" = '--' ; then
+		findonly=1
+		continue
+	    fi
 	    test -z "$SRC" && SRC=`pwd`
 	    if [ ! -e "$SRC" ]; then
 		echo "*** $SRC does not exist" >&2
 		cleanup_and_exit 1
-	    elif [ -e "$SRC"/suse/setup/descr/packages -o -e "$SRC"/suse/setup/descr/packages.gz ]; then
+	    elif [ -z "$findonly" -a -e "$SRC"/suse/setup/descr/packages -o -e "$SRC"/suse/setup/descr/packages.gz ]; then
 		set -- $BUILD_DIR/createyastdeps "$SRC"
-	    elif [ -e "$SRC"/repodata/repomd.xml ]; then
+	    elif [ -z "$findonly" -a -e "$SRC"/repodata/repomd.xml ]; then
 		set -- $BUILD_DIR/createrepomddeps "$SRC"
 	    else
 		set -- $BUILD_DIR/createrpmdeps "$SRC"
@@ -224,7 +226,7 @@ function validate_cache_file {
 	done > $CACHE_FILE.new
 
 	mv $CACHE_FILE.new $CACHE_FILE
-	echo "${repos[*]}" > $CACHE_FILE.id
+	echo "${repos[*]} ${BUILD_RPMS//:/ /}" > $CACHE_FILE.id
     fi
 }
 
