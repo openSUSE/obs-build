@@ -124,7 +124,7 @@ while (@ARGV)
 	# multi cd support hack
 	my $num = $data[0];
 	if($pkg->{'baseurl'} =~ /1\/$/ && $num ne 0) {
-	  $pkg->{'baseurl'} =~ s/1\//$num\//;
+	  $pkg->{'baseurl'} =~ s/1\/$/$num\//;
 	}
 	$pkg->{'location'} = $data[1];
       } elsif ($tag eq 'Siz:') {
