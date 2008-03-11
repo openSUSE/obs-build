@@ -17,7 +17,8 @@ export YAST_IS_RUNNING="instsys"
 export DEBIAN_FRONTEND=noninteractive
 export DEBIAN_PRIORITY=critical
 export BUILD_DIR=${BUILD_DIR:-/usr/lib/build}
-PROC_IS_MOUNTED=
+# need to restore build root owner for non-root builds
+browner=0
 definesnstuff=()
 repos=()
 
@@ -75,16 +76,25 @@ PKGS=("$@")
 #
 
 function cleanup_and_exit {
-    test -n "$PROC_IS_MOUNTED" && umount -n $BUILD_ROOT/proc 2>/dev/null
+    [ "$BUILD_ROOT" != / ] || chown $browner $BUILD_ROOT
+    # umount so init_buildsystem can be used standalone
+# XXX: use stat -f /dev/pts/ -c %T  to check whether it's mounted and not suppress errors then?
+    umount -n $BUILD_ROOT/proc 2> /dev/null || true
+    umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
+    umount -n $BUILD_ROOT/mnt 2> /dev/null || true
     exit ${1:-0}
 }
 
 function clean_build_root () {
         test -n "$BUILD_ROOT" && {
-            umount -n $BUILD_ROOT/proc 2> /dev/null
-            umount -n $BUILD_ROOT/dev/pts 2> /dev/null
-            umount -n $BUILD_ROOT/mnt 2> /dev/null
+            umount -n $BUILD_ROOT/proc 2> /dev/null || true
+            umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
+            umount -n $BUILD_ROOT/mnt 2> /dev/null || true
             rm -rf $BUILD_ROOT/*
+	    if [ "$UID" = '0' ]; then
+		    mount -n -tproc none $BUILD_ROOT/proc
+		    mount -n -tdevpts none $BUILD_ROOT/dev/pts
+	    fi
         }
 }
 
@@ -229,6 +239,10 @@ function validate_cache_file {
 	echo "${repos[*]} ${BUILD_RPMS//:/ /}" > $CACHE_FILE.id
     fi
 }
+
+if [ "$BUILD_ROOT" = / ]; then
+    read dummy dummy browner dummy < <(ls -ld /)
+fi
 
 #
 # now test if there was an incomplete run
@@ -392,7 +406,9 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
 	    preinstall ${PKG##*/}
 	done
     fi
-    test -c $BUILD_ROOT/dev/null || create_devs
+    if [ -w /root ]; then
+	    test -c $BUILD_ROOT/dev/null || create_devs
+    fi
     test -e $BUILD_ROOT/etc/fstab || touch $BUILD_ROOT/etc/fstab
     test -e $BUILD_ROOT/etc/ld.so.conf || cp $BUILD_ROOT/etc/ld.so.conf.in $BUILD_ROOT/etc/ld.so.conf
     if test -z "$PREPARE_XEN" ; then
@@ -423,8 +439,9 @@ if test -n "$PREPARE_XEN" ; then
 fi
 
 mkdir -p $BUILD_ROOT/proc
-mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
-PROC_IS_MOUNTED=true
+mkdir -p $BUILD_ROOT/dev/pts
+mount -n -tproc none $BUILD_ROOT/proc 2>/dev/null || true
+mount -n -tdevpts none $BUILD_ROOT/dev/pts 2>/dev/null || true
 
 #
 # get list and ids of already installed rpms
@@ -559,6 +576,9 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
     test -e $BUILD_ROOT/exit && cleanup_and_exit 1
     echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
 done
+
+# devices can vanish if devs got uninstalled
+test -c $BUILD_ROOT/dev/null || create_devs
 
 cd $BUILD_ROOT || cleanup_and_exit 1
 

@@ -17,8 +17,19 @@ icecream=0
 definesnstuff=()
 repos=()
 
+# mkreiserfs only works with qemu/uml if it is able to create a file
+# system that is owned by the calling user (bnc#369006)
+xen_img_mkfs='mkreiserfs -q -f'
+#xen_img_mkfs='mkfs.ext2 -m 0 -q -F'
+#xen_img_mkfs='mkfs.ext3 -j -m 0 -q -F'
+qemu_kernel=/boot/vmlinuz
+qemu_initrd=/boot/initrd
+qemu_bin=/usr/bin/qemu
+uml_kernel=/boot/vmlinux-um
+uml_initrd=/boot/initrd-um
+
 DO_INIT=true
-CLEAN_BUILD=false
+CLEAN_BUILD=
 SPECFILES=()
 SRCDIR=
 BUILD_JOBS=
@@ -26,7 +37,10 @@ ABUILD_TARGET_ARCH=
 CREATE_BASELIBS=
 USEUSEDFORBUILD=
 LIST_STATE=
-XENIMAGE=
+USE_UML=
+USE_QEMU=
+USE_XEN=
+VM_IMAGE=
 XENSWAP=
 XENMEMORY=
 RUNNING_IN_XEN=
@@ -162,6 +176,10 @@ cleanup_and_exit () {
 	kill -9 -1	# goodbye cruel world
 	exec /bin/bash -c 'mount -n -o remount,ro / ; halt -f'
 	halt -f
+    else
+	umount -n $BUILD_ROOT/proc 2>/dev/null || true
+	umount -n $BUILD_ROOT/dev/pts 2>/dev/null || true
+	[ -n "$VM_IMAGE" ] && umount "$VM_IMAGE" 2>/dev/null || true
     fi
     exit $1
 }
@@ -336,7 +354,7 @@ detect_xen_2nd_stage()
     fi
     PATH=$BUILD_DIR:$PATH
     RUNNING_IN_XEN=true
-    mount -orw -n -tproc none /proc 2>/dev/null
+    mount -orw -n -tproc none /proc
     mount -n -o remount,rw /
     if test -n "$XENSWAP" ; then
 	for i in 1 2 3 4 5 6 7 8 9 10 ; do
@@ -347,7 +365,9 @@ detect_xen_2nd_stage()
 	done
 	test $i = 1 || echo
     fi
-    umount -l /dev 2>/dev/null
+#why would one want to do that?? Breaks all kinds of things
+#    umount -l /dev 2>/dev/null
+# XXX: why wait for it and then recreate?
     if test -n "$XENSWAP" ; then
 	rm -f "$XENSWAP"
 	umask 027
@@ -415,6 +435,32 @@ find_spec_files()
     if test -z "$SPECFILES"; then
 	echo no spec files or src rpms found in $@. exit...
 	cleanup_and_exit 1
+    fi
+}
+
+become_root_or_fail()
+{
+    if [ ! -w /root ]; then
+	echo "You have to be root to use $0" >&2
+	exit 1
+    fi
+    cleanup_and_exit 1
+}
+
+mkdir_build_root()
+{
+    if [ -d "$BUILD_ROOT" ]; then
+	# check if it is owned by root
+	if [ -z "$RUNNING_IN_XEN" -a \! -O "$BUILD_ROOT" ]; then
+	    echo "BUILD_ROOT=$BUILD_ROOT must be owned by $USER. Exit..."
+	    cleanup_and_exit 1
+	fi
+    else
+	test "$BUILD_ROOT" != "${BUILD_ROOT%/*}" && mkdir -p "${BUILD_ROOT%/*}"
+	if ! mkdir $BUILD_ROOT; then
+	    echo "can not create BUILD_ROOT=$BUILD_ROOT. Exit..."
+	    cleanup_and_exit 1
+	fi
     fi
 }
 
@@ -490,8 +536,31 @@ while test -n "$1"; do
 	shift
       ;;
       *-xen)
-        XENIMAGE="$ARG"
-        shift
+        USE_XEN=1
+	if [ -n "$ARG" -a "$ARG" = "${ARG#-}" ]; then
+	    VM_IMAGE="$ARG"
+	    shift
+	else
+	    VM_IMAGE=1
+	fi
+      ;;
+      --uml)
+	USE_UML=1
+	if [ -n "$ARG" -a "$ARG" = "${ARG#-}" ]; then
+	    VM_IMAGE="$ARG"
+	    shift
+	else
+	    VM_IMAGE=1
+	fi
+      ;;
+      --qemu)
+	USE_QEMU=1
+	if [ -n "$ARG" -a "$ARG" = "${ARG#-}" ]; then
+	    VM_IMAGE="$ARG"
+	    shift
+	else
+	    VM_IMAGE=1
+	fi
       ;;
       *-xenswap)
         XENSWAP="$ARG"
@@ -575,10 +644,36 @@ while test -n "$1"; do
     esac
 done
 
-test -z "$LIST_STATE" -a "$UID" != 0 && {
-    echo You have to be root to use $0. Exit.
-    cleanup_and_exit 1
-}
+if [ -z "$RUNNING_IN_XEN" ]; then
+    
+    if [ -n "$VM_IMAGE" ]; then
+	if [ "$VM_IMAGE" = 1 ]; then
+	    VM_IMAGE="$BUILD_ROOT.img"
+	fi
+	if [ ! -f "$VM_IMAGE" ]; then
+	    echo "you need to create a file system on $VM_IMAGE first"
+	    cleanup_and_exit 1
+	fi
+    fi
+
+    if [ -n "$VM_IMAGE" ]; then
+
+	if [ -n "$CLEAN_BUILD" ]; then
+	    echo "Creating filesystem on $VM_IMAGE"
+	    $xen_img_mkfs $VM_IMAGE || become_root_or_fail
+	fi
+
+	mkdir_build_root
+
+	if [ -w /root ]; then
+	    mount -o loop $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 1
+	else
+	    mount $BUILD_ROOT || become_root_or_fail
+	fi
+    else
+	[ -w /root ] || become_root_or_fail
+    fi
+fi
 
 if [ -z "$RPMLIST" ]; then
     if [ -z "$repos" -a -z "$BUILD_RPMS" ]; then
@@ -592,13 +687,13 @@ set_build_arch
 
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
-    if test -z "$XENIMAGE" ; then
+    if test -z "$VM_IMAGE" ; then
 	if ! $BUILD_DIR/killchroot -s 9 $BUILD_ROOT ; then
 	    echo "could not kill build in $BUILD_ROOT"
 	    exit 1
 	fi
     else
-	XENID="${XENIMAGE%/root}"
+	XENID="${VM_IMAGE%/root}"
 	XENID="${XENID##*/}"
 	if xm list "build:$XENID" >/dev/null 2>&1 ; then
 	    if ! xm destroy "build:$XENID" ; then
@@ -632,42 +727,23 @@ if test -n "$LIST_STATE" ; then
     cleanup_and_exit $ERR
 fi
 
-if test -d "$BUILD_ROOT" ; then
-    # check if it is owned by root
-    test -O "$BUILD_ROOT" || {
-	echo "BUILD_ROOT=$BUILD_ROOT must be owned by root. Exit..."
-	cleanup_and_exit 1
-    }
-else
-    test "$BUILD_ROOT" != "${BUILD_ROOT%/*}" && mkdir -p "${BUILD_ROOT%/*}"
-    mkdir $BUILD_ROOT || {
-	echo "can not create BUILD_ROOT=$BUILD_ROOT. Exit..."
-	cleanup_and_exit 1
-    }
-fi
+mkdir_build_root
 
-if test -n "$XENIMAGE" ; then
-    umount -n $BUILD_ROOT/proc 2> /dev/null
-    umount -n $BUILD_ROOT/dev/pts 2> /dev/null
-    umount -t loop $BUILD_ROOT 2>/dev/null
-    if test "$CLEAN_BUILD" = true ; then
-	echo "Creating filesystem on $XENIMAGE"
-	if ! echo y | mkfs -t reiserfs -f $XENIMAGE >/dev/null 2>&1 ; then
-	    if ! echo y | mkfs -t reiserfs -f $XENIMAGE ; then
-		cleanup_and_exit 1
-	    fi
-	fi
-    fi
-    mount -oloop $XENIMAGE $BUILD_ROOT || cleanup_and_exit 1
-    if test -n "$XENSWAP" ; then
-	dd if=/dev/zero of="$XENSWAP" bs=12 count=1 conv=notrunc 2>/dev/null
-	mkswap "$XENSWAP"
-    fi
+if test -n "$XENSWAP" ; then
+    dd if=/dev/zero of="$XENSWAP" bs=12 count=1 conv=notrunc 2>/dev/null
+    mkswap "$XENSWAP"
 fi
 
 rm -f $BUILD_ROOT/exit
 
-if test -z "$XENIMAGE" -a -z "$LOGFILE"; then
+if [ -w /root ]; then
+    mkdir -p $BUILD_ROOT/proc
+    mkdir -p $BUILD_ROOT/dev/pts
+    mount -n -tproc none $BUILD_ROOT/proc || true
+    mount -n -tdevpts none $BUILD_ROOT/dev/pts
+fi
+
+if test -z "$VM_IMAGE" -a -z "$LOGFILE"; then
     LOGFILE="$BUILD_ROOT/.build.log"
 fi
 
@@ -675,7 +751,7 @@ if test -n "$LOGFILE" ; then
     echo  logging output to $LOGFILE...
     rm -f $LOGFILE
     touch $LOGFILE
-    if test -n "$XENIMAGE" ; then
+    if test -n "$VM_IMAGE" ; then
 	exec 1> >(exec -a 'build logging tee' perl -e 'open(F,">>",$ARGV[0])||die("$ARGV[0]: $!\n");$|=1;select(F);$|=1;while(<STDIN>){print STDOUT;s/^\r//s;s/\r\n/\n/gs;print F}' $LOGFILE) 2>&1
     else
 	exec 1> >(exec -a 'build logging tee' tee -a $LOGFILE) 2>&1
@@ -691,7 +767,7 @@ test -z "$HOST" && HOST=`hostname`
 echo Using BUILD_ROOT=$BUILD_ROOT
 test -n "$BUILD_RPMS" && echo Using BUILD_RPMS=$BUILD_RPMS
 echo Using BUILD_ARCH=$BUILD_ARCH
-test -n "$XENIMAGE" && echo "Doing XEN build in $XENIMAGE"
+test -n "$USE_XEN" && echo "Doing XEN build in $VM_IMAGE"
 echo
 
 test "$BUILD_ARCH" = all && BUILD_ARCH=
@@ -761,12 +837,21 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	fi
     fi
 
-    if test -n "$XENIMAGE" ; then
-	# do fist stage of init_buildsystem
-        echo init_buildsystem  --prepare "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $RPMLIST $SPECFILE $ADDITIONAL_PACKS ...
-        init_buildsystem --prepare "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS || cleanup_and_exit 1
-	# start up xen, rerun ourself
+    if test -n "$USE_XEN" -o -n "$USE_UML" -o -n "$USE_QEMU"; then
+	rm -rf $BUILD_ROOT/.build
 	mkdir -p $BUILD_ROOT/.build
+	if test "$DO_INIT" = true ; then
+	    # do fist stage of init_buildsystem
+	    rm -f $BUILD_ROOT/.build.success
+	    set -- init_buildsystem --prepare "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
+	    echo "$* ..."
+	    "$@" || cleanup_and_exit 1
+	    if [ ! -w /root ]; then
+		# remove setuid bit if files belong to user to make e.g. mount work
+		find $BUILD_ROOT/{bin,sbin,usr/bin,usr/sbin} -type f -uid $UID -perm +4000 -print0 | xargs -0 --no-run-if-empty chmod -s
+	    fi
+	fi
+	# start up xen, rerun ourself
 	cp -a $BUILD_DIR/. $BUILD_ROOT/.build
 	if ! test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
 	    rm -rf $BUILD_ROOT/.build-srcdir
@@ -807,24 +892,41 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo -n "repos=(" >> $BUILD_ROOT/.build/build.data
 	shellquote "${repos[@]}" >> $BUILD_ROOT/.build/build.data
 	echo ")" >> $BUILD_ROOT/.build/build.data
-	umount $BUILD_ROOT
-	XMROOT=file:$XENIMAGE
-	XMROOT=${XMROOT/#file:\/dev/phy:}
-	XMROOT="disk=$XMROOT,hda1,w"
-	XMSWAP=
-	if test -n "$XENSWAP" ; then
-	    XMSWAP=file:$XENSWAP
-	    XMSWAP=${XMSWAP/#file:\/dev/phy:}
-	    XMSWAP="disk=$XMSWAP,hda2,w"
-	fi
-	XENID="${XENIMAGE%/root}"
-	XENID="${XENID##*/}"
-	echo "starting xen virtual machine"
-	if test "$PERSONALITY" != 0 ; then
-	    # have to switch back to PER_LINUX to make xm work
-	    perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' xm create -c $BUILD_DIR/xen.conf name="build:$XENID" $XENMEMORY $XMROOT $XMSWAP extra="init=/.build/build panic=1 console=ttyS0"
-	else
-	    xm create -c $BUILD_DIR/xen.conf name="build:$XENID" $XENMEMORY $XMROOT $XMSWAP extra="init=/.build/build panic=1 console=ttyS0"
+	umount -n $BUILD_ROOT/proc 2> /dev/null || true
+	umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
+	umount -n $BUILD_ROOT/mnt 2> /dev/null || true
+	umount $VM_IMAGE
+
+	if [ -n "$USE_XEN" ]; then
+		XMROOT=file:$VM_IMAGE
+		XMROOT=${XMROOT/#file:\/dev/phy:}
+		XMROOT="disk=$XMROOT,hda1,w"
+		XMSWAP=
+		if test -n "$XENSWAP" ; then
+		    XMSWAP=file:$XENSWAP
+		    XMSWAP=${XMSWAP/#file:\/dev/phy:}
+		    XMSWAP="disk=$XMSWAP,hda2,w"
+		fi
+		XENID="${VM_IMAGE%/root}"
+		XENID="${XENID##*/}"
+		echo "booting XEN kernel ..."
+		set -- xm create -c $BUILD_DIR/xen.conf name="build:$XENID" ${VM_MEMORY:+memory=$VM_MEMORY} $XMROOT $XMSWAP extra="init=/.build/build panic=1 console=ttyS0"
+		if test "$PERSONALITY" != 0 ; then
+		    # have to switch back to PER_LINUX to make xm work
+		    set -- perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' "$@"
+		fi
+		echo "$@"
+		"$@" || true # somehow this is always false
+	elif [ -n "$USE_UML" ]; then
+		echo "booting UML kernel ..."
+		set -- $uml_kernel initrd=$uml_initrd root=/ubda init=/.build/build panic=1 quiet ubd0=$VM_IMAGE ${VM_MEMORY:+mem=$VM_MEMORY}
+		echo "$@"
+		"$@"
+	elif [ -n "$USE_QEMU" ]; then
+		echo "booting QEMU ..."
+		set -- $qemu_bin -no-reboot -nographic -net none -kernel $qemu_kernel -initrd $qemu_initrd -append "init=/.build/build panic=1 quiet root=/dev/sda rw console=ttyS0,115200" -serial stdio -hda $VM_IMAGE ${VM_MEMORY:+-m $VM_MEMORY}
+		echo "$@"
+		"$@"
 	fi
 	if test -n "$XENSWAP" ; then
 	    BUILDSTATUS=`dd if="$XENSWAP" bs=12 count=1 2>/dev/null`
@@ -841,6 +943,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     if test "$DO_INIT" = true ; then
         echo init_buildsystem "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $RPMLIST $SPECFILE $ADDITIONAL_PACKS ...
         init_buildsystem "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS || cleanup_and_exit 1
+	mount -n -tproc none $BUILD_ROOT/proc || true
+	mount -n -tdevpts none $BUILD_ROOT/dev/pts
     fi
 
     if test -z "$BUILD_DIST" -a -e "$BUILD_ROOT/.guessed_dist" ; then
@@ -898,7 +1002,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
     mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
     mount -n -tdevpts none $BUILD_ROOT/dev/pts 2> /dev/null
-
+ 
     setupicecream
 
     setupccache
@@ -1010,9 +1114,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	done
     fi
 
-    umount -n $BUILD_ROOT/proc 2> /dev/null
-    umount -n $BUILD_ROOT/mnt 2> /dev/null
-    umount -n $BUILD_ROOT/dev/pts 2> /dev/null
     test "$BUILD_SUCCEDED" = true || cleanup_and_exit 1
     test -d "$SRCDIR" && cd "$SRCDIR"
 done
