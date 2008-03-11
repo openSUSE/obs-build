@@ -35,6 +35,7 @@ PREPARE_XEN=
 USEUSEDFORBUILD=
 LIST_STATE=
 RPMLIST=
+CLEAN_BUILD=
 
 while test -n "$1" ; do
     case "$1" in
@@ -64,6 +65,10 @@ while test -n "$1" ; do
 	    repos[${#repos[@]}]="$2";
 	    shift 2;
 	    ;;
+	--clean)
+	    CLEAN_BUILD="$1"
+	    shift
+	;;
 	*)
 	    break
 	    ;;
@@ -90,7 +95,11 @@ function clean_build_root () {
             umount -n $BUILD_ROOT/proc 2> /dev/null || true
             umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
             umount -n $BUILD_ROOT/mnt 2> /dev/null || true
-            rm -rf $BUILD_ROOT/*
+            rm -rf -- $BUILD_ROOT/*
+            rm -rf -- $BUILD_ROOT/.build
+	    rm -rf -- $BUILD_ROOT/.init_b_cache
+	    mkdir -p $BUILD_ROOT/proc
+	    mkdir -p $BUILD_ROOT/dev/pts
 	    if [ "$UID" = '0' ]; then
 		    mount -n -tproc none $BUILD_ROOT/proc
 		    mount -n -tdevpts none $BUILD_ROOT/dev/pts
@@ -242,6 +251,10 @@ function validate_cache_file {
 
 if [ "$BUILD_ROOT" = / ]; then
     read dummy dummy browner dummy < <(ls -ld /)
+fi
+
+if [ -n "$CLEAN_BUILD" ]; then
+    clean_build_root
 fi
 
 #

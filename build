@@ -151,15 +151,6 @@ usage () {
     cleanup_and_exit 1
 }
 
-function clean_build_root () {
-        test -n "$BUILD_ROOT" && {
-            umount -n $BUILD_ROOT/proc 2> /dev/null
-            umount -n $BUILD_ROOT/dev/pts 2> /dev/null
-            umount -n $BUILD_ROOT/mnt 2> /dev/null
-            rm -rf $BUILD_ROOT/*
-        }
-}
-
 #
 #  cleanup_and_exit
 #
@@ -491,7 +482,7 @@ while test -n "$1"; do
         DO_INIT=false
       ;;
       *-clean)
-        CLEAN_BUILD=true
+        CLEAN_BUILD='--clean'
       ;;
       *-kill)
         KILL=true
@@ -685,6 +676,10 @@ fi
 
 set_build_arch
 
+if [ -n "$CLEAN_BUILD" ]; then
+    DO_INIT=true
+fi
+
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
     if test -z "$VM_IMAGE" ; then
@@ -820,11 +815,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     test "$ccache" = '1' && ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
     test "$icecream" -gt 1 && ADDITIONAL_PACKS="$ADDITIONAL_PACKS icecream gcc-c++"
 
-    if test "$CLEAN_BUILD" = true ; then
-        clean_build_root
-        DO_INIT=true
-    fi
-
     if test -n "$CHANGELOG" -a -z "$RUNNING_IN_XEN" ; then
 	rm -f $BUILD_ROOT/.build-changelog
 	case $SPECFILE in
@@ -843,7 +833,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if test "$DO_INIT" = true ; then
 	    # do fist stage of init_buildsystem
 	    rm -f $BUILD_ROOT/.build.success
-	    set -- init_buildsystem --prepare "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
+	    set -- init_buildsystem --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
 	    echo "$* ..."
 	    "$@" || cleanup_and_exit 1
 	    if [ ! -w /root ]; then
@@ -941,8 +931,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
 
     if test "$DO_INIT" = true ; then
-        echo init_buildsystem "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $RPMLIST $SPECFILE $ADDITIONAL_PACKS ...
-        init_buildsystem "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS || cleanup_and_exit 1
+        set -- init_buildsystem "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
+	echo "$* ..."
+	"$@" || cleanup_and_exit 1
 	mount -n -tproc none $BUILD_ROOT/proc || true
 	mount -n -tdevpts none $BUILD_ROOT/dev/pts
     fi
