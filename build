@@ -1012,7 +1012,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     rm -rf $BUILD_ROOT$TOPDIR
     for i in BUILD RPMS/`arch` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS ; do
         mkdir -p $BUILD_ROOT$TOPDIR/$i
-	test BUILD_USER = abuild && chown 99:99 $BUILD_ROOT$TOPDIR/$i
+	test $BUILD_USER = abuild && chown 99:99 $BUILD_ROOT$TOPDIR/$i
     done
     test -e $BUILD_ROOT/exit && cleanup_and_exit
     mkdir -p $BUILD_ROOT$TOPDIR/SOURCES
