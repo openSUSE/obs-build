@@ -289,7 +289,7 @@ setupicecream()
 
 setmemorylimit()
 {
-    if [ -n "$RUNNING_IN_XEN" ]; then
+    if [ -n "$VM_IMAGE" -o -n "$RUNNING_IN_XEN" ]; then
 	return
     fi
     local mem
