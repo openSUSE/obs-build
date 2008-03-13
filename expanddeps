@@ -141,6 +141,7 @@ if (!defined($dist) || $dist eq '') {
     chomp $rpmdist;
     $rpmdist = lc($rpmdist);
     $rpmdist =~ s/-/_/g;
+    $rpmdist =~ s/opensuse/suse linux/;
     my $rpmdista = $rpmdist;
     $rpmdista =~ s/.*\(//;
     $rpmdista =~ s/\).*//;
