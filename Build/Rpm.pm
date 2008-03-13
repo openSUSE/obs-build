@@ -257,7 +257,7 @@ sub parse {
 
     if ($skip) {
       $xspec->[-1] = [ $xspec->[-1], undef ] if $xspec;
-      $ifdeps = 1 if $line =~ /^(BuildRequires|BuildConflicts|\#\!BuildIgnore):\s*(\S.*)$/i;
+      $ifdeps = 1 if $line =~ /^(BuildRequires|BuildConflicts|\#\!BuildIgnore)\s*:\s*(\S.*)$/i;
       next;
     }
 
@@ -297,23 +297,23 @@ sub parse {
       $hasif = 1;
       next;
     }
-    if ($main_preamble && ($line =~ /^Name:\s*(\S+)/i)) {
+    if ($main_preamble && ($line =~ /^Name\s*:\s*(\S+)/i)) {
       $packname = $1;
       $macros{'name'} = $packname;
     }
-    if ($main_preamble && ($line =~ /^Version:\s*(\S+)/i)) {
+    if ($main_preamble && ($line =~ /^Version\s*:\s*(\S+)/i)) {
       $packvers = $1;
       $macros{'version'} = $packvers;
     }
-    if ($main_preamble && ($line =~ /^Release:\s*(\S+)/i)) {
+    if ($main_preamble && ($line =~ /^Release\s*:\s*(\S+)/i)) {
       $packrel = $1;
       $macros{'release'} = $packrel;
     }
-    if ($main_preamble && ($line =~ /^ExclusiveArch:\s*(.*)/i)) {
+    if ($main_preamble && ($line =~ /^ExclusiveArch\s*:\s*(.*)/i)) {
       $exclarch ||= [];
       push @$exclarch, split(' ', $1);
     }
-    if ($line =~ /^PreReq:\s*(\S.*)$/i) {
+    if ($line =~ /^PreReq\s*:\s*(\S.*)$/i) {
       my $deps = $1;
       my @deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
       while (@deps) {
@@ -323,7 +323,7 @@ sub parse {
       }
       next;
     }
-    if ($preamble && ($line =~ /^(BuildRequires|BuildConflicts|\#\!BuildIgnore):\s*(\S.*)$/i)) {
+    if ($preamble && ($line =~ /^(BuildRequires|BuildConflicts|\#\!BuildIgnore)\s*:\s*(\S.*)$/i)) {
       my $what = $1;
       my $deps = $2;
       $ifdeps = 1 if $hasif;
@@ -364,12 +364,11 @@ sub parse {
 	next;
       }
       if (defined($hasnfb)) {
-        next unless $xspec;
         if ((grep {$_ eq 'glibc' || $_ eq 'rpm' || $_ eq 'gcc' || $_ eq 'bash'} @ndeps) > 2) {
-          # ignore old generetad BuildRequire lines.
-	  $xspec->[-1] = [ $xspec->[-1], undef ];
+          # ignore old generated BuildRequire lines.
+	  $xspec->[-1] = [ $xspec->[-1], undef ] if $xspec;
+	  next;
 	}
-	next;
       }
       push @packdeps, @ndeps;
       next unless $xspec && $inspec;
