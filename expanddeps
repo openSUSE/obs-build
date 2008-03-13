@@ -137,8 +137,8 @@ if (!defined($dist) || $dist eq '') {
     $dist = 'default';
   } else {
     my $rpmfn = $fn{"rpm.$rpmarch"};
-    my $rpmdist = `rpm -qp --nodigest --nosignature --qf '%{DISTRIBUTION}' $rpmfn`;
-    chomp $rpmdist;
+    my %res = Build::Rpm::rpmq($rpmfn, 1010);
+    my $rpmdist = $res{1010}->[0] || '';
     $rpmdist = lc($rpmdist);
     $rpmdist =~ s/-/_/g;
     $rpmdist =~ s/opensuse/suse linux/;
