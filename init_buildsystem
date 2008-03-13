@@ -268,7 +268,7 @@ if test -e $BUILD_IS_RUNNING ; then
     umount -n $BUILD_ROOT/mnt 2> /dev/null
     echo "Your build system is broken!! Shall I execute"
     echo
-    echo "    rm -rf -- $BUILD_ROOT"
+    echo "    rm -rf -- $BUILD_ROOT/*"
     echo
     echo -n "[y/N/c] "
     read ANSWER
