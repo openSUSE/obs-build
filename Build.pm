@@ -24,6 +24,7 @@ sub import {
 
 
 my $std_macros = q{
+%define nil
 %define ix86 i386 i486 i586 i686 athlon
 %define arm armv4l armv4b armv5l armv5b armv5tel armv5teb
 %define arml armv4l armv5l armv5tel
@@ -216,7 +217,13 @@ sub read_config {
   # add rawmacros to our macro list
   if ($config->{'rawmacros'} ne '') {
     for my $rm (split("\n", $config->{'rawmacros'})) {
-      if ((@macros && $macros[-1] =~ /\\$/) || $rm !~ /^%/) {
+      if (@macros && $macros[-1] =~ /\\$/) {
+	if ($rm =~ /\\$/) {
+	  push @macros, '...\\';
+	} else {
+	  push @macros, '...';
+	}
+      } elsif ($rm !~ /^%/) {
 	push @macros, $rm;
       } else {
 	push @macros, "%define ".substr($rm, 1);
@@ -433,6 +440,8 @@ sub addproviders {
   for my $rp (@rp) {
     for my $pp (@{$provides->{$rp} || []}) {
       if ($pp eq $rn) {
+	# debian: unversioned provides do not match
+	next if $config->{'type'} ne 'spec';
 	push @p, $rp;
 	last;
       }
