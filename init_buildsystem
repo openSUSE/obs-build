@@ -111,8 +111,17 @@ function preinstall {
     if test -n "$1" ; then
         echo "preinstalling $1..."
         cd $BUILD_ROOT || cleanup_and_exit 1
+	CPIO="cpio --extract --unconditional --preserve-modification-time --make-directories --no-absolute-filenames --quiet"
 	if test -e "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" ; then
-	    rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" | cpio --extract --unconditional --preserve-modification-time --make-directories --no-absolute-filenames --quiet
+	    PAYLOADDECOMPRESS=cat
+	    case `rpm -qp --nodigest --nosignature --qf "%{PAYLOADCOMPRESSOR}\n" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm"` in
+		lzma) rpm --showrc | grep PayloadIsLzma > /dev/null || PAYLOADDECOMPRESS="lzma -d" ;;
+	    esac
+	    if test "$PAYLOADDECOMPRESS" = cat ; then
+	      rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" | $CPIO
+	    else
+	      rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" | $PAYLOADDECOMPRESS | $CPIO
+	    fi
 	    if test -e .init_b_cache/scripts/$1.run ; then
 		rpm -qp --nodigest --nosignature --qf "%{PREIN}" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" > .init_b_cache/scripts/$1.pre
 		rpm -qp --nodigest --nosignature --qf "%{POSTIN}" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" > .init_b_cache/scripts/$1.post
