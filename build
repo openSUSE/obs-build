@@ -357,8 +357,8 @@ detect_xen_2nd_stage()
 	test $i = 1 || echo
     fi
 #why would one want to do that?? Breaks all kinds of things
-#    umount -l /dev 2>/dev/null
 # XXX: why wait for it and then recreate?
+    umount -l /dev 2>/dev/null
     if test -n "$XENSWAP" ; then
 	rm -f "$XENSWAP"
 	umask 027
@@ -558,7 +558,7 @@ while test -n "$1"; do
         shift
       ;;
       *-xenmemory)
-        XENMEMORY="memory=$ARG"
+        VM_MEMORY="$ARG"
         shift
       ;;
       *-rpmlist)
