@@ -635,51 +635,6 @@ while test -n "$1"; do
     esac
 done
 
-if [ -z "$RUNNING_IN_XEN" ]; then
-    
-    if [ -n "$VM_IMAGE" ]; then
-	if [ "$VM_IMAGE" = 1 ]; then
-	    VM_IMAGE="$BUILD_ROOT.img"
-	fi
-	if [ ! -f "$VM_IMAGE" ]; then
-	    echo "you need to create a file system on $VM_IMAGE first"
-	    cleanup_and_exit 1
-	fi
-    fi
-
-    if [ -n "$VM_IMAGE" ]; then
-
-	if [ -n "$CLEAN_BUILD" ]; then
-	    echo "Creating filesystem on $VM_IMAGE"
-	    $xen_img_mkfs $VM_IMAGE || become_root_or_fail
-	fi
-
-	mkdir_build_root
-
-	if [ -w /root ]; then
-	    mount -o loop $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 1
-	else
-	    mount $BUILD_ROOT || become_root_or_fail
-	fi
-    else
-	[ -w /root ] || become_root_or_fail
-    fi
-fi
-
-if [ -z "$RPMLIST" ]; then
-    if [ -z "$repos" -a -z "$BUILD_RPMS" ]; then
-	BUILD_RPMS="/media/dvd/suse"
-    fi
-else
-    repos=()
-fi
-
-set_build_arch
-
-if [ -n "$CLEAN_BUILD" ]; then
-    DO_INIT=true
-fi
-
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
     if test -z "$VM_IMAGE" ; then
@@ -698,6 +653,20 @@ if test -n "$KILL" ; then
 	fi
     fi
     exit 0
+fi
+
+if [ -z "$RPMLIST" ]; then
+    if [ -z "$repos" -a -z "$BUILD_RPMS" ]; then
+	BUILD_RPMS="/media/dvd/suse"
+    fi
+else
+    repos=()
+fi
+
+set_build_arch
+
+if [ -n "$CLEAN_BUILD" ]; then
+    DO_INIT=true
 fi
 
 find_spec_files
@@ -722,12 +691,37 @@ if test -n "$LIST_STATE" ; then
     cleanup_and_exit $ERR
 fi
 
-mkdir_build_root
-
-if test -n "$XENSWAP" ; then
-    dd if=/dev/zero of="$XENSWAP" bs=12 count=1 conv=notrunc 2>/dev/null
-    mkswap "$XENSWAP"
+if test -z "$RUNNING_IN_XEN" ; then
+    if test -n "$VM_IMAGE" ; then
+	if test "$VM_IMAGE" = 1 ; then
+	    VM_IMAGE="$BUILD_ROOT.img"
+	fi
+	if test ! -f "$VM_IMAGE" ; then
+	    echo "you need to create a file system on $VM_IMAGE first"
+	    cleanup_and_exit 1
+	fi
+    fi
+    if test -n "$VM_IMAGE" ; then
+	if test -n "$CLEAN_BUILD" ; then
+	    echo "Creating filesystem on $VM_IMAGE"
+	    $xen_img_mkfs $VM_IMAGE || become_root_or_fail
+	fi
+	mkdir_build_root
+	if [ -w /root ]; then
+	    mount -o loop $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 1
+	else
+	    mount $BUILD_ROOT || become_root_or_fail
+	fi
+    else
+	test -w /root || become_root_or_fail
+    fi
+    if test -n "$XENSWAP" ; then
+	dd if=/dev/zero of="$XENSWAP" bs=12 count=1 conv=notrunc 2>/dev/null
+	mkswap "$XENSWAP"
+    fi
 fi
+
+mkdir_build_root
 
 rm -f $BUILD_ROOT/exit
 
