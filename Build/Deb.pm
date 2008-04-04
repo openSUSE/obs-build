@@ -221,7 +221,7 @@ sub query {
   my $src = $name;
   $src = $res{'SOURCE'} if $res{'SOURCE'};
   my @provides = split(',\s*', $res{'PROVIDES'} || '');
-  push @provides, "$name = $res{'VERSION'}" unless grep {/^\Q$name\E(?: |$)/} @provides;
+  push @provides, "$name = $res{'VERSION'}";
   my @depends = split(',\s*', $res{'DEPENDS'} || '');
   my @predepends = split(',\s*', $res{'PRE-DEPENDS'} || '');
   push @depends, @predepends;
