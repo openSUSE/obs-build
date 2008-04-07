@@ -29,6 +29,7 @@ uml_kernel=/boot/vmlinux-um
 uml_initrd=/boot/initrd-um
 
 DO_INIT=true
+DO_LINT=
 CLEAN_BUILD=
 SPECFILES=()
 SRCDIR=
@@ -514,8 +515,14 @@ while test -n "$1"; do
         BUILD_EXTRA_PACKS="$BUILD_EXTRA_PACKS $ARG"
         shift
       ;;
+      *-lint)
+        DO_LINT=true
+        ;;
       *-baselibs)
         CREATE_BASELIBS=true
+        ;;
+      *-baselibs-internal)
+        CREATE_BASELIBS=internal
         ;;
       *-root)
         BUILD_ROOT="$ARG"
@@ -808,6 +815,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     test -n "$CREATE_BASELIBS" && ADDITIONAL_PACKS="$ADDITIONAL_PACKS build"
     test "$ccache" = '1' && ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
     test "$icecream" -gt 1 && ADDITIONAL_PACKS="$ADDITIONAL_PACKS icecream gcc-c++"
+    test -n "$DO_LINT" && ADDITIONAL_PACKS="$ADDITIONAL_PACKS rpmlint-mini"
 
     if test -n "$CHANGELOG" -a -z "$RUNNING_IN_XEN" ; then
 	rm -f $BUILD_ROOT/.build-changelog
@@ -1103,10 +1111,24 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     test -d "$SRCDIR" && cd "$SRCDIR"
 done
 
-if test -n "$CREATE_BASELIBS" ; then
-    mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
-    create_baselibs
-    umount -n $BUILD_ROOT/proc 2> /dev/null
+if test -n "$DO_LINT" -a -x $BUILD_ROOT/opt/testing/bin/rpmlint -a -d "$BUILD_ROOT/$TOPDIR/RPMS" ; then
+    LINT_RPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/RPMS -name "*-debuginfo-*" -prune \
+                          -o -name "*-32bit-*" -prune -o -name "*-64bit-*" -prune \
+                          -o -name "*-x86-*" -prune -o -name "*-ia32-*" -prune \
+                          -o -type f -name '*.rpm' -print))
+    SRPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/SRPMS -type f -name "*.rpm"))
+    echo
+    echo "RPMLINT report:"
+    echo "==============="
+    chroot $BUILD_ROOT /opt/testing/bin/rpmlint --info ${LINT_RPM_FILE_LIST[*]#$BUILD_ROOT} ${SRPM_FILE_LIST[*]#$BUILD_ROOT} || cleanup_and_exit 1
+fi
+
+if test -n "$CREATE_BASELIBS" -a -d "$BUILD_ROOT/$TOPDIR/RPMS" ; then
+    if test -f $BUILD_ROOT/usr/lib/build/mkbaselibs -o "$CREATE_BASELIBS" != internal ; then
+	mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
+	create_baselibs
+	umount -n $BUILD_ROOT/proc 2> /dev/null
+    fi
 fi
 
 cleanup_and_exit 0
