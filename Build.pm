@@ -4,21 +4,27 @@ package Build;
 use strict;
 use Digest::MD5;
 use Build::Rpm;
+use Data::Dumper;
 
 our $expand_dbg;
 our $strip_versions;
 
 our $do_rpm;
 our $do_deb;
+our $do_img;
 
 sub import {
   for (@_) {
     $do_rpm = 1 if $_ eq ':rpm';
     $do_deb = 1 if $_ eq ':deb';
+    $do_img = 1 if $_ eq ':img';
   }
-  $do_rpm = $do_deb = 1 if !$do_rpm && !$do_deb;
+  $do_rpm = $do_deb = $do_img = 1 if !$do_rpm && !$do_deb && !$do_img;
   if ($do_deb) {
     require Build::Deb;
+  }
+  if ($do_img) {
+    require Build::Kiwi;
   }
 }
 
@@ -96,6 +102,8 @@ sub read_config_dist {
 
 sub read_config {
   my ($arch, $cfile) = @_;
+# FIXME: make this an option
+  my $use_ignore = 0;
   my @macros = split("\n", $std_macros.$extra_macros);
   push @macros, "%define _target_cpu $arch";
   push @macros, "%define _target_os linux";
@@ -160,6 +168,7 @@ sub read_config {
       next;
     }
     if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:') {
+      next if ( $l0 eq 'ignore:' && $use_ignore == 0 );
       my $t = substr($l0, 0, -1);
       for my $l (@l) {
 	if ($l eq '!*') {
@@ -708,6 +717,8 @@ sub parse {
   my ($cf, $fn, @args) = @_;
   return Build::Rpm::parse($cf, $fn, @args) if $do_rpm && $fn =~ /\.spec$/;
   return Build::Deb::parse($cf, $fn, @args) if $do_deb && $fn =~ /\.dsc$/;
+  return Build::Kiwi::parse($cf, $fn, @args) if $do_img && $fn =~ /config\.xml$/;
+  return Build::Kiwi::parse($cf, $fn, @args) if $do_img && $fn =~ /\.kiwi$/;
   return undef;
 }
 
@@ -720,6 +731,7 @@ sub query {
   }
   return Build::Rpm::query($handle, %opts) if $do_rpm && $binname =~ /\.rpm$/;
   return Build::Deb::query($handle, %opts) if $do_deb && $binname =~ /\.deb$/;
+  return Build::Kiwi::queryiso($handle, %opts) if $do_img && $binname =~ /\.iso$/;
   return undef;
 }
 
@@ -727,6 +739,9 @@ sub queryhdrmd5 {
   my ($binname) = @_;
   return Build::Rpm::queryhdrmd5($binname) if $do_rpm && $binname =~ /\.rpm$/;
   return Build::Deb::queryhdrmd5($binname) if $do_deb && $binname =~ /\.deb$/;
+  return Build::Kiwi::queryhdrmd5($binname) if $do_img && $binname =~ /\.iso$/;
+  return Build::Kiwi::queryhdrmd5($binname) if $do_img && $binname =~ /\.raw$/;
+  return Build::Kiwi::queryhdrmd5($binname) if $do_img && $binname =~ /\.raw.install$/;
   return undef;
 }
 
