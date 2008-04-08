@@ -5,7 +5,7 @@
 #
 # BUILD_ROOT        here the packages will be built
 #
-# (c) 1997-2006 SuSE GmbH Nuernberg, Germany
+# (c) 1997-2008 SuSE GmbH Nuernberg, Germany
 
 test -z "$BUILD_DIR" && BUILD_DIR=/usr/lib/build
 test -z "$BUILD_ROOT" && BUILD_ROOT=/var/tmp/build-root

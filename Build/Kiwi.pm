@@ -18,7 +18,7 @@ sub parse {
   my @control;
 
 print "Build::Kiwi::parse IS NOT IMPLEMENTED ! \n";
-die();
+  return ;
 
   # get arch and os from macros
   my ($arch, $os);
