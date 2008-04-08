@@ -38,9 +38,11 @@ foreach my $dir (@ARGV) {
   open(F, '-|', $cmd) or next;
   while (<F>) {
     chomp;
-    next unless /^(\d+\/\d+\/\d+) (.*)$/;
+    next unless /^([\d\.]+\/\d+\/\d+) (.*)$/;
     my $id = $1;
     my $path = $2;
+    # new find added a fraction part to %T@, ignore it
+    $id =~ s/^(\d+)\.\d+/$1/;
     next unless $path =~ /\.(?:rpm|deb)$/;
     my $fn = $path;
     $fn =~ s/.*\///;
