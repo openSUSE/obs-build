@@ -975,10 +975,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     test -n "$NOROOTFORBUILD" && BUILD_USER=abuild
     if test $BUILD_USER = abuild ; then
         if ! egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
-            echo 'abuild::99:99:Autobuild:/home/abuild:/bin/bash' >>$BUILD_ROOT/etc/passwd
-            echo 'abuild::99:' >>$BUILD_ROOT/etc/group
+            echo 'abuild::399:399:Autobuild:/home/abuild:/bin/bash' >>$BUILD_ROOT/etc/passwd
+            echo 'abuild::399:' >>$BUILD_ROOT/etc/group
             mkdir -p $BUILD_ROOT/home/abuild
-            chown 99:99 $BUILD_ROOT/home/abuild
+            chown 399:399 $BUILD_ROOT/home/abuild
         fi
 	if test -f $BUILD_ROOT/etc/shadow ; then
 	    sed -e "s@^root::@root:*:@" < $BUILD_ROOT/etc/shadow > $BUILD_ROOT/etc/shadow.t && mv $BUILD_ROOT/etc/shadow.t $BUILD_ROOT/etc/shadow
@@ -1005,7 +1005,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     rm -rf $BUILD_ROOT$TOPDIR
     for i in BUILD RPMS/`arch` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS ; do
         mkdir -p $BUILD_ROOT$TOPDIR/$i
-	test $BUILD_USER = abuild && chown 99:99 $BUILD_ROOT$TOPDIR/$i
+	test $BUILD_USER = abuild && chown 399:399 $BUILD_ROOT$TOPDIR/$i
     done
     test -e $BUILD_ROOT/exit && cleanup_and_exit
     mkdir -p $BUILD_ROOT$TOPDIR/SOURCES
@@ -1038,7 +1038,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
     if test "$SPECFILE" != "${SPECFILE%.dsc}" ; then
 	rm -rf $BUILD_ROOT$TOPDIR/BUILD
-	test $BUILD_USER = abuild && chown 99:99 $BUILD_ROOT$TOPDIR
+	test $BUILD_USER = abuild && chown 399:399 $BUILD_ROOT$TOPDIR
 	DEB_TRANSFORM=
 	for f in $BUILD_ROOT$TOPDIR/SOURCES/debian.* ; do
 	    test -f $f && DEB_TRANSFORM=true
@@ -1056,7 +1056,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
         fi
     fi
     if test $BUILD_USER = abuild ; then
-        chown -R 99:99 $BUILD_ROOT$TOPDIR/*
+        chown -R 399:399 $BUILD_ROOT$TOPDIR/*
     else
         chown -R root:root $BUILD_ROOT$TOPDIR/*
     fi
