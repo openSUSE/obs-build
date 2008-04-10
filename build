@@ -1112,10 +1112,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 done
 
 if test -n "$DO_LINT" -a -x $BUILD_ROOT/opt/testing/bin/rpmlint -a -d "$BUILD_ROOT/$TOPDIR/RPMS" ; then
-    LINT_RPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/RPMS -name "*-debuginfo-*" -prune \
-                          -o -name "*-32bit-*" -prune -o -name "*-64bit-*" -prune \
-                          -o -name "*-x86-*" -prune -o -name "*-ia32-*" -prune \
-                          -o -type f -name '*.rpm' -print))
+    LINT_RPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/RPMS \
+        \( -name "*-debuginfo-*" -o -name "*-debugsource-*" \
+        -o -name "*-32bit-*" -o -name "*-64bit-*" \
+        -o -name "*-x86-*" -o -name "*-ia32-*" \) -prune \
+        -o -type f -name '*.rpm' -print))
     SRPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/SRPMS -type f -name "*.rpm"))
     echo
     echo "RPMLINT report:"
