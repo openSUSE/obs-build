@@ -166,7 +166,6 @@ sub read_config {
       next;
     }
     if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:') {
-      next if ( $l0 eq 'ignore:' );
       my $t = substr($l0, 0, -1);
       for my $l (@l) {
 	if ($l eq '!*') {
