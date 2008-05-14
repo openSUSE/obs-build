@@ -171,7 +171,8 @@ cleanup_and_exit () {
     else
 	umount -n $BUILD_ROOT/proc 2>/dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2>/dev/null || true
-	[ -n "$VM_IMAGE" ] && umount "$VM_IMAGE" 2>/dev/null || true
+	test "$VM_IMAGE" = 1 && VM_IMAGE=
+	[ -n "$VM_IMAGE" ] && umount $BUILD_ROOT 2>/dev/null || true
     fi
     exit $1
 }
@@ -458,11 +459,10 @@ mkdir_build_root()
 
 shopt -s nullglob
 
-if detect_xen_2nd_stage; then
+if detect_xen_2nd_stage ; then
     set "/.build-srcdir/$SPECFILE"
-else
-    export HOST
 fi
+export HOST
 
 while test -n "$1"; do
   PARAM="$1"
@@ -887,7 +887,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	umount -n $BUILD_ROOT/proc 2> /dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
 	umount -n $BUILD_ROOT/mnt 2> /dev/null || true
-	umount $VM_IMAGE
+	umount $BUILD_ROOT
 
 	if [ -n "$USE_XEN" ]; then
 		XMROOT=file:$VM_IMAGE
