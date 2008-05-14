@@ -52,6 +52,7 @@ NOROOTFORBUILD=
 LOGFILE=
 KILL=
 CHANGELOG=
+BUILD_DEBUG=
 
 export PATH=$BUILD_DIR:$PATH
 
@@ -141,6 +142,9 @@ Known Parameters:
 
   --icecream N
               use N parallel build jobs with icecream
+
+  --debug
+              enable creation of a debuginfo package
 
 Remember to have fun!
 
@@ -625,6 +629,9 @@ while test -n "$1"; do
       --ccache)
         ccache=1
       ;;
+      --debug)
+        BUILD_DEBUG=1
+      ;;
       ----noarg)
         echo "$ARG does not take an argument"
         cleanup_and_exit
@@ -1020,9 +1027,20 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	substitutedeps $RELEASE --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$BUILD_DIR/configs" $CHANGELOGARGS "$BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE" "$BUILD_ROOT/.spec.new" || cleanup_and_exit 1
 	# extract macros from configuration
 	getmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$BUILD_DIR/configs" > $BUILD_ROOT/root/.rpmmacros
+	if test -n "$BUILD_DEBUG" ; then
+	    echo '
+%prep %?_suse_insert_debug_package%%prep
+%package %?_suse_insert_debug_package%%package
+%suse_insert_debug_package \
+  %global _suse_insert_debug_package \\\
+    %%undefine _suse_insert_debug_package \\\
+    %%debug_package
+
+' >> $BUILD_ROOT/root/.rpmmacros
+	fi
 	test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/.rpmmacros $BUILD_ROOT/home/abuild/.rpmmacros
 	# extract optflags from configuration
-	getoptflags --dist "$BUILD_DIST" --configdir "$BUILD_DIR/configs" --archpath "$BUILD_ARCH" > $BUILD_ROOT/root/.rpmrc
+	getoptflags --dist "$BUILD_DIST" --configdir "$BUILD_DIR/configs" --archpath "$BUILD_ARCH" ${BUILD_DEBUG:+--debug} > $BUILD_ROOT/root/.rpmrc
 	test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/.rpmrc $BUILD_ROOT/home/abuild/.rpmrc
     fi
     if test -f $BUILD_ROOT/.spec.new ; then
@@ -1086,6 +1104,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if [ -n "$BUILD_JOBS" ]; then
 		rpmbopts[${#rpmbopts[@]}]='--eval'
 		rpmbopts[${#rpmbopts[@]}]="%define jobs $BUILD_JOBS"
+	fi
+	if [ -n "$BUILD_DEBUG" ]; then
+		rpmbopts[${#rpmbopts[@]}]='--eval'
+		rpmbopts[${#rpmbopts[@]}]="%suse_insert_debug_package"
 	fi
 	rpmbuild=rpmbuild
 

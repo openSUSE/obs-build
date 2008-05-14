@@ -8,7 +8,7 @@ use strict;
 
 use Build;
 
-my ($dist, $archs, $configdir);
+my ($dist, $archs, $configdir, $debug);
 
 while (@ARGV)  {
   if ($ARGV[0] eq '--dist') {
@@ -26,6 +26,11 @@ while (@ARGV)  {
     $configdir = shift @ARGV;
     next;
   }
+  if ($ARGV[0] eq '--debug') {
+    shift @ARGV;
+    $debug = 1;
+    next;
+  }
   last;
 }
 
@@ -35,6 +40,7 @@ my $cf = Build::read_config_dist($dist, $archs, $configdir);
 exit 0 unless $cf->{'optflags'};
 my $all = $cf->{'optflags'}->{'*'};
 $all = defined($all) && $all ne '' ? " $all" : '';
+$all .= " -g" if $debug;
 for (sort keys %{$cf->{'optflags'}}) {
   next if $_ eq '*';
   print "optflags: $_ $cf->{'optflags'}->{$_}$all\n";

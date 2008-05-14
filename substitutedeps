@@ -80,7 +80,13 @@ for my $l (@$xspec) {
     next;
   }
 
-  $l =~ s/^(Release:\s*).*/$1$release/i if $release;
+  if ($release) {
+    if ($l =~ /^Release:/i) {
+      if (!($l =~ s/<RELEASE>/$release/g)) {
+	$l =~ s/^(Release:\s*).*/$1$release/i;
+      }
+    }
+  }
 
   if (!$used || ($l !~ /^(?:Build)?Requires:/i)) {
     print F "$l\n";
