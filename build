@@ -710,7 +710,7 @@ if test -z "$RUNNING_IN_XEN" ; then
 	if test "$VM_IMAGE" = 1 ; then
 	    VM_IMAGE="$BUILD_ROOT.img"
 	fi
-	if test ! -f "$VM_IMAGE" ; then
+	if test ! -e "$VM_IMAGE" ; then
 	    echo "you need to create a file system on $VM_IMAGE first"
 	    cleanup_and_exit 1
 	fi
