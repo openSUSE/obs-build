@@ -591,7 +591,7 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
 	rm -f $BUILD_ROOT/.init_b_cache/$PKG.rpm
 	cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm $BUILD_ROOT/.init_b_cache/$PKG.rpm || cleanup_and_exit 1
     fi
-    ( chroot $BUILD_ROOT rpm --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
+    ( chroot $BUILD_ROOT rpm --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
 		$ADDITIONAL_PARAMS .init_b_cache/$PKG.rpm 2>&1 || \
 	  touch $BUILD_ROOT/exit ) | \
 	      grep -v "^warning:.*saved as.*rpmorig$"
