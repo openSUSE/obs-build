@@ -180,6 +180,8 @@ my $out = $ARGV[2];
 
 die("$out: $!\n") unless -d $out;
 
+chdir $dir || die("$dir: $!\n");
+
 my $tags = parsedsc($dsc);
 
 opendir(D, $dir) || die("$dir: $!\n");
