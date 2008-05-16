@@ -899,12 +899,12 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
 	if [ -n "$USE_XEN" ]; then
 		XMROOT=file:$VM_IMAGE
-		XMROOT=${XMROOT/#file:\/dev/phy:}
+		XMROOT=${XMROOT/#file:\/dev/phy:/dev}
 		XMROOT="disk=$XMROOT,hda1,w"
 		XMSWAP=
 		if test -n "$XENSWAP" ; then
 		    XMSWAP=file:$XENSWAP
-		    XMSWAP=${XMSWAP/#file:\/dev/phy:}
+		    XMSWAP=${XMSWAP/#file:\/dev/phy:/dev}
 		    XMSWAP="disk=$XMSWAP,hda2,w"
 		fi
 		XENID="${VM_IMAGE%/root}"

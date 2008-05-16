@@ -8,12 +8,12 @@ $| = 1;
 
 if ($0 ne '/.build/extractbuild') {
   my $builddir = $ENV{'BUILD_DIR'} || '/usr/lib/build';
-  my $xen;
+  my $xenroot;
   my $xenswap;
   while (@ARGV) {
-    if ($ARGV[0] eq '--xen') {
+    if ($ARGV[0] eq '--xenroot') {
       shift @ARGV;
-      $xen = shift @ARGV;
+      $xenroot = shift @ARGV;
       next;
     }
     if ($ARGV[0] eq '--xenswap') {
@@ -23,16 +23,17 @@ if ($0 ne '/.build/extractbuild') {
     }
     last
   }
-  die("please specify a root image\n") unless defined $xen;
+  die("please specify a root image\n") unless defined $xenroot;
   die("please specify a swap image\n") unless defined $xenswap;
-  my $xenname = $xen;
+  my $xenname = $xenroot;
   $xenname =~ s/\/root$//;
   $xenname =~ s/.*\///;
-  my $xmroot = "disk=file:$xen,hda1,w";
-  $xmroot = "disk=phy:$xen,hda1,w" if $xen =~ /^\/dev\//;
+  my $xmroot = "disk=file:$xenroot,hda1,w";
+  $xmroot = "disk=phy:$xenroot,hda1,w" if $xenroot =~ /^\/dev\//;
   my $xmswap= "disk=file:$xenswap,hda2,w";
-  $xmswap= "disk=phy:$xen,hda2,w" if $xenswap =~ /^\/dev\//;
+  $xmswap= "disk=phy:$xenswap,hda2,w" if $xenswap =~ /^\/dev\//;
   syscall(135, 0);	# switch back to PER_LINUX to make xm work
+print "xm create -c $builddir/xen.conf name=build:$xenname $xmroot $xmswap extra=init=/.build/extractbuild panic=1 console=ttyS0\n";
   system('xm', 'create', '-c', "$builddir/xen.conf", "name=build:$xenname", $xmroot, $xmswap, "extra=init=/.build/extractbuild panic=1 console=ttyS0") && die("xm call failed: $?\n");
   exit(0);
 }
