@@ -1007,6 +1007,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     setupicecream
 
     setupccache
+
+    # nasty hack to prevent rpath on known paths
+    echo "export SUSE_IGNORED_RPATHS=/etc/ld.so.conf" > "$BUILD_ROOT"/etc/profile.d/buildsystem.sh
+
     #
     # now clean up RPM building directories
     #
