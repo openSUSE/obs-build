@@ -118,6 +118,19 @@ my %STAG = (
         "FILEDEPENDSN"	=> 1144,
         "DEPENDSDICT"	=> 1145,
         "SOURCEPKGID"	=> 1146,
+        "PRETRANS"	=> 1151,
+        "POSTTRANS"	=> 1152,
+        "PRETRANSPROG"	=> 1153,
+        "POSTTRANSPROG"	=> 1154,
+        "DISTTAG"	=> 1155,
+        "SUGGESTSNAME"	=> 1156,
+        "SUGGESTSVERSION"	=> 1157,
+        "SUGGESTSFLAGS"	=> 1158,
+        "ENHANCESNAME"	=> 1159,
+        "ENHANCESVERSION"	=> 1160,
+        "ENHANCESFLAGS"	=> 1161,
+        "PRIORITY"	=> 1162,
+        "CVSID"		=> 1163,
 );
 
 # do not mix numeric tags with symbolic tags.
@@ -304,6 +317,7 @@ my $prefix;
 my $extension;
 my $configdir;
 my $targetname;
+my $legacyversion;
 
 my @baselib;
 my @config;
@@ -313,11 +327,14 @@ my @obsoletes;
 my @requires;
 my @prerequires;
 my @conflicts;
+my @recommends;
+my @supplements;
 
 my @prein;
 my @postin;
 my @preun;
 my @postun;
+my $autoreqprov;
 
 sub parse_config {
   my $target = shift;
@@ -328,6 +345,7 @@ sub parse_config {
 
   my $pkgmatches = 1;
   $prefix = '';
+  $legacyversion = '';
   $extension = '';
   $configdir = '';
   $targetname = '';
@@ -337,12 +355,15 @@ sub parse_config {
   @provides = ();
   @obsoletes = ();
   @requires = ();
+  @recommends = ();
+  @supplements = ();
   @prerequires = ();
   @conflicts = ();
   @prein = ();
   @postin = ();
   @preun = ();
   @postun = ();
+  $autoreqprov = 'on';
   my $match1 = '';
 
   for (split("\n", $config)) {
@@ -376,6 +397,7 @@ sub parse_config {
       next unless s/^targetarch\s+\Q$targetarch\E\s+//;
     }
     if (/^prefix\s+(.*?)$/) { $prefix = $1; next; }
+    if (/^legacyversion\s+(.*?)$/) { $legacyversion = $1; next; }
     if (/^extension\s+(.*?)$/) { $extension = $1; next; }
     if (/^configdir\s+(.*?)$/) { $configdir= $1; next; }
     if (/^targetname\s+(.*?)$/) { $targetname = $1; next; }
@@ -397,6 +419,8 @@ sub parse_config {
     return 0 if $_ eq 'block!';
     if (/^provides\s+(.*?)$/) { push @provides, $1; next; }
     if (/^requires\s+(.*?)$/) { push @requires, $1; next; }
+    if (/^recommends\s+(.*?)$/) { push @recommends, $1; next; }
+    if (/^supplements\s+(.*?)$/) { push @supplements, $1; next; }
     if (/^prereq\s+(.*?)$/) { push @prerequires, $1; next; }
     if (/^obsoletes\s+(.*?)$/) { push @obsoletes, $1; next; }
     if (/^conflicts\s+(.*?)$/) { push @conflicts, $1; next; }
@@ -406,6 +430,7 @@ sub parse_config {
     if (/^post(in)?\s+(.*?)$/) { push @postin, $2; next; }
     if (/^preun\s+(.*?)$/) { push @preun, $1; next; }
     if (/^postun\s+(.*?)$/) { push @preun, $1; next; }
+    if (/^autoreqprov\s+(.*?)$/) {$autoreqprov = $1; next; }
     die("bad line: $_\n");
   }
   return $pkghasmatched;
@@ -488,13 +513,14 @@ for $rpm (@rpms) {
   push @stags, 'FILENAMES', 'FILEMODES', 'FILEUSERNAME', 'FILEGROUPNAME', 'FILEFLAGS', 'FILEVERIFYFLAGS';
   push @stags, 'CHANGELOGTIME', 'CHANGELOGNAME', 'CHANGELOGTEXT';
   push @stags, 'ARCH', 'SOURCERPM', 'RPMVERSION';
+  push @stags, 'BUILDTIME';
   my %res = rpmq_many($rpm, @stags);
   die("$rpm: bad rpm\n") unless $res{'NAME'};
 
   my $rname = $res{'NAME'}->[0];
   my $sname = $res{'SOURCERPM'}->[0];
   die("$rpm is a sourcerpm\n") unless $sname;
-  die("bad sourcerpm: $sname\n") unless $sname =~ /^(.*)-([^-]+)-([^-]+)$/;
+  die("bad sourcerpm: $sname\n") unless $sname =~ /^(.*)-([^-]+)-([^-]+)\.(no)?src\.rpm$/;
   $sname = $1;
   my $sversion = $2;
   my $srelease = $3;
@@ -643,7 +669,6 @@ for $rpm (@rpms) {
     }
     print SPEC "Source: $rpm\n";
     print SPEC "NoSource: 0\n" if $res{'SOURCERPM'}->[0] =~ /\.nosrc\.rpm$/;
-    print SPEC "Autoreqprov: on\n";
     print SPEC "BuildRoot: %{_tmppath}/baselibs-%{name}-%{version}-build\n";
     print SPEC "%define _target_cpu $targetarch\n";
     print SPEC "%define __os_install_post %{nil}\n";
@@ -655,12 +680,23 @@ for $rpm (@rpms) {
       next unless $res{$pt};
       my $d = $res{$pt}->[0];
       $d =~ s/%/%%/g;
+      if ($pt eq 'VERSION' && $legacyversion) {
+	$d = $legacyversion;
+      } elsif ($pt eq 'RELEASE' && $legacyversion) {
+	my @bt = localtime($res{'BUILDTIME'}->[0]);
+	$bt[5] += 1900;
+	$bt[4] += 1;
+	$d = sprintf("%04d%02d%02d%02d%02d\n", @bt[5,4,3,2,1]);
+      }
       print SPEC "$p: $d\n";
     }
+    print SPEC "Autoreqprov: $autoreqprov\n";
 
     for my $ar ([\@provides, 'provides'],
                 [\@prerequires, 'prereq'],
                 [\@requires, 'requires'],
+                [\@recommends, 'recommends'],
+                [\@supplements, 'supplements'],
                 [\@obsoletes, 'obsoletes'],
                 [\@conflicts, 'conflicts']) {
 	my @a = @{$ar->[0]};
@@ -682,6 +718,9 @@ for $rpm (@rpms) {
     $cpiopre = './' if $res{'RPMVERSION'}->[0] !~ /^3/;
     my $d = $res{'DESCRIPTION'}->[0];
     $d =~ s/%/%%/g;
+    if ($legacyversion) {
+      $d = "This rpm was re-packaged from $res{'NAME'}->[0]-$res{'VERSION'}->[0]-$res{'RELEASE'}->[0]\n\n$d";
+    }
     print SPEC "\n%description -n $targetname\n";
     print SPEC "$d\n";
     print SPEC "%prep\n";
