@@ -71,7 +71,7 @@ sub listtar {
 }
 
 sub dotar {
-  my ($tar, $tardir, @c) = @_;
+  my ($tar, $tardir, $origin, @c) = @_;
   local *F;
   open(F, '-|', 'tar', '-xOf', $tar) || die("tar: $!\n");
   for my $c (@c) {
@@ -82,6 +82,7 @@ sub dotar {
       die("tar read error\n") unless $l;
       $s -= $l;
     }
+    next if $origin && $origin->{$c->{'name'}} ne $tar;
     my @file = split("\n", $file);
     print DIFF "--- $tardir.orig/debian/$c->{'name'}\n";
     print DIFF "+++ $tardir/debian/$c->{'name'}\n";
@@ -95,11 +96,6 @@ sub dotar {
 sub dofile {
   my ($file, $tardir, $dfile) = @_;
   local *F;
-  if (!defined($dfile)) {
-    $dfile = $file;
-    $dfile =~ s/.*\///;
-    $dfile =~ s/\./\//;
-  }
   open(F, '<', $file) || die("$file: $!\n");
   my @file = <F>;
   close F;
@@ -180,8 +176,6 @@ my $out = $ARGV[2];
 
 die("$out: $!\n") unless -d $out;
 
-chdir $dir || die("$dir: $!\n");
-
 my $tags = parsedsc($dsc);
 
 opendir(D, $dir) || die("$dir: $!\n");
@@ -190,21 +184,27 @@ closedir(D);
 my %dir = map {$_ => 1} @dir;
 
 my $tarfile = $tags->{'DEBTRANSFORM-TAR'};
-my $debtarfile = $tags->{'DEBTRANSFORM-FILES-TAR'};
+my @debtarfiles;
+if ($tags->{'DEBTRANSFORM-FILES-TAR'}) {
+  @debtarfiles = split(' ', $tags->{'DEBTRANSFORM-FILES-TAR'});
+}
 
-if (!$tarfile || !$debtarfile) {
+if (!$tarfile || !@debtarfiles) {
   my @tars = grep {/\.tar(?:\.gz|\.bz2)?$/} @dir;
   my @debtars = grep {/^debian\.tar(?:\.gz|\.bz2)?$/} @tars;
   if (!$tarfile) {
     @tars = grep {!/^debian\.tar(?:\.gz|\.bz2)?$/} @tars;
-    @tars = grep {$_ ne $debtarfile} @tars if $debtarfile;
+    if (@debtarfiles) {
+      my %debtarfiles = map {$_ => 1} @debtarfiles;
+      @tars = grep {!$debtarfiles{$_}} @tars;
+    }
     die("package contains no tar file\n") unless @tars;
     die("package contains more than one tar file: @tars\n") if @tars > 1;
     $tarfile = $tars[0];
   }
   if (!exists($tags->{'DEBTRANSFORM-FILES-TAR'})) {
     die("package contains more than one debian tar file\n") if @debtars > 1;
-    $debtarfile = $debtars[0];
+    @debtarfiles = ($debtars[0]);
   }
 }
 
@@ -230,24 +230,29 @@ open(DIFF, '>', "$out/${name}_$version.diff") || die("$out/${name}_$version.diff
 
 undef $changelog if $dir{'debian.changelog'};
 
-if ($debtarfile) {
-  my @c = listtar($debtarfile);
+my %debtarorigin;
+my %debtarcontent;
+for my $debtarfile (@debtarfiles) {
+  my @c = listtar("$dir/$debtarfile");
+  $debtarcontent{$debtarfile} = \@c;
   for (@c) {
     die("debian tar and directory both contain '$_->{'name'}'\n") if $dir{"debian.$_->{'name'}"};
     undef $changelog if $_->{'name'} eq 'changelog';
+    $debtarorigin{$_->{'name'}} = $debtarfile;
   }
-  dofile($changelog, $tardir, "debian/changelog") if defined $changelog;
-  undef $changelog;
-  dotar($debtarfile, $tardir, @c);
 }
 
-dofile($changelog, $tardir, "debian/changelog") if defined $changelog;
+dofile($changelog, $tardir, 'debian/changelog') if defined $changelog;
+
+for my $debtarfile (@debtarfiles) {
+  dotar("$dir/$debtarfile", $tardir, \%debtarorigin, @{$debtarcontent{$debtarfile} });
+}
 
 for my $file (grep {/^debian\./} @dir) {
   next if $file eq 'debian.series';
   next if $file =~ /\.tar$/;
   next if $file =~ /\.tar\./;
-  dofile("$dir/$file", $tardir);
+  dofile("$dir/$file", $tardir, 'debian/'.substr($file, 7));
 }
 
 if ($tags->{'DEBTRANSFORM-SERIES'}) {
