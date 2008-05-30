@@ -202,7 +202,7 @@ if (!$tarfile || !@debtarfiles) {
     die("package contains more than one tar file: @tars\n") if @tars > 1;
     $tarfile = $tars[0];
   }
-  if (!exists($tags->{'DEBTRANSFORM-FILES-TAR'})) {
+  if (@debtars && !exists($tags->{'DEBTRANSFORM-FILES-TAR'})) {
     die("package contains more than one debian tar file\n") if @debtars > 1;
     @debtarfiles = ($debtars[0]);
   }
