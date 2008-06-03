@@ -238,7 +238,7 @@ for my $debtarfile (@debtarfiles) {
   for (@c) {
     die("debian tar and directory both contain '$_->{'name'}'\n") if $dir{"debian.$_->{'name'}"};
     undef $changelog if $_->{'name'} eq 'changelog';
-    $debtarorigin{$_->{'name'}} = $debtarfile;
+    $debtarorigin{$_->{'name'}} = "$dir/$debtarfile";
   }
 }
 
