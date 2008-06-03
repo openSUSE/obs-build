@@ -60,7 +60,7 @@ sub parse {
       $version =~ s/-[^-]+$//;
     } elsif ($tag eq 'SOURCE') {
       $name = $data;
-    } elsif ($tag eq 'BUILD-DEPENDS' || $tag eq 'BUILD-CONFLICTS' || $tag eq 'BUILD-IGNORE') {
+    } elsif ($tag eq 'BUILD-DEPENDS' || $tag eq 'BUILD-CONFLICTS' || $tag eq 'BUILD-IGNORE' || $tag eq 'BUILD-DEPENDS-INDEP') {
       my @d = split(/,\s*/, $data);
       for my $d (@d) {
         if ($d =~ /^(.*?)\s*\[(.*)\]$/) {
@@ -84,7 +84,7 @@ sub parse {
 	$d =~ s/ \(([^\)]*)\)/ $1/g;
 	$d =~ s/>>/>/g;
 	$d =~ s/<</</g;
-	if ($tag eq 'BUILD-DEPENDS') {
+	if ($tag eq 'BUILD-DEPENDS' || $tag eq 'BUILD-DEPENDS-INDEP') {
           push @deps, $d;
 	} else {
           push @deps, "-$d";
