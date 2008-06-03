@@ -1015,7 +1015,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     # now clean up RPM building directories
     #
     rm -rf $BUILD_ROOT$TOPDIR
-    for i in BUILD RPMS/`arch` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS ; do
+    for i in BUILD RPMS/`uname -m` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS ; do
         mkdir -p $BUILD_ROOT$TOPDIR/$i
 	test $BUILD_USER = abuild && chown 399:399 $BUILD_ROOT$TOPDIR/$i
     done
