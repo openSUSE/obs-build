@@ -145,6 +145,7 @@ sub read_config {
   $config->{'substitute_vers'} = {};
   $config->{'optflags'} = {};
   $config->{'order'} = {};
+  $config->{'exportfilter'} = {};
   $config->{'rawmacros'} = '';
   $config->{'release'} = '<CI_CNT>.<B_CNT>';
   $config->{'repotype'} = [];
@@ -186,6 +187,10 @@ sub read_config {
       } else {
         $config->{'substitute'}->{$ll} = [ @l ];
       }
+    } elsif ($l0 eq 'exportfilter:') {
+      next unless @l;
+      $ll = shift @l;
+      $config->{'exportfilter'}->{$ll} = [ @l ];
     } elsif ($l0 eq 'optflags:') {
       next unless @l;
       $ll = shift @l;
