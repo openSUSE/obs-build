@@ -1114,6 +1114,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		rpmbopts[${#rpmbopts[@]}]='--eval'
 		rpmbopts[${#rpmbopts[@]}]="%define jobs $BUILD_JOBS"
 	fi
+	if test -s "$BUILD_ROOT/usr/lib/rpm/mandriva/macros" ; then
+		rpmbopts[${#rpmbopts[@]}]='--eval'
+		rpmbopts[${#rpmbopts[@]}]="%undefine _enable_debug_packages"
+	fi
 	if [ -n "$BUILD_DEBUG" ]; then
 		rpmbopts[${#rpmbopts[@]}]='--eval'
 		rpmbopts[${#rpmbopts[@]}]="%suse_insert_debug_package"
