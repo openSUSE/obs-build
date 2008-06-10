@@ -872,6 +872,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "BUILD_DIST='${BUILD_DIST//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "RELEASE='${RELEASE//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "BUILD_DEBUG='${BUILD_DEBUG//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+	echo "DO_LINT='${DO_LINT//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "NOROOTFORBUILD='${NOROOTFORBUILD//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "CREATE_BASELIBS='$CREATE_BASELIBS'" >> $BUILD_ROOT/.build/build.data
 	echo "REASON='${REASON//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
