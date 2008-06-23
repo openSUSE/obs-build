@@ -448,7 +448,7 @@ mkdir_build_root()
 {
     if [ -d "$BUILD_ROOT" ]; then
 	# check if it is owned by root
-	if [ -z "$RUNNING_IN_XEN" -a \( \! -O "$BUILD_ROOT" -o \! "`stat -c %u $BUILD_ROOT`" -eq 0 ]; then
+	if [ -z "$RUNNING_IN_XEN" -a \! -O "$BUILD_ROOT" -a "`stat -c %u $BUILD_ROOT`" -ne 0 ]; then
 	    echo "BUILD_ROOT=$BUILD_ROOT must be owned by $USER. Exit..."
 	    cleanup_and_exit 1
 	fi
