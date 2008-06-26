@@ -798,6 +798,8 @@ echo
 
 test "$BUILD_ARCH" = all && BUILD_ARCH=
 
+rm -rf $BUILD_ROOT/.build.packages
+
 for SPECFILE in "${SPECFILES[@]}" ; do
 
     SRCDIR="${SPECFILE%/*}"
@@ -963,7 +965,13 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if test -n "$XENSWAP" ; then
 	    BUILDSTATUS=`dd if="$XENSWAP" bs=12 count=1 2>/dev/null`
 	    case $BUILDSTATUS in
-	      BUILDSTATUS[0-9])
+	      BUILDSTATUS0)
+		mkdir -p $BUILD_ROOT/.build.packages 
+		cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
+		dd if=$XENSWAP bs=512 skip=1 | cpio --extract --no-absolute-filenames -v
+		cleanup_and_exit 0
+		;;
+	      BUILDSTATUS[1-9])
 		cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
 		;;
 	    esac
