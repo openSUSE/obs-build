@@ -900,7 +900,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "CREATE_BASELIBS='$CREATE_BASELIBS'" >> $BUILD_ROOT/.build/build.data
 	echo "REASON='${REASON//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "CHANGELOG='${CHANGELOG//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	test -n "$XENSWAP" && echo "XENSWAP='/dev/hda2'" >> $BUILD_ROOT/.build/build.data
+	# FIXME: this depends on the kernel and vm.
+	# could be hda2, sda2 for xen or hdb/sdb for qemu
+	test -n "$XENSWAP" && echo "XENSWAP='${VM_SWAPDEV:-/dev/hda2}'" >> $BUILD_ROOT/.build/build.data
 	PERSONALITY_SYSCALL=
 	PERSONALITY=0
 	case `perl -V:archname` in
@@ -948,7 +950,13 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		"$@"
 	elif [ -n "$USE_QEMU" ]; then
 		echo "booting QEMU ..."
-		set -- $qemu_bin -no-reboot -nographic -net none -kernel $qemu_kernel -initrd $qemu_initrd -append "root=/dev/sda panic=1 quiet rw console=ttyS0,115200 init=/.build/build" -serial stdio -hda $VM_IMAGE ${VM_MEMORY:+-m $VM_MEMORY}
+		set -- $qemu_bin -no-reboot -nographic -net none -serial stdio \
+		    -kernel $qemu_kernel \
+		    -initrd $qemu_initrd \
+		    -append "root=/dev/sda panic=1 quiet rw console=ttyS0,115200 init=/.build/build" \
+		    -hda $VM_IMAGE \
+		    ${VM_MEMORY:+-m $VM_MEMORY} \
+		    ${XENSWAP:+-hdb $XENSWAP}
 		echo "$@"
 		"$@"
 	fi
