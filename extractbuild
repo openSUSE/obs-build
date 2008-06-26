@@ -1,42 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 
 use strict;
-
-$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin";
-
-$| = 1;
-
-if ($0 ne '/.build/extractbuild') {
-  my $builddir = $ENV{'BUILD_DIR'} || '/usr/lib/build';
-  my $xenroot;
-  my $xenswap;
-  while (@ARGV) {
-    if ($ARGV[0] eq '--xenroot') {
-      shift @ARGV;
-      $xenroot = shift @ARGV;
-      next;
-    }
-    if ($ARGV[0] eq '--xenswap') {
-      shift @ARGV;
-      $xenswap = shift @ARGV;
-      next;
-    }
-    last
-  }
-  die("please specify a root image\n") unless defined $xenroot;
-  die("please specify a swap image\n") unless defined $xenswap;
-  my $xenname = $xenroot;
-  $xenname =~ s/\/root$//;
-  $xenname =~ s/.*\///;
-  my $xmroot = "disk=file:$xenroot,hda1,w";
-  $xmroot = "disk=phy:$xenroot,hda1,w" if $xenroot =~ /^\/dev\//;
-  my $xmswap= "disk=file:$xenswap,hda2,w";
-  $xmswap= "disk=phy:$xenswap,hda2,w" if $xenswap =~ /^\/dev\//;
-  syscall(135, 0);	# switch back to PER_LINUX to make xm work
-print "xm create -c $builddir/xen.conf name=build:$xenname $xmroot $xmswap extra=init=/.build/extractbuild panic=1 console=ttyS0\n";
-  system('xm', 'create', '-c', "$builddir/xen.conf", "name=build:$xenname", $xmroot, $xmswap, "extra=init=/.build/extractbuild panic=1 console=ttyS0") && die("xm call failed: $?\n");
-  exit(0);
-}
 
 sub ls {
   local *D;
@@ -46,50 +10,24 @@ sub ls {
   return @r;
 }
 
-open(F, '</.build/build.data') || die("/.build/build.data: $!\n");
-my (%vars, $var, $val);
-my $l = '';
-while (<F>) {
-  chomp;
-  $l .= $_;
-  my $q = $l =~ tr/\'/\'/;
-  if ($q < 2 || ($q - 2) % 3 != 0) {
-    $l .= "\n";
-    next;
-  }
-  if ($l =~ /^([a-zA-Z0-9]*)=\'(.*)\'$/s) {
-    $var = $1;
-    $val = $2;
-    $val =~ s/\'\\\'\'/\'/gs;
-    $vars{$var} = $val;
-  }
-  $l = '';
-}
-close F;
+my $xenswap = $ARGV[0] || die "please specify output file";
 
-my $xenswap = $vars{'XENSWAP'};
-die("need XENSWAP for swapout operation\n") unless $xenswap;
-system("umount -l /dev 2>/dev/null");
 die("$xenswap: $!\n") unless -e $xenswap;
 open(S, '>', $xenswap) || die("$xenswap: $!\n");
+# placeholder for buildstatus information
+syswrite(S, 'x'x512);
 
-my $specfile = $vars{'SPECFILE'};
-die("no specfile/dscfile\n") unless $specfile;
-my $topdir = '/usr/src/packages';
-my $psuf = 'deb';
-my @dirs = ("$topdir/DEBS");
-if ($specfile =~ /\.spec$/) {
-  $topdir = `rpm --eval '%_topdir'`;
-  chomp $topdir;
-  die("rpm returned no topdir\n") unless $topdir;
-  die("rpm returned bad topdir\n") unless -d $topdir;
-  @dirs = map {"$topdir/RPMS/$_"} ls("$topdir/RPMS");
-  unshift @dirs, "$topdir/SRPMS";
-  $psuf = 'rpm';
+my $topdir = '/.build.packages';
+if (-l $topdir) {
+    $topdir = '/'.readlink $topdir || die "readlink: $!";
 }
+my @dirs = map {"$topdir/RPMS/$_"} ls("$topdir/RPMS");
+unshift @dirs, "$topdir/SRPMS";
+unshift @dirs, "$topdir/DEBS";
+
 my @packs;
 for my $dir (@dirs) {
-  push @packs, map {"$dir/$_"} grep {/$psuf$/} ls($dir);
+  push @packs, map {"$dir/$_"} grep {/\.(rpm|deb)$/} ls($dir);
 }
 #unshift @packs, '/.build.log';
 
@@ -128,4 +66,3 @@ while (length($cpio)) {
   (syswrite(S, $cpio, 4096) || 0) == 4096 || die("swap write: $!\n");
   $cpio = substr($cpio, 4096);
 }
-exec('halt -f');

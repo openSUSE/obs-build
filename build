@@ -1199,4 +1199,8 @@ if test -n "$CREATE_BASELIBS" -a -d "$BUILD_ROOT/$TOPDIR/RPMS" ; then
     fi
 fi
 
+if test -n "$RUNNING_IN_XEN" -a -n "$XENSWAP"; then
+    $BUILD_DIR/extractbuild "$XENSWAP" || cleanup_and_exit 1
+fi
+
 cleanup_and_exit 0
