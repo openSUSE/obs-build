@@ -160,6 +160,7 @@ usage () {
 #  cleanup_and_exit
 #
 cleanup_and_exit () {
+    trap EXIT
     test -z "$1" && set 0
     if test -n "$RUNNING_IN_XEN" ; then
 	cd /
@@ -179,6 +180,11 @@ cleanup_and_exit () {
 	[ -n "$VM_IMAGE" ] && umount $BUILD_ROOT 2>/dev/null || true
     fi
     exit $1
+}
+
+fail_exit()
+{
+  cleanup_and_exit 1
 }
 
 shellquote()
@@ -460,6 +466,10 @@ mkdir_build_root()
     fi
 }
 
+#### main ####
+
+trap fail_exit EXIT
+
 shopt -s nullglob
 
 if detect_xen_2nd_stage ; then
@@ -653,7 +663,7 @@ if test -n "$KILL" ; then
     if test -z "$VM_IMAGE" ; then
 	if ! $BUILD_DIR/killchroot -s 9 $BUILD_ROOT ; then
 	    echo "could not kill build in $BUILD_ROOT"
-	    exit 1
+	    cleanup_and_exit 1
 	fi
     else
 	XENID="${VM_IMAGE%/root}"
@@ -661,11 +671,11 @@ if test -n "$KILL" ; then
 	if xm list "build:$XENID" >/dev/null 2>&1 ; then
 	    if ! xm destroy "build:$XENID" ; then
 		echo "could not kill xen build $XENID"
-		exit 1
+		cleanup_and_exit 1
 	    fi
 	fi
     fi
-    exit 0
+    cleanup_and_exit 0
 fi
 
 if [ -z "$RPMLIST" ]; then
@@ -686,7 +696,7 @@ find_spec_files
 
 if test -n "$LIST_STATE" ; then
     BUILD_ROOT=`mktemp -d /var/tmp/build-list-state-XXXXXX`
-    test -d "$BUILD_ROOT" || exit 1
+    test -d "$BUILD_ROOT" || cleanup_and_exit 1
     SPECFILE=$SPECFILES # only one specified anyways
     if test "$SPECFILE" != "${SPECFILE%.src.rpm}" ; then
        rm -rf $BUILD_ROOT/usr/src/packages
@@ -932,12 +942,12 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    BUILDSTATUS=`dd if="$XENSWAP" bs=12 count=1 2>/dev/null`
 	    case $BUILDSTATUS in
 	      BUILDSTATUS[0-9])
-		exit ${BUILDSTATUS#BUILDSTATUS}
+		cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
 		;;
 	    esac
-	    exit 1
+	    cleanup_and_exit 1
 	fi
-	exit 0
+	cleanup_and_exit 0
     fi
 
     if test "$DO_INIT" = true ; then

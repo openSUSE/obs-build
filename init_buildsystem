@@ -81,6 +81,7 @@ PKGS=("$@")
 #
 
 function cleanup_and_exit {
+    trap EXIT
     [ "$BUILD_ROOT" != / ] || chown $browner $BUILD_ROOT
     # umount so init_buildsystem can be used standalone
 # XXX: use stat -f /dev/pts/ -c %T  to check whether it's mounted and not suppress errors then?
@@ -258,6 +259,13 @@ function validate_cache_file {
     fi
 }
 
+fail_exit()
+{
+  cleanup_and_exit 1
+}
+
+trap fail_exit EXIT
+
 if [ "$BUILD_ROOT" = / ]; then
     read dummy dummy browner dummy < <(ls -ld /)
 fi
@@ -342,7 +350,7 @@ else
 	   echo "${SRC##*/}"
 	done < $BUILD_ROOT/.init_b_cache/rpmlist
 	rm -rf $BUILD_ROOT/.init_b_cache
-	exit 0
+	cleanup_and_exit 0
     fi
 
     PACKAGES_TO_INSTALL=
@@ -459,7 +467,7 @@ if test -n "$PREPARE_XEN" ; then
     echo "PACKAGES_TO_RUNSCRIPTS='${PACKAGES_TO_RUNSCRIPTS//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
     echo "PSUF='$PSUF'" >> $BUILD_ROOT/.build/init_buildsystem.data
     rm -f $BUILD_IS_RUNNING
-    exit 0
+    cleanup_and_exit 0
 fi
 
 mkdir -p $BUILD_ROOT/proc
