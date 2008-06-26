@@ -959,6 +959,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		    -hda $VM_IMAGE \
 		    ${VM_MEMORY:+-m $VM_MEMORY} \
 		    ${XENSWAP:+-hdb $XENSWAP}
+		if test "$PERSONALITY" != 0 ; then
+		    # have to switch back to PER_LINUX to make qemu work
+		    set -- perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' "$@"
+		fi
 		echo "$@"
 		"$@"
 	fi
