@@ -678,6 +678,11 @@ if test -n "$KILL" ; then
     cleanup_and_exit 0
 fi
 
+if [ -n "$USE_QEMU" -a -r /dev/kvm -a -x "$qemu_bin"-kvm ]; then
+    echo "using qemu-kvm"
+    qemu_bin="$qemu_bin-kvm"
+fi
+
 if [ -z "$RPMLIST" ]; then
     if [ -z "$repos" -a -z "$BUILD_RPMS" ]; then
 	BUILD_RPMS="/media/dvd/suse"
