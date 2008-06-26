@@ -464,6 +464,8 @@ mkdir_build_root()
 	    cleanup_and_exit 1
 	fi
     fi
+    
+    rm -rf "$BUILD_ROOT"/.build.packages
 }
 
 #### main ####
@@ -798,8 +800,6 @@ echo
 
 test "$BUILD_ARCH" = all && BUILD_ARCH=
 
-rm -rf $BUILD_ROOT/.build.packages
-
 for SPECFILE in "${SPECFILES[@]}" ; do
 
     SRCDIR="${SPECFILE%/*}"
@@ -972,6 +972,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	      BUILDSTATUS0)
 		mkdir -p $BUILD_ROOT/.build.packages 
 		cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
+		echo "extracting built packages..."
 		dd if=$XENSWAP bs=512 skip=1 | cpio --extract --no-absolute-filenames -v
 		cleanup_and_exit 0
 		;;
@@ -1212,6 +1213,7 @@ if test -n "$CREATE_BASELIBS" -a -d "$BUILD_ROOT/$TOPDIR/RPMS" ; then
 fi
 
 if test -n "$RUNNING_IN_XEN" -a -n "$XENSWAP"; then
+    echo "saving built packages..."
     $BUILD_DIR/extractbuild "$XENSWAP" || cleanup_and_exit 1
 fi
 
