@@ -658,6 +658,7 @@ while test -n "$1"; do
     esac
 done
 
+# XXX: doesn't kill vm if in prepare stage (because there is none)
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
     if test -z "$VM_IMAGE" ; then
@@ -665,7 +666,7 @@ if test -n "$KILL" ; then
 	    echo "could not kill build in $BUILD_ROOT"
 	    cleanup_and_exit 1
 	fi
-    else
+    elif test -n "$USE_XEN"; then
 	XENID="${VM_IMAGE%/root}"
 	XENID="${XENID##*/}"
 	if xm list "build:$XENID" >/dev/null 2>&1 ; then
@@ -674,6 +675,14 @@ if test -n "$KILL" ; then
 		cleanup_and_exit 1
 	    fi
 	fi
+    elif test -n "$USE_QEMU" -o -n "$USE_UML"; then
+	if ! fuser -k -TERM "$VM_IMAGE"; then
+	    echo "could not kill build in $VM_IMAGE"
+	    cleanup_and_exit 1
+	fi
+    else
+	echo "don't know how to kill this build job"
+	cleanup_and_exit 1
     fi
     cleanup_and_exit 0
 fi
