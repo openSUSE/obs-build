@@ -170,8 +170,8 @@ cleanup_and_exit () {
 	exec >&0 2>&0	# so that the logging tee finishes
 	sleep 1		# wait till tee terminates
 	kill -9 -1	# goodbye cruel world
-	exec /bin/bash -c 'mount -n -o remount,ro / ; halt -f'
-	halt -f
+	exec /bin/bash -c 'mount -n -o remount,ro / ; halt -f -p'
+	halt -f -p
     else
 	umount -n $BUILD_ROOT/proc 2>/dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2>/dev/null || true
