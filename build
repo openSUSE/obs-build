@@ -925,7 +925,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		"$@"
 	elif [ -n "$USE_QEMU" ]; then
 		echo "booting QEMU ..."
-		set -- $qemu_bin -no-reboot -nographic -net none -kernel $qemu_kernel -initrd $qemu_initrd -append "init=/.build/build panic=1 quiet root=/dev/sda rootdev=/dev/sda rw console=ttyS0,115200" -serial stdio -hda $VM_IMAGE ${VM_MEMORY:+-m $VM_MEMORY}
+		set -- $qemu_bin -no-reboot -nographic -net none -kernel $qemu_kernel -initrd $qemu_initrd -append "root=/dev/sda panic=1 quiet rw console=ttyS0,115200 init=/.build/build" -serial stdio -hda $VM_IMAGE ${VM_MEMORY:+-m $VM_MEMORY}
 		echo "$@"
 		"$@"
 	fi
