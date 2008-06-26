@@ -361,15 +361,14 @@ detect_xen_2nd_stage()
 	    sleep 1
 	done
 	test $i = 1 || echo
-    fi
-#why would one want to do that?? Breaks all kinds of things
-# XXX: why wait for it and then recreate?
-    umount -l /dev 2>/dev/null
-    if test -n "$XENSWAP" ; then
-	rm -f "$XENSWAP"
-	umask 027
-	mknod "$XENSWAP" b 3 2
-	umask 022
+	# recreate the swap device manually if it didn't exist for some
+	# reason, hardcoded to hda2 atm
+	if ! test -b "$XENSWAP" ; then
+	    rm -f "$XENSWAP"
+	    umask 027
+	    mknod "$XENSWAP" b 3 2
+	    umask 022
+	fi
 	swapon -v "$XENSWAP" || exit 1
     fi
     HOST="$MYHOSTNAME"
