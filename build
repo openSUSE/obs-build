@@ -28,6 +28,10 @@ qemu_bin=/usr/bin/qemu
 uml_kernel=/boot/vmlinux-um
 uml_initrd=/boot/initrd-um
 
+mkinird_virtio_cmd=(env rootfstype=ext2 mkinitrd -d /dev/null -m "virtio_pci virtio_blk" -k $qemu_kernel -i $qemu_initrd-virtio)
+# whether we have virtio support
+kvm_virtio=
+
 DO_INIT=true
 DO_LINT=
 CLEAN_BUILD=
@@ -692,6 +696,29 @@ fi
 if [ -n "$USE_QEMU" -a -r /dev/kvm -a -x "$qemu_bin"-kvm ]; then
     echo "using qemu-kvm"
     qemu_bin="$qemu_bin-kvm"
+    if [ ! -e $qemu_initrd-virtio -o $qemu_kernel -nt $qemu_initrd-virtio ]; then
+	if [ ! -w /root ]; then
+	    echo "No initrd that provides virtio support found. virtio accelleration disabled."
+	    echo "Run the following command as root to enable virtio:"
+	    shellquote "${mkinird_virtio_cmd[@]}"
+	    echo
+	elif /sbin/modinfo virtio_pci >/dev/null 2>&1; then
+	    echo "creating $qemu_initrd-virtio"
+	    "${mkinird_virtio_cmd[@]}" || cleanup_and_exit 1
+	    kvm_virtio=1
+	fi
+    else
+	kvm_virtio=1
+    fi
+
+    if [ "$kvm_virtio" = 1 ]; then
+	qemu_initrd="$qemu_initrd-virtio"
+	VM_SWAPDEV=/dev/vdb
+	qemu_rootdev=/dev/vda
+    else
+	VM_SWAPDEV=/dev/sdb
+	qemu_rootdev=/dev/sda
+    fi
 fi
 
 if [ -z "$RPMLIST" ]; then
@@ -952,13 +979,26 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		"$@"
 	elif [ -n "$USE_QEMU" ]; then
 		echo "booting QEMU ..."
+		if [ "$kvm_virtio" = 1 ]; then
+		    qemu_disks=(-drive file="$VM_IMAGE",if=virtio -hda /dev/null)
+		    if [ -n "$XENSWAP" ]; then
+			qemu_disks[${#qemu_disks[@]}]="-drive"
+			qemu_disks[${#qemu_disks[@]}]="file=$XENSWAP,if=virtio"
+		    fi
+		else
+		    qemu_disks=(-hda "$VM_IMAGE")
+		    if [ -n "$XENSWAP" ]; then
+			qemu_disks[${#qemu_disks[@]}]="-hdb"
+			qemu_disks[${#qemu_disks[@]}]="$XENSWAP"
+		    fi
+		fi
 		set -- $qemu_bin -no-reboot -nographic -net none -serial stdio \
 		    -kernel $qemu_kernel \
 		    -initrd $qemu_initrd \
-		    -append "root=/dev/sda panic=1 quiet rw console=ttyS0,115200 init=/.build/build" \
-		    -hda $VM_IMAGE \
+		    -append "root=$qemu_rootdev panic=1 quiet rw console=ttyS0,115200 init=/.build/build" \
 		    ${VM_MEMORY:+-m $VM_MEMORY} \
-		    ${XENSWAP:+-hdb $XENSWAP}
+		    "${qemu_disks[@]}"
+
 		if test "$PERSONALITY" != 0 ; then
 		    # have to switch back to PER_LINUX to make qemu work
 		    set -- perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' "$@"
