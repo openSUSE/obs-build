@@ -819,11 +819,14 @@ setmemorylimit
 # say hello
 #
 test -z "$HOST" && HOST=`hostname`
-echo Using BUILD_ROOT=$BUILD_ROOT
-test -n "$BUILD_RPMS" && echo Using BUILD_RPMS=$BUILD_RPMS
-echo Using BUILD_ARCH=$BUILD_ARCH
-test -n "$USE_XEN" && echo "Doing XEN build in $VM_IMAGE"
-echo
+
+if [ -z "$RUNNING_IN_XEN" ]; then
+    echo Using BUILD_ROOT=$BUILD_ROOT
+    test -n "$BUILD_RPMS" && echo Using BUILD_RPMS=$BUILD_RPMS
+    echo Using BUILD_ARCH=$BUILD_ARCH
+    test -n "$USE_XEN" && echo "Doing XEN build in $VM_IMAGE"
+    echo
+fi
 
 test "$BUILD_ARCH" = all && BUILD_ARCH=
 
@@ -834,11 +837,13 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
     cd "$SRCDIR"
 
-    echo
-    echo "$HOST started \"build $SPECFILE\" at `date`."
-    echo
-    test -n "$REASON" && echo "$REASON"
-    echo
+    if [ -z "$RUNNING_IN_XEN" ]; then
+	echo
+	echo "$HOST started \"build $SPECFILE\" at `date`."
+	echo
+	test -n "$REASON" && echo "$REASON"
+	echo
+    fi
 
     #
     # first setup building directory...
