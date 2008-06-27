@@ -208,9 +208,11 @@ sub read_config {
           $config->{'order'}->{$l} = 1;
 	}
       }
-    } elsif ($l0 eq 'repotype:') {
+    } elsif ($l0 eq 'repotype:') { #type of generated repository data
       $config->{'repotype'} = [ @l ];
-    } elsif ($l0 eq 'patterntype:') {
+    } elsif ($l0 eq 'type:') { #kind of packaging system (spec, dsc or kiwi)
+      $config->{'type'} = $l[0];
+    } elsif ($l0 eq 'patterntype:') { #kind of generated patterns in repository 
       $config->{'patterntype'} = [ @l ];
     } elsif ($l0 eq 'release:') {
       $config->{'release'} = $l[0];
@@ -227,7 +229,16 @@ sub read_config {
     s/=$// for @{$config->{'substitute'}->{$l}};
   }
   init_helper_hashes($config);
-  $config->{'type'} = (grep {$_ eq 'rpm'} @{$config->{'preinstall'} || []}) ? 'spec' : 'dsc';
+  if ( ! $config->{'type'}) {
+    # Fallback to old guessing method if no type (spec, dsc or kiwi) is defined
+    if (grep {$_ eq 'rpm'} @{$config->{'preinstall'} || []}) {
+      $config->{'type'} = 'spec';
+    } elsif (grep {$_ eq 'deb'} @{$config->{'preinstall'} || []}) {
+      $config->{'type'} = 'dsc';
+    } else {
+      $config->{'type'} = 'UNDEFINED';
+    }
+  }
   # add rawmacros to our macro list
   if ($config->{'rawmacros'} ne '') {
     for my $rm (split("\n", $config->{'rawmacros'})) {
@@ -455,7 +466,8 @@ sub addproviders {
     for my $pp (@{$provides->{$rp} || []}) {
       if ($pp eq $rn) {
 	# debian: unversioned provides do not match
-	next if $config->{'type'} ne 'spec';
+        # kiwi: supports only rpm, so we need to hand it like it
+	next if $config->{'type'} eq 'dsc';
 	push @p, $rp;
 	last;
       }
@@ -474,7 +486,8 @@ sub addproviders {
       }
       my $rr = $rf == 2 ? $pf : ($rf ^ 5);
       $rr &= 5 unless $pf & 2;
-      my $vv = Build::Rpm::verscmp($pv, $rv, $config->{'type'} eq 'spec' ? 1 : 0);
+      # verscmp for spec and kiwi types
+      my $vv = Build::Rpm::verscmp($pv, $rv, $config->{'type'} eq 'dsc' ? 0 : 1);
       if ($rr & (1 << ($vv + 1))) {
 	push @p, $rp;
 	last;
