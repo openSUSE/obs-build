@@ -57,6 +57,7 @@ LOGFILE=
 KILL=
 CHANGELOG=
 BUILD_DEBUG=
+PERSONALITY_SYSCALL=
 
 export PATH=$BUILD_DIR:$PATH
 
@@ -472,9 +473,19 @@ mkdir_build_root()
     rm -rf "$BUILD_ROOT"/.build.packages
 }
 
+linux64()
+{
+	perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' "$@"
+}
+
 #### main ####
 
 trap fail_exit EXIT
+
+case `perl -V:archname` in
+    *x86_64*) PERSONALITY_SYSCALL=135 ;;
+    *i?86*)   PERSONALITY_SYSCALL=136 ;;
+esac
 
 shopt -s nullglob
 
@@ -928,12 +939,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	# FIXME: this depends on the kernel and vm.
 	# could be hda2, sda2 for xen or hdb/sdb for qemu
 	test -n "$VM_SWAP" && echo "VM_SWAP='${VM_SWAPDEV:-/dev/hda2}'" >> $BUILD_ROOT/.build/build.data
-	PERSONALITY_SYSCALL=
 	PERSONALITY=0
-	case `perl -V:archname` in
-	    *x86_64*) PERSONALITY_SYSCALL=135 ;;
-	    *i?86*)   PERSONALITY_SYSCALL=136 ;;
-	esac
 	test -n "$PERSONALITY_SYSCALL" && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
 	echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
 	echo "MYHOSTNAME='`hostname`'" >> $BUILD_ROOT/.build/build.data
@@ -964,7 +970,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		set -- xm create -c $BUILD_DIR/xen.conf name="build:$XENID" ${MEMSIZE:+memory=$MEMSIZE} $XMROOT $XMSWAP extra="quiet init=/.build/build panic=1 console=ttyS0"
 		if test "$PERSONALITY" != 0 ; then
 		    # have to switch back to PER_LINUX to make xm work
-		    set -- perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' "$@"
+		    set -- linux64 "$@"
 		fi
 		echo "$@"
 		"$@" || true # somehow this is always false
@@ -997,7 +1003,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
 		if test "$PERSONALITY" != 0 ; then
 		    # have to switch back to PER_LINUX to make qemu work
-		    set -- perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' "$@"
+		    set -- linux64 "$@"
 		fi
 		echo "$@"
 		"$@"
