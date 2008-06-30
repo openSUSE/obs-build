@@ -28,7 +28,10 @@ qemu_bin=/usr/bin/qemu
 uml_kernel=/boot/vmlinux-um
 uml_initrd=/boot/initrd-um
 
-mkinird_virtio_cmd=(env rootfstype=ext2 mkinitrd -d /dev/null -m "virtio_pci virtio_blk" -k $qemu_kernel -i $qemu_initrd-virtio)
+kvm_kernel=/boot/vmlinuz
+kvm_initrd=/boot/initrd
+kvm_bin=/usr/bin/qemu-kvm
+mkinitrd_virtio_cmd=(env rootfstype=ext2 mkinitrd -d /dev/null -m "virtio_pci virtio_blk" -k $kvm_kernel -i $kvm_initrd-virtio)
 # whether we have virtio support
 kvm_virtio=
 
@@ -42,13 +45,10 @@ ABUILD_TARGET_ARCH=
 CREATE_BASELIBS=
 USEUSEDFORBUILD=
 LIST_STATE=
-USE_UML=
-USE_QEMU=
-USE_XEN=
 VM_IMAGE=
-XENSWAP=
-XENMEMORY=
-RUNNING_IN_XEN=
+VM_SWAP=
+MEMSIZE=
+RUNNING_IN_VM=
 RPMLIST=
 RELEASE=
 REASON=
@@ -166,11 +166,11 @@ usage () {
 cleanup_and_exit () {
     trap EXIT
     test -z "$1" && set 0
-    if test -n "$RUNNING_IN_XEN" ; then
+    if test -n "$RUNNING_IN_VM" ; then
 	cd /
-	if test -n "$XENSWAP" -a -e "$XENSWAP" ; then
-	    swapoff "$XENSWAP"
-	    echo -n "BUILDSTATUS$1" >"$XENSWAP"
+	if test -n "$VM_SWAP" -a -e "$VM_SWAP" ; then
+	    swapoff "$VM_SWAP"
+	    echo -n "BUILDSTATUS$1" >"$VM_SWAP"
 	fi
 	exec >&0 2>&0	# so that the logging tee finishes
 	sleep 1		# wait till tee terminates
@@ -296,7 +296,7 @@ setupicecream()
 
 setmemorylimit()
 {
-    if [ -n "$VM_IMAGE" -o -n "$RUNNING_IN_XEN" ]; then
+    if [ -n "$VM_IMAGE" -o -n "$RUNNING_IN_VM" ]; then
 	return
     fi
     local mem
@@ -343,12 +343,12 @@ function create_baselibs {
     fi
 }
 
-detect_xen_2nd_stage()
+detect_vm_2nd_stage()
 {
     if ! test "$0" = "/.build/build" ; then
 	return 1
     fi
-    echo "XEN 2nd stage started"
+    echo "2nd stage started in virtual machine"
     BUILD_ROOT=/
     BUILD_DIR=/.build
     . $BUILD_DIR/build.data
@@ -360,26 +360,26 @@ detect_xen_2nd_stage()
 	exec perl -e 'syscall(136, '$PERSONALITY') == -1 && warn("personality: $!\n");exec "/.build/build" || die("/.build/build: $!\n")'
     fi
     PATH=$BUILD_DIR:$PATH
-    RUNNING_IN_XEN=true
+    RUNNING_IN_VM=true
     mount -orw -n -tproc none /proc
     mount -n -o remount,rw /
-    if test -n "$XENSWAP" ; then
+    if test -n "$VM_SWAP" ; then
 	for i in 1 2 3 4 5 6 7 8 9 10 ; do
-	    test -e "$XENSWAP" && break
-	    test $i = 1 && echo "waiting for $XENSWAP to appear"
+	    test -e "$VM_SWAP" && break
+	    test $i = 1 && echo "waiting for $VM_SWAP to appear"
 	    echo -n .
 	    sleep 1
 	done
 	test $i = 1 || echo
 	# recreate the swap device manually if it didn't exist for some
 	# reason, hardcoded to hda2 atm
-	if ! test -b "$XENSWAP" ; then
-	    rm -f "$XENSWAP"
+	if ! test -b "$VM_SWAP" ; then
+	    rm -f "$VM_SWAP"
 	    umask 027
-	    mknod "$XENSWAP" b 3 2
+	    mknod "$VM_SWAP" b 3 2
 	    umask 022
 	fi
-	swapon -v "$XENSWAP" || exit 1
+	swapon -v "$VM_SWAP" || exit 1
     fi
     HOST="$MYHOSTNAME"
 
@@ -457,7 +457,7 @@ mkdir_build_root()
 {
     if [ -d "$BUILD_ROOT" ]; then
 	# check if it is owned by root
-	if [ -z "$RUNNING_IN_XEN" -a \! -O "$BUILD_ROOT" -a "`stat -c %u $BUILD_ROOT`" -ne 0 ]; then
+	if [ -z "$RUNNING_IN_VM" -a \! -O "$BUILD_ROOT" -a "`stat -c %u $BUILD_ROOT`" -ne 0 ]; then
 	    echo "BUILD_ROOT=$BUILD_ROOT must be owned by $USER. Exit..."
 	    cleanup_and_exit 1
 	fi
@@ -478,7 +478,7 @@ trap fail_exit EXIT
 
 shopt -s nullglob
 
-if detect_xen_2nd_stage ; then
+if detect_vm_2nd_stage ; then
     set "/.build-srcdir/$SPECFILE"
 fi
 export HOST
@@ -552,8 +552,8 @@ while test -n "$1"; do
 	export BUILD_DIST
 	shift
       ;;
-      *-xen)
-        USE_XEN=1
+      *-xen|*-kvm|--uml|--qemu)
+	VM_TYPE=${PARAM##*-}
 	if [ -n "$ARG" -a "$ARG" = "${ARG#-}" ]; then
 	    VM_IMAGE="$ARG"
 	    shift
@@ -561,30 +561,12 @@ while test -n "$1"; do
 	    VM_IMAGE=1
 	fi
       ;;
-      --uml)
-	USE_UML=1
-	if [ -n "$ARG" -a "$ARG" = "${ARG#-}" ]; then
-	    VM_IMAGE="$ARG"
-	    shift
-	else
-	    VM_IMAGE=1
-	fi
-      ;;
-      --qemu)
-	USE_QEMU=1
-	if [ -n "$ARG" -a "$ARG" = "${ARG#-}" ]; then
-	    VM_IMAGE="$ARG"
-	    shift
-	else
-	    VM_IMAGE=1
-	fi
-      ;;
-      *-xenswap)
-        XENSWAP="$ARG"
+      *-xenswap|*-swap)
+        VM_SWAP="$ARG"
         shift
       ;;
-      *-xenmemory)
-        VM_MEMORY="$ARG"
+      *-xenmemory|*-memory)
+        MEMSIZE="$ARG"
         shift
       ;;
       *-rpmlist)
@@ -672,7 +654,7 @@ if test -n "$KILL" ; then
 	    echo "could not kill build in $BUILD_ROOT"
 	    cleanup_and_exit 1
 	fi
-    elif test -n "$USE_XEN"; then
+    elif test "$VM_TYPE" = 'xen'; then
 	XENID="${VM_IMAGE%/root}"
 	XENID="${XENID##*/}"
 	if xm list "build:$XENID" >/dev/null 2>&1 ; then
@@ -681,7 +663,7 @@ if test -n "$KILL" ; then
 		cleanup_and_exit 1
 	    fi
 	fi
-    elif test -n "$USE_QEMU" -o -n "$USE_UML"; then
+    elif test -n "$VM_TYPE"; then
 	if ! fuser -k -TERM "$VM_IMAGE"; then
 	    echo "could not kill build in $VM_IMAGE"
 	    cleanup_and_exit 1
@@ -693,18 +675,22 @@ if test -n "$KILL" ; then
     cleanup_and_exit 0
 fi
 
-if [ -n "$USE_QEMU" -a -r /dev/kvm -a -x "$qemu_bin"-kvm ]; then
-    echo "using qemu-kvm"
-    qemu_bin="$qemu_bin-kvm"
+if [ "$VM_TYPE" = 'kvm' ]; then
+    if [ ! -r /dev/kvm -o ! -x "$qemu_bin"-kvm ]; then
+	echo ""
+    fi
+    qemu_bin="$kvm_bin"
+    qemu_kernel="$kvm_kernel"
+    qemu_initrd="$kvm_initrd"
     if [ ! -e $qemu_initrd-virtio -o $qemu_kernel -nt $qemu_initrd-virtio ]; then
 	if [ ! -w /root ]; then
 	    echo "No initrd that provides virtio support found. virtio accelleration disabled."
 	    echo "Run the following command as root to enable virtio:"
-	    shellquote "${mkinird_virtio_cmd[@]}"
+	    shellquote "${mkinitrd_virtio_cmd[@]}"
 	    echo
 	elif /sbin/modinfo virtio_pci >/dev/null 2>&1; then
 	    echo "creating $qemu_initrd-virtio"
-	    "${mkinird_virtio_cmd[@]}" || cleanup_and_exit 1
+	    "${mkinitrd_virtio_cmd[@]}" || cleanup_and_exit 1
 	    kvm_virtio=1
 	fi
     else
@@ -719,6 +705,11 @@ if [ -n "$USE_QEMU" -a -r /dev/kvm -a -x "$qemu_bin"-kvm ]; then
 	VM_SWAPDEV=/dev/sdb
 	qemu_rootdev=/dev/sda
     fi
+fi
+
+if [ "$VM_TYPE" = 'qemu' ]; then
+    VM_SWAPDEV=/dev/sdb
+    qemu_rootdev=/dev/sda
 fi
 
 if [ -z "$RPMLIST" ]; then
@@ -757,7 +748,7 @@ if test -n "$LIST_STATE" ; then
     cleanup_and_exit $ERR
 fi
 
-if test -z "$RUNNING_IN_XEN" ; then
+if test -z "$RUNNING_IN_VM" ; then
     if test -n "$VM_IMAGE" ; then
 	if test "$VM_IMAGE" = 1 ; then
 	    VM_IMAGE="$BUILD_ROOT.img"
@@ -781,9 +772,9 @@ if test -z "$RUNNING_IN_XEN" ; then
     else
 	test -w /root || become_root_or_fail
     fi
-    if test -n "$XENSWAP" ; then
-	dd if=/dev/zero of="$XENSWAP" bs=12 count=1 conv=notrunc 2>/dev/null
-	mkswap "$XENSWAP"
+    if test -n "$VM_SWAP" ; then
+	dd if=/dev/zero of="$VM_SWAP" bs=12 count=1 conv=notrunc 2>/dev/null
+	mkswap "$VM_SWAP"
     fi
 fi
 
@@ -820,11 +811,11 @@ setmemorylimit
 #
 test -z "$HOST" && HOST=`hostname`
 
-if [ -z "$RUNNING_IN_XEN" ]; then
+if [ -z "$RUNNING_IN_VM" ]; then
     echo Using BUILD_ROOT=$BUILD_ROOT
     test -n "$BUILD_RPMS" && echo Using BUILD_RPMS=$BUILD_RPMS
     echo Using BUILD_ARCH=$BUILD_ARCH
-    test -n "$USE_XEN" && echo "Doing XEN build in $VM_IMAGE"
+    test -n "$VM_TYPE" && echo "Doing $VM_TYPE build in $VM_IMAGE"
     echo
 fi
 
@@ -837,7 +828,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
     cd "$SRCDIR"
 
-    if [ -z "$RUNNING_IN_XEN" ]; then
+    if [ -z "$RUNNING_IN_VM" ]; then
 	echo
 	echo "$HOST started \"build $SPECFILE\" at `date`."
 	echo
@@ -881,7 +872,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     test "$icecream" -gt 1 && ADDITIONAL_PACKS="$ADDITIONAL_PACKS icecream gcc-c++"
     test -n "$DO_LINT" && ADDITIONAL_PACKS="$ADDITIONAL_PACKS rpmlint-mini"
 
-    if test -n "$CHANGELOG" -a -z "$RUNNING_IN_XEN" ; then
+    if test -n "$CHANGELOG" -a -z "$RUNNING_IN_VM" ; then
 	rm -f $BUILD_ROOT/.build-changelog
 	case $SPECFILE in
 	  *.dsc) CFFORMAT=debian ;;
@@ -893,7 +884,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	fi
     fi
 
-    if test -n "$USE_XEN" -o -n "$USE_UML" -o -n "$USE_QEMU"; then
+    if test -n "$VM_TYPE"; then
 	rm -rf $BUILD_ROOT/.build
 	mkdir -p $BUILD_ROOT/.build
 	if test "$DO_INIT" = true ; then
@@ -936,7 +927,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "CHANGELOG='${CHANGELOG//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	# FIXME: this depends on the kernel and vm.
 	# could be hda2, sda2 for xen or hdb/sdb for qemu
-	test -n "$XENSWAP" && echo "XENSWAP='${VM_SWAPDEV:-/dev/hda2}'" >> $BUILD_ROOT/.build/build.data
+	test -n "$VM_SWAP" && echo "VM_SWAP='${VM_SWAPDEV:-/dev/hda2}'" >> $BUILD_ROOT/.build/build.data
 	PERSONALITY_SYSCALL=
 	PERSONALITY=0
 	case `perl -V:archname` in
@@ -957,51 +948,51 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	umount -n $BUILD_ROOT/mnt 2> /dev/null || true
 	umount $BUILD_ROOT
 
-	if [ -n "$USE_XEN" ]; then
+	if [ "$VM_TYPE" = 'xen' ]; then
 		XMROOT=file:$VM_IMAGE
 		XMROOT=${XMROOT/#file:\/dev/phy:/dev}
 		XMROOT="disk=$XMROOT,hda1,w"
 		XMSWAP=
-		if test -n "$XENSWAP" ; then
-		    XMSWAP=file:$XENSWAP
+		if test -n "$VM_SWAP" ; then
+		    XMSWAP=file:$VM_SWAP
 		    XMSWAP=${XMSWAP/#file:\/dev/phy:/dev}
 		    XMSWAP="disk=$XMSWAP,hda2,w"
 		fi
 		XENID="${VM_IMAGE%/root}"
 		XENID="${XENID##*/}"
 		echo "booting XEN kernel ..."
-		set -- xm create -c $BUILD_DIR/xen.conf name="build:$XENID" ${VM_MEMORY:+memory=$VM_MEMORY} $XMROOT $XMSWAP extra="init=/.build/build panic=1 console=ttyS0"
+		set -- xm create -c $BUILD_DIR/xen.conf name="build:$XENID" ${MEMSIZE:+memory=$MEMSIZE} $XMROOT $XMSWAP extra="init=/.build/build panic=1 console=ttyS0"
 		if test "$PERSONALITY" != 0 ; then
 		    # have to switch back to PER_LINUX to make xm work
 		    set -- perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' "$@"
 		fi
 		echo "$@"
 		"$@" || true # somehow this is always false
-	elif [ -n "$USE_UML" ]; then
+	elif [ "$VM_TYPE" = 'uml' ]; then
 		echo "booting UML kernel ..."
-		set -- $uml_kernel initrd=$uml_initrd root=/ubda init=/.build/build panic=1 quiet ubd0=$VM_IMAGE ${VM_MEMORY:+mem=$VM_MEMORY}
+		set -- $uml_kernel initrd=$uml_initrd root=/ubda init=/.build/build panic=1 quiet ubd0=$VM_IMAGE ${MEMSIZE:+mem=$MEMSIZE}
 		echo "$@"
 		"$@"
-	elif [ -n "$USE_QEMU" ]; then
+	elif [ "$VM_TYPE" = 'qemu' -o "$VM_TYPE" = 'kvm' ]; then
 		echo "booting QEMU ..."
 		if [ "$kvm_virtio" = 1 ]; then
 		    qemu_disks=(-drive file="$VM_IMAGE",if=virtio -hda /dev/null)
-		    if [ -n "$XENSWAP" ]; then
+		    if [ -n "$VM_SWAP" ]; then
 			qemu_disks[${#qemu_disks[@]}]="-drive"
-			qemu_disks[${#qemu_disks[@]}]="file=$XENSWAP,if=virtio"
+			qemu_disks[${#qemu_disks[@]}]="file=$VM_SWAP,if=virtio"
 		    fi
 		else
 		    qemu_disks=(-hda "$VM_IMAGE")
-		    if [ -n "$XENSWAP" ]; then
+		    if [ -n "$VM_SWAP" ]; then
 			qemu_disks[${#qemu_disks[@]}]="-hdb"
-			qemu_disks[${#qemu_disks[@]}]="$XENSWAP"
+			qemu_disks[${#qemu_disks[@]}]="$VM_SWAP"
 		    fi
 		fi
 		set -- $qemu_bin -no-reboot -nographic -net none -serial stdio \
 		    -kernel $qemu_kernel \
 		    -initrd $qemu_initrd \
 		    -append "root=$qemu_rootdev panic=1 quiet rw console=ttyS0,115200 init=/.build/build" \
-		    ${VM_MEMORY:+-m $VM_MEMORY} \
+		    ${MEMSIZE:+-m $MEMSIZE} \
 		    "${qemu_disks[@]}"
 
 		if test "$PERSONALITY" != 0 ; then
@@ -1011,14 +1002,14 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		echo "$@"
 		"$@"
 	fi
-	if test -n "$XENSWAP" ; then
-	    BUILDSTATUS=`dd if="$XENSWAP" bs=12 count=1 2>/dev/null`
+	if test -n "$VM_SWAP" ; then
+	    BUILDSTATUS=`dd if="$VM_SWAP" bs=12 count=1 2>/dev/null`
 	    case $BUILDSTATUS in
 	      BUILDSTATUS0)
 		mkdir -p $BUILD_ROOT/.build.packages 
 		cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
 		echo "extracting built packages..."
-		dd if=$XENSWAP bs=512 skip=1 | cpio --extract --no-absolute-filenames -v
+		dd if=$VM_SWAP bs=512 skip=1 | cpio --extract --no-absolute-filenames -v
 		cleanup_and_exit 0
 		;;
 	      BUILDSTATUS[1-9])
@@ -1187,8 +1178,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
     echo -----------------------------------------------------------------
     echo -----------------------------------------------------------------
-    test -n "$RUNNING_IN_XEN" && ifconfig lo 127.0.0.1 up
-    test -n "$RUNNING_IN_XEN" -a -n "$MYHOSTNAME" && hostname "$MYHOSTNAME"
+    test -n "$RUNNING_IN_VM" && ifconfig lo 127.0.0.1 up
+    test -n "$RUNNING_IN_VM" -a -n "$MYHOSTNAME" && hostname "$MYHOSTNAME"
 
     BUILD_SUCCEDED=false
 
@@ -1257,10 +1248,10 @@ if test -n "$CREATE_BASELIBS" -a -d "$BUILD_ROOT/$TOPDIR/RPMS" ; then
     fi
 fi
 
-if test -n "$RUNNING_IN_XEN" -a -n "$XENSWAP"; then
+if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
     echo "saving built packages..."
-    swapoff "$XENSWAP"
-    $BUILD_DIR/extractbuild "$XENSWAP" || cleanup_and_exit 1
+    swapoff "$VM_SWAP"
+    $BUILD_DIR/extractbuild "$VM_SWAP" || cleanup_and_exit 1
 fi
 
 cleanup_and_exit 0
