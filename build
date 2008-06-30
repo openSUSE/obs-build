@@ -961,7 +961,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		XENID="${VM_IMAGE%/root}"
 		XENID="${XENID##*/}"
 		echo "booting XEN kernel ..."
-		set -- xm create -c $BUILD_DIR/xen.conf name="build:$XENID" ${MEMSIZE:+memory=$MEMSIZE} $XMROOT $XMSWAP extra="init=/.build/build panic=1 console=ttyS0"
+		set -- xm create -c $BUILD_DIR/xen.conf name="build:$XENID" ${MEMSIZE:+memory=$MEMSIZE} $XMROOT $XMSWAP extra="quiet init=/.build/build panic=1 console=ttyS0"
 		if test "$PERSONALITY" != 0 ; then
 		    # have to switch back to PER_LINUX to make xm work
 		    set -- perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' "$@"
