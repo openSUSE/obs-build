@@ -233,7 +233,7 @@ sub read_config {
     # Fallback to old guessing method if no type (spec, dsc or kiwi) is defined
     if (grep {$_ eq 'rpm'} @{$config->{'preinstall'} || []}) {
       $config->{'type'} = 'spec';
-    } elsif (grep {$_ eq 'deb'} @{$config->{'preinstall'} || []}) {
+    } elsif (grep {$_ eq 'debianutils'} @{$config->{'preinstall'} || []}) {
       $config->{'type'} = 'dsc';
     } else {
       $config->{'type'} = 'UNDEFINED';
