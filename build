@@ -831,6 +831,7 @@ if [ -z "$RUNNING_IN_VM" ]; then
 fi
 
 test "$BUILD_ARCH" = all && BUILD_ARCH=
+BUILD_USER_ABUILD_USED=
 
 for SPECFILE in "${SPECFILES[@]}" ; do
 
@@ -1078,6 +1079,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if test -f $BUILD_ROOT/etc/shadow ; then
 	    sed -e "s@^root::@root:*:@" < $BUILD_ROOT/etc/shadow > $BUILD_ROOT/etc/shadow.t && mv $BUILD_ROOT/etc/shadow.t $BUILD_ROOT/etc/shadow
 	fi
+	BUILD_USER_ABUILD_USED=true
     else
         if egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
             egrep -v '^abuild:' <$BUILD_ROOT/etc/passwd >$BUILD_ROOT/etc/passwd.new
@@ -1193,13 +1195,13 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	test -z "$BUILD_RPM_BUILD_STAGE" && BUILD_RPM_BUILD_STAGE=-ba
 
 	# XXX: move _srcdefattr to macro file?
-	rpmbopts=("$BUILD_RPM_BUILD_STAGE" "--eval" "%define _srcdefattr (-,root,root)")
+	rpmbopts=("$BUILD_RPM_BUILD_STAGE" "--define" "_srcdefattr (-,root,root)")
 	if [ -n "$ABUILD_TARGET_ARCH" ]; then
 		rpmbopts[${#rpmbopts[@]}]="--target=$ABUILD_TARGET_ARCH"
 	fi
 	if [ -n "$BUILD_JOBS" ]; then
-		rpmbopts[${#rpmbopts[@]}]='--eval'
-		rpmbopts[${#rpmbopts[@]}]="%define jobs $BUILD_JOBS"
+		rpmbopts[${#rpmbopts[@]}]='--define'
+		rpmbopts[${#rpmbopts[@]}]="jobs $BUILD_JOBS"
 	fi
 	if test -s "$BUILD_ROOT/usr/lib/rpm/mandriva/macros" ; then
 		rpmbopts[${#rpmbopts[@]}]='--eval'
@@ -1232,6 +1234,38 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     test "$BUILD_SUCCEDED" = true || cleanup_and_exit 1
     test -d "$SRCDIR" && cd "$SRCDIR"
 done
+
+if test -n "$BUILD_USER_ABUILD_USED" ; then
+    echo "... checking for files with abuild user/group"
+    BADFILE=
+    RPMS=`find $BUILD_ROOT/$TOPDIR/RPMS -type f -name "*.rpm"`
+    if test -n "$RPMS" ; then
+	while read un gn fn ; do
+	    if test "$un" = abuild -o "$gn" = abuild -o "$un" = 399 -o "$gn" = 399 ; then
+		echo "  $un $gn $fn"
+		BADFILE=true
+	    fi
+	done < <(rpm -qp --qf '[%{FILEUSERNAME} %{FILEGROUPNAME} %{FILENAMES}\n]' $RPMS)
+    fi
+    if test -n "$BADFILE" ; then
+	echo "please fix your filelist (e.g. add defattr)"
+	cleanup_and_exit 1
+    fi
+fi
+
+if test -d $BUILD_ROOT/usr/lib/build/checks ; then
+    mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
+    export PNAME=""
+    export DO_RPM_REMOVE=true
+    for SRPM in $BUILD_ROOT/$TOPDIR/SRPMS/*src.rpm ; do
+	test -f "$SRPM" && PNAME=`rpm --nodigest --nosignature -qp --qf "%{NAME}" $SRPM`
+    done
+    for CHECKSCRIPT in $BUILD_ROOT/usr/lib/build/checks/* ; do
+	echo running `basename $CHECKSCRIPT`
+	$CHECKSCRIPT || cleanup_and_exit 1
+    done
+    umount -n $BUILD_ROOT/proc 2> /dev/null
+fi
 
 if test -n "$DO_LINT" -a -x $BUILD_ROOT/opt/testing/bin/rpmlint -a -d "$BUILD_ROOT/$TOPDIR/RPMS" ; then
     LINT_RPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/RPMS \
