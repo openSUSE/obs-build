@@ -37,6 +37,7 @@ kvm_virtio=
 
 DO_INIT=true
 DO_LINT=
+DO_CHECKS=true
 CLEAN_BUILD=
 SPECFILES=()
 SRCDIR=
@@ -108,6 +109,8 @@ Known Parameters:
 
   --no-init   Skip initialization of build root and start with build
               immediately.
+
+  --no-checks Do not run post-build checks
 
   --rpms path1:path2:...
               Specify path where to find the RPMs for the build system
@@ -512,6 +515,9 @@ while test -n "$1"; do
       *-no*init)
         DO_INIT=false
       ;;
+      *-no*checks)
+        DO_CHECKS=false
+      ;;
       *-clean)
         CLEAN_BUILD='--clean'
       ;;
@@ -882,7 +888,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     test -n "$CREATE_BASELIBS" && ADDITIONAL_PACKS="$ADDITIONAL_PACKS build"
     test "$ccache" = '1' && ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
     test "$icecream" -gt 1 && ADDITIONAL_PACKS="$ADDITIONAL_PACKS icecream gcc-c++"
-    test -n "$DO_LINT" && ADDITIONAL_PACKS="$ADDITIONAL_PACKS rpmlint-mini"
+    test -n "$DO_LINT" && ADDITIONAL_PACKS="$ADDITIONAL_PACKS rpmlint-Factory"
 
     if test -n "$CHANGELOG" -a -z "$RUNNING_IN_VM" ; then
 	rm -f $BUILD_ROOT/.build-changelog
@@ -933,6 +939,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "RELEASE='${RELEASE//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "BUILD_DEBUG='${BUILD_DEBUG//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "DO_LINT='${DO_LINT//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+	echo "DO_CHECKS='${DO_CHECKS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "NOROOTFORBUILD='${NOROOTFORBUILD//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "CREATE_BASELIBS='$CREATE_BASELIBS'" >> $BUILD_ROOT/.build/build.data
 	echo "REASON='${REASON//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
@@ -1267,7 +1274,7 @@ if test -d $BUILD_ROOT/usr/lib/build/checks ; then
     umount -n $BUILD_ROOT/proc 2> /dev/null
 fi
 
-if test -n "$DO_LINT" -a -x $BUILD_ROOT/opt/testing/bin/rpmlint -a -d "$BUILD_ROOT/$TOPDIR/RPMS" ; then
+if test "$DO_CHECKS" != "false" -a -x $BUILD_ROOT/opt/testing/bin/rpmlint -a -d "$BUILD_ROOT/$TOPDIR/RPMS" ; then
     LINT_RPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/RPMS \
         \( -name "*-debuginfo-*" -o -name "*-debugsource-*" \
         -o -name "*-32bit-*" -o -name "*-64bit-*" \
