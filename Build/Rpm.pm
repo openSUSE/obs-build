@@ -313,8 +313,8 @@ sub parse {
       $exclarch ||= [];
       push @$exclarch, split(' ', $1);
     }
-    if ($line =~ /^PreReq\s*:\s*(\S.*)$/i) {
-      my $deps = $1;
+    if ($line =~ /^(Require\(pre\)|Require\(post\)|PreReq)\s*:\s*(\S.*)$/i) {
+      my $deps = $2;
       my @deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
       while (@deps) {
 	my ($pack, $vers, $qual) = splice(@deps, 0, 3);
