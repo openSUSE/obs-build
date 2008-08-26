@@ -110,6 +110,7 @@ sub parse {
   my $packvers;
   my $packrel;
   my $exclarch;
+  my $badarch;
   my @subpacks;
   my @packdeps;
   my @prereqs;
@@ -313,8 +314,12 @@ sub parse {
       $exclarch ||= [];
       push @$exclarch, split(' ', $1);
     }
-    if ($line =~ /^(Require\(pre\)|Require\(post\)|PreReq)\s*:\s*(\S.*)$/i) {
-      my $deps = $2;
+    if ($main_preamble && ($line =~ /^ExcludeArch\s*:\s*(.*)/i)) {
+      $badarch ||= [];
+      push @$badarch, split(' ', $1);
+    }
+    if ($line =~ /^(?:Require\(pre\)|Require\(post\)|PreReq)\s*:\s*(\S.*)$/i) {
+      my $deps = $1;
       my @deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
       while (@deps) {
 	my ($pack, $vers, $qual) = splice(@deps, 0, 3);
@@ -416,6 +421,7 @@ sub parse {
   $ret->{'release'} = $packrel if defined $packrel;
   $ret->{'subpacks'} = \@subpacks;
   $ret->{'exclarch'} = $exclarch if defined $exclarch;
+  $ret->{'badarch'} = $badarch if defined $badarch;
   $ret->{'deps'} = \@packdeps;
   $ret->{'prereqs'} = \@prereqs if @prereqs;
   $ret->{'configdependent'} = 1 if $ifdeps;
