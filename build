@@ -59,6 +59,7 @@ KILL=
 CHANGELOG=
 BUILD_DEBUG=
 PERSONALITY_SYSCALL=
+INCARNATION=
 
 export PATH=$BUILD_DIR:$PATH
 
@@ -646,6 +647,10 @@ while test -n "$1"; do
       --debug)
         BUILD_DEBUG=1
       ;;
+      --incarnation)
+        INCARNATION=$ARG
+	shift
+      ;;
       ----noarg)
         echo "$ARG does not take an argument"
         cleanup_and_exit
@@ -944,6 +949,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "CREATE_BASELIBS='$CREATE_BASELIBS'" >> $BUILD_ROOT/.build/build.data
 	echo "REASON='${REASON//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "CHANGELOG='${CHANGELOG//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+	echo "INCARNATION='${INCARNATION//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	# FIXME: this depends on the kernel and vm.
 	# could be hda2, sda2 for xen or hdb/sdb for qemu
 	test -n "$VM_SWAP" && echo "VM_SWAP='${VM_SWAPDEV:-/dev/hda2}'" >> $BUILD_ROOT/.build/build.data
@@ -1036,7 +1042,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
 
     if test "$DO_INIT" = true ; then
-        set -- init_buildsystem "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
+	CREATE_BUILD_BINARIES=
+	egrep '^#[       ]*needsbinariesforbuild[       ]*$' >/dev/null <$MYSRCDIR/$SPECFILE && CREATE_BUILD_BINARIES=--create-build-binaries
+        set -- init_buildsystem "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
 	"$@" || cleanup_and_exit 1
 	mount -n -tproc none $BUILD_ROOT/proc || true
@@ -1105,7 +1113,14 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     setupccache
 
     # nasty hack to prevent rpath on known paths
+    # FIXME: do this only for suse
     echo "export SUSE_IGNORED_RPATHS=/etc/ld.so.conf" > "$BUILD_ROOT"/etc/profile.d/buildsystem.sh
+
+    #
+    # create legacy .buildenv file
+    #
+    test -z "$INCARNATION" && INCARNATION=0
+    echo "BUILD_INCARNATION=$INCARNATION" > $BUILD_ROOT/.buildenv
 
     #
     # now clean up RPM building directories

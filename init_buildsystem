@@ -36,12 +36,17 @@ USEUSEDFORBUILD=
 LIST_STATE=
 RPMLIST=
 CLEAN_BUILD=
+CREATE_BUILD_BINARIES=
 
 while test -n "$1" ; do
     case "$1" in
 	--prepare)
 	    shift
 	    PREPARE_XEN=true
+	    ;;
+	--create-build-binaries)
+	    shift
+	    CREATE_BUILD_BINARIES=true
 	    ;;
 	--useusedforbuild)
 	    shift
@@ -479,6 +484,22 @@ mkdir -p $BUILD_ROOT/proc
 mkdir -p $BUILD_ROOT/dev/pts
 mount -n -tproc none $BUILD_ROOT/proc 2>/dev/null || true
 mount -n -tdevpts none $BUILD_ROOT/dev/pts 2>/dev/null || true
+
+#
+# create .build.binaries directory if requested
+#
+rm -rf $BUILD_ROOT/.build.binaries
+if test -n "$CREATE_BUILD_BINARIES" ; then
+    echo "creating .build.binaries directory..."
+    mkdir -p "$BUILD_ROOT/.build.binaries"
+    for PKG in $PACKAGES_TO_INSTALL ; do
+	test -L "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" || continue
+	LPKG=`readlink -f "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF"`
+	ln "$LPKG" "$BUILD_ROOT/.build.binaries/$PKG.$PSUF" 2>/dev/null
+	test -f "$BUILD_ROOT/.build.binaries/$PKG.$PSUF" && continue
+	cp "$LPKG" "$BUILD_ROOT/.build.binaries/$PKG.$PSUF"
+    done
+fi
 
 #
 # get list and ids of already installed rpms
