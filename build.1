@@ -1,4 +1,10 @@
-.TH build 1 "(c) 1997-2005 SuSE Linux AG Nuernberg, Germany"
+.de TQ \"follow a TP item with several TQ items to define several
+.      \"entities with one shared description.
+.br
+.ns
+.TP \\$1
+..
+.TH build 1 "(c) 1997-2008 SuSE Linux AG Nuernberg, Germany"
 .SH NAME
 build \- build SuSE Linux RPMs in a chroot environment
 .SH SYNOPSIS
@@ -43,6 +49,7 @@ automatically unpacks it for the build.
 If neither is given,
 .B build
 will use all the specfiles in the current directory.
+.P
 .SH OPTIONS
 .TP
 .B --clean
@@ -70,18 +77,52 @@ don't specify this option.
 Specifies where the build system is set up. Overrides the
 BUILD_ROOT enviroment variable.
 .TP
-.B "\-\-useusedforbuild"
+.B --useusedforbuild
 Tell build not to do dependency expansion, but to extract the
-list of packages to install from "usedforbuild" lines or, if none
-are found, from all "BuildRequires" lines. This option is useful
+list of packages to install from "# usedforbuild" lines or, if none
+are found, from all "BuildRequires" lines.  This option is useful
 if you want to re-build a package from a srcrpm with exactly the
 same packages used for the srcrpm build.
+.TP
+.B --norootforbuild
+
 .TP
 .B --help
 Print a short help text.
 .TP
 .B --verify
 verify the files in an existing build system.
+
+.SH .spec FILE OPTIONS
+The
+.B build
+command interprets some special control comments in the specfile:
+.TP
+.B # norootforbuild
+.TQ
+.B # needsrootforbuild
+.B build
+uses either user
+.I root
+or user
+.I abuild
+in the build system to do the build.  For non-SUSE distros as well as
+since SUSE 10.2, the default build user is
+.I abuild.
+For 10.2 and before, the default build user is
+.I root.
+These two flags in the spec file allow to deviate from the defaults
+and force-set the build user to
+.I abuild
+and
+.I root
+.RI "(for " "#\ norootforbuild" " and " "#\ needsrootforbuild" " respectively."
+.TP
+.B # needsbinariesforbuild
+provide the binary rpms that have been used to set up the build root
+in
+.I /.build.binaries
+within the build root.
 .SH ENVIRONMENT
 .TP
 .B BUILD_ROOT
@@ -104,3 +145,9 @@ You can use this to add more options to RPM.
 .TP
 .BR "Maximum RPM":
 .I http://www.rpm.org/max-rpm/
+.TP
+.BR "cross distribution packaging":
+.I http://en.opensuse.org/Build_Service/cross_distribution_package_how_to
+.TP
+.BR "SUSE packaging standards and guidelines":
+.I http://en.opensuse.org/Packaging
