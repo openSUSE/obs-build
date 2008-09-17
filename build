@@ -1289,7 +1289,7 @@ if test -d $BUILD_ROOT/usr/lib/build/checks ; then
 	test -f "$SRPM" && PNAME=`rpm --nodigest --nosignature -qp --qf "%{NAME}" $SRPM`
     done
     for CHECKSCRIPT in $BUILD_ROOT/usr/lib/build/checks/* ; do
-	echo running `basename $CHECKSCRIPT`
+	echo "... running `basename $CHECKSCRIPT`"
 	$CHECKSCRIPT || cleanup_and_exit 1
     done
     umount -n $BUILD_ROOT/proc 2> /dev/null
@@ -1317,9 +1317,10 @@ if test -n "$CREATE_BASELIBS" -a -d "$BUILD_ROOT/$TOPDIR/RPMS" ; then
 fi
 
 if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
-    echo "saving built packages..."
+    echo "... saving built packages"
     swapoff "$VM_SWAP"
     $BUILD_DIR/extractbuild "$VM_SWAP" || cleanup_and_exit 1
 fi
 
+echo "... build is finished"
 cleanup_and_exit 0
