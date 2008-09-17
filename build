@@ -622,7 +622,7 @@ while test -n "$1"; do
         definesnstuff[${#definesnstuff[@]}]="$ARG";
 	shift
       ;;
-      --repository)
+      --repository|--repo)
         if [ -z "$ARG" ] ; then
           echo_help
           cleanup_and_exit
@@ -1077,7 +1077,13 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     #
     # check if we want to build with the abuild user
     #
-    BUILD_USER=root
+    BUILD_USER=abuild
+    if test -x $BUILD_ROOT/bin/rpm ; then
+	SUSE_VERSION=`chroot $BUILD_ROOT /bin/rpm --eval '%{?suse_version}' 2>/dev/null`
+	if test -n "$SUSE_VERSION" -a "$SUSE_VERSION" -le 1020 ; then
+	    BUILD_USER=root
+	fi
+    fi
     if test "$BUILD_USER" = abuild ; then
 	egrep '^#[       ]*needsrootforbuild[       ]*$' >/dev/null <$SPECFILE && BUILD_USER=root
     else
