@@ -395,9 +395,10 @@ sub parse {
 	push @subpacks, "$packname-$2" if defined $packname;
       }
       $preamble = 1;
+      $main_preamble = 0;
     }
 
-    if ($line =~ /^\s*%(package|prep|build|install|check|clean|preun|postun|pretrans|posttrans|pre|post|files|changelog|description|triggerpostun|triggerun|triggerin|trigger|verifyscript)/) {
+    if ($line =~ /^\s*%(prep|build|install|check|clean|preun|postun|pretrans|posttrans|pre|post|files|changelog|description|triggerpostun|triggerun|triggerin|trigger|verifyscript)/) {
       $main_preamble = 0;
       $preamble = 0;
     }
