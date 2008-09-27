@@ -1042,6 +1042,12 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
 
     if test "$DO_INIT" = true ; then
+	#
+	# create legacy .buildenv file
+	#
+	test -z "$INCARNATION" && INCARNATION=0
+	echo "BUILD_INCARNATION=$INCARNATION" > $BUILD_ROOT/.buildenv
+
 	CREATE_BUILD_BINARIES=
 	egrep '^#[       ]*needsbinariesforbuild[       ]*$' >/dev/null <$MYSRCDIR/$SPECFILE && CREATE_BUILD_BINARIES=--create-build-binaries
         set -- init_buildsystem "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
@@ -1121,12 +1127,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     # nasty hack to prevent rpath on known paths
     # FIXME: do this only for suse
     echo "export SUSE_IGNORED_RPATHS=/etc/ld.so.conf" > "$BUILD_ROOT"/etc/profile.d/buildsystem.sh
-
-    #
-    # create legacy .buildenv file
-    #
-    test -z "$INCARNATION" && INCARNATION=0
-    echo "BUILD_INCARNATION=$INCARNATION" > $BUILD_ROOT/.buildenv
 
     #
     # now clean up RPM building directories
