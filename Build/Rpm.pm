@@ -43,11 +43,19 @@ sub expr {
       return ($v, $expr) if $lev > 1;
       ($v2, $expr) = expr(substr($expr, 2), 1);
       return undef unless defined $v2;
+      $v = 0 if $v && $v eq '\"\"';
+      $v =~ s/^0+/0/;
+      $v2 = 0 if $v2 && $v2 eq '\"\"';
+      $v2 =~ s/^0+/0/;
       $v &&= $v2;
     } elsif ($expr =~ /^\|\|/) {
       return ($v, $expr) if $lev > 1;
       ($v2, $expr) = expr(substr($expr, 2), 1);
       return undef unless defined $v2;
+      $v = 0 if $v && $v eq '\"\"';
+      $v =~ s/^0+/0/;
+      $v2 = 0 if $v2 && $v2 eq '\"\"';
+      $v2 =~ s/^0+/0/;
       $v ||= $v2;
     } elsif ($expr =~ /^>=/) {
       return ($v, $expr) if $lev > 2;
