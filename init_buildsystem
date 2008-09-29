@@ -544,6 +544,12 @@ for PKG in $BUILD_ROOT/.init_b_cache/todelete/* ; do
 done
 rm -rf $BUILD_ROOT/.init_b_cache/todelete
 
+rm -rf $BUILD_ROOT/.init_b_cache/preinstalls
+mkdir -p $BUILD_ROOT/.init_b_cache/preinstalls
+for PKG in $PACKAGES_TO_PREINSTALL ; do
+    touch "$BUILD_ROOT/.init_b_cache/preinstalls/$PKG"
+done
+
 rm -rf $BUILD_ROOT/installed-pkg
 mkdir -p $BUILD_ROOT/installed-pkg
 
@@ -614,6 +620,10 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
 	    echo "keeping ${PKGID%% *}"
 	    echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
 	    continue
+	fi
+	if test -e "$BUILD_ROOT/.init_b_cache/preinstalls/$PKG" ; then
+	    preinstall "$PKG"
+	    test rpm = "$PKG" && chroot $BUILD_ROOT rpm --rebuilddb
 	fi
     fi
     export ADDITIONAL_PARAMS=
