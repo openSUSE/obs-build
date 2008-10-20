@@ -794,4 +794,11 @@ rm -f $BUILD_IS_RUNNING
 
 rm -f $TMPFILE
 
+F=`df -h $BUILD_ROOT | grep "100%"`
+if test -n "$F" ; then
+    df -h $BUILD_ROOT
+    echo "build does not work on a completely full filesystem"
+    cleanup_and_exit 1
+fi
+
 cleanup_and_exit 0
