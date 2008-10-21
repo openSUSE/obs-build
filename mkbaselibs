@@ -408,6 +408,7 @@ sub parse_config {
       my $pm = $1;
       $pkgmatches = $pkgname =~ /$pm/;
       $match1 = $1 if defined $1;
+      $pkghasmatched |= $pkgmatches;
       next;
     }
     if (/^package\s+(.*?)$/) {
@@ -496,6 +497,9 @@ for my $rpm (splice @rpms) {
   $rpmn =~ s/-[^-]+-[^-]+\.[^\.]+\.rpm$/\.rpm/;
   $rpmn =~ s/\.rpm$//;
   push @rpms, $rpm if $goodpkgs{$rpmn};
+  if ($rpmn =~ s/-debuginfo$//) {
+    push @rpms, $rpm if $goodpkgs{$rpmn};
+  }
 }
 for (@rpms) {
   die("$_: need absolute path to rpm\n") unless /^\//;
