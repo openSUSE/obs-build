@@ -27,7 +27,7 @@ unshift @dirs, "$topdir/DEBS";
 
 my @packs;
 for my $dir (@dirs) {
-  push @packs, map {"$dir/$_"} grep {/\.(rpm|deb)$/} ls($dir);
+  push @packs, map {"$dir/$_"} grep {/\.(rpm|deb|iso|desktopfiles)$/} ls($dir);
 }
 #unshift @packs, '/.build.log';
 
