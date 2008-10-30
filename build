@@ -60,6 +60,7 @@ CHANGELOG=
 BUILD_DEBUG=
 PERSONALITY_SYSCALL=
 INCARNATION=
+DISTURL=
 
 export PATH=$BUILD_DIR:$PATH
 
@@ -651,6 +652,10 @@ while test -n "$1"; do
         INCARNATION=$ARG
 	shift
       ;;
+      --disturl)
+        DISTURL=$ARG
+	shift
+      ;;
       ----noarg)
         echo "$ARG does not take an argument"
         cleanup_and_exit
@@ -950,6 +955,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "REASON='${REASON//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "CHANGELOG='${CHANGELOG//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "INCARNATION='${INCARNATION//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+	echo "DISTURL='${DISTURL//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	# FIXME: this depends on the kernel and vm.
 	# could be hda2, sda2 for xen or hdb/sdb for qemu
 	test -n "$VM_SWAP" && echo "VM_SWAP='${VM_SWAPDEV:-/dev/hda2}'" >> $BUILD_ROOT/.build/build.data
@@ -1059,6 +1065,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
     if test -z "$BUILD_DIST" -a -e "$BUILD_ROOT/.guessed_dist" ; then
 	BUILD_DIST=`cat $BUILD_ROOT/.guessed_dist`
+	echo "assuming dist $BUILD_DIST"
     fi
 
     if test "$SPECFILE" = "${SPECFILE%.dsc}" ; then
@@ -1230,6 +1237,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if [ -n "$BUILD_JOBS" ]; then
 		rpmbopts[${#rpmbopts[@]}]='--define'
 		rpmbopts[${#rpmbopts[@]}]="jobs $BUILD_JOBS"
+	fi
+	if [ -n "$DISTURL" ]; then
+		rpmbopts[${#rpmbopts[@]}]='--define'
+		rpmbopts[${#rpmbopts[@]}]="disturl $DISTURL"
 	fi
 	if test -s "$BUILD_ROOT/usr/lib/rpm/mandriva/macros" ; then
 		rpmbopts[${#rpmbopts[@]}]='--eval'
