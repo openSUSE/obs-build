@@ -60,8 +60,8 @@ $configdir = '.' unless defined $configdir;
 $archs = '' unless defined $archs;
 die("you must specfiy a depfile!\n") unless defined $rpmdeps;
 
-my @extradeps = grep {!/\.(?:spec|dsc)$/} @ARGV;
-my @specs = grep {/\.(?:spec|dsc)$/} @ARGV;
+my @extradeps = grep {!/\.(?:spec|dsc|kiwi)$/} @ARGV;
+my @specs = grep {/\.(?:spec|dsc|kiwi)$/} @ARGV;
 die("can only work with at most one spec\n") if @specs > 1;
 my $spec = $specs[0];
 
@@ -211,7 +211,16 @@ my ($packname, $packvers, $subpacks, @packdeps);
 $subpacks = [];
 
 if ($spec) {
-  my $d = Build::parse($cf, $spec);
+  my $d;
+  if ($spec =~ /\.kiwi$/) {
+    # just set up kiwi root for now
+    $d = {
+      'deps' => [ 'kiwi', 'zypper', 'createrepo' ],
+      'subpacks' => [],
+    };
+  } else {
+    $d = Build::parse($cf, $spec);
+  }
   $packname = $d->{'name'};
   $packvers = $d->{'version'};
   $subpacks = $d->{'subpacks'};
