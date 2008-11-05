@@ -215,7 +215,7 @@ if ($spec) {
   if ($spec =~ /\.kiwi$/) {
     # just set up kiwi root for now
     $d = {
-      'deps' => [ 'kiwi', 'zypper', 'createrepo' ],
+      'deps' => [ 'kiwi', 'zypper', 'createrepo', 'squashfs' ],
       'subpacks' => [],
     };
   } else {

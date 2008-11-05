@@ -942,7 +942,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if ! test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
 	    rm -rf $BUILD_ROOT/.build-srcdir
 	    mkdir $BUILD_ROOT/.build-srcdir
-	    cp -p "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
+	    if test "$BUILDTYPE" = kiwi ; then
+		cp -a "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
+	    else
+		cp -p "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
+	    fi
 	    MYSRCDIR=$BUILD_ROOT/.build-srcdir
 	fi
 	Q="'\''"
@@ -1297,8 +1301,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
 
     if test "$BUILDTYPE" = kiwi ; then
-	chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile /.build.log.prepare --root $TOPDIR/KIWIROOT" - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
-	chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT --logfile /.build.log -d $TOPDIR/KIWI --type iso" - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
+	chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT" - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
+	chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT --logfile terminal -d $TOPDIR/KIWI --type iso" - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
     fi
 
     test "$BUILD_SUCCEDED" = true || cleanup_and_exit 1
