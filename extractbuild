@@ -19,7 +19,7 @@ syswrite(S, 'x'x512);
 
 my $topdir = '/.build.packages';
 if (-l $topdir) {
-    $topdir = '/'.readlink $topdir || die "readlink: $!";
+  $topdir = '/'.readlink($topdir) || die("readlink: $!");
 }
 my @dirs = map {"$topdir/RPMS/$_"} ls("$topdir/RPMS");
 unshift @dirs, "$topdir/SRPMS";
@@ -27,7 +27,7 @@ unshift @dirs, "$topdir/DEBS";
 
 my @packs;
 for my $dir (@dirs) {
-  push @packs, map {"$dir/$_"} grep {/\.(rpm|deb|iso|desktopfiles)$/} ls($dir);
+  push @packs, map {"$dir/$_"} grep {-f "$dir/$_"} ls($dir);
 }
 #unshift @packs, '/.build.log';
 

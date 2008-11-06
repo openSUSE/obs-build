@@ -1301,8 +1301,33 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
 
     if test "$BUILDTYPE" = kiwi ; then
-	chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT" - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
-	chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT --logfile terminal -d $TOPDIR/KIWI --type iso" - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
+	# run createrepo on the repositories
+	if test -d $BUILD_ROOT/$TOPDIR/SOURCES/repos ; then
+	    (
+	    cd $BUILD_ROOT/$TOPDIR/SOURCES/repos
+	    find . | sed -n -e 's/^\.\///' -e '/.*:\/[^\/]*[^\/:]\/[^\/]*[^\/:]$/p' | while read d ; do
+	    	test -d $BUILD_ROOT/$TOPDIR/SOURCES/repos/$d/repodata && continue
+		echo "creating repodata for $d"
+		chroot $BUILD_ROOT createrepo "$TOPDIR/SOURCES/repos/$d"
+	    done
+	    )
+	fi
+	# unpack tar files in image directories
+	if test -d $BUILD_ROOT/$TOPDIR/SOURCES/images ; then
+	    (
+	    cd $BUILD_ROOT/$TOPDIR/SOURCES/images
+	    find . | sed -n -e 's/^\.\///' -e '/.*:\/[^\/]*[^\/:]\/[^\/]*[^\/:]$/p' | while read d ; do
+		for t in $BUILDROOT/$TOPDIR/SOURCES/images/$d/root.tar* ; do
+		    test -f $t || continue
+		    mkdir -p $BUILDROOT/$TOPDIR/SOURCES/images/$d/root
+		    chroot $BUILD_ROOT tar -C $TOPDIR/SOURCES/images/$d/root -xf "$TOPDIR/SOURCES/images/$d/$t{##*/}"
+		done
+	    done
+	    )
+	fi
+	if chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT" - $BUILD_USER < /dev/null ; then
+	    chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT --logfile terminal -d $TOPDIR/KIWI --type iso" - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
+	fi
     fi
 
     test "$BUILD_SUCCEDED" = true || cleanup_and_exit 1
