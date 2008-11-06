@@ -4,6 +4,10 @@
 # Convert a SUSE or Debian changelog file to rpm format
 #
 
+BEGIN {
+  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+}
+
 use Date::Parse;
 use Time::Zone;
 
