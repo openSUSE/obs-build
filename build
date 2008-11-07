@@ -1325,6 +1325,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    done
 	    )
 	fi
+	rm -f $BUILD_ROOT/$TOPDIR/SOURCES/config.xml
+	ln -s $SPECFILE $BUILD_ROOT/$TOPDIR/SOURCES/config.xml
 	if chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT" - $BUILD_USER < /dev/null ; then
 	    chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT --logfile terminal -d $TOPDIR/KIWI --type iso" - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
 	fi
