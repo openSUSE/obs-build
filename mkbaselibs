@@ -336,6 +336,10 @@ my @preun;
 my @postun;
 my $autoreqprov;
 
+my $verbose;
+my %target_matched;
+my @filesystem;
+
 sub parse_config {
   my $target = shift;
   my $pkgname = shift;
@@ -408,7 +412,7 @@ sub parse_config {
       my $pm = $1;
       $pkgmatches = $pkgname =~ /$pm/;
       $match1 = $1 if defined $1;
-      $pkghasmatched |= $pkgmatches;
+      $pkghasmatched |= $pkgmatches if $pkgname =~ /-debuginfo$/ && $target_matched{$target};
       next;
     }
     if (/^package\s+(.*?)$/) {
@@ -473,44 +477,8 @@ sub get_pkgnames {
   return sort keys %rpms;
 }
 
-my $verbose;
-
-die("Usage: mkbaselibs <rpms>\n") unless @ARGV;
-
-if ($ARGV[0] eq '-v') {
-  $verbose = 1;
-  shift @ARGV;
-}
-while ($ARGV[0] eq '-c') {
-  shift @ARGV;
-  read_config($ARGV[0]);
-  shift @ARGV;
-}
-
-my %goodpkgs = map {$_ => 1} get_pkgnames();
-my @rpms = @ARGV;
-for my $rpm (splice @rpms) {
-  my $rpmn = $rpm;
-  next if $rpm =~ /\.(no)?src\.rpm$/;
-  next if $rpm =~ /\.spm$/;
-  $rpmn =~ s/.*\///;
-  $rpmn =~ s/-[^-]+-[^-]+\.[^\.]+\.rpm$/\.rpm/;
-  $rpmn =~ s/\.rpm$//;
-  push @rpms, $rpm if $goodpkgs{$rpmn};
-  if ($rpmn =~ s/-debuginfo$//) {
-    push @rpms, $rpm if $goodpkgs{$rpmn};
-  }
-}
-for (@rpms) {
-  die("$_: need absolute path to rpm\n") unless /^\//;
-}
-
-exit 0 unless @rpms;
-
-my @filesystem = split("\n", `rpm -ql filesystem 2>/dev/null`);
-die("filesystem rpm is not installed\n") unless @filesystem;
-
-for $rpm (@rpms) {
+sub handle_rpms {
+ for $rpm (@_) {
 
   my @stags = map {uc($_)} @preamble;
   push @stags, 'DESCRIPTION';
@@ -539,6 +507,7 @@ for $rpm (@rpms) {
 
     next unless parse_config($target, $res{'NAME'}->[0], $res{'VERSION'}->[0]);
     die("targetname not set\n") unless $targetname;
+    $target_matched{$target} = 1;
 
     my %ghosts;
     my @rpmfiles = @{$res{'FILENAMES'}};
@@ -914,4 +883,47 @@ for $rpm (@rpms) {
     }
     unlink($specfile);
   }
+ }
 }
+
+
+die("Usage: mkbaselibs <rpms>\n") unless @ARGV;
+
+if ($ARGV[0] eq '-v') {
+  $verbose = 1;
+  shift @ARGV;
+}
+while ($ARGV[0] eq '-c') {
+  shift @ARGV;
+  read_config($ARGV[0]);
+  shift @ARGV;
+}
+
+my %goodpkgs = map {$_ => 1} get_pkgnames();
+my @rpms = @ARGV;
+my @debugrpms;
+for my $rpm (splice @rpms) {
+  my $rpmn = $rpm;
+  next if $rpm =~ /\.(no)?src\.rpm$/;
+  next if $rpm =~ /\.spm$/;
+  $rpmn =~ s/.*\///;
+  $rpmn =~ s/-[^-]+-[^-]+\.[^\.]+\.rpm$/\.rpm/;
+  $rpmn =~ s/\.rpm$//;
+  push @rpms, $rpm if $goodpkgs{$rpmn};
+  if ($rpmn =~ s/-debuginfo$//) {
+      push @debugrpms, $rpm if $goodpkgs{$rpmn};
+  }
+}
+for (@rpms) {
+  die("$_: need absolute path to rpm\n") unless /^\//;
+}
+
+exit 0 unless @rpms;
+
+@filesystem = split("\n", `rpm -ql filesystem 2>/dev/null`);
+die("filesystem rpm is not installed\n") unless @filesystem;
+
+handle_rpms(@rpms);
+handle_rpms(@debugrpms);
+
+
