@@ -1123,6 +1123,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     if test $BUILD_USER = abuild ; then
         if ! egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
             echo 'abuild::399:399:Autobuild:/home/abuild:/bin/bash' >>$BUILD_ROOT/etc/passwd
+            echo 'abuild:*:::::::' >>$BUILD_ROOT/etc/shadow # This is needed on Mandriva 2009
             echo 'abuild::399:' >>$BUILD_ROOT/etc/group
             mkdir -p $BUILD_ROOT/home/abuild
             chown 399:399 $BUILD_ROOT/home/abuild
@@ -1135,6 +1136,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
         if egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
             egrep -v '^abuild:' <$BUILD_ROOT/etc/passwd >$BUILD_ROOT/etc/passwd.new
             mv $BUILD_ROOT/etc/passwd.new $BUILD_ROOT/etc/passwd
+            egrep -v '^abuild:' <$BUILD_ROOT/etc/shadow >$BUILD_ROOT/etc/shadow.new
+            mv $BUILD_ROOT/etc/shadow.new $BUILD_ROOT/etc/shadow
             egrep -v '^abuild:' <$BUILD_ROOT/etc/group >$BUILD_ROOT/etc/group.new
             mv $BUILD_ROOT/etc/group.new $BUILD_ROOT/etc/group
             rm -rf $BUILD_ROOT/home/abuild
