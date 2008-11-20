@@ -1305,10 +1305,19 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if test -d $BUILD_ROOT/$TOPDIR/SOURCES/repos ; then
 	    (
 	    cd $BUILD_ROOT/$TOPDIR/SOURCES/repos
-	    find . | sed -n -e 's/^\.\///' -e '/.*:\/[^\/]*[^\/:]\/[^\/]*[^\/:]$/p' | while read d ; do
-	    	test -d $BUILD_ROOT/$TOPDIR/SOURCES/repos/$d/repodata && continue
-		echo "creating repodata for $d"
-		chroot $BUILD_ROOT createrepo "$TOPDIR/SOURCES/repos/$d"
+	    for r in */* ; do
+		test -L $r && continue
+		test -d $r || continue
+		echo "creating repodata for $r"
+		chroot $BUILD_ROOT createrepo "$TOPDIR/SOURCES/repos/$r"
+		# create compatibility link
+		rc="${r//:/:/}"
+		if test "$rc" != "$r" ; then
+		    rl="${rc//[^\/]}"
+		    rl="${rl//?/../}"
+		    mkdir -p "${rc%/*}"
+		    ln -s $rl$r "${rc%/*}/${rc##*/}"
+		fi
 	    done
 	    )
 	fi
@@ -1316,19 +1325,31 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if test -d $BUILD_ROOT/$TOPDIR/SOURCES/images ; then
 	    (
 	    cd $BUILD_ROOT/$TOPDIR/SOURCES/images
-	    find . | sed -n -e 's/^\.\///' -e '/.*:\/[^\/]*[^\/:]\/[^\/]*[^\/:]$/p' | while read d ; do
-		for t in $BUILDROOT/$TOPDIR/SOURCES/images/$d/root.tar* ; do
+	    for r in */* ; do
+		test -L $r && continue
+		test -d $r || continue
+		for t in $r/root.tar* ; do
 		    test -f $t || continue
-		    mkdir -p $BUILDROOT/$TOPDIR/SOURCES/images/$d/root
-		    chroot $BUILD_ROOT tar -C $TOPDIR/SOURCES/images/$d/root -xf "$TOPDIR/SOURCES/images/$d/$t{##*/}"
+		    mkdir -p $r/root
+		    chroot $BUILD_ROOT tar -C $TOPDIR/SOURCES/images/$r/root -xf "$TOPDIR/SOURCES/images/$r/$t{##*/}"
 		done
+		# create compatibility link
+		rc="${r//:/:/}"
+		if test "$rc" != "$r" ; then
+		    rl="${rc//[^\/]}"
+		    rl="${rl//?/../}"
+		    mkdir -p "${rc%/*}"
+		    ln -s $rl$r "${rc%/*}/${rc##*/}"
+		fi
 	    done
 	    )
 	fi
 	rm -f $BUILD_ROOT/$TOPDIR/SOURCES/config.xml
 	ln -s $SPECFILE $BUILD_ROOT/$TOPDIR/SOURCES/config.xml
+	echo "running kiwi --prepare..."
 	if chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT" - $BUILD_USER < /dev/null ; then
-	    chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT --logfile terminal -d $TOPDIR/KIWI --type iso" - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
+	    echo "running kiwi --create..."
+	    chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT --logfile terminal -d $TOPDIR/KIWI" - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
 	fi
     fi
 
