@@ -1349,10 +1349,24 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	fi
 	rm -f $BUILD_ROOT/$TOPDIR/SOURCES/config.xml
 	ln -s $SPECFILE $BUILD_ROOT/$TOPDIR/SOURCES/config.xml
-	echo "running kiwi --prepare..."
-	if chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT" - $BUILD_USER < /dev/null ; then
-	    echo "running kiwi --create..."
-	    chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT --logfile terminal -d $TOPDIR/KIWI" - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
+	imagetype=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE imagetype)
+	chroot $BUILD_ROOT su -c "kiwi --version" -
+	if test "$imagetype" = product ; then
+	    echo "running kiwi --create-instsource..."
+	    chroot $BUILD_ROOT su -c "kiwi --root $TOPDIR/KIWIROOT -v -v --instsource-local --logfile terminal -p $TOPDIR/SOURCES --create-instsource $TOPDIR/SOURCES" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+	    for i in "$BUILD_ROOT/$TOPDIR/KIWIROOT/main/*" ; do
+		test -d "$i" || continue
+		n="${i##*/}"
+		test "$n" = scripts && continue
+		test "$n" != "${n%0}" && continue
+		chroot $BUILD_ROOT su -c "suse-isolinux $TOPDIR/KIWIROOT/main/$i $TOPDIR/KIWI/$i.iso" - $BUILD_USER
+	    done
+	else
+	    echo "running kiwi --prepare..."
+	    if chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT" - $BUILD_USER < /dev/null ; then
+		echo "running kiwi --create..."
+		chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT --logfile terminal -d $TOPDIR/KIWI" - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
+	    fi
 	fi
     fi
 

@@ -2,154 +2,216 @@
 package Build::Kiwi;
 
 use strict;
-use Digest::MD5;
-#use Device::Cdio::ISO9660;
-#use Device::Cdio::ISO9660::IFS;
 
-my $have_zlib;
-eval {
-  require Compress::Zlib;
-  $have_zlib = 1;
-};
+our $bootcallback;
 
-sub parse {
-  my ($bconf, $fn) = @_;
-  my $ret;
-  my @control;
+# worst xml parser ever, just good enough to parse those kiwi files...
+#
+sub parsexml {
+  my ($xml) = @_;
 
-print "Build::Kiwi::parse IS NOT IMPLEMENTED ! \n";
-  return ;
-
-  # get arch and os from macros
-  my ($arch, $os);
-  for (@{$bconf->{'macros'} || []}) {
-    $arch = $1 if /^%define _target_cpu (\S+)/;
-    $os = $1 if /^%define _target_os (\S+)/;
-  }
-  # map to debian names
-  $os = 'linux' if !defined($os);
-  $arch = 'all' if !defined($arch) || $arch eq 'noarch';
-  $arch = 'i386' if $arch =~ /^i[456]86$/;
-  $arch = 'powerpc' if $arch eq 'ppc';
-  $arch = 'amd64' if $arch eq 'x86_64';
-
-  if (ref($fn) eq 'ARRAY') {
-    @control = @$fn;
-  } else {
-    local *F;
-    if (!open(F, '<', $fn)) {
-      $ret->{'error'} = "$fn: $!";
-      return $ret;
+  my @nodestack;
+  my $node = {};
+  my $c = '';
+  $xml =~ s/^\s*\<\?.*?\?\>//s;
+  while ($xml =~ /^(.*?)\</s) {
+    if ($1 ne '') {
+      $c .= $1;
+      $xml = substr($xml, length($1));
     }
-    @control = <F>;
-    close F;
-    chomp @control;
-  }
-  splice(@control, 0, 3) if @control > 3 && $control[0] =~ /^-----BEGIN/;
-  my $name;
-  my $version;
-  my @deps;
-  while (@control) {
-    my $c = shift @control;
-    last if $c eq '';   # new paragraph
-    my ($tag, $data) = split(':', $c, 2);
-    next unless defined $data;
-    $tag = uc($tag);
-    while (@control && $control[0] =~ /^\s/) {
-      $data .= "\n".substr(shift @control, 1);
+    if (substr($xml, 0, 4) eq '<!--') {
+      $xml =~ s/.*?-->//s;
+      next;
     }
-    $data =~ s/^\s+//s;
-    $data =~ s/\s+$//s;
-    if ($tag eq 'VERSION') {
-      $version = $data;
-      $version =~ s/-[^-]+$//;
-    } elsif ($tag eq 'SOURCE') {
-      $name = $data;
-    } elsif ($tag eq 'BUILD-DEPENDS' || $tag eq 'BUILD-CONFLICTS' || $tag eq 'BUILD-IGNORE') {
-      my @d = split(/,\s*/, $data);
-      for my $d (@d) {
-        if ($d =~ /^(.*?)\s*\[(.*)\]$/) {
-	  $d = $1;
-	  my $isneg = 0;
-          my $bad;
-          for my $q (split('[\s,]', $2)) {
-            $isneg = 1 if $q =~ s/^\!//;
-            $bad = 1 if !defined($bad) && !$isneg;
-            if ($isneg) {
-              if ($q eq $arch || $q eq "$os-$arch") {
-		$bad = 1;
-		last;
-	      }
-	    } elsif ($q eq $arch || $q eq "$os-$arch") {
-	      $bad = 0;
-	    }
-	  }
-	  next if $bad;
-	}
-	$d =~ s/ \(([^\)]*)\)/ $1/g;
-	$d =~ s/>>/>/g;
-	$d =~ s/<</</g;
-	if ($tag eq 'BUILD-DEPENDS') {
-          push @deps, $d;
-	} else {
-          push @deps, "-$d";
-	}
+    die("bad xml\n") unless $xml =~ /(.*?\>)/s;
+    my $tag = $1;
+    $xml = substr($xml, length($tag));
+    my $mode = 0;
+    if ($tag =~ s/^\<\///s) {
+      chop $tag;
+      $mode = 1;	# end
+    } elsif ($tag =~ s/\/\>$//s) {
+      $mode = 2;	# start & end
+      $tag = substr($tag, 1);
+    } else {
+      $tag = substr($tag, 1);
+      chop $tag;
+    }
+    my @tag = split(/(=(?:\"[^\"]*\"|[^\"\s]*))?\s+/, "$tag ");
+    $tag = shift @tag;
+    shift @tag;
+    push @tag, undef if @tag & 1;
+    my %atts = @tag;
+    for (values %atts) {
+      next unless defined $_;
+      s/^=\"([^\"]*)\"$/=$1/s;
+      s/^=//s;
+      s/&lt;/</g;
+      s/&gt;/>/g;
+      s/&amp;/&/g;
+      s/&quot;/\"/g;
+    }
+    if ($mode == 0 || $mode == 2) {
+      my $n = {};
+      push @{$node->{$tag}}, $n;
+      for (sort keys %atts) {
+        $n->{$_} = $atts{$_};
+      }
+      if ($mode == 0) {
+        push @nodestack, [ $tag, $node, $c ];
+        $c = '';
+        $node = $n;
+      }
+    } else {
+      die("element '$tag' closes without open\n") unless @nodestack;
+      die("element '$tag' closes, but I expected '$nodestack[-1]->[0]'\n") unless $nodestack[-1]->[0] eq $tag;
+      $c =~ s/^\s*//s;
+      $c =~ s/\s*$//s;
+      $node->{'_content'} = $c if $c ne '';
+      $node = $nodestack[-1]->[1];
+      $c = $nodestack[-1]->[2];
+      pop @nodestack;
+    }
+  }
+  $c .= $xml;
+  $c =~ s/^\s*//s;
+  $c =~ s/\s*$//s;
+  $node->{'_content'} = $c if $c ne '';
+  return $node;
+}
+
+sub unify {
+  my %h = map {$_ => 1} @_;
+  return grep(delete($h{$_}), @_);
+}
+
+sub kiwiparse  {
+  my ($xml, $arch, $count) = @_;
+  $count ||= 0;
+  die("kiwi config inclusion depth limit reached\n") if $count++ > 10;
+
+  my @alltypes;
+  my @allrepos;
+  my @allpackages;
+  my @extrasources;
+  my $kiwi = parsexml($xml);
+  die("not a kiwi config\n") unless $kiwi && $kiwi->{'image'};
+  $kiwi = $kiwi->{'image'}->[0];
+  my $preferences = ($kiwi->{'preferences'} || [])->[0];
+  $preferences ||= {};
+  for my $type (@{$preferences->{'type'} || []}) {
+    next unless @{$preferences->{'type'}} == 1 || $type->{'primary'};
+    push @alltypes, $type->{'_content'};
+    push @allpackages, "kiwi-filesystem:$type->{'filesystem'}" if $type->{'filesystem'};
+    if (defined $type->{'boot'}) {
+      if ($type->{'boot'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
+        next unless $bootcallback;
+	my ($bootxml, $xsrc) = $bootcallback->($1, $2);
+	next unless $bootxml;
+	push @extrasources, $xsrc if $xsrc;
+	my ($bootrepos, $bootpackages, $boottypes, $bootextrasources) = kiwiparse($bootxml, $arch, $count);
+	push @allrepos, @$bootrepos;
+	push @allpackages, @$bootpackages;
+	push @extrasources, @$bootextrasources;
+      } else {
+	die("bad boot reference: $type->{'boot'}\n") unless $type->{'boot'} =~ /^([^\/]+)\/([^\/]+)$/;
+	push @allpackages, "kiwi-boot:$1";
       }
     }
   }
-  $ret->{'name'} = $name;
-  $ret->{'version'} = $version;
-  $ret->{'deps'} = \@deps;
-  return $ret;
+
+  my $instsource = ($kiwi->{'instsource'} || [])->[0];
+  if ($instsource) {
+    for my $repository (@{$instsource->{'instrepo'} || []}) {
+      my $kiwisource = ($repository->{'source'} || [])->[0];
+      die("bad instsource path: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
+      push @allrepos, {'project' => $1, 'repository' => $2};
+    }
+    for my $repopackages (@{$instsource->{'repopackages'} || []}) {
+      for my $repopackage (@{$repopackages->{'repopackage'} || []}) {
+	push @allpackages, $repopackage->{'name'};
+      }
+    }
+    if ($instsource->{'metadata'}) {
+      for my $repopackage (@{$instsource->{'metadata'}->[0]->{'repopackage'} || []}) {
+	push @allpackages, $repopackage->{'name'};
+     }
+    }
+  }
+
+  for my $repository (@{$kiwi->{'repository'} || []}) {
+    my $kiwisource = ($repository->{'source'} || [])->[0];
+    next if $kiwisource->{'path'} eq '/var/lib/empty';	# grr
+    die("bad path: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
+    push @allrepos, {'project' => $1, 'repository' => $2};
+  }
+  for my $packagegroup (@{$kiwi->{'packages'} || []}) {
+    for my $package (@{$packagegroup->{'package'} || []}) {
+      if ($package->{'arch'}) {
+        my $ma = $arch;
+        $ma =~ s/i[456]86/i386/;
+        my $pa = $package->{'arch'};
+        $pa =~ s/i[456]86/i386/;
+        next if $ma ne $pa;
+      }
+      push @allpackages, $package->{'name'};
+    }
+  }
+
+  if (!$instsource) {
+    my $packman = $preferences->{'packagemanager'}->[0]->{'_content'};
+    push @allpackages, "kiwi-packagemanager:$packman";
+  } else {
+    push @allpackages, "kiwi-packagemanager:instsource";
+  }
+
+  @allrepos = unify(@allrepos);
+  @allpackages = unify(@allpackages);
+  @alltypes = unify(@alltypes);
+  return (\@allrepos, \@allpackages, \@alltypes, \@extrasources);
 }
 
-sub debq {
-  my ($fn) = @_;
+sub parse {
+  my ($cf, $fn) = @_;
 
-  print "Build::Kiwi::debq IS NOT IMPLEMENTED ! \n";
-  die();
-
-  return 1;
-}
-
-sub queryiso {
-  my ($handle, %opts) = @_;
-
-#  $iso = Device::Cdio::ISO9660::IFS->new(-source=>'copying.iso');
-  my $src = '';
-  my $data = {
-    name => "DEFAULT_NAME",
-#    hdrmd5 => Digest::MD5::md5_hex($handle); #FIXME create real checksum from iso
+  local *F;
+  open(F, '<', $fn) || die("$fn: $!\n");
+  my $xml = '';
+  1 while sysread(F, $xml, 4096, length($xml)) > 0;
+  close F;
+  $cf ||= {};
+  my ($repos, $packages, $types, $extrasources);
+  eval {
+    ($repos, $packages, $types, $extrasources) = kiwiparse($xml, ($cf->{'arch'} || ''));
   };
-#  $data->{'source'} = $src if $src ne '';
-  if ($opts{'evra'}) {
-#FIXME find out of iso:
-    my $arch = "i586";
-    $data->{'version'} = "0.1";
-    $data->{'release'} = "1";
-    $data->{'type'} = "iso";
-    $data->{'arch'} = $arch;
+  if ($@) {
+    my $err = $@;
+    $err =~ s/^\n$//s;
+    return {'error' => $err};
   }
-  if ($opts{'filelist'}) {
-    print ("Build::KIWI query filelist not implemented !\n");
-    die();
-#    $data->{'filelist'} = $res{'FILENAMES'};
-  }
-  if ($opts{'description'}) {
-    print ("Build::KIWI query description not implemented !\n");
-    die();
-#    $data->{'summary'} = $res{'SUMMARY'}->[0];
-#    $data->{'description'} = $res{'DESCRIPTION'}->[0];
-  }
-  return $data;
+  my $d = {'deps' => $packages, 'path' => $repos, 'imagetype' => $types};
+  $d->{'extrasource'} = $extrasources if @$extrasources;
+  return $d;
+}
+
+sub show {
+  my ($fn, $field, $arch) = @ARGV;
+  my $cf = {'arch' => $arch};
+  my $d = parse($cf, $fn);
+  die("$d->{'error'}\n") if $d->{'error'};
+  my $x = $d->{$field};
+  $x = [ $x ] unless ref $x;
+  print "@$x\n";
+}
+
+sub query {
+  my ($handle, %opts) = @_;
+  return {};
 }
 
 sub queryhdrmd5 {
   my ($bin) = @_; 
-
-  print "Build::Kiwi::queryhdrmd5 IS NOT IMPLEMENTED ! \n";
-  die();
-
+  die("Build::Kiwi::queryhdrmd5 unimplemented.\n");
 }
 
 1;
