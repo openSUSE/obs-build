@@ -328,6 +328,23 @@ if test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
     fi
 else
     #
+    # Hack to detect cross-build (fixed code) and copy qemus for cross-build emulation mode
+    #
+    if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xsh4 ]; then
+       if [ x"`uname -i`" == xx86_64 -o  x"`uname -i`" == xi386 ]; then
+          if [ -e /proc/sys/fs/binfmt_misc/arm -o -e /proc/sys/fs/binfmt_misc/armeb -o -e /proc/sys/fs/binfmt_misc/sh4 ]; then
+             echo -n "qemu-* already registered "
+          else
+             echo -n "qemu will be registered " && test -e /usr/sbin/qemu-binfmt-conf.sh && sh /usr/sbin/qemu-binfmt-conf.sh
+          fi
+	  if [ -e /usr/sbin/qemu-binfmt-conf.sh ]; then 
+             (mkdir -p  $BUILD_ROOT/usr/bin && set -x && cp /usr/bin/qemu-* $BUILD_ROOT/usr/bin)
+	     # Hack to circumvent qemu mmap addr bug
+             test -e /proc/sys/vm/mmap_min_addr && echo 0 > /proc/sys/vm/mmap_min_addr
+          fi
+       fi
+    fi
+    #
     # now make sure that all the packages are installed.
     #
     rm -rf $BUILD_ROOT/.init_b_cache
