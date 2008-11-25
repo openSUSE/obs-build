@@ -6,6 +6,8 @@ use strict;
 our $bootcallback;
 
 # worst xml parser ever, just good enough to parse those kiwi files...
+# can't use standard XML parsers, unfortunatelly, as the build script
+# must not rely on external libraries
 #
 sub parsexml {
   my ($xml) = @_;
@@ -85,37 +87,44 @@ sub unify {
   return grep(delete($h{$_}), @_);
 }
 
-sub kiwiparse  {
+sub kiwiparse {
   my ($xml, $arch, $count) = @_;
   $count ||= 0;
   die("kiwi config inclusion depth limit reached\n") if $count++ > 10;
 
-  my @alltypes;
-  my @allrepos;
-  my @allpackages;
+  my $ret = {};
+  my @types;
+  my @repos;
+  my @packages;
   my @extrasources;
   my $kiwi = parsexml($xml);
   die("not a kiwi config\n") unless $kiwi && $kiwi->{'image'};
   $kiwi = $kiwi->{'image'}->[0];
-  my $preferences = ($kiwi->{'preferences'} || [])->[0];
-  $preferences ||= {};
+  my $description = (($kiwi->{'description'} || [])->[0]) || {};
+  if ($description->{'specification'}) {
+    $ret->{'name'} = $description->{'specification'}->[0]->{'_content'};
+  }
+  my $preferences = (($kiwi->{'preferences'} || [])->[0]) || {};
+  if ($preferences->{'version'}) {
+    $ret->{'version'} = $preferences->{'version'}->[0]->{'_content'};
+  }
   for my $type (@{$preferences->{'type'} || []}) {
     next unless @{$preferences->{'type'}} == 1 || $type->{'primary'};
-    push @alltypes, $type->{'_content'};
-    push @allpackages, "kiwi-filesystem:$type->{'filesystem'}" if $type->{'filesystem'};
+    push @types, $type->{'_content'};
+    push @packages, "kiwi-filesystem:$type->{'filesystem'}" if $type->{'filesystem'};
     if (defined $type->{'boot'}) {
       if ($type->{'boot'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
         next unless $bootcallback;
 	my ($bootxml, $xsrc) = $bootcallback->($1, $2);
 	next unless $bootxml;
 	push @extrasources, $xsrc if $xsrc;
-	my ($bootrepos, $bootpackages, $boottypes, $bootextrasources) = kiwiparse($bootxml, $arch, $count);
-	push @allrepos, @$bootrepos;
-	push @allpackages, @$bootpackages;
-	push @extrasources, @$bootextrasources;
+	my $bret = kiwiparse($bootxml, $arch, $count);
+	push @repos, map {"$_->{'project'}/$_->{'repository'}"} @{$bret->{'path'} || []};
+	push @packages, @{$bret->{'deps'} || []};
+	push @extrasources, @{$bret->{'extrasource'} || []};
       } else {
 	die("bad boot reference: $type->{'boot'}\n") unless $type->{'boot'} =~ /^([^\/]+)\/([^\/]+)$/;
-	push @allpackages, "kiwi-boot:$1";
+	push @packages, "kiwi-boot:$1";
       }
     }
   }
@@ -125,16 +134,16 @@ sub kiwiparse  {
     for my $repository (@{$instsource->{'instrepo'} || []}) {
       my $kiwisource = ($repository->{'source'} || [])->[0];
       die("bad instsource path: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
-      push @allrepos, {'project' => $1, 'repository' => $2};
+      push @repos, "$1/$2";
     }
     for my $repopackages (@{$instsource->{'repopackages'} || []}) {
       for my $repopackage (@{$repopackages->{'repopackage'} || []}) {
-	push @allpackages, $repopackage->{'name'};
+	push @packages, $repopackage->{'name'};
       }
     }
     if ($instsource->{'metadata'}) {
       for my $repopackage (@{$instsource->{'metadata'}->[0]->{'repopackage'} || []}) {
-	push @allpackages, $repopackage->{'name'};
+	push @packages, $repopackage->{'name'};
      }
     }
   }
@@ -143,7 +152,7 @@ sub kiwiparse  {
     my $kiwisource = ($repository->{'source'} || [])->[0];
     next if $kiwisource->{'path'} eq '/var/lib/empty';	# grr
     die("bad path: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
-    push @allrepos, {'project' => $1, 'repository' => $2};
+    push @repos, "$1/$2";
   }
   for my $packagegroup (@{$kiwi->{'packages'} || []}) {
     for my $package (@{$packagegroup->{'package'} || []}) {
@@ -154,21 +163,26 @@ sub kiwiparse  {
         $pa =~ s/i[456]86/i386/;
         next if $ma ne $pa;
       }
-      push @allpackages, $package->{'name'};
+      push @packages, $package->{'name'};
     }
   }
 
   if (!$instsource) {
     my $packman = $preferences->{'packagemanager'}->[0]->{'_content'};
-    push @allpackages, "kiwi-packagemanager:$packman";
+    push @packages, "kiwi-packagemanager:$packman";
   } else {
-    push @allpackages, "kiwi-packagemanager:instsource";
+    push @packages, "kiwi-packagemanager:instsource";
   }
 
-  @allrepos = unify(@allrepos);
-  @allpackages = unify(@allpackages);
-  @alltypes = unify(@alltypes);
-  return (\@allrepos, \@allpackages, \@alltypes, \@extrasources);
+  $ret->{'deps'} = [ unify(@packages) ];
+  $ret->{'path'} = [ unify(@repos) ];
+  $ret->{'imagetype'} = [ unify(@types) ];
+  $ret->{'extrasource'} = \@extrasources if @extrasources;
+  for (@{$ret->{'path'}}) {
+    my @s = split('/', $_, 2);
+    $_ = {'project' => $s[0], 'repository' => $s[1]};
+  }
+  return $ret;
 }
 
 sub parse {
@@ -180,17 +194,15 @@ sub parse {
   1 while sysread(F, $xml, 4096, length($xml)) > 0;
   close F;
   $cf ||= {};
-  my ($repos, $packages, $types, $extrasources);
+  my $d;
   eval {
-    ($repos, $packages, $types, $extrasources) = kiwiparse($xml, ($cf->{'arch'} || ''));
+    $d = kiwiparse($xml, ($cf->{'arch'} || ''));
   };
   if ($@) {
     my $err = $@;
     $err =~ s/^\n$//s;
     return {'error' => $err};
   }
-  my $d = {'deps' => $packages, 'path' => $repos, 'imagetype' => $types};
-  $d->{'extrasource'} = $extrasources if @$extrasources;
   return $d;
 }
 
