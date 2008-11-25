@@ -11,19 +11,19 @@ our $strip_versions;
 
 our $do_rpm;
 our $do_deb;
-our $do_img;
+our $do_kiwi;
 
 sub import {
   for (@_) {
     $do_rpm = 1 if $_ eq ':rpm';
     $do_deb = 1 if $_ eq ':deb';
-    $do_img = 1 if $_ eq ':img';
+    $do_kiwi = 1 if $_ eq ':kiwi';
   }
-  $do_rpm = $do_deb = $do_img = 1 if !$do_rpm && !$do_deb && !$do_img;
+  $do_rpm = $do_deb = $do_kiwi = 1 if !$do_rpm && !$do_deb && !$do_kiwi;
   if ($do_deb) {
     require Build::Deb;
   }
-  if ($do_img) {
+  if ($do_kiwi) {
     require Build::Kiwi;
   }
 }
@@ -735,8 +735,8 @@ sub parse {
   my ($cf, $fn, @args) = @_;
   return Build::Rpm::parse($cf, $fn, @args) if $do_rpm && $fn =~ /\.spec$/;
   return Build::Deb::parse($cf, $fn, @args) if $do_deb && $fn =~ /\.dsc$/;
-  return Build::Kiwi::parse($cf, $fn, @args) if $do_img && $fn =~ /config\.xml$/;
-  return Build::Kiwi::parse($cf, $fn, @args) if $do_img && $fn =~ /\.kiwi$/;
+  return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /config\.xml$/;
+  return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /\.kiwi$/;
   return undef;
 }
 
@@ -749,7 +749,7 @@ sub query {
   }
   return Build::Rpm::query($handle, %opts) if $do_rpm && $binname =~ /\.rpm$/;
   return Build::Deb::query($handle, %opts) if $do_deb && $binname =~ /\.deb$/;
-  return Build::Kiwi::queryiso($handle, %opts) if $do_img && $binname =~ /\.iso$/;
+  return Build::Kiwi::queryiso($handle, %opts) if $do_kiwi && $binname =~ /\.iso$/;
   return undef;
 }
 
@@ -757,9 +757,9 @@ sub queryhdrmd5 {
   my ($binname) = @_;
   return Build::Rpm::queryhdrmd5($binname) if $do_rpm && $binname =~ /\.rpm$/;
   return Build::Deb::queryhdrmd5($binname) if $do_deb && $binname =~ /\.deb$/;
-  return Build::Kiwi::queryhdrmd5($binname) if $do_img && $binname =~ /\.iso$/;
-  return Build::Kiwi::queryhdrmd5($binname) if $do_img && $binname =~ /\.raw$/;
-  return Build::Kiwi::queryhdrmd5($binname) if $do_img && $binname =~ /\.raw.install$/;
+  return Build::Kiwi::queryhdrmd5($binname) if $do_kiwi && $binname =~ /\.iso$/;
+  return Build::Kiwi::queryhdrmd5($binname) if $do_kiwi && $binname =~ /\.raw$/;
+  return Build::Kiwi::queryhdrmd5($binname) if $do_kiwi && $binname =~ /\.raw.install$/;
   return undef;
 }
 

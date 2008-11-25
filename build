@@ -1354,7 +1354,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if test "$imagetype" = product ; then
 	    echo "running kiwi --create-instsource..."
 	    chroot $BUILD_ROOT su -c "kiwi --root $TOPDIR/KIWIROOT -v -v --instsource-local --logfile terminal -p $TOPDIR/SOURCES --create-instsource $TOPDIR/SOURCES" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
-	    for i in "$BUILD_ROOT/$TOPDIR/KIWIROOT/main/*" ; do
+	    for i in $BUILD_ROOT/$TOPDIR/KIWIROOT/main/* ; do
 		test -d "$i" || continue
 		n="${i##*/}"
 		test "$n" = scripts && continue
