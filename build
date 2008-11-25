@@ -1359,7 +1359,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		n="${i##*/}"
 		test "$n" = scripts && continue
 		test "$n" != "${n%0}" && continue
-		chroot $BUILD_ROOT su -c "suse-isolinux $TOPDIR/KIWIROOT/main/$i $TOPDIR/KIWI/$i.iso" - $BUILD_USER
+		chroot $BUILD_ROOT su -c "suse-isolinux $TOPDIR/KIWIROOT/main/$n $TOPDIR/KIWI/$n.iso" - $BUILD_USER
 	    done
 	else
 	    echo "running kiwi --prepare..."
