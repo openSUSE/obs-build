@@ -1255,7 +1255,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     test -n "$RUNNING_IN_VM" && ifconfig lo 127.0.0.1 up
     test -n "$RUNNING_IN_VM" -a -n "$MYHOSTNAME" && hostname "$MYHOSTNAME"
 
-    BUILD_SUCCEDED=false
+    BUILD_SUCCEEDED=false
 
     if test "$BUILDTYPE" = spec ; then
 	test -z "$BUILD_RPM_BUILD_STAGE" && BUILD_RPM_BUILD_STAGE=-ba
@@ -1292,11 +1292,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		"$TOPDIR/SOURCES/$SPECFILE" \
 		> $BUILD_ROOT/.build.command
 	chmod 755 $BUILD_ROOT/.build.command
-	chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
+	chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
     fi
 
     if test "$BUILDTYPE" = dsc ; then
-	chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && dpkg-buildpackage -us -uc -rfakeroot-tcp" - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
+	chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && dpkg-buildpackage -us -uc -rfakeroot-tcp" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
 	mkdir -p $BUILD_ROOT/$TOPDIR/DEBS
 	for DEB in $BUILD_ROOT/$TOPDIR/*.deb ; do
 	    test -e "$DEB" && mv "$DEB" "$BUILD_ROOT/$TOPDIR/DEBS"
@@ -1365,12 +1365,12 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    echo "running kiwi --prepare..."
 	    if chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT" - $BUILD_USER < /dev/null ; then
 		echo "running kiwi --create..."
-		chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT --logfile terminal -d $TOPDIR/KIWI" - $BUILD_USER < /dev/null && BUILD_SUCCEDED=true
+		chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT --logfile terminal -d $TOPDIR/KIWI" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
 	    fi
 	fi
     fi
 
-    test "$BUILD_SUCCEDED" = true || cleanup_and_exit 1
+    test "$BUILD_SUCCEEDED" = true || cleanup_and_exit 1
     test -d "$SRCDIR" && cd "$SRCDIR"
 done
 
