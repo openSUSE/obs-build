@@ -95,6 +95,7 @@ sub kiwiparse {
   my $ret = {};
   my @types;
   my @repos;
+  my @bootrepos;
   my @packages;
   my @extrasources;
   my $kiwi = parsexml($xml);
@@ -109,7 +110,7 @@ sub kiwiparse {
     $ret->{'version'} = $preferences->{'version'}->[0]->{'_content'};
   }
   for my $type (@{$preferences->{'type'} || []}) {
-    next unless @{$preferences->{'type'}} == 1 || $type->{'primary'};
+    next unless @{$preferences->{'type'}} == 1 || !$type->{'optional'};
     push @types, $type->{'_content'};
     push @packages, "kiwi-filesystem:$type->{'filesystem'}" if $type->{'filesystem'};
     if (defined $type->{'boot'}) {
@@ -119,7 +120,7 @@ sub kiwiparse {
 	next unless $bootxml;
 	push @extrasources, $xsrc if $xsrc;
 	my $bret = kiwiparse($bootxml, $arch, $count);
-	push @repos, map {"$_->{'project'}/$_->{'repository'}"} @{$bret->{'path'} || []};
+	push @bootrepos, map {"$_->{'project'}/$_->{'repository'}"} @{$bret->{'path'} || []};
 	push @packages, @{$bret->{'deps'} || []};
 	push @extrasources, @{$bret->{'extrasource'} || []};
       } else {
@@ -175,7 +176,7 @@ sub kiwiparse {
   }
 
   $ret->{'deps'} = [ unify(@packages) ];
-  $ret->{'path'} = [ unify(@repos) ];
+  $ret->{'path'} = [ unify(@repos, @bootrepos) ];
   $ret->{'imagetype'} = [ unify(@types) ];
   $ret->{'extrasource'} = \@extrasources if @extrasources;
   for (@{$ret->{'path'}}) {
