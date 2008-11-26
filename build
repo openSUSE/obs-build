@@ -1362,11 +1362,17 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		chroot $BUILD_ROOT su -c "suse-isolinux $TOPDIR/KIWIROOT/main/$n $TOPDIR/KIWI/$n.iso" - $BUILD_USER
 	    done
 	else
-	    echo "running kiwi --prepare..."
-	    if chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT" - $BUILD_USER < /dev/null ; then
-		echo "running kiwi --create..."
-		chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT --logfile terminal -d $TOPDIR/KIWI" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
-	    fi
+	    BUILD_SUCCEEDED=true
+	    for imagetype in $imagetype ; do
+		echo "running kiwi --prepare for $imagetype..."
+		if chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT" - $BUILD_USER < /dev/null ; then
+		    echo "running kiwi --create for $imagetype..."
+		    chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT --logfile terminal --type $imagetype -d $TOPDIR/KIWI" - $BUILD_USER < /dev/null || BUILD_SUCCEEDED=
+		else
+		    BUILD_SUCCEEDED=
+		fi
+		test -z "$BUILD_SUCCEEDED" && break
+	    done
 	fi
     fi
 
