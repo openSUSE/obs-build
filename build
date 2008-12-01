@@ -1083,16 +1083,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "assuming dist $BUILD_DIST"
     fi
 
-    if test "$BUILDTYPE" = spec ; then
-	TOPDIR=`chroot $BUILD_ROOT rpm --eval '%_topdir'`
-    else
-	TOPDIR=/usr/src/packages
-	mkdir -p $BUILD_ROOT$TOPDIR
-    fi
-
-    rm -f $BUILD_ROOT/.build.packages
-    ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
-
     #
     # fix rpmrc if we are compiling for i686
     #
@@ -1144,6 +1134,16 @@ for SPECFILE in "${SPECFILES[@]}" ; do
         fi
     fi
 
+    if test "$BUILDTYPE" = spec ; then
+	TOPDIR=`chroot $BUILD_ROOT su -c "rpm --eval '%_topdir'" - $BUILD_USER`
+    else
+	TOPDIR=/usr/src/packages
+	mkdir -p $BUILD_ROOT$TOPDIR
+    fi
+
+    rm -f $BUILD_ROOT/.build.packages
+    ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
+
     mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
     mount -n -tdevpts none $BUILD_ROOT/dev/pts 2> /dev/null
  
@@ -1159,7 +1159,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     # now clean up RPM building directories
     #
     rm -rf $BUILD_ROOT$TOPDIR
-    for i in BUILD RPMS/`uname -m` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS ; do
+    for i in BUILD RPMS/`uname -m` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS BUILDROOT; do
         mkdir -p $BUILD_ROOT$TOPDIR/$i
 	test $BUILD_USER = abuild && chown 399:399 $BUILD_ROOT$TOPDIR/$i
     done
@@ -1283,7 +1283,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	fi
 	rpmbuild=rpmbuild
 
-	test -x $BUILD_ROOT/usr/lib/rpm/rpmi || rpmbuild=rpm
+	test -x $BUILD_ROOT/usr/bin/rpmbuild || rpmbuild=rpm
 	# su involves a shell which would require even more
 	# complicated quoting to bypass than this
 	toshellscript $rpmbuild \
