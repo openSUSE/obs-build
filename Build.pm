@@ -32,9 +32,9 @@ sub import {
 my $std_macros = q{
 %define nil
 %define ix86 i386 i486 i586 i686 athlon
-%define arm armv4l armv4b armv5l armv5b armv5el armv5eb armv5tel armv5teb armv6el armv6eb
-%define arml armv4l armv5l armv5tel armv5el armv6el
-%define armb armv4b armv5b armv5teb armv5eb armv6eb
+%define arm armv4l armv4b armv5l armv5b armv5el armv5eb armv5tel armv5teb armv6el armv6eb armv7el armv7eb
+%define arml armv4l armv5l armv5tel armv5el armv6el armv7el
+%define armb armv4b armv5b armv5teb armv5eb armv6eb armv7eb
 };
 my $extra_macros = '';
 

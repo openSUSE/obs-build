@@ -330,7 +330,7 @@ else
     #
     # Hack to detect cross-build (fixed code) and copy qemus for cross-build emulation mode
     #
-    if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xsh4 ]; then
+    if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xarmv7el -o x"$BUILD_ARCH" == xsh4 ]; then
        if [ x"`uname -i`" == xx86_64 -o  x"`uname -i`" == xi386 ]; then
           if [ -e /proc/sys/fs/binfmt_misc/arm -o -e /proc/sys/fs/binfmt_misc/armeb -o -e /proc/sys/fs/binfmt_misc/sh4 ]; then
              echo -n "qemu-* already registered "
