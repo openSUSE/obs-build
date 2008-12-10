@@ -943,7 +943,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    rm -rf $BUILD_ROOT/.build-srcdir
 	    mkdir $BUILD_ROOT/.build-srcdir
 	    if test "$BUILDTYPE" = kiwi ; then
-		cp -a "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
+		cp -pRL "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
 	    else
 		cp -p "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
 	    fi
@@ -1171,7 +1171,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
 	    mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
 	else
-	    cp -a "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+	    cp -dLR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
 	fi
     else
 	cp -p "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
@@ -1311,16 +1311,19 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    for r in */* ; do
 		test -L $r && continue
 		test -d $r || continue
-		echo "creating repodata for $r"
-		chroot $BUILD_ROOT createrepo "$TOPDIR/SOURCES/repos/$r"
+		repo="$TOPDIR/SOURCES/repos/$r/"
 		# create compatibility link
 		rc="${r//:/:/}"
 		if test "$rc" != "$r" ; then
 		    rl="${rc//[^\/]}"
 		    rl="${rl//?/../}"
 		    mkdir -p "${rc%/*}"
+ls -l "${rc%/*}/"
 		    ln -s $rl$r "${rc%/*}/${rc##*/}"
+		    repo="$TOPDIR/SOURCES/repos/${rc%/*}/${rc##*/}/"
 		fi
+		echo "creating repodata for $repo"
+		chroot $BUILD_ROOT createrepo "$repo"
 	    done
 	    )
 	fi
