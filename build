@@ -1098,7 +1098,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     BUILD_USER=abuild
     if test -x $BUILD_ROOT/bin/rpm ; then
 	SUSE_VERSION=`chroot $BUILD_ROOT /bin/rpm --eval '%{?suse_version}' 2>/dev/null`
-	if test -n "$SUSE_VERSION" -a "$SUSE_VERSION" -le 1020 ; then
+	if test -n "$SUSE_VERSION" && test "$SUSE_VERSION" -le 1020 ; then
 	    BUILD_USER=root
 	fi
     fi
