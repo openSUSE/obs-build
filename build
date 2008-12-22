@@ -856,7 +856,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
     BUILDTYPE=
     case $SPECFILE in
-      *.spec) BUILDTYPE=spec ;;
+      *.spec|*.src.rpm) BUILDTYPE=spec ;;
       *.dsc) BUILDTYPE=dsc ;;
       *.kiwi) BUILDTYPE=kiwi ;;
     esac
@@ -1221,6 +1221,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	rm -rf $BUILD_ROOT$TOPDIR/BUILD
 	test $BUILD_USER = abuild && chown 399:399 $BUILD_ROOT$TOPDIR
 	DEB_TRANSFORM=
+	DEB_SOURCEDIR=$TOPDIR/SOURCES
+	DEB_DSCFILE=$SPECFILE
 	for f in $BUILD_ROOT$TOPDIR/SOURCES/debian.* ; do
 	    test -f $f && DEB_TRANSFORM=true
 	done
@@ -1231,10 +1233,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		echo "debian transforming failed."
 		cleanup_and_exit 1
 	    fi
-	    chroot $BUILD_ROOT su -c "dpkg-source -x $TOPDIR/SOURCES.DEB/*.dsc $TOPDIR/BUILD" - $BUILD_USER
-        else
-	    chroot $BUILD_ROOT su -c "dpkg-source -x $TOPDIR/SOURCES/$SPECFILE $TOPDIR/BUILD" - $BUILD_USER
+	    DEB_SOURCEDIR=$TOPDIR/SOURCES.DEB
+	    for DEB_DSCFILE in $BUILD_ROOT/$DEB_SOURCEDIR/*.dsc ; do : ; done
         fi
+	chroot $BUILD_ROOT su -c "dpkg-source -x $DEB_SOURCEDIR/$DEB_DSCFILE $TOPDIR/BUILD" - $BUILD_USER
     fi
 
     if test $BUILD_USER = abuild ; then
@@ -1301,6 +1303,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	for DEB in $BUILD_ROOT/$TOPDIR/*.deb ; do
 	    test -e "$DEB" && mv "$DEB" "$BUILD_ROOT/$TOPDIR/DEBS"
 	done
+	# link sources over
+	ln $BUILD_ROOT/$DEB_SOURCEDIR/$DEB_DSCFILE $BUILD_ROOT/$TOPDIR/DEBS/
+	while read f ; do
+	    ln $BUILD_ROOT/$DEB_SOURCEDIR/$f $BUILD_ROOT/$TOPDIR/DEBS/
+	done < <(sed -ne '/^Files:/,$s/^ ................................ [0-9][0-9]* //p' < $BUILD_ROOT/$DEB_SOURCEDIR/$DEB_DSCFILE)
     fi
 
     if test "$BUILDTYPE" = kiwi ; then
