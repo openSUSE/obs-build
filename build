@@ -1153,7 +1153,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
     # nasty hack to prevent rpath on known paths
     # FIXME: do this only for suse
-    echo "export SUSE_IGNORED_RPATHS=/etc/ld.so.conf" > "$BUILD_ROOT"/etc/profile.d/buildsystem.sh
+    if test -d "$BUILD_ROOT/etc/profile.d" ; then
+	echo "export SUSE_IGNORED_RPATHS=/etc/ld.so.conf" > "$BUILD_ROOT/etc/profile.d/buildsystem.sh"
+    fi
 
     #
     # now clean up RPM building directories
