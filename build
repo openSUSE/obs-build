@@ -1237,6 +1237,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    fi
 	    DEB_SOURCEDIR=$TOPDIR/SOURCES.DEB
 	    for DEB_DSCFILE in $BUILD_ROOT/$DEB_SOURCEDIR/*.dsc ; do : ; done
+	    DEB_DSCFILE="${DEB_DSCFILE##*/}"
         fi
 	chroot $BUILD_ROOT su -c "dpkg-source -x $DEB_SOURCEDIR/$DEB_DSCFILE $TOPDIR/BUILD" - $BUILD_USER
     fi
