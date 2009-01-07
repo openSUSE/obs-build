@@ -82,7 +82,7 @@ for my $l (@$xspec) {
 
   if ($release) {
     if ($l =~ /^Release:/i) {
-      if (!($l =~ s/<RELEASE>/$release/g)) {
+      if (!($l =~ s/<RELEASE\d*>/$release/g)) {
 	if ($l =~ /<(?:CI_CNT|B_CNT)>/) {
 	  # XXX: should pass ci_cnt/b_cnt instead
 	  if ($release =~ /(\d+)\.(\d+)$/) {
