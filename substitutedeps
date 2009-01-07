@@ -83,7 +83,19 @@ for my $l (@$xspec) {
   if ($release) {
     if ($l =~ /^Release:/i) {
       if (!($l =~ s/<RELEASE>/$release/g)) {
-	$l =~ s/^(Release:\s*).*/$1$release/i;
+	if ($l =~ /<(?:CI_CNT|B_CNT)>/) {
+	  # XXX: should pass ci_cnt/b_cnt instead
+	  if ($release =~ /(\d+)\.(\d+)$/) {
+	    my ($ci, $b) = ($1, $2);
+	    $l =~ s/<CI_CNT>/$ci/;
+	    $l =~ s/<B_CNT>/$b/;
+	  } elsif ($release =~ /(\d+)$/) {
+	    my $b = $1;
+	    $l =~ s/<B_CNT>/$b/ unless $l =~ s/<CI_CNT>/$b/;
+	  }
+	} else {
+	  $l =~ s/^(Release:\s*).*/$1$release/i;
+	}
       }
     }
   }
