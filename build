@@ -1378,9 +1378,9 @@ ls -l "${rc%/*}/"
 	    BUILD_SUCCEEDED=true
 	    for imagetype in $imagetype ; do
 		echo "running kiwi --prepare for $imagetype..."
-		if chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT" - $BUILD_USER < /dev/null ; then
+		if chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT-$imagetype" - $BUILD_USER < /dev/null ; then
 		    echo "running kiwi --create for $imagetype..."
-		    chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT --logfile terminal --type $imagetype -d $TOPDIR/KIWI" - $BUILD_USER < /dev/null || BUILD_SUCCEEDED=
+		    chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT-$imagetype --logfile terminal --type $imagetype -d $TOPDIR/KIWI" - $BUILD_USER < /dev/null || BUILD_SUCCEEDED=
 		else
 		    BUILD_SUCCEEDED=
 		fi
