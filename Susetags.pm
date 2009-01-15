@@ -4,6 +4,16 @@ use strict;
 use warnings;
 use Data::Dumper;
 
+sub addpkg {
+  my ($pkgs, $cur, $order, @arches) = @_;
+  if (defined($cur) && (!@arches || grep { /$cur->{'arch'}/ } @arches)) {
+    my $k = "$cur->{'name'}-$cur->{'version'}-$cur->{'release'}-$cur->{'arch'}";
+    $pkgs->{$k} = $cur;
+    # keep order (or should we use Tie::IxHash?)
+    push @{$order}, $k if defined $order;
+  }
+}
+
 sub parse {
   my ($file, $tmap, $order, @arches) = @_;
   # if @arches is empty take all arches
@@ -30,17 +40,14 @@ sub parse {
         push @{$cur->{$tmap->{$tag}}}, $_;
       }
     } elsif ($tag eq 'Pkg') {
-      $pkgs->{"$cur->{'name'}-$cur->{'arch'}"} = $cur if defined $cur && (!@arches || grep { /$cur->{'arch'}/ } @arches);
-      # keep order (or should we use Tie::IxHash?)
-      push @{$order}, "$cur->{'name'}-$cur->{'arch'}" if defined $order && defined $cur;
+      addpkg($pkgs, $cur, $order, @arches);
       $cur = {};
       ($cur->{'name'}, $cur->{'version'}, $cur->{'release'}, $cur->{'arch'}) = split(' ', $data);
     } else {
       $cur->{$tmap->{$tag}} = $data;
     }
   }
-  $pkgs->{"$cur->{'name'}-$cur->{'arch'}"} = $cur if defined $cur && (!@arches || grep { /$cur->{'arch'}/ } @arches);
-  push @{$order}, "$cur->{'name'}-$cur->{'arch'}" if defined $order && defined $cur;
+  addpkg($pkgs, $cur, $order, @arches);
   close(F);
   return $pkgs;
 }
