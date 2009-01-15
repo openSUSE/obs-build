@@ -574,8 +574,10 @@ mkdir -p $BUILD_ROOT/installed-pkg
 
 RPMCHECKOPTS=
 RPMCHECKOPTS_HOST=
-test -x $BUILD_ROOT/usr/lib/rpm/rpmi && RPMCHECKOPTS="--nodigest --nosignature"
-test -x /usr/lib/rpm/rpmi && RPMCHECKOPTS_HOST="--nodigest --nosignature"
+# on Fedoar 10 rpmbuild is in a separate package so we need something else to
+# detect rpm4
+test -x $BUILD_ROOT/usr/bin/rpmsign && RPMCHECKOPTS="--nodigest --nosignature"
+test -x /usr/bin/rpmsign && RPMCHECKOPTS_HOST="--nodigest --nosignature"
 
 for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
     case $PKG in
