@@ -34,6 +34,32 @@ sub print_pkg($)
   print "I:$id$tag\n";
 }
 
+sub callback
+{
+  my ($pkg, $url) = @_;
+  $pkg->{'provides'} = [] unless exists $pkg->{'provides'};
+  # add self provides (rpm3 misses that)
+  my $n = $pkg->{'name'};
+  if(substr($pkg->{'arch'}, -3) ne 'src' && !scalar grep(/^\Q$n\E( =.*)?$/,@{$pkg->{'provides'}}))
+  {
+    push @{$pkg->{'provides'}}, sprintf("%s = %s-%s", $pkg->{'name'}, $pkg->{'version'}, $pkg->{'release'});
+  }
+  $pkg->{'provides'} = join(' ', @{$pkg->{'provides'}});
+  $pkg->{'requires'} = join(' ', @{$pkg->{'requires'}}) if $pkg->{'requires'};
+  $pkg->{'baseurl'} = $url;
+  my @data = split(' ', $pkg->{'location'});
+  # multi cd support hack
+  my $num = $data[0];
+  if($pkg->{'baseurl'} =~ /1\/$/ && $num ne 0) {
+    $pkg->{'baseurl'} =~ s/1\/$/$num\//;
+  }
+  $pkg->{'location'} = $data[1];
+
+  print_pkg($pkg);
+
+  return 0;
+}
+
 while (@ARGV)
 {
   my $url = shift;
@@ -62,29 +88,9 @@ while (@ARGV)
   my $packages = $url.'suse/setup/descr/packages';
 
   my @order = ();
-  my $pkgs = Susetags::parse($packages, { 'Loc' => 'location', 'Prv' => 'provides', 'Req' => 'requires', 'Tim' => 'buildtime' }, \@order);
-  foreach (@order) {
-    my $pkg = $pkgs->{$_};
-    $pkg->{'provides'} = [] unless exists $pkg->{'provides'};
-    # add self provides (rpm3 misses that)
-    my $n = $pkg->{'name'};
-    if(substr($pkg->{'arch'}, -3) ne 'src' && !scalar grep(/^\Q$n\E( =.*)?$/,@{$pkg->{'provides'}}))
-    {
-      push @{$pkg->{'provides'}}, sprintf("%s = %s-%s", $pkg->{'name'}, $pkg->{'version'}, $pkg->{'release'});
-    }
-    $pkg->{'provides'} = join(' ', @{$pkg->{'provides'}});
-    $pkg->{'requires'} = join(' ', @{$pkg->{'requires'}}) if $pkg->{'requires'};
-    $pkg->{'baseurl'} = $url;
-    my @data = split(' ', $pkg->{'location'});
-    # multi cd support hack
-    my $num = $data[0];
-    if($pkg->{'baseurl'} =~ /1\/$/ && $num ne 0) {
-      $pkg->{'baseurl'} =~ s/1\/$/$num\//;
-    }
-    $pkg->{'location'} = $data[1];
-
-    print_pkg($pkg);
-  }
+  my $pkgs = Susetags::parse($packages,
+    { 'Loc' => 'location', 'Prv' => 'provides', 'Req' => 'requires', 'Tim' => 'buildtime' },
+    { cb => \&callback, data => $url });
 }
 
 # vim: sw=2
