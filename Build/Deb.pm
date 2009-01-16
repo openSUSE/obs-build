@@ -301,4 +301,33 @@ sub queryhdrmd5 {
   return Digest::MD5::md5_hex($data);
 }
 
+sub verscmp_part {
+  my ($s1, $s2) = @_;
+  return 0 if $s1 eq $s2;
+  $s1 =~ s/([0-9]+)/substr("00000000000000000000000000000000$1", -32, 32)/ge;
+  $s2 =~ s/([0-9]+)/substr("00000000000000000000000000000000$1", -32, 32)/ge;
+  $s1 .= "\0";
+  $s2 .= "\0";
+  $s1 =~ tr[\176\000-\037\060-\071\101-\132\141-\172\040-\057\072-\100\133-\140\173-\175][\000-\176];
+  $s2 =~ tr[\176\000-\037\060-\071\101-\132\141-\172\040-\057\072-\100\133-\140\173-\175][\000-\176];
+  return $s1 cmp $s2;
+}
+
+sub verscmp {
+  my ($s1, $s2) = @_;
+  my ($e1, $v1, $r1) = $s1 =~ /^(?:(\d+):)?(.*?)(?:-([^-]*))?$/s;
+  $e1 = 0 unless defined $e1;
+  my ($e2, $v2, $r2) = $s2 =~ /^(?:(\d+):)?(.*?)(?:-([^-]*))?$/s;
+  $e2 = 0 unless defined $e2;
+  if ($e1 ne $e2) {
+    my $r = verscmp_part($e1, $e2);
+    return $r if $r;
+  }
+  my $r = verscmp_part($v1, $v2);
+  return $r if $r;
+  $r1 = '' unless defined $r1;
+  $r2 = '' unless defined $r2;
+  return verscmp_part($r1, $r2);
+}
+
 1;

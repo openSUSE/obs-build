@@ -487,7 +487,12 @@ sub addproviders {
       my $rr = $rf == 2 ? $pf : ($rf ^ 5);
       $rr &= 5 unless $pf & 2;
       # verscmp for spec and kiwi types
-      my $vv = Build::Rpm::verscmp($pv, $rv, $config->{'type'} eq 'dsc' ? 0 : 1);
+      my $vv;
+      if ($config->{'type'} eq 'dsc') {
+        $vv = Build::Deb::verscmp($pv, $rv, 1);
+      } else {
+        $vv = Build::Rpm::verscmp($pv, $rv, 1);
+      }
       if ($rr & (1 << ($vv + 1))) {
 	push @p, $rp;
 	last;
