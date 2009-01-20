@@ -987,7 +987,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	umount -n $BUILD_ROOT/proc 2> /dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
 	umount -n $BUILD_ROOT/mnt 2> /dev/null || true
-	umount $BUILD_ROOT
+
+	# needs to work otherwise we have a corrupted file system
+	umount $BUILD_ROOT || cleanup_and_exit 1
 
 	if [ "$VM_TYPE" = 'xen' ]; then
 		XMROOT=file:$VM_IMAGE
@@ -1015,7 +1017,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		echo "$@"
 		"$@"
 	elif [ "$VM_TYPE" = 'qemu' -o "$VM_TYPE" = 'kvm' ]; then
-		echo "booting QEMU ..."
+		echo "booting $VM_TYPE ..."
 		if [ "$kvm_virtio" = 1 ]; then
 		    qemu_disks=(-drive file="$VM_IMAGE",if=virtio -hda /dev/null)
 		    if [ -n "$VM_SWAP" ]; then
