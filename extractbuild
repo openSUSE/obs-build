@@ -24,6 +24,7 @@ if (-l $topdir) {
 my @dirs = map {"$topdir/RPMS/$_"} ls("$topdir/RPMS");
 unshift @dirs, "$topdir/SRPMS";
 unshift @dirs, "$topdir/DEBS";
+unshift @dirs, "$topdir/KIWI";
 
 my @packs;
 for my $dir (@dirs) {
