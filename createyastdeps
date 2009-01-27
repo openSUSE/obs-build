@@ -88,7 +88,7 @@ while (@ARGV)
   my $packages = $url.'suse/setup/descr/packages';
 
   my @order = ();
-  my $pkgs = Susetags::parse($packages,
+  my $pkgs = Build::Susetags::parse($packages,
     { 'Loc' => 'location', 'Prv' => 'provides', 'Req' => 'requires', 'Tim' => 'buildtime' },
     { cb => \&callback, data => $url });
 }

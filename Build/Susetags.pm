@@ -1,4 +1,4 @@
-package Susetags;
+package Build::Susetags;
 
 use strict;
 use warnings;
