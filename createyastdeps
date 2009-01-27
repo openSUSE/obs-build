@@ -5,7 +5,7 @@ BEGIN {
 }
 
 use Build;
-use Susetags;
+use Build::Susetags;
 use strict;
 
 sub print_pkg($)
