@@ -1454,7 +1454,6 @@ if test -n "$RPMS" -a -d "$BUILD_ROOT/$TOPDIR/RPMS" -a -d "$BUILD_ROOT/.build.ol
     # exit with 2, if packages built successfull, but have no changes to former built packages.
     chroot $BUILD_ROOT /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/RPMS" "$TOPDIR/SRPMS" && cleanup_and_exit 2
 fi
-cleanup_and_exit 2
 
 # IMPLEMENT ME: place code for creating binary package deltas here
 
