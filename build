@@ -132,6 +132,9 @@ Known Parameters:
   --root rootdir
               Use 'rootdir' to setup chroot environment
 
+  --oldpackages oladpackagesdir
+              Define a directory with a former build
+
   --baselibs  Create -32bit/-64bit/-x86 rpms for other architectures
 
   --list-state
@@ -569,6 +572,10 @@ while test -n "$1"; do
         BUILD_ROOT="$ARG"
         shift
       ;;
+      *-oldpackages)
+        OLD_PACKAGES="$ARG"
+        shift
+      ;;
       *-dist) 
 	BUILD_DIST="$ARG"
 	export BUILD_DIST
@@ -939,6 +946,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		# remove setuid bit if files belong to user to make e.g. mount work
 		find $BUILD_ROOT/{bin,sbin,usr/bin,usr/sbin} -type f -uid $UID -perm +4000 -print0 | xargs -0 --no-run-if-empty chmod -s
 	    fi
+            if [ -d $OLD_PACKAGES ]; then
+               rm -rf $BUILD_ROOT/.build.oldpackages
+               cp -a $OLD_PACKAGES $BUILD_ROOT/.build.oldpackages
+            fi
 	fi
 	# start up xen, rerun ourself
 	cp -a $BUILD_DIR/. $BUILD_ROOT/.build
@@ -1073,7 +1084,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	#
 	test -z "$INCARNATION" && INCARNATION=0
 	echo "BUILD_INCARNATION=$INCARNATION" > $BUILD_ROOT/.buildenv
-
 	CREATE_BUILD_BINARIES=
 	egrep '^#[       ]*needsbinariesforbuild[       ]*$' >/dev/null <$MYSRCDIR/$SPECFILE && CREATE_BUILD_BINARIES=--create-build-binaries
         set -- init_buildsystem "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
@@ -1449,10 +1459,10 @@ if test -n "$RPMS" -a -n "$CREATE_BASELIBS" -a -d "$BUILD_ROOT/$TOPDIR/RPMS" ; t
     fi
 fi
 
-if test -n "$RPMS" -a -d "$BUILD_ROOT/$TOPDIR/RPMS" -a -d "$BUILD_ROOT/.build.oldpackages" -a -x "$BUILD_ROOT/usr/lib/build/same-build-result.sh" ; then
+if test -n "$RPMS" -a -d "$BUILD_ROOT/$TOPDIR/RPMS" -a -d "$OLD_PACKAGES" -a -x "$BUILD_ROOT/usr/lib/build/same-build-result.sh" ; then
     echo "... comparing built packages with the former built"
     # exit with 2, if packages built successfull, but have no changes to former built packages.
-    chroot $BUILD_ROOT /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/RPMS" "$TOPDIR/SRPMS" && cleanup_and_exit 2
+    chroot $BUILD_ROOT /usr/lib/build/same-build-result.sh "$OLD_PACKAGES" "$TOPDIR/RPMS" "$TOPDIR/SRPMS" && cleanup_and_exit 2
 fi
 
 # IMPLEMENT ME: place code for creating binary package deltas here
