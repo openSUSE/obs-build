@@ -168,6 +168,19 @@ my $cf = Build::read_config_dist($dist, $archs[0], $configdir);
 
 #######################################################################
 
+sub print_rpmlist
+{
+	for (@_) {
+		print "$_ $fn{$packs{$_}}\n";
+		print "rpmid: $_:$ids{$packs{$_}}\n" if exists $ids{$packs{$_}};
+	}
+	print "preinstall: @{$cf->{'preinstall'} || []}\n";
+	print "vminstall: @{$cf->{'vminstall'} || []}\n";
+	print "runscripts: @{$cf->{'runscripts'} || []}\n";
+	print "dist: $dist\n" if defined $dist;
+
+}
+
 if ($useusedforbuild) {
   die("Need a specfile/dscfile for --usedforbuild\n") unless defined $spec;
   local *F;
@@ -195,13 +208,7 @@ if ($useusedforbuild) {
     print STDERR "  $_\n" for @errors;
     exit(1);
   }
-  for (@usedforbuild) {
-    print "$_ $fn{$packs{$_}}\n";
-  }
-  print "preinstall: @{$cf->{'preinstall'} || []}\n";
-  print "vminstall: @{$cf->{'vminstall'} || []}\n";
-  print "runscripts: @{$cf->{'runscripts'} || []}\n";
-  print "dist: $dist\n" if defined $dist;
+  print_rpmlist(@usedforbuild);
   exit(0);
 }
 
@@ -239,10 +246,4 @@ if (!shift @bdeps) {
   exit(1);
 }
 
-for (@bdeps) {
-  print "$_ $fn{$packs{$_}}\n";
-  print "rpmid: $_:$ids{$packs{$_}}\n" if exists $ids{$packs{$_}};
-}
-print "preinstall: @{$cf->{'preinstall'} || []}\n";
-print "runscripts: @{$cf->{'runscripts'} || []}\n";
-print "dist: $dist\n" if defined $dist;
+print_rpmlist(@bdeps);
