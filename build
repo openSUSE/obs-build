@@ -132,7 +132,7 @@ Known Parameters:
   --root rootdir
               Use 'rootdir' to setup chroot environment
 
-  --oldpackages oladpackagesdir
+  --oldpackages oldpackagesdir
               Define a directory with a former build
 
   --baselibs  Create -32bit/-64bit/-x86 rpms for other architectures
@@ -949,6 +949,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
             if [ -d $OLD_PACKAGES ]; then
                rm -rf $BUILD_ROOT/.build.oldpackages
                cp -a $OLD_PACKAGES $BUILD_ROOT/.build.oldpackages
+               OLD_PACKAGES=/.build.oldpackages
             fi
 	fi
 	# start up xen, rerun ourself
@@ -990,6 +991,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	test -n "$VM_SWAP" && echo "VM_SWAP='${VM_SWAPDEV:-/dev/hda2}'" >> $BUILD_ROOT/.build/build.data
 	PERSONALITY=0
 	test -n "$PERSONALITY_SYSCALL" && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
+	echo "OLD_PACKAGES='$OLD_PACKAGES'" >> $BUILD_ROOT/.build/build.data
 	echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
 	echo "MYHOSTNAME='`hostname`'" >> $BUILD_ROOT/.build/build.data
 	echo -n "definesnstuff=(" >> $BUILD_ROOT/.build/build.data
