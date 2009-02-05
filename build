@@ -1064,21 +1064,12 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if test -n "$VM_SWAP" ; then
 	    BUILDSTATUS=`dd if="$VM_SWAP" bs=12 count=1 2>/dev/null`
 	    case $BUILDSTATUS in
-	      BUILDSTATUS0)
-                # usual successfull build
+	      BUILDSTATUS[02])
 		mkdir -p $BUILD_ROOT/.build.packages 
 		cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
 		echo "build: extracting built packages..."
 		dd if=$VM_SWAP bs=512 skip=1 | cpio --extract --no-absolute-filenames -v
-		cleanup_and_exit 0
-		;;
-	      BUILDSTATUS2)
-                # successful, but unchanged build, copy back result anyway
-		mkdir -p $BUILD_ROOT/.build.packages 
-		cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
-		echo "build: extracting built packages..."
-		dd if=$VM_SWAP bs=512 skip=1 | cpio --extract --no-absolute-filenames -v
-		cleanup_and_exit 2
+		cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
 		;;
 	      *)
 		cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
