@@ -101,6 +101,7 @@ sub kiwiparse {
   my $kiwi = parsexml($xml);
   die("not a kiwi config\n") unless $kiwi && $kiwi->{'image'};
   $kiwi = $kiwi->{'image'}->[0];
+  $ret->{'filename'} = $kiwi->{'name'} if $kiwi->{'name'};
   my $description = (($kiwi->{'description'} || [])->[0]) || {};
   if ($description->{'specification'}) {
     $ret->{'name'} = $description->{'specification'}->[0]->{'_content'};
