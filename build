@@ -1405,21 +1405,21 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		fi
 	    done
 
-	    # create tar.bz2 of images, in case it makes sense
+	    # create tar.gz of images, in case it makes sense
             imagearch=`uname -m`
             for imgtype in $imagetype ; do
                 case "$imgtype" in
                     oem)
             	    	pushd $BUILD_ROOT/$TOPDIR/KIWI-oem > /dev/null
                         echo "compressing images... "
-                        tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-raw.tar.bz2 \
+                        tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-raw.tar.gz \
                           $imagename.$imagearch-$imageversion.raw
                         popd > /dev/null
                         ;;
                     vmx)
                         pushd $BUILD_ROOT/$TOPDIR/KIWI-vmx > /dev/null
                         echo "compressing images... "
-                        tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-vmx.tar.bz2 \
+                        tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-vmx.tar.gz \
                           $imagename.$imagearch-$imageversion.vmx \
                           $imagename.$imagearch-$imageversion.vmdk
                         
@@ -1433,7 +1433,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                     xen)
                         pushd $BUILD_ROOT/$TOPDIR/KIWI-xen > /dev/null
                         echo "compressing images... "
-                        tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-xen.tar.bz2 \
+                        tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-xen.tar.gz \
                           `grep ^kernel $imagename.$imagearch-$imageversion.xenconfig | cut -d'"'  -f2` \
                           `grep ^ramdisk $imagename.$imagearch-$imageversion.xenconfig | cut -d'"'  -f2` \
                           $imagename.$imagearch-$imageversion.xenconfig \
@@ -1443,7 +1443,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                     pxe)
                         pushd $BUILD_ROOT/$TOPDIR/KIWI-pxe > /dev/null
                         echo "compressing images... "
-                        tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-pxe.tar.bz2 \
+                        tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-pxe.tar.gz \
                           $imagename.$imagearch-$imageversion.config \
                           $imagename.$imagearch-$imageversion.gz \
                           initrd-*
@@ -1452,7 +1452,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                     *)
                         pushd $BUILD_ROOT/$TOPDIR/KIWI-$imgtype > /dev/null
                         echo "compressing unkown images... "
-                        tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-$imgtype.tar.bz2 \
+                        tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-$imgtype.tar.gz \
                           *
             	    	popd > /dev/null
                         ;;
