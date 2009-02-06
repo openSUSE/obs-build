@@ -1393,6 +1393,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		chroot $BUILD_ROOT su -c "suse-isolinux $TOPDIR/KIWIROOT/main/$n $TOPDIR/KIWI/$n.iso" - $BUILD_USER
 	    done
 	else
+	    BUILD_SUCCEEDED=true
 	    for imgtype in $imagetype ; do
 		echo "running kiwi --prepare for $imgtype..."
 		if chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT-$imgtype" - $BUILD_USER < /dev/null ; then
