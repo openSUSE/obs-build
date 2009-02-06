@@ -1379,6 +1379,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	rm -f $BUILD_ROOT/$TOPDIR/SOURCES/config.xml
 	ln -s $SPECFILE $BUILD_ROOT/$TOPDIR/SOURCES/config.xml
 	imagetype=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE imagetype)
+	imagename=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE filename)
+	imageversion=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE version)
 	chroot $BUILD_ROOT su -c "kiwi --version" -
 	if test "$imagetype" = product ; then
 	    echo "running kiwi --create-instsource..."
@@ -1391,17 +1393,54 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		chroot $BUILD_ROOT su -c "suse-isolinux $TOPDIR/KIWIROOT/main/$n $TOPDIR/KIWI/$n.iso" - $BUILD_USER
 	    done
 	else
-	    BUILD_SUCCEEDED=true
-	    for imagetype in $imagetype ; do
-		echo "running kiwi --prepare for $imagetype..."
-		if chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT-$imagetype" - $BUILD_USER < /dev/null ; then
-		    echo "running kiwi --create for $imagetype..."
-		    chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT-$imagetype --logfile terminal --type $imagetype -d $TOPDIR/KIWI" - $BUILD_USER < /dev/null || BUILD_SUCCEEDED=
+	    for imgtype in $imagetype ; do
+		echo "running kiwi --prepare for $imgtype..."
+		if chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT-$imgtype" - $BUILD_USER < /dev/null ; then
+		    echo "running kiwi --create for $imgtype..."
+		    mkdir -p $BUILD_ROOT/$TOPDIR/KIWI-$imgtype
+		    chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT-$imgtype --logfile terminal --type $imgtype -d $TOPDIR/KIWI-$imgtype" - $BUILD_USER < /dev/null || cleanup_and_exit 1
 		else
-		    BUILD_SUCCEEDED=
+                    cleanup_and_exit 1
 		fi
-		test -z "$BUILD_SUCCEEDED" && break
 	    done
+
+	    # create tar.bz2 of images, in case it makes sense
+            imagearch=`uname -m`
+            for imgtype in $imagetype ; do
+                case "$imgtype" in
+                    oem)
+            	    pushd $BUILD_ROOT/$TOPDIR/KIWI-oem > /dev/null
+                        echo "compressing images... "
+                        tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-raw.tar.bz2 \
+                          $imagename.$imagearch-$imageversion.raw
+                        popd > /dev/null
+                        ;;
+                    vmx)
+                        pushd $BUILD_ROOT/$TOPDIR/KIWI-vmx > /dev/null
+                        echo "compressing images... "
+            	    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-vmx.tar.bz2 \
+            	      $imagename.$imagearch-$imageversion.vmx \
+            	      $imagename.$imagearch-$imageversion.vmdk
+            
+            	    # don't compress ovf output
+            	    if [ -e $imagename.$imagearch-$imageversion.ovf ] ; then
+            	        mv $imagename.$imagearch-$imageversion.ovf $BUILD_ROOT/$TOPDIR/KIWI/
+            	        mv $imagename.$imagearch-$imageversion-disk*.vmdk $BUILD_ROOT/$TOPDIR/KIWI/
+            	    fi
+            	    popd > /dev/null
+                        ;;
+                    xen)
+                        pushd $BUILD_ROOT/$TOPDIR/KIWI-xen > /dev/null
+                        echo "compressing images... "
+                        tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-xen.tar.bz2 \
+                          `grep ^kernel $imagename.$imagearch-$imageversion.xenconfig | cut -d'"'  -f2` \
+            	      `grep ^ramdisk $imagename.$imagearch-$imageversion.xenconfig | cut -d'"'  -f2` \
+                          $imagename.$imagearch-$imageversion.xenconfig \
+                          $imagename.$imagearch-$imageversion
+            	    popd > /dev/null
+                        ;;
+                esac
+            done
 	fi
     fi
 
