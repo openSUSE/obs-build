@@ -1409,7 +1409,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
             for imgtype in $imagetype ; do
                 case "$imgtype" in
                     oem)
-            	    pushd $BUILD_ROOT/$TOPDIR/KIWI-oem > /dev/null
+            	    	pushd $BUILD_ROOT/$TOPDIR/KIWI-oem > /dev/null
                         echo "compressing images... "
                         tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-raw.tar.bz2 \
                           $imagename.$imagearch-$imageversion.raw
@@ -1418,26 +1418,42 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                     vmx)
                         pushd $BUILD_ROOT/$TOPDIR/KIWI-vmx > /dev/null
                         echo "compressing images... "
-            	    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-vmx.tar.bz2 \
-            	      $imagename.$imagearch-$imageversion.vmx \
-            	      $imagename.$imagearch-$imageversion.vmdk
-            
-            	    # don't compress ovf output
-            	    if [ -e $imagename.$imagearch-$imageversion.ovf ] ; then
-            	        mv $imagename.$imagearch-$imageversion.ovf $BUILD_ROOT/$TOPDIR/KIWI/
-            	        mv $imagename.$imagearch-$imageversion-disk*.vmdk $BUILD_ROOT/$TOPDIR/KIWI/
-            	    fi
-            	    popd > /dev/null
+                        tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-vmx.tar.bz2 \
+                          $imagename.$imagearch-$imageversion.vmx \
+                          $imagename.$imagearch-$imageversion.vmdk
+                        
+                        # don't compress ovf output
+            	    	if [ -e $imagename.$imagearch-$imageversion.ovf ] ; then
+            	          mv $imagename.$imagearch-$imageversion.ovf $BUILD_ROOT/$TOPDIR/KIWI/
+            	          mv $imagename.$imagearch-$imageversion-disk*.vmdk $BUILD_ROOT/$TOPDIR/KIWI/
+            	     	fi
+            	    	popd > /dev/null
                         ;;
                     xen)
                         pushd $BUILD_ROOT/$TOPDIR/KIWI-xen > /dev/null
                         echo "compressing images... "
                         tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-xen.tar.bz2 \
                           `grep ^kernel $imagename.$imagearch-$imageversion.xenconfig | cut -d'"'  -f2` \
-            	      `grep ^ramdisk $imagename.$imagearch-$imageversion.xenconfig | cut -d'"'  -f2` \
+                          `grep ^ramdisk $imagename.$imagearch-$imageversion.xenconfig | cut -d'"'  -f2` \
                           $imagename.$imagearch-$imageversion.xenconfig \
                           $imagename.$imagearch-$imageversion
-            	    popd > /dev/null
+            	    	popd > /dev/null
+                        ;;
+                    pxe)
+                        pushd $BUILD_ROOT/$TOPDIR/KIWI-pxe > /dev/null
+                        echo "compressing images... "
+                        tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-pxe.tar.bz2 \
+                          $imagename.$imagearch-$imageversion.config \
+                          $imagename.$imagearch-$imageversion.gz \
+                          initrd-*
+            	    	popd > /dev/null
+                        ;;
+                    *)
+                        pushd $BUILD_ROOT/$TOPDIR/KIWI-$imgtype > /dev/null
+                        echo "compressing unkown images... "
+                        tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-$imgtype.tar.bz2 \
+                          *
+            	    	popd > /dev/null
                         ;;
                 esac
             done
