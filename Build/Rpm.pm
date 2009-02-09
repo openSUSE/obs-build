@@ -117,6 +117,7 @@ sub parse {
   my $packname;
   my $packvers;
   my $packrel;
+  my $packdisttag;
   my $exclarch;
   my $badarch;
   my @subpacks;
@@ -318,6 +319,10 @@ sub parse {
       $packrel = $1;
       $macros{'release'} = $packrel;
     }
+    if ($main_preamble && ($line =~ /^Disttag\s*:\s*(\S+)/i)) {
+      $packdisttag = $1;
+      $macros{'disttag'} = $packdisttag;
+    }
     if ($main_preamble && ($line =~ /^ExclusiveArch\s*:\s*(.*)/i)) {
       $exclarch ||= [];
       push @$exclarch, split(' ', $1);
@@ -428,6 +433,7 @@ sub parse {
   $ret->{'name'} = $packname;
   $ret->{'version'} = $packvers;
   $ret->{'release'} = $packrel if defined $packrel;
+  $ret->{'disttag'} = $packdisttag if defined $packdisttag;
   $ret->{'subpacks'} = \@subpacks;
   $ret->{'exclarch'} = $exclarch if defined $exclarch;
   $ret->{'badarch'} = $badarch if defined $badarch;
@@ -740,6 +746,7 @@ sub query {
     $data->{'release'} = $res{'RELEASE'}->[0];
     $data->{'arch'} = $arch;
     $data->{'epoch'} = $res{'EPOCH'}->[0] if exists $res{'EPOCH'};
+    $data->{'disttag'} = $res{'DISTTAG'}->[0] if exists $res{'DISTTAG'};
   }
   if ($opts{'filelist'}) {
     $data->{'filelist'} = $res{'FILENAMES'};
