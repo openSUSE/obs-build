@@ -31,7 +31,7 @@ uml_initrd=/boot/initrd-um
 kvm_kernel=/boot/vmlinuz
 kvm_initrd=/boot/initrd
 kvm_bin=/usr/bin/qemu-kvm
-mkinitrd_virtio_cmd=(env rootfstype=ext2 mkinitrd -d /dev/null -m "virtio_pci virtio_blk" -k $kvm_kernel -i $kvm_initrd-virtio)
+mkinitrd_virtio_cmd=(env rootfstype=ext3 mkinitrd -d /dev/null -m "virtio_pci virtio_blk" -k $kvm_kernel -i $kvm_initrd-virtio)
 # whether we have virtio support
 kvm_virtio=
 
@@ -1040,7 +1040,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	elif [ "$VM_TYPE" = 'qemu' -o "$VM_TYPE" = 'kvm' ]; then
 		echo "booting $VM_TYPE ..."
 		if [ "$kvm_virtio" = 1 ]; then
-		    qemu_disks=(-drive file="$VM_IMAGE",if=virtio -hda /dev/null)
+		    qemu_disks=(-drive file="$VM_IMAGE",if=virtio -hda /boot/vmlinuz)
 		    if [ -n "$VM_SWAP" ]; then
 			qemu_disks[${#qemu_disks[@]}]="-drive"
 			qemu_disks[${#qemu_disks[@]}]="file=$VM_SWAP,if=virtio"
@@ -1055,7 +1055,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		set -- $qemu_bin -no-reboot -nographic -net none -serial stdio \
 		    -kernel $qemu_kernel \
 		    -initrd $qemu_initrd \
-		    -append "root=$qemu_rootdev panic=1 quiet rw console=ttyS0,115200 init=/.build/build" \
+		    -append "root=$qemu_rootdev panic=1 quiet noapic rw console=ttyS0 init=/.build/build" \
 		    ${MEMSIZE:+-m $MEMSIZE} \
 		    "${qemu_disks[@]}"
 
