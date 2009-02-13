@@ -1040,7 +1040,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	elif [ "$VM_TYPE" = 'qemu' -o "$VM_TYPE" = 'kvm' ]; then
 		echo "booting $VM_TYPE ..."
 		if [ "$kvm_virtio" = 1 ]; then
-		    qemu_disks=(-drive file="$VM_IMAGE",if=virtio -hda /boot/vmlinuz)
+		    qemu_disks=(-drive file="$VM_IMAGE",if=virtio -hda "$VM_IMAGE")
 		    if [ -n "$VM_SWAP" ]; then
 			qemu_disks[${#qemu_disks[@]}]="-drive"
 			qemu_disks[${#qemu_disks[@]}]="file=$VM_SWAP,if=virtio"
