@@ -52,7 +52,6 @@ MEMSIZE=
 RUNNING_IN_VM=
 RPMLIST=
 RELEASE=
-DISTTAG=
 REASON=
 NOROOTFORBUILD=
 LOGFILE=
@@ -667,10 +666,6 @@ while test -n "$1"; do
         DISTURL=$ARG
 	shift
       ;;
-      *-disttag)
-        DISTTAG="$ARG"
-        shift
-      ;;
       ----noarg)
         echo "$ARG does not take an argument"
         cleanup_and_exit
@@ -990,7 +985,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "CHANGELOG='${CHANGELOG//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "INCARNATION='${INCARNATION//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "DISTURL='${DISTURL//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	echo "DISTTAG='${DISTTAG//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	# FIXME: this depends on the kernel and vm.
 	# could be hda2, sda2 for xen or hdb/sdb for qemu
 	test -n "$VM_SWAP" && echo "VM_SWAP='${VM_SWAPDEV:-/dev/hda2}'" >> $BUILD_ROOT/.build/build.data
@@ -1302,10 +1296,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if [ -n "$DISTURL" ]; then
 		rpmbopts[${#rpmbopts[@]}]='--define'
 		rpmbopts[${#rpmbopts[@]}]="disturl $DISTURL"
-	fi
-	if [ -n "$DISTTAG" ]; then
-		rpmbopts[${#rpmbopts[@]}]='--define'
-		rpmbopts[${#rpmbopts[@]}]="disttag $DISTTAG"
 	fi
 	if test -s "$BUILD_ROOT/usr/lib/rpm/mandriva/macros" ; then
 		rpmbopts[${#rpmbopts[@]}]='--eval'
