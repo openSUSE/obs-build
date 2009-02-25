@@ -1336,6 +1336,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	# run createrepo on the repositories
 	if test -d $BUILD_ROOT/$TOPDIR/SOURCES/repos ; then
 	    (
+	    ln -sf $TOPDIR/SOURCES/repos $BUILD_ROOT/repos
 	    cd $BUILD_ROOT/$TOPDIR/SOURCES/repos
 	    for r in */* ; do
 		test -L $r && continue
@@ -1401,7 +1402,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		if chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT-$imgtype" - $BUILD_USER < /dev/null ; then
 		    echo "running kiwi --create for $imgtype..."
 		    mkdir -p $BUILD_ROOT/$TOPDIR/KIWI-$imgtype
-		    chroot $BUILD_ROOT su -c "kiwi --create $TOPDIR/KIWIROOT-$imgtype --logfile terminal --type $imgtype -d $TOPDIR/KIWI-$imgtype" - $BUILD_USER < /dev/null || cleanup_and_exit 1
+		    chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --create $TOPDIR/KIWIROOT-$imgtype --logfile terminal --type $imgtype -d $TOPDIR/KIWI-$imgtype" - $BUILD_USER < /dev/null || cleanup_and_exit 1
 		else
                     cleanup_and_exit 1
 		fi
