@@ -114,7 +114,7 @@ sub kiwiparse {
   # override with product version, if existing
   my $productoptions = (($kiwi->{'instsource'}[0]->{'productoptions'} || [])->[0]) || {};
   for my $po (@{$productoptions->{'productvar'} || []}) {
-    next unless @{$po->{'name'}} == "VERSION";
+    next unless $po->{'name'} eq "VERSION";
     $ret->{'version'} = $po->{'_content'};
   }
   for my $type (@{$preferences->{'type'} || []}) {
