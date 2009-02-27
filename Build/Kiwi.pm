@@ -106,9 +106,16 @@ sub kiwiparse {
   if ($description->{'specification'}) {
     $ret->{'name'} = $description->{'specification'}->[0]->{'_content'};
   }
+  # take default version setting
   my $preferences = (($kiwi->{'preferences'} || [])->[0]) || {};
   if ($preferences->{'version'}) {
     $ret->{'version'} = $preferences->{'version'}->[0]->{'_content'};
+  }
+  # override with product version, if existing
+  my $productoptions = (($kiwi->{'productoptions'} || [])->[0]) || {};
+  for my $po (@{$productoptions->{'productvar'} || []}) {
+    next unless @{$po->{'name'}} == "VERSION";
+    $ret->{'version'} = $po->{'_content'};
   }
   for my $type (@{$preferences->{'type'} || []}) {
     next unless @{$preferences->{'type'}} == 1 || !$type->{'optional'};
