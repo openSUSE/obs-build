@@ -112,7 +112,7 @@ sub kiwiparse {
     $ret->{'version'} = $preferences->{'version'}->[0]->{'_content'};
   }
   # override with product version, if existing
-  my $productoptions = (($kiwi->{'productoptions'} || [])->[0]) || {};
+  my $productoptions = (($kiwi->{'instsource'}[0]->{'productoptions'} || [])->[0]) || {};
   for my $po (@{$productoptions->{'productvar'} || []}) {
     next unless @{$po->{'name'}} == "VERSION";
     $ret->{'version'} = $po->{'_content'};
