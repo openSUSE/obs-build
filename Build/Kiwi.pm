@@ -111,12 +111,6 @@ sub kiwiparse {
   if ($preferences->{'version'}) {
     $ret->{'version'} = $preferences->{'version'}->[0]->{'_content'};
   }
-  # override with product version, if existing
-  my $productoptions = (($kiwi->{'instsource'}[0]->{'productoptions'} || [])->[0]) || {};
-  for my $po (@{$productoptions->{'productvar'} || []}) {
-    next unless $po->{'name'} eq "VERSION";
-    $ret->{'version'} = $po->{'_content'};
-  }
   for my $type (@{$preferences->{'type'} || []}) {
     next unless @{$preferences->{'type'}} == 1 || !$type->{'optional'};
     push @types, $type->{'_content'};
@@ -153,7 +147,13 @@ sub kiwiparse {
     if ($instsource->{'metadata'}) {
       for my $repopackage (@{$instsource->{'metadata'}->[0]->{'repopackage'} || []}) {
 	push @packages, $repopackage->{'name'};
-     }
+      }
+    }
+    if ($instsource->{'productoptions'}) {
+      my $productoptions = $instsource->{'productoptions'}->[0] || {};
+      for my $po (@{$productoptions->{'productvar'} || []}) {
+        $ret->{'version'} = $po->{'_content'} if $po->{'name'} eq 'VERSION';
+      }
     }
   }
 
