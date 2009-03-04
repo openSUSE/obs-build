@@ -1456,9 +1456,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                         pushd $BUILD_ROOT/$TOPDIR/KIWI-iso > /dev/null
                         echo "creating md5 sum for iso images... "
                         ln * $BUILD_ROOT/$TOPDIR/KIWI/
-                        for i in $BUILD_ROOT/$TOPDIR/KIWI/*.iso; do
+                        pushd $BUILD_ROOT/$TOPDIR/KIWI/ > /dev/null
+                        for i in *.iso; do
                            md5sum "$i" > "$i".MD5
                         done
+            	    	popd > /dev/null
             	    	popd > /dev/null
                         ;;
                     *)
