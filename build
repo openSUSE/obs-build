@@ -1356,6 +1356,14 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    done
 	    )
 	fi
+        # unpack root tar
+	for t in $BUILD_ROOT/$TOPDIR/SOURCES/root.tar* ; do
+	    test -f $t || continue
+	    mkdir -p $BUILD_ROOT/$TOPDIR/SOURCES/root
+	    chroot $BUILD_ROOT tar -C $TOPDIR/SOURCES/root -xf "$TOPDIR/SOURCES/${t##*/}"
+	done
+        # fix script permissions
+        chmod a+x $BUILD_ROOT/$TOPDIR/SOURCES/*.sh
 	# unpack tar files in image directories
 	if test -d $BUILD_ROOT/$TOPDIR/SOURCES/images ; then
 	    (
@@ -1366,8 +1374,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		for t in $r/root.tar* ; do
 		    test -f $t || continue
 		    mkdir -p $r/root
-		    chroot $BUILD_ROOT tar -C $TOPDIR/SOURCES/images/$r/root -xf "$TOPDIR/SOURCES/images/$r/$t{##*/}"
+		    chroot $BUILD_ROOT tar -C $TOPDIR/SOURCES/images/$r/root -xf "$TOPDIR/SOURCES/images/$r/${t##*/}"
 		done
+                # fix script permissions
+                chmod a+x $BUILD_ROOT/$TOPDIR/SOURCES/images/$r/*.sh
 		# create compatibility link
 		rc="${r//:/:/}"
 		if test "$rc" != "$r" ; then
