@@ -1426,7 +1426,12 @@ for SPECFILE in "${SPECFILES[@]}" ; do
             	    	pushd $BUILD_ROOT/$TOPDIR/KIWI-oem > /dev/null
                         echo "compressing images... "
                         tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-raw.tar.gz \
-                          $imagename.$imagearch-$imageversion.raw
+                          --exclude=$imagename.$imagearch-$imageversion.iso *
+                        if [ -e $imagename.$imagearch-$imageversion.iso ]; then
+                          echo "Copy iso file and create md5..."
+                          ln $imagename.$imagearch-$imageversion.iso $BUILD_ROOT/$TOPDIR/KIWI/
+                          md5sum $imagename.$imagearch-$imageversion.iso > "$i".MD5
+                        fi
                         popd > /dev/null
                         ;;
                     vmx)
