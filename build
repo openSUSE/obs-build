@@ -1430,7 +1430,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                         if [ -e $imagename.$imagearch-$imageversion.iso ]; then
                           echo "Copy iso file and create md5..."
                           ln $imagename.$imagearch-$imageversion.iso $BUILD_ROOT/$TOPDIR/KIWI/
-                          md5sum $imagename.$imagearch-$imageversion.iso > "$i".MD5
+                          md5sum $imagename.$imagearch-$imageversion.iso > "$BUILD_ROOT/$TOPDIR/KIWI/$i".MD5
                         fi
                         popd > /dev/null
                         ;;
