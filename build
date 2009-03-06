@@ -1420,38 +1420,49 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
 	    # create tar.gz of images, in case it makes sense
             imagearch=`uname -m`
+            buildnum=""
+  	    if test -n "$RELEASE"; then
+		buildnum="-Build$RELEASE"
+	    fi
             for imgtype in $imagetype ; do
                 case "$imgtype" in
                     oem)
             	    	pushd $BUILD_ROOT/$TOPDIR/KIWI-oem > /dev/null
                         echo "compressing images... "
-                        tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-raw.tar.gz \
+                        tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-raw.tar.gz \
                           --exclude=$imagename.$imagearch-$imageversion.iso *
                         if [ -e $imagename.$imagearch-$imageversion.iso ]; then
                           echo "Copy iso file and create md5..."
-                          ln $imagename.$imagearch-$imageversion.iso $BUILD_ROOT/$TOPDIR/KIWI/
-                          md5sum $imagename.$imagearch-$imageversion.iso > "$BUILD_ROOT/$TOPDIR/KIWI/$i".MD5
+                          mv $imagename.$imagearch-$imageversion.iso \
+                             $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum.iso
+            	    	  pushd $BUILD_ROOT/$TOPDIR/KIWI-oem > /dev/null
+                          md5sum $imagename.$imagearch-$imageversion$buildnum.iso \
+                                 > "$imagename.$imagearch-$imageversion$buildnum.iso.md5"
+                          popd > /dev/null
                         fi
                         popd > /dev/null
                         ;;
                     vmx)
                         pushd $BUILD_ROOT/$TOPDIR/KIWI-vmx > /dev/null
                         echo "compressing images... "
-                        tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-vmx.tar.gz \
+                        tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-vmx.tar.gz \
                           $imagename.$imagearch-$imageversion.vmx \
                           $imagename.$imagearch-$imageversion.vmdk
                         
                         # don't compress ovf output
             	    	if [ -e $imagename.$imagearch-$imageversion.ovf ] ; then
-            	          mv $imagename.$imagearch-$imageversion.ovf $BUILD_ROOT/$TOPDIR/KIWI/
-            	          mv $imagename.$imagearch-$imageversion-disk*.vmdk $BUILD_ROOT/$TOPDIR/KIWI/
+            	          mybase=$imagename.$imagearch-$imageversion
+            	          mv $mybase.ovf $BUILD_ROOT/$TOPDIR/KIWI/$mybase$buildnum.ovf
+            	          for i in $imagename.$imagearch-$imageversion-disk*.vmdk; do
+              	            mv $i $BUILD_ROOT/$TOPDIR/KIWI/${i%.vmdk}$buildnum.vmdk
+                          done
             	     	fi
             	    	popd > /dev/null
                         ;;
                     xen)
                         pushd $BUILD_ROOT/$TOPDIR/KIWI-xen > /dev/null
                         echo "compressing images... "
-                        tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-xen.tar.gz \
+                        tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-xen.tar.gz \
                           `grep ^kernel $imagename.$imagearch-$imageversion.xenconfig | cut -d'"'  -f2` \
                           `grep ^ramdisk $imagename.$imagearch-$imageversion.xenconfig | cut -d'"'  -f2` \
                           $imagename.$imagearch-$imageversion.xenconfig \
@@ -1461,7 +1472,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                     pxe)
                         pushd $BUILD_ROOT/$TOPDIR/KIWI-pxe > /dev/null
                         echo "compressing images... "
-                        tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-pxe.tar.gz \
+                        tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-pxe.tar.gz \
                           $imagename.$imagearch-$imageversion.config \
                           $imagename.$imagearch-$imageversion.gz \
                           initrd-*
@@ -1470,18 +1481,18 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                     iso)
                         pushd $BUILD_ROOT/$TOPDIR/KIWI-iso > /dev/null
                         echo "creating md5 sum for iso images... "
-                        ln * $BUILD_ROOT/$TOPDIR/KIWI/
-                        pushd $BUILD_ROOT/$TOPDIR/KIWI/ > /dev/null
-                        for i in *.iso; do
-                           md5sum "$i" > "$i".MD5
+            	        for i in *.iso; do
+                          pushd $BUILD_ROOT/$TOPDIR/KIWI/ > /dev/null
+              	          mv $BUILD_ROOT/$TOPDIR/KIWI-iso/$i ${i%.iso}$buildnum.iso
+              	          md5sum ${i%.iso}$buildnum.iso > ${i%.iso}$buildnum.iso.md5
+            	    	  popd > /dev/null
                         done
-            	    	popd > /dev/null
             	    	popd > /dev/null
                         ;;
                     *)
                         pushd $BUILD_ROOT/$TOPDIR/KIWI-$imgtype > /dev/null
                         echo "compressing unkown images... "
-                        tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion-$imgtype.tar.gz \
+                        tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-$imgtype.tar.gz \
                           *
             	    	popd > /dev/null
                         ;;
