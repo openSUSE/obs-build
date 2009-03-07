@@ -1435,7 +1435,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                           echo "Copy iso file and create md5..."
                           mv $imagename.$imagearch-$imageversion.iso \
                              $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum.iso
-            	    	  pushd $BUILD_ROOT/$TOPDIR/KIWI-oem > /dev/null
+            	    	  pushd $BUILD_ROOT/$TOPDIR/KIWI > /dev/null
                           md5sum $imagename.$imagearch-$imageversion$buildnum.iso \
                                  > "$imagename.$imagearch-$imageversion$buildnum.iso.md5"
                           popd > /dev/null
