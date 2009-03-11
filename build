@@ -1449,13 +1449,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                           $imagename.$imagearch-$imageversion.vmx \
                           $imagename.$imagearch-$imageversion.vmdk
                         
-                        # don't compress ovf output
             	    	if [ -e $imagename.$imagearch-$imageversion.ovf ] ; then
-            	          mybase=$imagename.$imagearch-$imageversion
-            	          mv $mybase.ovf $BUILD_ROOT/$TOPDIR/KIWI/$mybase$buildnum.ovf
-            	          for i in $imagename.$imagearch-$imageversion-disk*.vmdk; do
-              	            mv $i $BUILD_ROOT/$TOPDIR/KIWI/${i%.vmdk}$buildnum.vmdk
-                          done
+                          tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-ovf.tar.gz \
+                            $imagename.$imagearch-$imageversion.ovf \
+                            $imagename.$imagearch-$imageversion-disk*.vmdk
             	     	fi
             	    	popd > /dev/null
                         ;;
