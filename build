@@ -1471,6 +1471,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                         echo "compressing images... "
                         tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-pxe.tar.gz \
                           $imagename.$imagearch-$imageversion.config \
+                          $imagename.$imagearch-$imageversion.md5 \
                           $imagename.$imagearch-$imageversion.gz \
                           initrd-*
             	    	popd > /dev/null
