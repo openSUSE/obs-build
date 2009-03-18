@@ -1133,6 +1133,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
         if ! egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
             echo 'abuild::399:399:Autobuild:/home/abuild:/bin/bash' >>$BUILD_ROOT/etc/passwd
             echo 'abuild:*:::::::' >>$BUILD_ROOT/etc/shadow # This is needed on Mandriva 2009
+            echo 'abuild:*:::::::' >>$BUILD_ROOT/etc/gshadow # This is needed on Ubuntu 8.10
             echo 'abuild::399:' >>$BUILD_ROOT/etc/group
             mkdir -p $BUILD_ROOT/home/abuild
             chown 399:399 $BUILD_ROOT/home/abuild
@@ -1140,16 +1141,25 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if test -f $BUILD_ROOT/etc/shadow ; then
 	    sed -e "s@^root::@root:*:@" < $BUILD_ROOT/etc/shadow > $BUILD_ROOT/etc/shadow.t && mv $BUILD_ROOT/etc/shadow.t $BUILD_ROOT/etc/shadow
 	fi
+	if test -f $BUILD_ROOT/etc/gshadow ; then
+	    sed -e "s@^root::@root:*:@" < $BUILD_ROOT/etc/gshadow > $BUILD_ROOT/etc/gshadow.t && mv $BUILD_ROOT/etc/gshadow.t $BUILD_ROOT/etc/gshadow
+	fi
 	BUILD_USER_ABUILD_USED=true
     else
         if egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
+            rm -rf $BUILD_ROOT/home/abuild
             egrep -v '^abuild:' <$BUILD_ROOT/etc/passwd >$BUILD_ROOT/etc/passwd.new
             mv $BUILD_ROOT/etc/passwd.new $BUILD_ROOT/etc/passwd
-            egrep -v '^abuild:' <$BUILD_ROOT/etc/shadow >$BUILD_ROOT/etc/shadow.new
-            mv $BUILD_ROOT/etc/shadow.new $BUILD_ROOT/etc/shadow
             egrep -v '^abuild:' <$BUILD_ROOT/etc/group >$BUILD_ROOT/etc/group.new
             mv $BUILD_ROOT/etc/group.new $BUILD_ROOT/etc/group
-            rm -rf $BUILD_ROOT/home/abuild
+            if test -f $BUILD_ROOT/etc/shadow ; then
+              egrep -v '^abuild:' <$BUILD_ROOT/etc/shadow >$BUILD_ROOT/etc/shadow.new
+              mv $BUILD_ROOT/etc/shadow.new $BUILD_ROOT/etc/shadow
+            fi
+            if test -f $BUILD_ROOT/etc/gshadow ; then
+              egrep -v '^abuild:' <$BUILD_ROOT/etc/gshadow >$BUILD_ROOT/etc/gshadow.new
+              mv $BUILD_ROOT/etc/gshadow.new $BUILD_ROOT/etc/gshadow
+            fi
         fi
     fi
 
