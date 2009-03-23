@@ -331,7 +331,7 @@ sub parse {
       $badarch ||= [];
       push @$badarch, split(' ', $1);
     }
-    if ($line =~ /^(?:Require\(pre\)|Require\(post\)|PreReq)\s*:\s*(\S.*)$/i) {
+    if ($line =~ /^(?:Requires\(pre\)|Requires\(post\)|PreReq)\s*:\s*(\S.*)$/i) {
       my $deps = $1;
       my @deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
       while (@deps) {
