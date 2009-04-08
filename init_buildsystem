@@ -279,7 +279,7 @@ function register_qemu_user {
 if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xarmv7el -o x"$BUILD_ARCH" == xsh4 -o x"$BUILD_ARCH" == xppc ]; then
     if [ x"`uname -i`" == xx86_64 -o  x"`uname -i`" == xi386 ]; then
 	if [ -e /usr/sbin/qemu-binfmt-conf.sh ]; then 
-            (mkdir -p  $BUILD_ROOT/usr/bin && set -x && cp /usr/bin/qemu-* $BUILD_ROOT/usr/bin)
+            (mkdir -p  $BUILD_ROOT/usr/bin $BUILD_ROOT/usr/sbin && set -x && cp /usr/bin/qemu-* $BUILD_ROOT/usr/bin && cp /usr/sbin/qemu-binfmt-conf.sh $BUILD_ROOT/usr/sbin)
         fi
         # To initially run the init script, there needs to be also a static bash to register qemu in this chroot and though to start up /.build/build
 	if [ -e /bin/bash-static ]; then 
