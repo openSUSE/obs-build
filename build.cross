@@ -1,0 +1,4 @@
+#!/bin/bash-static
+bash-static /usr/sbin/qemu-binfmt-conf.sh
+exec /.build/build
+
