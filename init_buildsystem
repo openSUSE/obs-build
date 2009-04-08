@@ -271,6 +271,47 @@ function validate_cache_file {
     fi
 }
 
+function register_qemu_user {
+#
+# Detect cross-build (fixed code) and copy qemus for cross-build emulation mode
+# And for XEN, copy also a static shell to run the init scripts in the target chroot
+#
+if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xarmv7el -o x"$BUILD_ARCH" == xsh4 -o x"$BUILD_ARCH" == xppc ]; then
+    if [ x"`uname -i`" == xx86_64 -o  x"`uname -i`" == xi386 ]; then
+        if [ -e /proc/sys/fs/binfmt_misc/arm -o -e /proc/sys/fs/binfmt_misc/armeb -o -e /proc/sys/fs/binfmt_misc/sh4 ]; then
+            echo -n "qemu-* already registered "
+        else
+            echo -n "qemu will be registered " && test -e /usr/sbin/qemu-binfmt-conf.sh && sh /usr/sbin/qemu-binfmt-conf.sh
+        fi
+	if [ -e /usr/sbin/qemu-binfmt-conf.sh ]; then 
+            (mkdir -p  $BUILD_ROOT/usr/bin && set -x && cp /usr/bin/qemu-* $BUILD_ROOT/usr/bin)
+        fi
+        # To initially run the init script, there needs to be also a static bash to register qemu in this chroot and though to start up /.build/build
+	if [ -e /bin/bash-static ]; then 
+            (mkdir -p  $BUILD_ROOT/bin && set -x && cp /bin/bash-static $BUILD_ROOT/bin)
+        fi
+    fi
+fi
+}
+
+# Hack to circumvent qemu mmap addr bug
+# Setup scripts can reset this, so set to 0 again before calling debin transformer
+# This is to my understanding a BUG in Ubuntu rc scripts, which change this kernel vars
+# This can cause a race condition on a multiprocessor system, when its called in more than one process at once
+# It can also cause a problem when this is changed while there was already memory allocated at the addresses that are now inaccessable
+# Ubuntu 8.04, 8.10, 9.04 at least seem to do that
+function reset_mmap_min_addr {
+    if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xarmv7el -o x"$BUILD_ARCH" == xsh4 -o x"$BUILD_ARCH" == xppc ]; then
+	if [ x"`uname -i`" == xx86_64 -o  x"`uname -i`" == xi386 ]; then
+            if [ -e /proc/sys/fs/binfmt_misc/arm -o -e /proc/sys/fs/binfmt_misc/armeb -o -e /proc/sys/fs/binfmt_misc/sh4 ]; then
+		# echo "reset mmap_min_addr to 0"
+		test -e /proc/sys/vm/mmap_min_addr && echo 0 > /proc/sys/vm/mmap_min_addr
+		test -e /proc/sys/kernel/randomize_va_space && echo 0 > /proc/sys/kernel/randomize_va_space
+	    fi
+	fi
+    fi
+}
+
 fail_exit()
 {
   cleanup_and_exit 1
@@ -309,6 +350,13 @@ if test -e $BUILD_IS_RUNNING ; then
 fi
 
 #
+# register the QEMU emulator
+# reset mmap_min_addr for QEMU
+#
+register_qemu_user
+reset_mmap_min_addr
+
+#
 # store that we start to build system
 #
 mkdir -p $BUILD_ROOT
@@ -327,23 +375,6 @@ if test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
 	touch $BUILD_ROOT/.init_b_cache/preinstall_finished
     fi
 else
-    #
-    # Hack to detect cross-build (fixed code) and copy qemus for cross-build emulation mode
-    #
-    if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xarmv7el -o x"$BUILD_ARCH" == xsh4 ]; then
-       if [ x"`uname -i`" == xx86_64 -o  x"`uname -i`" == xi386 ]; then
-          if [ -e /proc/sys/fs/binfmt_misc/arm -o -e /proc/sys/fs/binfmt_misc/armeb -o -e /proc/sys/fs/binfmt_misc/sh4 ]; then
-             echo -n "qemu-* already registered "
-          else
-             echo -n "qemu will be registered " && test -e /usr/sbin/qemu-binfmt-conf.sh && sh /usr/sbin/qemu-binfmt-conf.sh
-          fi
-	  if [ -e /usr/sbin/qemu-binfmt-conf.sh ]; then 
-             (mkdir -p  $BUILD_ROOT/usr/bin && set -x && cp /usr/bin/qemu-* $BUILD_ROOT/usr/bin)
-	     # Hack to circumvent qemu mmap addr bug
-             test -e /proc/sys/vm/mmap_min_addr && echo 0 > /proc/sys/vm/mmap_min_addr
-          fi
-       fi
-    fi
     #
     # now make sure that all the packages are installed.
     #
@@ -567,12 +598,19 @@ test -x $BUILD_ROOT/usr/bin/rpmsign && RPMCHECKOPTS="--nodigest --nosignature"
 test -x /usr/bin/rpmsign && RPMCHECKOPTS_HOST="--nodigest --nosignature"
 
 for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
+
+    #
+    # reset mmap_min_addr for QEMU
+    #
+    reset_mmap_min_addr
+
     case $PKG in
       RUN_LDCONFIG)
         test -x $BUILD_ROOT/sbin/ldconfig && chroot $BUILD_ROOT /sbin/ldconfig 2>&1
         continue
       ;;
     esac
+
     test -f $BUILD_ROOT/installed-pkg/$PKG && continue
 
     if test $PSUF = deb ; then
@@ -651,6 +689,7 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
     rm -f $BUILD_ROOT/.init_b_cache/$PKG.rpm
     test -e $BUILD_ROOT/exit && cleanup_and_exit 1
     echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
+
 done
 
 # devices can vanish if devs got uninstalled
@@ -793,6 +832,11 @@ if test -x $BUILD_ROOT/bin/rpm -a ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a !
     # create provides index
     chroot $BUILD_ROOT rpm -q --whatprovides rpm >/dev/null 2>&1
 fi
+
+#
+# reset mmap_min_addr for QEMU
+#
+reset_mmap_min_addr
 
 rm -rf $BUILD_ROOT/.init_b_cache
 
