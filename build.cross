@@ -1,4 +1,12 @@
 #!/bin/bash-static
-bash-static /usr/sbin/qemu-binfmt-conf.sh
+
+# from /usr/sbin/qemu-binfmt-conf.sh
+if [ ! -f /proc/sys/fs/binfmt_misc/register ]; then
+  mount-static binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
+fi
+# register arm
+echo   ':arm:M::\x7fELF\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x28\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/bin/qemu-arm:' > /proc/sys/fs/binfmt_misc/register
+echo   ':armeb:M::\x7fELF\x01\x02\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x28:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff:/usr/bin/qemu-armeb:' > /proc/sys/fs/binfmt_misc/register
+
 exec /.build/build
 
