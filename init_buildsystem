@@ -290,12 +290,7 @@ if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" =
         else
 	    if [ -e /usr/sbin/qemu-binfmt-conf.sh ]; then
 		echo "qemu-* will be registered"
-		if [ -e /bin/bash-static ]; then
-                    # should not be needed in XEN, because already done via build.cross
-		    (set -x && bash-static /usr/sbin/qemu-binfmt-conf.sh)
-		else
-		    (set -x && sh /usr/sbin/qemu-binfmt-conf.sh)
-		fi
+		(set -x && /usr/sbin/qemu-binfmt-conf.sh)
 	    fi
         fi
     fi
