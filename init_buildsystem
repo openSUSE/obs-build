@@ -274,21 +274,28 @@ function validate_cache_file {
 function register_qemu_user {
 #
 # Detect cross-build (fixed code) and copy qemus for cross-build emulation mode
-# And for XEN, copy also a static shell to run the init scripts in the target chroot
+# And copy also a static host binary shell to run the init scripts in the target chroot
 #
 if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xarmv7el -o x"$BUILD_ARCH" == xsh4 -o x"$BUILD_ARCH" == xppc ]; then
     if [ x"`uname -i`" == xx86_64 -o  x"`uname -i`" == xi386 ]; then
-        if [ -e /proc/sys/fs/binfmt_misc/arm -o -e /proc/sys/fs/binfmt_misc/armeb -o -e /proc/sys/fs/binfmt_misc/sh4 ]; then
-            echo -n "qemu-* already registered "
-        else
-            echo -n "qemu will be registered " && test -e /usr/sbin/qemu-binfmt-conf.sh && sh /usr/sbin/qemu-binfmt-conf.sh
-        fi
 	if [ -e /usr/sbin/qemu-binfmt-conf.sh ]; then 
             (mkdir -p  $BUILD_ROOT/usr/bin && set -x && cp /usr/bin/qemu-* $BUILD_ROOT/usr/bin)
         fi
         # To initially run the init script, there needs to be also a static bash to register qemu in this chroot and though to start up /.build/build
 	if [ -e /bin/bash-static ]; then 
             (mkdir -p  $BUILD_ROOT/bin && set -x && cp /bin/bash-static $BUILD_ROOT/bin)
+        fi
+        if [ -e /proc/sys/fs/binfmt_misc/arm -o -e /proc/sys/fs/binfmt_misc/armeb -o -e /proc/sys/fs/binfmt_misc/sh4 ]; then
+            echo "qemu-* already registered"
+        else
+	    if [ -e /usr/sbin/qemu-binfmt-conf.sh ]; then
+		echo "qemu-* will be registered"
+		if [ -e /bin/bash-static ]; then
+		    (set -x && bash-static /usr/sbin/qemu-binfmt-conf.sh)
+		else
+		    (set -x && sh /usr/sbin/qemu-binfmt-conf.sh)
+		fi
+	    fi
         fi
     fi
 fi

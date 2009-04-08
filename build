@@ -1018,8 +1018,21 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		fi
 		XENID="${VM_IMAGE%/root}"
 		XENID="${XENID##*/}"
+		CROSS_INIT_SCRIPT="/.build/build"
+		# to run the qemu initialization in the XEN chroot, we need to register it with a statically build shell
+		if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xarmv7el -o x"$BUILD_ARCH" == xsh4 -o x"$BUILD_ARCH" == xppc ]; then
+		    if [ x"`uname -i`" == xx86_64 -o  x"`uname -i`" == xi386 ]; then
+			if [ -e /bin/bash-static ]; then
+			    echo "#!/bin/bash-static" > $BUILD_ROOT/.build/build.cross
+			    echo "bash-static /usr/sbin/qemu-binfmt-conf.sh" >> $BUILD_ROOT/.build/build.cross
+			    echo "exec /.build/build" >> $BUILD_ROOT/.build/build.cross
+			    CROSS_INIT_SCRIPT="/.build/build.cross"
+			fi
+		    fi
+		fi
+
 		echo "booting XEN kernel ..."
-		set -- xm create -c $BUILD_DIR/xen.conf name="build:$XENID" ${MEMSIZE:+memory=$MEMSIZE} $XMROOT $XMSWAP extra="quiet init=/.build/build panic=1 console=ttyS0"
+		set -- xm create -c $BUILD_DIR/xen.conf name="build:$XENID" ${MEMSIZE:+memory=$MEMSIZE} $XMROOT $XMSWAP extra="quiet init="$CROSS_INIT_SCRIPT" panic=1 console=ttyS0"
 		if test "$PERSONALITY" != 0 ; then
 		    # have to switch back to PER_LINUX to make xm work
 		    set -- linux64 "$@"
