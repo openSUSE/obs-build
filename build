@@ -377,7 +377,7 @@ detect_vm_2nd_stage()
     mount -n -o remount,rw /
     if [ -e /dev/kqemu ]; then
         # allow abuild user to run qemu
-        chmod 0755 /dev/kqemu
+        chmod 0666 /dev/kqemu
     fi
     if test -n "$VM_SWAP" ; then
 	for i in 1 2 3 4 5 6 7 8 9 10 ; do
