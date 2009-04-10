@@ -373,6 +373,7 @@ sub parse {
 	  next if $bad;
 	}
 	$vers = '' unless defined $vers;
+	$vers =~ s/=(>|<)/$1=/;
 	push @ndeps, "$pack$vers";
       }
 
