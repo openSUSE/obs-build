@@ -295,7 +295,7 @@ setupicecream()
 	  false
 	  return
 	fi
-	chroot $BUILD_ROOT bash -c "cd /var/run/icecream; $createenv"
+	chroot $BUILD_ROOT bash -c "cd /var/run/icecream; $createenv" || cleanup_and_exit 1
 	icecc_vers=(`shopt -s nullglob; echo $BUILD_ROOT/var/run/icecream/*.tar.{bz2,gz}`)
 	icecc_vers=${icecc_vers//$BUILD_ROOT/}
     else
