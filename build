@@ -653,7 +653,9 @@ while test -n "$1"; do
           cleanup_and_exit 1
         fi
         icecream="$ARG"
-        BUILD_JOBS="$ARG"
+	if [ "$icecream" -gt 0 ]; then
+		BUILD_JOBS="$ARG"
+	fi
         shift
       ;;
       --ccache)
