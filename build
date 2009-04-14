@@ -290,6 +290,8 @@ setupicecream()
 	  createenv=/usr/bin/create-env
 	elif [ -e "$BUILD_ROOT"/usr/lib/icecc/icecc-create-env ]; then
 	  createenv="/usr/lib/icecc/icecc-create-env /usr/bin/gcc /usr/bin/g++" # XXX
+	elif [ -e "$BUILD_ROOT"/usr/lib64/icecc/icecc-create-env ]; then
+	  createenv="/usr/lib64/icecc/icecc-create-env /usr/bin/gcc /usr/bin/g++" # XXX
 	else
 	  echo "create-env not found"
 	  false
