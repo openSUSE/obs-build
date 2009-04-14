@@ -62,7 +62,7 @@ PERSONALITY_SYSCALL=
 INCARNATION=
 DISTURL=
 
-export PATH=$BUILD_DIR:$PATH
+export PATH=$BUILD_DIR:/sbin:/usr/sbin:$PATH
 
 # This is for insserv
 export YAST_IS_RUNNING=instsys
