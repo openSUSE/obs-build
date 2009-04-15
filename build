@@ -1435,6 +1435,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    done
 	else
 	    BUILD_SUCCEEDED=true
+            if [ -z "$RUNNING_IN_VM" ]; then
+                # NOTE: this must be done with the outer system, because it loads the dm-mod kernel modules, which needs to fit to the kernel.
+                echo "starting device mapper for kiwi..."
+                [ -x /etc/init.d/boot.device-mapper ] && /etc/init.d/boot.device-mapper start
+            fi
 	    for imgtype in $imagetype ; do
 		echo "running kiwi --prepare for $imgtype..."
 		if chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT-$imgtype" - $BUILD_USER < /dev/null ; then
