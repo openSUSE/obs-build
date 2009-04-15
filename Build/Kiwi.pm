@@ -134,7 +134,7 @@ sub kiwiparse {
 
   my $instsource = ($kiwi->{'instsource'} || [])->[0];
   if ($instsource) {
-    for my $repository (@{$instsource->{'instrepo'} || []}) {
+    foreach my $repository(sort {$a->{priority} <=> $b->{priority}} @{$instsource->{'instrepo'} || []}) {
       my $kiwisource = ($repository->{'source'} || [])->[0];
       die("bad instsource path: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
       push @repos, "$1/$2";
@@ -157,7 +157,7 @@ sub kiwiparse {
     }
   }
 
-  for my $repository (@{$kiwi->{'repository'} || []}) {
+  foreach my $repository(sort {$a->{priority} <=> $b->{priority}} @{$kiwi->{'repository'} || []}) {
     my $kiwisource = ($repository->{'source'} || [])->[0];
     next if $kiwisource->{'path'} eq '/var/lib/empty';	# grr
     die("bad path: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
