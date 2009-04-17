@@ -1,0 +1,130 @@
+#!/bin/bash
+# use this script to edit *.changes files
+#
+# based on changelog edit script from xqf
+#
+# Copyright (C) 2002 Ludwig Nussel
+# Copyright (C) 2009 SUSE Linux Products GmbH, Nuernberg, Germany.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
+
+shopt -s nullglob
+
+if [ -z "$mailaddr" ]; then
+	domain=`dnsdomainname`
+	[ -z "$domain" ] && domain=localhost
+	mailaddr="$USER@$domain"
+fi
+
+EDITOR=${EDITOR:-vim}
+date=`LC_ALL=POSIX TZ=Europe/Berlin date`
+
+if ! which mktemp > /dev/null 2>&1; then
+	echo "mktemp is required for this script to work"
+	exit 1
+fi
+
+while [ -n "$1" ]; do
+	case "$1" in
+		-m)
+			message="$2"
+			shift 2
+			;;
+		--help)
+			echo "Usage: $0 [filename[.changes]|path [file_with_comment]]"
+			echo
+			echo "Will use '$mailaddr' for changelog entries"
+			exit 0
+			;;
+		*) break ;;
+	esac
+done
+
+changelog="$1"
+content="$2"
+pkgpath=
+if [ -n "$changelog" -a -d "$changelog" ]; then
+	pkgpath="$changelog/"
+	changelog=''
+fi
+
+if [ -n "$changelog" ]; then
+	if [ "${changelog%.changes}" = "$changelog" ]; then
+		changelog="$changelog.changes"
+	fi
+else
+	changelog=($pkgpath*.changes)
+	if [ "${#changelog[@]}" -eq 1 ]; then
+		changelog="$changelog"
+	elif [ -n "$changelog" ]; then
+		echo "Choose one of ${changelog[@]}"
+		exit 1
+	fi
+fi
+
+if [ -z "$changelog" ]; then
+	changelog=($pkgpath*.spec)
+	if [ "${#changelog[@]}" -eq 1 ]; then
+		changelog=${changelog%.spec}.changes
+	elif [ -n "$changelog" ]; then
+		echo "Choose one of ${changelog[@]}"
+		exit 1
+	fi
+fi
+
+if [ -z "$changelog" ]; then
+	echo "no .changes and no .spec file found"
+	exit 1
+fi
+
+if [ ! -e "$changelog" ]; then
+	touch $changelog
+fi
+
+tmpfile=`mktemp -q $changelog.XXXXXX`
+if [ $? -ne 0 ]; then
+	echo "$0: Can't create temp file, exiting..."
+	exit 1
+fi
+trap "rm -f \"$tmpfile\"" EXIT
+
+set +e
+
+{
+	echo "-------------------------------------------------------------------"
+	echo "$date - $mailaddr"
+	echo
+	if [ -n "$message" ]; then
+		echo "- $message"
+	elif [ -n "$content" ]; then
+		cat "$content"
+	else
+		echo "- "
+	fi
+	echo
+	cat $changelog
+} >> "$tmpfile"
+
+if [ -z "$message" ]; then
+	set -- `md5sum "$tmpfile"`
+	chksum="$1"
+	$EDITOR +4 "$tmpfile"
+	set -- `md5sum "$tmpfile"`
+	if [ -z "$content" -a "$chksum" == "$1" ]; then
+		echo "no changes made"
+		exit 0
+	fi
+fi
+mv "$tmpfile" "$changelog"
