@@ -1,0 +1,98 @@
+#!/usr/bin/perl -w
+# compute the blocks used by a file
+# usage:
+# computeblocklists [options] <files...>
+# options:
+# --padstart NUM, --padend NUM, --verbose
+#
+# output:
+# <file base name> <size> <blocksize> <block numbers...>
+#
+# a block is either a number or a range (start-end)
+#
+# TODO: instead of printing zeroes for each block in a hole use
+# something like 0*num
+
+use strict;
+
+my ($opt_padstart, $opt_padend, $opt_verbose);
+
+while (@ARGV)  {
+  if ($ARGV[0] eq '--padstart') {
+    shift @ARGV;
+    $opt_padstart = shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--padend') {
+    shift @ARGV;
+    $opt_padend = shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--verbose' || $ARGV[0] eq '-v') {
+    shift @ARGV;
+    $opt_verbose = 1;
+    next;
+  }
+  last;
+}
+
+if($opt_padstart) {
+  print "\n"x$opt_padstart;
+}
+
+for my $file (@ARGV) {
+  next unless -f $file;
+  print STDERR "$file\n" if $opt_verbose;
+  my $n = $file;
+  $n =~ s/.*\///;
+
+  if(!open(F, '<', $file)) {
+    print STDERR "$file: $!";
+    next;
+  }
+
+  my $bsize = 'xxxx';
+  ioctl(F, 2, $bsize) || die("FIGETBSZ: $!\n");
+  $bsize = unpack("L", $bsize);
+
+  my @stat = stat(F);
+  my ($st_size, $st_blocks) = ($stat[7], $stat[11], $stat[12]);
+
+  my $blocks = int(($st_size+$bsize-1)/$bsize);
+
+  print "$n $st_size $bsize ";
+
+  my ($firstblock, $lastblock);
+  for ($b = 0; $b < $blocks; ++$b) {
+    my $block = pack('I', $b);
+    if(not defined ioctl(F, 1, $block)) {
+      die "$file: $!";
+    }
+    $block = unpack('I', $block);
+    if($b == 0) {
+      print "$block";
+      $firstblock = $block;
+    } else {
+      # blocks are non-contiguous
+      if($lastblock+1 != $block) {
+	# check if we skipped some that form a range
+	if($firstblock != $lastblock) {
+	  printf "-$lastblock";
+	}
+	print " $block";
+	$firstblock = $block;
+      }
+      # last block, check if contiguous
+      if($b+1==$blocks && $lastblock+1 == $block) {
+	print "-$block";
+      }
+    }
+    $lastblock = $block;
+  }
+  close F;
+  print "\n";
+}
+
+if($opt_padend) {
+  print "\n"x$opt_padend;
+}

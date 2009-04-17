@@ -1085,7 +1085,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		mkdir -p $BUILD_ROOT/.build.packages 
 		cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
 		echo "build: extracting built packages..."
-		dd if=$VM_SWAP bs=512 skip=1 | cpio --extract --no-absolute-filenames -v
+		extractbuild --disk "$VM_IMAGE" --input "$VM_SWAP" --skip 512 -v
 		cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
 		;;
 	      *)
@@ -1593,7 +1593,18 @@ fi
 if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
     echo "... saving built packages"
     swapoff "$VM_SWAP"
-    $BUILD_DIR/extractbuild "$VM_SWAP" || cleanup_and_exit 1
+    args="--padstart 512 --padend 512 -v"
+    case "$BUILDTYPE" in
+	spec)
+	    computeblocklists $args $TOPDIR/RPMS/*/*.rpm $TOPDIR/SRPMS/*.rpm > "$VM_SWAP"
+	    ;;
+	dsc)
+	    computeblocklists $args $TOPDIR/DEBS/*.deb > "$VM_SWAP"
+	    ;;
+	kiwi)
+	    computeblocklists $args $TOPDIR/KIWI/* > "$VM_SWAP"
+	    ;;
+    esac || cleanup_and_exit 1
 fi
 
 if test -n "$RPMS" -a -d "$BUILD_ROOT/$TOPDIR/RPMS" -a -d "$BUILD_ROOT/.build.oldpackages" -a -x "$BUILD_ROOT/usr/lib/build/same-build-result.sh" ; then

@@ -2,68 +2,100 @@
 
 use strict;
 
-sub ls {
-  local *D;
-  opendir(D, $_[0]) || return ();
-  my @r = grep {$_ ne '.' && $_ ne '..'} readdir(D);
-  closedir D;
-  return @r;
+# buffer size for reading
+my $bufsize = 4*1024*1024;
+
+my ($opt_skip, $opt_disk, $opt_input, $opt_verbose);
+
+while (@ARGV)  {
+  if ($ARGV[0] eq '--skip') {
+    shift @ARGV;
+    $opt_skip = shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--disk') {
+    shift @ARGV;
+    $opt_disk = shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--input') {
+    shift @ARGV;
+    $opt_input = shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--verbose' || $ARGV[0] eq '-v') {
+    shift @ARGV;
+    $opt_verbose = 1;
+    next;
+  }
+  last;
 }
 
-my $xenswap = $ARGV[0] || die "please specify output file";
+die "need to specify disk image\n" unless $opt_disk;
 
-die("$xenswap: $!\n") unless -e $xenswap;
-open(S, '>', $xenswap) || die("$xenswap: $!\n");
-# placeholder for buildstatus information
-syswrite(S, 'x'x512);
+open(F, '<', $opt_disk) || die "$opt_disk: $!\n";
 
-my $topdir = '/.build.packages';
-if (-l $topdir) {
-  $topdir = '/'.readlink($topdir) || die("readlink: $!");
+if($opt_input) {
+  open(S, '<', $opt_input) || die "$opt_input: $!\n";
+} else {
+  open(S, '<&STDIN') || die "can't dup stdin: $!\n";
 }
-my @dirs = map {"$topdir/RPMS/$_"} ls("$topdir/RPMS");
-unshift @dirs, "$topdir/SRPMS";
-unshift @dirs, "$topdir/DEBS";
-unshift @dirs, "$topdir/KIWI";
 
-my @packs;
-for my $dir (@dirs) {
-  push @packs, map {"$dir/$_"} grep {-f "$dir/$_"} ls($dir);
+# skip build status
+if($opt_skip) {
+  seek(S, $opt_skip, 0) || die "$!\n";
 }
-#unshift @packs, '/.build.log';
 
-my $cpio = '';
-for my $pack (@packs) {
-  print "$pack\n";
-  my @s = stat($pack);
-  my $n = $pack;
-  $n =~ s/.*\///;
-  $n = 'logfile' if $n eq '.build.log';
-  die("$pack: $!\n") unless @s;
-  $cpio .= "07070100000000000081a4000000000000000000000001";
-  $cpio .= sprintf("%08x%08x", $s[9], $s[7]);
-  $cpio .= "00000000000000000000000000000000";
-  $cpio .= sprintf("%08x", length($n) + 1);
-  $cpio .= "00000000";
-  $cpio .= "$n\0";
-  $cpio .= substr("\0\0\0\0", (length($cpio) & 3)) if length($cpio) & 3;
-  open(F, '<', $pack) || die("$pack: $!\n");
-  my $l = $s[7];
-  while ($l) {
-    my $ll = sysread(F, $cpio, $l > 8192 ? 8192 : $l, length($cpio));
-    die("$pack: $!\n") unless $ll;
-    die if $ll > $l;
-    $l -= $ll;
-    while (length($cpio) > 4096) {
-      (syswrite(S, $cpio, 4096) || 0) == 4096 || die("swap write: $!\n");
-      $cpio = substr($cpio, 4096);
+while(<S>) {
+  chomp;
+  last unless length $_;
+  my ($file, $filesize, $blksize, @blocks) = split(/ /);
+  if($#blocks == -1) {
+    die "invalid input\n";
+  }
+  $filesize = int($filesize);
+  $blksize = int($blksize);
+  die "invalid block size" unless ($blksize > 0 && $blksize <= $bufsize);
+  my $maxblocks = int($bufsize/$blksize);
+  $file =~ s/.*\///; # ensure basename, also stops directory traversal
+  $file =~ s/[^[:print:]]/_/g; # no binary junk in file names
+  print "$file\n" if $opt_verbose;
+  open (O, '>', $file) or die "$file: $!";
+  for my $block (@blocks) {
+    my ($block, $end) = split(/-/, $block);
+    $block = int($block);
+
+    if($block == 0) { # a hole!
+      seek(O, $blksize, 1);
+      $filesize -= $blksize;
+      next;
+    }
+
+    $end = $block unless $end;
+    $end = int($end);
+    seek(F, $block*$blksize, 0) || die "$file: seek: $!\n";
+    while($block <= $end && $filesize) {
+      my $size;
+      if($end == $block) {
+	$size = $blksize;
+	++$block;
+      } elsif($maxblocks >= $end-$block) {
+	$size = ($end-$block)*$blksize;
+	$block += $end-$block;
+      } else {
+	$size = $maxblocks*$blksize;
+	$block += $maxblocks;
+      }
+      $size = $filesize if $size > $filesize;
+      my $buf;
+      if((sysread(F, $buf, $size) || 0) != $size) {
+	die "$file: read: $!\n";
+      }
+      $filesize -= $size;
+      print O $buf;
     }
   }
-  $cpio .= substr("\0\0\0\0", (length($cpio) & 3)) if length($cpio) & 3;
-}
-$cpio .= "07070100000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000b00000000TRAILER!!!\0\0\0\0";
-$cpio .= "\0" x (4096 - length($cpio) % 4096) if length($cpio) % 4096;
-while (length($cpio)) {
-  (syswrite(S, $cpio, 4096) || 0) == 4096 || die("swap write: $!\n");
-  $cpio = substr($cpio, 4096);
+  close O;
+  # sanity check
+  die "$file: invalid file size ($filesize byes left)\n" if $filesize != 0;
 }
