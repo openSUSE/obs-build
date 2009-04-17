@@ -30,6 +30,7 @@ install:
 	    createrpmdeps \
 	    order \
 	    expanddeps \
+	    computeblocklists \
 	    extractbuild \
 	    xen.conf \
 	    getmacros \
