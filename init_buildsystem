@@ -277,7 +277,7 @@ function register_qemu_user {
 # And copy also a static host binary shell to run the init scripts in the target chroot
 #
 if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xarmv7el -o x"$BUILD_ARCH" == xsh4 -o x"$BUILD_ARCH" == xppc ]; then
-    if [  -n "$(uname -m | grep [x3-6]86)" ]; then
+    if [  -n "$(uname -m | grep '[x3-6]86')" ]; then
 	if [ -e /usr/sbin/qemu-binfmt-conf.sh ]; then 
             (mkdir -p  $BUILD_ROOT/usr/bin $BUILD_ROOT/usr/sbin && set -x && cp /usr/bin/qemu-* $BUILD_ROOT/usr/bin && cp /usr/sbin/qemu-binfmt-conf.sh $BUILD_ROOT/usr/sbin)
         fi
@@ -305,7 +305,7 @@ fi
 # Ubuntu 8.04, 8.10, 9.04 at least seem to do that
 function reset_mmap_min_addr {
     if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xarmv7el -o x"$BUILD_ARCH" == xsh4 -o x"$BUILD_ARCH" == xppc ]; then
-	if [ -n "$(uname -m | grep [x3-6]86)" ]; then
+	if [ -n "$(uname -m | grep '[x3-6]86')" ]; then
             if [ -e /proc/sys/fs/binfmt_misc/arm -o -e /proc/sys/fs/binfmt_misc/armeb -o -e /proc/sys/fs/binfmt_misc/sh4 ]; then
 		# echo "reset mmap_min_addr to 0"
 		test -e /proc/sys/vm/mmap_min_addr && echo 0 > /proc/sys/vm/mmap_min_addr

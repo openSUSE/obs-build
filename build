@@ -1029,7 +1029,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		CROSS_INIT_SCRIPT="/.build/build"
 		# to run the qemu initialization in the XEN chroot, we need to register it with a statically build shell
 		if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xarmv7el -o x"$BUILD_ARCH" == xsh4 -o x"$BUILD_ARCH" == xppc ]; then
-		    if [  -n "$(uname -m | grep [x3-6]86)" ]; then
+		    if [  -n "$(uname -m | grep '[x3-6]86')" ]; then
 			if [ -e /bin/bash-static -a -e /bin/mount-static ]; then
 			    CROSS_INIT_SCRIPT="/.build/initscript_qemu_vm"
 			fi
