@@ -1630,5 +1630,8 @@ if test -n "$RPMS" -a -d "$BUILD_ROOT/$TOPDIR/RPMS" -a -d "$BUILD_ROOT/.build.ol
     chroot $BUILD_ROOT /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/RPMS" "$TOPDIR/SRPMS" && cleanup_and_exit 2
 fi
 
-echo "... build is finished"
+echo
+echo "$HOST finished \"build $SPECFILE\" at `date`."
+echo
+
 cleanup_and_exit 0
