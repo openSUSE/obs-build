@@ -1086,6 +1086,18 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
 		echo "build: extracting built packages..."
 		extractbuild --disk "$VM_IMAGE" --input "$VM_SWAP" --skip 512 -v
+                # create same layout as with plain chroot
+                if test "$BUILDTYPE" = spec ; then
+                  mkdir -p SRPMS RPMS
+                  for i in *src.rpm; do mv "$i" SRPMS/; done
+                  for i in *.rpm; do mv "$i" RPMS/; done
+                elif test "$BUILDTYPE" = dsc ; then
+                  mkdir -p DEBS
+                  for i in *.deb; do mv "$i" DEBS/; done
+                else
+                  mkdir -p KIWI
+                  find . -type f | while read i in *; do mv "$i" KIWI/; done
+                fi
 		cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
 		;;
 	      *)
