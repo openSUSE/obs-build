@@ -32,6 +32,8 @@ install:
 	    expanddeps \
 	    computeblocklists \
 	    extractbuild \
+	    getbinaryid \
+	    killchroot \
 	    xen.conf \
 	    getmacros \
 	    getoptflags \
