@@ -39,13 +39,29 @@ fi
 while [ -n "$1" ]; do
 	case "$1" in
 		-m)
+			if [ $just_edit ]; then
+				echo "You cannot use -m and -e together!"
+				exit 1
+			fi
 			message="$2"
 			shift 2
 			;;
+		-e)
+			if [ -n "${message}" ]; then
+				echo "You cannot use -m and -e together!"
+				exit 1
+			fi
+			just_edit=true
+			shift 1
+			;;
 		--help)
-			echo "Usage: $0 [filename[.changes]|path [file_with_comment]]"
+			echo "Usage: $0 [-m MESSAGE|-e] [filename[.changes]|path [file_with_comment]]"
 			echo
 			echo "Will use '$mailaddr' for changelog entries"
+			echo
+			echo "Options:"
+			echo "    -m MESSAGE    add MESSAGE to changes (not open an editor)"
+			echo "    -e            just open changes (cannot be used with -m)"
 			exit 0
 			;;
 		*) break ;;
@@ -103,17 +119,21 @@ trap "rm -f \"$tmpfile\"" EXIT
 set +e
 
 {
-	echo "-------------------------------------------------------------------"
-	echo "$date - $mailaddr"
-	echo
+	if [ ! $just_edit ]; then
+	    echo "-------------------------------------------------------------------"
+	    echo "$date - $mailaddr"
+	    echo
+	fi
 	if [ -n "$message" ]; then
 		echo "- $message"
+		echo
 	elif [ -n "$content" ]; then
 		cat "$content"
-	else
+		echo
+	elif [ ! $just_edit ]; then
 		echo "- "
+		echo
 	fi
-	echo
 	cat $changelog
 } >> "$tmpfile"
 
