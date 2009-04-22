@@ -53,7 +53,7 @@ install:
 	install -m644 build.1 $(DESTDIR)$(man1dir)
 	install -m755 unrpm $(DESTDIR)$(bindir)
 	ln -sf $(pkglibdir)/build $(DESTDIR)$(bindir)/build
-	ln -sf $(pkglibdir)/build $(DESTDIR)$(bindir)/buildvc
+	ln -sf $(pkglibdir)/vc    $(DESTDIR)$(bindir)/buildvc
 
 dist:
 ifeq ($(SCM),svn)
