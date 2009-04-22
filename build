@@ -19,9 +19,10 @@ repos=()
 
 # mkreiserfs only works with qemu/uml if it is able to create a file
 # system that is owned by the calling user (bnc#369006)
-#xen_img_mkfs='mkreiserfs -q -f'
-#xen_img_mkfs='mkfs.ext2 -m 0 -q -F'
-xen_img_mkfs='mkfs.ext3 -m 0 -q -F'
+#vm_img_mkfs='mkreiserfs -q -f'
+#vm_img_mkfs='mkfs.ext2 -m 0 -q -F'
+vm_img_mkfs='mkfs.ext3 -m 0 -q -F'
+vm_img_tunefs='tune2fs -c 0'
 qemu_kernel=/boot/vmlinuz
 qemu_initrd=/boot/initrd
 qemu_bin=/usr/bin/qemu
@@ -806,7 +807,10 @@ if test -z "$RUNNING_IN_VM" ; then
     if test -n "$VM_IMAGE" ; then
 	if test -n "$CLEAN_BUILD" ; then
 	    echo "Creating filesystem on $VM_IMAGE"
-	    $xen_img_mkfs $VM_IMAGE || become_root_or_fail
+	    $vm_img_mkfs $VM_IMAGE || become_root_or_fail
+	    if test -n "$vm_img_tunefs" ; then
+	        $vm_img_tunefs $VM_IMAGE || become_root_or_fail
+	    fi
 	fi
 	mkdir_build_root
 	if [ -w /root ]; then
