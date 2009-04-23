@@ -297,24 +297,6 @@ if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" =
 fi
 }
 
-# Hack to circumvent qemu mmap addr bug
-# Setup scripts can reset this, so set to 0 again before calling debin transformer
-# This is to my understanding a BUG in Ubuntu rc scripts, which change this kernel vars
-# This can cause a race condition on a multiprocessor system, when its called in more than one process at once
-# It can also cause a problem when this is changed while there was already memory allocated at the addresses that are now inaccessable
-# Ubuntu 8.04, 8.10, 9.04 at least seem to do that
-function reset_mmap_min_addr {
-    if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xarmv7el -o x"$BUILD_ARCH" == xsh4 -o x"$BUILD_ARCH" == xppc ]; then
-	if [ -n "$(uname -m | grep '[x3-6]86')" ]; then
-            if [ -e /proc/sys/fs/binfmt_misc/arm -o -e /proc/sys/fs/binfmt_misc/armeb -o -e /proc/sys/fs/binfmt_misc/sh4 ]; then
-		# echo "reset mmap_min_addr to 0"
-		test -e /proc/sys/vm/mmap_min_addr && echo 0 > /proc/sys/vm/mmap_min_addr
-		test -e /proc/sys/kernel/randomize_va_space && echo 0 > /proc/sys/kernel/randomize_va_space
-	    fi
-	fi
-    fi
-}
-
 fail_exit()
 {
   cleanup_and_exit 1
@@ -357,7 +339,6 @@ fi
 # reset mmap_min_addr for QEMU
 #
 register_qemu_user
-reset_mmap_min_addr
 
 #
 # store that we start to build system
@@ -602,11 +583,6 @@ test -x /usr/bin/rpmsign && RPMCHECKOPTS_HOST="--nodigest --nosignature"
 
 for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
 
-    #
-    # reset mmap_min_addr for QEMU
-    #
-    reset_mmap_min_addr
-
     case $PKG in
       RUN_LDCONFIG)
         test -x $BUILD_ROOT/sbin/ldconfig && chroot $BUILD_ROOT /sbin/ldconfig 2>&1
@@ -835,11 +811,6 @@ if test -x $BUILD_ROOT/bin/rpm -a ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a !
     # create provides index
     chroot $BUILD_ROOT rpm -q --whatprovides rpm >/dev/null 2>&1
 fi
-
-#
-# reset mmap_min_addr for QEMU
-#
-reset_mmap_min_addr
 
 rm -rf $BUILD_ROOT/.init_b_cache
 
