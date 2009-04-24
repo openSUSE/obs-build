@@ -1109,6 +1109,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
         set -- init_buildsystem "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
 	"$@" || cleanup_and_exit 1
+	if df $BUILD_ROOT 2>/dev/null | grep -q "100%"; then
+	    df -h $BUILD_ROOT
+	    echo "build does not work on a completely full filesystem"
+	    cleanup_and_exit 1
+	fi
 	mount -n -tproc none $BUILD_ROOT/proc || true
 	mount -n -tdevpts none $BUILD_ROOT/dev/pts
         if [ -d "$OLD_PACKAGES" ]; then
