@@ -1,0 +1,8 @@
+#!/bin/bash
+. ${0%/*}/common
+
+repo sle10sp2_x86_64
+repo sle10sp2_sdk_x86_64
+
+run_build --dist sles10 \
+	"$@"

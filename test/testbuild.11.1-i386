@@ -1,0 +1,9 @@
+#!/bin/bash
+. ${0%/*}/common
+
+arch32bit
+
+repo 11_1_ftp
+
+run_build --dist 11.1-i386 \
+	"$@"

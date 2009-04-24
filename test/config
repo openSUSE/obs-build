@@ -1,0 +1,8 @@
+#!/bin/bash
+
+: ${build_root:=/abuild/build-root}
+: ${build_vm_img:=/abuild/build-root.img}
+: ${build_vm_swap:=/abuild/build-root.swap}
+: ${build_vm_mem:=256}
+: ${build_vm_image_size:=500}
+: ${build_vm_swap_size:=100}

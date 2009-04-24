@@ -1,0 +1,7 @@
+#!/bin/bash
+. ${0%/*}/common
+
+repo 11_0_x86_64
+
+run_build --dist 11.0-x86_64 \
+	"$@"

@@ -1,0 +1,10 @@
+#!/bin/bash
+. ${0%/*}/common
+
+arch32bit
+
+repo sle10sp2_i386
+repo sle10sp2_sdk_i386
+
+run_build --dist sles10 \
+	"$@"
