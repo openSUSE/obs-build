@@ -10,7 +10,7 @@
 test -z "$BUILD_DIR" && BUILD_DIR=/usr/lib/build
 test -z "$BUILD_ROOT" && BUILD_ROOT=/var/tmp/build-root
 
-export BUILD_ARCH BUILD_ROOT BUILD_RPMS BUILD_DIR
+export BUILD_ARCH BUILD_HOST_ARCH BUILD_ROOT BUILD_RPMS BUILD_DIR
 
 ccache=0
 icecream=0
@@ -405,29 +405,6 @@ detect_vm_2nd_stage()
     return 0
 }
 
-set_build_arch()
-{
-    if [ -z "$BUILD_ARCH" ]; then
-	BUILD_ARCH=`uname -m`
-	test i686 = "$BUILD_ARCH" && BUILD_ARCH=i586 # XXX: why?
-    fi
-
-    case $BUILD_ARCH in
-      i686) BUILD_ARCH="i686:i586:i486:i386" ;;
-      i586) BUILD_ARCH="i586:i486:i386" ;;
-      i486) BUILD_ARCH="i486:i386" ;;
-      x86_64) BUILD_ARCH="x86_64:i686:i586:i486:i386" ;;
-    esac
-    if test "$BUILD_ARCH" != "${BUILD_ARCH#i686}" ; then
-	cpuflags=`grep ^flags /proc/cpuinfo`
-	cpuflags="$cpuflags "
-	test "$cpuflags" = "${cpuflags/ cx8 /}" -o "$cpuflags" = "${cpuflags/ cmov /}" && {
-	    echo "Your cpu doesn't support i686 rpms. Exit."
-	    exit 1
-	}
-    fi
-}
-
 find_spec_files()
 {
     local spec files
@@ -510,6 +487,9 @@ shopt -s nullglob
 if detect_vm_2nd_stage ; then
     set "/.build-srcdir/$SPECFILE"
 fi
+
+. $BUILD_DIR/common_functions || exit 1
+
 export HOST
 
 while test -n "$1"; do

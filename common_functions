@@ -1,0 +1,28 @@
+#!/bin/bash
+
+set_build_arch()
+{
+    : ${BUILD_HOST_ARCH:=`uname -m`}
+
+    if [ -z "$BUILD_ARCH" ]; then
+	BUILD_ARCH="$BUILD_HOST_ARCH"
+	test i686 != "$BUILD_ARCH" || BUILD_ARCH=i586 # XXX: why?
+    fi
+
+    case $BUILD_ARCH in
+      i686) BUILD_ARCH="i686:i586:i486:i386" ;;
+      i586) BUILD_ARCH="i586:i486:i386" ;;
+      i486) BUILD_ARCH="i486:i386" ;;
+      x86_64) BUILD_ARCH="x86_64:i686:i586:i486:i386" ;;
+    esac
+    if test "$BUILD_ARCH" != "${BUILD_ARCH#i686}" ; then
+	cpuflags=`grep ^flags /proc/cpuinfo`
+	cpuflags="$cpuflags "
+	test "$cpuflags" = "${cpuflags/ cx8 /}" -o "$cpuflags" = "${cpuflags/ cmov /}" && {
+	    echo "Your cpu doesn't support i686 rpms. Exit."
+	    exit 1
+	}
+    fi
+}
+
+# vim:sw=4
