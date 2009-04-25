@@ -37,6 +37,7 @@ install:
 	    xen.conf \
 	    getmacros \
 	    getoptflags \
+	    common_functions \
 	    init_buildsystem \
 	    substitutedeps \
 	    debtransform \
