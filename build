@@ -1605,7 +1605,7 @@ if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
 	    computeblocklists $args $TOPDIR/RPMS/*/*.rpm $TOPDIR/SRPMS/*.rpm > "$VM_SWAP"
 	    ;;
 	dsc)
-	    computeblocklists $args $TOPDIR/DEBS/*.deb > "$VM_SWAP"
+	    computeblocklists $args $TOPDIR/DEBS/*.deb $TOPDIR/SOURCES.DEB/* > "$VM_SWAP"
 	    ;;
 	kiwi)
 	    computeblocklists $args $TOPDIR/KIWI/* > "$VM_SWAP"
