@@ -330,6 +330,9 @@ if test -e $BUILD_IS_RUNNING ; then
     echo
     echo "    rm -rf -- $BUILD_ROOT/*"
     echo
+    echo "y - yes, cleanup the build root"
+    echo "N - No, abort build (default on enter)"
+    echo "c - Continue anyway with this build root"
     echo -n "[y/N/c] "
     read ANSWER
     case "$ANSWER" in
