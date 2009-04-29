@@ -378,10 +378,11 @@ detect_vm_2nd_stage()
     RUNNING_IN_VM=true
     mount -orw -n -tproc none /proc
     mount -n -o remount,rw /
-    if [ -e /dev/kqemu ]; then
-        # allow abuild user to run qemu
-        chmod 0666 /dev/kqemu
-    fi
+# qemu inside of xen does not work, check again with kvm later before enabling this
+#    if [ -e /dev/kqemu ]; then
+#        # allow abuild user to run qemu
+#        chmod 0666 /dev/kqemu
+#    fi
     if test -n "$VM_SWAP" ; then
 	for i in 1 2 3 4 5 6 7 8 9 10 ; do
 	    test -e "$VM_SWAP" && break
@@ -1469,7 +1470,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
             	    	pushd $BUILD_ROOT/$TOPDIR/KIWI-oem > /dev/null
                         echo "compressing images... "
                         tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-raw.tar.gz \
-                          --exclude=$imagename.$imagearch-$imageversion.iso *
+                          --exclude=$imagename.$imagearch-$imageversion.iso \
+                          --exclude=$imagename.$imagearch-$imageversion.raw \
+                          *
                         if [ -e $imagename.$imagearch-$imageversion.iso ]; then
                           echo "Copy iso file and create md5..."
                           mv $imagename.$imagearch-$imageversion.iso \
@@ -1477,6 +1480,16 @@ for SPECFILE in "${SPECFILES[@]}" ; do
             	    	  pushd $BUILD_ROOT/$TOPDIR/KIWI > /dev/null
                           md5sum $imagename.$imagearch-$imageversion$buildnum.iso \
                                  > "$imagename.$imagearch-$imageversion$buildnum.iso.md5"
+                          popd > /dev/null
+                        fi
+                        if [ -e $imagename.$imagearch-$imageversion.raw ]; then
+                          echo "Copy raw file and create md5..."
+                          mv $imagename.$imagearch-$imageversion.raw \
+                             $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum.raw
+            	    	  pushd $BUILD_ROOT/$TOPDIR/KIWI > /dev/null
+                          bzip2 $imagename.$imagearch-$imageversion$buildnum.raw
+                          md5sum $imagename.$imagearch-$imageversion$buildnum.raw.bz2 \
+                                 > "$imagename.$imagearch-$imageversion$buildnum.raw.bz2.md5"
                           popd > /dev/null
                         fi
                         popd > /dev/null
