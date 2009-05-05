@@ -1266,7 +1266,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if ! cmp -s $BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE $BUILD_ROOT/.spec.new ; then
 	    echo -----------------------------------------------------------------
 	    echo I have the following modifications for $SPECFILE:
-	    diff $BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE $BUILD_ROOT/.spec.new
+	    sed -e "/^%changelog/q" $BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE > $BUILD_ROOT/.spec.t1
+	    sed -e "/^%changelog/q" $BUILD_ROOT/.spec.new > $BUILD_ROOT/.spec.t2
+	    diff $BUILD_ROOT/.spec.t1 $BUILD_ROOT/.spec.t2
+	    rm -f $BUILD_ROOT/.spec.t1 $BUILD_ROOT/.spec.t2
 	    mv $BUILD_ROOT/.spec.new $BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE
 	else
 	    rm -f $BUILD_ROOT/.spec.new
