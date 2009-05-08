@@ -1500,7 +1500,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                     vmx)
                         pushd $BUILD_ROOT/$TOPDIR/KIWI-vmx > /dev/null
                         echo "compressing images... "
-            	    	if [ -e $imagename.$imagearch-$imageversion.xenconfig ] ; then
+            	    	if [ -e $imagename.$imagearch-$imageversion.ovf ] ; then
+                          tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-ovf.tar.gz \
+                            $imagename.$imagearch-$imageversion.ovf \
+                            $imagename.$imagearch-$imageversion-disk*.vmdk
+            	     	elif [ -e $imagename.$imagearch-$imageversion.xenconfig ] ; then
                           tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-xenvmx.tar.gz \
                             $imagename.$imagearch-$imageversion.raw \
                             $imagename.$imagearch-$imageversion.xenconfig			
@@ -1509,11 +1513,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                             $imagename.$imagearch-$imageversion.vmx \
                             $imagename.$imagearch-$imageversion.vmdk
 			fi
-            	    	if [ -e $imagename.$imagearch-$imageversion.ovf ] ; then
-                          tar cvzfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-ovf.tar.gz \
-                            $imagename.$imagearch-$imageversion.ovf \
-                            $imagename.$imagearch-$imageversion-disk*.vmdk
-            	     	fi
             	    	popd > /dev/null
                         ;;
                     xen)
