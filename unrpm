@@ -2,7 +2,7 @@
 #
 
 function Usage () {
-    echo "Usage: $(basename $0) [-v] rpm-files...";
+    echo "Usage: $(basename $0) [-vq] rpm-files...";
     echo "Unpack rpm files in current directory.";
     exit 1
 }

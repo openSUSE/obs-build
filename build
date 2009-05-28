@@ -887,25 +887,21 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     }
 
     if test "$SPECFILE" != "${SPECFILE%.src.rpm}" ; then
-	echo processing src rpm `pwd`/$SPECFILE...
-	TOPDIR=`rpm --eval '%_topdir'`
-	rm -rf $BUILD_ROOT$TOPDIR
-	mkdir -p $BUILD_ROOT$TOPDIR/SOURCES $BUILD_ROOT$TOPDIR/SPECS
-	rpm -i --nodigest --nosignature --root $BUILD_ROOT $SPECFILE || {
+	echo processing src rpm $SRCDIR/$SPECFILE ...
+	MYSRCDIR=$BUILD_ROOT/.build-srcdir
+	rm -rf $MYSRCDIR
+	mkdir -p $MYSRCDIR
+	cd $MYSRCDIR || cleanup_and_exit 1
+	$BUILD_DIR/unrpm -q $SRCDIR/$SPECFILE || {	    
 	    echo "could not install $SPECFILE."
 	    cleanup_and_exit 1
 	}
-	rm -rf $BUILD_ROOT/.build-srcdir
-	mkdir -p $BUILD_ROOT/.build-srcdir
-	mv $BUILD_ROOT$TOPDIR/SOURCES/* $BUILD_ROOT/.build-srcdir
-	mv $BUILD_ROOT$TOPDIR/SPECS/* $BUILD_ROOT/.build-srcdir
-	MYSRCDIR=$BUILD_ROOT/.build-srcdir
-	cd $MYSRCDIR || cleanup_and_exit 1
 	for SPECFILE in *.spec ; do : ; done
     else
-	echo processing specfile `pwd`/$SPECFILE...
 	MYSRCDIR="$SRCDIR"
     fi
+
+    echo processing specfile $MYSRCDIR/$SPECFILE ...
 
     ADDITIONAL_PACKS=""
     test -n "$BUILD_EXTRA_PACKS" && ADDITIONAL_PACKS="$ADDITIONAL_PACKS $BUILD_EXTRA_PACKS"
@@ -955,6 +951,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		cp -p "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
 	    fi
 	    MYSRCDIR=$BUILD_ROOT/.build-srcdir
+	else
+	    # cwd is at $BUILD_ROOT/.build-srcdir which we want to
+	    # umount later so step aside
+	    cd "$SRCDIR"
 	fi
 	Q="'\''"
 	echo "SPECFILE='${SPECFILE//"'"/$Q}'" > $BUILD_ROOT/.build/build.data
