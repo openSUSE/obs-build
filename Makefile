@@ -46,6 +46,7 @@ install:
 	    createrepomddeps \
 	    createyastdeps \
 	    changelog2spec \
+	    spectool \
 	    $(DESTDIR)$(pkglibdir)
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build
 	install -m644 *.pm baselibs_global.conf $(DESTDIR)$(pkglibdir)

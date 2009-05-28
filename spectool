@@ -1,0 +1,354 @@
+#!/usr/bin/perl -w
+
+=head1 spectool
+
+spectool - tool to work with rpm spec files
+
+=head1 SYNOPSIS
+
+spectool [options] specfiles...
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--help>
+
+display help as manpage
+
+=item B<--dist>=I<STRING>
+
+set distribution, e.g. "11.1-i586" or path to config
+
+=item B<--archpath>=I<STRING>
+
+compatible architecture separated by colon, e.g. C<i586:i486:i386>.
+Autotected if missing.
+
+=item B<--configdir>=I<STRING>
+
+path to config files if B<--dist> didn't specify a full path
+
+=item B<--define>=I<STRING>
+
+=item B<--with>=I<STRING>
+
+=item B<--without>=I<STRING>
+
+same meaning as in rpmbuild
+
+=item B<--tag>=I<STRING>
+
+print tag from spec file, e.g. C<version>. Regexp is also possible,
+e.g. C</source[01]/>
+
+=item B<--sources>
+
+print package source files. If a file C<sources> or
+C<I<packagename>.sources> is present verify the checksums against
+that.
+
+=over 4
+
+=item B<--update>
+
+update the checksums
+
+=item B<--download>
+
+download missing sources
+
+=back
+
+=back
+
+=head1 DESCRIPTION
+
+The B<--sources> option allows to manage a sources file in a way
+similar to Fedora. The sources file lists the check sums and file
+names of the binary files specified in the spec file.
+
+B<--sources> without further options compares the check sums of all
+files and prints a report consisting of a character that describes
+the status of the file and the file name. Meaning of the characters
+is as follows:
+
+=over 4
+
+=item B<.> check sum matches
+
+=item B<!> check sum broken
+
+=item B<d> file is missing, checksum known. Can be verified after download
+
+=item B<-> file is missing and checksum unknown
+
+=item B<_> file is present but checksum unknown
+
+=item B<t> text file, will be skipped for check sums
+
+=item B<?> check sum known but not referenced from spec file
+
+=back
+
+Additionally specifying B<--update> recomputes all check sums and
+updates the sources file.
+
+With B<--download> all missing files are downloaded if the spec file
+has an http or ftp url.
+
+=head2 FORMAT OF THE SOURCES FILE
+
+Lines of the form
+<checksum> <whitespace> <filename>
+
+=head2 NAME OF THE SOURCES FILE
+
+A file named C<sources> is preferred if present for compatibility
+with Fedora. It only contains md5 sums. If that file is not present
+the C<.spec> suffix of the spec file is replaced with C<.sources>
+and the this name used as sources file (e.g. C<foo.spec> ->
+C<foo.sources>). In this file sha1 is preferred. Also, the name of
+the algorithm is prepended with colon to the check sum.
+
+=cut
+
+my $builddir;
+
+BEGIN {
+  $builddir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+  unshift @INC, $builddir;
+}
+
+use strict;
+
+use Build;
+use Pod::Usage;
+use Getopt::Long;
+Getopt::Long::Configure("no_ignore_case");
+
+my (@opt_showtag, $opt_sources, $opt_update, $opt_download);
+
+sub parse_depfile;
+
+my ($dist, $rpmdeps, $archs, $configdir, $useusedforbuild);
+
+GetOptions (
+  "help" => sub { pod2usage(-exitstatus => 0, -verbose => 2) },
+
+  "dist=s" => \$dist,
+  "archpath=s" => \$archs,
+  "configdir=s" => \$configdir,
+  "define=s" => sub { Build::define($_[1]) },
+  "with=s" => sub { Build::define("_with_".$_[1]." --with-".$_[1]) },
+  "without=s" => sub { Build::define("_without_".$_[1]." --without-".$_[1]) },
+
+  "tag=s" => \@opt_showtag,
+  "sources" => \$opt_sources,
+  "update" => \$opt_update,
+  "download" => \$opt_download,
+) or pod2usage(1);
+
+pod2usage(1) unless @ARGV;
+
+my @specs = @ARGV;
+
+die "--download must be used together with --sources\n" if ($opt_download && !$opt_sources);
+die "--update must be used together with --sources\n" if ($opt_update && !$opt_sources);
+
+my @archs;
+if (!defined $archs) {
+  use POSIX qw/uname/;
+  my %archmap = qw/x86_64 i686 i686 i586 i586 i486 i486 i386/;
+  my @a = uname();
+  push @archs, $a[4];
+  while(exists $archmap{$archs[-1]}) {
+    push @archs, $archmap{$archs[-1]};
+  }
+} else {
+  @archs = split(':', $archs);
+}
+push @archs, 'noarch' unless grep {$_ eq 'noarch'} @archs;
+
+$dist = 'default' unless $dist;
+
+if($dist !~ /\// && !defined $configdir) {
+  if($0 =~ /^\//) {
+    use File::Basename qw/dirname/;
+    $configdir = dirname($0).'/configs';
+    undef $configdir unless -e $configdir.'/default.conf';
+  } else {
+    $configdir = $builddir.'/configs';
+    undef $configdir unless -e $configdir.'/default.conf';
+  }
+  if(!defined $configdir) {
+    print STDERR "please specify config dir\n";
+  }
+}
+
+#######################################################################
+
+# param: array to fill, spec file
+# return: file name
+sub read_sources_digests($$)
+{
+  my $files = shift;
+  my $spec = shift;
+  my $srcfile = 'sources';
+  if (! -r $srcfile) {
+    $srcfile = $spec;
+    $srcfile =~ s/spec$/sources/;
+  }
+  if (open (F, '<', $srcfile)) {
+    while(<F>) {
+      chomp;
+      my ($sum, $file) = split(/ +/, $_, 2);
+      $files->{$file} = $sum;
+    }
+    close F;
+  }
+  return $srcfile;
+}
+
+# param: file, oldsum
+# return: newsum or undef if match
+sub check_sum($$)
+{
+  my $file = shift;
+  my $oldsum = shift || 'sha1:';
+  my $sum;
+  my $type = 'md5:';
+  if($oldsum =~ /^(\S+:)/) {
+    $type = $1;
+  } else {
+    $oldsum = $type.$oldsum;
+  }
+  if ($type eq 'md5:') {
+    $sum = $type.`md5sum $file` || die "md5sum failed\n";
+  } elsif ($type eq 'sha1:') {
+    $sum = $type.`sha1sum $file` || die "sha1sum failed\n";
+  } else {
+    die "unsupported digest type '$type'\n";
+  }
+  $sum =~ s/ .*//s;
+  if($sum ne $oldsum) {
+    return $sum;
+  }
+  return undef;
+}
+
+#######################################################################
+
+for my $spec (@specs) {
+  my $cf = Build::read_config_dist($dist, $archs[0], $configdir);
+  my $parsed = Build::parse($cf, $spec);
+
+  if (!defined $parsed) {
+    die "can't parse $spec\n";
+  }
+
+  for my $tag (@opt_showtag) {
+    if($tag =~ /^\/(.+)\/$/) {
+      my $expr = $1;
+      for my $t (keys %$parsed) {
+	if ($t =~ $expr) {
+	  push @opt_showtag, $t;
+	}
+      }
+    } else {
+      if(exists $parsed->{lc $tag}) {
+	print $tag, ": ";
+	my $v = $parsed->{lc $tag};
+	$v = join(' ', @$v) if (ref $v eq 'ARRAY');
+	print $v, "\n";
+      } else {
+	print STDERR "$tag does not exist\n";
+      }
+    }
+  }
+
+  if ($opt_sources) {
+    my $files = {};
+    my $srcfile = read_sources_digests($files, $spec);
+    if ($opt_download) {
+      for my $t (keys %$parsed) {
+	next unless ($t =~ /^source\d*/);
+	my $url = $parsed->{$t};
+	next unless $url =~ /^(?:http|ftp):\/\//;
+	my $file = $url;
+	$file =~ s/.*\///;
+	next if -e $file;
+	print "Downloading $file...\n";
+	if(system('curl', '-f', '-L', '-#', '-o', $file, $url) != 0) {
+	  # let's see if the file was recompressed
+	  if($url =~ s/\.bz2$/.gz/ && $file =~ s/\.bz2$/.gz/
+	    && system('curl', '-f', '-L', '-#', '-o', $file, $url) == 0) {
+	    if(system('bznew', $file) == 0) {
+	      print STDERR "Used $file and recompressed to bz2 instead\n";
+	    } else {
+	      unlink $file;
+	    }
+	  } else {
+	    print STDERR "Downloading $file failed\n";
+	  }
+	}
+      }
+    }
+    if ($opt_update) {
+      my $changed;
+      for my $t (keys %$parsed) {
+	next unless ($t =~ /^source\d*/);
+	my $file = $parsed->{$t};
+	$file =~ s/.*\///;
+	next unless -B $file;
+	my $sum = check_sum($file, ($files->{$file} || ($srcfile eq 'sources'?'md5:':'sha1:')));
+	if($sum) {
+	  print STDERR "update $file\n";
+	  $files->{$file} = $sum;
+	  $changed = 1;
+	}
+      }
+      if($changed) {
+	if(open(F, '>', $srcfile)) {
+	  for my $file (keys %$files) {
+	    $files->{$file} =~ s/^md5:// if $srcfile eq 'sources';
+	    print F $files->{$file}, ' ', $file, "\n";
+	  }
+	  close F;
+	}
+      }
+    } else {
+      for my $t (keys %$parsed) {
+	next unless ($t =~ /^source\d*/);
+	my $file = $parsed->{$t};
+	$file =~ s/.*\///;
+	if (!exists $files->{$file}) {
+	  if (! -e $file) {
+	    print '- ';
+	  } elsif (-B $file) {
+	    print '_ ';
+	  } else {
+	    print 't ';
+	  }
+	} elsif (! -e $file) {
+	    print 'd ';
+	    delete $files->{$file};
+	} else {
+	  my $sum = check_sum($file, $files->{$file});
+	  if($sum) {
+	    print '! ';
+	  } else {
+	    print '. ';
+	  }
+	  delete $files->{$file};
+	}
+	print $parsed->{$t}, "\n";
+      }
+      for my $file (keys %$files) {
+	print "? $file\n";
+      }
+    }
+  }
+}
+
+# vim: sw=2
