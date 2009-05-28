@@ -115,9 +115,6 @@ sub parse {
   my ($config, $specfile, $xspec) = @_;
 
   my $packname;
-  my $packvers;
-  my $packrel;
-  my $packdisttag;
   my $exclarch;
   my $badarch;
   my @subpacks;
@@ -307,29 +304,19 @@ sub parse {
       $hasif = 1;
       next;
     }
-    if ($main_preamble && ($line =~ /^Name\s*:\s*(\S+)/i)) {
-      $packname = $1;
-      $macros{'name'} = $packname;
-    }
-    if ($main_preamble && ($line =~ /^Version\s*:\s*(\S+)/i)) {
-      $packvers = $1;
-      $macros{'version'} = $packvers;
-    }
-    if ($main_preamble && ($line =~ /^Release\s*:\s*(\S+)/i)) {
-      $packrel = $1;
-      $macros{'release'} = $packrel;
-    }
-    if ($main_preamble && ($line =~ /^Disttag\s*:\s*(\S+)/i)) {
-      $packdisttag = $1;
-      $macros{'disttag'} = $packdisttag;
-    }
-    if ($main_preamble && ($line =~ /^ExclusiveArch\s*:\s*(.*)/i)) {
-      $exclarch ||= [];
-      push @$exclarch, split(' ', $1);
-    }
-    if ($main_preamble && ($line =~ /^ExcludeArch\s*:\s*(.*)/i)) {
-      $badarch ||= [];
-      push @$badarch, split(' ', $1);
+    if ($main_preamble) {
+      if ($line =~ /^(Name|Version|Disttag|Release)\s*:\s*(\S+)/i) {
+	$ret->{lc $1} = $2;
+	$macros{lc $1} = $2;
+      } elsif ($line =~ /^(Source\d*|Patch\d*|Url)\s*:\s*(\S+)/i) {
+	$ret->{lc $1} = $2;
+      } elsif ($line =~ /^ExclusiveArch\s*:\s*(.*)/i) {
+	$exclarch ||= [];
+	push @$exclarch, split(' ', $1);
+      } elsif ($line =~ /^ExcludeArch\s*:\s*(.*)/i) {
+	$badarch ||= [];
+	push @$badarch, split(' ', $1);
+      }
     }
     if ($line =~ /^(?:Requires\(pre\)|Requires\(post\)|PreReq)\s*:\s*(\S.*)$/i) {
       my $deps = $1;
@@ -406,7 +393,7 @@ sub parse {
       if ($1) {
 	push @subpacks, $2;
       } else {
-	push @subpacks, "$packname-$2" if defined $packname;
+	push @subpacks, $ret->{'name'}.'-'.$2 if defined $ret->{'name'};
       }
       $preamble = 1;
       $main_preamble = 0;
@@ -430,11 +417,7 @@ sub parse {
       $$nfbline = [$$nfbline, undef ];
     }
   }
-  unshift @subpacks, $packname;
-  $ret->{'name'} = $packname;
-  $ret->{'version'} = $packvers;
-  $ret->{'release'} = $packrel if defined $packrel;
-  $ret->{'disttag'} = $packdisttag if defined $packdisttag;
+  unshift @subpacks, $ret->{'name'};
   $ret->{'subpacks'} = \@subpacks;
   $ret->{'exclarch'} = $exclarch if defined $exclarch;
   $ret->{'badarch'} = $badarch if defined $badarch;
