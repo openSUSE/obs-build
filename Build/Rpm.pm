@@ -143,6 +143,7 @@ sub parse {
   my $preamble = 1;
   my $inspec = 0;
   my $hasif = 0;
+  my $lineno = 0;
   while (1) {
     my $line;
     if (@macros) {
@@ -152,6 +153,7 @@ sub parse {
       $inspec = 1;
       last unless @$specdata;
       $line = shift @$specdata;
+      ++$lineno;
       if (ref $line) {
 	$line = $line->[0]; # verbatim line
         push @$xspec, $line if $xspec;
@@ -163,6 +165,7 @@ sub parse {
       $line = <SPEC>;
       last unless defined $line;
       chomp $line;
+      ++$lineno;
     }
     push @$xspec, $line if $inspec && $xspec;
     if ($line =~ /^#\s*neededforbuild\s*(\S.*)$/) {
@@ -182,6 +185,7 @@ sub parse {
       my $tries = 0;
       while ($line =~ /^(.*?)%(\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\()(.*?)$/) {
 	if ($tries++ > 1000) {
+	  print STDERR "Warning: spec file parser ",($lineno?" line $lineno":''),": macro too deeply nested\n";
 	  $line = 'MACRO';
 	  last;
 	}
@@ -203,6 +207,7 @@ sub parse {
 	  $expandedline .= '%';
 	  next;
 	} elsif ($macname eq '(') {
+	  print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand %(...)\n";
 	  $line = 'MACRO';
 	  last;
 	} elsif ($macname eq 'define' || $macname eq 'global') {
@@ -237,6 +242,7 @@ sub parse {
 	  $line = ((exists($macros{$args[0]}) ? 1 : 0) ^ ($macname eq 'undefined' || $macname eq 'without' ? 1 : 0)).$line;
 	} elsif (exists($macros{$macname})) {
 	  if (!defined($macros{$macname})) {
+	    print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand '$macname'\n";
 	    $line = 'MACRO';
 	    last;
 	  }
