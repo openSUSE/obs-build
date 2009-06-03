@@ -1,0 +1,43 @@
+#!/usr/bin/perl -w
+
+BEGIN {
+  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+}
+
+use strict;
+
+use Build;
+
+my ($dist, $archs, $configdir, $debug);
+
+while (@ARGV)  {
+  if ($ARGV[0] eq '--dist') {
+    shift @ARGV;
+    $dist = shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--archpath') {
+    shift @ARGV;
+    $archs = shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--configdir') {
+    shift @ARGV;
+    $configdir = shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--debug') {
+    shift @ARGV;
+    $debug = 1;
+    next;
+  }
+  last;
+}
+
+die("Usage: getchangetargetarch --dist <dist> --archpath <archpath> [--configdir <configdir>]\n") if @ARGV;
+
+my $cf = Build::read_config_dist($dist, $archs, $configdir);
+exit 0 unless $cf->{'changetarget'};
+my $target = $cf->{'changetarget'};
+$target = defined($target) && $target ne '' ? "$target" : '';
+print "$arch";

@@ -216,6 +216,8 @@ sub read_config {
       $config->{'patterntype'} = [ @l ];
     } elsif ($l0 eq 'release:') {
       $config->{'release'} = $l[0];
+    } elsif ($l0 eq 'changetarget:') {
+      $config->{'changetarget'} = join(' ', @l);
     } elsif ($l0 !~ /^[#%]/) {
       warn("unknown keyword in config: $l0\n");
     }

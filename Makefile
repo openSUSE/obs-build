@@ -37,6 +37,7 @@ install:
 	    xen.conf \
 	    getmacros \
 	    getoptflags \
+	    getchangetarget \
 	    common_functions \
 	    init_buildsystem \
 	    initscript_qemu_vm \

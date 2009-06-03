@@ -62,6 +62,7 @@ BUILD_DEBUG=
 PERSONALITY_SYSCALL=
 INCARNATION=
 DISTURL=
+CHANGETARGET=
 
 export PATH=$BUILD_DIR:/sbin:/usr/sbin:$PATH
 
@@ -1261,6 +1262,14 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	# extract optflags from configuration
 	getoptflags --dist "$BUILD_DIST" --configdir "$BUILD_DIR/configs" --archpath "$BUILD_ARCH" ${BUILD_DEBUG:+--debug} > $BUILD_ROOT/root/.rpmrc
 	test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/.rpmrc $BUILD_ROOT/home/abuild/.rpmrc
+	# case arm, extract changetarget
+	# this is restricted to arm to make sure it doesn't interfere with x86
+	buildarchtest=$( echo $BUILD_ARCH | grep -i arm )
+	if [ x"$buildarchtest" != x"" ]; then
+	    echo "changing targetarch" 
+	    CHANGETARGET=$(getchangetarget --dist "$BUILD_DIST" --configdir "$BUILD_DIR/configs" --archpath "$BUILD_ARCH" )
+	    echo "NEW TARGET: $CHANGETARGET"
+	fi
     fi
     if test -f $BUILD_ROOT/.spec.new ; then
 	if ! cmp -s $BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE $BUILD_ROOT/.spec.new ; then
@@ -1342,6 +1351,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if [ -n "$BUILD_DEBUG" ]; then
 		rpmbopts[${#rpmbopts[@]}]='--eval'
 		rpmbopts[${#rpmbopts[@]}]="%suse_insert_debug_package"
+	fi
+	if [ -n "$CHANGETARGET" ]; then
+		rpmbopts[${#rpmbopts[@]}]='--target'
+		rpmbopts[${#rpmbopts[@]}]="$CHANGETARGET"
 	fi
 	rpmbuild=rpmbuild
 
