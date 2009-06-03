@@ -707,7 +707,7 @@ sub query {
   my ($handle, %opts) = @_;
 
   my @tags = qw{NAME SOURCERPM NOSOURCE NOPATCH SIGTAG_MD5 PROVIDENAME PROVIDEFLAGS PROVIDEVERSION REQUIRENAME REQUIREFLAGS REQUIREVERSION};
-  push @tags, qw{EPOCH VERSION RELEASE ARCH} if $opts{'evra'};
+  push @tags, qw{EPOCH VERSION RELEASE ARCH};
   push @tags, qw{FILENAMES} if $opts{'filelist'};
   push @tags, qw{SUMMARY DESCRIPTION} if $opts{'description'};
   my %res = rpmq($handle, @tags);
@@ -727,6 +727,12 @@ sub query {
   } else {
     $data->{'provides'} = [ grep {!/^rpmlib\(/ && !/^\//} @{$res{'PROVIDENAME'} || []} ];
     $data->{'requires'} = [ grep {!/^rpmlib\(/ && !/^\//} @{$res{'REQUIRENAME'} || []} ];
+  }
+  # rpm3 compatibility: retrofit missing self provides
+  if (!@{$data->{'provides'}} || $data->{'provides'}->[-1] !~ /^\Q$res{'NAME'}->[0]\E =/) {
+    my $evr = "$res{'VERSION'}->[0]-$res{'RELEASE'}->[0]";
+    $evr = "$res{'EPOCH'}->[0]:$evr" if $res{'EPOCH'} && $res{'EPOCH'}->[0];
+    push @{$data->{'provides'}}, "$res{'NAME'}->[0] = $evr";
   }
   $data->{'source'} = $src if $src ne '';
   if ($opts{'evra'}) {
