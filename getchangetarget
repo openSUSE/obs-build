@@ -40,4 +40,4 @@ my $cf = Build::read_config_dist($dist, $archs, $configdir);
 exit 0 unless $cf->{'changetarget'};
 my $target = $cf->{'changetarget'};
 $target = defined($target) && $target ne '' ? "$target" : '';
-print "$arch";
+print "$target";
