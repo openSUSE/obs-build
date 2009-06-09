@@ -216,6 +216,8 @@ sub read_config {
       $config->{'patterntype'} = [ @l ];
     } elsif ($l0 eq 'release:') {
       $config->{'release'} = $l[0];
+    } elsif ($l0 eq 'releaseprg:') {
+      $config->{'releaseprg'} = $l[0];
     } elsif ($l0 eq 'changetarget:') {
       $config->{'changetarget'} = join(' ', @l);
     } elsif ($l0 !~ /^[#%]/) {

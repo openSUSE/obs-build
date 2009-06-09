@@ -8,9 +8,24 @@ use strict;
 
 use Build;
 
-my ($dist, $rpmdeps, $archs, $configdir, $release, $changelog);
+
+sub expand {
+  my ($config, $str) = @_;
+  my @xspec;
+  my %cf = %$config;
+  $cf{'save_expanded'} = 1;
+  Build::Rpm::parse(\%cf, [ "$str" ], \@xspec);
+  return @xspec && ref($xspec[0]) ? $xspec[0]->[1] : '';
+}
+
+my ($dist, $buildroot, $rpmdeps, $archs, $configdir, $release, $changelog);
 
 while (@ARGV)  {
+  if ($ARGV[0] eq '--root') {
+    shift @ARGV;
+    $buildroot = shift @ARGV;
+    next;
+  }
   if ($ARGV[0] eq '--dist') {
     shift @ARGV;
     $dist = shift @ARGV;
@@ -40,6 +55,10 @@ while (@ARGV)  {
 }
 die("Usage: substitutedeps --dist <dist> --archpath <archpath> [--configdir <configdir>] <specin> <specout>\n") unless @ARGV == 2;
 my $spec = $ARGV[0];
+my $specdir = $spec;
+$specdir =~ s/[^\/]*$//;
+$specdir = "./" if $specdir eq '';
+
 my $newspec = $ARGV[1];
 
 my $cf = Build::read_config_dist($dist, $archs, $configdir);
@@ -60,6 +79,9 @@ open(F, '>', $newspec) || die("$newspec: $!\n");
 
 my $used;
 my $inchangelog = 0;
+my $mainpkg = '';
+my $pkg;
+
 for my $l (@$xspec) {
   $used = 1;
   if (ref($l)) {
@@ -80,8 +102,20 @@ for my $l (@$xspec) {
     next;
   }
 
-  if ($release) {
-    if ($l =~ /^Release:/i) {
+  if ($l =~ /^Name\s*:\s*(\S+)/i) {
+    $pkg = $mainpkg = $1 unless $mainpkg;
+  }
+  if ($l =~ /^\s*%package\s+(-n\s+)?(\S+)/) {
+    if ($1) {
+      $pkg = $2;
+    } else {
+      $pkg = "$mainpkg-$2";
+    }
+  }
+
+  if ($l =~ /^Release:/i) {
+    my $oldl = $l;
+    if ($release) {
       if (!($l =~ s/<RELEASE\d*>/$release/g)) {
 	if ($l =~ /<(?:CI_CNT|B_CNT)>/) {
 	  # XXX: should pass ci_cnt/b_cnt instead
@@ -98,6 +132,74 @@ for my $l (@$xspec) {
 	}
       }
     }
+    # this is to be compatible to legacy autobuild.
+    # you can specify a releaseprg in the project configuration,
+    # if your package contains this file it is executed and its
+    # output is used as a release.
+    # use only if you really must.
+    if ($cf->{'releaseprg'} && -f "$specdir$cf->{'releaseprg'}") {
+      my $newl = $l;
+      $newl =~ s/^Release:\s*//;
+      $oldl =~ s/^Release:\s*//;
+      my $project = expand($cf, "%?_project") || 'BUILD_BASENAME';
+      my $arch = expand($cf, "%?_target_cpu") || 'noarch';
+      $::ENV{'BUILD_OLDRELEASE'} = $oldl;
+      my @nl;
+      my $interpreter = "/bin/bash";
+      if (open(RP, '<', "$specdir$cf->{'releaseprg'}")) {
+	@nl = <RP>;
+        close RP;
+	if (@nl && $nl[0] =~ /^#!\s*(\S*)/) {
+	  $interpreter = $1;
+	}
+      }
+      if ($buildroot) {
+	my $sd = $specdir;
+	$sd =~ s/^\Q$buildroot\E//;
+        open(RP, "-|", 'chroot', $buildroot, $interpreter, "$sd$cf->{'releaseprg'}", $project, $newl, $pkg, $arch) || die("$cf->{'releaseprg'}: $!\n");
+      } else {
+        open(RP, "-|", $interpreter, "$specdir$cf->{'releaseprg'}", $project, $newl, $pkg, $arch) || die("$cf->{'releaseprg'}: $!\n");
+      }
+      @nl = grep {$_ ne ''} <RP>;
+      if (!close(RP)) {
+	warn("$cf->{'releaseprg'} failed: $?\n");
+      }
+      # and another compatibility hack: if the prg returns pkg:<package>,
+      # the release of the package will be used. yuck...
+      if (@nl && $nl[0] =~ s/^pkg://) {
+	my $relpkg = $nl[0];
+	chomp $relpkg;
+	if ($buildroot) {
+	  open(RP, "-|", 'chroot', $buildroot, 'rpm', '-q', '--qf', '%{RELEASE}', $relpkg) || die("rpm: $!\n");
+	} else {
+	  open(RP, "-|", 'rpm', '-q', '--qf', '%{RELEASE}', $relpkg) || die("rpm: $!\n");
+	}
+        @nl = grep {$_ ne ''} <RP>;
+        if (!close(RP)) {
+	  warn("rpm package query of '$relpkg' failed: $?\n");
+        }
+      }
+      if ($nl[0]) {
+	chomp $nl[0];
+	$l =~ s/^(Release:\s*).*/$1$nl[0]/i;
+        if ($release) {
+	  if (!($l =~ s/<RELEASE\d*>/$release/g)) {
+	    if ($l =~ /<(?:CI_CNT|B_CNT)>/) {
+	      # XXX: should pass ci_cnt/b_cnt instead
+	      if ($release =~ /(\d+)\.(\d+)$/) {
+		my ($ci, $b) = ($1, $2);
+		$l =~ s/<CI_CNT>/$ci/;
+		$l =~ s/<B_CNT>/$b/;
+	      } elsif ($release =~ /(\d+)$/) {
+		my $b = $1;
+		$l =~ s/<B_CNT>/$b/ unless $l =~ s/<CI_CNT>/$b/;
+	      }
+	    }
+	  }
+	}
+      }
+    }
+    # all compat stuff done. we return to your scheduled program
   }
 
   if (!$used || ($l !~ /^(?:Build)?Requires:/i)) {
