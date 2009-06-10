@@ -62,6 +62,7 @@ $specdir = "./" if $specdir eq '';
 my $newspec = $ARGV[1];
 
 my $cf = Build::read_config_dist($dist, $archs, $configdir);
+$cf->{'warnings'} = 1;
 
 #######################################################################
 

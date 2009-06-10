@@ -185,7 +185,7 @@ sub parse {
       my $tries = 0;
       while ($line =~ /^(.*?)%(\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\()(.*?)$/) {
 	if ($tries++ > 1000) {
-	  print STDERR "Warning: spec file parser ",($lineno?" line $lineno":''),": macro too deeply nested\n";
+	  print STDERR "Warning: spec file parser ",($lineno?" line $lineno":''),": macro too deeply nested\n" if $config->{'warnings'};
 	  $line = 'MACRO';
 	  last;
 	}
@@ -207,7 +207,7 @@ sub parse {
 	  $expandedline .= '%';
 	  next;
 	} elsif ($macname eq '(') {
-	  print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand %(...)\n";
+	  print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand %(...)\n" if $config->{'warnings'};
 	  $line = 'MACRO';
 	  last;
 	} elsif ($macname eq 'define' || $macname eq 'global') {
@@ -242,7 +242,7 @@ sub parse {
 	  $line = ((exists($macros{$args[0]}) ? 1 : 0) ^ ($macname eq 'undefined' || $macname eq 'without' ? 1 : 0)).$line;
 	} elsif (exists($macros{$macname})) {
 	  if (!defined($macros{$macname})) {
-	    print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand '$macname'\n";
+	    print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand '$macname'\n" if $config->{'warnings'};
 	    $line = 'MACRO';
 	    last;
 	  }

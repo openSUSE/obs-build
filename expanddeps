@@ -165,6 +165,7 @@ if (!defined($dist) || $dist eq '') {
 }
 
 my $cf = Build::read_config_dist($dist, $archs[0], $configdir);
+$cf->{'warnings'} = 1;
 
 #######################################################################
 
