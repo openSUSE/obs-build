@@ -29,7 +29,7 @@ if [ -z "$mailaddr" ]; then
 fi
 
 EDITOR=${EDITOR:-vim}
-date=`LC_ALL=POSIX TZ=Europe/Berlin date`
+date=`LC_ALL=POSIX TZ=UTC date`
 
 if ! which mktemp > /dev/null 2>&1; then
 	echo "mktemp is required for this script to work"
