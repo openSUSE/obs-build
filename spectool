@@ -272,7 +272,7 @@ for my $spec (@specs) {
     my $srcfile = read_sources_digests($files, $spec);
     if ($opt_download) {
       for my $t (keys %$parsed) {
-	next unless ($t =~ /^source\d*/);
+	next unless ($t =~ /^(?:source|patch)\d*/);
 	my $url = $parsed->{$t};
 	next unless $url =~ /^(?:http|ftp):\/\//;
 	my $file = $url;
@@ -297,7 +297,7 @@ for my $spec (@specs) {
     if ($opt_update) {
       my $changed;
       for my $t (keys %$parsed) {
-	next unless ($t =~ /^source\d*/);
+	next unless ($t =~ /^(?:source|patch)\d*/);
 	my $file = $parsed->{$t};
 	$file =~ s/.*\///;
 	next unless -B $file;
@@ -319,7 +319,7 @@ for my $spec (@specs) {
       }
     } else {
       for my $t (keys %$parsed) {
-	next unless ($t =~ /^source\d*/);
+	next unless ($t =~ /^(?:source|patch)\d*/);
 	my $file = $parsed->{$t};
 	$file =~ s/.*\///;
 	if (!exists $files->{$file}) {
