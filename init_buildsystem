@@ -820,6 +820,12 @@ if test -x $BUILD_ROOT/bin/rpm -a ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a !
     chroot $BUILD_ROOT rpm -q --whatprovides rpm >/dev/null 2>&1
 fi
 
+# create modules.dep in kvm/xen
+# This can not work, until we use the native repository kernel
+#if [ $BUILD_ROOT = "/" -a -x /sbin/depmod ]; then
+#  /sbin/depmod -a
+#fi
+
 rm -rf $BUILD_ROOT/.init_b_cache
 
 rm -f $BUILD_IS_RUNNING
