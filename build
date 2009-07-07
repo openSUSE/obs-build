@@ -758,7 +758,7 @@ find_spec_files
 
 if test -n "$LIST_STATE" ; then
     BUILD_ROOT=`mktemp -d /var/tmp/build-list-state-XXXXXX`
-    test -d "$BUILD_ROOT" || cleanup_and_exit 1
+    test -d "$BUILD_ROOT" || cleanup_and_exit 3
     SPECFILE=$SPECFILES # only one specified anyways
     if test "$SPECFILE" != "${SPECFILE%.src.rpm}" ; then
        rm -rf $BUILD_ROOT/usr/src/packages
@@ -766,7 +766,7 @@ if test -n "$LIST_STATE" ; then
        rpm -i --nodigest --nosignature --root $BUILD_ROOT $SPECFILE || {
 	   echo "could not install $SPECFILE." 2>&1
 	   rm -rf $BUILD_ROOT
-	   cleanup_and_exit 1
+	   cleanup_and_exit 3
        }
        for SPECFILE in $BUILD_ROOT/usr/src/packages/SPECS/*.spec ; do : ; done
     fi
@@ -783,22 +783,22 @@ if test -z "$RUNNING_IN_VM" ; then
 	fi
 	if test ! -e "$VM_IMAGE" ; then
 	    echo "you need to create a file system on $VM_IMAGE first"
-	    cleanup_and_exit 1
+	    cleanup_and_exit 3
 	fi
     fi
     if test -n "$VM_IMAGE" ; then
 	if test -n "$CLEAN_BUILD" ; then
 	    echo "Creating filesystem on $VM_IMAGE"
-	    $vm_img_mkfs $VM_IMAGE || become_root_or_fail
+	    $vm_img_mkfs $VM_IMAGE || cleanup_and_exit 3
 	    if test -n "$vm_img_tunefs" ; then
-	        $vm_img_tunefs $VM_IMAGE || become_root_or_fail
+	        $vm_img_tunefs $VM_IMAGE || cleanup_and_exit 3
 	    fi
 	fi
 	mkdir_build_root
 	if [ -w /root ]; then
-	    mount -o loop $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 1
+	    mount -o loop $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 3
 	else
-	    mount $BUILD_ROOT || become_root_or_fail
+	    mount $BUILD_ROOT || cleanup_and_exit 3
 	fi
     else
 	test -w /root || become_root_or_fail
@@ -1636,7 +1636,7 @@ if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
     args="--padstart 512 --padend 512 -v"
     case "$BUILDTYPE" in
 	spec)
-	    computeblocklists $args $TOPDIR/RPMS/*/*.rpm $TOPDIR/SRPMS/*.rpm > "$VM_SWAP"
+	    computeblocklists $args $TOPDIR/RPMS/*/*.rpm $TOPDIR/SRPMS/* > "$VM_SWAP"
 	    ;;
 	dsc)
 	    computeblocklists $args $TOPDIR/DEBS/*.deb $TOPDIR/SOURCES.DEB/* > "$VM_SWAP"
