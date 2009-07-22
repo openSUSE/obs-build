@@ -1654,7 +1654,9 @@ fi
 if test -n "$RPMS" -a -d "$BUILD_ROOT/$TOPDIR/RPMS" -a -d "$BUILD_ROOT/.build.oldpackages" -a -x "$BUILD_ROOT/usr/lib/build/same-build-result.sh" ; then
     echo "... comparing built packages with the former built"
     # exit with 2, if packages built successfull, but have no changes to former built packages.
+    mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
     chroot $BUILD_ROOT /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/RPMS" "$TOPDIR/SRPMS" && cleanup_and_exit 2
+    umount -n $BUILD_ROOT/proc 2> /dev/null
 fi
 
 echo
