@@ -235,7 +235,7 @@ setupccache()
 		rm -f $BUILD_ROOT/var/lib/build/ccache/bin/$i
 		test -e $BUILD_ROOT/usr/bin/$i || continue
 		echo '#! /bin/sh' > $BUILD_ROOT/var/lib/build/ccache/bin/$i
-		echo "test -e /usr/bin/$i || exit 1" > $BUILD_ROOT/var/lib/build/ccache/bin/$i
+		echo "test -e /usr/bin/$i || exit 1" >> $BUILD_ROOT/var/lib/build/ccache/bin/$i
 	        echo 'export PATH=/opt/icecream/bin:/usr/bin:$PATH' >> $BUILD_ROOT/var/lib/build/ccache/bin/$i
 		echo "ccache $i \"\$@\"" >> $BUILD_ROOT/var/lib/build/ccache/bin/$i
 		chmod 755 $BUILD_ROOT/var/lib/build/ccache/bin/$i
