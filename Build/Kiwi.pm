@@ -157,11 +157,20 @@ sub kiwiparse {
     }
   }
 
-  foreach my $repository(sort {$a->{priority} <=> $b->{priority}} @{$kiwi->{'repository'} || []}) {
-    my $kiwisource = ($repository->{'source'} || [])->[0];
-    next if $kiwisource->{'path'} eq '/var/lib/empty';	# grr
-    die("bad path: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
-    push @repos, "$1/$2";
+  if ($preferences->{'packagemanager'}->[0]->{'_content'} eq 'smart') {
+    foreach my $repository(sort {$b->{priority} <=> $a->{priority}} @{$kiwi->{'repository'} || []}) {
+      my $kiwisource = ($repository->{'source'} || [])->[0];
+      next if $kiwisource->{'path'} eq '/var/lib/empty';	# grr
+      die("bad path: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
+      push @repos, "$1/$2";
+    }
+  }else{
+    foreach my $repository(sort {$a->{priority} <=> $b->{priority}} @{$kiwi->{'repository'} || []}) {
+      my $kiwisource = ($repository->{'source'} || [])->[0];
+      next if $kiwisource->{'path'} eq '/var/lib/empty';	# grr
+      die("bad path: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
+      push @repos, "$1/$2";
+    }
   }
   for my $packagegroup (@{$kiwi->{'packages'} || []}) {
     for my $package (@{$packagegroup->{'package'} || []}) {
