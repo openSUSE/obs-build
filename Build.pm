@@ -7,7 +7,6 @@ use Build::Rpm;
 use Data::Dumper;
 
 our $expand_dbg;
-our $strip_versions;
 
 our $do_rpm;
 our $do_deb;
@@ -361,7 +360,7 @@ sub get_runscripts {
 ###########################################################################
 
 sub readdeps {
-  my ($config, $pkgidp, @depfiles) = @_;
+  my ($config, $pkginfo, @depfiles) = @_;
 
   my %whatprovides = ();
   my %requires = ();
@@ -370,46 +369,57 @@ sub readdeps {
   for my $depfile (@depfiles) {
     if (ref($depfile) eq 'HASH') {
       for my $rr (keys %$depfile) {
-	$provides{$rr} = $depfile->{$rr}->{'provides'};
-	$requires{$rr} = $depfile->{$rr}->{'requires'};
+        $provides{$rr} = $depfile->{$rr}->{'provides'};
+        $requires{$rr} = $depfile->{$rr}->{'requires'};
       }
       next;
     }
+    # XXX: we don't support different architectures per file
     open(F, "<$depfile") || die("$depfile: $!\n");
     while(<F>) {
       my @s = split(' ', $_);
       my $s = shift @s;
       my @ss; 
       while (@s) {
-	if ($s[0] =~ /^\//) {
-	  shift @s;
-	  next;
-	}
-	if ($s[0] =~ /^rpmlib\(/) {
-	  shift @s;
-	  shift @s;
-	  shift @s;
-	  next;
-	}
-	push @ss, shift @s;
-	if (@s && $s[0] =~ /^[<=>]/) {
-	  $ss[-1] .= " $s[0] $s[1]" unless $strip_versions;
-	  shift @s;
-	  shift @s;
-	}
+        if ($s[0] =~ /^\//) {
+          shift @s;
+          next;
+        }
+        if ($s[0] =~ /^rpmlib\(/) {
+            splice(@s, 0, 3);
+            next;
+        }
+        push @ss, shift @s;
+        while (@s) {
+          if ($s[0] =~ /^[\(<=>|]/) {
+            $ss[-1] .= " $s[0] $s[1]";
+            $ss[-1] =~ s/\((.*)\)/$1/;
+            $ss[-1] =~ s/(<|>){2}/$1/;
+            splice(@s, 0, 2);
+          } else {
+            last;
+          }
+        }
       }
       my %ss; 
       @ss = grep {!$ss{$_}++} @ss;
-      if ($s =~ s/^P:(.*):$/$1/) {
-	my $pkgid = $s;
-	$s =~ s/-[^-]+-[^-]+-[^-]+$//;
-	$provides{$s} = \@ss; 
-	$pkgidp->{$s} = $pkgid if $pkgidp;
-      } elsif ($s =~ s/^R:(.*):$/$1/) {
-	my $pkgid = $s;
-	$s =~ s/-[^-]+-[^-]+-[^-]+$//;
-	$requires{$s} = \@ss; 
-	$pkgidp->{$s} = $pkgid if $pkgidp;
+      if ($s =~ /^(P|R):(.*)\.(.*)-\d+\/\d+\/\d+:$/) {
+        my $pkgid = $2;
+        my $arch = $3;
+        if ($1 eq "R") {
+          $requires{$pkgid} = \@ss;
+          next;
+        }
+        # handle provides
+        $provides{$pkgid} = \@ss;
+        if ($pkginfo) {
+          # extract ver and rel from self provides
+          my ($v, $r) = map { /\Q$pkgid\E = ([^-]+)(?:-(.+))?$/ } @ss;
+          die("$pkgid: no self provides\n") unless $v;
+          $pkginfo->{$pkgid}->{'version'} = $v;
+          $pkginfo->{$pkgid}->{'release'} = $r if defined($r);
+          $pkginfo->{$pkgid}->{'arch'} = $arch;
+        }
       }
     }
     close F;
