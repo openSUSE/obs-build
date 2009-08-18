@@ -63,6 +63,10 @@ PERSONALITY_SYSCALL=
 INCARNATION=
 DISTURL=
 CHANGETARGET=
+OVERLAY=
+RSYNCSRC=
+RSYNCDEST=
+RSYNCDONE=
 
 export PATH=$BUILD_DIR:/sbin:/usr/sbin:$PATH
 
@@ -157,6 +161,25 @@ Known Parameters:
 
   --icecream N
               use N parallel build jobs with icecream
+  --overlay OVERLAY
+              Copy overlay filesystem to buildroot after installing
+              all RPMs. This must be a valid directory.
+
+  --rsync-src RSYNCSRC
+              Copy overlay folder (RSYNCSRC) to a folder (RSYNCDEST)
+              inside the buildroot using rsync.
+              It will "%define RSYNCDONE 1" for handling %setup in your
+              specfile. E.g.:
+              %prep
+              %if 0%{?RSYNCDONE}
+              %setup -n aaa_base -T -D -b 5 -b 7
+              %else
+              %setup -n aaa_base -b 5 -b 7
+              %endif
+
+  --rsync-dest RSYNCDEST
+              Copy overlay folder (RSYNCSRC) to a folder (RSYNCDEST)
+              inside the buildroot using rsync.
 
   --debug
               enable creation of a debuginfo package
@@ -663,6 +686,18 @@ while test -n "$1"; do
       ;;
       *-changelog)
         CHANGELOG=true
+      ;;
+      --overlay)
+        OVERLAY=$ARG
+        shift
+      ;;
+      --rsync-src)
+        RSYNCSRC=$ARG
+        shift
+      ;;
+      --rsync-dest)
+        RSYNCDEST=$ARG
+        shift
       ;;
       -*)
         echo Unknown Option "$PARAM". Exit.
@@ -1332,6 +1367,37 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
     BUILD_SUCCEEDED=false
 
+    if test -n "$OVERLAY" ; then
+        if -d "$OVERLAY"; then
+            pushd $OVERLAY
+            echo "Copying overlay to BUILD_ROOT"
+            tar -cpf - . | (cd $BUILD_ROOT ; tar -xvf -)
+            popd
+        else
+            echo "OVERLAY ($OVERLAY) is no directory - skipping"
+        fi
+    fi
+
+    if test -n "$RSYNCSRC" ; then
+        if test -n "$RSYNCDEST"; then
+            if test -d "$RSYNCSRC"; then
+                if ! test -d "$BUILD_ROOT/$RSYNCDEST"; then
+                    echo "ATTENTION! Creating target directory ($BUILD_ROOT/$RSYNCDEST) as its not there."
+                    mkdir -p $BUILD_ROOT/$RSYNCDEST
+                fi
+                echo "Running rsync ..."
+                rsync -av $RSYNCSRC/* $BUILD_ROOT/$RSYNCDEST/
+                chown -R 399:399 $BUILD_ROOT/$RSYNCDEST
+                RSYNCDONE=true
+                echo "... done"
+            else
+                echo "RSYNCSRC is no directory - skipping"
+            fi
+        else
+            echo "RSYNCSRC given, but not RSYNCDEST - skipping"
+        fi
+    fi
+
     if test "$BUILDTYPE" = spec ; then
 	test -z "$BUILD_RPM_BUILD_STAGE" && BUILD_RPM_BUILD_STAGE=-ba
 
@@ -1360,6 +1426,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		rpmbopts[${#rpmbopts[@]}]='--target'
 		rpmbopts[${#rpmbopts[@]}]="$CHANGETARGET"
 	fi
+	if [ -n "$RSYNCDONE" ] ; then
+		rpmbopts[${#rpmbopts[@]}]='--define'
+		rpmbopts[${#rpmbopts[@]}]="RSYNCDONE 1"
+	fi
+
 	rpmbuild=rpmbuild
 
 	test -x $BUILD_ROOT/usr/bin/rpmbuild || rpmbuild=rpm
