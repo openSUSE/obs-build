@@ -1291,6 +1291,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
     if test "$BUILDTYPE" = dsc ; then
 	rm -rf $BUILD_ROOT$TOPDIR/BUILD
+	mkdir -p $BUILD_ROOT$TOPDIR/SOURCES.DEB
 	test $BUILD_USER = abuild && chown 399:399 $BUILD_ROOT$TOPDIR
 	DEB_TRANSFORM=
 	DEB_SOURCEDIR=$TOPDIR/SOURCES
@@ -1300,7 +1301,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	done
 	if test -n "$DEB_TRANSFORM" ; then
 	    echo "running debian transformer..."
-	    mkdir -p $BUILD_ROOT$TOPDIR/SOURCES.DEB
             if ! debtransform $CHANGELOGARGS $BUILD_ROOT$TOPDIR/SOURCES $BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE $BUILD_ROOT$TOPDIR/SOURCES.DEB ; then
 		echo "debian transforming failed."
 		cleanup_and_exit 1
