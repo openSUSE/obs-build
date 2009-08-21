@@ -1109,6 +1109,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		fi
 
 		echo "booting XEN kernel ..."
+                if xm list "build:$XENID" >/dev/null 2>&1 ; then
+                   echo "Instance does already exist, something really went wrong..."
+                   cleanup_and_exit 1
+                fi
 		set -- xm create -c $BUILD_DIR/xen.conf name="build:$XENID" ${MEMSIZE:+memory=$MEMSIZE} $XMROOT $XMSWAP extra="quiet init="$CROSS_INIT_SCRIPT" panic=1 console=ttyS0"
 		if test "$PERSONALITY" != 0 ; then
 		    # have to switch back to PER_LINUX to make xm work
