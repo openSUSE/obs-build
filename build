@@ -1110,7 +1110,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
 		echo "booting XEN kernel ..."
                 if xm list "build:$XENID" >/dev/null 2>&1 ; then
-                   echo "Instance does already exist, something really went wrong..."
+                   echo "Instance already exist, something really went wrong..."
+                   echo "Please report to your server admin, there might be multiple services running for same domain"
                    cleanup_and_exit 1
                 fi
 		set -- xm create -c $BUILD_DIR/xen.conf name="build:$XENID" ${MEMSIZE:+memory=$MEMSIZE} $XMROOT $XMSWAP extra="quiet init="$CROSS_INIT_SCRIPT" panic=1 console=ttyS0"
