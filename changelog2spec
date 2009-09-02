@@ -215,6 +215,7 @@ while(defined($_)) {
   @gm = (0, 0, 0, 2, 0, 97, 4) if $gm[5] < 97 || ($gm[5] == 97 && $gm[4] == 0 && $gm[3] <= 1);
   printf("* %s %s %2d %4d %s\n", $wday[$gm[6]], $mon[$gm[4]], $gm[3], $gm[5] + 1900, $who);
   $changes =~ s/%/%%/g;
+  $changes =~ s/^(\s*)%%(\S*)/$1\[%%$2\]/;
   $changes =~ s/^(\s*)(\#\d*)/$1\[$2\]/mg;
   $changes =~ s/^\*/  */mg;
   print $changes;
