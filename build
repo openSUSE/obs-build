@@ -1112,7 +1112,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                 if xm list "build:$XENID" >/dev/null 2>&1 ; then
                    echo "Instance already exist, something really went wrong..."
                    echo "Please report to your server admin, there might be multiple services running for same domain"
-                   cleanup_and_exit 1
+                   cleanup_and_exit 3
                 fi
 		set -- xm create -c $BUILD_DIR/xen.conf name="build:$XENID" ${MEMSIZE:+memory=$MEMSIZE} $XMROOT $XMSWAP extra="quiet init="$CROSS_INIT_SCRIPT" panic=1 console=ttyS0"
 		if test "$PERSONALITY" != 0 ; then
@@ -1120,7 +1120,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		    set -- linux64 "$@"
 		fi
 		echo "$@"
-		"$@" || true # somehow this is always false
+		"$@" || cleanup_and_exit 3
 	elif [ "$VM_TYPE" = 'uml' ]; then
 		echo "booting UML kernel ..."
 		set -- $uml_kernel initrd=$uml_initrd root=/ubda init=/.build/build panic=1 quiet ubd0=$VM_IMAGE ${MEMSIZE:+mem=$MEMSIZE}
