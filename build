@@ -1162,7 +1162,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		mkdir -p $BUILD_ROOT/.build.packages 
 		cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
 		echo "build: extracting built packages..."
-		extractbuild --disk "$VM_IMAGE" --input "$VM_SWAP" --skip 512 -v
+		extractbuild --disk "$VM_IMAGE" --input "$VM_SWAP" --skip 512 -v || cleanup_and_exit 3
                 # create same layout as with plain chroot
                 if test "$BUILDTYPE" = spec ; then
                   mkdir -p SRPMS
