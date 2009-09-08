@@ -728,12 +728,22 @@ sub query {
     $data->{'provides'} = [ grep {!/^rpmlib\(/ && !/^\//} @{$res{'PROVIDENAME'} || []} ];
     $data->{'requires'} = [ grep {!/^rpmlib\(/ && !/^\//} @{$res{'REQUIRENAME'} || []} ];
   }
+
   # rpm3 compatibility: retrofit missing self provides
-  if (!@{$data->{'provides'}} || $data->{'provides'}->[-1] !~ /^\Q$res{'NAME'}->[0]\E =/) {
+  my $haveselfprovides;
+  if (@{$data->{'provides'}}) {
+    if ($data->{'provides'}->[-1] =~ /^\Q$res{'NAME'}->[0]\E =/) {
+      $haveselfprovides = 1;
+    } elsif (@{$data->{'provides'}} > 1 && $data->{'provides'}->[-2] =~ /^\Q$res{'NAME'}->[0]\E =/) {
+      $haveselfprovides = 1;
+    }
+  }
+  if (!$haveselfprovides) {
     my $evr = "$res{'VERSION'}->[0]-$res{'RELEASE'}->[0]";
     $evr = "$res{'EPOCH'}->[0]:$evr" if $res{'EPOCH'} && $res{'EPOCH'}->[0];
     push @{$data->{'provides'}}, "$res{'NAME'}->[0] = $evr";
   }
+
   $data->{'source'} = $src if $src ne '';
   if ($opts{'evra'}) {
     my $arch = $res{'ARCH'}->[0];
