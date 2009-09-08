@@ -742,7 +742,6 @@ sub query {
     $data->{'release'} = $res{'RELEASE'}->[0];
     $data->{'arch'} = $arch;
     $data->{'epoch'} = $res{'EPOCH'}->[0] if exists $res{'EPOCH'};
-    $data->{'disttag'} = $res{'DISTTAG'}->[0] if exists $res{'DISTTAG'};
   }
   if ($opts{'filelist'}) {
     $data->{'filelist'} = $res{'FILENAMES'};
