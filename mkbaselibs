@@ -1069,7 +1069,7 @@ sub handle_debs {
       $control{"Package"} = "${d_name}-${targettype}";
 
       $controlParser->write_file("${baseTarget}/DEBIAN/control", \%control,
-				 {clobberFile => 1} );
+				 {clobberFile => 1, addNewline=>1 } );
       system "dpkg -b ${baseTarget} /usr/src/packages/DEBS/${d_name}-${targettype}_${d_version}_${targetarch}.deb" || die "dpkg -b failed on $deb";
       system "rm -rf ${baseTarget}";
     }
