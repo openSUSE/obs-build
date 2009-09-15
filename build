@@ -1497,7 +1497,17 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
 
     if test "$BUILDTYPE" = dsc ; then
-	chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && dpkg-buildpackage -us -uc -rfakeroot-tcp" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+	# Checks to see if a build script should be used
+	# this allows the build environment to be manipulated
+	# and alternate build commands can be used
+	DSC_BUILD_CMD="dpkg-buildpackage -us -uc -rfakeroot-tcp"
+	if test -e $BUILD_ROOT/$TOPDIR/SOURCES/build.script ; then
+	    echo "Sourcing build.script to build - it should normally run 'dpkg-buildpackage -us -uc -rfakeroot-tcp'"
+	    DSC_BUILD_CMD="source $TOPDIR/SOURCES/build.script"
+	    chmod +x $BUILD_ROOT/$TOPDIR/SOURCES/build.script
+	fi
+	chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+
 	mkdir -p $BUILD_ROOT/$TOPDIR/DEBS
 	for DEB in $BUILD_ROOT/$TOPDIR/*.deb ; do
 	    test -e "$DEB" && mv "$DEB" "$BUILD_ROOT/$TOPDIR/DEBS"
