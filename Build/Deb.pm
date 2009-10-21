@@ -219,7 +219,10 @@ sub query {
   return undef unless %res;
   my $name = $res{'PACKAGE'};
   my $src = $name;
-  $src = $res{'SOURCE'} if $res{'SOURCE'};
+  if ($res{'SOURCE'}) {
+    $src = $res{'SOURCE'};
+    $src =~ s/\s.*$//;
+  }
   my @provides = split(',\s*', $res{'PROVIDES'} || '');
   push @provides, "$name = $res{'VERSION'}";
   my @depends = split(',\s*', $res{'DEPENDS'} || '');
