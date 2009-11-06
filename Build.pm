@@ -408,6 +408,7 @@ sub readdeps {
         my $arch = $3;
         if ($1 eq "R") {
           $requires{$pkgid} = \@ss;
+          $pkginfo->{$pkgid}->{'requires'} = \@ss if $pkginfo;
           next;
         }
         # handle provides
@@ -416,9 +417,11 @@ sub readdeps {
           # extract ver and rel from self provides
           my ($v, $r) = map { /\Q$pkgid\E = ([^-]+)(?:-(.+))?$/ } @ss;
           die("$pkgid: no self provides\n") unless $v;
+          $pkginfo->{$pkgid}->{'name'} = $pkgid;
           $pkginfo->{$pkgid}->{'version'} = $v;
           $pkginfo->{$pkgid}->{'release'} = $r if defined($r);
           $pkginfo->{$pkgid}->{'arch'} = $arch;
+          $pkginfo->{$pkgid}->{'provides'} = \@ss;
         }
       }
     }
