@@ -1680,9 +1680,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                         pushd $BUILD_ROOT/$TOPDIR/KIWI-pxe > /dev/null
                         echo "compressing images... "
                         tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-pxe.tar.bz2 \
-                          $imagename.$imagearch-$imageversion.config \
-                          $imagename.$imagearch-$imageversion.md5 \
-                          $imagename.$imagearch-$imageversion.gz \
+                          $imagename.$imagearch-$imageversion* \
                           initrd-* || cleanup_and_exit 1
             	    	popd > /dev/null
                         ;;
