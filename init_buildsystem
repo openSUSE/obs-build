@@ -600,17 +600,6 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
 
     test -f $BUILD_ROOT/installed-pkg/$PKG && continue
 
-    test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm || continue
-    if test -f $BUILD_ROOT/.init_b_cache/rpms/$PKG.id -a -f $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG ; then
-        read PKGID < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
-	read OLDPKGID < $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG
-	if test "$PKGID" = "$OLDPKGID" ; then
-	    echo "keeping ${PKGID%% *}"
-	    echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
-	    continue
-	fi
-    fi
-
     if test $PSUF = deb ; then
 	# debian world, install deb files
 	test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.deb || continue
@@ -627,6 +616,18 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
 	test -e $BUILD_ROOT/exit && cleanup_and_exit 1
 	echo "$PKGID debian" > $BUILD_ROOT/installed-pkg/$PKG
 	continue
+    fi
+
+    test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm || continue
+
+    if test -f $BUILD_ROOT/.init_b_cache/rpms/$PKG.id -a -f $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG ; then
+        read PKGID < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
+	read OLDPKGID < $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG
+	if test "$PKGID" = "$OLDPKGID" ; then
+	    echo "keeping ${PKGID%% *}"
+	    echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
+	    continue
+	fi
     fi
 
     PKGID=`rpm -qp --qf "$RPMIDFMT" $RPMCHECKOPTS_HOST $BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm`
@@ -658,7 +659,6 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
 	    test rpm = "$PKG" && chroot $BUILD_ROOT rpm --rebuilddb
 	fi
     fi
-
     export ADDITIONAL_PARAMS=
     if test "$USE_FORCE" = true ; then
         export ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --force"
