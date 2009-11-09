@@ -1250,7 +1250,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
         if ! egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
             echo 'abuild::399:399:Autobuild:/home/abuild:/bin/bash' >>$BUILD_ROOT/etc/passwd
             echo 'abuild:*:::::::' >>$BUILD_ROOT/etc/shadow # This is needed on Mandriva 2009
-            echo 'abuild:*:::::::' >>$BUILD_ROOT/etc/gshadow # This is needed on Ubuntu 8.10
+            echo 'abuild:*::' >>$BUILD_ROOT/etc/gshadow # This is needed on Ubuntu 
             echo 'abuild::399:' >>$BUILD_ROOT/etc/group
             mkdir -p $BUILD_ROOT/home/abuild
             chown 399:399 $BUILD_ROOT/home/abuild
