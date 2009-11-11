@@ -48,6 +48,7 @@ install:
 	    createyastdeps \
 	    changelog2spec \
 	    spectool \
+	    unrpm \
 	    $(DESTDIR)$(pkglibdir)
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build
 	install -m644 *.pm baselibs_global*.conf $(DESTDIR)$(pkglibdir)
@@ -55,9 +56,9 @@ install:
 	rm -f $(DESTDIR)$(pkglibdir)/configs/default.conf
 	cp -a configs/default.conf $(DESTDIR)$(pkglibdir)/configs/default.conf
 	install -m644 build.1 $(DESTDIR)$(man1dir)
-	install -m755 unrpm $(DESTDIR)$(bindir)
 	ln -sf $(pkglibdir)/build $(DESTDIR)$(bindir)/build
 	ln -sf $(pkglibdir)/vc    $(DESTDIR)$(bindir)/buildvc
+	ln -sf $(pkglibdir)/unrpm $(DESTDIR)$(bindir)/unrpm
 
 dist:
 ifeq ($(SCM),svn)
