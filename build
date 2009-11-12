@@ -748,6 +748,7 @@ if test -n "$KILL" ; then
 	fi
     elif test "$VM_TYPE" = 'xen'; then
 	XENID="${VM_IMAGE%/root}"
+	XENID="${XENID%/tmpfs}"
 	XENID="${XENID##*/}"
 	if xm list "build:$XENID" >/dev/null 2>&1 ; then
 	    if ! xm destroy "build:$XENID" ; then
