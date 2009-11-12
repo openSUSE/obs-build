@@ -1097,6 +1097,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		    XMSWAP="disk=$XMSWAP,hda2,w"
 		fi
 		XENID="${VM_IMAGE%/root}"
+		XENID="${XENID%/tmpfs}"
 		XENID="${XENID##*/}"
 		CROSS_INIT_SCRIPT="/.build/build"
 		# to run the qemu initialization in the XEN chroot, we need to register it with a statically build shell
