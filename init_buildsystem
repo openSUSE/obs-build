@@ -33,7 +33,7 @@ TMPFILE=$BUILD_ROOT/tmpfile
 #RPMIDFMT="%{NAME}-%{VERSION}-%{RELEASE} %{BUILDHOST}-%{BUILDTIME}\n"
 RPMIDFMT="%{NAME}-%{VERSION}-%{RELEASE} %{BUILDTIME}\n"
 
-PREPARE_XEN=
+PREPARE_VM=
 USEUSEDFORBUILD=
 LIST_STATE=
 RPMLIST=
@@ -44,7 +44,7 @@ while test -n "$1" ; do
     case "$1" in
 	--prepare)
 	    shift
-	    PREPARE_XEN=true
+	    PREPARE_VM=true
 	    ;;
 	--create-build-binaries)
 	    shift
@@ -187,6 +187,10 @@ function init_db {
     if test $PSUF = rpm ; then
 	echo initializing rpm db...
 	chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
+	# hack: add nofsync to db config to speed up install
+	mkdir -p $BUILD_ROOT/root
+	echo '%__dbi_perms perms=0644 nofsync' > $BUILD_ROOT/.rpmmacros
+	echo '%__dbi_perms perms=0644 nofsync' > $BUILD_ROOT/root/.rpmmacros
     else
 	# force dpkg into database to make epoch test work
 	if ! test "$BUILD_ROOT/.init_b_cache/rpms/dpkg.deb" -ef "$BUILD_ROOT/.init_b_cache/dpkg.deb" ; then
@@ -354,11 +358,11 @@ register_qemu_user
 mkdir -p $BUILD_ROOT
 touch $BUILD_IS_RUNNING
 
-if test -n "$PREPARE_XEN" ; then
+if test -n "$PREPARE_VM" ; then
     rm -f $BUILD_ROOT/.build/init_buildsystem.data
 fi
 if test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
-    # xen continuation
+    # vm continuation
     . $BUILD_ROOT/.build/init_buildsystem.data
     if ! test -e $BUILD_ROOT/.init_b_cache/preinstall_finished ; then
 	# finish preinstall
@@ -471,7 +475,7 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
     for PKG in $PACKAGES_TO_PREINSTALL ; do
 	preinstall ${PKG##*/}
     done
-    if test -n "$PREPARE_XEN" ; then
+    if test -n "$PREPARE_VM" ; then
 	for PKG in $PACKAGES_TO_VMINSTALL ; do
 	    preinstall ${PKG##*/}
 	done
@@ -481,14 +485,14 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
     fi
     test -e $BUILD_ROOT/etc/fstab || touch $BUILD_ROOT/etc/fstab
     test -e $BUILD_ROOT/etc/ld.so.conf || cp $BUILD_ROOT/etc/ld.so.conf.in $BUILD_ROOT/etc/ld.so.conf
-    if test -z "$PREPARE_XEN" ; then
+    if test -z "$PREPARE_VM" ; then
 	preinstall '' true
 	init_db
 	touch $BUILD_ROOT/.init_b_cache/preinstall_finished
     fi
 fi
 
-if test -n "$PREPARE_XEN" ; then
+if test -n "$PREPARE_VM" ; then
     mkdir -p $BUILD_ROOT/.build
     echo "copying packages..."
     for PKG in $PACKAGES_TO_INSTALL ; do
@@ -543,7 +547,7 @@ if test -f $BUILD_ROOT/var/lib/rpm/packages.rpm -o -f $BUILD_ROOT/var/lib/rpm/Pa
 fi
 
 #
-# reorder packages (already done in XEN continuation)
+# reorder packages (already done in vm continuation)
 #
 if ! test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
     echo -n 'reordering...'
@@ -826,10 +830,9 @@ fi
 #  /sbin/depmod -a
 #fi
 
+rm -f $BUILD_ROOT/.rpmmacros $BUILD_ROOT/root/.rpmmacros
 rm -rf $BUILD_ROOT/.init_b_cache
-
 rm -f $BUILD_IS_RUNNING
-
 rm -f $TMPFILE
 
 cleanup_and_exit 0
