@@ -125,6 +125,7 @@ function preinstall {
 	    PAYLOADDECOMPRESS=cat
 	    case `rpm -qp --nodigest --nosignature --qf "%{PAYLOADCOMPRESSOR}\n" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm"` in
 		lzma) rpm --showrc | grep PayloadIsLzma > /dev/null || PAYLOADDECOMPRESS="lzma -d" ;;
+		xz) rpm --showrc | grep PayloadIsXz > /dev/null || PAYLOADDECOMPRESS="xz -d" ;;
 	    esac
 	    if test "$PAYLOADDECOMPRESS" = "lzma -d" ; then
 		if ! lzma </dev/null >/dev/null 2>&1 ; then
