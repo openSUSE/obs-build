@@ -21,7 +21,8 @@ all:
 
 install:
 	install -m755 -d \
-	    $(DESTDIR)$(pkglibdir)/{configs,Build} \
+	    $(DESTDIR)$(pkglibdir)/configs \
+	    $(DESTDIR)$(pkglibdir)/Build \
 	    $(DESTDIR)$(bindir) \
 	    $(DESTDIR)$(man1dir)
 	install -m755 \
