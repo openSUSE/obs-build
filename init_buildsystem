@@ -685,12 +685,12 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
 done
 
 if test $PSUF = deb ; then
-    echo "Configure all installed packages:"
-    # debian configures all packages after complete installations, not for each package like rpm
-    # We need to run this twice, because due to cycle dependencies it does not succeed on most
-    # debian based distros on first attempt.
+    echo "configure all installed packages..."
+    # configure all packages after complete installation, not for each package like rpm does
+    # We need to run this twice, because of cyclic dependencies as it does not succeed on most
+    # debian based distros in the first attempt.
     if ! chroot $BUILD_ROOT dpkg --configure --pending  2>&1; then
-       echo "WARNING: First attempt of configuring packages failed, trying again"
+       echo "first configure attempt failed, trying again..."
        chroot $BUILD_ROOT dpkg --configure --pending  2>&1 || touch $BUILD_ROOT/exit
     fi
 fi

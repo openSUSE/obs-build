@@ -416,6 +416,13 @@ detect_vm_2nd_stage()
     if ! test "$0" = "/.build/build" ; then
 	return 1
     fi
+    if test $$ -eq 1 ; then
+	# ignore special init signals if we're init
+	trap '' TERM HUP
+	$0 "$@"
+	cleanup_and_exit 1
+    fi
+    trap - TERM HUP
     echo "2nd stage started in virtual machine"
     BUILD_ROOT=/
     BUILD_DIR=/.build
@@ -1184,8 +1191,12 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                 fi
 		cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
 		;;
-	      *)
+	      BUILDSTATUS*)
 		cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
+		;;
+	      *)
+		echo "argh, no buildstatus set, assuming bad build host..."
+		cleanup_and_exit 3
 		;;
 	    esac
 	    cleanup_and_exit 1
@@ -1313,7 +1324,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
         mkdir -p $BUILD_ROOT$TOPDIR/$i
 	test $BUILD_USER = abuild && chown 399:399 $BUILD_ROOT$TOPDIR/$i
     done
-    test -e $BUILD_ROOT/exit && cleanup_and_exit
+    test -e $BUILD_ROOT/exit && cleanup_and_exit 1
 
     mkdir -p $BUILD_ROOT$TOPDIR/SOURCES
     if test "$BUILDTYPE" = kiwi ; then
