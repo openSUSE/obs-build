@@ -589,7 +589,7 @@ mkdir -p $BUILD_ROOT/installed-pkg
 
 RPMCHECKOPTS=
 RPMCHECKOPTS_HOST=
-# on Fedoar 10 rpmbuild is in a separate package so we need something else to
+# on Fedora 10 rpmbuild is in a separate package so we need something else to
 # detect rpm4
 test -x $BUILD_ROOT/usr/bin/rpmsign && RPMCHECKOPTS="--nodigest --nosignature"
 test -x /usr/bin/rpmsign && RPMCHECKOPTS_HOST="--nodigest --nosignature"
@@ -616,7 +616,7 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
 	PKGID="${PKGID##*/}"
 	PKGID="${PKGID%.deb}"
 	echo "installing ${PKGID%_*}"
-	( chroot $BUILD_ROOT dpkg -i --force all .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
+	( chroot $BUILD_ROOT dpkg --unpack --force all .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
 	    perl -ne '$|=1;/^(Configuration file|Installing new config file|Selecting previously deselected|\(Reading database|Unpacking |Setting up|Creating config file|Preparing to replace dpkg)/||/^$/||print'
 	test -e $BUILD_ROOT/exit && cleanup_and_exit 1
 	echo "$PKGID debian" > $BUILD_ROOT/installed-pkg/$PKG
@@ -683,6 +683,17 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
     echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
 
 done
+
+if test $PSUF = deb ; then
+    echo "Configure all installed packages:"
+    # debian configures all packages after complete installations, not for each package like rpm
+    # We need to run this twice, because due to cycle dependencies it does not succeed on most
+    # debian based distros on first attempt.
+    if ! chroot $BUILD_ROOT dpkg --configure --pending  2>&1; then
+       echo "WARNING: First attempt of configuring packages failed, trying again"
+       chroot $BUILD_ROOT dpkg --configure --pending  2>&1 || touch $BUILD_ROOT/exit
+    fi
+fi
 
 # devices can vanish if devs got uninstalled
 test -c $BUILD_ROOT/dev/null || create_devs
