@@ -616,7 +616,7 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
 	PKGID="${PKGID##*/}"
 	PKGID="${PKGID%.deb}"
 	echo "installing ${PKGID%_*}"
-	( chroot $BUILD_ROOT dpkg --unpack --force all .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
+	( chroot $BUILD_ROOT dpkg --install --force all .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
 	    perl -ne '$|=1;/^(Configuration file|Installing new config file|Selecting previously deselected|\(Reading database|Unpacking |Setting up|Creating config file|Preparing to replace dpkg)/||/^$/||print'
 	test -e $BUILD_ROOT/exit && cleanup_and_exit 1
 	echo "$PKGID debian" > $BUILD_ROOT/installed-pkg/$PKG
