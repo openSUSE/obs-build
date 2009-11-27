@@ -62,6 +62,7 @@ BUILD_DEBUG=
 PERSONALITY_SYSCALL=
 INCARNATION=
 DISTURL=
+LINKSOURCES=
 CHANGETARGET=
 OVERLAY=
 RSYNCSRC=
@@ -515,7 +516,7 @@ mkdir_build_root()
     if [ -d "$BUILD_ROOT" ]; then
 	# check if it is owned by root
 	if [ -z "$RUNNING_IN_VM" -a \! -O "$BUILD_ROOT" -a "`stat -c %u $BUILD_ROOT`" -ne 0 ]; then
-	    echo "BUILD_ROOT=$BUILD_ROOT must be owned by $USER. Exit..."
+	    echo "BUILD_ROOT=$BUILD_ROOT must be owned by root. Exit..."
 	    cleanup_and_exit 1
 	fi
     else
@@ -715,6 +716,9 @@ while test -n "$1"; do
       --disturl)
         DISTURL=$ARG
 	shift
+      ;;
+      --linksources)
+	LINKSOURCES=true
       ;;
       ----noarg)
         echo "$ARG does not take an argument"
@@ -1332,7 +1336,15 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
 	    mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
 	else
-	    cp -dLR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+	    if test -z "$LINKSOURCES" ; then
+		cp -dLR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+	    else
+		cp -lR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+	    fi
+	    if test "$?" != 0 ; then
+		echo "source copy failed"
+		cleanup_and_exit 1
+	    fi
 	fi
     else
 	cp -p "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
@@ -1542,7 +1554,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		test -L $r && continue
 		test -d $r || continue
 		repo="$TOPDIR/SOURCES/repos/$r/"
-		# create compatibility link
+		# create compatibility link for old kiwi versions
 		rc="${r//:/:/}"
 		if test "$rc" != "$r" ; then
 		    rl="${rc//[^\/]}"
@@ -1563,7 +1575,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    chroot $BUILD_ROOT tar -C $TOPDIR/SOURCES/root -xf "$TOPDIR/SOURCES/${t##*/}"
 	done
         # fix script permissions
-        chmod a+x $BUILD_ROOT/$TOPDIR/SOURCES/*.sh
+        chmod a+x $BUILD_ROOT/$TOPDIR/SOURCES/*.sh 2>/dev/null
 	# unpack tar files in image directories
 	if test -d $BUILD_ROOT/$TOPDIR/SOURCES/images ; then
 	    (
@@ -1577,8 +1589,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		    chroot $BUILD_ROOT tar -C $TOPDIR/SOURCES/images/$r/root -xf "$TOPDIR/SOURCES/images/$r/${t##*/}"
 		done
                 # fix script permissions
-                chmod a+x $BUILD_ROOT/$TOPDIR/SOURCES/images/$r/*.sh
-		# create compatibility link
+                chmod a+x $BUILD_ROOT/$TOPDIR/SOURCES/images/$r/*.sh 2>/dev/null
+		# create compatibility link for old kiwi versions
 		rc="${r//:/:/}"
 		if test "$rc" != "$r" ; then
 		    rl="${rc//[^\/]}"
@@ -1597,7 +1609,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	chroot $BUILD_ROOT su -c "kiwi --version" -
 	if test "$imagetype" = product ; then
 	    echo "running kiwi --create-instsource..."
-	    chroot $BUILD_ROOT su -c "kiwi --root $TOPDIR/KIWIROOT -v -v --instsource-local --logfile terminal -p $TOPDIR/SOURCES --create-instsource $TOPDIR/SOURCES" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+	    chroot $BUILD_ROOT su -c "APPID=- KIWI_COLLECT_TERMINAL_LOG=1 LANG=POSIX kiwi --root $TOPDIR/KIWIROOT -v -v --instsource-local --logfile terminal -p $TOPDIR/SOURCES --create-instsource $TOPDIR/SOURCES" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
 ### This block is obsolete with current kiwi versions, only needed for kiwi 3.01 version
 #	    for i in $BUILD_ROOT/$TOPDIR/KIWIROOT/main/* ; do
 #		test -d "$i" || continue
@@ -1606,6 +1618,18 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 #		test "$n" != "${n%0}" && continue
 #		chroot $BUILD_ROOT su -c "suse-isolinux $TOPDIR/KIWIROOT/main/$n $TOPDIR/KIWI/$n.iso" - $BUILD_USER
 #	    done
+
+	    # move created product to correct destination
+	    for i in $BUILD_ROOT/$TOPDIR/KIWIROOT/main/* ; do
+		test -e "$i" || continue
+		f=${i##*/}
+		case $f in
+		    *.iso) mv $i $BUILD_ROOT/$TOPDIR/KIWI/. ;;
+		    scripts) ;;
+		    *0) ;;
+		    *) test -d $i && mv $i $BUILD_ROOT/$TOPDIR/KIWI/. ;;
+		esac
+	    done
 	else
 	    BUILD_SUCCEEDED=true
             if [ -z "$RUNNING_IN_VM" ]; then
