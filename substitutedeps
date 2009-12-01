@@ -116,7 +116,7 @@ for my $l (@$xspec) {
 
   if ($l =~ /^Release:/i) {
     my $oldl = $l;
-    if ($release) {
+    if (defined $release) {
       if (!($l =~ s/<RELEASE\d*>/$release/g)) {
 	if ($l =~ /<(?:CI_CNT|B_CNT)>/) {
 	  # XXX: should pass ci_cnt/b_cnt instead
@@ -183,7 +183,7 @@ for my $l (@$xspec) {
       if ($nl[0]) {
 	chomp $nl[0];
 	$l =~ s/^(Release:\s*).*/$1$nl[0]/i;
-        if ($release) {
+        if (defined $release) {
 	  if (!($l =~ s/<RELEASE\d*>/$release/g)) {
 	    if ($l =~ /<(?:CI_CNT|B_CNT)>/) {
 	      # XXX: should pass ci_cnt/b_cnt instead
