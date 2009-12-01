@@ -629,7 +629,7 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
         read PKGID < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
 	read OLDPKGID < $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG
 	if test "$PKGID" = "$OLDPKGID" ; then
-	    echo "keeping ${PKGID%% *}"
+	    #echo "keeping ${PKGID%% *}"
 	    echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
 	    continue
 	fi
@@ -650,12 +650,12 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
 		chroot $BUILD_ROOT rpm --nodeps -e $PKG 2>&1 | \
 		    grep -v -e "^r.*failed: No such file or directory" -e "^error: failed to stat .*: No such file or directory"
 	    else
-		echo "keeping ${PKGID%% *}"
+		#echo "keeping ${PKGID%% *}"
 		echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
 		continue
 	    fi
 	else
-	    echo "keeping ${PKGID%% *}"
+	    #echo "keeping ${PKGID%% *}"
 	    echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
 	    continue
 	fi
