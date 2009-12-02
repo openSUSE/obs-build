@@ -98,6 +98,7 @@ sub kiwiparse {
   my @bootrepos;
   my @packages;
   my @extrasources;
+  my @requiredarch;
   my $kiwi = parsexml($xml);
   die("not a kiwi config\n") unless $kiwi && $kiwi->{'image'};
   $kiwi = $kiwi->{'image'}->[0];
@@ -155,6 +156,12 @@ sub kiwiparse {
         $ret->{'version'} = $po->{'_content'} if $po->{'name'} eq 'VERSION';
       }
     }
+    if ($instsource->{'architectures'}) {
+      my $a = $instsource->{'architectures'}->[0] || {};
+      for my $ra (@{$a->{'requiredarch'} || []}) {
+	push @requiredarch, $ra->{'ref'} if defined($ra->{'ref'});
+      }
+    }
   }
 
   if ($preferences->{'packagemanager'}->[0]->{'_content'} eq 'smart') {
@@ -192,6 +199,7 @@ sub kiwiparse {
     push @packages, "kiwi-packagemanager:instsource";
   }
 
+  $ret->{'exclarch'} = [ unify(@requiredarch) ];
   $ret->{'deps'} = [ unify(@packages) ];
   $ret->{'path'} = [ unify(@repos, @bootrepos) ];
   $ret->{'imagetype'} = [ unify(@types) ];
