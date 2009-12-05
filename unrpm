@@ -1,5 +1,4 @@
-#! /bin/bash
-#
+#!/bin/bash
 
 function Usage () {
     echo "Usage: $(basename $0) [-vq] rpm-files...";
@@ -26,7 +25,6 @@ for i in $* ; do
         ;;
     esac
 done
-
 
 test "$VERBOSE" = "true" && CPIO_OPTS="$CPIO_OPTS --verbose"
 test "$QUIET" = "true" && CPIO_OPTS="$CPIO_OPTS --quiet"

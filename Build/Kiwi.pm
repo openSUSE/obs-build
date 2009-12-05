@@ -1,4 +1,3 @@
-
 package Build::Kiwi;
 
 use strict;
@@ -119,16 +118,16 @@ sub kiwiparse {
     if (defined $type->{'boot'}) {
       if ($type->{'boot'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
         next unless $bootcallback;
-	my ($bootxml, $xsrc) = $bootcallback->($1, $2);
-	next unless $bootxml;
-	push @extrasources, $xsrc if $xsrc;
-	my $bret = kiwiparse($bootxml, $arch, $count);
-	push @bootrepos, map {"$_->{'project'}/$_->{'repository'}"} @{$bret->{'path'} || []};
-	push @packages, @{$bret->{'deps'} || []};
-	push @extrasources, @{$bret->{'extrasource'} || []};
+        my ($bootxml, $xsrc) = $bootcallback->($1, $2);
+        next unless $bootxml;
+        push @extrasources, $xsrc if $xsrc;
+        my $bret = kiwiparse($bootxml, $arch, $count);
+        push @bootrepos, map {"$_->{'project'}/$_->{'repository'}"} @{$bret->{'path'} || []};
+        push @packages, @{$bret->{'deps'} || []};
+        push @extrasources, @{$bret->{'extrasource'} || []};
       } else {
-	die("bad boot reference: $type->{'boot'}\n") unless $type->{'boot'} =~ /^([^\/]+)\/([^\/]+)$/;
-	push @packages, "kiwi-boot:$1";
+        die("bad boot reference: $type->{'boot'}\n") unless $type->{'boot'} =~ /^([^\/]+)\/([^\/]+)$/;
+        push @packages, "kiwi-boot:$1";
       }
     }
   }
@@ -142,12 +141,12 @@ sub kiwiparse {
     }
     for my $repopackages (@{$instsource->{'repopackages'} || []}) {
       for my $repopackage (@{$repopackages->{'repopackage'} || []}) {
-	push @packages, $repopackage->{'name'};
+        push @packages, $repopackage->{'name'};
       }
     }
     if ($instsource->{'metadata'}) {
       for my $repopackage (@{$instsource->{'metadata'}->[0]->{'repopackage'} || []}) {
-	push @packages, $repopackage->{'name'};
+        push @packages, $repopackage->{'name'};
       }
     }
     if ($instsource->{'productoptions'}) {
@@ -159,7 +158,7 @@ sub kiwiparse {
     if ($instsource->{'architectures'}) {
       my $a = $instsource->{'architectures'}->[0] || {};
       for my $ra (@{$a->{'requiredarch'} || []}) {
-	push @requiredarch, $ra->{'ref'} if defined($ra->{'ref'});
+        push @requiredarch, $ra->{'ref'} if defined($ra->{'ref'});
       }
     }
   }
@@ -248,7 +247,7 @@ sub query {
 }
 
 sub queryhdrmd5 {
-  my ($bin) = @_; 
+  my ($bin) = @_;
   die("Build::Kiwi::queryhdrmd5 unimplemented.\n");
 }
 

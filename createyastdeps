@@ -14,23 +14,23 @@ sub print_pkg($)
 
   return if $pkg->{'arch'} eq 'src' || $pkg->{'arch'} eq 'nosrc';
   my $id = sprintf("%s.%s-%d/%d/%d: ",
-	  $pkg->{'name'},
-	  $pkg->{'arch'},
-	  $pkg->{'buildtime'},
-	  0,
-	  0);
+    $pkg->{'name'},
+    $pkg->{'arch'},
+    $pkg->{'buildtime'},
+    0,
+    0);
   print sprintf('F:%s%ssuse/%s/%s',$id,$pkg->{'baseurl'},
     $pkg->{'arch'}, $pkg->{'location'}), "\n";
-  
+
   print "P:$id".$pkg->{'provides'}."\n";
   print "R:$id".$pkg->{'requires'}."\n";
 
   my $tag = sprintf("%s-%s-%s %s",
-	  $pkg->{'name'},
-	  $pkg->{'version'},
-	  $pkg->{'release'},
-#			$pkg->{'rpm:buildhost'},
-	  $pkg->{'buildtime'});
+    $pkg->{'name'},
+    $pkg->{'version'},
+    $pkg->{'release'},
+#    $pkg->{'rpm:buildhost'},
+    $pkg->{'buildtime'});
   print "I:$id$tag\n";
 }
 
@@ -70,15 +70,15 @@ while (@ARGV)
 #    if(open(F, '<', $url."/yast/order")) {
 #      my $found_products;
 #      while(<F>) {
-#	chomp;
-#	my ($a, $b) = split(/ /);
-#	$a =~ s/^\///;
-#	if(-e $url.$a)
-#	{
-#	  push @ARGV, $url.$a;
-#	  $found_products = 1;
-#	  print STDERR "$url -> $url$a\n";
-#	}
+#        chomp;
+#        my ($a, $b) = split(/ /);
+#        $a =~ s/^\///;
+#        if(-e $url.$a)
+#        {
+#          push @ARGV, $url.$a;
+#          $found_products = 1;
+#          print STDERR "$url -> $url$a\n";
+#        }
 #      }
 #      close(F);
 #      next if $found_products;
@@ -92,5 +92,3 @@ while (@ARGV)
     { 'Loc' => 'location', 'Prv' => 'provides', 'Req' => 'requires', 'Tim' => 'buildtime' },
     { cb => \&callback, data => $url });
 }
-
-# vim: sw=2

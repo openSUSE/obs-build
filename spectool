@@ -251,18 +251,18 @@ for my $spec (@specs) {
     if($tag =~ /^\/(.+)\/$/) {
       my $expr = $1;
       for my $t (keys %$parsed) {
-	if ($t =~ $expr) {
-	  push @opt_showtag, $t;
-	}
+        if ($t =~ $expr) {
+          push @opt_showtag, $t;
+        }
       }
     } else {
       if(exists $parsed->{lc $tag}) {
-	print $tag, ": ";
-	my $v = $parsed->{lc $tag};
-	$v = join(' ', @$v) if (ref $v eq 'ARRAY');
-	print $v, "\n";
+        print $tag, ": ";
+        my $v = $parsed->{lc $tag};
+        $v = join(' ', @$v) if (ref $v eq 'ARRAY');
+        print $v, "\n";
       } else {
-	print STDERR "$tag does not exist\n";
+        print STDERR "$tag does not exist\n";
       }
     }
   }
@@ -272,83 +272,81 @@ for my $spec (@specs) {
     my $srcfile = read_sources_digests($files, $spec);
     if ($opt_download) {
       for my $t (keys %$parsed) {
-	next unless ($t =~ /^(?:source|patch)\d*/);
-	my $url = $parsed->{$t};
-	next unless $url =~ /^(?:http|ftp):\/\//;
-	my $file = $url;
-	$file =~ s/.*\///;
-	next if -e $file;
-	print "Downloading $file...\n";
-	if(system('curl', '-f', '-L', '-#', '-o', $file, $url) != 0) {
-	  # let's see if the file was recompressed
-	  if($url =~ s/\.bz2$/.gz/ && $file =~ s/\.bz2$/.gz/
-	    && system('curl', '-f', '-L', '-#', '-o', $file, $url) == 0) {
-	    if(system('bznew', $file) == 0) {
-	      print STDERR "Used $file and recompressed to bz2 instead\n";
-	    } else {
-	      unlink $file;
-	    }
-	  } else {
-	    print STDERR "Downloading $file failed\n";
-	  }
-	}
+        next unless ($t =~ /^(?:source|patch)\d*/);
+        my $url = $parsed->{$t};
+        next unless $url =~ /^(?:http|ftp):\/\//;
+        my $file = $url;
+        $file =~ s/.*\///;
+        next if -e $file;
+        print "Downloading $file...\n";
+        if(system('curl', '-f', '-L', '-#', '-o', $file, $url) != 0) {
+          # let's see if the file was recompressed
+          if($url =~ s/\.bz2$/.gz/ && $file =~ s/\.bz2$/.gz/
+            && system('curl', '-f', '-L', '-#', '-o', $file, $url) == 0) {
+            if(system('bznew', $file) == 0) {
+              print STDERR "Used $file and recompressed to bz2 instead\n";
+            } else {
+              unlink $file;
+            }
+          } else {
+            print STDERR "Downloading $file failed\n";
+          }
+        }
       }
     }
     if ($opt_update) {
       my $changed;
       for my $t (keys %$parsed) {
-	next unless ($t =~ /^(?:source|patch)\d*/);
-	my $file = $parsed->{$t};
-	$file =~ s/.*\///;
-	next unless -B $file;
-	my $sum = check_sum($file, ($files->{$file} || ($srcfile eq 'sources'?'md5:':'sha1:')));
-	if($sum) {
-	  print STDERR "update $file\n";
-	  $files->{$file} = $sum;
-	  $changed = 1;
-	}
+        next unless ($t =~ /^(?:source|patch)\d*/);
+        my $file = $parsed->{$t};
+        $file =~ s/.*\///;
+        next unless -B $file;
+        my $sum = check_sum($file, ($files->{$file} || ($srcfile eq 'sources'?'md5:':'sha1:')));
+        if($sum) {
+          print STDERR "update $file\n";
+          $files->{$file} = $sum;
+          $changed = 1;
+        }
       }
       if($changed) {
-	if(open(F, '>', $srcfile)) {
-	  for my $file (keys %$files) {
-	    $files->{$file} =~ s/^md5:// if $srcfile eq 'sources';
-	    print F $files->{$file}, ' ', $file, "\n";
-	  }
-	  close F;
-	}
+        if(open(F, '>', $srcfile)) {
+          for my $file (keys %$files) {
+            $files->{$file} =~ s/^md5:// if $srcfile eq 'sources';
+            print F $files->{$file}, ' ', $file, "\n";
+          }
+          close F;
+        }
       }
     } else {
       for my $t (keys %$parsed) {
-	next unless ($t =~ /^(?:source|patch)\d*/);
-	my $file = $parsed->{$t};
-	$file =~ s/.*\///;
-	if (!exists $files->{$file}) {
-	  if (! -e $file) {
-	    print '- ';
-	  } elsif (-B $file) {
-	    print '_ ';
-	  } else {
-	    print 't ';
-	  }
-	} elsif (! -e $file) {
-	    print 'd ';
-	    delete $files->{$file};
-	} else {
-	  my $sum = check_sum($file, $files->{$file});
-	  if($sum) {
-	    print '! ';
-	  } else {
-	    print '. ';
-	  }
-	  delete $files->{$file};
-	}
-	print $parsed->{$t}, "\n";
+        next unless ($t =~ /^(?:source|patch)\d*/);
+        my $file = $parsed->{$t};
+        $file =~ s/.*\///;
+        if (!exists $files->{$file}) {
+          if (! -e $file) {
+            print '- ';
+          } elsif (-B $file) {
+            print '_ ';
+          } else {
+            print 't ';
+          }
+        } elsif (! -e $file) {
+            print 'd ';
+            delete $files->{$file};
+        } else {
+          my $sum = check_sum($file, $files->{$file});
+          if($sum) {
+            print '! ';
+          } else {
+            print '. ';
+          }
+          delete $files->{$file};
+        }
+        print $parsed->{$t}, "\n";
       }
       for my $file (keys %$files) {
-	print "? $file\n";
+        print "? $file\n";
       }
     }
   }
 }
-
-# vim: sw=2

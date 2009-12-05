@@ -91,46 +91,46 @@ foreach my $dir (@ARGV) {
         my $id = $known;
         $id =~ s/.*-//;
         if ($known ne "$res{1000}->[0].$res{1022}->[0]-$id") {
-	  $known = "$res{1000}->[0].$res{1022}->[0]-$id";
-	  if (!$known2path{$known}) {
-	    push @known, $known;
-	    $known2path{$known} = $path;
-	  }
+          $known = "$res{1000}->[0].$res{1022}->[0]-$id";
+          if (!$known2path{$known}) {
+            push @known, $known;
+            $known2path{$known} = $path;
+          }
         }
-	# rpm3 compatibility: retrofit missing self provides
-	my $name = $res{1000}->[0];
-	if (!@{$res{1047} || []} || $res{1047}->[-1] !~ /^\Q$name\E =/) {
-	  my $evr = "$res{1001}->[0]-$res{1002}->[0]";
-	  $evr = "$res{1003}->[0]:$evr" if $res{1003} && $res{1003}->[0];
-	  push @{$res{1047}}, "$name = $evr";
-	}
+        # rpm3 compatibility: retrofit missing self provides
+        my $name = $res{1000}->[0];
+        if (!@{$res{1047} || []} || $res{1047}->[-1] !~ /^\Q$name\E =/) {
+          my $evr = "$res{1001}->[0]-$res{1002}->[0]";
+          $evr = "$res{1003}->[0]:$evr" if $res{1003} && $res{1003}->[0];
+          push @{$res{1047}}, "$name = $evr";
+        }
 
         $newp{$known} = "P:$known: ".join(' ', @{$res{1047} || []});
         $newr{$known} = "R:$known: ".join(' ', @{$res{1049} || []});
-	#$tag{$known} = $res{1000}->[0]."-".$res{1001}->[0]."-".$res{1002}->[0]." ".$res{1007}->[0]."-".$res{1006}->[0];
-	$tag{$known} = $res{1000}->[0]."-".$res{1001}->[0]."-".$res{1002}->[0]." ".$res{1006}->[0];
+        #$tag{$known} = $res{1000}->[0]."-".$res{1001}->[0]."-".$res{1002}->[0]." ".$res{1007}->[0]."-".$res{1006}->[0];
+        $tag{$known} = $res{1000}->[0]."-".$res{1001}->[0]."-".$res{1002}->[0]." ".$res{1006}->[0];
       } else {
         my %res = Build::Deb::debq($path);
         next unless %res;
-	my ($dn, $da) = ($res{'PACKAGE'}, $res{'ARCHITECTURE'});
-	$da = 'noarch' if $da eq 'all';
+        my ($dn, $da) = ($res{'PACKAGE'}, $res{'ARCHITECTURE'});
+        $da = 'noarch' if $da eq 'all';
         my $id = $known;
         $id =~ s/.*-//;
         if ($known ne "$dn.$da-$id") {
-	  $known = "$dn.$da-$id";
-	  if (!$known2path{$known}) {
-	    push @known, $known;
-	    $known2path{$known} = $path;
-	  }
-	}
-	my @provides = split(',\s*', $res{'PROVIDES'} || '');
-	my @depends = split(',\s*', $res{'DEPENDS'} || '');
-	my @predepends = split(',\s*', $res{'PRE-DEPENDS'} || '');
-	s/\s.*// for @provides;   #for now
-	s/\s.*// for @depends;    #for now
-	s/\s.*// for @predepends; #for now
-	push @depends, @predepends;
-	push @provides, $res{'PACKAGE'};
+          $known = "$dn.$da-$id";
+          if (!$known2path{$known}) {
+            push @known, $known;
+            $known2path{$known} = $path;
+          }
+        }
+        my @provides = split(',\s*', $res{'PROVIDES'} || '');
+        my @depends = split(',\s*', $res{'DEPENDS'} || '');
+        my @predepends = split(',\s*', $res{'PRE-DEPENDS'} || '');
+        s/\s.*// for @provides;   #for now
+        s/\s.*// for @depends;    #for now
+        s/\s.*// for @predepends; #for now
+        push @depends, @predepends;
+        push @provides, $res{'PACKAGE'};
         $newp{$known} = "P:$known: ".join(' ', @provides);
         $newr{$known} = "R:$known: ".join(' ', @depends);
       }

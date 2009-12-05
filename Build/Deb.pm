@@ -1,4 +1,3 @@
-
 package Build::Deb;
 
 use strict;
@@ -64,31 +63,31 @@ sub parse {
       my @d = split(/,\s*/, $data);
       for my $d (@d) {
         if ($d =~ /^(.*?)\s*\[(.*)\]$/) {
-	  $d = $1;
-	  my $isneg = 0;
+          $d = $1;
+          my $isneg = 0;
           my $bad;
           for my $q (split('[\s,]', $2)) {
             $isneg = 1 if $q =~ s/^\!//;
             $bad = 1 if !defined($bad) && !$isneg;
             if ($isneg) {
               if ($q eq $arch || $q eq "$os-$arch") {
-		$bad = 1;
-		last;
-	      }
-	    } elsif ($q eq $arch || $q eq "$os-$arch") {
-	      $bad = 0;
-	    }
-	  }
-	  next if $bad;
-	}
-	$d =~ s/ \(([^\)]*)\)/ $1/g;
-	$d =~ s/>>/>/g;
-	$d =~ s/<</</g;
-	if ($tag eq 'BUILD-DEPENDS' || $tag eq 'BUILD-DEPENDS-INDEP') {
+                $bad = 1;
+                last;
+              }
+            } elsif ($q eq $arch || $q eq "$os-$arch") {
+              $bad = 0;
+            }
+          }
+          next if $bad;
+        }
+        $d =~ s/ \(([^\)]*)\)/ $1/g;
+        $d =~ s/>>/>/g;
+        $d =~ s/<</</g;
+        if ($tag eq 'BUILD-DEPENDS' || $tag eq 'BUILD-DEPENDS-INDEP') {
           push @deps, $d;
-	} else {
+        } else {
           push @deps, "-$d";
-	}
+        }
       }
     }
   }
@@ -257,22 +256,22 @@ sub query {
 }
 
 sub queryhdrmd5 {
-  my ($bin) = @_; 
+  my ($bin) = @_;
 
-  local *F; 
+  local *F;
   open(F, '<', $bin) || die("$bin: $!\n");
-  my $data = ''; 
+  my $data = '';
   sysread(F, $data, 4096);
   if (length($data) < 8+60) {
     warn("$bin: not a debian package\n");
     close F;
-    return undef; 
-  }   
+    return undef;
+  }
   if (substr($data, 0, 8+16) ne "!<arch>\ndebian-binary   ") {
     warn("$bin: not a debian package\n");
     close F;
-    return undef; 
-  }   
+    return undef;
+  }
   my $len = substr($data, 8+48, 10);
   $len += $len & 1;
   if (length($data) < 8+60+$len+60) {
@@ -281,24 +280,24 @@ sub queryhdrmd5 {
     if ((sysread(F, $data, $r < 4096 ? 4096 : $r, length($data)) || 0) < $r) {
       warn("$bin: unexpected EOF\n");
       close F;
-      return undef; 
-    }   
-  }   
+      return undef;
+    }
+  }
   $data = substr($data, 8 + 60 + $len);
   if (substr($data, 0, 16) ne 'control.tar.gz  ') {
     warn("$bin: control.tar.gz is not second ar entry\n");
     close F;
-    return undef; 
-  }   
+    return undef;
+  }
   $len = substr($data, 48, 10);
   if (length($data) < 60+$len) {
     my $r = 60+$len - length($data);
     if ((sysread(F, $data, $r, length($data)) || 0) < $r) {
       warn("$bin: unexpected EOF\n");
       close F;
-      return undef; 
-    }   
-  }   
+      return undef;
+    }
+  }
   close F;
   $data = substr($data, 60, $len);
   return Digest::MD5::md5_hex($data);

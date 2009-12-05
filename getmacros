@@ -18,7 +18,7 @@ while (@ARGV)  {
   if ($ARGV[0] eq '--archpath') {
     shift @ARGV;
     $archs = shift @ARGV;
-    next;   
+    next;
   }
   if ($ARGV[0] eq '--configdir') {
     shift @ARGV;

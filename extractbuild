@@ -77,19 +77,19 @@ while(<S>) {
     while($block <= $end && $filesize) {
       my $size;
       if($end == $block) {
-	$size = $blksize;
-	++$block;
+        $size = $blksize;
+        ++$block;
       } elsif($maxblocks >= $end-$block) {
-	$size = ($end-$block)*$blksize;
-	$block += $end-$block;
+        $size = ($end-$block)*$blksize;
+        $block += $end-$block;
       } else {
-	$size = $maxblocks*$blksize;
-	$block += $maxblocks;
+        $size = $maxblocks*$blksize;
+        $block += $maxblocks;
       }
       $size = $filesize if $size > $filesize;
       my $buf;
       if((sysread(F, $buf, $size) || 0) != $size) {
-	die "$file: read: $!\n";
+        die "$file: read: $!\n";
       }
       $filesize -= $size;
       print O $buf;

@@ -8,7 +8,6 @@ use strict;
 
 use Build;
 
-
 sub expand {
   my ($config, $str) = @_;
   my @xspec;
@@ -118,19 +117,19 @@ for my $l (@$xspec) {
     my $oldl = $l;
     if (defined $release) {
       if (!($l =~ s/<RELEASE\d*>/$release/g)) {
-	if ($l =~ /<(?:CI_CNT|B_CNT)>/) {
-	  # XXX: should pass ci_cnt/b_cnt instead
-	  if ($release =~ /(\d+)\.(\d+)$/) {
-	    my ($ci, $b) = ($1, $2);
-	    $l =~ s/<CI_CNT>/$ci/;
-	    $l =~ s/<B_CNT>/$b/;
-	  } elsif ($release =~ /(\d+)$/) {
-	    my $b = $1;
-	    $l =~ s/<B_CNT>/$b/ unless $l =~ s/<CI_CNT>/$b/;
-	  }
-	} else {
-	  $l =~ s/^(Release:\s*).*/$1$release/i;
-	}
+        if ($l =~ /<(?:CI_CNT|B_CNT)>/) {
+          # XXX: should pass ci_cnt/b_cnt instead
+          if ($release =~ /(\d+)\.(\d+)$/) {
+            my ($ci, $b) = ($1, $2);
+            $l =~ s/<CI_CNT>/$ci/;
+            $l =~ s/<B_CNT>/$b/;
+          } elsif ($release =~ /(\d+)$/) {
+            my $b = $1;
+            $l =~ s/<B_CNT>/$b/ unless $l =~ s/<CI_CNT>/$b/;
+          }
+        } else {
+          $l =~ s/^(Release:\s*).*/$1$release/i;
+        }
       }
     }
     # this is to be compatible to legacy autobuild.
@@ -148,56 +147,56 @@ for my $l (@$xspec) {
       my @nl;
       my $interpreter = "/bin/bash";
       if (open(RP, '<', "$specdir$cf->{'releaseprg'}")) {
-	@nl = <RP>;
+        @nl = <RP>;
         close RP;
-	if (@nl && $nl[0] =~ /^#!\s*(\S*)/) {
-	  $interpreter = $1;
-	}
+        if (@nl && $nl[0] =~ /^#!\s*(\S*)/) {
+          $interpreter = $1;
+        }
       }
       if ($buildroot) {
-	my $sd = $specdir;
-	$sd =~ s/^\Q$buildroot\E//;
+        my $sd = $specdir;
+        $sd =~ s/^\Q$buildroot\E//;
         open(RP, "-|", 'chroot', $buildroot, $interpreter, "$sd$cf->{'releaseprg'}", $project, $newl, $pkg, $arch) || die("$cf->{'releaseprg'}: $!\n");
       } else {
         open(RP, "-|", $interpreter, "$specdir$cf->{'releaseprg'}", $project, $newl, $pkg, $arch) || die("$cf->{'releaseprg'}: $!\n");
       }
       @nl = grep {$_ ne ''} <RP>;
       if (!close(RP)) {
-	warn("$cf->{'releaseprg'} failed: $?\n");
+        warn("$cf->{'releaseprg'} failed: $?\n");
       }
       # and another compatibility hack: if the prg returns pkg:<package>,
       # the release of the package will be used. yuck...
       if (@nl && $nl[0] =~ s/^pkg://) {
-	my $relpkg = $nl[0];
-	chomp $relpkg;
-	if ($buildroot) {
-	  open(RP, "-|", 'chroot', $buildroot, 'rpm', '-q', '--qf', '%{RELEASE}', $relpkg) || die("rpm: $!\n");
-	} else {
-	  open(RP, "-|", 'rpm', '-q', '--qf', '%{RELEASE}', $relpkg) || die("rpm: $!\n");
-	}
+        my $relpkg = $nl[0];
+        chomp $relpkg;
+        if ($buildroot) {
+          open(RP, "-|", 'chroot', $buildroot, 'rpm', '-q', '--qf', '%{RELEASE}', $relpkg) || die("rpm: $!\n");
+        } else {
+          open(RP, "-|", 'rpm', '-q', '--qf', '%{RELEASE}', $relpkg) || die("rpm: $!\n");
+        }
         @nl = grep {$_ ne ''} <RP>;
         if (!close(RP)) {
-	  warn("rpm package query of '$relpkg' failed: $?\n");
+          warn("rpm package query of '$relpkg' failed: $?\n");
         }
       }
       if ($nl[0]) {
-	chomp $nl[0];
-	$l =~ s/^(Release:\s*).*/$1$nl[0]/i;
+        chomp $nl[0];
+        $l =~ s/^(Release:\s*).*/$1$nl[0]/i;
         if (defined $release) {
-	  if (!($l =~ s/<RELEASE\d*>/$release/g)) {
-	    if ($l =~ /<(?:CI_CNT|B_CNT)>/) {
-	      # XXX: should pass ci_cnt/b_cnt instead
-	      if ($release =~ /(\d+)\.(\d+)$/) {
-		my ($ci, $b) = ($1, $2);
-		$l =~ s/<CI_CNT>/$ci/;
-		$l =~ s/<B_CNT>/$b/;
-	      } elsif ($release =~ /(\d+)$/) {
-		my $b = $1;
-		$l =~ s/<B_CNT>/$b/ unless $l =~ s/<CI_CNT>/$b/;
-	      }
-	    }
-	  }
-	}
+          if (!($l =~ s/<RELEASE\d*>/$release/g)) {
+            if ($l =~ /<(?:CI_CNT|B_CNT)>/) {
+              # XXX: should pass ci_cnt/b_cnt instead
+              if ($release =~ /(\d+)\.(\d+)$/) {
+                my ($ci, $b) = ($1, $2);
+                $l =~ s/<CI_CNT>/$ci/;
+                $l =~ s/<B_CNT>/$b/;
+              } elsif ($release =~ /(\d+)$/) {
+                my $b = $1;
+                $l =~ s/<B_CNT>/$b/ unless $l =~ s/<CI_CNT>/$b/;
+              }
+            }
+          }
+        }
       }
     }
     # all compat stuff done. we return to your scheduled program

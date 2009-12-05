@@ -171,15 +171,14 @@ $cf->{'warnings'} = 1;
 
 sub print_rpmlist
 {
-	for (@_) {
-		print "$_ $fn{$packs{$_}}\n";
-		print "rpmid: $_:$ids{$packs{$_}}\n" if exists $ids{$packs{$_}};
-	}
-	print "preinstall: @{$cf->{'preinstall'} || []}\n";
-	print "vminstall: @{$cf->{'vminstall'} || []}\n";
-	print "runscripts: @{$cf->{'runscripts'} || []}\n";
-	print "dist: $dist\n" if defined $dist;
-
+  for (@_) {
+    print "$_ $fn{$packs{$_}}\n";
+    print "rpmid: $_:$ids{$packs{$_}}\n" if exists $ids{$packs{$_}};
+  }
+  print "preinstall: @{$cf->{'preinstall'} || []}\n";
+  print "vminstall: @{$cf->{'vminstall'} || []}\n";
+  print "runscripts: @{$cf->{'runscripts'} || []}\n";
+  print "dist: $dist\n" if defined $dist;
 }
 
 if ($useusedforbuild) {

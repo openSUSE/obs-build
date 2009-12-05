@@ -120,9 +120,9 @@ set +e
 
 {
 	if [ ! $just_edit ]; then
-	    echo "-------------------------------------------------------------------"
-	    echo "$date - $mailaddr"
-	    echo
+		echo "-------------------------------------------------------------------"
+		echo "$date - $mailaddr"
+		echo
 	fi
 	if [ -n "$message" ]; then
 		echo "- $message"

@@ -132,15 +132,15 @@ sub doseries {
         $_ = substr($_, 4);
         my $l = $level;
         while ($l > 0) {
-	  last unless s/.*?\///;
-	  $l--;
-	}
+          last unless s/.*?\///;
+          $l--;
+        }
         if ($start eq '--- ') {
           print DIFF "$start$tardir.orig/$_\n";
-	} else {
+        } else {
           print DIFF "$start$tardir/$_\n";
-	}
-	next;
+        }
+        next;
       }
       print DIFF "$_\n";
     }

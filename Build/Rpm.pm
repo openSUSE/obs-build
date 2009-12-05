@@ -1,4 +1,3 @@
-
 package Build::Rpm;
 
 use strict;
@@ -155,10 +154,10 @@ sub parse {
       $line = shift @$specdata;
       ++$lineno;
       if (ref $line) {
-	$line = $line->[0]; # verbatim line
+        $line = $line->[0]; # verbatim line
         push @$xspec, $line if $xspec;
         $xspec->[-1] = [ $line, undef ] if $xspec && $skip;
-	next;
+        next;
       }
     } else {
       $inspec = 1;
@@ -171,7 +170,7 @@ sub parse {
     if ($line =~ /^#\s*neededforbuild\s*(\S.*)$/) {
       if (defined $hasnfb) {
         $xspec->[-1] = [ $xspec->[-1], undef ] if $inspec && $xspec;
-	next;
+        next;
       }
       $hasnfb = $1;
       $nfbline = \$xspec->[-1] if $inspec && $xspec;
@@ -184,77 +183,77 @@ sub parse {
     if (!$skip) {
       my $tries = 0;
       while ($line =~ /^(.*?)%(\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\()(.*?)$/) {
-	if ($tries++ > 1000) {
-	  print STDERR "Warning: spec file parser ",($lineno?" line $lineno":''),": macro too deeply nested\n" if $config->{'warnings'};
-	  $line = 'MACRO';
-	  last;
-	}
-	$expandedline .= $1;
-	$line = $4;
-	my $macname = defined($3) ? $3 : $2;
-	my $macorig = $2;
-	my $mactest = 0;
-	if ($macname =~ /^\!\?/ || $macname =~ /^\?\!/) {
-	  $mactest = -1;
-	} elsif ($macname =~ /^\?/) {
-	  $mactest = 1;
-	}
-	$macname =~ s/^[\!\?]+//;
-	$macname =~ s/^([^:\s]*)\s.*/$1/;
-	my $macalt;
-	($macname, $macalt) = split(':', $macname, 2);
-	if ($macname eq '%') {
-	  $expandedline .= '%';
-	  next;
-	} elsif ($macname eq '(') {
-	  print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand %(...)\n" if $config->{'warnings'};
-	  $line = 'MACRO';
-	  last;
-	} elsif ($macname eq 'define' || $macname eq 'global') {
-	  if ($line =~ /^\s*([0-9a-zA-Z_]+)(\([^\)]*\))?\s*(.*?)$/) {
-	    my $macname = $1;
-	    my $macargs = $2;
-	    my $macbody = $3;
-	    $macbody = undef if $macargs;
-	    $macros{$macname} = $macbody;
-	  }
-	  $line = '';
-	  last;
-	} elsif ($macname eq 'defined' || $macname eq 'with' || $macname eq 'undefined' || $macname eq 'without' || $macname eq 'bcond_with' || $macname eq 'bcond_without') {
-	  my @args;
-	  if ($macorig =~ /^\{(.*)\}$/) {
-	    @args = split(' ', $1);
-	    shift @args;
-	  } else {
-	    @args = split(' ', $line);
-	    $line = '';
-	  }
-	  next unless @args;
-	  if ($macname eq 'bcond_with') {
-	    $macros{"with_$args[0]"} = 1 if exists $macros{"_with_$args[0]"};
-	    next;
-	  }
-	  if ($macname eq 'bcond_without') {
-	    $macros{"with_$args[0]"} = 1 unless exists $macros{"_without_$args[0]"};
-	    next;
-	  }
-	  $args[0] = "with_$args[0]" if $macname eq 'with' || $macname eq 'without';
-	  $line = ((exists($macros{$args[0]}) ? 1 : 0) ^ ($macname eq 'undefined' || $macname eq 'without' ? 1 : 0)).$line;
-	} elsif (exists($macros{$macname})) {
-	  if (!defined($macros{$macname})) {
-	    print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand '$macname'\n" if $config->{'warnings'};
-	    $line = 'MACRO';
-	    last;
-	  }
-	  $macalt = $macros{$macname} unless defined $macalt;
-	  $macalt = '' if $mactest == -1;
-	  $line = "$macalt$line";
-	} elsif ($mactest) {
-	  $macalt = '' if !defined($macalt) || $mactest == 1;
-	  $line = "$macalt$line";
-	} else {
-	  $expandedline .= "%$macorig";
-	}
+        if ($tries++ > 1000) {
+          print STDERR "Warning: spec file parser ",($lineno?" line $lineno":''),": macro too deeply nested\n" if $config->{'warnings'};
+          $line = 'MACRO';
+          last;
+        }
+        $expandedline .= $1;
+        $line = $4;
+        my $macname = defined($3) ? $3 : $2;
+        my $macorig = $2;
+        my $mactest = 0;
+        if ($macname =~ /^\!\?/ || $macname =~ /^\?\!/) {
+          $mactest = -1;
+        } elsif ($macname =~ /^\?/) {
+          $mactest = 1;
+        }
+        $macname =~ s/^[\!\?]+//;
+        $macname =~ s/^([^:\s]*)\s.*/$1/;
+        my $macalt;
+        ($macname, $macalt) = split(':', $macname, 2);
+        if ($macname eq '%') {
+          $expandedline .= '%';
+          next;
+        } elsif ($macname eq '(') {
+          print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand %(...)\n" if $config->{'warnings'};
+          $line = 'MACRO';
+          last;
+        } elsif ($macname eq 'define' || $macname eq 'global') {
+          if ($line =~ /^\s*([0-9a-zA-Z_]+)(\([^\)]*\))?\s*(.*?)$/) {
+            my $macname = $1;
+            my $macargs = $2;
+            my $macbody = $3;
+            $macbody = undef if $macargs;
+            $macros{$macname} = $macbody;
+          }
+          $line = '';
+          last;
+        } elsif ($macname eq 'defined' || $macname eq 'with' || $macname eq 'undefined' || $macname eq 'without' || $macname eq 'bcond_with' || $macname eq 'bcond_without') {
+          my @args;
+          if ($macorig =~ /^\{(.*)\}$/) {
+            @args = split(' ', $1);
+            shift @args;
+          } else {
+            @args = split(' ', $line);
+            $line = '';
+          }
+          next unless @args;
+          if ($macname eq 'bcond_with') {
+            $macros{"with_$args[0]"} = 1 if exists $macros{"_with_$args[0]"};
+            next;
+          }
+          if ($macname eq 'bcond_without') {
+            $macros{"with_$args[0]"} = 1 unless exists $macros{"_without_$args[0]"};
+            next;
+          }
+          $args[0] = "with_$args[0]" if $macname eq 'with' || $macname eq 'without';
+          $line = ((exists($macros{$args[0]}) ? 1 : 0) ^ ($macname eq 'undefined' || $macname eq 'without' ? 1 : 0)).$line;
+        } elsif (exists($macros{$macname})) {
+          if (!defined($macros{$macname})) {
+            print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand '$macname'\n" if $config->{'warnings'};
+            $line = 'MACRO';
+            last;
+          }
+          $macalt = $macros{$macname} unless defined $macalt;
+          $macalt = '' if $mactest == -1;
+          $line = "$macalt$line";
+        } elsif ($mactest) {
+          $macalt = '' if !defined($macalt) || $mactest == 1;
+          $line = "$macalt$line";
+        } else {
+          $expandedline .= "%$macorig";
+        }
       }
     }
     $line = $expandedline . $line;
@@ -312,25 +311,25 @@ sub parse {
     }
     if ($main_preamble) {
       if ($line =~ /^(Name|Version|Disttag|Release)\s*:\s*(\S+)/i) {
-	$ret->{lc $1} = $2;
-	$macros{lc $1} = $2;
+        $ret->{lc $1} = $2;
+        $macros{lc $1} = $2;
       } elsif ($line =~ /^(Source\d*|Patch\d*|Url)\s*:\s*(\S+)/i) {
-	$ret->{lc $1} = $2;
+        $ret->{lc $1} = $2;
       } elsif ($line =~ /^ExclusiveArch\s*:\s*(.*)/i) {
-	$exclarch ||= [];
-	push @$exclarch, split(' ', $1);
+        $exclarch ||= [];
+        push @$exclarch, split(' ', $1);
       } elsif ($line =~ /^ExcludeArch\s*:\s*(.*)/i) {
-	$badarch ||= [];
-	push @$badarch, split(' ', $1);
+        $badarch ||= [];
+        push @$badarch, split(' ', $1);
       }
     }
     if ($line =~ /^(?:Requires\(pre\)|Requires\(post\)|PreReq)\s*:\s*(\S.*)$/i) {
       my $deps = $1;
       my @deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
       while (@deps) {
-	my ($pack, $vers, $qual) = splice(@deps, 0, 3);
-	next if $pack =~ /\//;
-	push @prereqs, $pack unless grep {$_ eq $pack} @prereqs;
+        my ($pack, $vers, $qual) = splice(@deps, 0, 3);
+        next if $pack =~ /\//;
+        push @prereqs, $pack unless grep {$_ eq $pack} @prereqs;
       }
       next;
     }
@@ -342,64 +341,64 @@ sub parse {
       my $replace = 0;
       my @ndeps = ();
       while (@deps) {
-	my ($pack, $vers, $qual) = splice(@deps, 0, 3);
-	if (defined($qual)) {
+        my ($pack, $vers, $qual) = splice(@deps, 0, 3);
+        if (defined($qual)) {
           $replace = 1;
           my $arch = $macros{'_target_cpu'} || '';
           my $proj = $macros{'_target_project'} || '';
-	  $qual =~ s/^\s*\[//;
-	  $qual =~ s/\]$//;
-	  my $isneg = 0;
-	  my $bad;
-	  for my $q (split('[\s,]', $qual)) {
-	    $isneg = 1 if $q =~ s/^\!//;
-	    $bad = 1 if !defined($bad) && !$isneg;
-	    if ($isneg) {
-	      if ($q eq $arch || $q eq $proj) {
-		$bad = 1;
-		last;
-	      }
-	    } elsif ($q eq $arch || $q eq $proj) {
-	      $bad = 0;
-	    }
-	  }
-	  next if $bad;
-	}
-	$vers = '' unless defined $vers;
-	$vers =~ s/=(>|<)/$1=/;
-	push @ndeps, "$pack$vers";
+          $qual =~ s/^\s*\[//;
+          $qual =~ s/\]$//;
+          my $isneg = 0;
+          my $bad;
+          for my $q (split('[\s,]', $qual)) {
+            $isneg = 1 if $q =~ s/^\!//;
+            $bad = 1 if !defined($bad) && !$isneg;
+            if ($isneg) {
+              if ($q eq $arch || $q eq $proj) {
+                $bad = 1;
+                last;
+              }
+            } elsif ($q eq $arch || $q eq $proj) {
+              $bad = 0;
+            }
+          }
+          next if $bad;
+        }
+        $vers = '' unless defined $vers;
+        $vers =~ s/=(>|<)/$1=/;
+        push @ndeps, "$pack$vers";
       }
 
       $replace = 1 if grep {/^-/} @ndeps;
       if (lc($what) ne 'buildrequires') {
-	push @packdeps, map {"-$_"} @ndeps;
-	next;
+        push @packdeps, map {"-$_"} @ndeps;
+        next;
       }
       if (defined($hasnfb)) {
         if ((grep {$_ eq 'glibc' || $_ eq 'rpm' || $_ eq 'gcc' || $_ eq 'bash'} @ndeps) > 2) {
           # ignore old generated BuildRequire lines.
-	  $xspec->[-1] = [ $xspec->[-1], undef ] if $xspec;
-	  next;
-	}
+          $xspec->[-1] = [ $xspec->[-1], undef ] if $xspec;
+          next;
+        }
       }
       push @packdeps, @ndeps;
       next unless $xspec && $inspec;
       if ($replace) {
-	my @cndeps = grep {!/^-/} @ndeps;
-	if (@cndeps) {
+        my @cndeps = grep {!/^-/} @ndeps;
+        if (@cndeps) {
           $xspec->[-1] = [ $xspec->[-1], "$what:  ".join(' ', @cndeps) ];
-	} else {
+        } else {
           $xspec->[-1] = [ $xspec->[-1], ''];
-	}
+        }
       }
       next;
     }
 
     if ($line =~ /^\s*%package\s+(-n\s+)?(\S+)/) {
       if ($1) {
-	push @subpacks, $2;
+        push @subpacks, $2;
       } else {
-	push @subpacks, $ret->{'name'}.'-'.$2 if defined $ret->{'name'};
+        push @subpacks, $ret->{'name'}.'-'.$2 if defined $ret->{'name'};
       }
       $preamble = 1;
       $main_preamble = 0;
@@ -472,7 +471,7 @@ sub rpmq {
   push @stags, 'BASENAMES', 'DIRNAMES', 'DIRINDEXES', 'OLDFILENAMES' if $need_filenames;
   @stags = grep { $_ ne 'FILENAMES' } @stags if $need_filenames;
 
-  my %stags = map {0 + ($rpmstag{$_} || $_) => $_} @stags; 
+  my %stags = map {0 + ($rpmstag{$_} || $_) => $_} @stags;
 
   my ($magic, $sigtype, $headmagic, $cnt, $cntdata, $lead, $head, $index, $data, $tag, $type, $offset, $count);
 
@@ -769,8 +768,8 @@ sub queryhdrmd5 {
   local *F;
   open(F, '<', $bin) || die("$bin: $!\n");
   my $buf = '';
-  my $l;  
-  while (length($buf) < 96 + 16) { 
+  my $l;
+  while (length($buf) < 96 + 16) {
     $l = sysread(F, $buf, 4096, length($buf));
     if (!$l) {
       warn("$bin: read error\n");
