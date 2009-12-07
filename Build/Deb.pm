@@ -241,12 +241,10 @@ sub query {
   };
   $data->{'source'} = $src if $src ne '';
   if ($opts{'evra'}) {
-    if ($res{'VERSION'} =~ /^(.*)-(.*?)$/) {
-      $data->{'version'} = $1;
-      $data->{'release'} = $2;
-    } else {
-      $data->{'version'} = $res{'VERSION'};
-    }
+    $res{'VERSION'} =~ /^(?:(\d+):)?(.*?)(?:-([^-]*))?$/s;
+    $data->{'epoch'} = $1 if defined $1;
+    $data->{'version'} = $2;
+    $data->{'release'} = $3 if defined $3;
     $data->{'arch'} = $res{'ARCHITECTURE'};
   }
   if ($opts{'description'}) {
