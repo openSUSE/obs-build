@@ -128,19 +128,19 @@ sub doseries {
     while(<F>) {
       chomp;
       if ((/^--- ./ || /^\+\+\+ ./) && !/^... \/dev\/null/) {
-        my $start = substr($_, 0, 4);
-        $_ = substr($_, 4);
-        my $l = $level;
-        while ($l > 0) {
-          last unless s/.*?\///;
-          $l--;
-        }
-        if ($start eq '--- ') {
-          print DIFF "$start$tardir.orig/$_\n";
-        } else {
-          print DIFF "$start$tardir/$_\n";
-        }
-        next;
+	my $start = substr($_, 0, 4);
+	$_ = substr($_, 4);
+	my $l = $level;
+	while ($l > 0) {
+	  last unless s/.*?\///;
+	  $l--;
+	}
+	if ($start eq '--- ') {
+	  print DIFF "$start$tardir.orig/$_\n";
+	} else {
+	  print DIFF "$start$tardir/$_\n";
+	}
+	next;
       }
       print DIFF "$_\n";
     }

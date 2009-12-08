@@ -56,12 +56,12 @@ sub parsexml {
       my $n = {};
       push @{$node->{$tag}}, $n;
       for (sort keys %atts) {
-        $n->{$_} = $atts{$_};
+	$n->{$_} = $atts{$_};
       }
       if ($mode == 0) {
-        push @nodestack, [ $tag, $node, $c ];
-        $c = '';
-        $node = $n;
+	push @nodestack, [ $tag, $node, $c ];
+	$c = '';
+	$node = $n;
       }
     } else {
       die("element '$tag' closes without open\n") unless @nodestack;
@@ -117,17 +117,17 @@ sub kiwiparse {
     push @packages, "kiwi-filesystem:$type->{'filesystem'}" if $type->{'filesystem'};
     if (defined $type->{'boot'}) {
       if ($type->{'boot'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
-        next unless $bootcallback;
-        my ($bootxml, $xsrc) = $bootcallback->($1, $2);
-        next unless $bootxml;
-        push @extrasources, $xsrc if $xsrc;
-        my $bret = kiwiparse($bootxml, $arch, $count);
-        push @bootrepos, map {"$_->{'project'}/$_->{'repository'}"} @{$bret->{'path'} || []};
-        push @packages, @{$bret->{'deps'} || []};
-        push @extrasources, @{$bret->{'extrasource'} || []};
+	next unless $bootcallback;
+	my ($bootxml, $xsrc) = $bootcallback->($1, $2);
+	next unless $bootxml;
+	push @extrasources, $xsrc if $xsrc;
+	my $bret = kiwiparse($bootxml, $arch, $count);
+	push @bootrepos, map {"$_->{'project'}/$_->{'repository'}"} @{$bret->{'path'} || []};
+	push @packages, @{$bret->{'deps'} || []};
+	push @extrasources, @{$bret->{'extrasource'} || []};
       } else {
-        die("bad boot reference: $type->{'boot'}\n") unless $type->{'boot'} =~ /^([^\/]+)\/([^\/]+)$/;
-        push @packages, "kiwi-boot:$1";
+	die("bad boot reference: $type->{'boot'}\n") unless $type->{'boot'} =~ /^([^\/]+)\/([^\/]+)$/;
+	push @packages, "kiwi-boot:$1";
       }
     }
   }
@@ -141,24 +141,24 @@ sub kiwiparse {
     }
     for my $repopackages (@{$instsource->{'repopackages'} || []}) {
       for my $repopackage (@{$repopackages->{'repopackage'} || []}) {
-        push @packages, $repopackage->{'name'};
+	push @packages, $repopackage->{'name'};
       }
     }
     if ($instsource->{'metadata'}) {
       for my $repopackage (@{$instsource->{'metadata'}->[0]->{'repopackage'} || []}) {
-        push @packages, $repopackage->{'name'};
+	push @packages, $repopackage->{'name'};
       }
     }
     if ($instsource->{'productoptions'}) {
       my $productoptions = $instsource->{'productoptions'}->[0] || {};
       for my $po (@{$productoptions->{'productvar'} || []}) {
-        $ret->{'version'} = $po->{'_content'} if $po->{'name'} eq 'VERSION';
+	$ret->{'version'} = $po->{'_content'} if $po->{'name'} eq 'VERSION';
       }
     }
     if ($instsource->{'architectures'}) {
       my $a = $instsource->{'architectures'}->[0] || {};
       for my $ra (@{$a->{'requiredarch'} || []}) {
-        push @requiredarch, $ra->{'ref'} if defined($ra->{'ref'});
+	push @requiredarch, $ra->{'ref'} if defined($ra->{'ref'});
       }
     }
   }
@@ -181,11 +181,11 @@ sub kiwiparse {
   for my $packagegroup (@{$kiwi->{'packages'} || []}) {
     for my $package (@{$packagegroup->{'package'} || []}) {
       if ($package->{'arch'}) {
-        my $ma = $arch;
-        $ma =~ s/i[456]86/i386/;
-        my $pa = $package->{'arch'};
-        $pa =~ s/i[456]86/i386/;
-        next if $ma ne $pa;
+	my $ma = $arch;
+	$ma =~ s/i[456]86/i386/;
+	my $pa = $package->{'arch'};
+	$pa =~ s/i[456]86/i386/;
+	next if $ma ne $pa;
       }
       push @packages, $package->{'name'};
     }

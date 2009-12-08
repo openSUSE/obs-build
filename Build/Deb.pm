@@ -62,32 +62,32 @@ sub parse {
     } elsif ($tag eq 'BUILD-DEPENDS' || $tag eq 'BUILD-CONFLICTS' || $tag eq 'BUILD-IGNORE' || $tag eq 'BUILD-DEPENDS-INDEP') {
       my @d = split(/,\s*/, $data);
       for my $d (@d) {
-        if ($d =~ /^(.*?)\s*\[(.*)\]$/) {
-          $d = $1;
-          my $isneg = 0;
-          my $bad;
-          for my $q (split('[\s,]', $2)) {
-            $isneg = 1 if $q =~ s/^\!//;
-            $bad = 1 if !defined($bad) && !$isneg;
-            if ($isneg) {
-              if ($q eq $arch || $q eq "$os-$arch") {
-                $bad = 1;
-                last;
-              }
-            } elsif ($q eq $arch || $q eq "$os-$arch") {
-              $bad = 0;
-            }
-          }
-          next if $bad;
-        }
-        $d =~ s/ \(([^\)]*)\)/ $1/g;
-        $d =~ s/>>/>/g;
-        $d =~ s/<</</g;
-        if ($tag eq 'BUILD-DEPENDS' || $tag eq 'BUILD-DEPENDS-INDEP') {
-          push @deps, $d;
-        } else {
-          push @deps, "-$d";
-        }
+	if ($d =~ /^(.*?)\s*\[(.*)\]$/) {
+	  $d = $1;
+	  my $isneg = 0;
+	  my $bad;
+	  for my $q (split('[\s,]', $2)) {
+	    $isneg = 1 if $q =~ s/^\!//;
+	    $bad = 1 if !defined($bad) && !$isneg;
+	    if ($isneg) {
+	      if ($q eq $arch || $q eq "$os-$arch") {
+		$bad = 1;
+		last;
+	      }
+	    } elsif ($q eq $arch || $q eq "$os-$arch") {
+	      $bad = 0;
+	    }
+	  }
+	  next if $bad;
+	}
+	$d =~ s/ \(([^\)]*)\)/ $1/g;
+	$d =~ s/>>/>/g;
+	$d =~ s/<</</g;
+	if ($tag eq 'BUILD-DEPENDS' || $tag eq 'BUILD-DEPENDS-INDEP') {
+	  push @deps, $d;
+	} else {
+	  push @deps, "-$d";
+	}
       }
     }
   }

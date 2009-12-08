@@ -75,16 +75,16 @@ for my $file (@ARGV) {
     } else {
       # blocks are non-contiguous
       if($lastblock+1 != $block) {
-        # check if we skipped some that form a range
-        if($firstblock != $lastblock) {
-          printf "-$lastblock";
-        }
-        print " $block";
-        $firstblock = $block;
+	# check if we skipped some that form a range
+	if($firstblock != $lastblock) {
+	  printf "-$lastblock";
+	}
+	print " $block";
+	$firstblock = $block;
       }
       # last block, check if contiguous
       if($b+1==$blocks && $lastblock+1 == $block) {
-        print "-$block";
+	print "-$block";
       }
     }
     $lastblock = $block;

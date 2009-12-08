@@ -15,14 +15,14 @@ QUIET=false
 for i in $* ; do
     case "$i" in
       -v)
-        VERBOSE=true
-        ;;
+	VERBOSE=true
+	;;
       -q)
-        QUIET=true
-        ;;
+	QUIET=true
+	;;
       *)
-        FILES="$FILES $i"
-        ;;
+	FILES="$FILES $i"
+	;;
     esac
 done
 
@@ -33,7 +33,7 @@ test -z "$FILES" && Usage
 
 for f in $FILES; do
     if test "$QUIET" = "false" ; then
-        echo -ne "$f:\t"
+	echo -ne "$f:\t"
     fi
     rpm2cpio $f | cpio ${CPIO_OPTS}
 done

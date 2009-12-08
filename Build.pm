@@ -158,32 +158,32 @@ sub read_config {
     if ($l0 eq 'macros:') {
       $l =~ s/.*?\n//s;
       if ($l =~ /^!\n/s) {
-        $config->{'rawmacros'} = substr($l, 2);
+	$config->{'rawmacros'} = substr($l, 2);
       } else {
-        $config->{'rawmacros'} .= $l;
+	$config->{'rawmacros'} .= $l;
       }
       next;
     }
     if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:') {
       my $t = substr($l0, 0, -1);
       for my $l (@l) {
-        if ($l eq '!*') {
-          $config->{$t} = [];
-        } elsif ($l =~ /^!/) {
-          $config->{$t} = [ grep {"!$_" ne $l} @{$config->{$t}} ];
-        } else {
-          push @{$config->{$t}}, $l;
-        }
+	if ($l eq '!*') {
+	  $config->{$t} = [];
+	} elsif ($l =~ /^!/) {
+	  $config->{$t} = [ grep {"!$_" ne $l} @{$config->{$t}} ];
+	} else {
+	  push @{$config->{$t}}, $l;
+	}
       }
     } elsif ($l0 eq 'substitute:') {
       next unless @l;
       $ll = shift @l;
       if ($ll eq '!*') {
-        $config->{'substitute'} = {};
+	$config->{'substitute'} = {};
       } elsif ($ll =~ /^!(.*)$/) {
-        delete $config->{'substitute'}->{$1};
+	delete $config->{'substitute'}->{$1};
       } else {
-        $config->{'substitute'}->{$ll} = [ @l ];
+	$config->{'substitute'}->{$ll} = [ @l ];
       }
     } elsif ($l0 eq 'exportfilter:') {
       next unless @l;
@@ -197,13 +197,13 @@ sub read_config {
       $config->{'optflags'}->{$ll} = join(' ', @l);
     } elsif ($l0 eq 'order:') {
       for my $l (@l) {
-        if ($l eq '!*') {
-          $config->{'order'} = {};
-        } elsif ($l =~ /^!(.*)$/) {
-          delete $config->{'order'}->{$1};
-        } else {
-          $config->{'order'}->{$l} = 1;
-        }
+	if ($l eq '!*') {
+	  $config->{'order'} = {};
+	} elsif ($l =~ /^!(.*)$/) {
+	  delete $config->{'order'}->{$1};
+	} else {
+	  $config->{'order'}->{$l} = 1;
+	}
       }
     } elsif ($l0 eq 'repotype:') { #type of generated repository data
       $config->{'repotype'} = [ @l ];
@@ -244,15 +244,15 @@ sub read_config {
   if ($config->{'rawmacros'} ne '') {
     for my $rm (split("\n", $config->{'rawmacros'})) {
       if (@macros && $macros[-1] =~ /\\$/) {
-        if ($rm =~ /\\$/) {
-          push @macros, '...\\';
-        } else {
-          push @macros, '...';
-        }
+	if ($rm =~ /\\$/) {
+	  push @macros, '...\\';
+	} else {
+	  push @macros, '...';
+	}
       } elsif ($rm !~ /^%/) {
-        push @macros, $rm;
+	push @macros, $rm;
       } else {
-        push @macros, "%define ".substr($rm, 1);
+	push @macros, "%define ".substr($rm, 1);
       }
     }
   }
@@ -367,8 +367,8 @@ sub readdeps {
   for my $depfile (@depfiles) {
     if (ref($depfile) eq 'HASH') {
       for my $rr (keys %$depfile) {
-        $provides{$rr} = $depfile->{$rr}->{'provides'};
-        $requires{$rr} = $depfile->{$rr}->{'requires'};
+	$provides{$rr} = $depfile->{$rr}->{'provides'};
+	$requires{$rr} = $depfile->{$rr}->{'requires'};
       }
       next;
     }
@@ -379,48 +379,48 @@ sub readdeps {
       my $s = shift @s;
       my @ss;
       while (@s) {
-        if ($s[0] =~ /^\//) {
-          shift @s;
-          next;
-        }
-        if ($s[0] =~ /^rpmlib\(/) {
-            splice(@s, 0, 3);
-            next;
-        }
-        push @ss, shift @s;
-        while (@s) {
-          if ($s[0] =~ /^[\(<=>|]/) {
-            $ss[-1] .= " $s[0] $s[1]";
-            $ss[-1] =~ s/\((.*)\)/$1/;
-            $ss[-1] =~ s/(<|>){2}/$1/;
-            splice(@s, 0, 2);
-          } else {
-            last;
-          }
-        }
+	if ($s[0] =~ /^\//) {
+	  shift @s;
+	  next;
+	}
+	if ($s[0] =~ /^rpmlib\(/) {
+	    splice(@s, 0, 3);
+	    next;
+	}
+	push @ss, shift @s;
+	while (@s) {
+	  if ($s[0] =~ /^[\(<=>|]/) {
+	    $ss[-1] .= " $s[0] $s[1]";
+	    $ss[-1] =~ s/\((.*)\)/$1/;
+	    $ss[-1] =~ s/(<|>){2}/$1/;
+	    splice(@s, 0, 2);
+	  } else {
+	    last;
+	  }
+	}
       }
       my %ss;
       @ss = grep {!$ss{$_}++} @ss;
       if ($s =~ /^(P|R):(.*)\.(.*)-\d+\/\d+\/\d+:$/) {
-        my $pkgid = $2;
-        my $arch = $3;
-        if ($1 eq "R") {
-          $requires{$pkgid} = \@ss;
-          $pkginfo->{$pkgid}->{'requires'} = \@ss if $pkginfo;
-          next;
-        }
-        # handle provides
-        $provides{$pkgid} = \@ss;
-        if ($pkginfo) {
-          # extract ver and rel from self provides
-          my ($v, $r) = map { /\Q$pkgid\E = ([^-]+)(?:-(.+))?$/ } @ss;
-          die("$pkgid: no self provides\n") unless $v;
-          $pkginfo->{$pkgid}->{'name'} = $pkgid;
-          $pkginfo->{$pkgid}->{'version'} = $v;
-          $pkginfo->{$pkgid}->{'release'} = $r if defined($r);
-          $pkginfo->{$pkgid}->{'arch'} = $arch;
-          $pkginfo->{$pkgid}->{'provides'} = \@ss;
-        }
+	my $pkgid = $2;
+	my $arch = $3;
+	if ($1 eq "R") {
+	  $requires{$pkgid} = \@ss;
+	  $pkginfo->{$pkgid}->{'requires'} = \@ss if $pkginfo;
+	  next;
+	}
+	# handle provides
+	$provides{$pkgid} = \@ss;
+	if ($pkginfo) {
+	  # extract ver and rel from self provides
+	  my ($v, $r) = map { /\Q$pkgid\E = ([^-]+)(?:-(.+))?$/ } @ss;
+	  die("$pkgid: no self provides\n") unless $v;
+	  $pkginfo->{$pkgid}->{'name'} = $pkgid;
+	  $pkginfo->{$pkgid}->{'version'} = $v;
+	  $pkginfo->{$pkgid}->{'release'} = $r if defined($r);
+	  $pkginfo->{$pkgid}->{'arch'} = $arch;
+	  $pkginfo->{$pkgid}->{'provides'} = \@ss;
+	}
       }
     }
     close F;
@@ -480,37 +480,37 @@ sub addproviders {
   for my $rp (@rp) {
     for my $pp (@{$provides->{$rp} || []}) {
       if ($pp eq $rn) {
-        # debian: unversioned provides do not match
-        # kiwi: supports only rpm, so we need to hand it like it
-        next if $config->{'type'} eq 'dsc';
-        push @p, $rp;
-        last;
+	# debian: unversioned provides do not match
+	# kiwi: supports only rpm, so we need to hand it like it
+	next if $config->{'type'} eq 'dsc';
+	push @p, $rp;
+	last;
       }
       next unless $pp =~ /^\Q$rn\E\s*([<=>]{1,2})\s*(.*?)$/;
       my $pv = $2;
       my $pf = $addproviders_fm{$1};
       next unless $pf;
       if ($pf & $rf & 5) {
-        push @p, $rp;
-        last;
+	push @p, $rp;
+	last;
       }
       if ($pv eq $rv) {
-        next unless $pf & $rf & 2;
-        push @p, $rp;
-        last;
+	next unless $pf & $rf & 2;
+	push @p, $rp;
+	last;
       }
       my $rr = $rf == 2 ? $pf : ($rf ^ 5);
       $rr &= 5 unless $pf & 2;
       # verscmp for spec and kiwi types
       my $vv;
       if ($config->{'type'} eq 'dsc') {
-        $vv = Build::Deb::verscmp($pv, $rv, 1);
+	$vv = Build::Deb::verscmp($pv, $rv, 1);
       } else {
-        $vv = Build::Rpm::verscmp($pv, $rv, 1);
+	$vv = Build::Rpm::verscmp($pv, $rv, 1);
       }
       if ($rr & (1 << ($vv + 1))) {
-        push @p, $rp;
-        last;
+	push @p, $rp;
+	last;
       }
     }
   }
@@ -561,64 +561,64 @@ sub expand {
     my @rerror = ();
     for my $p (splice @p) {
       for my $r (@{$requires->{$p} || [$p]}) {
-        my $ri = (split(/[ <=>]/, $r, 2))[0];
-        next if $ignore->{"$p:$ri"} || $xignore{"$p:$ri"};
-        next if $ignore->{$ri} || $xignore{$ri};
-        my @q = @{$whatprovides->{$r} || addproviders($config, $r)};
-        next if grep {$p{$_}} @q;
-        next if grep {$xignore{$_}} @q;
-        next if grep {$ignore->{"$p:$_"} || $xignore{"$p:$_"}} @q;
-        @q = grep {!$aconflicts{$_}} @q;
-        if (!@q) {
-          if ($r eq $p) {
-            push @rerror, "nothing provides $r";
-          } else {
-            push @rerror, "nothing provides $r needed by $p";
-          }
-          next;
-        }
-        if (@q > 1 && !$doamb) {
-          push @pamb, $p unless @pamb && $pamb[-1] eq $p;
-          print "undecided about $p:$r: @q\n" if $expand_dbg;
-          next;
-        }
-        if (@q > 1) {
-          my @pq = grep {!$prefer->{"-$_"} && !$prefer->{"-$p:$_"}} @q;
-          @q = @pq if @pq;
-          @pq = grep {$prefer->{$_} || $prefer->{"$p:$_"}} @q;
-          if (@pq > 1) {
-            my %pq = map {$_ => 1} @pq;
-            @q = (grep {$pq{$_}} @{$config->{'prefer'}})[0];
-          } elsif (@pq == 1) {
-            @q = @pq;
-          }
-        }
-        if (@q > 1 && $r =~ /\|/) {
-            # choice op, implicit prefer of first match...
-            my %pq = map {$_ => 1} @q;
-            for my $rr (split(/\s*\|\s*/, $r)) {
-                next unless $whatprovides->{$rr};
-                my @pq = grep {$pq{$_}} @{$whatprovides->{$rr}};
-                next unless @pq;
-                @q = @pq;
-                last;
-            }
-        }
-        if (@q > 1) {
-          if ($r ne $p) {
-            push @error, "have choice for $r needed by $p: @q";
-          } else {
-            push @error, "have choice for $r: @q";
-          }
-          push @pamb, $p unless @pamb && $pamb[-1] eq $p;
-          next;
-        }
-        push @p, $q[0];
-        print "added $q[0] because of $p:$r\n" if $expand_dbg;
-        $p{$q[0]} = 1;
-        $aconflicts{$_} = 1 for @{$conflicts->{$q[0]} || []};
-        @error = ();
-        $doamb = 0;
+	my $ri = (split(/[ <=>]/, $r, 2))[0];
+	next if $ignore->{"$p:$ri"} || $xignore{"$p:$ri"};
+	next if $ignore->{$ri} || $xignore{$ri};
+	my @q = @{$whatprovides->{$r} || addproviders($config, $r)};
+	next if grep {$p{$_}} @q;
+	next if grep {$xignore{$_}} @q;
+	next if grep {$ignore->{"$p:$_"} || $xignore{"$p:$_"}} @q;
+	@q = grep {!$aconflicts{$_}} @q;
+	if (!@q) {
+	  if ($r eq $p) {
+	    push @rerror, "nothing provides $r";
+	  } else {
+	    push @rerror, "nothing provides $r needed by $p";
+	  }
+	  next;
+	}
+	if (@q > 1 && !$doamb) {
+	  push @pamb, $p unless @pamb && $pamb[-1] eq $p;
+	  print "undecided about $p:$r: @q\n" if $expand_dbg;
+	  next;
+	}
+	if (@q > 1) {
+	  my @pq = grep {!$prefer->{"-$_"} && !$prefer->{"-$p:$_"}} @q;
+	  @q = @pq if @pq;
+	  @pq = grep {$prefer->{$_} || $prefer->{"$p:$_"}} @q;
+	  if (@pq > 1) {
+	    my %pq = map {$_ => 1} @pq;
+	    @q = (grep {$pq{$_}} @{$config->{'prefer'}})[0];
+	  } elsif (@pq == 1) {
+	    @q = @pq;
+	  }
+	}
+	if (@q > 1 && $r =~ /\|/) {
+	    # choice op, implicit prefer of first match...
+	    my %pq = map {$_ => 1} @q;
+	    for my $rr (split(/\s*\|\s*/, $r)) {
+		next unless $whatprovides->{$rr};
+		my @pq = grep {$pq{$_}} @{$whatprovides->{$rr}};
+		next unless @pq;
+		@q = @pq;
+		last;
+	    }
+	}
+	if (@q > 1) {
+	  if ($r ne $p) {
+	    push @error, "have choice for $r needed by $p: @q";
+	  } else {
+	    push @error, "have choice for $r: @q";
+	  }
+	  push @pamb, $p unless @pamb && $pamb[-1] eq $p;
+	  next;
+	}
+	push @p, $q[0];
+	print "added $q[0] because of $p:$r\n" if $expand_dbg;
+	$p{$q[0]} = 1;
+	$aconflicts{$_} = 1 for @{$conflicts->{$q[0]} || []};
+	@error = ();
+	$doamb = 0;
       }
     }
     return undef, @rerror if @rerror;
@@ -670,7 +670,7 @@ sub order {
       @p = grep {$needed{$_}} @p;
       push @res, @good;
       for my $p (@good) {
-        $needed{$_}-- for @{$rdeps{$p}};
+	$needed{$_}-- for @{$rdeps{$p}};
       }
       next;
     }
@@ -681,46 +681,46 @@ sub order {
     while (@todo) {
       my $v = shift @todo;
       if (ref($v)) {
-        $notdone{$$v} = 0;      # finished this one
-        next;
+	$notdone{$$v} = 0;      # finished this one
+	next;
       }
       my $s = $notdone{$v};
       next unless $s;
       my @e = grep {$notdone{$_}} @{$deps{$v}};
       if (!@e) {
-        $notdone{$v} = 0;       # all deps done, mark as finished
-        next;
+	$notdone{$v} = 0;       # all deps done, mark as finished
+	next;
       }
       if ($s == 1) {
-        $notdone{$v} = 2;       # now under investigation
-        unshift @todo, @e, \$v;
-        next;
+	$notdone{$v} = 2;       # now under investigation
+	unshift @todo, @e, \$v;
+	next;
       }
       # reached visited package, found a cycle!
       my @cyc = ();
       my $cycv = $v;
       # go back till $v is reached again
       while(1) {
-        die unless @todo;
-        $v = shift @todo;
-        next unless ref($v);
-        $v = $$v;
-        $notdone{$v} = 1 if $notdone{$v} == 2;
-        unshift @cyc, $v;
-        last if $v eq $cycv;
+	die unless @todo;
+	$v = shift @todo;
+	next unless ref($v);
+	$v = $$v;
+	$notdone{$v} = 1 if $notdone{$v} == 2;
+	unshift @cyc, $v;
+	last if $v eq $cycv;
       }
       unshift @todo, $cycv;
       print STDERR "cycle: ".join(' -> ', @cyc)."\n";
       my $breakv;
       my @breakv = (@cyc, $cyc[0]);
       while (@breakv > 1) {
-        last if $config->{'order'}->{"$breakv[0]:$breakv[1]"};
-        shift @breakv;
+	last if $config->{'order'}->{"$breakv[0]:$breakv[1]"};
+	shift @breakv;
       }
       if (@breakv > 1) {
-        $breakv = $breakv[0];
+	$breakv = $breakv[0];
       } else {
-        $breakv = (sort {$needed{$a} <=> $needed{$b} || $a cmp $b} @cyc)[-1];
+	$breakv = (sort {$needed{$a} <=> $needed{$b} || $a cmp $b} @cyc)[-1];
       }
       push @cyc, $cyc[0];	# make it loop
       shift @cyc while $cyc[0] ne $breakv;

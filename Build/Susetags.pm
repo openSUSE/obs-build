@@ -46,9 +46,9 @@ sub parse {
     my ($multi, $tag, $data) = ($1, $2, $3);
     if ($multi eq '+') {
       while (<F>) {
-        chomp;
-        last if $_ =~ /-$tag/;
-        push @{$cur->{$tmap->{$tag}}}, $_;
+	chomp;
+	last if $_ =~ /-$tag/;
+	push @{$cur->{$tmap->{$tag}}}, $_;
       }
     } elsif ($tag eq 'Pkg') {
       addpkg($pkgs, $cur, $order, $cb, $cbdata, @arches);

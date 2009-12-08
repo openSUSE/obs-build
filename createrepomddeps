@@ -29,7 +29,7 @@ my $repomdparser = {
     data => {
       _start => \&repomd_handle_data_start,
       location => {
-        _start => \&repomd_handle_location,
+	_start => \&repomd_handle_location,
       },
     },
   },
@@ -45,17 +45,17 @@ my $primaryparser = {
       version => { _start => \&primary_handle_version },
       'time' => { _start => \&primary_handle_time },
       format => {
-        'rpm:provides' => { 'rpm:entry' => { _start => \&primary_handle_package_provides }, },
-        'rpm:requires' => { 'rpm:entry' => { _start => \&primary_handle_package_requires }, },
-        'rpm:conflicts' => { 'rpm:entry' => { _start => \&primary_handle_package_conflicts }, },
-        'rpm:obsoletes' => { 'rpm:entry' => { _start => \&primary_handle_package_obsoletes }, },
-        'rpm:buildhost' => { _text => \&primary_collect_text, _end => \&primary_store_text },
-        'rpm:sourcerpm' => { _text => \&primary_collect_text, _end => \&primary_store_text },
-        file => {
-          _start => \&primary_handle_file_start,
-          _text => \&primary_collect_text,
-          _end => \&primary_handle_file_end
-        },
+	'rpm:provides' => { 'rpm:entry' => { _start => \&primary_handle_package_provides }, },
+	'rpm:requires' => { 'rpm:entry' => { _start => \&primary_handle_package_requires }, },
+	'rpm:conflicts' => { 'rpm:entry' => { _start => \&primary_handle_package_conflicts }, },
+	'rpm:obsoletes' => { 'rpm:entry' => { _start => \&primary_handle_package_obsoletes }, },
+	'rpm:buildhost' => { _text => \&primary_collect_text, _end => \&primary_store_text },
+	'rpm:sourcerpm' => { _text => \&primary_collect_text, _end => \&primary_store_text },
+	file => {
+	  _start => \&primary_handle_file_start,
+	  _text => \&primary_collect_text,
+	  _end => \&primary_handle_file_end
+	},
       },
       location => { _start => \&primary_handle_package_location },
     },
@@ -186,20 +186,20 @@ sub primary_handle_package_end
     $arch = 'src' if $pkg->{'arch'} eq 'nosrc';
     next if ($arch eq 'src' && $opt_nosrc);
     if(exists($old_seen->{$pkg->{'name'}}->{$arch})) {
-        my $pv = $old_seen->{$pkg->{'name'}}->{$arch}->{'ver'};
-        my $rv = $pkg->{'ver'}.'-'.$pkg->{'rel'};
-        my $vv = Build::Rpm::verscmp($pv, $rv, 0);
-        if($vv < 0)
-        {
+	my $pv = $old_seen->{$pkg->{'name'}}->{$arch}->{'ver'};
+	my $rv = $pkg->{'ver'}.'-'.$pkg->{'rel'};
+	my $vv = Build::Rpm::verscmp($pv, $rv, 0);
+	if($vv < 0)
+	{
       print $old_seen->{$pkg->{'name'}}->{$arch}->{'loc'}."\n";
       $old_seen->{$pkg->{'name'}}->{$arch}->{'ver'} = $pkg->{'ver'}.'-'.$pkg->{'rel'};
       $old_seen->{$pkg->{'name'}}->{$arch}->{'loc'} = $pkg->{'baseurl'} . $pkg->{'location'};
-        } else {
+	} else {
       print $pkg->{'baseurl'} . $pkg->{'location'}."\n";
-        }
+	}
     } else {
-        $old_seen->{$pkg->{'name'}}->{$arch}->{'ver'} = $pkg->{'ver'}.'-'.$pkg->{'rel'};
-        $old_seen->{$pkg->{'name'}}->{$arch}->{'loc'} = $pkg->{'baseurl'} . $pkg->{'location'};
+	$old_seen->{$pkg->{'name'}}->{$arch}->{'ver'} = $pkg->{'ver'}.'-'.$pkg->{'rel'};
+	$old_seen->{$pkg->{'name'}}->{$arch}->{'loc'} = $pkg->{'baseurl'} . $pkg->{'location'};
     }
       }
       shift @packages;
@@ -303,14 +303,14 @@ sub primary_handle_package_provides
 sub deps2string
 {
   return join(' ', map {
-        my $s = $_->{'name'};
-        if(exists $_->{'flags'}) {
-          $s .= ' '.$_->{'flags'}.' ';
-          $s .= $_->{'epoch'}.':' if(exists $_->{'epoch'} && $_->{'epoch'} != 0);
-          $s .= $_->{'ver'};
-          $s .= '-'.$_->{'rel'} if exists $_->{'rel'};
-        }
-        $s
+	my $s = $_->{'name'};
+	if(exists $_->{'flags'}) {
+	  $s .= ' '.$_->{'flags'}.' ';
+	  $s .= $_->{'epoch'}.':' if(exists $_->{'epoch'} && $_->{'epoch'} != 0);
+	  $s .= $_->{'ver'};
+	  $s .= '-'.$_->{'rel'} if exists $_->{'rel'};
+	}
+	$s
       } @_);
 }
 

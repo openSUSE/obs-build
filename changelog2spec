@@ -55,8 +55,8 @@ if (@ARGV == 2 && $ARGV[0] eq '--file') {
     while ($file ne '') {
       my @c = grep {/\Q$file\E/} @changes;
       if (@c) {
-        @changes = @c;
-        last;
+	@changes = @c;
+	last;
       }
       last unless $file =~ s/[-.][^-.]*$//;
     }
