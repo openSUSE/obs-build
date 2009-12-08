@@ -1544,7 +1544,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
 
     if test "$BUILDTYPE" = kiwi ; then
-        # run createrepo on the repositories
+        imagetype=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE imagetype)
+        imagename=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE filename)
+        imageversion=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE version)
+        # prepare rpms as source and createrepo on the repositories
         if test -d $BUILD_ROOT/$TOPDIR/SOURCES/repos ; then
             (
             ln -sf $TOPDIR/SOURCES/repos $BUILD_ROOT/repos
@@ -1562,8 +1565,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                     ln -s $rl$r "${rc%/*}/${rc##*/}"
                     repo="$TOPDIR/SOURCES/repos/${rc%/*}/${rc##*/}/"
                 fi
-                echo "creating repodata for $repo"
-                chroot $BUILD_ROOT createrepo "$repo"
+                if test "$imagetype" != product ; then
+                    echo "creating repodata for $repo"
+                    chroot $BUILD_ROOT createrepo "$repo"
+                fi
             done
             )
         fi
@@ -1602,9 +1607,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
         fi
         rm -f $BUILD_ROOT/$TOPDIR/SOURCES/config.xml
         ln -s $SPECFILE $BUILD_ROOT/$TOPDIR/SOURCES/config.xml
-        imagetype=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE imagetype)
-        imagename=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE filename)
-        imageversion=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE version)
         chroot $BUILD_ROOT su -c "kiwi --version" -
         if test "$imagetype" = product ; then
             echo "running kiwi --create-instsource..."
