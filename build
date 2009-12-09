@@ -1437,8 +1437,17 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
     echo -----------------------------------------------------------------
     echo -----------------------------------------------------------------
-    test -n "$RUNNING_IN_VM" && ifconfig lo 127.0.0.1 up
-    test -n "$RUNNING_IN_VM" -a -n "$MYHOSTNAME" && hostname "$MYHOSTNAME"
+    if [ -n "$RUNNING_IN_VM" ]; then
+	if [ -x /sbin/ip ]; then
+	    ip addr add 127.0.0.1/8 dev lo
+	    ip link set lo up
+	else
+	    ifconfig lo 127.0.0.1 up
+	fi
+	if [ -n "$MYHOSTNAME" ]; then
+	    hostname "$MYHOSTNAME"
+	fi
+    fi
 
     BUILD_SUCCEEDED=false
 
