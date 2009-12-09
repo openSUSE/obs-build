@@ -378,16 +378,16 @@ function create_baselibs {
 	if test -e $BUILD_ROOT$TOPDIR/SOURCES/baselibs.conf ; then
 	    BASELIBS_CFG="-c $TOPDIR/SOURCES/baselibs.conf"
 	fi
-	if test -e $BUILD_ROOT/usr/lib/build/baselibs_global.conf; then
-	    BASELIBS_GLOBAL="-c /usr/lib/build/baselibs_global.conf"
+	if test -e $BUILD_ROOT$BUILD_DIR/baselibs_global.conf; then
+	    BASELIBS_GLOBAL="-c $BUILD_DIR/baselibs_global.conf"
 	fi
 	BPKGS=$BRPMS
     fi
-    if test -f $BUILD_ROOT/usr/lib/build/mkbaselibs ; then
-	if test -z "$BASELIBS_CFG" -a -e $BUILD_ROOT/usr/lib/build/baselibs.conf ; then
-	    BASELIBS_CFG="-c /usr/lib/build/baselibs.conf"
+    if test -f $BUILD_ROOT$BUILD_DIR/mkbaselibs ; then
+	if test -z "$BASELIBS_CFG" -a -e $BUILD_ROOT$BUILD_DIR/baselibs.conf ; then
+	    BASELIBS_CFG="-c $BUILD_DIR/baselibs.conf"
 	fi
-	chroot $BUILD_ROOT /usr/lib/build/mkbaselibs $BASELIBS_GLOBAL $BASELIBS_CFG $BPKGS || cleanup_and_exit 1
+	chroot $BUILD_ROOT $BUILD_DIR/mkbaselibs $BASELIBS_GLOBAL $BASELIBS_CFG $BPKGS || cleanup_and_exit 1
     else
 	# use external version
 	rm -rf $BUILD_ROOT/.mkbaselibs
@@ -1598,7 +1598,7 @@ if test -n "$RPMS" -a "$DO_CHECKS" != "false" -a -x "$BUILD_ROOT/opt/testing/bin
 fi
 
 if test \( -n "$RPMS" -o -n "$DEBS" \) -a -n "$CREATE_BASELIBS" -a \( -d "$BUILD_ROOT/$TOPDIR/RPMS" -o -d "$BUILD_ROOT/$TOPDIR/DEBS" \)  ; then
-    if test -f $BUILD_ROOT/usr/lib/build/mkbaselibs -o "$CREATE_BASELIBS" != internal ; then
+    if test -f $BUILD_ROOT$BUILD_DIR/mkbaselibs -o "$CREATE_BASELIBS" != internal ; then
 	mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
 	create_baselibs
 	umount -n $BUILD_ROOT/proc 2> /dev/null
