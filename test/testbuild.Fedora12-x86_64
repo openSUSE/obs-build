@@ -1,0 +1,7 @@
+#!/bin/bash
+. ${0%/*}/common
+
+repo fedora12_x86_64
+
+run_build --dist $PWD/Fedora_12.conf \
+	"$@"

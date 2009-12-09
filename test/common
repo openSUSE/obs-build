@@ -75,7 +75,6 @@ enable_kvm()
 {
 	test -w /dev/kvm || skip "no kvm support"
 	set -- "${build_args[@]}" \
-		--root "${build_root}" \
 		--kvm "${build_vm_img}" \
 		--swap "${build_vm_swap}" \
 		--memory "$build_vm_mem"
@@ -94,6 +93,7 @@ run_build()
 	done
 	set -- $linux32 sudo env \
 		/usr/bin/build \
+		--root "${build_root}" \
 		"${repos[@]}" \
 		"${build_args[@]}"
 	echo "$@"
