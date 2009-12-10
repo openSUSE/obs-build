@@ -18,9 +18,9 @@ set_build_arch()
     if test "$BUILD_ARCH" != "${BUILD_ARCH#i686}" ; then
 	cpuflags=`grep ^flags /proc/cpuinfo`
 	cpuflags="$cpuflags "
-	test "$cpuflags" = "${cpuflags/ cx8 /}" -o "$cpuflags" = "${cpuflags/ cmov /}" && {
+	if test "$cpuflags" = "${cpuflags/ cx8 /}" -o "$cpuflags" = "${cpuflags/ cmov /}"; then
 	    echo "Your cpu doesn't support i686 rpms. Exit."
-	    exit 1
-	}
+	    cleanup_and_exit 1
+	fi
     fi
 }
