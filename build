@@ -419,11 +419,12 @@ detect_vm_2nd_stage()
     fi
     if test $$ -eq 1 ; then
 	# ignore special init signals if we're init
-	trap '' HUP
+	# we're using ' ' instead of '' so that the signal handlers
+	# are reset in the child processes
+	trap ' ' HUP TERM
 	$0 "$@"
 	cleanup_and_exit 1
     fi
-    trap - HUP
     echo "2nd stage started in virtual machine"
     BUILD_ROOT=/
     BUILD_DIR=/.build
