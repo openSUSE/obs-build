@@ -753,6 +753,10 @@ done
 # XXX: doesn't kill vm if in prepare stage (because there is none)
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
+    if test -n "$VM_IMAGE" -a -n "$VM_SWAP" -a -n "$VM_TYPE"; then
+	# mark job as failed so that we don't extract packages
+	echo -n "BUILDSTATUS1" >"$VM_SWAP"
+    fi
     if test -z "$VM_IMAGE" ; then
 	if ! $BUILD_DIR/killchroot -s 9 $BUILD_ROOT ; then
 	    echo "could not kill build in $BUILD_ROOT"
