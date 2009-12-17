@@ -557,6 +557,24 @@ if ! test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
     echo 'done'
 fi
 
+rpm_e()
+{
+    chroot $BUILD_ROOT rpm --nodeps -e $PKG 2>&1 | \
+    while read line; do
+	case "$line" in
+
+	    r*failed:\ No\ such\ file\ or\ directory) ;;
+	    error:\ failed\ to\ stat\ *:\ No\ such\ file\ or\ directory) ;;
+	    error:\ *scriptlet\ failed*)
+		echo "$line"
+	        echo "re-try deleting $PKG using --noscripts"
+		chroot $BUILD_ROOT rpm --nodeps --noscripts -e $PKG || true
+	    ;;
+	    *) echo "$line" ;;
+	esac
+    done
+}
+
 #
 # delete all packages we don't want
 #
@@ -572,9 +590,8 @@ done
 for PKG in $BUILD_ROOT/.init_b_cache/todelete/* ; do
     PKG=${PKG##*/}
     test "$PKG" = "*" && continue
-    echo deleting `sed -e 's/ .*//' < $BUILD_ROOT/.init_b_cache/todelete/$PKG`
-    chroot $BUILD_ROOT rpm --nodeps -e $PKG 2>&1 | \
-	grep -v -e "^r.*failed: No such file or directory" -e "^error: failed to stat .*: No such file or directory"
+    echo "deleting $PKG"
+    rpm_e "$PKG"
 done
 rm -rf $BUILD_ROOT/.init_b_cache/todelete
 
@@ -641,14 +658,12 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
 	read OLDPKGID < $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG
 	if test "$PKGID" != "$OLDPKGID" ; then
 	    echo deleting unwanted ${OLDPKGID%% *}
-	    chroot $BUILD_ROOT rpm --nodeps -e $PKG 2>&1 | \
-		grep -v -e "^r.*failed: No such file or directory" -e "^error: failed to stat .*: No such file or directory"
+	    rpm_e "$PKG"
 	elif test "$VERIFY_BUILD_SYSTEM" = true ; then
 	    chroot $BUILD_ROOT rpm --verify $PKG 2>&1 | tee $TMPFILE
 	    if grep ^missing $TMPFILE > /dev/null ; then
 		echo deleting incomplete ${PKGID%% *}
-		chroot $BUILD_ROOT rpm --nodeps -e $PKG 2>&1 | \
-		    grep -v -e "^r.*failed: No such file or directory" -e "^error: failed to stat .*: No such file or directory"
+		rpm_e "$PKG"
 	    else
 		#echo "keeping ${PKGID%% *}"
 		echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
