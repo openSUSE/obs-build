@@ -158,7 +158,7 @@ sub kiwiparse {
     if ($instsource->{'architectures'}) {
       my $a = $instsource->{'architectures'}->[0] || {};
       for my $ra (@{$a->{'requiredarch'} || []}) {
-	push @requiredarch, $ra->{'ref'} if defined($ra->{'ref'});
+	push @requiredarch, $ra->{'ref'} if defined $ra->{'ref'};
       }
     }
   }
@@ -198,7 +198,7 @@ sub kiwiparse {
     push @packages, "kiwi-packagemanager:instsource";
   }
 
-  $ret->{'exclarch'} = [ unify(@requiredarch) ] if defined(@requiredarch);
+  $ret->{'exclarch'} = [ unify(@requiredarch) ] if @requiredarch;
   $ret->{'deps'} = [ unify(@packages) ];
   $ret->{'path'} = [ unify(@repos, @bootrepos) ];
   $ret->{'imagetype'} = [ unify(@types) ];
