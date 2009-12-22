@@ -198,7 +198,7 @@ sub kiwiparse {
     push @packages, "kiwi-packagemanager:instsource";
   }
 
-  $ret->{'exclarch'} = [ unify(@requiredarch) ];
+  $ret->{'exclarch'} = [ unify(@requiredarch) ] if defined(@requiredarch);
   $ret->{'deps'} = [ unify(@packages) ];
   $ret->{'path'} = [ unify(@repos, @bootrepos) ];
   $ret->{'imagetype'} = [ unify(@types) ];
