@@ -269,7 +269,7 @@ sub parse {
 
     if ($skip) {
       $xspec->[-1] = [ $xspec->[-1], undef ] if $xspec;
-      $ifdeps = 1 if $line =~ /^(BuildRequires|BuildConflicts|\#\!BuildIgnore)\s*:\s*(\S.*)$/i;
+      $ifdeps = 1 if $line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore)\s*:\s*(\S.*)$/i;
       next;
     }
 
@@ -333,7 +333,7 @@ sub parse {
       }
       next;
     }
-    if ($preamble && ($line =~ /^(BuildRequires|BuildConflicts|\#\!BuildIgnore)\s*:\s*(\S.*)$/i)) {
+    if ($preamble && ($line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore)\s*:\s*(\S.*)$/i)) {
       my $what = $1;
       my $deps = $2;
       $ifdeps = 1 if $hasif;
@@ -370,7 +370,7 @@ sub parse {
       }
 
       $replace = 1 if grep {/^-/} @ndeps;
-      if (lc($what) ne 'buildrequires') {
+      if (lc($what) ne 'buildrequires' && lc($what) ne 'buildprereq') {
 	push @packdeps, map {"-$_"} @ndeps;
 	next;
       }
