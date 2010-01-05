@@ -407,7 +407,7 @@ function create_baselibs {
 	if test -e $BUILD_ROOT/.mkbaselibs/baselibs_g.conf; then
 	    BASELIBS_GLOBAL="-c /.mkbaselibs/baselibs_g.conf"
 	fi
-	chroot $BUILD_ROOT /.mkbaselibs/mkbaselibs $BASELIBS_GLOBAL $BASELIBS_CFG $BPKGS || cleanup_and_exit 1
+	chroot $BUILD_ROOT su -c "/.mkbaselibs/mkbaselibs $BASELIBS_GLOBAL $BASELIBS_CFG $BPKGS" - $BUILD_USER || cleanup_and_exit 1
 	rm -rf $BUILD_ROOT/.mkbaselibs
     fi
 }
