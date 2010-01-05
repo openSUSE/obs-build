@@ -2,6 +2,7 @@
 
 use POSIX;
 use strict;
+use File::Temp qw/tempfile tempdir/;
 
 # See: http://www.rpm.org/max-rpm/s1-rpm-file-format-rpm-file-format.html#S3-RPM-FILE-FORMAT-HEADER-TAG-LISTING
 # cf http://search.cpan.org/~davecross/Parse-RPM-Spec-0.01/lib/Parse/RPM/Spec.pm
@@ -641,10 +642,9 @@ sub handle_rpms {
     delete $alldirs{$ad} while $ad =~ s/\/[^\/]+$//;
     delete $alldirs{$_} for @filesystem;
 
-    my $specfile = "/usr/src/packages/SPECS/mkbaselibs$$.spec";
-    unlink($specfile);
     print "$rname($target): writing specfile...\n";
-    open(SPEC, ">$specfile") || die("$specfile: $!\n");
+    my ($fh, $specfile) = tempfile(SUFFIX => ".spec");
+    open(SPEC, ">&=", $fh) || die("open: $!\n");
     for my $p (@preamble) {
       my $pt = uc($p);
       next unless $res{$pt};
@@ -939,11 +939,10 @@ sub handle_debs {
   #   process the config file for this package modifying control and moving files
   #   repackage the target deb
 
-  my $base = "/tmp/$$";
   for my $deb (@_) {
     # http://www.debian.org/doc/debian-policy/ch-controlfields.html#s-binarycontrolfiles
     # unpack the outer loop control file - this gives us eg: the arch
-    system "mkdir ${base}";
+    my $base = tempdir() || die("tempdir: $!\n");
     system "dpkg -e $deb  ${base}/DEBIAN" || die "dpkg -e failed on $deb";
     my $controlParser = new Parse::DebControl;
     $controlParser->DEBUG();
@@ -1111,6 +1110,7 @@ my %debs_to_process = map {$_ => 1} get_debpkgnames();  # These are packages nam
 my @debs;
 for my $deb (@pkgs) {
   my $debn = $deb;
+  next unless $debn =~ /\.deb$/;
   $debn =~ s/.*\///;   # Remove leading path info
   $debn =~ s/_[^_]+_[^_]+\.deb$//; # remove all version info and extension
   push @debs, $deb if $debs_to_process{$debn};
