@@ -1377,6 +1377,13 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
 ' >> $BUILD_ROOT/root/.rpmmacros
 	fi
+
+	if [ -n "$BUILD_JOBS" ]; then
+		cat >> $BUILD_ROOT/root/.rpmmacros <<-EOF
+		%jobs $BUILD_JOBS
+		%_smp_mflags -j$BUILD_JOBS
+		EOF
+	fi
 	test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/.rpmmacros $BUILD_ROOT/home/abuild/.rpmmacros
 	# extract optflags from configuration
 	getoptflags --dist "$BUILD_DIST" --configdir "$BUILD_DIR/configs" --archpath "$BUILD_ARCH" ${BUILD_DEBUG:+--debug} > $BUILD_ROOT/root/.rpmrc
@@ -1493,10 +1500,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	rpmbopts=("$BUILD_RPM_BUILD_STAGE" "--define" "_srcdefattr (-,root,root)")
 	if [ -n "$ABUILD_TARGET_ARCH" ]; then
 		rpmbopts[${#rpmbopts[@]}]="--target=$ABUILD_TARGET_ARCH"
-	fi
-	if [ -n "$BUILD_JOBS" ]; then
-		rpmbopts[${#rpmbopts[@]}]='--define'
-		rpmbopts[${#rpmbopts[@]}]="jobs $BUILD_JOBS"
 	fi
 	if [ -n "$DISTURL" ]; then
 		rpmbopts[${#rpmbopts[@]}]='--define'
