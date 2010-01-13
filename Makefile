@@ -27,6 +27,7 @@ install:
 	    $(DESTDIR)$(man1dir)
 	install -m755 \
 	    build \
+	    build_kiwi.sh \
 	    vc \
 	    createrpmdeps \
 	    order \
