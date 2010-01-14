@@ -92,6 +92,7 @@ function cleanup_and_exit {
     [ "$BUILD_ROOT" != / ] || chown $browner $BUILD_ROOT
     # umount so init_buildsystem can be used standalone
 # XXX: use stat -f /dev/pts/ -c %T  to check whether it's mounted and not suppress errors then?
+    umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
     umount -n $BUILD_ROOT/proc 2> /dev/null || true
     umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
     umount -n $BUILD_ROOT/mnt 2> /dev/null || true
@@ -100,6 +101,7 @@ function cleanup_and_exit {
 
 function clean_build_root () {
 	test -n "$BUILD_ROOT" && {
+	    umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	    umount -n $BUILD_ROOT/proc 2> /dev/null || true
 	    umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
 	    umount -n $BUILD_ROOT/mnt 2> /dev/null || true
@@ -328,6 +330,7 @@ fi
 if test -e $BUILD_IS_RUNNING ; then
     echo It seems that there was an incomplete setup of $BUILD_ROOT.
     echo To be sure, we will build it again completely...
+    umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
     umount -n $BUILD_ROOT/proc 2> /dev/null
     umount -n $BUILD_ROOT/dev/pts 2> /dev/null
     umount -n $BUILD_ROOT/mnt 2> /dev/null

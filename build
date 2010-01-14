@@ -216,6 +216,7 @@ cleanup_and_exit () {
 	exec /bin/bash -c 'mount -n -o remount,ro / ; halt -f -p'
 	halt -f -p
     else
+	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	umount -n $BUILD_ROOT/proc 2>/dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2>/dev/null || true
 	test "$VM_IMAGE" = 1 && VM_IMAGE=
@@ -1096,6 +1097,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo -n "repos=(" >> $BUILD_ROOT/.build/build.data
 	shellquote "${repos[@]}" >> $BUILD_ROOT/.build/build.data
 	echo ")" >> $BUILD_ROOT/.build/build.data
+	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	umount -n $BUILD_ROOT/proc 2> /dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
 	umount -n $BUILD_ROOT/mnt 2> /dev/null || true
