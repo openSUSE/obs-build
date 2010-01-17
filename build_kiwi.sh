@@ -155,9 +155,11 @@ run_kiwi()
 		    # This option has a number of format parameters
 		    FILES=""
 		    for i in $imagename.$imagearch-$imageversion.vmx $imagename.$imagearch-$imageversion.vmdk $imagename.$imagearch-$imageversion.ovf \
-		    	 $imagename.$imagearch-$imageversion-disk*.vmdk $imagename.$imagearch-$imageversion.raw $imagename.$imagearch-$imageversion.xenconfig; do
+		    	 $imagename.$imagearch-$imageversion-disk*.vmdk $imagename.$imagearch-$imageversion.xenconfig; do
 		    	ls $i >& /dev/null && FILES="$FILES $i"
 		    done
+		    # kiwi is not removing the .rar file, if a different output format is defined. Do not include it by default.
+		    [ -z "$FILES" ] && FILES="$imagename.$imagearch-$imageversion.raw"
 		    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-vmx.tar.bz2 \
 		    	$FILES || cleanup_and_exit 1
 		    sha1sum $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-vmx.tar.bz2 \
