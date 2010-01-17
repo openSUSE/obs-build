@@ -121,7 +121,7 @@ run_kiwi()
 	    case "$imgtype" in
 		oem)
 			    pushd $BUILD_ROOT/$TOPDIR/KIWI-oem > /dev/null
-		    echo "compressing images... "
+		    echo "compressing oem images... "
 		    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-raw.tar.bz2 \
 			--exclude=$imagename.$imagearch-$imageversion.iso \
 			--exclude=$imagename.$imagearch-$imageversion.raw \
@@ -129,7 +129,7 @@ run_kiwi()
 		    sha1sum $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-raw.tar.bz2 \
 			> "$BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-raw.tar.bz2.sha1" || cleanup_and_exit 1
 		    if [ -e $imagename.$imagearch-$imageversion.iso ]; then
-		      echo "Copy iso file and create sha1..."
+		      echo "take iso file and create sha1..."
 		      mv $imagename.$imagearch-$imageversion.iso \
 			 $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum.iso || cleanup_and_exit 1
 			      pushd $BUILD_ROOT/$TOPDIR/KIWI > /dev/null
@@ -138,7 +138,7 @@ run_kiwi()
 		      popd > /dev/null
 		    fi
 		    if [ -e $imagename.$imagearch-$imageversion.raw ]; then
-		      echo "Copy raw file and create sha1..."
+		      echo "bzip2 raw file and create sha1..."
 		      mv $imagename.$imagearch-$imageversion.raw \
 			 $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum.raw || cleanup_and_exit 1
 			      pushd $BUILD_ROOT/$TOPDIR/KIWI > /dev/null
@@ -151,7 +151,7 @@ run_kiwi()
 		    ;;
 		vmx)
 		    pushd $BUILD_ROOT/$TOPDIR/KIWI-vmx > /dev/null
-		    echo "compressing images... "
+		    echo "compressing vmx images... "
 		    # This option has a number of format parameters
 		    FILES=""
 		    for i in $imagename.$imagearch-$imageversion.vmx $imagename.$imagearch-$imageversion.vmdk $imagename.$imagearch-$imageversion.ovf \
@@ -166,7 +166,7 @@ run_kiwi()
 		    ;;
 		xen)
 		    pushd $BUILD_ROOT/$TOPDIR/KIWI-xen > /dev/null
-		    echo "compressing images... "
+		    echo "compressing xen images... "
 		    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-xen.tar.bz2 \
 			`grep ^kernel $imagename.$imagearch-$imageversion.xenconfig | cut -d'"'  -f2` \
 			`grep ^ramdisk $imagename.$imagearch-$imageversion.xenconfig | cut -d'"'  -f2` \
@@ -178,7 +178,7 @@ run_kiwi()
 		    ;;
 		pxe)
 		    pushd $BUILD_ROOT/$TOPDIR/KIWI-pxe > /dev/null
-		    echo "compressing images... "
+		    echo "compressing pxe images... "
 		    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-pxe.tar.bz2 \
 				$imagename.$imagearch-$imageversion* \
 				initrd-* || cleanup_and_exit 1
