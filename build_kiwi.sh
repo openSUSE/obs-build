@@ -138,11 +138,12 @@ run_kiwi()
 		      popd > /dev/null
 		    fi
 		    if [ -e $imagename.$imagearch-$imageversion.raw ]; then
-		      echo "bzip2 raw file and create sha1..."
 		      mv $imagename.$imagearch-$imageversion.raw \
 			 $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum.raw || cleanup_and_exit 1
-			      pushd $BUILD_ROOT/$TOPDIR/KIWI > /dev/null
+		      pushd $BUILD_ROOT/$TOPDIR/KIWI > /dev/null
+		      echo "bzip2 raw file..."
 		      bzip2 $imagename.$imagearch-$imageversion$buildnum.raw && \
+		      echo "Create sha1 file..." && \
 		      sha1sum $imagename.$imagearch-$imageversion$buildnum.raw.bz2 \
 			     > "$imagename.$imagearch-$imageversion$buildnum.raw.bz2.sha1" || cleanup_and_exit 1
 		      popd > /dev/null
@@ -162,6 +163,7 @@ run_kiwi()
 		    [ -z "$FILES" ] && FILES="$imagename.$imagearch-$imageversion.raw"
 		    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-vmx.tar.bz2 \
 		    	$FILES || cleanup_and_exit 1
+		    echo "Create sha1 file..."
 		    sha1sum $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-vmx.tar.bz2 \
 			     > "$BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-vmx.tar.bz2.sha1" || cleanup_and_exit 1
 		    popd > /dev/null
@@ -175,6 +177,7 @@ run_kiwi()
 			$imagename.$imagearch-$imageversion.xenconfig \
 			$imagename.$imagearch-$imageversion || cleanup_and_exit 1
 		    popd > /dev/null
+		    echo "Create sha1 file..."
 		    sha1sum $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-xen.tar.bz2 \
 			     > "$BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-xen.tar.bz2.sha1" || cleanup_and_exit 1
 		    ;;
@@ -185,6 +188,7 @@ run_kiwi()
 				$imagename.$imagearch-$imageversion* \
 				initrd-* || cleanup_and_exit 1
 		    popd > /dev/null
+		    echo "Create sha1 file..."
 		    sha1sum $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-pxe.tar.bz2 \
 			     > "$BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-pxe.tar.bz2.sha1" || cleanup_and_exit 1
 		    ;;
@@ -204,6 +208,7 @@ run_kiwi()
 		    echo "compressing unkown images... "
 		    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-$imgtype.tar.bz2 \
 			* || cleanup_and_exit 1
+		    echo "Create sha1 file..."
 		    sha1sum $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-$imgtype.tar.bz2 \
 			> $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-$imgtype.tar.bz2.sha1 || cleanup_and_exit 1
 			    popd > /dev/null
