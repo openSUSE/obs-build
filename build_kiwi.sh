@@ -123,9 +123,11 @@ run_kiwi()
 			    pushd $BUILD_ROOT/$TOPDIR/KIWI-oem > /dev/null
 		    echo "compressing images... "
 		    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-raw.tar.bz2 \
-		      --exclude=$imagename.$imagearch-$imageversion.iso \
-		      --exclude=$imagename.$imagearch-$imageversion.raw \
-		      * || cleanup_and_exit 1
+			--exclude=$imagename.$imagearch-$imageversion.iso \
+			--exclude=$imagename.$imagearch-$imageversion.raw \
+			* || cleanup_and_exit 1
+		    md5sum $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-raw.tar.bz2 \
+			> "$BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-raw.tar.bz2.md5" || cleanup_and_exit 1
 		    if [ -e $imagename.$imagearch-$imageversion.iso ]; then
 		      echo "Copy iso file and create md5..."
 		      mv $imagename.$imagearch-$imageversion.iso \
@@ -158,42 +160,50 @@ run_kiwi()
 		    done
 		    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-vmx.tar.bz2 \
 		    	$FILES || cleanup_and_exit 1
+		    md5sum $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-vmx.tar.bz2 \
+			     > "$BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-vmx.tar.bz2.md5" || cleanup_and_exit 1
 		    popd > /dev/null
 		    ;;
 		xen)
 		    pushd $BUILD_ROOT/$TOPDIR/KIWI-xen > /dev/null
 		    echo "compressing images... "
 		    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-xen.tar.bz2 \
-		      `grep ^kernel $imagename.$imagearch-$imageversion.xenconfig | cut -d'"'  -f2` \
-		      `grep ^ramdisk $imagename.$imagearch-$imageversion.xenconfig | cut -d'"'  -f2` \
-		      $imagename.$imagearch-$imageversion.xenconfig \
-		      $imagename.$imagearch-$imageversion || cleanup_and_exit 1
-			    popd > /dev/null
+			`grep ^kernel $imagename.$imagearch-$imageversion.xenconfig | cut -d'"'  -f2` \
+			`grep ^ramdisk $imagename.$imagearch-$imageversion.xenconfig | cut -d'"'  -f2` \
+			$imagename.$imagearch-$imageversion.xenconfig \
+			$imagename.$imagearch-$imageversion || cleanup_and_exit 1
+		    popd > /dev/null
+		    md5sum $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-xen.tar.bz2 \
+			     > "$BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-xen.tar.bz2.md5" || cleanup_and_exit 1
 		    ;;
 		pxe)
 		    pushd $BUILD_ROOT/$TOPDIR/KIWI-pxe > /dev/null
 		    echo "compressing images... "
 		    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-pxe.tar.bz2 \
-		      $imagename.$imagearch-$imageversion* \
-		      initrd-* || cleanup_and_exit 1
-			    popd > /dev/null
+				$imagename.$imagearch-$imageversion* \
+				initrd-* || cleanup_and_exit 1
+		    popd > /dev/null
+		    md5sum $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-pxe.tar.bz2 \
+			     > "$BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-pxe.tar.bz2.md5" || cleanup_and_exit 1
 		    ;;
 		iso)
 		    pushd $BUILD_ROOT/$TOPDIR/KIWI-iso > /dev/null
 		    echo "creating md5 sum for iso images... "
-			for i in *.iso; do
-		      pushd $BUILD_ROOT/$TOPDIR/KIWI/ > /dev/null
-			    mv $BUILD_ROOT/$TOPDIR/KIWI-iso/$i ${i%.iso}$buildnum.iso || cleanup_and_exit 1
-			    md5sum ${i%.iso}$buildnum.iso > ${i%.iso}$buildnum.iso.md5 || cleanup_and_exit 1
-			      popd > /dev/null
+		    for i in *.iso; do
+			pushd $BUILD_ROOT/$TOPDIR/KIWI/ > /dev/null
+			mv $BUILD_ROOT/$TOPDIR/KIWI-iso/$i ${i%.iso}$buildnum.iso || cleanup_and_exit 1
+			md5sum ${i%.iso}$buildnum.iso > ${i%.iso}$buildnum.iso.md5 || cleanup_and_exit 1
+			popd > /dev/null
 		    done
-			    popd > /dev/null
+		    popd > /dev/null
 		    ;;
 		*)
 		    pushd $BUILD_ROOT/$TOPDIR/KIWI-$imgtype > /dev/null
 		    echo "compressing unkown images... "
 		    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-$imgtype.tar.bz2 \
-		      * || cleanup_and_exit 1
+			* || cleanup_and_exit 1
+		    md5sum $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-$imgtype.tar.bz2 \
+			> $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-$imgtype.tar.bz2.md5 || cleanup_and_exit 1
 			    popd > /dev/null
 		    ;;
 	    esac
