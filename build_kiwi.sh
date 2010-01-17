@@ -150,21 +150,15 @@ run_kiwi()
 		vmx)
 		    pushd $BUILD_ROOT/$TOPDIR/KIWI-vmx > /dev/null
 		    echo "compressing images... "
-			    if [ -e $imagename.$imagearch-$imageversion.xenconfig ] ; then
-		      tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-xenvmx.tar.bz2 \
-			$imagename.$imagearch-$imageversion.raw \
-			$imagename.$imagearch-$imageversion.xenconfig || cleanup_and_exit 1
-		    else
-		      tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-vmx.tar.bz2 \
-			$imagename.$imagearch-$imageversion.vmx \
-			$imagename.$imagearch-$imageversion.vmdk || cleanup_and_exit 1
-			  if [ -e $imagename.$imagearch-$imageversion.ovf ] ; then
-			tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-ovf.tar.bz2 \
-			  $imagename.$imagearch-$imageversion.ovf \
-			  $imagename.$imagearch-$imageversion-disk*.vmdk || cleanup_and_exit 1
-			  fi
-		    fi
-			    popd > /dev/null
+		    # This option has a number of format parameters
+		    FILES=""
+		    for i in $imagename.$imagearch-$imageversion.vmx $imagename.$imagearch-$imageversion.vmdk $imagename.$imagearch-$imageversion.ovf \
+		    	 $imagename.$imagearch-$imageversion-disk*.vmdk $imagename.$imagearch-$imageversion.raw $imagename.$imagearch-$imageversion.xenconfig; do
+		    	ls $i >& /dev/null && FILES="$FILES $i"
+		    done
+		    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-vmx.tar.bz2 \
+		    	$FILES || cleanup_and_exit 1
+		    popd > /dev/null
 		    ;;
 		xen)
 		    pushd $BUILD_ROOT/$TOPDIR/KIWI-xen > /dev/null
