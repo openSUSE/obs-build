@@ -49,6 +49,7 @@ install:
 	    createrepomddeps \
 	    createyastdeps \
 	    changelog2spec \
+	    download \
 	    spectool \
 	    unrpm \
 	    $(DESTDIR)$(pkglibdir)

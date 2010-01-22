@@ -360,21 +360,41 @@ my $p = new XML::Parser(
   });
 
 #my $url = '/mounts/mirror/SuSE/ftp.suse.com/pub/suse/update/10.1/';
-foreach my $url (@ARGV) {
-  $url .= '/' unless $url =~ /\/$/;
+for my $url (@ARGV) {
+  my $dir;
+  if ($url =~ /^zypp:\/\/([^\/]*)\/?/) {
+    use Build::Zypp;
+    my $repo = Build::Zypp::parsecfg($1);
+    die "can't parse $1\n" unless $repo;
+    my $type = $repo->{'type'};
+    if($type eq 'rpm-md') {
+      my $name = $repo->{'name'};
+      $dir = "/var/cache/zypp/raw/$name/";
+      $baseurl = $url;
+      $baseurl .= '/' unless $baseurl =~ /\/$/;
+    } elsif ($type eq 'yast2') {
+      # XXX
+      exec ($INC[0].'/createyastdeps', $url);
+    } else {
+      die "unsupported repo type: $type\n";
+    }
+  } else {
+    $dir = $url;
+    $dir .= '/' unless $dir =~ /\/$/;
+    $baseurl = $dir;
+  }
 
-  $baseurl = $url;
   @primaryfiles = ();
   @cursor = ([undef, $repomdparser]);
 
-  $p->parsefile($url . 'repodata/repomd.xml');
+  $p->parsefile($dir . 'repodata/repomd.xml');
 
 #  print Dumper(\@primaryfiles);
 
   foreach my $f (@primaryfiles) {
     @cursor = ([undef, $primaryparser]);
 
-    my $u = $url . $f->{'location'};
+    my $u = $dir . $f->{'location'};
     $u = 'gzip -cd ' . $u . '|' if ($u =~ /\.gz$/); # XXX
 
     my $fh;

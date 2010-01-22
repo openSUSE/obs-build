@@ -1239,8 +1239,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
 
     if test -z "$BUILD_DIST" -a -e "$BUILD_ROOT/.guessed_dist" ; then
-	BUILD_DIST=`cat $BUILD_ROOT/.guessed_dist`
-	echo "assuming dist $BUILD_DIST"
+	read BUILD_DIST < $BUILD_ROOT/.guessed_dist
     fi
 
     #

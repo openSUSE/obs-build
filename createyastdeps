@@ -60,10 +60,18 @@ sub callback
   return 0;
 }
 
-while (@ARGV)
-{
-  my $url = shift;
-  $url .= '/' unless $url =~ /\/$/;
+for my $url (@ARGV) {
+  my $dir;
+  if ($url =~ /^zypp:\/\/([^\/]*)\/?/) {
+    use Build::Zypp;
+    my $repo = Build::Zypp::parsecfg($1);
+    die "can't parse $1\n" unless $repo;
+    die "only yast2 repos supported\n" unless $repo->{'type'} eq 'yast2';
+    my $name = $repo->{'name'};
+    $dir = "/var/cache/zypp/raw/$name/";
+  } else {
+    $dir = $url;
+  }
 
 # a really fucked up system
 #  if (-e $url."/yast/order") {
@@ -85,7 +93,9 @@ while (@ARGV)
 #    }
 #  }
   # XXX: location is actually defined in content file
-  my $packages = $url.'suse/setup/descr/packages';
+  my $packages = $dir.'/suse/setup/descr/packages';
+  
+  $url .= '/' unless $url =~ /\/$/;
 
   my @order = ();
   my $pkgs = Build::Susetags::parse($packages,

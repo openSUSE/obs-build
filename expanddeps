@@ -137,8 +137,11 @@ if (!defined($dist) || $dist eq '') {
     $dist = 'default';
   } else {
     my $rpmfn = $fn{"rpm.$rpmarch"};
-    my %res = Build::Rpm::rpmq($rpmfn, 1010);
-    my $rpmdist = $res{1010}->[0] || '';
+    my $rpmdist = '';
+    if ($rpmfn =~ /^\// && -e $rpmfn) {
+      my %res = Build::Rpm::rpmq($rpmfn, 1010);
+      $rpmdist = $res{1010}->[0] || '';
+    }
     $rpmdist = lc($rpmdist);
     $rpmdist =~ s/-/_/g;
     $rpmdist =~ s/opensuse/suse linux/;
@@ -162,6 +165,7 @@ if (!defined($dist) || $dist eq '') {
       $dist = 'default';
     }
   }
+  print STDERR "Warning: distribution not specified, assuming '$dist' (see $configdir).\n";
 }
 
 my $cf = Build::read_config_dist($dist, $archs[0], $configdir);

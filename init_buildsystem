@@ -262,7 +262,9 @@ function validate_cache_file {
 		continue
 	    fi
 	    test -z "$SRC" && SRC=`pwd`
-	    if [ ! -e "$SRC" ]; then
+	    if [ "${SRC#zypp://}" != "$SRC" ]; then
+		set -- $BUILD_DIR/createrepomddeps "$SRC"
+	    elif [ ! -e "$SRC" ]; then
 		echo "*** $SRC does not exist" >&2
 		cleanup_and_exit 1
 	    elif [ -z "$findonly" -a -e "$SRC"/suse/setup/descr/packages -o -e "$SRC"/suse/setup/descr/packages.gz ]; then
@@ -310,6 +312,32 @@ fi
 fail_exit()
 {
   cleanup_and_exit 1
+}
+
+# modify $SRC
+download_zypp()
+{
+    local url="$1"
+    local zd="/var/cache/zypp/packages/"
+    SRC=$zd${url#zypp://}
+    if [ ! -e "$SRC" ]; then
+	local destdir="$zd/tmp"
+	mkdir -p "$destdir"
+	echo "downloading $url ... ";
+	$BUILD_DIR/download "$destdir" "$url" || cleanup_and_exit 1
+	local destfile="$destdir/${url##*/}"
+	if [ ! -e "$destfile" ]; then
+	    echo "expected $destfile after download but it's missing" >&2
+	    cleanup_and_exit 1
+	fi
+	rpm -K "$destfile" > $destfile.v || { echo "rpm verify failed" >&2; rm -rf "$destdir"; cleanup_and_exit 1; }
+	if grep "NOT OK" $destfile.v; then
+	    rm -rf "$destdir"
+	    cleanup_and_exit 1
+	fi
+	rm -f "$destfile.v"
+	mv "$destfile" "$SRC" || cleanup_and_exit 1
+    fi
 }
 
 set_build_arch
@@ -441,6 +469,18 @@ else
 	if test "$PKG" = "rpmid:" ; then
 	    echo "${SRC#*:}" > $BUILD_ROOT/.init_b_cache/rpms/${SRC%%:*}.id
 	    continue
+	fi
+	if [ "${SRC#/}" = "$SRC" ]; then
+	    url="$SRC"
+	    case "$url" in
+		zypp://*)
+		    download_zypp "$url"
+		    ;;
+		*)
+		    echo "unsupported url: $url" >&2
+		    cleanup_and_exit 1
+		    ;;
+	    esac
 	fi
 	ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRC##*.}"
 	PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $PKG"

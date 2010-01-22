@@ -1,0 +1,41 @@
+#!/usr/bin/perl -w
+
+BEGIN {
+  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+}
+
+use LWP::UserAgent;
+use URI;
+use File::Path;
+use File::Basename;
+
+use strict;
+
+die "USAGE: $0 DIR URLS..." unless $#ARGV >= 1;
+
+my $dir = shift @ARGV;
+
+my $ua = LWP::UserAgent->new(
+  agent => "openSUSE build script",
+  env_proxy => 1,
+  timeout => 42);
+
+for my $url (@ARGV) {
+  my $dest = $dir;
+  if ($url =~ /^zypp:\/\/([^\/]*)\/?/) {
+    use Build::Zypp;
+    my $repo = Build::Zypp::parsecfg($1);
+    die "can't parse $1\n" unless $repo;
+    die "missing url in repo ".$repo->{'name'}."\n" unless exists $repo->{'baseurl'};
+    my $u = $repo->{'baseurl'};
+    $u .= '/' unless substr($u, -1, 1) eq '/';
+    $url =~ s/^zypp:\/\/[^\/]*\/*//;
+    $url = URI->new($u.$url)
+  } else {
+    $url = URI->new($url);
+  }
+  my $res = $ua->mirror($url, $dest.'/'.basename($url->path));
+  die "reqesting $url failed: ".$res->status_line."\n" unless $res->is_success;
+}
+
+# vim:sw=2
