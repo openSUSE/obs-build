@@ -1,0 +1,133 @@
+#!/usr/bin/perl -w
+# vim:sw=4:et
+# Author: Dirk Mueller
+
+use strict;
+
+my $diffname = $ARGV[0];
+my $specname = $ARGV[1];
+
+if (!defined($diffname) || ! -f $diffname) {
+
+    print "$0: <diffname>\n";
+    exit 1;
+}
+
+sub find_specfile()
+{
+    opendir(D, ".");
+    my @specs = grep { /\.spec$/ } readdir(D);
+    closedir(D);
+
+    # choose the one with the shortest name (heuristic)
+    $specname = ( sort { length($a) - length($b) } @specs)[0];
+
+}
+
+if (!defined($specname) || ! -f $specname) {
+    &find_specfile();
+}
+
+
+open(S, "<$specname") or die;
+
+my $ifdef_level = 0;
+my $in_prep = 0;
+my $in_global = 1;
+my $last_patch_in_prep_index = 0;
+my $last_patch_in_global_index = 0;
+my $already_found_patch = 0;
+my @c = ();
+my $index = 0;
+
+# first read the specfile, parse useful information
+while(<S>)
+{
+
+    if(/^\s*%\s*endif/) {
+        $ifdef_level--;
+        $last_patch_in_prep_index = $index if ($in_prep && $ifdef_level == 0);
+    }
+    die if ($ifdef_level < 0);
+    $ifdef_level++ if(/^\s*%\s*if/);
+
+    if ($ifdef_level == 0 && !$in_prep && $in_global
+        && /^\%(?:prep|build|install|package|description|doc)/) {
+        $in_global = 0;
+    }
+
+    if (!$in_prep && /^%prep/i) {
+        $in_prep = 1;
+        die if ($in_global);
+    }
+
+    if ($in_prep
+        && /^%setup\b/) {
+        $last_patch_in_prep_index = $index;
+    }
+
+    if ($in_prep
+        && /^\%(?:build|install|package|description|doc)/) {
+        $in_prep = 0;
+    }
+
+    die if (($in_prep + $in_global) > 1);
+
+    if ($in_global && /^Patch(?:\d+)?:/) {
+        $last_patch_in_global_index = $index;
+    }
+
+    if ($in_global && $ifdef_level == 0 && /^Source(?:\d+)?:/) {
+        $last_patch_in_global_index = $index;
+    }
+
+    if ($in_global && /^Patch.*?:\s+$diffname/) {
+        $already_found_patch = 1;
+    }
+
+    if ($in_prep && $ifdef_level == 0 && /^\%patch/) {
+        $last_patch_in_prep_index = $index;
+    }
+    push(@c, $_);
+    $index++;
+}
+close(S);
+
+exit 0 if ($already_found_patch);
+
+print "Adding patch $diffname to $specname\n";
+
+die if ($ifdef_level > 0);
+die if ($in_global || $in_prep);
+die if ($last_patch_in_prep_index == 0);
+die if ($last_patch_in_global_index == 0);
+
+#print "adding Patch: $diffname to line $last_patch_in_global_index\n";
+#print "adding %patch to line $last_patch_in_prep_index\n";
+
+# determine patch number
+my $patchnum = 0;
+$patchnum = $1+1 if ($c[$last_patch_in_global_index] =~ /Patch(\d+):/);
+$patchnum = 1 if ($c[$last_patch_in_global_index] =~ /Patch:/);
+
+# determine strip level
+my $striplevel = "";
+open(P, "<$diffname") or die;
+while(<P>) {
+    $striplevel = " -p1" if (m/^--- a/ or m/^--- [^\/]+-\d+\./);
+    last if (/^--- /);
+
+}
+close(P);
+
+
+splice @c, $last_patch_in_prep_index+1, 0, ("\%patch$patchnum$striplevel\n");
+splice @c, $last_patch_in_global_index+1, 0,
+    (sprintf "Patch%s:%s%s\n", $patchnum, ' ' x (10-length($patchnum)), $diffname);
+
+open(O, ">$specname.new") or die;
+print O @c;
+close(O);
+
+system("diff", "-u", $specname, "$specname.new");
+rename("$specname.new", $specname);

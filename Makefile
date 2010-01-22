@@ -51,6 +51,7 @@ install:
 	    changelog2spec \
 	    spec2changelog \
 	    download \
+	    spec_add_patch \
 	    spectool \
 	    unrpm \
 	    $(DESTDIR)$(pkglibdir)
