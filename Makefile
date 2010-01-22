@@ -49,6 +49,7 @@ install:
 	    createrepomddeps \
 	    createyastdeps \
 	    changelog2spec \
+	    spec2changelog \
 	    download \
 	    spectool \
 	    unrpm \
