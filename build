@@ -824,7 +824,7 @@ fi
 
 if [ -z "$RPMLIST" ]; then
     if [ -z "$repos" -a -z "$BUILD_RPMS" ]; then
-	BUILD_RPMS="/media/dvd/suse"
+	repos=(--repository 'zypp://')
     fi
 else
     repos=()

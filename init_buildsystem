@@ -246,8 +246,28 @@ function create_devs {
 DEVLIST
 }
 
+# check whether the repo list contains a plain "zypp://". Add all
+# enabled zypp repos in this case
+maybe_add_all_zypp_repos()
+{
+    local i j
+    r=()
+    for i in "${repos[@]}"; do
+	if [ "$i" = "zypp://" ]; then
+	    for j in `grep -l enabled=1 /etc/zypp/repos.d/*.repo`; do
+		j="${j#/etc/zypp/repos.d/}"
+		r+=("zypp://${j%.repo}")
+	    done
+	else
+	    r+=("$i")
+	fi
+    done
+    repos=("${r[@]}")
+}
+
 function validate_cache_file {
     local findonly=''
+    maybe_add_all_zypp_repos
     test "${repos[*]} ${BUILD_RPMS//:/ /}" != "$(cat $CACHE_FILE.id 2>/dev/null)" && rm -f $CACHE_FILE.id
     test -f $CACHE_FILE || rm -f $CACHE_FILE.id
     for SRC in "${repos[@]}" ${BUILD_RPMS//:/ /}; do
