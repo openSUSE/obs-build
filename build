@@ -1206,7 +1206,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
 		;;
 	      *)
-		echo "argh, no buildstatus set, assuming bad build host..."
+		echo "No buildstatus set, packager broke either the base system (glibc/bash) or the build host has a problem, server will retry..."
 		cleanup_and_exit 3
 		;;
 	    esac
