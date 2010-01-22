@@ -121,15 +121,19 @@ Known Parameters:
 
   --no-checks Do not run post-build checks
 
+  --repository PATH
+	      Use package repository at PATH. Supported formats are
+	      rpm-md and yast2.
+	      Alternatively zypp://NAME specifies the zypp
+	      repository NAME. The repo must be refreshed with zypp
+	      so package meta data is available locally. With emtpy
+	      NAME all enabled repositories are used.
+
   --rpms path1:path2:...
               Specify path where to find the RPMs for the build system
 
   --arch arch1:arch2:...
               Specify what architectures to select from the RPMs
-
-  --useusedforbuild
-              Do not expand dependencies but search the specfile for
-              usedforbuild lines.
 
   --verify    Run verify when initializing the build root
 
