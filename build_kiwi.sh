@@ -5,7 +5,7 @@ run_kiwi()
     imagename=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE filename)
     imageversion=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE version)
     # prepare rpms as source and createrepo on the repositories
-    if test -d $BUILD_ROOT/$TOPDIR/SOURCES/repos ; then
+    if test -d $BUILD_ROOT/$TOPDIR/SOURCES/repos -a "$DO_INIT" = true ; then
 	(
 	ln -sf $TOPDIR/SOURCES/repos $BUILD_ROOT/repos
 	cd $BUILD_ROOT/$TOPDIR/SOURCES/repos
