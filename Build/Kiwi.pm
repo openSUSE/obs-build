@@ -113,7 +113,13 @@ sub kiwiparse {
   }
   for my $type (@{$preferences->{'type'} || []}) {
     next unless @{$preferences->{'type'}} == 1 || !$type->{'optional'};
-    push @types, $type->{'_content'};
+    if (defined $type->{'image'}) {
+      # for kiwi 4.1
+      push @types, $type->{'image'}
+    }else{
+      # for kiwi 3.8 and before
+      push @types, $type->{'_content'}
+    }
     push @packages, "kiwi-filesystem:$type->{'filesystem'}" if $type->{'filesystem'};
     if (defined $type->{'boot'}) {
       if ($type->{'boot'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
@@ -196,8 +202,6 @@ sub kiwiparse {
     push @packages, "kiwi-packagemanager:$packman";
   } else {
     push @packages, "kiwi-packagemanager:instsource";
-    # required for kiwi 4.1 and later, build_kiwi.sh is checking via this the type
-    push @types, "product";
   }
 
   $ret->{'exclarch'} = [ unify(@requiredarch) ] if @requiredarch;
