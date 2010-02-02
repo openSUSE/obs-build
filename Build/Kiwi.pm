@@ -196,6 +196,8 @@ sub kiwiparse {
     push @packages, "kiwi-packagemanager:$packman";
   } else {
     push @packages, "kiwi-packagemanager:instsource";
+    # required for kiwi 4.1 and later, build_kiwi.sh is checking via this the type
+    push @types, "product";
   }
 
   $ret->{'exclarch'} = [ unify(@requiredarch) ] if @requiredarch;
