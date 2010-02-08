@@ -256,10 +256,10 @@ maybe_add_all_zypp_repos()
 	if [ "$i" = "zypp://" ]; then
 	    for j in `grep -l enabled=1 /etc/zypp/repos.d/*.repo`; do
 		j="${j#/etc/zypp/repos.d/}"
-		r+=("zypp://${j%.repo}")
+		r=("${r[@]}" "zypp://${j%.repo}")
 	    done
 	else
-	    r+=("$i")
+	    r=("${r[@]}" "$i")
 	fi
     done
     repos=("${r[@]}")
