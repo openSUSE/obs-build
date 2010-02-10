@@ -157,8 +157,8 @@ done
 # kiwi is not removing the .rar file, if a different output format is defined. Do not include it by default.
 [ -z "\$FILES" ] && FILES="$imageout.raw"
 
+tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" \$FILES
 cd /$TOPDIR/KIWI
-tar cvjfS "$imageout$buildnum-vmx.tar.bz2" \$FILES
 echo "Create sha256 file..."
 sha256sum "$imageout$buildnum-vmx.tar.bz2" > "$imageout$buildnum-vmx.tar.bz2.sha256"
 EOF
