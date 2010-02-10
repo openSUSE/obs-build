@@ -139,13 +139,11 @@ fi
 if [ -e "$imageout.raw" ]; then
 	mv "$imageout.raw" "/$TOPDIR/KIWI/$imageout$buildnum.raw"
 	echo "bzip2 raw file..."
-	bzip2 "$imageout$buildnum.raw" && \
-	echo 'Create sha256 file...' && \
+	bzip2 "$imageout$buildnum.raw"
+	echo "Create sha256 file..."
 	sha256sum "$imageout$buildnum.raw.bz2" > "$imageout$buildnum.raw.bz2.sha256"
 fi
 EOF
-		    chroot $BUILD_ROOT su -c "sh -e -x /kiwi_post.sh" || cleanup_and_exit 1
-		    rm -f $BUILD_ROOT/kiwi_post.sh
 		    ;;
 		vmx)
 		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
@@ -164,8 +162,6 @@ tar cvjfS "$imageout$buildnum-vmx.tar.bz2" \$FILES
 echo "Create sha256 file..."
 sha256sum "$imageout$buildnum-vmx.tar.bz2" > "$imageout$buildnum-vmx.tar.bz2.sha256"
 EOF
-                    chroot $BUILD_ROOT su -c "sh -e -x /kiwi_post.sh" || cleanup_and_exit 1
-                    rm -f $BUILD_ROOT/kiwi_post.sh
 		    ;;
 		xen)
 		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
@@ -180,8 +176,6 @@ echo "Create sha256 file..."
 cd $TOPDIR/KIWI
 sha256sum "$imageout$buildnum-xen.tar.bz2" > "$imageout$buildnum-xen.tar.bz2.sha256"
 EOF
-                    chroot $BUILD_ROOT su -c "sh -e -x /kiwi_post.sh" || cleanup_and_exit 1
-                    rm -f $BUILD_ROOT/kiwi_post.sh
 		    ;;
 		pxe)
 		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
@@ -192,8 +186,6 @@ echo "Create sha256 file..."
 cd $TOPDIR/KIWI
 sha256sum "$imageout$buildnum-pxe.tar.bz2" > "$imageout$buildnum-pxe.tar.bz2.sha256"
 EOF
-                    chroot $BUILD_ROOT su -c "sh -e -x /kiwi_post.sh" || cleanup_and_exit 1
-                    rm -f $BUILD_ROOT/kiwi_post.sh
 		    ;;
 		iso)
 		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
@@ -207,8 +199,6 @@ for i in *.iso; do
 	sha256sum "\$i" > "\$i.sha256"
 done
 EOF
-                    chroot $BUILD_ROOT su -c "sh -e -x /kiwi_post.sh" || cleanup_and_exit 1
-                    rm -f $BUILD_ROOT/kiwi_post.sh
 		    ;;
 		*)
 		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
@@ -219,10 +209,10 @@ echo "Create sha256 file..."
 cd /$TOPDIR/KIWI
 sha256sum "$imageout$buildnum-$imgtype.tar.bz2" > "$imageout$buildnum-$imgtype.tar.bz2.sha256"
 EOF
-                    chroot $BUILD_ROOT su -c "sh -e -x /kiwi_post.sh" || cleanup_and_exit 1
-                    rm -f $BUILD_ROOT/kiwi_post.sh
 		    ;;
 	    esac
+	    chroot $BUILD_ROOT su -c "sh -e -x /kiwi_post.sh" || cleanup_and_exit 1
+	    rm -f $BUILD_ROOT/kiwi_post.sh
 	done
     fi
 }
