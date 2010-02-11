@@ -127,19 +127,22 @@ cd /$TOPDIR/KIWI-oem
 if [ -e "$imageout.iso" ]; then
 	echo "take iso file and create sha256..."
 	mv "$imageout.iso" "/$TOPDIR/KIWI/$imageout$buildnum.iso"
+	pushd /$TOPDIR/KIWI
 	sha256sum "$imageout$buildnum.iso" > "$imageout$buildnum.iso.sha256"
+	popd
 fi
-
 if [ -e "$imageout.raw" ]; then
 	mv "$imageout.raw" "/$TOPDIR/KIWI/$imageout$buildnum.raw"
+	pushd /$TOPDIR/KIWI
 	echo "bzip2 raw file..."
 	bzip2 "$imageout$buildnum.raw"
 	echo "Create sha256 file..."
 	sha256sum "$imageout$buildnum.raw.bz2" > "$imageout$buildnum.raw.bz2.sha256"
+	popd
 fi
+
 tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-raw.tar.bz2" \
 	--exclude="$imageout.iso" --exclude="$imageout.raw" *
-
 cd /$TOPDIR/KIWI
 sha256sum "$imageout$buildnum-raw.tar.bz2" > "$imageout$buildnum-raw.tar.bz2.sha256"
 EOF
