@@ -124,12 +124,6 @@ run_kiwi()
 		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
 echo "compressing oem images... "
 cd /$TOPDIR/KIWI-oem
-tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-raw.tar.bz2" \
-	--exclude="$imageout.iso" --exclude="$imageout.raw" *
-
-cd /$TOPDIR/KIWI
-sha256sum "$imageout$buildnum-raw.tar.bz2" > "$imageout$buildnum-raw.tar.bz2.sha256"
-
 if [ -e "$imageout.iso" ]; then
 	echo "take iso file and create sha256..."
 	mv "$imageout.iso" "/$TOPDIR/KIWI/$imageout$buildnum.iso"
@@ -143,6 +137,11 @@ if [ -e "$imageout.raw" ]; then
 	echo "Create sha256 file..."
 	sha256sum "$imageout$buildnum.raw.bz2" > "$imageout$buildnum.raw.bz2.sha256"
 fi
+tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-raw.tar.bz2" \
+	--exclude="$imageout.iso" --exclude="$imageout.raw" *
+
+cd /$TOPDIR/KIWI
+sha256sum "$imageout$buildnum-raw.tar.bz2" > "$imageout$buildnum-raw.tar.bz2.sha256"
 EOF
 		    ;;
 		vmx)
