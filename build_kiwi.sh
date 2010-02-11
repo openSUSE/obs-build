@@ -150,17 +150,32 @@ EOF
 echo "compressing vmx images... "
 cd /$TOPDIR/KIWI-vmx
 # This option has a number of format parameters
-FILES=""
-for i in "$imageout.vmx" "$imageout.vmdk" "$imageout.ovf" "$imageout-disk*.vmdk" "$imageout.xenconfig" ; do
-	ls \$i >& /dev/null && FILES="\$FILES \$i"
+VMXFILES=""
+SHAFILES=""
+for i in "$imageout.vmx" "$imageout.vmdk" "$imageout-disk*.vmdk"; do
+	ls \$i >& /dev/null && VMXFILES="\$VMXFILES \$i"
 done
-# kiwi is not removing the .rar file, if a different output format is defined. Do not include it by default.
-[ -z "\$FILES" ] && FILES="$imageout.raw"
+if [ -n "\$VMXFILES" ]; then
+	tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" \$VMXFILES
+	SHAFILES="\$SHAFILES $imageout$buildnum-vmx.tar.bz2"
+fi
 
-tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" \$FILES
+if [ -e "$imageout.xenconfig" ]; then
+	tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" $imageout.xenconfig $imageout.raw
+	SHAFILES="\$SHAFILES $imageout$buildnum-vmx.tar.bz2"
+fi
+for i in "$imageout.ovf"; do
+	[ -e \$i ] && SHAFILES="\$SHAFILES \$i"
+done
+# FIXME: do we need a single .raw file in any case ?
+
 cd /$TOPDIR/KIWI
-echo "Create sha256 file..."
-sha256sum "$imageout$buildnum-vmx.tar.bz2" > "$imageout$buildnum-vmx.tar.bz2.sha256"
+if [ -n "\$SHAFILES" ]; then
+	for i in \$SHAFILES; do
+		echo "Create sha256 file..."
+		sha256sum "\$i" > "\$i.sha256"
+	done
+fi
 EOF
 		    ;;
 		xen)
