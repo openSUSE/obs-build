@@ -8,6 +8,7 @@ sub parsecfg($)
 {
   my $file = shift;
   my $repocfg = "$root/etc/zypp/repos.d/$file.repo";
+  local *REPO;
   open(REPO, '<', $repocfg) or return undef;
   my $name;
   my $repo = {};
