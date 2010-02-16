@@ -163,7 +163,7 @@ if [ -n "\$VMXFILES" ]; then
 fi
 
 if [ -e "$imageout.xenconfig" ]; then
-	tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" $imageout.xenconfig $imageout.raw
+	tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" $imageout.xenconfig $imageout.raw initrd-*
 	SHAFILES="\$SHAFILES $imageout$buildnum-vmx.tar.bz2"
 fi
 for i in "$imageout.ovf"; do
