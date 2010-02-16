@@ -115,10 +115,10 @@ sub kiwiparse {
     next unless @{$preferences->{'type'}} == 1 || !$type->{'optional'};
     if (defined $type->{'image'}) {
       # for kiwi 4.1
-      push @types, $type->{'image'}
-    }else{
+      push @types, $type->{'image'};
+    } else {
       # for kiwi 3.8 and before
-      push @types, $type->{'_content'}
+      push @types, $type->{'_content'};
     }
     push @packages, "kiwi-filesystem:$type->{'filesystem'}" if $type->{'filesystem'};
     if (defined $type->{'boot'}) {
