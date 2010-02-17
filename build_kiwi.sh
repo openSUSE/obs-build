@@ -187,6 +187,7 @@ cd /$TOPDIR/KIWI-xen
 tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-xen.tar.bz2" \
 	`grep ^kernel $imageout.xenconfig | cut -d'"'  -f2` \
 	`grep ^ramdisk $imageout.xenconfig | cut -d'"'  -f2` \
+	initrd-* \
 	"$imageout.xenconfig" \
 	"$imageout"
 echo "Create sha256 file..."
