@@ -1362,12 +1362,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     CHANGELOGARGS=
     test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" && CHANGELOGARGS="--changelog $BUILD_ROOT/.build-changelog"
 
-    if test $BUILD_USER = abuild ; then
-	chown -R 399:399 $BUILD_ROOT$TOPDIR/*
-    else
-	chown -R root:root $BUILD_ROOT$TOPDIR/*
-    fi
-
     if test "$BUILDTYPE" = spec ; then
 	# do buildrequires/release substitution
 	args=()
@@ -1424,7 +1418,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     if test "$BUILDTYPE" = dsc ; then
 	rm -rf $BUILD_ROOT$TOPDIR/BUILD
 	mkdir -p $BUILD_ROOT$TOPDIR/SOURCES.DEB
-	test $BUILD_USER = abuild && chown 399:399 $BUILD_ROOT$TOPDIR
+	test $BUILD_USER = abuild && chown -R 399:399 $BUILD_ROOT$TOPDIR
 	DEB_TRANSFORM=
 	DEB_SOURCEDIR=$TOPDIR/SOURCES
 	DEB_DSCFILE=$SPECFILE
@@ -1444,6 +1438,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	chroot $BUILD_ROOT su -c "dpkg-source -x $DEB_SOURCEDIR/$DEB_DSCFILE $TOPDIR/BUILD" - $BUILD_USER
     fi
 
+    if test $BUILD_USER = abuild ; then
+	chown -R 399:399 $BUILD_ROOT$TOPDIR/*
+    else
+	chown -R root:root $BUILD_ROOT$TOPDIR/*
+    fi
     cd $BUILD_ROOT$TOPDIR/SOURCES || cleanup_and_exit 1
 
     echo -----------------------------------------------------------------
