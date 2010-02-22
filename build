@@ -36,6 +36,10 @@ mkinitrd_virtio_cmd=(env rootfstype=ext3 mkinitrd -d /dev/null -m "virtio_pci vi
 # whether we have virtio support
 kvm_virtio=
 
+# Default uid:gid for the build user
+ABUILD_UID=399
+ABUILD_GID=399
+
 DO_INIT=true
 DO_LINT=
 DO_CHECKS=true
@@ -185,6 +189,11 @@ Known Parameters:
   --rsync-dest RSYNCDEST
               Copy overlay folder (RSYNCSRC) to a folder (RSYNCDEST)
               inside the buildroot using rsync.
+
+  --uid uid:gid
+              Specify the uid and gid to use for the abuild user.
+              This is useful if you are hacking in the buildroot.
+              This must be set to the same value if the buildroot is re-used.
 
   --debug
               enable creation of a debuginfo package
@@ -745,6 +754,16 @@ while test -n "$1"; do
 	RSYNCDEST=$ARG
 	shift
       ;;
+      --uid)
+        ABUILD_ID="$ARG"
+        if test -n "${ABUILD_ID//[0-9:]/}"; then
+            echo "--uid argument must be uid:gid"
+            cleanup_and_exit
+	fi
+	ABUILD_UID=${ABUILD_ID%:*}
+	ABUILD_GID=${ABUILD_ID#*:}
+        shift
+      ;;
       -*)
 	echo Unknown Option "$PARAM". Exit.
 	cleanup_and_exit 1
@@ -1274,12 +1293,22 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
     if test $BUILD_USER = abuild ; then
 	if ! egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
-	    echo 'abuild::399:399:Autobuild:/home/abuild:/bin/bash' >>$BUILD_ROOT/etc/passwd
+	    echo "abuild::${ABUILD_UID}:${ABUILD_GID}:Autobuild:/home/abuild:/bin/bash" >>$BUILD_ROOT/etc/passwd
 	    echo 'abuild:*:::::::' >>$BUILD_ROOT/etc/shadow # This is needed on Mandriva 2009
 	    echo 'abuild:*::' >>$BUILD_ROOT/etc/gshadow # This is needed on Ubuntu
-	    echo 'abuild::399:' >>$BUILD_ROOT/etc/group
+	    echo "abuild::${ABUILD_GID}:" >>$BUILD_ROOT/etc/group
 	    mkdir -p $BUILD_ROOT/home/abuild
-	    chown 399:399 $BUILD_ROOT/home/abuild
+	    chown ${ABUILD_UID}:${ABUILD_GID} $BUILD_ROOT/home/abuild
+	else
+	    if ! egrep "^abuild::${ABUILD_UID}:${ABUILD_GID}" >/dev/null <$BUILD_ROOT/etc/passwd ; then
+		echo "abuild user present in the buildroot ($BUILD_ROOT) but uid:gid does not match"
+		echo "buildroot currently using:"
+		egrep "^abuild:" <$BUILD_ROOT/etc/passwd
+		echo "build script attempting to use:"
+		echo "abuild::${ABUILD_UID}:${ABUILD_GID}:..."
+		echo "build aborting"
+		cleanup_and_exit 1
+            fi
 	fi
 	if test -f $BUILD_ROOT/etc/shadow ; then
 	    sed -e "s@^root::@root:*:@" < $BUILD_ROOT/etc/shadow > $BUILD_ROOT/etc/shadow.t && mv $BUILD_ROOT/etc/shadow.t $BUILD_ROOT/etc/shadow
@@ -1335,7 +1364,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     rm -rf $BUILD_ROOT$TOPDIR
     for i in BUILD RPMS/`uname -m` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS BUILDROOT; do
 	mkdir -p $BUILD_ROOT$TOPDIR/$i
-	test $BUILD_USER = abuild && chown 399:399 $BUILD_ROOT$TOPDIR/$i
+	test $BUILD_USER = abuild && chown ${ABUILD_UID}:${ABUILD_GID} $BUILD_ROOT$TOPDIR/$i
     done
     test -e $BUILD_ROOT/exit && cleanup_and_exit 1
 
@@ -1418,7 +1447,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     if test "$BUILDTYPE" = dsc ; then
 	rm -rf $BUILD_ROOT$TOPDIR/BUILD
 	mkdir -p $BUILD_ROOT$TOPDIR/SOURCES.DEB
-	test $BUILD_USER = abuild && chown -R 399:399 $BUILD_ROOT$TOPDIR
+	test $BUILD_USER = abuild && chown -R ${ABUILD_UID}:${ABUILD_GID} $BUILD_ROOT$TOPDIR
 	DEB_TRANSFORM=
 	DEB_SOURCEDIR=$TOPDIR/SOURCES
 	DEB_DSCFILE=$SPECFILE
@@ -1439,7 +1468,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
 
     if test $BUILD_USER = abuild ; then
-	chown -R 399:399 $BUILD_ROOT$TOPDIR/*
+	chown -R ${ABUILD_UID}:${ABUILD_GID} $BUILD_ROOT$TOPDIR/*
     else
 	chown -R root:root $BUILD_ROOT$TOPDIR/*
     fi
@@ -1487,7 +1516,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		fi
 		echo "Running rsync ..."
 		rsync -av $RSYNCSRC/* $BUILD_ROOT/$RSYNCDEST/
-		chown -R 399:399 $BUILD_ROOT/$RSYNCDEST
+		chown -R ${ABUILD_UID}:${ABUILD_GID} $BUILD_ROOT/$RSYNCDEST
 		RSYNCDONE=true
 		echo "... done"
 	    else
@@ -1580,7 +1609,7 @@ if test -n "$RPMS" -a -n "$BUILD_USER_ABUILD_USED" ; then
     echo "... checking for files with abuild user/group"
     BADFILE=
     while read un gn fn ; do
-	if test "$un" = abuild -o "$gn" = abuild -o "$un" = 399 -o "$gn" = 399 ; then
+	if test "$un" = abuild -o "$gn" = abuild -o "$un" = ${ABUILD_UID} -o "$gn" = ${ABUILD_GID} ; then
 	    echo "  $un $gn $fn"
 	    BADFILE=true
 	fi
