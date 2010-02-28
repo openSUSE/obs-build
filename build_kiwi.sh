@@ -117,103 +117,120 @@ run_kiwi()
 	  if test -n "$RELEASE"; then
 	    buildnum="-Build$RELEASE"
 	fi
+	imageout="$imagename.$imagearch-$imageversion"
 	for imgtype in $imagetype ; do
 	    case "$imgtype" in
 		oem)
-			    pushd $BUILD_ROOT/$TOPDIR/KIWI-oem > /dev/null
-		    echo "compressing oem images... "
-		    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-raw.tar.bz2 \
-			--exclude=$imagename.$imagearch-$imageversion.iso \
-			--exclude=$imagename.$imagearch-$imageversion.raw \
-			* || cleanup_and_exit 1
-		    sha256sum $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-raw.tar.bz2 \
-			> "$BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-raw.tar.bz2.sha256" || cleanup_and_exit 1
-		    if [ -e $imagename.$imagearch-$imageversion.iso ]; then
-		      echo "take iso file and create sha256..."
-		      mv $imagename.$imagearch-$imageversion.iso \
-			 $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum.iso || cleanup_and_exit 1
-			      pushd $BUILD_ROOT/$TOPDIR/KIWI > /dev/null
-		      sha256sum $imagename.$imagearch-$imageversion$buildnum.iso \
-			     > "$imagename.$imagearch-$imageversion$buildnum.iso.sha256" || cleanup_and_exit 1
-		      popd > /dev/null
-		    fi
-		    if [ -e $imagename.$imagearch-$imageversion.raw ]; then
-		      mv $imagename.$imagearch-$imageversion.raw \
-			 $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum.raw || cleanup_and_exit 1
-		      pushd $BUILD_ROOT/$TOPDIR/KIWI > /dev/null
-		      echo "bzip2 raw file..."
-		      bzip2 $imagename.$imagearch-$imageversion$buildnum.raw && \
-		      echo "Create sha256 file..." && \
-		      sha256sum $imagename.$imagearch-$imageversion$buildnum.raw.bz2 \
-			     > "$imagename.$imagearch-$imageversion$buildnum.raw.bz2.sha256" || cleanup_and_exit 1
-		      popd > /dev/null
-		    fi
-		    popd > /dev/null
+		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
+echo "compressing oem images... "
+cd /$TOPDIR/KIWI-oem
+if [ -e "$imageout.iso" ]; then
+	echo "take iso file and create sha256..."
+	mv "$imageout.iso" "/$TOPDIR/KIWI/$imageout$buildnum.iso"
+	pushd /$TOPDIR/KIWI
+	sha256sum "$imageout$buildnum.iso" > "$imageout$buildnum.iso.sha256"
+	popd
+fi
+if [ -e "$imageout.raw" ]; then
+	mv "$imageout.raw" "/$TOPDIR/KIWI/$imageout$buildnum.raw"
+	pushd /$TOPDIR/KIWI
+	echo "bzip2 raw file..."
+	bzip2 "$imageout$buildnum.raw"
+	echo "Create sha256 file..."
+	sha256sum "$imageout$buildnum.raw.bz2" > "$imageout$buildnum.raw.bz2.sha256"
+	popd
+fi
+
+tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-raw.tar.bz2" \
+	--exclude="$imageout.iso" --exclude="$imageout.raw" *
+cd /$TOPDIR/KIWI
+sha256sum "$imageout$buildnum-raw.tar.bz2" > "$imageout$buildnum-raw.tar.bz2.sha256"
+EOF
 		    ;;
 		vmx)
-		    pushd $BUILD_ROOT/$TOPDIR/KIWI-vmx > /dev/null
-		    echo "compressing vmx images... "
-		    # This option has a number of format parameters
-		    FILES=""
-		    for i in $imagename.$imagearch-$imageversion.vmx $imagename.$imagearch-$imageversion.vmdk $imagename.$imagearch-$imageversion.ovf \
-		    	 $imagename.$imagearch-$imageversion-disk*.vmdk $imagename.$imagearch-$imageversion.xenconfig; do
-		    	ls $i >& /dev/null && FILES="$FILES $i"
-		    done
-		    # kiwi is not removing the .rar file, if a different output format is defined. Do not include it by default.
-		    [ -z "$FILES" ] && FILES="$imagename.$imagearch-$imageversion.raw"
-		    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-vmx.tar.bz2 \
-		    	$FILES || cleanup_and_exit 1
-		    echo "Create sha256 file..."
-		    sha256sum $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-vmx.tar.bz2 \
-			     > "$BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-vmx.tar.bz2.sha256" || cleanup_and_exit 1
-		    popd > /dev/null
+		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
+echo "compressing vmx images... "
+cd /$TOPDIR/KIWI-vmx
+# This option has a number of format parameters
+VMXFILES=""
+SHAFILES=""
+for i in "$imageout.vmx" "$imageout.vmdk" "$imageout-disk*.vmdk"; do
+	ls \$i >& /dev/null && VMXFILES="\$VMXFILES \$i"
+done
+if [ -n "\$VMXFILES" ]; then
+	tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" \$VMXFILES
+	SHAFILES="\$SHAFILES $imageout$buildnum-vmx.tar.bz2"
+fi
+
+if [ -e "$imageout.xenconfig" ]; then
+	tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" $imageout.xenconfig $imageout.raw initrd-*
+	SHAFILES="\$SHAFILES $imageout$buildnum-vmx.tar.bz2"
+fi
+for i in "$imageout.ovf"; do
+	[ -e \$i ] && SHAFILES="\$SHAFILES \$i"
+done
+# FIXME: do we need a single .raw file in any case ?
+
+cd /$TOPDIR/KIWI
+if [ -n "\$SHAFILES" ]; then
+	for i in \$SHAFILES; do
+		echo "Create sha256 file..."
+		sha256sum "\$i" > "\$i.sha256"
+	done
+fi
+EOF
 		    ;;
 		xen)
-		    pushd $BUILD_ROOT/$TOPDIR/KIWI-xen > /dev/null
-		    echo "compressing xen images... "
-		    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-xen.tar.bz2 \
-			`grep ^kernel $imagename.$imagearch-$imageversion.xenconfig | cut -d'"'  -f2` \
-			`grep ^ramdisk $imagename.$imagearch-$imageversion.xenconfig | cut -d'"'  -f2` \
-			$imagename.$imagearch-$imageversion.xenconfig \
-			$imagename.$imagearch-$imageversion || cleanup_and_exit 1
-		    popd > /dev/null
-		    echo "Create sha256 file..."
-		    sha256sum $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-xen.tar.bz2 \
-			     > "$BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-xen.tar.bz2.sha256" || cleanup_and_exit 1
+		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
+echo "compressing xen images... "
+cd /$TOPDIR/KIWI-xen
+tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-xen.tar.bz2" \
+	`grep ^kernel $imageout.xenconfig | cut -d'"'  -f2` \
+	`grep ^ramdisk $imageout.xenconfig | cut -d'"'  -f2` \
+	initrd-* \
+	"$imageout.xenconfig" \
+	"$imageout"
+echo "Create sha256 file..."
+cd $TOPDIR/KIWI
+sha256sum "$imageout$buildnum-xen.tar.bz2" > "$imageout$buildnum-xen.tar.bz2.sha256"
+EOF
 		    ;;
 		pxe)
-		    pushd $BUILD_ROOT/$TOPDIR/KIWI-pxe > /dev/null
-		    echo "compressing pxe images... "
-		    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-pxe.tar.bz2 \
-				$imagename.$imagearch-$imageversion* \
-				initrd-* || cleanup_and_exit 1
-		    popd > /dev/null
-		    echo "Create sha256 file..."
-		    sha256sum $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-pxe.tar.bz2 \
-			     > "$BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-pxe.tar.bz2.sha256" || cleanup_and_exit 1
+		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
+echo "compressing pxe images... "
+cd /$TOPDIR/KIWI-pxe
+tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-pxe.tar.bz2" "$imageout"* initrd-*"
+echo "Create sha256 file..."
+cd $TOPDIR/KIWI
+sha256sum "$imageout$buildnum-pxe.tar.bz2" > "$imageout$buildnum-pxe.tar.bz2.sha256"
+EOF
 		    ;;
 		iso)
-		    pushd $BUILD_ROOT/$TOPDIR/KIWI-iso > /dev/null
-		    echo "creating sha256 sum for iso images... "
-		    for i in *.iso; do
-			pushd $BUILD_ROOT/$TOPDIR/KIWI/ > /dev/null
-			mv $BUILD_ROOT/$TOPDIR/KIWI-iso/$i ${i%.iso}$buildnum.iso || cleanup_and_exit 1
-			sha256sum ${i%.iso}$buildnum.iso > ${i%.iso}$buildnum.iso.sha256 || cleanup_and_exit 1
-			popd > /dev/null
-		    done
-		    popd > /dev/null
+		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
+cd /$TOPDIR/KIWI-iso
+for i in *.iso; do
+	mv "\$i" "/$TOPDIR/KIWI/\${i%.iso}$buildnum.iso"
+done
+echo "creating sha256 sum for iso images... "
+cd $TOPDIR/KIWI
+for i in *.iso; do
+	sha256sum "\$i" > "\$i.sha256"
+done
+EOF
 		    ;;
 		*)
-		    pushd $BUILD_ROOT/$TOPDIR/KIWI-$imgtype > /dev/null
-		    echo "compressing unkown images... "
-		    tar cvjfS $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-$imgtype.tar.bz2 \
-			* || cleanup_and_exit 1
-		    echo "Create sha256 file..."
-		    sha256sum $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-$imgtype.tar.bz2 \
-			> $BUILD_ROOT/$TOPDIR/KIWI/$imagename.$imagearch-$imageversion$buildnum-$imgtype.tar.bz2.sha256 || cleanup_and_exit 1
-			    popd > /dev/null
+		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
+echo "compressing unkown images... "
+cd /$TOPDIR/KIWI-$imgtype
+tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-$imgtype.tar.bz2" *
+echo "Create sha256 file..."
+cd /$TOPDIR/KIWI
+sha256sum "$imageout$buildnum-$imgtype.tar.bz2" > "$imageout$buildnum-$imgtype.tar.bz2.sha256"
+EOF
 		    ;;
 	    esac
+	    chroot $BUILD_ROOT su -c "sh -e -x /kiwi_post.sh" || cleanup_and_exit 1
+	    rm -f $BUILD_ROOT/kiwi_post.sh
 	done
     fi
 }

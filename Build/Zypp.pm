@@ -8,22 +8,23 @@ sub parsecfg($)
 {
   my $file = shift;
   my $repocfg = "$root/etc/zypp/repos.d/$file.repo";
+  local *REPO;
   open(REPO, '<', $repocfg) or return undef;
   my $name;
   my $repo = {};
-  while(<REPO>) {
+  while (<REPO>) {
     chomp;
-    if(/^\[(.+)\]/) {
+    if (/^\[(.+)\]/) {
       $name = $1;
     } else {
       my ($key, $value) = split(/=/,$_,2);
       $repo->{$key} = $value;
     }
   }
+  close(REPO);
   return undef unless $name;
   $repo->{'description'} = $repo->{'name'} if exists $repo->{'name'};
   $repo->{'name'} = $name;
-  close(REPO);
   return $repo;
 }
 
