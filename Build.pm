@@ -776,11 +776,11 @@ sub query {
 
 sub queryhdrmd5 {
   my ($binname) = @_;
-  return Build::Rpm::queryhdrmd5($binname) if $do_rpm && $binname =~ /\.rpm$/;
-  return Build::Deb::queryhdrmd5($binname) if $do_deb && $binname =~ /\.deb$/;
-  return Build::Kiwi::queryhdrmd5($binname) if $do_kiwi && $binname =~ /\.iso$/;
-  return Build::Kiwi::queryhdrmd5($binname) if $do_kiwi && $binname =~ /\.raw$/;
-  return Build::Kiwi::queryhdrmd5($binname) if $do_kiwi && $binname =~ /\.raw.install$/;
+  return Build::Rpm::queryhdrmd5(@_) if $do_rpm && $binname =~ /\.rpm$/;
+  return Build::Deb::queryhdrmd5(@_) if $do_deb && $binname =~ /\.deb$/;
+  return Build::Kiwi::queryhdrmd5(@_) if $do_kiwi && $binname =~ /\.iso$/;
+  return Build::Kiwi::queryhdrmd5(@_) if $do_kiwi && $binname =~ /\.raw$/;
+  return Build::Kiwi::queryhdrmd5(@_) if $do_kiwi && $binname =~ /\.raw.install$/;
   return undef;
 }
 

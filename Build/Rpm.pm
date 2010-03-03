@@ -2,6 +2,8 @@ package Build::Rpm;
 
 use strict;
 
+use Digest::MD5;
+
 sub expr {
   my $expr = shift;
   my $lev = shift;
@@ -763,7 +765,7 @@ sub query {
 }
 
 sub queryhdrmd5 {
-  my ($bin) = @_;
+  my ($bin, $leadsigp) = @_;
 
   local *F;
   open(F, '<', $bin) || die("$bin: $!\n");
@@ -800,6 +802,7 @@ sub queryhdrmd5 {
     }
   }
   close F;
+  $$leadsigp = Digest::MD5::md5_hex(substr($buf, 0, $hlen)) if $leadsigp;
   my $idxarea = substr($buf, 96 + 16, $cnt * 16);
   if ($idxarea !~ /\A(?:.{16})*\000\000\003\354\000\000\000\007(....)\000\000\000\020/s) {
     warn("$bin: no md5 signature header\n");
