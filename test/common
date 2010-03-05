@@ -98,5 +98,5 @@ run_build()
 		"${build_args[@]}"
 	echo "$@"
 	"$@" || fail
-	find $build_root/.build.packages/ -type f -name '*.rpm' -print0 | xargs -0 rpm -K || fail
+	find $build_root/.build.packages/ -type f -name '*.rpm' -print0 | xargs --no-run-if-empty -0 rpm -K || fail
 }

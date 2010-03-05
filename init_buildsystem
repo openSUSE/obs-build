@@ -119,6 +119,7 @@ function clean_build_root () {
 }
 
 function preinstall {
+    check_exit
     if test -n "$1" ; then
 	echo "preinstalling $1..."
 	cd $BUILD_ROOT || cleanup_and_exit 1
@@ -563,6 +564,7 @@ if test -n "$PREPARE_VM" ; then
 	rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
 	cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
 	ln -s -f ../$PKG.$PSUF $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF
+	check_exit
     done
     # alreadyinstalled check will not work, but we have to live with
     # that...
@@ -595,6 +597,7 @@ if test -n "$CREATE_BUILD_BINARIES" ; then
 	ln "$LPKG" "$BUILD_ROOT/.build.binaries/$PKG.$PSUF" 2>/dev/null
 	test -f "$BUILD_ROOT/.build.binaries/$PKG.$PSUF" && continue
 	cp "$LPKG" "$BUILD_ROOT/.build.binaries/$PKG.$PSUF"
+	check_exit
     done
 fi
 
@@ -655,6 +658,7 @@ for PKG in $BUILD_ROOT/.init_b_cache/todelete/* ; do
     test "$PKG" = "*" && continue
     echo "deleting $PKG"
     rpm_e "$PKG"
+    check_exit
 done
 rm -rf $BUILD_ROOT/.init_b_cache/todelete
 
@@ -698,7 +702,7 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
 	echo "installing ${PKGID%_*}"
 	( chroot $BUILD_ROOT dpkg --install --force all .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
 	    perl -ne '$|=1;/^(Configuration file|Installing new config file|Selecting previously deselected|\(Reading database|Unpacking |Setting up|Creating config file|Preparing to replace dpkg)/||/^$/||print'
-	test -e $BUILD_ROOT/exit && cleanup_and_exit 1
+	check_exit
 	echo "$PKGID debian" > $BUILD_ROOT/installed-pkg/$PKG
 	continue
     fi
@@ -757,7 +761,7 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
 	      grep -v "^warning:.*saved as.*rpmorig$"
     # delete link so package is only installed once
     rm -f $BUILD_ROOT/.init_b_cache/$PKG.rpm
-    test -e $BUILD_ROOT/exit && cleanup_and_exit 1
+    check_exit
     echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
 
 done

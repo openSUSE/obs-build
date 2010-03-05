@@ -783,13 +783,13 @@ while test -n "$1"; do
     esac
 done
 
-# XXX: doesn't kill vm if in prepare stage (because there is none)
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
     if test -n "$VM_IMAGE" -a -n "$VM_SWAP" -a -n "$VM_TYPE"; then
 	# mark job as failed so that we don't extract packages
 	echo -n "BUILDSTATUS1" >"$VM_SWAP"
     fi
+    (set -C; > "$BUILD_ROOT/exit" || true)
     if test "$VM_TYPE" = 'lxc'; then
 	LXCID=${BUILD_ROOT##*/}
 	lxc-stop -n "$LXCID" || true
@@ -1073,6 +1073,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    set -- init_buildsystem --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
 	    echo "$* ..."
 	    "$@" || cleanup_and_exit 1
+	    check_exit
 	    if [ ! -w /root ]; then
 		# remove setuid bit if files belong to user to make e.g. mount work
 		find $BUILD_ROOT/{bin,sbin,usr/bin,usr/sbin} -type f -uid $UID -perm +4000 -print0 | xargs -0 --no-run-if-empty chmod -s
@@ -1143,6 +1144,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	umount -n $BUILD_ROOT/mnt 2> /dev/null || true
 
 	if [ -n "$VM_IMAGE" ]; then
+	    check_exit
 	    # needs to work otherwise we have a corrupted file system
 	    umount $BUILD_ROOT || cleanup_and_exit 1
 	fi
@@ -1285,6 +1287,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	set -- init_buildsystem "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
 	"$@" || cleanup_and_exit 1
+	check_exit
 	if df $BUILD_ROOT 2>/dev/null | grep -q "100%"; then
 	    df -h $BUILD_ROOT
 	    echo "build does not work on a completely full filesystem"
@@ -1402,7 +1405,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	mkdir -p $BUILD_ROOT$TOPDIR/$i
 	test $BUILD_USER = abuild && chown ${ABUILD_UID}:${ABUILD_GID} $BUILD_ROOT$TOPDIR/$i
     done
-    test -e $BUILD_ROOT/exit && cleanup_and_exit 1
+    check_exit
 
     mkdir -p $BUILD_ROOT$TOPDIR/SOURCES
     if test "$BUILDTYPE" = kiwi ; then
@@ -1603,6 +1606,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		"$TOPDIR/SOURCES/$SPECFILE" \
 		> $BUILD_ROOT/.build.command
 	chmod 755 $BUILD_ROOT/.build.command
+	check_exit
 	chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
     fi
 

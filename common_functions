@@ -31,3 +31,11 @@ set_build_arch()
 	fi
     fi
 }
+
+check_exit()
+{
+    if test -e $BUILD_ROOT/exit; then
+	echo "exit ..."
+	cleanup_and_exit 1
+    fi
+}
