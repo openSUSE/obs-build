@@ -73,8 +73,6 @@ RSYNCSRC=
 RSYNCDEST=
 RSYNCDONE=
 
-export PATH=$BUILD_DIR:/sbin:/usr/sbin:$PATH
-
 # This is for insserv
 export YAST_IS_RUNNING=instsys
 
@@ -213,6 +211,7 @@ usage () {
 #  return values: 0 -> success, new packages built
 #                 1 -> error, build failed
 #                 2 -> successfull build, but no changes to former built packages
+#                 3 -> something wrong with build host
 #
 cleanup_and_exit () {
     trap EXIT
@@ -225,9 +224,11 @@ cleanup_and_exit () {
 	fi
 	exec >&0 2>&0        # so that the logging tee finishes
 	sleep 1                # wait till tee terminates
-	kill -9 -1        # goodbye cruel world
-	exec /bin/bash -c 'mount -n -o remount,ro / ; halt -f -p'
-	halt -f -p
+	if test "$VM_TYPE" != lxc; then
+	    kill -9 -1        # goodbye cruel world
+	    exec /bin/bash -c 'mount -n -o remount,ro / ; halt -f -p'
+	    halt -f -p
+	fi
     else
 	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	umount -n $BUILD_ROOT/proc 2>/dev/null || true
@@ -235,6 +236,7 @@ cleanup_and_exit () {
 	test "$VM_IMAGE" = 1 && VM_IMAGE=
 	[ -n "$VM_IMAGE" ] && umount $BUILD_ROOT 2>/dev/null || true
     fi
+#    echo "pid $$ exit $1"
     exit $1
 }
 
@@ -437,7 +439,7 @@ detect_vm_2nd_stage()
 	# are reset in the child processes
 	trap ' ' HUP TERM
 	$0 "$@"
-	cleanup_and_exit 1
+	cleanup_and_exit $?
     fi
     echo "2nd stage started in virtual machine"
     BUILD_ROOT=/
@@ -450,10 +452,11 @@ detect_vm_2nd_stage()
 	# this is 32bit perl/glibc, thus the 32bit syscall number
 	exec perl -e 'syscall(136, '$PERSONALITY') == -1 && warn("personality: $!\n");exec "/.build/build" || die("/.build/build: $!\n")'
     fi
-    PATH=$BUILD_DIR:$PATH
     RUNNING_IN_VM=true
     mount -orw -n -tproc none /proc
-    mount -n -o remount,rw /
+    if test "$VM_TYPE" != 'lxc'; then
+	mount -n -o remount,rw /
+    fi
 # qemu inside of xen does not work, check again with kvm later before enabling this
 #    if [ -e /dev/kqemu ]; then
 #        # allow abuild user to run qemu
@@ -563,7 +566,10 @@ shopt -s nullglob
 
 if detect_vm_2nd_stage ; then
     set "/.build-srcdir/$SPECFILE"
+
 fi
+
+export PATH=$BUILD_DIR:/sbin:/usr/sbin:$PATH
 
 . $BUILD_DIR/common_functions || exit 1
 
@@ -653,6 +659,9 @@ while test -n "$1"; do
 	else
 	    VM_IMAGE=1
 	fi
+      ;;
+      --lxc)
+	VM_TYPE=${PARAM##*-}
       ;;
       *-xenswap|*-swap)
 	VM_SWAP="$ARG"
@@ -781,7 +790,11 @@ if test -n "$KILL" ; then
 	# mark job as failed so that we don't extract packages
 	echo -n "BUILDSTATUS1" >"$VM_SWAP"
     fi
-    if test -z "$VM_IMAGE" ; then
+    if test "$VM_TYPE" = 'lxc'; then
+	LXCID=${BUILD_ROOT##*/}
+	lxc-stop -n "$LXCID" || true
+	lxc-destroy -n "$LXCID"
+    elif test -z "$VM_IMAGE" ; then
 	if ! $BUILD_DIR/killchroot -s 9 $BUILD_ROOT ; then
 	    echo "could not kill build in $BUILD_ROOT"
 	    cleanup_and_exit 1
@@ -808,9 +821,10 @@ if test -n "$KILL" ; then
     cleanup_and_exit 0
 fi
 
-if [ "$VM_TYPE" = 'kvm' ]; then
+if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
     if [ ! -r /dev/kvm -o ! -x "$qemu_bin"-kvm ]; then
-	echo ""
+	echo "host doesn't support kvm"
+	cleanup_and_exit 3
     fi
     qemu_bin="$kvm_bin"
     qemu_kernel="$kvm_kernel"
@@ -951,7 +965,7 @@ if [ -z "$RUNNING_IN_VM" ]; then
     echo Using BUILD_ROOT=$BUILD_ROOT
     test -n "$BUILD_RPMS" && echo Using BUILD_RPMS=$BUILD_RPMS
     echo Using BUILD_ARCH=$BUILD_ARCH
-    test -n "$VM_TYPE" && echo "Doing $VM_TYPE build in $VM_IMAGE"
+    test -n "$VM_TYPE" && echo "Doing $VM_TYPE build${VM_IMAGE:+ in $VM_IMAGE}"
     echo
 fi
 
@@ -1050,7 +1064,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	fi
     fi
 
-    if test -n "$VM_TYPE"; then
+    if test -n "$VM_TYPE" -a -z "$RUNNING_IN_VM"; then
 	rm -rf $BUILD_ROOT/.build
 	mkdir -p $BUILD_ROOT/.build
 	if test "$DO_INIT" = true ; then
@@ -1110,9 +1124,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	# could be hda2, sda2 for xen or hdb/sdb for qemu
 	test -n "$VM_SWAP" && echo "VM_SWAP='${VM_SWAPDEV:-/dev/hda2}'" >> $BUILD_ROOT/.build/build.data
 	PERSONALITY=0
-	test -n "$PERSONALITY_SYSCALL" && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
-	echo "OLD_PACKAGES='$OLD_PACKAGES'" >> $BUILD_ROOT/.build/build.data
+	if test "$VM_TYPE" != 'lxc'; then
+	    test -n "$PERSONALITY_SYSCALL" && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
+	fi
 	echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
+	echo "OLD_PACKAGES='$OLD_PACKAGES'" >> $BUILD_ROOT/.build/build.data
 	echo "MYHOSTNAME='`hostname`'" >> $BUILD_ROOT/.build/build.data
 	echo -n "definesnstuff=(" >> $BUILD_ROOT/.build/build.data
 	shellquote "${definesnstuff[@]}" >> $BUILD_ROOT/.build/build.data
@@ -1120,13 +1136,16 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo -n "repos=(" >> $BUILD_ROOT/.build/build.data
 	shellquote "${repos[@]}" >> $BUILD_ROOT/.build/build.data
 	echo ")" >> $BUILD_ROOT/.build/build.data
+	echo "VM_TYPE='$VM_TYPE'" >> $BUILD_ROOT/.build/build.data
 	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	umount -n $BUILD_ROOT/proc 2> /dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
 	umount -n $BUILD_ROOT/mnt 2> /dev/null || true
 
-	# needs to work otherwise we have a corrupted file system
-	umount $BUILD_ROOT || cleanup_and_exit 1
+	if [ -n "$VM_IMAGE" ]; then
+	    # needs to work otherwise we have a corrupted file system
+	    umount $BUILD_ROOT || cleanup_and_exit 1
+	fi
 
 	if [ "$VM_TYPE" = 'xen' ]; then
 		XMROOT=file:$VM_IMAGE
@@ -1197,6 +1216,23 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		fi
 		echo "$@"
 		"$@"
+	elif [ "$VM_TYPE" = 'lxc' ]; then
+		echo "booting $VM_TYPE ..."
+		LXCCONF="$BUILD_ROOT/.build.lxc.conf"
+		rm -f "$LXCCONF"
+		cat $BUILD_DIR/lxc.conf > "$LXCCONF"
+		cat >> "$LXCCONF" <<-EOF
+		lxc.rootfs = $BUILD_ROOT
+		EOF
+		# XXX: do this always instead of leaking the hosts' one?
+		echo "rootfs / rootfs rw 0 0" > $BUILD_ROOT/etc/mtab
+		LXCID=${BUILD_ROOT##*/}
+		lxc-destroy -n "$LXCID" >/dev/null 2>&1 || true
+		lxc-create -n "$LXCID" -f "$LXCCONF" || cleanup_and_exit 1
+		lxc-start -n "$LXCID" /.build/build
+		BUILDSTATUS="$?"
+		test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
+		cleanup_and_exit "$BUILDSTATUS"
 	fi
 	if test -n "$VM_SWAP" ; then
 	    BUILDSTATUS=`dd if="$VM_SWAP" bs=12 count=1 2>/dev/null`
