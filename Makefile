@@ -58,8 +58,6 @@ install:
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build
 	install -m644 *.pm baselibs_global*.conf $(DESTDIR)$(pkglibdir)
 	install -m644 configs/* $(DESTDIR)$(pkglibdir)/configs
-	rm -f $(DESTDIR)$(pkglibdir)/configs/default.conf
-	cp -a configs/default.conf $(DESTDIR)$(pkglibdir)/configs/default.conf
 	install -m644 build.1 $(DESTDIR)$(man1dir)
 	ln -sf $(pkglibdir)/build $(DESTDIR)$(bindir)/build
 	ln -sf $(pkglibdir)/vc    $(DESTDIR)$(bindir)/buildvc
