@@ -1216,10 +1216,19 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 			qemu_disks[${#qemu_disks[@]}]="$VM_SWAP"
 		    fi
 		fi
+                CROSS_INIT_SCRIPT="/.build/build"
+                # to run the qemu initialization in the XEN chroot, we need to register it with a statically build shell
+                if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xarmv7el -o x"$BUILD_ARCH" == xsh4 -o x"$BUILD_ARCH" == xppc -o x"$BUILD_ARCH" == xppc64 -o x"$BUILD_ARCH" == xmips -o x"$BUILD_ARCH" == xmipsel ]; then
+                    if [  -n "$(uname -m | grep '[x3-6]86')" ]; then
+                        if [ -e /bin/bash-static -a -e /bin/mount-static ]; then
+                            CROSS_INIT_SCRIPT="/.build/initscript_qemu_vm"
+                        fi
+                    fi
+                fi
 		set -- $qemu_bin -no-reboot -nographic -net none -serial stdio \
 		    -kernel $qemu_kernel \
 		    -initrd $qemu_initrd \
-		    -append "root=$qemu_rootdev panic=1 quiet noapic rw console=ttyS0 init=/.build/build" \
+		    -append "root=$qemu_rootdev panic=1 quiet noapic rw console=ttyS0 init=$CROSS_INIT_SCRIPT" \
 		    ${MEMSIZE:+-m $MEMSIZE} \
 		    "${qemu_disks[@]}"
 
@@ -1242,7 +1251,16 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		LXCID=${BUILD_ROOT##*/}
 		lxc-destroy -n "$LXCID" >/dev/null 2>&1 || true
 		lxc-create -n "$LXCID" -f "$LXCCONF" || cleanup_and_exit 1
-		lxc-start -n "$LXCID" /.build/build
+                CROSS_INIT_SCRIPT="/.build/build"
+                # to run the qemu initialization in the XEN chroot, we need to register it with a statically build shell
+                if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xarmv7el -o x"$BUILD_ARCH" == xsh4 -o x"$BUILD_ARCH" == xppc -o x"$BUILD_ARCH" == xppc64 -o x"$BUILD_ARCH" == xmips -o x"$BUILD_ARCH" == xmipsel ]; then
+                    if [  -n "$(uname -m | grep '[x3-6]86')" ]; then
+                        if [ -e /bin/bash-static -a -e /bin/mount-static ]; then
+                            CROSS_INIT_SCRIPT="/.build/initscript_qemu_vm"
+                        fi
+                    fi
+                fi
+		lxc-start -n "$LXCID" "$CROSS_INIT_SCRIPT"
 		BUILDSTATUS="$?"
 		test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
 		cleanup_and_exit "$BUILDSTATUS"
