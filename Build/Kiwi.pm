@@ -145,16 +145,6 @@ sub kiwiparse {
       die("bad instsource path: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
       push @repos, "$1/$2";
     }
-    for my $repopackages (@{$instsource->{'repopackages'} || []}) {
-      for my $repopackage (@{$repopackages->{'repopackage'} || []}) {
-	push @packages, $repopackage->{'name'};
-      }
-    }
-    if ($instsource->{'metadata'}) {
-      for my $repopackage (@{$instsource->{'metadata'}->[0]->{'repopackage'} || []}) {
-	push @packages, $repopackage->{'name'};
-      }
-    }
     if ($instsource->{'productoptions'}) {
       my $productoptions = $instsource->{'productoptions'}->[0] || {};
       for my $po (@{$productoptions->{'productvar'} || []}) {
@@ -184,18 +174,43 @@ sub kiwiparse {
       push @repos, "$1/$2";
     }
   }
-  for my $packagegroup (@{$kiwi->{'packages'} || []}) {
-    for my $package (@{$packagegroup->{'package'} || []}) {
-      if ($package->{'arch'}) {
-	my $ma = $arch;
-	$ma =~ s/i[456]86/i386/;
-	my $pa = $package->{'arch'};
-	$pa =~ s/i[456]86/i386/;
-	next if $ma ne $pa;
+
+  # Find packages and possible additional required architectures
+  my @additionalarchs;
+  my @pkgs = unify(@{$instsource->{'metadata'}->[0]->{'repopackage'}}, @{$instsource->{'repopackages'}->[0]->{'repopackage'}},
+                   @{$kiwi->{'packages'}[0]->{'package'}});
+  for my $package (@pkgs) {
+    # filter packages, which are not targeted for the wanted plattform
+    if ($package->{'arch'}) {
+      if (@requiredarch) {
+        # this is a product
+        next unless ( grep { $_ eq $package->{'arch'} } @requiredarch );
+      }else{
+        # live appliance
+        my $ma = $arch;
+        $ma =~ s/i[456]86/i386/;
+        my $pa = $package->{'arch'};
+        $pa =~ s/i[456]86/i386/;
+        next if $ma ne $pa;
       }
-      push @packages, $package->{'name'};
+    }
+
+    # not nice, but optimise our build dependencies
+    next if defined($package->{'onlyarch'}) && $package->{'onlyarch'} eq "skipit";
+
+    # we need this package
+    push @packages, $package->{'name'};
+
+    # find the maximal superset of possible required architectures
+    my @add;
+    my @only;
+    @add = split(",",$package->{'addarch'}) if $package->{'addarch'};
+    @only = split(",",$package->{'onlyarch'}) if $package->{'onlyarch'};
+    for my $ra ( unify(@add, @only) ) {
+      push @additionalarchs, $ra
     }
   }
+  @requiredarch = unify( @requiredarch, @additionalarchs );
 
   if (!$instsource) {
     my $packman = $preferences->{'packagemanager'}->[0]->{'_content'};
