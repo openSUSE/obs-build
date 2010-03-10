@@ -159,33 +159,33 @@ sub kiwiparse {
     }
   }
 
+  my @repositories = sort {$a->{'priority'} <=> $b->{'priority'}} @{$kiwi->{'repository'} || []};
   if ($preferences->{'packagemanager'}->[0]->{'_content'} eq 'smart') {
-    foreach my $repository(sort {$b->{priority} <=> $a->{priority}} @{$kiwi->{'repository'} || []}) {
-      my $kiwisource = ($repository->{'source'} || [])->[0];
-      next if $kiwisource->{'path'} eq '/var/lib/empty';	# grr
-      die("bad path: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
-      push @repos, "$1/$2";
-    }
-  }else{
-    foreach my $repository(sort {$a->{priority} <=> $b->{priority}} @{$kiwi->{'repository'} || []}) {
-      my $kiwisource = ($repository->{'source'} || [])->[0];
-      next if $kiwisource->{'path'} eq '/var/lib/empty';	# grr
-      die("bad path: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
-      push @repos, "$1/$2";
-    }
+    @repositories = reverse @repositories;
+  }
+  for my $repository (@repositories) {
+    my $kiwisource = ($repository->{'source'} || [])->[0];
+    next if $kiwisource->{'path'} eq '/var/lib/empty';	# grr
+    die("bad path: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
+    push @repos, "$1/$2";
   }
 
   # Find packages and possible additional required architectures
   my @additionalarchs;
-  my @pkgs = unify(@{$instsource->{'metadata'}->[0]->{'repopackage'}}, @{$instsource->{'repopackages'}->[0]->{'repopackage'}},
-                   @{$kiwi->{'packages'}[0]->{'package'}});
+  my @pkgs;
+  push @pkgs, @{$kiwi->{'packages'}->[0]->{'package'}} if $kiwi->{'packages'};
+  if ($instsource) {
+    push @pkgs, @{$instsource->{'metadata'}->[0]->{'repopackage'} || []} if $instsource->{'metadata'};
+    push @pkgs, @{$instsource->{'repopackages'}->[0]->{'repopackage'} || []} if $instsource->{'repopackages'};
+  }
+  @pkgs = unify(@pkgs);
   for my $package (@pkgs) {
     # filter packages, which are not targeted for the wanted plattform
     if ($package->{'arch'}) {
       if (@requiredarch) {
         # this is a product
-        next unless ( grep { $_ eq $package->{'arch'} } @requiredarch );
-      }else{
+        next unless grep {$_ eq $package->{'arch'}} @requiredarch;
+      } else {
         # live appliance
         my $ma = $arch;
         $ma =~ s/i[456]86/i386/;
@@ -195,22 +195,17 @@ sub kiwiparse {
       }
     }
 
-    # not nice, but optimise our build dependencies
-    next if defined($package->{'onlyarch'}) && $package->{'onlyarch'} eq "skipit";
+    # not nice, but optimizes our build dependencies
+    next if $package->{'onlyarch'} && $package->{'onlyarch'} eq "skipit";
 
     # we need this package
     push @packages, $package->{'name'};
 
     # find the maximal superset of possible required architectures
-    my @add;
-    my @only;
-    @add = split(",",$package->{'addarch'}) if $package->{'addarch'};
-    @only = split(",",$package->{'onlyarch'}) if $package->{'onlyarch'};
-    for my $ra ( unify(@add, @only) ) {
-      push @additionalarchs, $ra
-    }
+    push @additionalarchs, split(',', $package->{'addarch'}) if $package->{'addarch'};
+    push @additionalarchs, split(',', $package->{'onlyarch'}) if $package->{'onlyarch'};
   }
-  @requiredarch = unify( @requiredarch, @additionalarchs );
+  @requiredarch = unify(@requiredarch, @additionalarchs);
 
   if (!$instsource) {
     my $packman = $preferences->{'packagemanager'}->[0]->{'_content'};
