@@ -32,7 +32,7 @@ uml_initrd=/boot/initrd-um
 kvm_kernel=/boot/vmlinuz
 kvm_initrd=/boot/initrd
 kvm_bin=/usr/bin/qemu-kvm
-mkinitrd_virtio_cmd=(env rootfstype=ext3 mkinitrd -d /dev/null -m "virtio_pci virtio_blk" -k $kvm_kernel -i $kvm_initrd-virtio)
+mkinitrd_virtio_cmd=(env rootfstype=ext3 mkinitrd -d /dev/null -m "binfmt_misc virtio_pci virtio_blk" -k $kvm_kernel -i $kvm_initrd-virtio)
 # whether we have virtio support
 kvm_virtio=
 
@@ -849,9 +849,11 @@ if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
 	    echo "creating $qemu_initrd-virtio"
 	    "${mkinitrd_virtio_cmd[@]}" || cleanup_and_exit 1
 	    kvm_virtio=1
+        else
+            kvm_virtio=0
 	fi
     else
-	kvm_virtio=1
+	kvm_virtio=0
     fi
 
     if [ "$kvm_virtio" = 1 ]; then
@@ -1495,6 +1497,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	# this is restricted to arm to make sure it doesn't interfere with x86
 	if [ "$BUILD_ARCH" != "${BUILD_ARCH#arm}" ]; then
 	    echo "changing targetarch"
+	    chmod a+x $BUILD_DIR/getchangetarget || cleanup_and_exit 1
 	    CHANGETARGET=$(getchangetarget --dist "$BUILD_DIST" --configdir "$BUILD_DIR/configs" --archpath "$BUILD_ARCH" )
 	    echo "NEW TARGET: $CHANGETARGET"
 	fi

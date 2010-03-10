@@ -316,7 +316,7 @@ if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" =
 	fi
 	# To initially run the init script, there needs to be also a static bash to register qemu in this chroot and though to start up /.build/build
 	if [ -e /bin/bash-static -a -e /bin/mount-static ]; then
-	    (mkdir -p  $BUILD_ROOT/bin && set -x && cp /bin/bash-static $BUILD_ROOT/bin && cp /bin/mount-static $BUILD_ROOT/bin)
+	    (mkdir -p  $BUILD_ROOT/bin && set -x && cp /bin/bash-static $BUILD_ROOT/bin && cp /bin/mount-static $BUILD_ROOT/bin && chmod a+x $BUILD_ROOT/bin/*-static )
 	fi
 	if [ -e /proc/sys/fs/binfmt_misc/arm -o -e /proc/sys/fs/binfmt_misc/armeb -o -e /proc/sys/fs/binfmt_misc/sh4 ]; then
 	    echo "qemu-* already registered"
