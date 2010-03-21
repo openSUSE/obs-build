@@ -885,12 +885,15 @@ fi
 #    #$vm_img_tunefs
 #fi
 if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" -a -n "$VM_KERNEL" -a -n "$VM_INITRD" ] ; then
+    qemu_bin="$kvm_bin"
     qemu_initrd="$VM_INITRD"
     qemu_kernel="$VM_KERNEL"
     VM_SWAPDEV=/dev/vdb
     qemu_rootdev=/dev/vda
     kvm_virtio=1
 elif [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" -a -f "${kvm_initrd}-build" ]; then
+    qemu_bin="$kvm_bin"
+    qemu_kernel="$kvm_kernel"
     qemu_initrd="${kvm_initrd}-build"
     VM_SWAPDEV=/dev/vdb
     qemu_rootdev=/dev/vda
