@@ -268,9 +268,11 @@ sub do_subst {
   while (@deps) {
     my $d = shift @deps;
     next if $done{$d};
-    if ($subst->{$d}) {
-      unshift @deps, @{$subst->{$d}};
-      push @res, $d if grep {$_ eq $d} @{$subst->{$d}};
+    my $ds = $d;
+    $ds =~ s/\s*[<=>].*$//s;
+    if ($subst->{$ds}) {
+      unshift @deps, @{$subst->{$ds}};
+      push @res, $d if grep {$_ eq $ds} @{$subst->{$ds}};
     } else {
       push @res, $d;
     }
