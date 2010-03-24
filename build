@@ -1051,6 +1051,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     test "$ccache" = '1' && ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
     test "$icecream" -gt 1 && ADDITIONAL_PACKS="$ADDITIONAL_PACKS icecream gcc-c++"
     test -n "$DO_LINT" && ADDITIONAL_PACKS="$ADDITIONAL_PACKS rpmlint-Factory"
+    test -n "$OLD_PACKAGES" && ADDITIONAL_PACKS="$ADDITIONAL_PACKS build-compare"
 
     if test -n "$CHANGELOG" -a -z "$RUNNING_IN_VM" ; then
 	rm -f $BUILD_ROOT/.build-changelog
@@ -1296,7 +1297,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	mount -n -tproc none $BUILD_ROOT/proc || true
 	mount -n -tdevpts none $BUILD_ROOT/dev/pts
 	if [ -d "$OLD_PACKAGES" ]; then
-	   [ -d "$BUILD_ROOT/.build.oldpackages" ] || cp -r $OLD_PACKAGES $BUILD_ROOT/.build.oldpackages
+	   rm -rf "$BUILD_ROOT/.build.oldpackages"
+	   cp -r $OLD_PACKAGES $BUILD_ROOT/.build.oldpackages
 	fi
     fi
 
