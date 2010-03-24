@@ -226,7 +226,12 @@ cleanup_and_exit () {
 	sleep 1                # wait till tee terminates
 	if test "$VM_TYPE" != lxc; then
 	    kill -9 -1        # goodbye cruel world
-	    exec /bin/bash -c 'mount -n -o remount,ro / ; halt -f -p'
+	    if ! test -x /sbin/halt ; then
+		mount -n -tproc none /proc
+		sync
+		sleep 2	# like halt does
+		test -e /proc/sysrq-trigger && echo o > /proc/sysrq-trigger
+	    fi
 	    halt -f -p
 	fi
     else
