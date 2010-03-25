@@ -551,6 +551,7 @@ mkdir_build_root()
     fi
 
     rm -rf "$BUILD_ROOT"/.build.packages
+    rm -rf "$BUILD_ROOT"/.build
 }
 
 linux64()
