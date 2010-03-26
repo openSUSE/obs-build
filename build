@@ -29,10 +29,10 @@ qemu_bin=/usr/bin/qemu
 uml_kernel=/boot/vmlinux-um
 uml_initrd=/boot/initrd-um
 
-kvm_kernel=/boot/vmlinuz
-kvm_initrd=/boot/initrd
+kvm_kernel=/boot/vmlinuz-kvm
+kvm_initrd=/boot/initrd-kvm
 kvm_bin=/usr/bin/qemu-kvm
-mkinitrd_virtio_cmd=(env rootfstype=ext3 mkinitrd -d /dev/null -m "binfmt_misc virtio_pci virtio_blk" -k $kvm_kernel -i $kvm_initrd-virtio)
+mkinitrd_virtio_cmd=(env rootfstype=ext3 mkinitrd -d /dev/null -m "binfmt_misc virtio_pci virtio_blk" -k $kvm_kernel -i ${kvm_initrd}-virtio)
 # whether we have virtio support
 kvm_virtio=
 rootfstype=
@@ -862,18 +862,21 @@ if test -n "$KILL" ; then
     cleanup_and_exit 0
 fi
 
+#if test "ext4" = "$VMDISK_FILESYSTEM"; then
+#    vm_img_mkfs='mkfs.ext4 -m 0 -q -F'
+#    mkinitrd_virtio_cmd=(env rootfstype=ext4 mkinitrd -d /dev/null -m "ext4 binfmt_misc virtio_pci virtio_blk" -k $kvm_kernel -i ${kvm_initrd}-ext4-virtio)
+#    env rootfstype=ext4 mkinitrd -d /dev/null -m "ext4 binfmt_misc virtio_pci virtio_blk" -k $kvm_kernel -i ${kvm_initrd}-ext4
+#    export kvm_initrd=${kvm_initrd}-ext4
+#    export rootfstype="rootfstype=ext4"
+#    #$vm_img_tunefs
+#fi
 
-if test "ext4" = "$VMDISK_FILESYSTEM"; then
-    vm_img_mkfs='mkfs.ext4 -m 0 -q -F'
-    mkinitrd_virtio_cmd=(env rootfstype=ext4 mkinitrd -d /dev/null -m "ext4 binfmt_misc virtio_pci virtio_blk" -k $kvm_kernel -i ${kvm_initrd}-ext4-virtio)
-    env rootfstype=ext4 mkinitrd -d /dev/null -m "ext4 binfmt_misc virtio_pci virtio_blk" -k $kvm_kernel -i ${kvm_initrd}-ext4
-    export kvm_initrd=${kvm_initrd}-ext4
-    export rootfstype="rootfstype=ext4"
-    #$vm_img_tunefs
-fi
-
-
-if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
+if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" -a -f "${kvm_initrd}-build" ]; then
+    qemu_initrd="${kvm_initrd}-build"
+    VM_SWAPDEV=/dev/vdb
+    qemu_rootdev=/dev/vda
+    kvm_virtio=1
+elif [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
     if [ ! -r /dev/kvm -o ! -x "$qemu_bin"-kvm ]; then
 	echo "host doesn't support kvm"
 	cleanup_and_exit 3
@@ -961,6 +964,9 @@ if test -z "$RUNNING_IN_VM" ; then
             else
                 # assuming MB for size ! thus root=4096 swap=1024 
                 # setup VM_IMAGE
+                echo ""
+                echo "$VMDISK_ROOTSIZE"
+                echo """dd if=/dev/zero of="$VM_IMAGE" bs=1 count=1 seek=$(( ${VMDISK_ROOTSIZE} * 1024 * 1024 )) || cleanup_and_exit 3"""
                 dd if=/dev/zero of="$VM_IMAGE" bs=1 count=1 seek=$(( ${VMDISK_ROOTSIZE} * 1024 * 1024 )) || cleanup_and_exit 3
                 if test -z "$CLEAN_BUILD"; then
                     $vm_img_mkfs $VM_IMAGE || cleanup_and_exit 3
