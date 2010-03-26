@@ -53,6 +53,10 @@ USEUSEDFORBUILD=
 LIST_STATE=
 VM_IMAGE=
 VM_SWAP=
+VMDISK_AUTOSETUP=
+VMDISK_ROOTSIZE=
+VMDISK_SWAPSIZE=
+VMDISK_FORCE=false
 MEMSIZE=
 RUNNING_IN_VM=
 RPMLIST=
@@ -193,6 +197,11 @@ Known Parameters:
               This is useful if you are hacking in the buildroot.
               This must be set to the same value if the buildroot is re-used.
 
+  --vmdisk-autosetup
+  --vmdisk-rootsize  <size in GB>
+  --vmdisk-swapsize  <size in GB>
+  --vmdisk-force                       [forces (re-)setup]
+              Enable automatic setup of VM root/swap files
   --debug
               enable creation of a debuginfo package
 
@@ -681,6 +690,21 @@ while test -n "$1"; do
 	MEMSIZE="$ARG"
 	shift
       ;;
+      # vmdisk
+      *-vmdisk-autosetup)
+        VMDISK_AUTOSETUP=true
+      ;;
+      *-vmdisk-rootsize)
+        VMDISK_ROOTSIZE="$ARG"
+        shift
+      ;;
+      *-vmdisk-swapsize)
+        VMDISK_SWAPSIZE="$ARG"
+        shift
+      ;;
+      *-vmdisk-force)
+        VMDISK_FORCE=true
+      ;;
       *-rpmlist)
 	RPMLIST="--rpmlist $ARG"
 	BUILD_RPMS=
@@ -907,11 +931,34 @@ if test -n "$LIST_STATE" ; then
     cleanup_and_exit $ERR
 fi
 
+
 if test -z "$RUNNING_IN_VM" ; then
     if test -n "$VM_IMAGE" ; then
 	if test "$VM_IMAGE" = 1 ; then
 	    VM_IMAGE="$BUILD_ROOT.img"
 	fi
+        if test -n "$VMDISK_AUTOSETUP"; then
+            if test -n "$VMDISK_ROOTSIZE" -a -n "$VMDISK_SWAPSIZE" ; then
+                if test -e "$VM_IMAGE" -a -e "$VM_SWAP" -a ! "$VMDISK_FORCE"; then
+                    echo "$BUILD_ROOT and $VM_SWAP present, skipping autosetup without --vmdisk-force being set."
+                else
+                    # assuming GB for size ! thus root=4 swap=1 
+                    # setup VM_IMAGE
+                    dd if=/dev/zero of="$VM_IMAGE" bs=1 count=1 seek=$(( ${VMDISK_ROOTSIZE} * 1024 * 1024 * 1024 )) || cleanup_and_exit 3
+                    $vm_img_mkfs $VM_IMAGE || cleanup_and_exit 3
+                    if test -n "$vm_img_tunefs" ; then
+                        $vm_img_tunefs $VM_IMAGE || cleanup_and_exit 3
+                    fi
+                    # setup VM_SWAP
+                    dd if=/dev/zero of="$VM_SWAP" bs=1 count=1 seek=$(( ${VMDISK_SWAPSIZE} * 1024 * 1024 * 1024 )) || cleanup_and_exit 3
+                    mkswap "$VM_SWAP" || cleanup_and_exit 3
+                fi
+            else
+                echo "--vmdisk-autosetup used, but either --vmdisk-rootsize or --vmdisk-swapsize not set."
+                cleanup_and_exit 3
+                # error, bad build(-host) setup
+            fi
+        fi
 	if test ! -e "$VM_IMAGE" ; then
 	    echo "you need to create a file system on $VM_IMAGE first"
 	    cleanup_and_exit 3
@@ -1221,8 +1268,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                 CROSS_INIT_SCRIPT="/.build/build"
                 # to run the qemu initialization in the XEN chroot, we need to register it with a statically build shell
                 if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xarmv7el -o x"$BUILD_ARCH" == xsh4 -o x"$BUILD_ARCH" == xppc -o x"$BUILD_ARCH" == xppc64 -o x"$BUILD_ARCH" == xmips -o x"$BUILD_ARCH" == xmipsel ]; then
+                    echo "Building for arch: $BUILD_ARCH"
                     if [  -n "$(uname -m | grep '[x3-6]86')" ]; then
+                        echo "         on arch: $(uname -m | grep '[x3-6]86')"
                         if [ -e /bin/bash-static -a -e /bin/mount-static ]; then
+                            echo "         using cross-init"
                             CROSS_INIT_SCRIPT="/.build/initscript_qemu_vm"
                         fi
                     fi
