@@ -309,7 +309,7 @@ function register_qemu_user {
 # Detect cross-build (fixed code) and copy qemus for cross-build emulation mode
 # And copy also a static host binary shell to run the init scripts in the target chroot
 #
-if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xarmv7el -o x"$BUILD_ARCH" == xsh4 -o x"$BUILD_ARCH" == xppc ]; then
+if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xarmv7el -o x"$BUILD_ARCH" == xsh4 -o x"$BUILD_ARCH" == xppc -o x"$BUILD_ARCH" == xppc64 -o x"$BUILD_ARCH" == xmips -o x"$BUILD_ARCH" == xmipsel ]; then
     if [  -n "$(uname -m | grep '[x3-6]86')" ]; then
 	if [ -e /usr/sbin/qemu-binfmt-conf.sh ]; then
 	    (mkdir -p  $BUILD_ROOT/usr/bin $BUILD_ROOT/usr/sbin && set -x && cp /usr/bin/qemu-* $BUILD_ROOT/usr/bin && cp /usr/sbin/qemu-binfmt-conf.sh $BUILD_ROOT/usr/sbin)
@@ -318,7 +318,7 @@ if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" =
 	if [ -e /bin/bash-static -a -e /bin/mount-static ]; then
 	    (mkdir -p  $BUILD_ROOT/bin && set -x && cp /bin/bash-static $BUILD_ROOT/bin && cp /bin/mount-static $BUILD_ROOT/bin && chmod a+x $BUILD_ROOT/bin/*-static )
 	fi
-	if [ -e /proc/sys/fs/binfmt_misc/arm -o -e /proc/sys/fs/binfmt_misc/armeb -o -e /proc/sys/fs/binfmt_misc/sh4 ]; then
+	if [ -e /proc/sys/fs/binfmt_misc/arm -o -e /proc/sys/fs/binfmt_misc/armeb -o -e /proc/sys/fs/binfmt_misc/sh4 -o -e /proc/sys/fs/binfmt_misc/mips -o -e /proc/sys/fs/binfmt_misc/ppc -o -e /proc/sys/fs/binfmt_misc/ppc64 ]; then
 	    echo "qemu-* already registered"
 	else
 	    if [ -e /usr/sbin/qemu-binfmt-conf.sh ]; then
