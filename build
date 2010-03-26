@@ -54,6 +54,8 @@ USEUSEDFORBUILD=
 LIST_STATE=
 VM_IMAGE=
 VM_SWAP=
+VM_KERNEL=
+VM_INITRD=
 VMDISK_AUTOSETUP=
 VMDISK_ROOTSIZE=
 VMDISK_SWAPSIZE=
@@ -204,6 +206,10 @@ Known Parameters:
   --vmdisk-filesystem <ext3|ext4>  
   --vmdisk-force                       [forces (re-)setup]
               Enable automatic setup of VM root/swap files
+
+  --vm-kernel 
+  --vm-initrd
+              Kernel and initrd to use for VM build.
 
   --debug
               enable creation of a debuginfo package
@@ -693,6 +699,14 @@ while test -n "$1"; do
 	MEMSIZE="$ARG"
 	shift
       ;;
+      *-vm-kernel)
+        VM_KERNEL="$ARG"
+        shift
+      ;;
+      *-vm-initrd)
+        VM_INITRD="$ARG"
+        shift
+      ;;
       # vmdisk
       *-vmdisk-autosetup)
         VMDISK_AUTOSETUP=true
@@ -870,8 +884,13 @@ fi
 #    export rootfstype="rootfstype=ext4"
 #    #$vm_img_tunefs
 #fi
-
-if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" -a -f "${kvm_initrd}-build" ]; then
+if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" -a -n "$VM_KERNEL" -a -n "$VM_INITRD" ] ; then
+    qemu_initrd="$VM_INITRD"
+    qemu_kernel="$VM_KERNEL"
+    VM_SWAPDEV=/dev/vdb
+    qemu_rootdev=/dev/vda
+    kvm_virtio=1
+elif [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" -a -f "${kvm_initrd}-build" ]; then
     qemu_initrd="${kvm_initrd}-build"
     VM_SWAPDEV=/dev/vdb
     qemu_rootdev=/dev/vda
