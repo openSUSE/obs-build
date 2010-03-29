@@ -914,22 +914,29 @@ if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
     elif [ -e "${qemu_initrd}-build" ]; then
 	qemu_initrd="${qemu_initrd}-build"
 	kvm_virtio=1
-    elif [ ! -e ${qemu_initrd}-virtio -o $qemu_kernel -nt ${qemu_initrd}-virtio ]; then
-	mkinitrd_virtio_cmd=(env rootfstype="$VMDISK_FILESYSTEM" \
-		mkinitrd -d /dev/null \
-		-m "binfmt_misc virtio_pci virtio_blk" \
-		-k $qemu_kernel \
-		-i ${qemu_initrd}-virtio)
-	if [ ! -w /root -o -n "$RPMLIST" ]; then
-	    echo "No initrd that provides virtio support found. virtio accelleration disabled."
-	    echo "Run the following command as root to enable virtio:"
-	    shellquote "${mkinitrd_virtio_cmd[@]}"
-	    echo
-	elif /sbin/modinfo virtio_pci >/dev/null 2>&1; then
-	    echo "creating $qemu_initrd-virtio"
-	    "${mkinitrd_virtio_cmd[@]}" || cleanup_and_exit 1
-	    kvm_virtio=1
-	    qemu_initrd="${qemu_initrd}-virtio"
+    else
+	if [ -L "$qemu_initrd" ]; then
+	    qemu_initrd=`readlink -f "$qemu_initrd"` || cleanup_and_exit 3
+	fi
+	qemu_initrd_virtio="${qemu_initrd}-virtio"
+
+	if [ ! -e ${qemu_initrd_virtio} -o $qemu_kernel -nt ${qemu_initrd_virtio} ]; then
+	    mkinitrd_virtio_cmd=(env rootfstype="$VMDISK_FILESYSTEM" \
+		    mkinitrd -d /dev/null \
+		    -m "binfmt_misc virtio_pci virtio_blk" \
+		    -k $qemu_kernel \
+		    -i ${qemu_initrd_virtio})
+	    if [ ! -w /root -o -n "$RPMLIST" ]; then
+		echo "No initrd that provides virtio support found. virtio accelleration disabled."
+		echo "Run the following command as root to enable virtio:"
+		shellquote "${mkinitrd_virtio_cmd[@]}"
+		echo
+	    elif /sbin/modinfo virtio_pci >/dev/null 2>&1; then
+		echo "creating $qemu_initrd_virtio"
+		"${mkinitrd_virtio_cmd[@]}" || cleanup_and_exit 1
+		kvm_virtio=1
+		qemu_initrd="${qemu_initrd_virtio}"
+	    fi
 	fi
     fi
 
