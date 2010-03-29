@@ -920,7 +920,7 @@ if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
 		-m "binfmt_misc virtio_pci virtio_blk" \
 		-k $qemu_kernel \
 		-i ${qemu_initrd}-virtio)
-	if [ ! -w /root ]; then
+	if [ ! -w /root -o -n "$RPMLIST" ]; then
 	    echo "No initrd that provides virtio support found. virtio accelleration disabled."
 	    echo "Run the following command as root to enable virtio:"
 	    shellquote "${mkinitrd_virtio_cmd[@]}"
