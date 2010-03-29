@@ -55,10 +55,8 @@ VM_IMAGE=
 VM_SWAP=
 VM_KERNEL=
 VM_INITRD=
-VMDISK_AUTOSETUP=
 VMDISK_ROOTSIZE=4096
 VMDISK_SWAPSIZE=1024
-VMDISK_FORCE=
 VMDISK_FILESYSTEM=ext3
 MEMSIZE=
 RUNNING_IN_VM=
@@ -200,12 +198,10 @@ Known Parameters:
               This is useful if you are hacking in the buildroot.
               This must be set to the same value if the buildroot is re-used.
 
-  --vmdisk-autosetup
   --vmdisk-rootsize   <size in MB>
   --vmdisk-swapsize   <size in MB>
   --vmdisk-filesystem <ext3|ext4>  
-  --vmdisk-force                       [forces (re-)setup]
-              Enable automatic setup of VM root/swap files
+              Defaults for automatic setup of VM root/swap files
 
   --vm-kernel 
   --vm-initrd
@@ -729,10 +725,6 @@ while test -n "$1"; do
         VM_INITRD="$ARG"
         shift
       ;;
-      # vmdisk
-      *-vmdisk-autosetup)
-        VMDISK_AUTOSETUP=true
-      ;;
       *-vmdisk-rootsize)
         VMDISK_ROOTSIZE="$ARG"
         shift
@@ -740,9 +732,6 @@ while test -n "$1"; do
       *-vmdisk-swapsize)
         VMDISK_SWAPSIZE="$ARG"
         shift
-      ;;
-      *-vmdisk-force)
-        VMDISK_FORCE=true
       ;;
       *-vmdisk-filesystem)
         VMDISK_FILESYSTEM="$ARG"
@@ -1000,19 +989,17 @@ if test -z "$RUNNING_IN_VM" ; then
 		echo "using $VM_SWAP as vm swap"
 	    fi
 	fi
-	if test -n "$VMDISK_AUTOSETUP"; then
-	    if test ! -e "$VM_IMAGE" -o -n "$VMDISK_FORCE"; then
-		echo "Creating $VM_IMAGE (${VMDISK_ROOTSIZE}M)"
-		dd if=/dev/zero of="$VM_IMAGE" bs=1 count=1 seek=$(( ${VMDISK_ROOTSIZE} * 1024 * 1024 )) || cleanup_and_exit 3
-		if test -z "$CLEAN_BUILD" ; then
-		    vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE" || cleanup_and_exit 3
-		fi
+	if test ! -e "$VM_IMAGE"; then
+	    echo "Creating $VM_IMAGE (${VMDISK_ROOTSIZE}M)"
+	    dd if=/dev/zero of="$VM_IMAGE" bs=1 count=1 seek=$(( ${VMDISK_ROOTSIZE} * 1024 * 1024 )) || cleanup_and_exit 3
+	    if test -z "$CLEAN_BUILD" ; then
+		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE" || cleanup_and_exit 3
 	    fi
-	    if test ! -e "$VM_SWAP" -o -n "$VMDISK_FORCE"; then
-		# setup VM_SWAP
-		echo "Creating $VM_SWAP (${VMDISK_SWAPSIZE}M)"
-		dd if=/dev/zero of="$VM_SWAP" bs=1 count=1 seek=$(( ${VMDISK_SWAPSIZE} * 1024 * 1024 )) || cleanup_and_exit 3
-	    fi
+	fi
+	if test ! -e "$VM_SWAP"; then
+	    # setup VM_SWAP
+	    echo "Creating $VM_SWAP (${VMDISK_SWAPSIZE}M)"
+	    dd if=/dev/zero of="$VM_SWAP" bs=1 count=1 seek=$(( ${VMDISK_SWAPSIZE} * 1024 * 1024 )) || cleanup_and_exit 3
 	fi
 	if test ! -e "$VM_IMAGE" ; then
 	    echo "you need to create $VM_IMAGE first"
