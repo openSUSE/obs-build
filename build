@@ -570,7 +570,7 @@ mkdir_build_root()
     fi
 
     rm -rf "$BUILD_ROOT"/.build.packages
-    if [ -z "$RUNNING_IN_VM"]; then
+    if [ -z "$RUNNING_IN_VM" ]; then
        # don't touch this in VM
        rm -rf "$BUILD_ROOT"/.build
     fi
