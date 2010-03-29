@@ -22,12 +22,12 @@ if [ -e ${0%/*}/config.local ]; then
 	. ${0%/*}/config.local
 fi
 
-if [ ! -e "$build_vm_img" ]; then
-	sudo dd if=/dev/zero of="$build_vm_img" bs=512 count=0 seek=$((build_vm_image_size*2*1024))
-fi
-if [ ! -e "$build_vm_swap" ]; then
-	sudo dd if=/dev/zero of="$build_vm_swap" bs=512 count=0 seek=$((build_vm_swap_size*2*1024))
-fi
+#if [ ! -e "$build_vm_img" ]; then
+#	sudo dd if=/dev/zero of="$build_vm_img" bs=512 count=0 seek=$((build_vm_image_size*2*1024))
+#fi
+#if [ ! -e "$build_vm_swap" ]; then
+#	sudo dd if=/dev/zero of="$build_vm_swap" bs=512 count=0 seek=$((build_vm_swap_size*2*1024))
+#fi
 
 die()
 {
@@ -74,12 +74,10 @@ arch32bit()
 enable_kvm()
 {
 	test -w /dev/kvm || skip "no kvm support"
-	set -- "${build_args[@]}" \
-		--kvm "${build_vm_img}" \
-		--swap "${build_vm_swap}" \
-		--memory "$build_vm_mem"
-
-	build_args=("$@")
+	build_args+=(--kvm)
+	[ -z "$build_vm_img" ] || build_args+=("$build_vm_img")
+	[ -z "$build_vm_swap" ] || build_args+=(--swap "$build_vm_swap")
+	[ -z "$build_vm_mem" ] || build_args+=(--memory "$build_vm_mem")
 }
 
 run_build()
@@ -88,14 +86,15 @@ run_build()
 		if [ "$i" = '--kvm' ]; then
 			enable_kvm
 		else
-			build_args[${#build_args[@]}]="$i";
+			build_args+=("$i")
 		fi
 	done
 	set -- $linux32 sudo env \
 		/usr/bin/build \
 		--root "${build_root}" \
 		"${repos[@]}" \
-		"${build_args[@]}"
+		"${build_args[@]}" \
+		"$@"
 	echo "$@"
 	"$@" || fail
 	find $build_root/.build.packages/ -type f -name '*.rpm' -print0 | xargs --no-run-if-empty -0 rpm -K || fail

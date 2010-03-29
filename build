@@ -17,25 +17,24 @@ icecream=0
 definesnstuff=()
 repos=()
 
-# mkreiserfs only works with qemu/uml if it is able to create a file
-# system that is owned by the calling user (bnc#369006)
-#vm_img_mkfs='mkreiserfs -q -f'
-#vm_img_mkfs='mkfs.ext2 -m 0 -q -F'
-vm_img_mkfs='mkfs.ext3 -m 0 -q -F'
-vm_img_tunefs='tune2fs -c 0'
+# defaults for vm_img_mkfs
+vm_img_mkfs_ext4='mkfs.ext4 -m 0 -q -F'
+vm_img_tunefs_ext4='tune2fs -c 0'
+vm_img_mkfs_ext3='mkfs.ext3 -m 0 -q -F'
+vm_img_tunefs_ext3='tune2fs -c 0'
+vm_img_mkfs_ext2='mkfs.ext2 -m 0 -q -F'
+vm_img_tunefs_ext2='tune2fs -c 0'
+vm_img_mkfs_reiserfs='mkreiserfs -q -f'
+
 qemu_kernel=/boot/vmlinuz
 qemu_initrd=/boot/initrd
 qemu_bin=/usr/bin/qemu
 uml_kernel=/boot/vmlinux-um
 uml_initrd=/boot/initrd-um
 
-kvm_kernel=/boot/vmlinuz-kvm
-kvm_initrd=/boot/initrd-kvm
 kvm_bin=/usr/bin/qemu-kvm
-mkinitrd_virtio_cmd=(env rootfstype=ext3 mkinitrd -d /dev/null -m "binfmt_misc virtio_pci virtio_blk" -k $kvm_kernel -i ${kvm_initrd}-virtio)
 # whether we have virtio support
 kvm_virtio=
-rootfstype=
 
 # Default uid:gid for the build user
 ABUILD_UID=399
@@ -57,9 +56,10 @@ VM_SWAP=
 VM_KERNEL=
 VM_INITRD=
 VMDISK_AUTOSETUP=
-VMDISK_ROOTSIZE=
-VMDISK_SWAPSIZE=
-VMDISK_FORCE=false
+VMDISK_ROOTSIZE=4096
+VMDISK_SWAPSIZE=1024
+VMDISK_FORCE=
+VMDISK_FILESYSTEM=ext3
 MEMSIZE=
 RUNNING_IN_VM=
 RPMLIST=
@@ -450,6 +450,28 @@ function create_baselibs {
 	chroot $BUILD_ROOT su -c "/.mkbaselibs/mkbaselibs $BASELIBS_GLOBAL $BASELIBS_CFG $BPKGS" - $BUILD_USER || cleanup_and_exit 1
 	rm -rf $BUILD_ROOT/.mkbaselibs
     fi
+}
+
+vm_img_mkfs()
+{
+    local fs="$1"
+    local img="$2"
+    local mkfs tunefs
+    eval "mkfs=\"\$vm_img_mkfs_${fs}\""
+    eval "tunefs=\"\$vm_img_tunefs_${fs}\""
+
+    if test -z "$mkfs"; then
+	echo "filesystem \"$fs\" isn't supported"
+	cleanup_and_exit 3
+    fi
+
+
+    echo "Creating $fs filesystem on $img"
+    $mkfs "$img"
+    if test -n "$tunefs" ; then
+	$tunefs "$img" || cleanup_and_exit 3
+    fi
+
 }
 
 detect_vm_2nd_stage()
@@ -876,39 +898,28 @@ if test -n "$KILL" ; then
     cleanup_and_exit 0
 fi
 
-if test "ext4" = "$VMDISK_FILESYSTEM"; then
-    vm_img_mkfs='mkfs.ext4 -m 0 -q -F'
-fi
-#    mkinitrd_virtio_cmd=(env rootfstype=ext4 mkinitrd -d /dev/null -m "ext4 binfmt_misc virtio_pci virtio_blk" -k $kvm_kernel -i ${kvm_initrd}-ext4-virtio)
-#    env rootfstype=ext4 mkinitrd -d /dev/null -m "ext4 binfmt_misc virtio_pci virtio_blk" -k $kvm_kernel -i ${kvm_initrd}-ext4
-#    export kvm_initrd=${kvm_initrd}-ext4
-#    export rootfstype="rootfstype=ext4"
-#    #$vm_img_tunefs
-#fi
-if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" -a -n "$VM_KERNEL" -a -n "$VM_INITRD" ] ; then
-
-    qemu_bin="$kvm_bin"
-    qemu_initrd="$VM_INITRD"
-    qemu_kernel="$VM_KERNEL"
-    VM_SWAPDEV=/dev/vdb
-    qemu_rootdev=/dev/vda
-    kvm_virtio=1
-elif [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" -a -f "${kvm_initrd}-build" ]; then
-    qemu_bin="$kvm_bin"
-    qemu_kernel="$kvm_kernel"
-    qemu_initrd="${kvm_initrd}-build"
-    VM_SWAPDEV=/dev/vdb
-    qemu_rootdev=/dev/vda
-    kvm_virtio=1
-elif [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
+if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
     if [ ! -r /dev/kvm -o ! -x "$qemu_bin"-kvm ]; then
 	echo "host doesn't support kvm"
 	cleanup_and_exit 3
     fi
     qemu_bin="$kvm_bin"
-    qemu_kernel="$kvm_kernel"
-    qemu_initrd="$kvm_initrd"
-    if [ ! -e ${qemu_initrd}-virtio -o $qemu_kernel -nt ${qemu_initrd}-virtio ]; then
+    if [ -n "$VM_KERNEL" ]; then
+	qemu_kernel="$VM_KERNEL"
+    fi
+
+    if [ -n "$VM_INITRD" ]; then
+	qemu_initrd="$VM_INITRD"
+	kvm_virtio=1
+    elif [ -e "${qemu_initrd}-build" ]; then
+	qemu_initrd="${qemu_initrd}-build"
+	kvm_virtio=1
+    elif [ ! -e ${qemu_initrd}-virtio -o $qemu_kernel -nt ${qemu_initrd}-virtio ]; then
+	mkinitrd_virtio_cmd=(env rootfstype="$VMDISK_FILESYSTEM" \
+		mkinitrd -d /dev/null \
+		-m "binfmt_misc virtio_pci virtio_blk" \
+		-k $qemu_kernel \
+		-i ${qemu_initrd}-virtio)
 	if [ ! -w /root ]; then
 	    echo "No initrd that provides virtio support found. virtio accelleration disabled."
 	    echo "Run the following command as root to enable virtio:"
@@ -918,15 +929,11 @@ elif [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
 	    echo "creating $qemu_initrd-virtio"
 	    "${mkinitrd_virtio_cmd[@]}" || cleanup_and_exit 1
 	    kvm_virtio=1
-        else
-            kvm_virtio=0
+	    qemu_initrd="${qemu_initrd}-virtio"
 	fi
-    else
-	kvm_virtio=0
     fi
 
     if [ "$kvm_virtio" = 1 ]; then
-	qemu_initrd="${qemu_initrd}-virtio"
 	VM_SWAPDEV=/dev/vdb
 	qemu_rootdev=/dev/vda
     else
@@ -980,48 +987,32 @@ if test -z "$RUNNING_IN_VM" ; then
     if test -n "$VM_IMAGE" ; then
 	if test "$VM_IMAGE" = 1 ; then
 	    VM_IMAGE="$BUILD_ROOT.img"
+	    echo "using $VM_IMAGE as vm image"
+	    if test -z "$VM_SWAP"; then
+		VM_SWAP="$BUILD_ROOT.swap"
+		echo "using $VM_SWAP as vm swap"
+	    fi
 	fi
-    if test -n "$VMDISK_AUTOSETUP"; then
-        if test -n "$VMDISK_ROOTSIZE" -a -n "$VMDISK_SWAPSIZE" ; then
-            if test -e "$VM_IMAGE" -a -e "$VM_SWAP" -a ! "$VMDISK_FORCE"; then
-                echo "$BUILD_ROOT and $VM_SWAP present, skipping autosetup without --vmdisk-force being set."
-            else
-                # assuming MB for size ! thus root=4096 swap=1024 
-                # setup VM_IMAGE
-                echo ""
-                echo "$VMDISK_ROOTSIZE"
-                echo """dd if=/dev/zero of="$VM_IMAGE" bs=1 count=1 seek=$(( ${VMDISK_ROOTSIZE} * 1024 * 1024 )) || cleanup_and_exit 3"""
-                dd if=/dev/zero of="$VM_IMAGE" bs=1 count=1 seek=$(( ${VMDISK_ROOTSIZE} * 1024 * 1024 )) || cleanup_and_exit 3
-                if test -z "$CLEAN_BUILD"; then
-                    $vm_img_mkfs $VM_IMAGE || cleanup_and_exit 3
-                    if test -n "$vm_img_tunefs" ; then
-                        $vm_img_tunefs $VM_IMAGE || cleanup_and_exit 3
-                    fi
-                fi
-                # setup VM_SWAP
-                dd if=/dev/zero of="$VM_SWAP" bs=1 count=1 seek=$(( ${VMDISK_SWAPSIZE} * 1024 * 1024 )) || cleanup_and_exit 3
-                if test -z "$CLEAN_BUILD"; then
-                    mkswap "$VM_SWAP" || cleanup_and_exit 3
-                fi
-            fi
-        else
-            echo "--vmdisk-autosetup used, but either --vmdisk-rootsize or --vmdisk-swapsize not set."
-            cleanup_and_exit 3
-            # error, bad build(-host) setup
-        fi
-    fi
+	if test -n "$VMDISK_AUTOSETUP"; then
+	    if test ! -e "$VM_IMAGE" -o -n "$VMDISK_FORCE"; then
+		echo "Creating $VM_IMAGE (${VMDISK_ROOTSIZE}M)"
+		dd if=/dev/zero of="$VM_IMAGE" bs=1 count=1 seek=$(( ${VMDISK_ROOTSIZE} * 1024 * 1024 )) || cleanup_and_exit 3
+		if test -z "$CLEAN_BUILD" ; then
+		    vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE" || cleanup_and_exit 3
+		fi
+	    fi
+	    if test ! -e "$VM_SWAP" -o -n "$VMDISK_FORCE"; then
+		# setup VM_SWAP
+		echo "Creating $VM_SWAP (${VMDISK_SWAPSIZE}M)"
+		dd if=/dev/zero of="$VM_SWAP" bs=1 count=1 seek=$(( ${VMDISK_SWAPSIZE} * 1024 * 1024 )) || cleanup_and_exit 3
+	    fi
+	fi
 	if test ! -e "$VM_IMAGE" ; then
-	    echo "you need to create a file system on $VM_IMAGE first"
+	    echo "you need to create $VM_IMAGE first"
 	    cleanup_and_exit 3
 	fi
-    fi
-    if test -n "$VM_IMAGE" ; then
 	if test -n "$CLEAN_BUILD" ; then
-	    echo "Creating filesystem on $VM_IMAGE"
-	    $vm_img_mkfs $VM_IMAGE || cleanup_and_exit 3
-	    if test -n "$vm_img_tunefs" ; then
-		  $vm_img_tunefs $VM_IMAGE || cleanup_and_exit 3
-	    fi
+	    vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE" || cleanup_and_exit 3
 	fi
 	mkdir_build_root
 	if [ -w /root ]; then
@@ -1034,6 +1025,7 @@ if test -z "$RUNNING_IN_VM" ; then
     fi
     if test -n "$VM_SWAP" ; then
 	dd if=/dev/zero of="$VM_SWAP" bs=12 count=1 conv=notrunc 2>/dev/null
+	echo "mkswap $VM_SWAP"
 	mkswap "$VM_SWAP"
     fi
 fi
@@ -1331,7 +1323,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		set -- $qemu_bin -no-reboot -nographic -net none -serial stdio \
 		    -kernel $qemu_kernel \
 		    -initrd $qemu_initrd \
-		    -append "root=$qemu_rootdev $rootfstype panic=1 quiet noapic rw console=ttyS0 init=$CROSS_INIT_SCRIPT" \
+		    -append "root=$qemu_rootdev panic=1 quiet noapic rw console=ttyS0 init=$CROSS_INIT_SCRIPT" \
 		    ${MEMSIZE:+-m $MEMSIZE} \
 		    "${qemu_disks[@]}"
 
