@@ -36,6 +36,9 @@ kvm_bin=/usr/bin/qemu-kvm
 # whether we have virtio support
 kvm_virtio=
 
+# need to restore build root owner for non-root builds
+browner=0
+
 # Default uid:gid for the build user
 ABUILD_UID=399
 ABUILD_GID=399
@@ -231,6 +234,7 @@ cleanup_and_exit () {
     trap EXIT
     test -z "$1" && set 0
     if test -n "$RUNNING_IN_VM" ; then
+	chown $browner $BUILD_ROOT
 	cd /
 	if test -n "$VM_SWAP" -a -e "$VM_SWAP" ; then
 	    swapoff "$VM_SWAP" 2>/dev/null
@@ -585,6 +589,11 @@ mkdir_build_root()
 	    echo "can not create BUILD_ROOT=$BUILD_ROOT. Exit..."
 	    cleanup_and_exit 1
 	fi
+    fi
+
+    if [ ! -w "$BUILD_ROOT" ]; then
+	echo "Error: BUILD_ROOT=$BUILD_ROOT not writeable, try --clean."
+	cleanup_and_exit 3
     fi
 
     rm -rf "$BUILD_ROOT"/.build.packages
@@ -1025,6 +1034,10 @@ if test -z "$RUNNING_IN_VM" ; then
 fi
 
 mkdir_build_root
+
+if [ "$BUILD_ROOT" = / ]; then
+    read dummy dummy browner dummy < <(ls -ld /)
+fi
 
 rm -f $BUILD_ROOT/exit
 
