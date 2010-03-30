@@ -1021,7 +1021,12 @@ if test -z "$RUNNING_IN_VM" ; then
 	if [ -w /root ]; then
 	    mount -o loop $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 3
 	else
-	    mount $BUILD_ROOT || cleanup_and_exit 3
+	    if ! mount $BUILD_ROOT; then
+		echo "mounting the build root failed. An fstab entry is probably missing or incorrect."
+		echo "/etc/fstab should contain an entry like this:"
+		echo "$VM_IMAGE $BUILD_ROOT auto noauto,user,loop 0 0"
+		cleanup_and_exit 3
+	    fi
 	fi
     else
 	test -w /root || become_root_or_fail
