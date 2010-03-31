@@ -1516,6 +1516,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
     if test "$BUILDTYPE" = spec ; then
 	TOPDIR=`chroot $BUILD_ROOT su -c "rpm --eval '%_topdir'" - $BUILD_USER`
+	if test -z "$TOPDIR"; then
+	    echo "Error: TOPDIR empty"
+	    cleanup_and_exit 1
+	fi
     else
 	TOPDIR=/usr/src/packages
 	mkdir -p $BUILD_ROOT$TOPDIR
