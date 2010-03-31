@@ -935,6 +935,9 @@ if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
 		kvm_virtio=1
 		qemu_initrd="${qemu_initrd_virtio}"
 	    fi
+	else
+	    kvm_virtio=1
+	    qemu_initrd="${qemu_initrd_virtio}"
 	fi
     fi
 
