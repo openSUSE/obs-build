@@ -1800,7 +1800,8 @@ if test -n "$RPMS" -a -d "$BUILD_ROOT/usr/lib/build/checks" ; then
     done
 fi
 
-rm -f $TOPDIR/rpmlint.log
+rpmlintlog="$BUILD_ROOT/$TOPDIR/rpmlint.log"
+rm -f "$rpmlintlog"
 if test -n "$RPMS" -a "$DO_CHECKS" != "false" -a -x "$BUILD_ROOT/opt/testing/bin/rpmlint" -a -d "$BUILD_ROOT/$TOPDIR/RPMS" ; then
     LINT_RPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/RPMS \
 	\( -name "*-debuginfo-*" -o -name "*-debugsource-*" \
@@ -1814,9 +1815,8 @@ if test -n "$RPMS" -a "$DO_CHECKS" != "false" -a -x "$BUILD_ROOT/opt/testing/bin
     rpmlint_failed=
     chroot $BUILD_ROOT /opt/testing/bin/rpmlint \
 	    --info ${LINT_RPM_FILE_LIST[*]#$BUILD_ROOT} ${SRPM_FILE_LIST[*]#$BUILD_ROOT} \
-	    > $TOPDIR/rpmlint.log 2>&1 || rpmlint_failed=1
-    cat $TOPDIR/rpmlint.log
-    mv $BUILD_ROOT/.build.rpmlint $TOPDIR/rpmlint.log
+	    > "$rpmlintlog" 2>&1 || rpmlint_failed=1
+    cat "$rpmlintlog"
     test -z "$rpmlint_failed" || cleanup_and_exit 1
 fi
 
