@@ -304,30 +304,40 @@ function validate_cache_file {
     fi
 }
 
-function register_qemu_user {
 #
 # Detect cross-build (fixed code) and copy qemus for cross-build emulation mode
 # And copy also a static host binary shell to run the init scripts in the target chroot
 #
-if [ x"$BUILD_ARCH" == xarmv4l -o x"$BUILD_ARCH" == xarmv5el -o x"$BUILD_ARCH" == xarmv7el -o x"$BUILD_ARCH" == xsh4 -o x"$BUILD_ARCH" == xppc -o x"$BUILD_ARCH" == xppc64 -o x"$BUILD_ARCH" == xmips -o x"$BUILD_ARCH" == xmipsel ]; then
-    if [  -n "$(uname -m | grep '[x3-6]86')" ]; then
-	if [ -e /usr/sbin/qemu-binfmt-conf.sh ]; then
-	    (mkdir -p  $BUILD_ROOT/usr/bin $BUILD_ROOT/usr/sbin && set -x && cp /usr/bin/qemu-* $BUILD_ROOT/usr/bin && cp /usr/sbin/qemu-binfmt-conf.sh $BUILD_ROOT/usr/sbin)
-	fi
-	# To initially run the init script, there needs to be also a static bash to register qemu in this chroot and though to start up /.build/build
-	if [ -e /bin/bash-static -a -e /bin/mount-static ]; then
-	    (mkdir -p  $BUILD_ROOT/bin && set -x && cp /bin/bash-static $BUILD_ROOT/bin && cp /bin/mount-static $BUILD_ROOT/bin && chmod a+x $BUILD_ROOT/bin/*-static )
-	fi
-	if [ -e /proc/sys/fs/binfmt_misc/arm -o -e /proc/sys/fs/binfmt_misc/armeb -o -e /proc/sys/fs/binfmt_misc/sh4 -o -e /proc/sys/fs/binfmt_misc/mips -o -e /proc/sys/fs/binfmt_misc/ppc -o -e /proc/sys/fs/binfmt_misc/ppc64 ]; then
-	    echo "qemu-* already registered"
-	else
-	    if [ -e /usr/sbin/qemu-binfmt-conf.sh ]; then
-		echo "qemu-* will be registered"
-		(set -x && /usr/sbin/qemu-binfmt-conf.sh)
-	    fi
-	fi
+copy_qemu()
+{
+    check_use_emulator || return
+
+    echo "copying qemu"
+    mkdir -p  $BUILD_ROOT/usr/bin $BUILD_ROOT/usr/sbin
+    install -m755 /usr/bin/qemu-* $BUILD_ROOT/usr/bin
+    install -m755 /usr/sbin/qemu-binfmt-conf.sh $BUILD_ROOT/usr/sbin
+    # To initially run the init script, there needs to be also a
+    # static bash to register qemu in this chroot and to start up
+    # /.build/build
+    mkdir -p  $BUILD_ROOT/bin
+    install -m755 /bin/bash-static $BUILD_ROOT/bin
+    install -m755 /bin/mount-static $BUILD_ROOT/bin
+    # XXX: not needed if vm is used
+    if ! check_binfmt_registered; then
+	echo "registering binfmt handlers"
+	/usr/sbin/qemu-binfmt-conf.sh
     fi
-fi
+}
+
+check_binfmt_registered()
+{
+    local arch
+    for arch in arm $EMULATOR_ARCHS; do
+	if test -e /proc/sys/fs/binfmt_misc/$arch; then
+	    return 0
+	fi
+    done
+    return 1
 }
 
 fail_exit()
@@ -403,7 +413,7 @@ fi
 # register the QEMU emulator
 # reset mmap_min_addr for QEMU
 #
-register_qemu_user
+copy_qemu
 
 #
 # store that we start to build system

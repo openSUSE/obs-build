@@ -39,3 +39,34 @@ check_exit()
 	cleanup_and_exit 1
     fi
 }
+
+is_emulator_arch()
+{
+    local arch
+    for arch in $EMULATOR_ARCHS; do
+	if test "$BUILD_ARCH" = "$arch"; then
+	    return 0
+	fi
+    done
+    return 1
+}
+
+check_use_emulator()
+{
+    is_emulator_arch || return
+
+    # to run the qemu initialization in the XEN chroot, we need to register it with a statically build shell
+    case "$BUILD_HOST_ARCH" in
+	i?86|x86_64)
+	    if test -e /bin/bash-static \
+		-a -e /bin/mount-static \
+		-a -e /usr/sbin/qemu-binfmt-conf.sh; then
+		return 0
+	    else
+		# XXX: error?
+		echo "Warning: cross compile not possible due to missing static binaries"
+	    fi
+	;;
+    esac
+    return 1
+}
