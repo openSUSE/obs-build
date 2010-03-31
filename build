@@ -1364,20 +1364,24 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		extractbuild --disk "$VM_IMAGE" --input "$VM_SWAP" --skip 512 -v || cleanup_and_exit 3
 		# create same layout as with plain chroot
 		if test "$BUILDTYPE" = spec ; then
-		  mkdir -p SRPMS
-		  for i in *src.rpm; do mv "$i" SRPMS/; done
-		  for i in *.rpm; do
-		    arch=${i%.rpm}
-		    arch=${arch##*\.}
-		    mkdir -p RPMS/$arch
-		    mv "$i" RPMS/$arch/;
-		  done
+		    mkdir -p SRPMS
+		    for i in *src.rpm *.desktopfiles ; do
+			test -e "$i" || continue
+			mv "$i" SRPMS/
+		    done
+		    for i in *.rpm ; do
+			test -e "$i" || continue
+			arch=${i%.rpm}
+			arch=${arch##*\.}
+			mkdir -p RPMS/$arch
+			mv "$i" RPMS/$arch/
+		    done
 		elif test "$BUILDTYPE" = dsc ; then
-		  mkdir -p DEBS
-		  find . -type f | while read i; do mv "$i" DEBS/; done
+		    mkdir -p DEBS
+		    find . -type f | while read i; do mv "$i" DEBS/; done
 		else
-		  mkdir -p KIWI
-		  find . -type f | while read i; do mv "$i" KIWI/; done
+		    mkdir -p KIWI
+		    find . -type f | while read i; do mv "$i" KIWI/; done
 		fi
 		cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
 		;;
