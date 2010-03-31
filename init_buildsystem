@@ -469,6 +469,10 @@ else
 		echo "registering binfmt handlers"
 		/usr/sbin/qemu-binfmt-conf.sh
 	    fi
+	    read mmap_min_addr < /proc/sys/vm/mmap_min_addr
+	    if [ "$mmap_min_addr" != 0 ]; then
+		echo "Warning: mmap_min_addr is != 0. If programs fail at mmap this could be the reason"
+	    fi
 	fi
     fi
 
