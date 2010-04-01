@@ -254,6 +254,7 @@ cleanup_and_exit () {
 		test -e /proc/sysrq-trigger && echo o > /proc/sysrq-trigger
 	    fi
 	    halt -f -p
+	    echo "wtf? I'm still alive. File a bug as I wanted to die!"
 	fi
     else
 	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
