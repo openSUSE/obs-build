@@ -9,6 +9,11 @@ use XML::Parser;
 use Data::Dumper;
 use Getopt::Long;
 use Build::Rpm;
+use Digest::MD5 qw(md5 md5_hex md5_base64);
+use File::Path qw(mkpath rmtree);
+use File::Basename;
+use LWP::UserAgent;
+use URI;
 Getopt::Long::Configure("no_ignore_case");
 
 my @parent = [];
@@ -342,6 +347,16 @@ sub printasbuildcachefile(@)
   }
 }
 
+sub getmetadata
+{
+  my $url = $_[0];
+  my $dir = $_[1];
+
+  my $dest = $dir . "repodata";
+  mkpath($dest);
+  system($INC[0].'/download', $dest, $url . "repodata/repomd.xml");
+}
+
 ### main
 
 GetOptions (
@@ -378,6 +393,12 @@ for my $url (@ARGV) {
     } else {
       die "unsupported repo type: $type\n";
     }
+  } elsif ($url =~ /^http:\/\/([^\/]*)\/?/) {
+    my $repoid = md5_hex($url);
+    my $cachedir = ($::ENV{'CACHE_DIR'} || '/var/cache/build');
+    $dir = "$cachedir/$repoid/";
+    getmetadata($url, $dir);
+    $baseurl = $url;
   } else {
     $dir = $url;
     $dir .= '/' unless $dir =~ /\/$/;
@@ -395,6 +416,9 @@ for my $url (@ARGV) {
     @cursor = ([undef, $primaryparser]);
 
     my $u = $dir . $f->{'location'};
+    if ($url =~ /^http:\/\/([^\/]*)\/?/) {
+        system($INC[0].'/download', $dir . "repodata/", $baseurl . "repodata/" . basename($u));
+    }
     $u = 'gzip -cd ' . $u . '|' if ($u =~ /\.gz$/); # XXX
 
     my $fh;

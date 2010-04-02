@@ -76,6 +76,10 @@ while test -n "$1" ; do
 	    CLEAN_BUILD="$1"
 	    shift
 	;;
+	--cachedir)
+	    CACHE_DIR="$2"
+	    shift 2
+	    ;;
 	*)
 	    break
 	    ;;
@@ -285,6 +289,9 @@ function validate_cache_file {
 	    test -z "$SRC" && SRC=`pwd`
 	    if [ "${SRC#zypp://}" != "$SRC" ]; then
 		set -- $BUILD_DIR/createrepomddeps "$SRC"
+	    elif [ "${SRC#http://}" != "$SRC" ]; then
+		mkdir -p "$(getcachedir "$SRC")"
+		set -- env CACHE_DIR="$CACHE_DIR" $BUILD_DIR/createrepomddeps "$SRC"
 	    elif [ ! -e "$SRC" ]; then
 		echo "*** $SRC does not exist" >&2
 		cleanup_and_exit 1
@@ -339,13 +346,26 @@ fail_exit()
 }
 
 # modify $SRC
-download_zypp()
+downloadpkg()
 {
     local url="$1"
-    local zd="/var/cache/zypp/packages/"
-    SRC=$zd${url#zypp://}
+    local cachedir
+
+    if [ "${url:0:7}" == "zypp://" ] ; then
+	cachedir="/var/cache/zypp/packages/"
+	SRC="$cachedir${url#zypp://}"
+	mkdir -p "$(dirname $SRC)"
+    elif [ "${url:0:7}" == "http://" ] ; then
+	cachedir="$(getcachedir "$url")"
+	local name="$(basename "$url")"
+	SRC="$cachedir/$name"
+    else
+	echo "Invalid url: $url"
+	cleanup_and_exit 1
+    fi
+
     if [ ! -e "$SRC" ]; then
-	local destdir="$zd/tmp"
+	local destdir="$cachedir/tmp"
 	mkdir -p "$destdir"
 	echo "downloading $url ... ";
 	$BUILD_DIR/download "$destdir" "$url" || cleanup_and_exit 1
@@ -362,6 +382,27 @@ download_zypp()
 	rm -f "$destfile.v"
 	mv "$destfile" "$SRC" || cleanup_and_exit 1
     fi
+}
+
+getcachedir()
+{
+    url=$1
+    for repo in "${repos[@]}" ; do
+	if [ "${url:0:${#repo}}" == "$repo" ] ; then
+	    read repoid dummy < <(echo -n "$repo" | md5sum)
+	    echo "$CACHE_DIR/$repoid"
+	    break
+	fi
+    done
+}
+
+get_pkg_filename()
+{
+    local url="$1"
+    local name=$(basename $url)
+    local cachedir=$(getcachedir $url)
+    local destfile="$cachedir/$name"
+    echo $destfile
 }
 
 set_build_arch
@@ -508,8 +549,8 @@ else
 	if [ "${SRC#/}" = "$SRC" ]; then
 	    url="$SRC"
 	    case "$url" in
-		zypp://*)
-		    download_zypp "$url"
+		zypp://* | http://*)
+		    downloadpkg "$url"
 		    ;;
 		*)
 		    echo "unsupported url: $url" >&2
@@ -517,7 +558,12 @@ else
 		    ;;
 	    esac
 	fi
-	ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRC##*.}"
+	if [ "${SRC:0:7}" == "http://" ] ; then
+	    target_file=$(get_pkg_filename "$SRC")
+	    ln -s "$target_file" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRC##*.}"
+	else
+	    ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRC##*.}"
+	fi
 	PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $PKG"
     done < $RPMLIST
 

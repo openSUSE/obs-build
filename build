@@ -142,6 +142,7 @@ Known Parameters:
 	      repository NAME. The repo must be refreshed with zypp
 	      so package meta data is available locally. With emtpy
 	      NAME all enabled repositories are used.
+              a url can specify a remote repo.
 
   --rpms path1:path2:...
               Specify path where to find the RPMs for the build system
@@ -156,6 +157,13 @@ Known Parameters:
 
   --root rootdir
               Use 'rootdir' to setup chroot environment
+
+  --cachedir cachedir
+              Use 'cachedir' to cache remote repo's packages, the
+              default cache dir is /var/cache/build, every repo
+              given by --repository corresponds to a subdir named
+              as md5sum of its repo url, forx eaxmple:
+                 /var/cache/build/3e8ea9b47808629414a0cebc33ea285e
 
   --oldpackages oldpackagesdir
               Define a directory with a former build
@@ -702,6 +710,10 @@ while test -n "$1"; do
 	BUILD_ROOT="$ARG"
 	shift
       ;;
+      *-cachedir)
+	CACHE_DIR="$ARG"
+	shift
+      ;;
       *-oldpackages)
 	OLD_PACKAGES="$ARG"
 	shift
@@ -867,6 +879,8 @@ while test -n "$1"; do
     esac
 done
 
+test -z "$CACHE_DIR" && CACHE_DIR=/var/cache/build
+
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
     if test -n "$VM_IMAGE" -a -n "$VM_SWAP" -a -n "$VM_TYPE"; then
@@ -994,7 +1008,7 @@ if test -n "$LIST_STATE" ; then
        }
        for SPECFILE in $BUILD_ROOT/usr/src/packages/SPECS/*.spec ; do : ; done
     fi
-    init_buildsystem --list-state "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $SPECFILE $BUILD_EXTRA_PACKS
+    init_buildsystem --cachedir "$CACHE_DIR" --list-state "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $SPECFILE $BUILD_EXTRA_PACKS
     ERR=$?
     rm -rf $BUILD_ROOT
     cleanup_and_exit $ERR
@@ -1197,7 +1211,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if test "$DO_INIT" = true ; then
 	    # do fist stage of init_buildsystem
 	    rm -f $BUILD_ROOT/.build.success
-	    set -- init_buildsystem --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
+	    set -- init_buildsystem --cachedir "$CACHE_DIR" --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
 	    echo "$* ..."
 	    "$@" || cleanup_and_exit 1
 	    check_exit
@@ -1414,7 +1428,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "BUILD_INCARNATION=$INCARNATION" > $BUILD_ROOT/.buildenv
 	CREATE_BUILD_BINARIES=
 	egrep '^#[       ]*needsbinariesforbuild[       ]*$' >/dev/null <$MYSRCDIR/$SPECFILE && CREATE_BUILD_BINARIES=--create-build-binaries
-	set -- init_buildsystem "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
+	set -- init_buildsystem --cachedir "$CACHE_DIR" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
 	"$@" || cleanup_and_exit 1
 	check_exit
