@@ -14,6 +14,7 @@ export BUILD_ARCH BUILD_HOST_ARCH BUILD_ROOT BUILD_RPMS BUILD_DIR
 
 ccache=0
 icecream=0
+shell=
 definesnstuff=()
 repos=()
 
@@ -852,6 +853,10 @@ while test -n "$1"; do
 	ABUILD_GID=${ABUILD_ID#*:}
         shift
       ;;
+      --shell)
+	  shell=1
+	  shift
+      ;;
       -*)
 	echo Unknown Option "$PARAM". Exit.
 	cleanup_and_exit 1
@@ -1064,7 +1069,7 @@ if test -z "$VM_IMAGE" -a -z "$LOGFILE"; then
     LOGFILE="$BUILD_ROOT/.build.log"
 fi
 
-if test -n "$LOGFILE" ; then
+if test -n "$LOGFILE" -a -z "$shell" ; then
     echo  logging output to $LOGFILE...
     rm -f $LOGFILE
     touch $LOGFILE
@@ -1261,6 +1266,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	shellquote "${repos[@]}" >> $BUILD_ROOT/.build/build.data
 	echo ")" >> $BUILD_ROOT/.build/build.data
 	echo "VM_TYPE='$VM_TYPE'" >> $BUILD_ROOT/.build/build.data
+	echo "shell='$shell'" >> $BUILD_ROOT/.build/build.data
 	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	umount -n $BUILD_ROOT/proc 2> /dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
@@ -1737,7 +1743,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		> $BUILD_ROOT/.build.command
 	chmod 755 $BUILD_ROOT/.build.command
 	check_exit
-	chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+	if test -n "$shell"; then
+	    chroot $BUILD_ROOT su -
+	else
+	    chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+	fi
     fi
 
     if test "$BUILDTYPE" = dsc ; then
@@ -1750,7 +1760,12 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    DSC_BUILD_CMD="source $TOPDIR/SOURCES/build.script"
 	    chmod +x $BUILD_ROOT/$TOPDIR/SOURCES/build.script
 	fi
-	chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+
+	if test -n "$shell"; then
+	    chroot $BUILD_ROOT su -
+	else
+	    chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+	fi
 
 	mkdir -p $BUILD_ROOT/$TOPDIR/DEBS
 	for DEB in $BUILD_ROOT/$TOPDIR/*.deb ; do
