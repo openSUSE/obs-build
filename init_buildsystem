@@ -291,7 +291,7 @@ function validate_cache_file {
 		set -- $BUILD_DIR/createrepomddeps "$SRC"
 	    elif [ "${SRC#http://}" != "$SRC" -o "${SRC#https://}" != "$SRC" -o "${SRC#ftp://}" != "$SRC" -o "${SRC#ftps://}" != "$SRC" ]; then
 		mkdir -p "$(getcachedir "$SRC")"
-                set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
+		set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
 	    elif [ ! -e "$SRC" ]; then
 		echo "*** $SRC does not exist" >&2
 		cleanup_and_exit 1

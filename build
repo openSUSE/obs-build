@@ -744,24 +744,24 @@ while test -n "$1"; do
 	shift
       ;;
       *-vm-kernel)
-        VM_KERNEL="$ARG"
-        shift
+	VM_KERNEL="$ARG"
+	shift
       ;;
       *-vm-initrd)
-        VM_INITRD="$ARG"
-        shift
+	VM_INITRD="$ARG"
+	shift
       ;;
       *-vmdisk-rootsize)
-        VMDISK_ROOTSIZE="$ARG"
-        shift
+	VMDISK_ROOTSIZE="$ARG"
+	shift
       ;;
       *-vmdisk-swapsize)
-        VMDISK_SWAPSIZE="$ARG"
-        shift
+	VMDISK_SWAPSIZE="$ARG"
+	shift
       ;;
       *-vmdisk-filesystem)
-        VMDISK_FILESYSTEM="$ARG"
-        shift
+	VMDISK_FILESYSTEM="$ARG"
+	shift
       ;;
       *-rpmlist)
 	RPMLIST="--rpmlist $ARG"
@@ -856,14 +856,14 @@ while test -n "$1"; do
 	shift
       ;;
       --uid)
-        ABUILD_ID="$ARG"
-        if test -n "${ABUILD_ID//[0-9:]/}"; then
-            echo "--uid argument must be uid:gid"
-            cleanup_and_exit
+	ABUILD_ID="$ARG"
+	if test -n "${ABUILD_ID//[0-9:]/}"; then
+	    echo "--uid argument must be uid:gid"
+	    cleanup_and_exit
 	fi
 	ABUILD_UID=${ABUILD_ID%:*}
 	ABUILD_GID=${ABUILD_ID#*:}
-        shift
+	shift
       ;;
       --shell)
 	  shell=1
@@ -1492,7 +1492,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		echo "abuild::${ABUILD_UID}:${ABUILD_GID}:..."
 		echo "build aborting"
 		cleanup_and_exit 1
-            fi
+	    fi
 	fi
 	if test -f $BUILD_ROOT/etc/shadow ; then
 	    sed -e "s@^root::@root:*:@" < $BUILD_ROOT/etc/shadow > $BUILD_ROOT/etc/shadow.t && mv $BUILD_ROOT/etc/shadow.t $BUILD_ROOT/etc/shadow
