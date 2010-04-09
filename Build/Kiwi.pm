@@ -182,17 +182,24 @@ sub kiwiparse {
   for my $package (@pkgs) {
     # filter packages, which are not targeted for the wanted plattform
     if ($package->{'arch'}) {
+      my $valid=undef;
       if (@requiredarch) {
         # this is a product
-        next unless grep {$_ eq $package->{'arch'}} @requiredarch;
+        foreach my $ma(@requiredarch) {
+          foreach my $pa(split(",", $package->{'arch'})) {
+            $valid = 1 if $ma ne $pa;
+          }
+        }
       } else {
         # live appliance
         my $ma = $arch;
         $ma =~ s/i[456]86/i386/;
-        my $pa = $package->{'arch'};
-        $pa =~ s/i[456]86/i386/;
-        next if $ma ne $pa;
+        foreach my $pa(split(",", $package->{'arch'})) {
+          $pa =~ s/i[456]86/i386/;
+          $valid = 1 if $ma ne $pa;
+        }
       }
+      next unless $valid;
     }
 
     # not nice, but optimizes our build dependencies
