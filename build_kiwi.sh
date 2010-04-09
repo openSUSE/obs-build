@@ -199,7 +199,7 @@ EOF
 		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
 echo "compressing pxe images... "
 cd /$TOPDIR/KIWI-pxe
-tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-pxe.tar.bz2" "$imageout"* initrd-*"
+tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-pxe.tar.bz2" ${imageout}* initrd-*
 echo "Create sha256 file..."
 cd $TOPDIR/KIWI
 sha256sum "$imageout$buildnum-pxe.tar.bz2" > "$imageout$buildnum-pxe.tar.bz2.sha256"
