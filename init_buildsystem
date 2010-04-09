@@ -289,9 +289,9 @@ function validate_cache_file {
 	    test -z "$SRC" && SRC=`pwd`
 	    if [ "${SRC#zypp://}" != "$SRC" ]; then
 		set -- $BUILD_DIR/createrepomddeps "$SRC"
-	    elif [ "${SRC#http://}" != "$SRC" ]; then
+	    elif [ "${SRC#http://}" != "$SRC" -o "${SRC#https://}" != "$SRC" -o "${SRC#ftp://}" != "$SRC" -o "${SRC#ftps://}" != "$SRC" ]; then
 		mkdir -p "$(getcachedir "$SRC")"
-		set -- env CACHE_DIR="$CACHE_DIR" $BUILD_DIR/createrepomddeps "$SRC"
+                set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
 	    elif [ ! -e "$SRC" ]; then
 		echo "*** $SRC does not exist" >&2
 		cleanup_and_exit 1
@@ -355,7 +355,7 @@ downloadpkg()
 	cachedir="/var/cache/zypp/packages/"
 	SRC="$cachedir${url#zypp://}"
 	mkdir -p "$(dirname $SRC)"
-    elif [ "${url:0:7}" == "http://" ] ; then
+    elif [ "${url:0:7}" == "http://" -o "${url:0:8}" == "https://" -o "${url:0:6}" == "ftp://" -o "${url:0:7}" == "ftps://" ] ; then
 	cachedir="$(getcachedir "$url")"
 	local name="$(basename "$url")"
 	SRC="$cachedir/$name"
@@ -549,7 +549,7 @@ else
 	if [ "${SRC#/}" = "$SRC" ]; then
 	    url="$SRC"
 	    case "$url" in
-		zypp://* | http://*)
+		zypp://* | http://* | https://* | ftp://* | ftps://*)
 		    downloadpkg "$url"
 		    ;;
 		*)
@@ -558,12 +558,8 @@ else
 		    ;;
 	    esac
 	fi
-	if [ "${SRC:0:7}" == "http://" ] ; then
-	    target_file=$(get_pkg_filename "$SRC")
-	    ln -s "$target_file" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRC##*.}"
-	else
-	    ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRC##*.}"
-	fi
+	# downloadpkg modified $SRC, so it has a right name for use
+	ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRC##*.}"
 	PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $PKG"
     done < $RPMLIST
 

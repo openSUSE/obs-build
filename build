@@ -879,7 +879,7 @@ while test -n "$1"; do
     esac
 done
 
-test -z "$CACHE_DIR" && CACHE_DIR=/var/cache/build
+test -n "$CACHE_DIR" ||  CACHE_DIR=/var/cache/build
 
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage

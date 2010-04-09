@@ -26,6 +26,7 @@ my $opt_dump;
 my $opt_old;
 my $opt_nosrc;
 my $opt_bc;
+my $cachedir = "/var/cache/build";
 
 my $old_seen = ();
 
@@ -363,6 +364,7 @@ GetOptions (
     "nosrc"   => \$opt_nosrc,
     "dump"   => \$opt_dump,
     "old"   => \$opt_old,
+    "cachedir=s"  => \$cachedir,
     ) or exit(1);
 
 $opt_bc = 1 unless ($opt_dump || $opt_old);
@@ -395,7 +397,6 @@ for my $url (@ARGV) {
     }
   } elsif ($url =~ /^http:\/\/([^\/]*)\/?/) {
     my $repoid = md5_hex($url);
-    my $cachedir = ($::ENV{'CACHE_DIR'} || '/var/cache/build');
     $dir = "$cachedir/$repoid/";
     getmetadata($url, $dir);
     $baseurl = $url;
