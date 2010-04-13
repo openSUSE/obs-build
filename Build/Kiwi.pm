@@ -187,7 +187,7 @@ sub kiwiparse {
         # this is a product
         foreach my $ma(@requiredarch) {
           foreach my $pa(split(",", $package->{'arch'})) {
-            $valid = 1 if $ma ne $pa;
+            $valid = 1 if $ma eq $pa;
           }
         }
       } else {
@@ -196,7 +196,7 @@ sub kiwiparse {
         $ma =~ s/i[456]86/i386/;
         foreach my $pa(split(",", $package->{'arch'})) {
           $pa =~ s/i[456]86/i386/;
-          $valid = 1 if $ma ne $pa;
+          $valid = 1 if $ma eq $pa;
         }
       }
       next unless $valid;
