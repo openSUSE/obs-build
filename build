@@ -257,13 +257,19 @@ cleanup_and_exit () {
 	if test "$VM_TYPE" != lxc; then
 	    kill -9 -1        # goodbye cruel world
 	    if ! test -x /sbin/halt ; then
-		mount -n -tproc none /proc
+		test -e /proc/sysrq-trigger || mount -n -tproc none /proc
 		sync
 		sleep 2	# like halt does
-		test -e /proc/sysrq-trigger && echo o > /proc/sysrq-trigger
+		if test -e /proc/sysrq-trigger; then
+		    echo o > /proc/sysrq-trigger
+		    sleep 5 # wait for sysrq to take effect
+		else
+		    echo "Warning: VM doesn't support sysrq and /sbin/halt not installed"
+		fi
+	    else
+		halt -f -p
 	    fi
-	    halt -f -p
-	    echo "wtf? I'm still alive. File a bug as I wanted to die!"
+	    echo "Warning: clean shut down of the VM didn't work"
 	fi
     else
 	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
