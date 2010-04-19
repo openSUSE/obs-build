@@ -13,9 +13,9 @@ mkdir -p %buildroot/etc
 cp /etc/shells %buildroot/etc/foo
 
 %description
-%_target_cpu
-%_arch
-%_build_arch
+target_cpu %_target_cpu
+arch       %_arch
+build_arch %_build_arch
 
 %files
 %defattr(-,root,root)
