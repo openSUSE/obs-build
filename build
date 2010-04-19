@@ -76,7 +76,6 @@ PERSONALITY_SYSCALL=
 INCARNATION=
 DISTURL=
 LINKSOURCES=
-CHANGETARGET=
 OVERLAY=
 RSYNCSRC=
 RSYNCDEST=
@@ -1616,13 +1615,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	# extract optflags from configuration
 	getoptflags --dist "$BUILD_DIST" --configdir "$BUILD_DIR/configs" --archpath "$BUILD_ARCH" ${BUILD_DEBUG:+--debug} > $BUILD_ROOT/root/.rpmrc
 	test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/.rpmrc $BUILD_ROOT/home/abuild/.rpmrc
-	# case arm, extract changetarget
-	# this is restricted to arm to make sure it doesn't interfere with x86
-	if [ "$BUILD_ARCH" != "${BUILD_ARCH#arm}" ]; then
-	    echo "changing targetarch"
+	if test -z "$ABUILD_TARGET_ARCH"; then
 	    chmod a+x $BUILD_DIR/getchangetarget || cleanup_and_exit 1
-	    CHANGETARGET=$(getchangetarget --dist "$BUILD_DIST" --configdir "$BUILD_DIR/configs" --archpath "$BUILD_ARCH" )
-	    echo "NEW TARGET: $CHANGETARGET"
+	    ABUILD_TARGET_ARCH=$(getchangetarget --dist "$BUILD_DIST" --configdir "$BUILD_DIR/configs" --archpath "$BUILD_ARCH" )
+	    test -z "$ABUILD_TARGET_ARCH" || echo "changing target arch to $ABUILD_TARGET_ARCH"
 	fi
     fi
     if test -f $BUILD_ROOT/.spec.new ; then
@@ -1741,10 +1737,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if [ -n "$BUILD_DEBUG" ]; then
 		rpmbopts[${#rpmbopts[@]}]='--eval'
 		rpmbopts[${#rpmbopts[@]}]="%suse_insert_debug_package"
-	fi
-	if [ -n "$CHANGETARGET" ]; then
-		rpmbopts[${#rpmbopts[@]}]='--target'
-		rpmbopts[${#rpmbopts[@]}]="$CHANGETARGET"
 	fi
 	if [ -n "$RSYNCDONE" ] ; then
 		rpmbopts[${#rpmbopts[@]}]='--define'
