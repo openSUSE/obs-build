@@ -1236,7 +1236,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		# remove setuid bit if files belong to user to make e.g. mount work
 		find $BUILD_ROOT/{bin,sbin,usr/bin,usr/sbin} -type f -uid $UID -perm +4000 -print0 | xargs -0 --no-run-if-empty chmod -s
 	    fi
-	    if [ -d "$OLD_PACKAGES" ]; then
+	    if [ -d "$OLD_PACKAGES" -a "$OLD_PACKAGES" != "$BUILD_ROOT/.build.oldpackages" ] ; then
 	       rm -rf $BUILD_ROOT/.build.oldpackages
 	       cp -a $OLD_PACKAGES $BUILD_ROOT/.build.oldpackages
 	    fi
