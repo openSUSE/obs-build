@@ -934,6 +934,18 @@ if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
 	qemu_kernel="$VM_KERNEL"
     fi
 
+    # check if a SUSE system with virtio initrd is running
+    if [ -z "$VM_INITRD" -a -e /etc/sysconfig/kernel ]; then
+       a=$( source /etc/sysconfig/kernel; echo $INITRD_MODULES )
+       have_virtio_pci=""
+       have_virtio_blk=""
+       for i in $a; do
+          [ "$i" == "virtio_pci" ] && have_virtio_pci="1"
+          [ "$i" == "virtio_blk" ] && have_virtio_blk="1"
+       done
+       [ -n "$have_virtio_pci" -a -n "$have_virtio_blk" ] && VM_INITRD="/boot/initrd"
+    fi
+
     if [ -n "$VM_INITRD" ]; then
 	qemu_initrd="$VM_INITRD"
 	kvm_virtio=1
