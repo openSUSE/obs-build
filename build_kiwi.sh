@@ -229,7 +229,7 @@ sha256sum "$imageout$buildnum-$imgtype.tar.bz2" > "$imageout$buildnum-$imgtype.t
 EOF
 		    ;;
 	    esac
-	    chroot $BUILD_ROOT su -c "sh -e -x /kiwi_post.sh" || cleanup_and_exit 1
+	    chroot $BUILD_ROOT su -c "sh -e /kiwi_post.sh" || cleanup_and_exit 1
 	    rm -f $BUILD_ROOT/kiwi_post.sh
 	done
     fi
