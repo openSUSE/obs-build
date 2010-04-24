@@ -181,6 +181,8 @@ sub print_rpmlist
   }
   print "preinstall: @{$cf->{'preinstall'} || []}\n";
   print "vminstall: @{$cf->{'vminstall'} || []}\n";
+  print "cbpreinstall: @{$cf->{'cbpreinstall'} || []}\n"; # preinstall if is_emulator_arch
+  print "cbinstall: @{$cf->{'cbinstall'} || []}\n";       # install if is_emulator_arch
   print "runscripts: @{$cf->{'runscripts'} || []}\n";
   print "dist: $dist\n" if defined $dist;
 }

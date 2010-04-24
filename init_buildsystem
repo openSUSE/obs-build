@@ -493,6 +493,7 @@ else
 	while read PKG SRC ; do
 	   test "$PKG" = "preinstall:" && continue
 	   test "$PKG" = "runscripts:" && continue
+	   test "$PKG" = "cbpreinstall:" && continue
 	   test "$PKG" = "vminstall:" && continue
 	   test "$PKG" = "dist:" && continue
 	   test "$PKG" = "rpmid:" && continue
@@ -523,6 +524,8 @@ else
     PACKAGES_TO_PREINSTALL=
     PACKAGES_TO_RUNSCRIPTS=
     PACKAGES_TO_VMINSTALL=
+    PACKAGES_TO_CBPREINSTALL=
+    PACKAGES_TO_CBINSTALL=
     RUNSCRIPTS_SEEN=
     GUESSED_DIST=unknown
     mkdir -p $BUILD_ROOT/.init_b_cache/rpms
@@ -533,6 +536,20 @@ else
 	fi
 	if test "$PKG" = "vminstall:" ; then
 	    PACKAGES_TO_VMINSTALL=$SRC
+	    continue
+	fi
+	# these additional preinstall / install values are only set for 
+	# emulated "CrossBuild" setups - thus CB(pre)install
+	if test "$PKG" = "cbpreinstall:" ; then
+	    if is_emulator_arch ; then
+		PACKAGES_TO_CBPREINSTALL=$SRC
+	    fi
+	    continue
+	fi
+	if test "$PKG" = "cbinstall:" ; then
+	    if is_emulator_arch ; then
+		PACKAGES_TO_CBINSTALL=$SRC
+	    fi
 	    continue
 	fi
 	if test "$PKG" = "runscripts:" ; then
@@ -565,6 +582,8 @@ else
 	PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $PKG"
     done < $RPMLIST
 
+    test -n "$PACKAGES_TO_CBPREINSTALL" && echo "cbpreinstall: $PACKAGES_TO_CBPREINSTALL"
+    test -n "$PACKAGES_TO_CBINSTALL" && echo "cbinstall   : $PACKAGES_TO_CBINSTALL"
     # compatibility...
     test -z "$RUNSCRIPTS_SEEN" && PACKAGES_TO_RUNSCRIPTS="$PACKAGES_TO_PREINSTALL"
 
@@ -603,6 +622,10 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
 	    preinstall ${PKG##*/}
 	done
     fi
+    # add cbpreinstall if cross HOST != TARGET
+    for PKG in $PACKAGES_TO_CBPREINSTALL ; do
+        preinstall ${PKG##*/}
+    done
     if [ -w /root ]; then
 	    test -c $BUILD_ROOT/dev/null || create_devs
     fi
@@ -708,7 +731,7 @@ for PKG in $BUILD_ROOT/.init_b_cache/alreadyinstalled/* ; do
     test "$PKG" = "*" && continue
     ln $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG $BUILD_ROOT/.init_b_cache/todelete/$PKG
 done
-for PKG in $PACKAGES_TO_INSTALL_FIRST $PACKAGES_TO_INSTALL ; do
+for PKG in $PACKAGES_TO_INSTALL_FIRST $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL ; do
     rm -f $BUILD_ROOT/.init_b_cache/todelete/$PKG
 done
 for PKG in $BUILD_ROOT/.init_b_cache/todelete/* ; do
@@ -722,7 +745,7 @@ rm -rf $BUILD_ROOT/.init_b_cache/todelete
 
 rm -rf $BUILD_ROOT/.init_b_cache/preinstalls
 mkdir -p $BUILD_ROOT/.init_b_cache/preinstalls
-for PKG in $PACKAGES_TO_PREINSTALL ; do
+for PKG in $PACKAGES_TO_PREINSTALL $PACKAGES_TO_CBPREINSTALL; do
     touch "$BUILD_ROOT/.init_b_cache/preinstalls/$PKG"
 done
 
@@ -736,7 +759,7 @@ RPMCHECKOPTS_HOST=
 test -x $BUILD_ROOT/usr/bin/rpmsign && RPMCHECKOPTS="--nodigest --nosignature"
 test -x /usr/bin/rpmsign && RPMCHECKOPTS_HOST="--nodigest --nosignature"
 
-for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
+for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL; do
 
     case $PKG in
       RUN_LDCONFIG)
@@ -801,7 +824,10 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL ; do
 	fi
 	if test -e "$BUILD_ROOT/.init_b_cache/preinstalls/$PKG" ; then
 	    preinstall "$PKG"
-	    test rpm = "$PKG" && chroot $BUILD_ROOT rpm --rebuilddb
+	    # call for rpm-4.x and not rpm-devel
+	    test -z "${PKG##rpm-[0-9]*}" && chroot $BUILD_ROOT rpm --rebuilddb
+	    # also exec for exchanged rpm !  naming is rpm-x86-<target>-<ver>
+	    test -z "${PKG##rpm-x86-*[0-9]*}" && chroot $BUILD_ROOT rpm --rebuilddb
 	fi
     fi
     export ADDITIONAL_PARAMS=
