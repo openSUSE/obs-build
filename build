@@ -1456,7 +1456,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	fi
 	mount -n -tproc none $BUILD_ROOT/proc || true
 	mount -n -tdevpts none $BUILD_ROOT/dev/pts
-	if [ -d "$OLD_PACKAGES" ]; then
+	if [ -d "$OLD_PACKAGES" -a "$OLD_PACKAGES" != "$BUILD_ROOT/.build.oldpackages" ] ; then
 	   rm -rf "$BUILD_ROOT/.build.oldpackages"
 	   cp -r $OLD_PACKAGES $BUILD_ROOT/.build.oldpackages
 	fi
