@@ -324,9 +324,11 @@ copy_qemu()
     # To initially run the init script, there needs to be also a
     # static bash to register qemu in this chroot and to start up
     # /.build/build
-    mkdir -p  $BUILD_ROOT/bin
-    install -m755 /bin/bash-static $BUILD_ROOT/bin
-    install -m755 /bin/mount-static $BUILD_ROOT/bin
+    if [ -n "$PREPARE_VM" ]; then
+	mkdir -p  $BUILD_ROOT/bin
+	install -m755 /bin/bash-static $BUILD_ROOT/bin
+	install -m755 /bin/mount-static $BUILD_ROOT/bin
+    fi
 }
 
 check_binfmt_registered()

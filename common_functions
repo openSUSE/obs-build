@@ -55,6 +55,10 @@ check_use_emulator()
 {
     is_emulator_arch || return
 
+    if [ -z "$VM_TYPE" ]; then
+	return 0
+    fi
+
     # to run the qemu initialization in the XEN chroot, we need to register it with a statically build shell
     case "$BUILD_HOST_ARCH" in
 	i?86|x86_64)
