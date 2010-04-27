@@ -1851,6 +1851,7 @@ if test -n "$RPMS" -a "$DO_CHECKS" != "false" -a -x "$BUILD_ROOT/opt/testing/bin
     echo "RPMLINT report:"
     echo "==============="
     chroot $BUILD_ROOT /opt/testing/bin/rpmlint --info ${LINT_RPM_FILE_LIST[*]#$BUILD_ROOT} ${SRPM_FILE_LIST[*]#$BUILD_ROOT} || cleanup_and_exit 1
+    echo
 fi
 
 if test \( -n "$RPMS" -o -n "$DEBS" \) -a -n "$CREATE_BASELIBS" -a \( -d "$BUILD_ROOT/$TOPDIR/RPMS" -o -d "$BUILD_ROOT/$TOPDIR/DEBS" \)  ; then
