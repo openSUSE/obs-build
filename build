@@ -444,8 +444,7 @@ function create_baselibs {
 	if test -z "$BASELIBS_CFG" -a -e $BUILD_ROOT/usr/lib/build/baselibs.conf ; then
 	    BASELIBS_CFG="-c /usr/lib/build/baselibs.conf"
 	fi
-	echo "RUNNING internal mkbaselibs ... "
-	chroot $BUILD_ROOT su -c "/usr/lib/build/mkbaselibs -v $BASELIBS_GLOBAL $BASELIBS_CFG $BPKGS" - $BUILD_USER || cleanup_and_exit 1
+	chroot $BUILD_ROOT su -c "/usr/lib/build/mkbaselibs $BASELIBS_GLOBAL $BASELIBS_CFG $BPKGS" - $BUILD_USER || cleanup_and_exit 1
     else
 	# use external version
 	rm -rf $BUILD_ROOT/.mkbaselibs
