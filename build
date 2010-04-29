@@ -909,6 +909,11 @@ while test -n "$1"; do
     esac
 done
 
+if test "$VM_TYPE" = "lxc"; then
+    VM_IMAGE=''
+    VM_SWAP=''
+fi
+
 test -n "$CACHE_DIR" ||  CACHE_DIR=/var/cache/build
 
 if test -n "$KILL" ; then
