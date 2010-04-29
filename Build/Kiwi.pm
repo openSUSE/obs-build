@@ -203,7 +203,11 @@ sub kiwiparse {
     }
 
     # not nice, but optimizes our build dependencies
-    next if $package->{'onlyarch'} && $package->{'onlyarch'} eq "skipit";
+    # FIXME: design a real blacklist option in kiwi
+    if ($package->{'onlyarch'} && $package->{'onlyarch'} eq "skipit") {
+       push @packages, "-".$package->{'name'};
+       next;
+    }
 
     # we need this package
     push @packages, $package->{'name'};
