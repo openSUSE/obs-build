@@ -8,7 +8,7 @@ use strict;
 
 use Build;
 
-my ($dist, $archs, $configdir, $debug);
+my ($dist, $archs, $configdir);
 
 while (@ARGV)  {
   if ($ARGV[0] eq '--dist') {
@@ -26,18 +26,10 @@ while (@ARGV)  {
     $configdir = shift @ARGV;
     next;
   }
-  if ($ARGV[0] eq '--debug') {
-    shift @ARGV;
-    $debug = 1;
-    next;
-  }
   last;
 }
 
-die("Usage: getchangetargetarch --dist <dist> --archpath <archpath> [--configdir <configdir>]\n") if @ARGV;
+die("Usage: getchangetarget --dist <dist> --archpath <archpath> [--configdir <configdir>]\n") if @ARGV;
 
 my $cf = Build::read_config_dist($dist, $archs, $configdir);
-exit 0 unless $cf->{'changetarget'};
-my $target = $cf->{'changetarget'};
-$target = defined($target) && $target ne '' ? "$target" : '';
-print "$target";
+print "$cf->{'target'}\n" if $cf->{'target'};

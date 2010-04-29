@@ -216,8 +216,8 @@ sub read_config {
       $config->{'release'} = $l[0];
     } elsif ($l0 eq 'releaseprg:') {
       $config->{'releaseprg'} = $l[0];
-    } elsif ($l0 eq 'changetarget:') {
-      $config->{'changetarget'} = join(' ', @l);
+    } elsif ($l0 eq 'changetarget:' || $l0 eq 'target:') {
+      $config->{'target'} = join(' ', @l);
     } elsif ($l0 !~ /^[#%]/) {
       warn("unknown keyword in config: $l0\n");
     }
