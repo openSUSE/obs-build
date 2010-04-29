@@ -647,9 +647,18 @@ export PATH=$BUILD_DIR:/sbin:/usr/sbin:$PATH
 
 export HOST
 
+needarg()
+{
+  if [ -z "$ARG" ]; then
+    echo "$PARAM needs an agrument" >&2
+    cleanup_and_exit 1
+  fi
+}
+
 while test -n "$1"; do
   PARAM="$1"
   ARG="$2"
+  [ "$ARG" = "${ARG#-}" ] || ARG=""
   shift
   case $PARAM in
     *-*=*)
@@ -675,14 +684,12 @@ while test -n "$1"; do
 	KILL=true
       ;;
       *-rpms)
+	needarg
 	BUILD_RPMS="$ARG"
-	if [ -z "$BUILD_RPMS" ] ; then
-	  echo_help
-	  cleanup_and_exit
-	fi
 	shift
       ;;
       *-arch)
+	needarg
 	BUILD_ARCH="$ARG"
 	shift
       ;;
@@ -690,14 +697,17 @@ while test -n "$1"; do
 	export VERIFY_BUILD_SYSTEM=true
       ;;
       *-target)
+	needarg
 	ABUILD_TARGET="$ARG"
 	shift
       ;;
       *-jobs)
+	needarg
 	BUILD_JOBS="$ARG"
 	shift
       ;;
       *-extra*packs|-X)
+	needarg
 	BUILD_EXTRA_PACKS="$BUILD_EXTRA_PACKS $ARG"
 	shift
       ;;
@@ -711,25 +721,29 @@ while test -n "$1"; do
 	CREATE_BASELIBS=internal
 	;;
       *-root)
+	needarg
 	BUILD_ROOT="$ARG"
 	shift
       ;;
       *-cachedir)
+	needarg
 	CACHE_DIR="$ARG"
 	shift
       ;;
       *-oldpackages)
+	needarg
 	OLD_PACKAGES="$ARG"
 	shift
       ;;
       *-dist)
+	needarg
 	BUILD_DIST="$ARG"
 	export BUILD_DIST
 	shift
       ;;
       *-xen|*-kvm|--uml|--qemu)
 	VM_TYPE=${PARAM##*-}
-	if [ -n "$ARG" -a "$ARG" = "${ARG#-}" ]; then
+	if [ -n "$ARG" ]; then
 	    VM_IMAGE="$ARG"
 	    shift
 	else
@@ -740,47 +754,58 @@ while test -n "$1"; do
 	VM_TYPE=${PARAM##*-}
       ;;
       *-xenswap|*-swap)
+	needarg
 	VM_SWAP="$ARG"
 	shift
       ;;
       *-xenmemory|*-memory)
+	needarg
 	MEMSIZE="$ARG"
 	shift
       ;;
       *-vm-kernel)
+	needarg
 	VM_KERNEL="$ARG"
 	shift
       ;;
       *-vm-initrd)
+	needarg
 	VM_INITRD="$ARG"
 	shift
       ;;
       *-vmdisk-rootsize)
+	needarg
 	VMDISK_ROOTSIZE="$ARG"
 	shift
       ;;
       *-vmdisk-swapsize)
+	needarg
 	VMDISK_SWAPSIZE="$ARG"
 	shift
       ;;
       *-vmdisk-filesystem)
+	needarg
 	VMDISK_FILESYSTEM="$ARG"
 	shift
       ;;
       *-rpmlist)
+	needarg
 	RPMLIST="--rpmlist $ARG"
 	BUILD_RPMS=
 	shift
       ;;
       *-release)
+	needarg
 	RELEASE="$ARG"
 	shift
       ;;
       *-logfile)
+	needarg
 	LOGFILE="$ARG"
 	shift
       ;;
       *-reason)
+	needarg
 	REASON="$ARG"
 	shift
       ;;
@@ -788,6 +813,7 @@ while test -n "$1"; do
 	NOROOTFORBUILD=true
       ;;
       *-stage)
+	needarg
 	BUILD_RPM_BUILD_STAGE="$ARG"
 	shift
       ;;
@@ -798,25 +824,19 @@ while test -n "$1"; do
 	LIST_STATE=true
       ;;
       --define|--with|--without)
+	needarg
 	definesnstuff[${#definesnstuff[@]}]="$PARAM";
 	definesnstuff[${#definesnstuff[@]}]="$ARG";
 	shift
       ;;
       --repository|--repo)
-	if [ -z "$ARG" ] ; then
-	  echo_help
-	  cleanup_and_exit
-	fi
+	needarg
 	repos[${#repos[@]}]="$PARAM";
 	repos[${#repos[@]}]="$ARG";
 	shift
       ;;
       --icecream)
-	if [ -z "$ARG" ] ; then
-	  echo "--icecream needs an argument" >&2
-	  echo_help
-	  cleanup_and_exit 1
-	fi
+	needarg
 	icecream="$ARG"
 	if [ "$icecream" -gt 0 ]; then
 		BUILD_JOBS="$ARG"
@@ -830,10 +850,12 @@ while test -n "$1"; do
 	BUILD_DEBUG=1
       ;;
       --incarnation)
+	needarg
 	INCARNATION=$ARG
 	shift
       ;;
       --disturl)
+	needarg
 	DISTURL=$ARG
 	shift
       ;;
@@ -848,18 +870,22 @@ while test -n "$1"; do
 	CHANGELOG=true
       ;;
       --overlay)
+	needarg
 	OVERLAY=$ARG
 	shift
       ;;
       --rsync-src)
+	needarg
 	RSYNCSRC=$ARG
 	shift
       ;;
       --rsync-dest)
+	needarg
 	RSYNCDEST=$ARG
 	shift
       ;;
       --uid)
+	needarg
 	ABUILD_ID="$ARG"
 	if test -n "${ABUILD_ID//[0-9:]/}"; then
 	    echo "--uid argument must be uid:gid"
