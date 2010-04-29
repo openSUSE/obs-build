@@ -81,6 +81,7 @@ RSYNCSRC=
 RSYNCDEST=
 RSYNCDONE=
 : ${EMULATOR_ARCHS:="armv4l armv5el armv6el armv7el sh4 ppc ppc64 mips mipsel"}
+: ${CACHE_DIR:=/var/cache/build}
 
 export EMULATOR_ARCHS
 
@@ -930,8 +931,6 @@ if test "$VM_TYPE" = "lxc"; then
     VM_IMAGE=''
     VM_SWAP=''
 fi
-
-test -n "$CACHE_DIR" ||  CACHE_DIR=/var/cache/build
 
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
