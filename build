@@ -753,6 +753,23 @@ while test -n "$1"; do
       --lxc)
 	VM_TYPE=${PARAM##*-}
       ;;
+      --vm-type)
+	needarg
+	VM_TYPE="$ARG"
+	case "$VM_TYPE" in
+	    xen|kvm|uml|qemu|lxc) ;;
+	    *)
+		echo "VM $VM_TYPE not supported"
+		cleanup_and_exit
+	    ;;
+	esac
+	shift
+      ;;
+      --vm-disk)
+	needarg
+	VM_IMAGE="$ARG"
+	shift
+      ;;
       *-xenswap|*-swap)
 	needarg
 	VM_SWAP="$ARG"
