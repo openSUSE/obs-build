@@ -213,14 +213,27 @@ Known Parameters:
               This is useful if you are hacking in the buildroot.
               This must be set to the same value if the buildroot is re-used.
 
-  --vmdisk-rootsize   <size in MB>
-  --vmdisk-swapsize   <size in MB>
-  --vmdisk-filesystem <ext3|ext4>  
+  --vm-type TYPE
+              Use virtual machine instead of chroot
+              TYPE is one of xen|kvm|uml|qemu|lxc
+
+  --vm-disk FILE
+              Use FILE as disk for virtual machine.
+              Defaults to \$BUILD_ROOT.img if unset
+
+  --vm-swap FILE
+              Use FILE as swap space for virtual machine. The swap space is
+              also used for retrieving packages from the VM so it's size must be
+              sufficiently large
+
+  --vm-disk-size SIZEINMB
+  --vm-swap-size SIZEINMB
+  --vm-disk-filesystem TYPE
               Defaults for automatic setup of VM root/swap files
 
-  --vm-kernel 
-  --vm-initrd
-              Kernel and initrd to use for VM build.
+  --vm-kernel FILE
+  --vm-initrd FILE
+              Kernel and initrd to use for VM (kvm and qemu only)
 
   --debug
               enable creation of a debuginfo package
@@ -759,6 +772,7 @@ while test -n "$1"; do
 	VM_TYPE="$ARG"
 	case "$VM_TYPE" in
 	    xen|kvm|uml|qemu|lxc) ;;
+	    none|chroot) VM_TYPE='' ;;
 	    *)
 		echo "VM $VM_TYPE not supported"
 		cleanup_and_exit
@@ -791,17 +805,17 @@ while test -n "$1"; do
 	VM_INITRD="$ARG"
 	shift
       ;;
-      *-vmdisk-rootsize)
+      *-vmdisk-rootsize|--vm-disk-size)
 	needarg
 	VMDISK_ROOTSIZE="$ARG"
 	shift
       ;;
-      *-vmdisk-swapsize)
+      *-vmdisk-swapsize|--vm-swap-size)
 	needarg
 	VMDISK_SWAPSIZE="$ARG"
 	shift
       ;;
-      *-vmdisk-filesystem)
+      *-vmdisk-filesystem|--vm-disk-filesystem)
 	needarg
 	VMDISK_FILESYSTEM="$ARG"
 	shift
