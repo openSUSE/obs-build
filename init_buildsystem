@@ -565,6 +565,10 @@ else
 	    echo "${SRC#*:}" > $BUILD_ROOT/.init_b_cache/rpms/${SRC%%:*}.id
 	    continue
 	fi
+	if test "$PKG" != "${PKG%:}"; then
+	    echo "Warning: ignoring unsupported tag '$PKG'" >&2
+	    continue
+	fi
 	if [ "${SRC#/}" = "$SRC" ]; then
 	    url="$SRC"
 	    case "$url" in
@@ -572,7 +576,7 @@ else
 		    downloadpkg "$url"
 		    ;;
 		*)
-		    echo "unsupported url: $url" >&2
+		    echo "unsupported url for '$PKG': $url" >&2
 		    cleanup_and_exit 1
 		    ;;
 	    esac
