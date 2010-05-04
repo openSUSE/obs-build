@@ -122,73 +122,75 @@ function clean_build_root () {
 	}
 }
 
-function preinstall {
+preinstall()
+{
     check_exit
-    if test -n "$1" ; then
-	echo "preinstalling $1..."
-	cd $BUILD_ROOT || cleanup_and_exit 1
-	CPIO="cpio --extract --unconditional --preserve-modification-time --make-directories --no-absolute-filenames --quiet"
-	if test -e "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" ; then
-	    PAYLOADDECOMPRESS=cat
-	    case `rpm -qp --nodigest --nosignature --qf "%{PAYLOADCOMPRESSOR}\n" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm"` in
-		lzma) rpm --showrc | grep PayloadIsLzma > /dev/null || PAYLOADDECOMPRESS="lzma -d" ;;
-		xz) rpm --showrc | grep PayloadIsXz > /dev/null || PAYLOADDECOMPRESS="xz -d" ;;
-	    esac
-	    if test "$PAYLOADDECOMPRESS" = "lzma -d" ; then
-		if ! lzma </dev/null >/dev/null 2>&1 ; then
-		    test -f "$BUILD_DIR/lzmadec.sh" && PAYLOADDECOMPRESS="bash $BUILD_DIR/lzmadec.sh"
-		fi
+    echo "preinstalling $1..."
+    cd $BUILD_ROOT || cleanup_and_exit 1
+    CPIO="cpio --extract --unconditional --preserve-modification-time --make-directories --no-absolute-filenames --quiet"
+    if test -e "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" ; then
+	PAYLOADDECOMPRESS=cat
+	case `rpm -qp --nodigest --nosignature --qf "%{PAYLOADCOMPRESSOR}\n" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm"` in
+	    lzma) rpm --showrc | grep PayloadIsLzma > /dev/null || PAYLOADDECOMPRESS="lzma -d" ;;
+	    xz) rpm --showrc | grep PayloadIsXz > /dev/null || PAYLOADDECOMPRESS="xz -d" ;;
+	esac
+	if test "$PAYLOADDECOMPRESS" = "lzma -d" ; then
+	    if ! lzma </dev/null >/dev/null 2>&1 ; then
+		test -f "$BUILD_DIR/lzmadec.sh" && PAYLOADDECOMPRESS="bash $BUILD_DIR/lzmadec.sh"
 	    fi
-	    if test "$PAYLOADDECOMPRESS" = cat ; then
-		rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" | $CPIO
-	    else
-		rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" | $PAYLOADDECOMPRESS | $CPIO
-	    fi
-	    if test -e .init_b_cache/scripts/$1.run ; then
-		rpm -qp --nodigest --nosignature --qf "%{PREIN}" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" > .init_b_cache/scripts/$1.pre
-		rpm -qp --nodigest --nosignature --qf "%{POSTIN}" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" > .init_b_cache/scripts/$1.post
-		echo -n '(none)' > .init_b_cache/scripts/.none
-		cmp -s .init_b_cache/scripts/$1.pre .init_b_cache/scripts/.none && rm -f .init_b_cache/scripts/$1.pre
-		cmp -s .init_b_cache/scripts/$1.post .init_b_cache/scripts/.none && rm -f .init_b_cache/scripts/$1.post
-		rm -f .init_b_cache/scripts/.none
-	    fi
-	elif test -e "$BUILD_ROOT/.init_b_cache/rpms/$1.deb" ; then
-	    ar x "$BUILD_ROOT/.init_b_cache/rpms/$1.deb" control.tar.gz data.tar.gz
-	    mkdir -p .init_b_cache/scripts/control
-	    tar -C .init_b_cache/scripts/control -xzf control.tar.gz
-	    tar xzf data.tar.gz
-	    if test -e .init_b_cache/scripts/$1.run ; then
-		test -e .init_b_cache/scripts/control/preinst && mv .init_b_cache/scripts/control/preinst .init_b_cache/scripts/$1.pre
-		test -e .init_b_cache/scripts/control/postinst && mv .init_b_cache/scripts/control/postinst .init_b_cache/scripts/$1.post
-	    fi
-	    rm -rf .init_b_cache/scripts/control control.tar.gz data.tar.gz
-	else
-	    echo "warning: package $1 does not exist"
 	fi
+	if test "$PAYLOADDECOMPRESS" = cat ; then
+	    rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" | $CPIO
+	else
+	    rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" | $PAYLOADDECOMPRESS | $CPIO
+	fi
+	if test -e .init_b_cache/scripts/$1.run ; then
+	    rpm -qp --nodigest --nosignature --qf "%{PREIN}" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" > .init_b_cache/scripts/$1.pre
+	    rpm -qp --nodigest --nosignature --qf "%{POSTIN}" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" > .init_b_cache/scripts/$1.post
+	    echo -n '(none)' > .init_b_cache/scripts/.none
+	    cmp -s .init_b_cache/scripts/$1.pre .init_b_cache/scripts/.none && rm -f .init_b_cache/scripts/$1.pre
+	    cmp -s .init_b_cache/scripts/$1.post .init_b_cache/scripts/.none && rm -f .init_b_cache/scripts/$1.post
+	    rm -f .init_b_cache/scripts/.none
+	fi
+    elif test -e "$BUILD_ROOT/.init_b_cache/rpms/$1.deb" ; then
+	ar x "$BUILD_ROOT/.init_b_cache/rpms/$1.deb" control.tar.gz data.tar.gz
+	mkdir -p .init_b_cache/scripts/control
+	tar -C .init_b_cache/scripts/control -xzf control.tar.gz
+	tar xzf data.tar.gz
+	if test -e .init_b_cache/scripts/$1.run ; then
+	    test -e .init_b_cache/scripts/control/preinst && mv .init_b_cache/scripts/control/preinst .init_b_cache/scripts/$1.pre
+	    test -e .init_b_cache/scripts/control/postinst && mv .init_b_cache/scripts/control/postinst .init_b_cache/scripts/$1.post
+	fi
+	rm -rf .init_b_cache/scripts/control control.tar.gz data.tar.gz
+    else
+	echo "warning: package $1 does not exist"
     fi
-    if test -n "$2" ; then
-	chroot $BUILD_ROOT /sbin/ldconfig 2>/dev/null
-	for PKG in $PACKAGES_TO_RUNSCRIPTS ; do
-	    if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre" ; then
-		echo "running $PKG preinstall script"
-		if test -e "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" ; then
-		    chroot $BUILD_ROOT sh ".init_b_cache/scripts/$PKG.pre" 0
-		else
-		    chroot $BUILD_ROOT ".init_b_cache/scripts/$PKG.pre" install < /dev/null
-		fi
-		rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre"
+}
+
+run_pkg_scripts()
+{
+    chroot $BUILD_ROOT /sbin/ldconfig 2>/dev/null
+    for PKG in $PACKAGES_TO_RUNSCRIPTS ; do
+	if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre" ; then
+	    echo "running $PKG preinstall script"
+	    if test -e "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" ; then
+		chroot $BUILD_ROOT sh ".init_b_cache/scripts/$PKG.pre" 0
+	    else
+		chroot $BUILD_ROOT ".init_b_cache/scripts/$PKG.pre" install < /dev/null
 	    fi
-	    if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post" ; then
-		echo "running $PKG postinstall script"
-		if test -e "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" ; then
-		    chroot $BUILD_ROOT sh ".init_b_cache/scripts/$PKG.post" 1
-		else
-		    chroot $BUILD_ROOT ".init_b_cache/scripts/$PKG.post" configure '' < /dev/null
-		fi
-		rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post"
+	    rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre"
+	fi
+	if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post" ; then
+	    echo "running $PKG postinstall script"
+	    if test -e "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" ; then
+		chroot $BUILD_ROOT sh ".init_b_cache/scripts/$PKG.post" 1
+	    else
+		chroot $BUILD_ROOT ".init_b_cache/scripts/$PKG.post" configure '' < /dev/null
 	    fi
-	done
-    fi
+	    rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post"
+	fi
+	check_exit
+    done
 }
 
 function init_db {
@@ -459,7 +461,7 @@ if test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
     . $BUILD_ROOT/.build/init_buildsystem.data
     if ! test -e $BUILD_ROOT/.init_b_cache/preinstall_finished ; then
 	# finish preinstall
-	preinstall '' true
+	run_pkg_scripts
 	init_db
 	touch $BUILD_ROOT/.init_b_cache/preinstall_finished
     fi
@@ -636,7 +638,7 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
     test -e $BUILD_ROOT/etc/fstab || touch $BUILD_ROOT/etc/fstab
     test -e $BUILD_ROOT/etc/ld.so.conf || cp $BUILD_ROOT/etc/ld.so.conf.in $BUILD_ROOT/etc/ld.so.conf
     if test -z "$PREPARE_VM" ; then
-	preinstall '' true
+	run_pkg_scripts
 	init_db
 	touch $BUILD_ROOT/.init_b_cache/preinstall_finished
     fi
