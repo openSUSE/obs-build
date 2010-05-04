@@ -338,7 +338,7 @@ setupccache()
 	    done
 	fi
 	mkdir -p "$BUILD_ROOT"/.ccache
-	chroot "$BUILD_ROOT" chown -R "$BUILD_USER" "/.ccache"
+	chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.ccache"
 	echo "export CCACHE_DIR=/.ccache" > "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
 	echo 'export PATH=/var/lib/build/ccache/bin:$PATH' >> "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
     else
@@ -1562,7 +1562,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    echo 'abuild:*::' >>$BUILD_ROOT/etc/gshadow # This is needed on Ubuntu
 	    echo "abuild::${ABUILD_GID}:" >>$BUILD_ROOT/etc/group
 	    mkdir -p $BUILD_ROOT/home/abuild
-	    chown ${ABUILD_UID}:${ABUILD_GID} $BUILD_ROOT/home/abuild
+	    chown "$ABUILD_UID:$ABUILD_GID" $BUILD_ROOT/home/abuild
 	else
 	    if ! egrep "^abuild::${ABUILD_UID}:${ABUILD_GID}" >/dev/null <$BUILD_ROOT/etc/passwd ; then
 		echo "abuild user present in the buildroot ($BUILD_ROOT) but uid:gid does not match"
@@ -1582,6 +1582,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	fi
 	BUILD_USER_ABUILD_USED=true
     else
+	# building as root
+	ABUILD_UID=0
+	ABUILD_GID=0
 	if egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
 	    rm -rf $BUILD_ROOT/home/abuild
 	    egrep -v '^abuild:' <$BUILD_ROOT/etc/passwd >$BUILD_ROOT/etc/passwd.new
@@ -1632,8 +1635,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     rm -rf $BUILD_ROOT$TOPDIR
     for i in BUILD RPMS/`uname -m` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS BUILDROOT; do
 	mkdir -p $BUILD_ROOT$TOPDIR/$i
-	test $BUILD_USER = abuild && chown ${ABUILD_UID}:${ABUILD_GID} $BUILD_ROOT$TOPDIR/$i
     done
+    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
     check_exit
 
     mkdir -p $BUILD_ROOT$TOPDIR/SOURCES
@@ -1712,7 +1715,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     if test "$BUILDTYPE" = dsc ; then
 	rm -rf $BUILD_ROOT$TOPDIR/BUILD
 	mkdir -p $BUILD_ROOT$TOPDIR/SOURCES.DEB
-	test $BUILD_USER = abuild && chown -R ${ABUILD_UID}:${ABUILD_GID} $BUILD_ROOT$TOPDIR
+	chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
 	DEB_TRANSFORM=
 	DEB_SOURCEDIR=$TOPDIR/SOURCES
 	DEB_DSCFILE=$SPECFILE
@@ -1732,11 +1735,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	chroot $BUILD_ROOT su -c "dpkg-source -x $DEB_SOURCEDIR/$DEB_DSCFILE $TOPDIR/BUILD" - $BUILD_USER
     fi
 
-    if test $BUILD_USER = abuild ; then
-	chown -R ${ABUILD_UID}:${ABUILD_GID} $BUILD_ROOT$TOPDIR/*
-    else
-	chown -R root:root $BUILD_ROOT$TOPDIR/*
-    fi
+    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
     cd $BUILD_ROOT$TOPDIR/SOURCES || cleanup_and_exit 1
 
     echo -----------------------------------------------------------------
@@ -1781,7 +1780,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		fi
 		echo "Running rsync ..."
 		rsync -av $RSYNCSRC/* $BUILD_ROOT/$RSYNCDEST/
-		chown -R ${ABUILD_UID}:${ABUILD_GID} $BUILD_ROOT/$RSYNCDEST
+		chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/$RSYNCDEST"
 		RSYNCDONE=true
 		echo "... done"
 	    else
@@ -1924,7 +1923,7 @@ if test \( -n "$RPMS" -o -n "$DEBS" \) -a -n "$CREATE_BASELIBS" -a \( -d "$BUILD
     # (and force distro version if CREATE_BASELIBS=internal)
     if test -f $BUILD_ROOT/usr/lib/build/mkbaselibs -o "$CREATE_BASELIBS" != internal ; then
 	mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
-	test $BUILD_USER = abuild && chown -R ${ABUILD_UID}:${ABUILD_GID} $BUILD_ROOT$TOPDIR
+	chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
 	create_baselibs
     fi
 fi
