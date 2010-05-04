@@ -426,26 +426,12 @@ setmemorylimit()
 
 create_baselibs()
 {
-    echo "... creating baselibs"
-    BRPMS=
-    for RPM in $BUILD_ROOT$TOPDIR/RPMS/*/*.rpm ; do
-	BRPMS="$BRPMS ${RPM#$BUILD_ROOT}"
-    done
-    BDEBS=
-    for DEB in $BUILD_ROOT$TOPDIR/DEBS/*.deb ; do
-	BDEBS="$BDEBS ${DEB#$BUILD_ROOT}"
-    done
+    local pkgs=()
+
     BASELIBS_CFG=
-## Nb REPO is the name of the project instance
-## DISTRO is the underlying (remote?) distro
-#    if test -e $BUILD_ROOT$TOPDIR/SOURCES/baselibs_${REPO}.conf ; then
-#        BASELIBS_CFG="-c $TOPDIR/SOURCES/baselibs_${REPO}.conf"
-#    elif test -e $BUILD_ROOT$TOPDIR/SOURCES/baselibs_${DISTRO}.conf ; then
-#        BASELIBS_CFG="-c $TOPDIR/SOURCES/baselibs_${DISTRO}.conf"
-#    elif test -e $BUILD_ROOT$TOPDIR/SOURCES/baselibs.conf ; then
 
     if test "$BUILDTYPE" == "dsc" ; then
-	BPKGS=$BDEBS
+	pkgs=($DEBS)
     else # spec and kiwi
 	if test -e $BUILD_ROOT$TOPDIR/SOURCES/baselibs.conf ; then
 	    BASELIBS_CFG="-c $TOPDIR/SOURCES/baselibs.conf"
@@ -453,15 +439,30 @@ create_baselibs()
 	if test -e $BUILD_ROOT/usr/lib/build/baselibs_global.conf; then
 	    BASELIBS_GLOBAL="-c /usr/lib/build/baselibs_global.conf"
 	fi
-	BPKGS=$BRPMS
+	pkgs=($RPMS)
     fi
-    if test -f $BUILD_ROOT/usr/lib/build/mkbaselibs ; then
+
+    mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
+    # don't use -R as extracted sources, build root etc might be below $TOPDIR
+    chown "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"/* "$BUILD_ROOT$TOPDIR"/RPMS/* || true
+
+    local mkbaselibs="/usr/lib/build/mkbaselibs"
+    local whichone=''
+    # $BUILD_DIR is set to /.build when using a vm. So we need to
+    # hardcode /usr/lib/build instead of $BUILD_DIR to prefer
+    # mkbaselibs from the distro.
+    if test -f $BUILD_ROOT$mkbaselibs; then
 	if test -z "$BASELIBS_CFG" -a -e $BUILD_ROOT/usr/lib/build/baselibs.conf ; then
 	    BASELIBS_CFG="-c /usr/lib/build/baselibs.conf"
 	fi
-	chroot $BUILD_ROOT su -c "/usr/lib/build/mkbaselibs $BASELIBS_GLOBAL $BASELIBS_CFG $BPKGS" - $BUILD_USER || cleanup_and_exit 1
     else
+	if test "$CREATE_BASELIBS" = 'internal'; then
+	    echo "Warning: mkbaselibs missing in build root, skipping baselibs"
+	    return
+	fi
 	# use external version
+	whichone=" (external)"
+	mkbaselibs="/.mkbaselibs/mkbaselibs"
 	rm -rf $BUILD_ROOT/.mkbaselibs
 	mkdir -p $BUILD_ROOT/.mkbaselibs
 	cp -f $BUILD_DIR/mkbaselibs $BUILD_ROOT/.mkbaselibs/
@@ -479,9 +480,10 @@ create_baselibs()
 	if test -e $BUILD_ROOT/.mkbaselibs/baselibs_g.conf; then
 	    BASELIBS_GLOBAL="-c /.mkbaselibs/baselibs_g.conf"
 	fi
-	chroot $BUILD_ROOT su -c "/.mkbaselibs/mkbaselibs $BASELIBS_GLOBAL $BASELIBS_CFG $BPKGS" - $BUILD_USER || cleanup_and_exit 1
-	rm -rf $BUILD_ROOT/.mkbaselibs
     fi
+    echo "... creating baselibs$whichone"
+    chroot $BUILD_ROOT su -c "$mkbaselibs $BASELIBS_GLOBAL $BASELIBS_CFG ${pkgs[*]#$BUILD_ROOT}" - $BUILD_USER || cleanup_and_exit 1
+    rm -rf $BUILD_ROOT/.mkbaselibs
 }
 
 vm_img_mkfs()
@@ -1916,17 +1918,8 @@ if test -n "$RPMS" -a "$DO_CHECKS" != "false" -a -x "$BUILD_ROOT/opt/testing/bin
     echo
 fi
 
-if test \( -n "$RPMS" -o -n "$DEBS" \) -a -n "$CREATE_BASELIBS" -a \( -d "$BUILD_ROOT/$TOPDIR/RPMS" -o -d "$BUILD_ROOT/$TOPDIR/DEBS" \)  ; then
-    # $BUILD_DIR is set to /.build when using a vm. So we need to
-    # hardcode /usr/lib/build instead of $BUILD_DIR to prefer
-    # mkbaselibs from the distro.
-    # (and force distro version if CREATE_BASELIBS=internal)
-    if test -f $BUILD_ROOT/usr/lib/build/mkbaselibs -o "$CREATE_BASELIBS" != internal ; then
-	mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
-	# don't use -R as extracted sources, build root etc might be below $TOPDIR
-	chown "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"/* "$BUILD_ROOT$TOPDIR"/RPMS/* || true
-	create_baselibs
-    fi
+if test \( -n "$RPMS" -o -n "$DEBS" \) -a -n "$CREATE_BASELIBS"; then
+    create_baselibs
 fi
 
 # IMPLEMENT ME: place code for creating binary package deltas here
