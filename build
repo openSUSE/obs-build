@@ -1923,7 +1923,7 @@ if test \( -n "$RPMS" -o -n "$DEBS" \) -a -n "$CREATE_BASELIBS" -a \( -d "$BUILD
     # (and force distro version if CREATE_BASELIBS=internal)
     if test -f $BUILD_ROOT/usr/lib/build/mkbaselibs -o "$CREATE_BASELIBS" != internal ; then
 	mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
-	test $BUILD_USER = abuild && chown ${ABUILD_UID}:${ABUILD_GID} $BUILD_ROOT$TOPDIR/*
+	test $BUILD_USER = abuild && chown -R ${ABUILD_UID}:${ABUILD_GID} $BUILD_ROOT$TOPDIR
 	create_baselibs
     fi
 fi
