@@ -424,7 +424,8 @@ setmemorylimit()
     done < <(cat /proc/meminfo) # cat for proc stuff
 }
 
-function create_baselibs {
+create_baselibs()
+{
     echo "... creating baselibs"
     BRPMS=
     for RPM in $BUILD_ROOT$TOPDIR/RPMS/*/*.rpm ; do

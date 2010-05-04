@@ -91,7 +91,8 @@ PKGS=("$@")
 # needed functions
 #
 
-function cleanup_and_exit {
+cleanup_and_exit()
+{
     trap EXIT
     [ "$BUILD_ROOT" != / ] || chown $browner $BUILD_ROOT
     # umount so init_buildsystem can be used standalone
@@ -103,7 +104,8 @@ function cleanup_and_exit {
     exit ${1:-0}
 }
 
-function clean_build_root () {
+clean_build_root()
+{
 	test -n "$BUILD_ROOT" && {
 	    umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	    umount -n $BUILD_ROOT/proc 2> /dev/null || true
@@ -193,7 +195,8 @@ run_pkg_scripts()
     done
 }
 
-function init_db {
+init_db()
+{
     if test $PSUF = rpm ; then
 	echo initializing rpm db...
 	chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
@@ -211,7 +214,8 @@ function init_db {
     fi
 }
 
-function reorder {
+reorder()
+{
     test -z "$*" && return
     rm -f $BUILD_ROOT/.init_b_cache/order.manifest
     for PKG in "$@" ; do
@@ -221,7 +225,8 @@ function reorder {
     rm -f $BUILD_ROOT/.init_b_cache/order.manifest
 }
 
-function create_devs {
+create_devs()
+{
     local com file mode arg
 
     mkdir -m 755 -p $BUILD_ROOT/dev/pts
@@ -272,7 +277,8 @@ maybe_add_all_zypp_repos()
     repos=("${r[@]}")
 }
 
-function validate_cache_file {
+validate_cache_file()
+{
     local findonly=''
     maybe_add_all_zypp_repos
     test "${repos[*]} ${BUILD_RPMS//:/ /}" != "$(cat $CACHE_FILE.id 2>/dev/null)" && rm -f $CACHE_FILE.id
