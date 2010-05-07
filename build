@@ -1104,6 +1104,13 @@ if test -z "$RUNNING_IN_VM" ; then
 		echo "using $VM_SWAP as vm swap"
 	    fi
 	fi
+	if [ "$VM_TYPE" = 'xen' ]; then
+	    # this should not be needed, but sometimes a xen instance got lost
+	    XENID="${VM_IMAGE%/root}"
+	    XENID="${XENID%/tmpfs}"
+	    XENID="${XENID##*/}"
+	    xm destroy "build:$XENID" >/dev/null 2>&1
+	fi
 	if test ! -e "$VM_IMAGE"; then
 	    echo "Creating $VM_IMAGE (${VMDISK_ROOTSIZE}M)"
 	    mkdir -p "${VM_IMAGE%/*}"
