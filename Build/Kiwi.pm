@@ -268,10 +268,12 @@ sub show {
   print "@$x\n";
 }
 
-sub query {
+# not implemented yet.
+sub queryiso {
   my ($handle, %opts) = @_;
   return {};
 }
+
 
 sub queryhdrmd5 {
   my ($bin) = @_;
