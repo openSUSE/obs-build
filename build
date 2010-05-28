@@ -1953,7 +1953,10 @@ if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
     esac || cleanup_and_exit 1
 fi
 
-if test -n "$RPMS" -a -d "$BUILD_ROOT/$TOPDIR/RPMS" -a -d "$BUILD_ROOT/.build.oldpackages" -a -x "$BUILD_ROOT/usr/lib/build/same-build-result.sh" ; then
+if test -n "$RPMS" \
+	-a -d "$BUILD_ROOT/$TOPDIR/RPMS" \
+	-a -d "$BUILD_ROOT/.build.oldpackages" \
+	-a -x "$BUILD_ROOT/usr/lib/build/same-build-result.sh" ; then
     echo "... comparing built packages with the former built"
     mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
     # exit with 2, if packages built successfull, but have no changes to former built packages.
