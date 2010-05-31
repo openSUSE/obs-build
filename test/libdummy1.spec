@@ -1,4 +1,4 @@
-Name:		dummy
+Name:		libdummy1
 Version:	0
 Release:	0
 Group:		None
