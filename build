@@ -1058,7 +1058,7 @@ if [ "$VM_TYPE" = 'qemu' ]; then
     qemu_rootdev=/dev/sda
 fi
 
-if [ -z "$RPMLIST" ]; then
+if [ -z "$RPMLIST" -a -z "$RUNNING_IN_VM" ]; then
     if [ -z "$repos" -a -z "$BUILD_RPMS" ]; then
 	repos=(--repository 'zypp://')
     fi
