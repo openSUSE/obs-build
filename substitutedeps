@@ -206,6 +206,11 @@ for my $l (@$xspec) {
     print F "$l\n";
     next;
   }
+  if ($l =~ /%\(/) {
+    # too hard for us
+    print F "$l\n";
+    next;
+  }
 
   my $isbuildrequires = 0;
   $isbuildrequires = 1 if $l =~ /^BuildRequires:/i;
