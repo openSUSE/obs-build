@@ -184,6 +184,7 @@ sub parse {
     my $expandedline = '';
     if (!$skip) {
       my $tries = 0;
+      # newer perls: \{((?:(?>[^{}]+)|(?2))*)\}
       while ($line =~ /^(.*?)%(\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\()(.*?)$/) {
 	if ($tries++ > 1000) {
 	  print STDERR "Warning: spec file parser ",($lineno?" line $lineno":''),": macro too deeply nested\n" if $config->{'warnings'};
@@ -194,6 +195,14 @@ sub parse {
 	$line = $4;
 	my $macname = defined($3) ? $3 : $2;
 	my $macorig = $2;
+        if (defined($3) && $macname =~ /{/) {
+	  while (($macname =~ y/{/{/) > ($macname =~ y/}/}/)) {
+	    last unless $line =~ /^([^}]*)}(.*)$/;
+	    $macname .= "}$1";
+	    $macorig .= "$1}";
+	    $line = $2;
+	  }
+	}
 	my $mactest = 0;
 	if ($macname =~ /^\!\?/ || $macname =~ /^\?\!/) {
 	  $mactest = -1;
