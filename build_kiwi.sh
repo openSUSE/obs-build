@@ -128,7 +128,9 @@ if [ -e "$imageout.iso" ]; then
 	echo "take iso file and create sha256..."
 	mv "$imageout.iso" "/$TOPDIR/KIWI/$imageout$buildnum.iso"
 	pushd /$TOPDIR/KIWI
-	sha256sum "$imageout$buildnum.iso" > "$imageout$buildnum.iso.sha256"
+	if [ -x /usr/bin/sha256sum ]; then
+           /usr/bin/sha256sum "$imageout$buildnum.iso" > "$imageout$buildnum.iso.sha256"
+        fi
 	popd
 fi
 if [ -e "$imageout.raw" ]; then
@@ -136,15 +138,19 @@ if [ -e "$imageout.raw" ]; then
 	pushd /$TOPDIR/KIWI
 	echo "bzip2 raw file..."
 	bzip2 "$imageout$buildnum.raw"
-	echo "Create sha256 file..."
-	sha256sum "$imageout$buildnum.raw.bz2" > "$imageout$buildnum.raw.bz2.sha256"
+	if [ -x /usr/bin/sha256sum ]; then
+	    echo "Create sha256 file..."
+	    /usr/bin/sha256sum "$imageout$buildnum.raw.bz2" > "$imageout$buildnum.raw.bz2.sha256"
+        fi
 	popd
 fi
 
 tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-raw.tar.bz2" \
 	--exclude="$imageout.iso" --exclude="$imageout.raw" *
 cd /$TOPDIR/KIWI
-sha256sum "$imageout$buildnum-raw.tar.bz2" > "$imageout$buildnum-raw.tar.bz2.sha256"
+if [ -x /usr/bin/sha256sum ]; then
+   /usr/bin/sha256sum "$imageout$buildnum-raw.tar.bz2" > "$imageout$buildnum-raw.tar.bz2.sha256"
+fi
 EOF
 		    ;;
 		vmx)
@@ -172,10 +178,10 @@ done
 # FIXME: do we need a single .raw file in any case ?
 
 cd /$TOPDIR/KIWI
-if [ -n "\$SHAFILES" ]; then
+if [ -n "\$SHAFILES" -a -x /usr/bin/sha256sum ]; then
 	for i in \$SHAFILES; do
 		echo "Create sha256 file..."
-		sha256sum "\$i" > "\$i.sha256"
+		/usr/bin/sha256sum "\$i" > "\$i.sha256"
 	done
 fi
 EOF
@@ -190,9 +196,11 @@ tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-xen.tar.bz2" \
 	initrd-* \
 	"$imageout.xenconfig" \
 	"$imageout"
-echo "Create sha256 file..."
-cd $TOPDIR/KIWI
-sha256sum "$imageout$buildnum-xen.tar.bz2" > "$imageout$buildnum-xen.tar.bz2.sha256"
+if [ -x /usr/bin/sha256sum ]; then
+   echo "Create sha256 file..."
+   cd $TOPDIR/KIWI
+   /usr/bin/sha256sum "$imageout$buildnum-xen.tar.bz2" > "$imageout$buildnum-xen.tar.bz2.sha256"
+fi
 EOF
 		    ;;
 		pxe)
@@ -200,9 +208,11 @@ EOF
 echo "compressing pxe images... "
 cd /$TOPDIR/KIWI-pxe
 tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-pxe.tar.bz2" ${imageout}* initrd-*
-echo "Create sha256 file..."
-cd $TOPDIR/KIWI
-sha256sum "$imageout$buildnum-pxe.tar.bz2" > "$imageout$buildnum-pxe.tar.bz2.sha256"
+if [ -x /usr/bin/sha256sum ]; then
+   echo "Create sha256 file..."
+   cd $TOPDIR/KIWI
+   /usr/bin/sha256sum "$imageout$buildnum-pxe.tar.bz2" > "$imageout$buildnum-pxe.tar.bz2.sha256"
+fi
 EOF
 		    ;;
 		iso)
@@ -211,11 +221,13 @@ cd /$TOPDIR/KIWI-iso
 for i in *.iso; do
 	mv "\$i" "/$TOPDIR/KIWI/\${i%.iso}$buildnum.iso"
 done
-echo "creating sha256 sum for iso images... "
-cd $TOPDIR/KIWI
-for i in *.iso; do
-	sha256sum "\$i" > "\$i.sha256"
-done
+if [ -x /usr/bin/sha256sum ]; then
+   echo "creating sha256 sum for iso images... "
+   cd $TOPDIR/KIWI
+   for i in *.iso; do
+	/usr/bin/sha256sum "\$i" > "\$i.sha256"
+   done
+fi
 EOF
 		    ;;
 		*)
@@ -223,13 +235,15 @@ EOF
 echo "compressing unkown images... "
 cd /$TOPDIR/KIWI-$imgtype
 tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-$imgtype.tar.bz2" *
-echo "Create sha256 file..."
-cd /$TOPDIR/KIWI
-sha256sum "$imageout$buildnum-$imgtype.tar.bz2" > "$imageout$buildnum-$imgtype.tar.bz2.sha256"
+if [ -x /usr/bin/sha256sum ]; then
+   echo "Create sha256 file..."
+   cd /$TOPDIR/KIWI
+   /usr/bin/sha256sum "$imageout$buildnum-$imgtype.tar.bz2" > "$imageout$buildnum-$imgtype.tar.bz2.sha256"
+fi
 EOF
 		    ;;
 	    esac
-	    chroot $BUILD_ROOT su -c "sh -e /kiwi_post.sh" || cleanup_and_exit 1
+	    chroot $BUILD_ROOT su -c "sh -x -e /kiwi_post.sh" || cleanup_and_exit 1
 	    rm -f $BUILD_ROOT/kiwi_post.sh
 	done
     fi
