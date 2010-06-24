@@ -631,9 +631,10 @@ mkdir_build_root()
     fi
 
     rm -rf "$BUILD_ROOT"/.build.packages
-    if [ -z "$RUNNING_IN_VM" ]; then
+    if [ -z "$VM_TYPE" -a -z "$RUNNING_IN_VM" ]; then
        # don't touch this in VM
        rm -rf "$BUILD_ROOT"/.build
+       mkdir -p "$BUILD_ROOT"/.build
     fi
 }
 
@@ -1305,7 +1306,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    fi
 	    if [ -d "$OLD_PACKAGES" -a "$OLD_PACKAGES" != "$BUILD_ROOT/.build.oldpackages" ] ; then
 	       rm -rf $BUILD_ROOT/.build.oldpackages
-	       cp -a $OLD_PACKAGES $BUILD_ROOT/.build.oldpackages
+	       mkdir -p $BUILD_ROOT/.build.oldpackages
+	       cp -L $OLD_PACKAGES/* $BUILD_ROOT/.build.oldpackages
 	    fi
 	fi
 	# start up xen, rerun ourself
@@ -1529,7 +1531,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	mount -n -tdevpts none $BUILD_ROOT/dev/pts
 	if [ -d "$OLD_PACKAGES" -a "$OLD_PACKAGES" != "$BUILD_ROOT/.build.oldpackages" ] ; then
 	   rm -rf "$BUILD_ROOT/.build.oldpackages"
-	   cp -r $OLD_PACKAGES $BUILD_ROOT/.build.oldpackages
+	   mkdir -p $BUILD_ROOT/.build.oldpackages
+	   cp -L $OLD_PACKAGES/* $BUILD_ROOT/.build.oldpackages
 	fi
     fi
 
@@ -1953,15 +1956,20 @@ if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
     esac || cleanup_and_exit 1
 fi
 
+# check for same build result
 if test -n "$RPMS" \
 	-a -d "$BUILD_ROOT/$TOPDIR/RPMS" \
 	-a -d "$BUILD_ROOT/.build.oldpackages" \
 	-a -x "$BUILD_ROOT/usr/lib/build/same-build-result.sh" ; then
     echo "... comparing built packages with the former built"
     mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
-    # exit with 2, if packages built successfull, but have no changes to former built packages.
     if chroot $BUILD_ROOT /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/RPMS" "$TOPDIR/SRPMS"; then
-	cleanup_and_exit 2
+	> $BUILD_ROOT/.build/.same_result_marker
+	# XXX: dirty build service hack. fix bs_worker. Search for
+	# 'same_result_marker' for traces of a first try to get rid of this
+	if test -n "$REASON" -a -n "$DISTURL"; then
+	    cleanup_and_exit 2
+	fi
     fi
 fi
 
