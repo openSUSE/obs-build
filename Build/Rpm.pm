@@ -545,12 +545,12 @@ sub rpmq {
   if (@sigtags && !$dosigs) {
     %res = &rpmq(["$head$index$data"], @sigtags);
   }
-  if (ref($rpm) eq 'ARRAY' && !$dosigs && @stags && @$rpm > 1) {
+  if (ref($rpm) eq 'ARRAY' && !$dosigs && @$rpm > 1) {
     my %res2 = &rpmq([ $rpm->[1] ], @stags);
     %res = (%res, %res2);
     return %res;
   }
-  if (ref($rpm) ne 'ARRAY' && !$dosigs && @stags) {
+  if (ref($rpm) ne 'ARRAY' && !$dosigs) {
     if (read(RPM, $head, 16) != 16) {
       warn("Bad rpm $rpm\n");
       close RPM unless ref($rpm);
@@ -575,14 +575,14 @@ sub rpmq {
   }
   close RPM unless ref($rpm);
 
-  return %res unless @stags;
+#  return %res unless @stags;
 
   while($cnt-- > 0) {
     ($tag, $type, $offset, $count, $index) = unpack('N4a*', $index);
     $tag = 0+$tag;
-    if ($stags{$tag}) {
+    if ($stags{$tag} || !@stags) {
       eval {
-	my $otag = $stags{$tag};
+	my $otag = $stags{$tag} || $tag;
 	if ($type == 0) {
 	  $res{$otag} = [ '' ];
 	} elsif ($type == 1) {
