@@ -1,0 +1,82 @@
+#!/usr/bin/perl -w
+
+BEGIN {
+  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+}
+
+use Build;
+use strict;
+
+my %oldpkgs;
+
+sub query
+{
+    my $file = shift;
+    return undef if $file =~ /\.patch\.rpm$/; # XXX: rpmtags?
+    my %res = Build::Rpm::rpmq($file, qw/NAME VERSION RELEASE ARCH SOURCERPM NOSOURCE NOPATCH 1124/);
+    return undef unless %res;
+    return undef if $res{'1124'}->[0] && $res{'1124'}->[0] eq 'drpm';
+    my $arch;
+    if ($res{'SOURCERPM'}->[0]) {
+	$arch = $res{'ARCH'}->[0];
+    } else {
+#	if ($res{'NOSOURCE'}->[0] || $res{'NOPATCH'}->[0]) {
+#	    $arch = 'nosrc';
+#	} else {
+#	    $arch = 'src';
+#	}
+	return undef;
+    }
+    return { name => $res{'NAME'}->[0], file => $file, version => $res{'VERSION'}->[0], release => $res{'RELEASE'}->[0], arch => $arch};
+}
+
+my $prevbuild = shift @ARGV || die "USAGE: $0 <oldpkgdir> <directories...>";
+$prevbuild .= "/*.rpm";
+for my $file (glob $prevbuild) {
+    my $q = query($file);
+    next unless $q;
+    my $n = $q->{'name'}.'.'.$q->{'arch'};
+    push @{$oldpkgs{$n}}, $q;
+}
+
+my $sysret = 0;
+for my $dir (@ARGV) {
+    for my $file (glob $dir.'/*.rpm') {
+	my $q = query($file);
+	next unless $q;
+	my $n = $q->{'name'}.'.'.$q->{'arch'};
+	next unless exists $oldpkgs{$n};
+	for my $old (@{$oldpkgs{$n}}) {
+	    my $v = $old->{'version'};
+	    my $r = $old->{'release'};
+	    if ($v eq $q->{'version'} && $r eq $q->{'release'}) {
+		# skip if same version and release
+		next;
+	    }
+	    $v .= '_'.$q->{'version'} unless $v eq $q->{'version'};
+	    $r .= '_'.$q->{'release'} unless $r eq $q->{'release'};
+	    my $on = $old->{'file'};
+	    my $nn = $q->{'file'};
+	    my $dn = sprintf("%s-%s-%s.%s.delta.rpm", $q->{'name'}, $v, $r, $q->{'arch'});
+	    print "$dn ... ";
+	    $dn = $dir.'/'.$dn;
+	    my $ret = system('makedeltarpm', $on, $nn, $dn);
+	    if ($ret || ! -e $dn) {
+		print "FAILED\n";
+		$sysret = 1;
+	    } else {
+		my $ns = (stat($dn))[7] || 1;
+		my $os = (stat($file))[7] || 1;
+		my $saved = int($ns / $os * 100);
+		if ($ns >= $os) {
+		    print "too big ($saved%), removed\n";
+		    unlink $file;
+		} else {
+		    print "ok ($saved%)\n";
+		}
+	    }
+	}
+    }
+}
+
+exit $sysret;

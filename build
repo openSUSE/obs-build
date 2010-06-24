@@ -1271,12 +1271,13 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     echo processing specfile $MYSRCDIR/$SPECFILE ...
 
     ADDITIONAL_PACKS=""
-    test -n "$BUILD_EXTRA_PACKS" && ADDITIONAL_PACKS="$ADDITIONAL_PACKS $BUILD_EXTRA_PACKS"
-    test -n "$CREATE_BASELIBS" && ADDITIONAL_PACKS="$ADDITIONAL_PACKS build"
-    test "$ccache" = '1' && ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
-    test "$icecream" -gt 1 && ADDITIONAL_PACKS="$ADDITIONAL_PACKS icecream gcc-c++"
-    test -n "$DO_LINT" && ADDITIONAL_PACKS="$ADDITIONAL_PACKS rpmlint-Factory"
-    test -n "$OLD_PACKAGES" && ADDITIONAL_PACKS="$ADDITIONAL_PACKS build-compare"
+    test -z "$BUILD_EXTRA_PACKS" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS $BUILD_EXTRA_PACKS"
+    test -z "$CREATE_BASELIBS" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS build"
+    test "$ccache" = '0' || ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
+    test "$icecream" = 0 || ADDITIONAL_PACKS="$ADDITIONAL_PACKS icecream gcc-c++"
+    test -z "$DO_LINT" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS rpmlint-Factory"
+    test -z "$OLD_PACKAGES" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS build-compare"
+    test -z "$OLD_PACKAGES" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS deltarpm"
 
     if test -n "$CHANGELOG" -a -z "$RUNNING_IN_VM" ; then
 	rm -f $BUILD_ROOT/.build-changelog
@@ -1484,6 +1485,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		    for i in *.rpm ; do
 			test -e "$i" || continue
 			arch=${i%.rpm}
+			arch=${i%.delta}
 			arch=${arch##*\.}
 			mkdir -p RPMS/$arch
 			mv "$i" RPMS/$arch/
@@ -1937,7 +1939,32 @@ if test \( -n "$RPMS" -o -n "$DEBS" \) -a -n "$CREATE_BASELIBS"; then
     create_baselibs
 fi
 
-# IMPLEMENT ME: place code for creating binary package deltas here
+exitcode=0
+# post build scripts
+# TODO: don't hardcode. instead run scripts in a directory as it's done for the checks
+if test -n "$RPMS" \
+	-a -d "$BUILD_ROOT/$TOPDIR/RPMS" \
+	-a -d "$BUILD_ROOT/.build.oldpackages" \
+	; then
+    if test -x "$BUILD_ROOT/usr/lib/build/same-build-result.sh" ; then
+	echo "... comparing built packages with the former built"
+	mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
+	if chroot $BUILD_ROOT /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/RPMS" "$TOPDIR/SRPMS"; then
+	    > $BUILD_ROOT/.build/.same_result_marker
+	    # XXX: dirty build service hack. fix bs_worker. Search for
+	    # 'same_result_marker' for traces of a first try to get rid of this
+	    if test -n "$REASON" -a -n "$DISTURL"; then
+		exitcode=2
+	    fi
+	fi
+    fi
+    if test -x "$BUILD_ROOT/usr/bin/makedeltarpm" \
+	-a -x $BUILD_ROOT/usr/lib/build/makedeltarpms; then
+	echo "... creating delta rpms"
+	ds=("$BUILD_ROOT/$TOPDIR"/RPMS/* "$BUILD_ROOT$TOPDIR/SRPMS")
+	chroot $BUILD_ROOT /usr/lib/build/makedeltarpms /.build.oldpackages "${ds[@]#$BUILD_ROOT}"
+    fi
+fi
 
 if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
     echo "... saving built packages"
@@ -1956,25 +1983,8 @@ if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
     esac || cleanup_and_exit 1
 fi
 
-# check for same build result
-if test -n "$RPMS" \
-	-a -d "$BUILD_ROOT/$TOPDIR/RPMS" \
-	-a -d "$BUILD_ROOT/.build.oldpackages" \
-	-a -x "$BUILD_ROOT/usr/lib/build/same-build-result.sh" ; then
-    echo "... comparing built packages with the former built"
-    mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
-    if chroot $BUILD_ROOT /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/RPMS" "$TOPDIR/SRPMS"; then
-	> $BUILD_ROOT/.build/.same_result_marker
-	# XXX: dirty build service hack. fix bs_worker. Search for
-	# 'same_result_marker' for traces of a first try to get rid of this
-	if test -n "$REASON" -a -n "$DISTURL"; then
-	    cleanup_and_exit 2
-	fi
-    fi
-fi
-
 echo
 echo "$HOST finished \"build $SPECFILE\" at `date --utc`."
 echo
 
-cleanup_and_exit 0
+cleanup_and_exit "$exitcode"
