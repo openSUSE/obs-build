@@ -1294,8 +1294,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     test "$ccache" = '0' || ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
     test "$icecream" = 0 || ADDITIONAL_PACKS="$ADDITIONAL_PACKS icecream gcc-c++"
     test -z "$DO_LINT" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS rpmlint-Factory"
-    test -z "$old_packages" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS build-compare"
-    test -z "$old_packages" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS deltarpm"
 
     if test -n "$CHANGELOG" -a -z "$RUNNING_IN_VM" ; then
 	rm -f $BUILD_ROOT/.build-changelog
