@@ -993,9 +993,6 @@ if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
 	cleanup_and_exit 3
     fi
     qemu_bin="$kvm_bin"
-    if [ -n "$BUILD_JOBS" ]; then
-        qemu_bin="$kvm_bin -smp $BUILD_JOBS"
-    fi
     if [ -n "$VM_KERNEL" ]; then
 	qemu_kernel="$VM_KERNEL"
     fi
@@ -1420,24 +1417,28 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	elif [ "$VM_TYPE" = 'qemu' -o "$VM_TYPE" = 'kvm' ]; then
 		echo "booting $VM_TYPE ..."
 		if [ "$kvm_virtio" = 1 ]; then
-		    qemu_disks=(-drive file="$VM_IMAGE",if=virtio -hda "$VM_IMAGE")
+		    qemu_args=(-drive file="$VM_IMAGE",if=virtio -hda "$VM_IMAGE")
 		    if [ -n "$VM_SWAP" ]; then
-			qemu_disks[${#qemu_disks[@]}]="-drive"
-			qemu_disks[${#qemu_disks[@]}]="file=$VM_SWAP,if=virtio"
+			qemu_args+=("-drive")
+			qemu_args+=("file=$VM_SWAP,if=virtio")
 		    fi
 		else
-		    qemu_disks=(-hda "$VM_IMAGE")
+		    qemu_args=(-hda "$VM_IMAGE")
 		    if [ -n "$VM_SWAP" ]; then
-			qemu_disks[${#qemu_disks[@]}]="-hdb"
-			qemu_disks[${#qemu_disks[@]}]="$VM_SWAP"
+			qemu_args+=("-hdb")
+			qemu_args+=("$VM_SWAP")
 		    fi
 		fi
+		if [ -n "$BUILD_JOBS" -a "$icecream" = 0 ]; then
+		    qemu_args+=("-smp" "$BUILD_JOBS")
+		fi
+
 		set -- $qemu_bin -no-reboot -nographic -net none \
 		    -kernel $qemu_kernel \
 		    -initrd $qemu_initrd \
 		    -append "root=$qemu_rootdev panic=1 quiet noapic rw elevator=noop console=ttyS0 init=$vm_init_script" \
 		    ${MEMSIZE:+-m $MEMSIZE} \
-		    "${qemu_disks[@]}"
+		    "${qemu_args[@]}"
 
 		if test "$PERSONALITY" != 0 ; then
 		    # have to switch back to PER_LINUX to make qemu work
