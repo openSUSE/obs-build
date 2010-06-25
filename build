@@ -17,6 +17,7 @@ icecream=0
 shell=
 definesnstuff=()
 repos=()
+old_packages=()
 
 # defaults for vm_img_mkfs
 vm_img_mkfs_ext4='mkfs.ext4 -m 0 -q -F'
@@ -486,6 +487,23 @@ create_baselibs()
     rm -rf $BUILD_ROOT/.mkbaselibs
 }
 
+copy_oldpackages()
+{
+    local i=0
+    local d
+    local dest
+    for d in "${old_packages[@]}"; do
+	dest="$BUILD_ROOT/.build.oldpackages"
+	test "$i" = 0 || dest="$dest$i"
+	if [ -d "$d" -a "$d" != "$dest" ] ; then
+	    rm -rf "$dest"
+	    mkdir -p "$dest"
+	    cp -L $d/* "$dest"
+	    : $((++i))
+	fi
+    done
+}
+
 vm_img_mkfs()
 {
     local fs="$1"
@@ -750,7 +768,7 @@ while test -n "$1"; do
       ;;
       *-oldpackages)
 	needarg
-	OLD_PACKAGES="$ARG"
+	old_packages+=("$ARG")
 	shift
       ;;
       *-dist)
@@ -1276,8 +1294,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     test "$ccache" = '0' || ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
     test "$icecream" = 0 || ADDITIONAL_PACKS="$ADDITIONAL_PACKS icecream gcc-c++"
     test -z "$DO_LINT" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS rpmlint-Factory"
-    test -z "$OLD_PACKAGES" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS build-compare"
-    test -z "$OLD_PACKAGES" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS deltarpm"
+    test -z "$old_packages" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS build-compare"
+    test -z "$old_packages" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS deltarpm"
 
     if test -n "$CHANGELOG" -a -z "$RUNNING_IN_VM" ; then
 	rm -f $BUILD_ROOT/.build-changelog
@@ -1305,11 +1323,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		# remove setuid bit if files belong to user to make e.g. mount work
 		find $BUILD_ROOT/{bin,sbin,usr/bin,usr/sbin} -type f -uid $UID -perm +4000 -print0 | xargs -0 --no-run-if-empty chmod -s
 	    fi
-	    if [ -d "$OLD_PACKAGES" -a "$OLD_PACKAGES" != "$BUILD_ROOT/.build.oldpackages" ] ; then
-	       rm -rf $BUILD_ROOT/.build.oldpackages
-	       mkdir -p $BUILD_ROOT/.build.oldpackages
-	       cp -L $OLD_PACKAGES/* $BUILD_ROOT/.build.oldpackages
-	    fi
+	    copy_oldpackages
 	fi
 	# start up xen, rerun ourself
 	cp -a $BUILD_DIR/. $BUILD_ROOT/.build
@@ -1358,7 +1372,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    test -n "$PERSONALITY_SYSCALL" && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
 	fi
 	echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
-	echo "OLD_PACKAGES='$OLD_PACKAGES'" >> $BUILD_ROOT/.build/build.data
 	echo "MYHOSTNAME='`hostname`'" >> $BUILD_ROOT/.build/build.data
 	echo -n "definesnstuff=(" >> $BUILD_ROOT/.build/build.data
 	shellquote "${definesnstuff[@]}" >> $BUILD_ROOT/.build/build.data
@@ -1531,11 +1544,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	fi
 	mount -n -tproc none $BUILD_ROOT/proc || true
 	mount -n -tdevpts none $BUILD_ROOT/dev/pts
-	if [ -d "$OLD_PACKAGES" -a "$OLD_PACKAGES" != "$BUILD_ROOT/.build.oldpackages" ] ; then
-	   rm -rf "$BUILD_ROOT/.build.oldpackages"
-	   mkdir -p $BUILD_ROOT/.build.oldpackages
-	   cp -L $OLD_PACKAGES/* $BUILD_ROOT/.build.oldpackages
-	fi
+
+	copy_oldpackages
     fi
 
     if test -z "$BUILD_DIST" -a -e "$BUILD_ROOT/.guessed_dist" ; then

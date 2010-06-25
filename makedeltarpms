@@ -12,7 +12,7 @@ my %oldpkgs;
 sub query
 {
     my $file = shift;
-    return undef if $file =~ /\.patch\.rpm$/; # XXX: rpmtags?
+    return undef if $file =~ /\.(?:patch|delta)\.rpm$/; # XXX: rpmtags?
     my %res = Build::Rpm::rpmq($file, qw/NAME VERSION RELEASE ARCH SOURCERPM NOSOURCE NOPATCH 1124/);
     return undef unless %res;
     return undef if $res{'1124'}->[0] && $res{'1124'}->[0] eq 'drpm';
@@ -31,12 +31,19 @@ sub query
 }
 
 my $prevbuild = shift @ARGV || die "USAGE: $0 <oldpkgdir> <directories...>";
-$prevbuild .= "/*.rpm";
-for my $file (glob $prevbuild) {
-    my $q = query($file);
-    next unless $q;
-    my $n = $q->{'name'}.'.'.$q->{'arch'};
-    push @{$oldpkgs{$n}}, $q;
+my @prevbuild = ($prevbuild);
+my $i = 1;
+while (-e $prevbuild.$i) {
+    push @prevbuild, $prevbuild.$i;
+    ++$i;
+}
+for my $dir (@prevbuild) {
+    for my $file (glob $dir.'/*.rpm') {
+	my $q = query($file);
+	next unless $q;
+	my $n = $q->{'name'}.'.'.$q->{'arch'};
+	push @{$oldpkgs{$n}}, $q;
+    }
 }
 
 my $sysret = 0;
