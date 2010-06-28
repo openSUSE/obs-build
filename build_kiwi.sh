@@ -5,30 +5,26 @@ run_kiwi()
     imagename=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE filename)
     imageversion=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE version)
     # prepare rpms as source and createrepo on the repositories
-    if test -d $BUILD_ROOT/$TOPDIR/SOURCES/repos -a "$DO_INIT" != false ; then
-	(
-	ln -sf $TOPDIR/SOURCES/repos $BUILD_ROOT/repos
-	cd $BUILD_ROOT/$TOPDIR/SOURCES/repos
-	for r in */* ; do
-	    test -L $r && continue
-	    test -d $r || continue
-	    repo="$TOPDIR/SOURCES/repos/$r/"
-	    # create compatibility link for old kiwi versions
-	    rc="${r//:/:/}"
-	    if test "$rc" != "$r" ; then
-		rl="${rc//[^\/]}"
-		rl="${rl//?/../}"
-		mkdir -p "${rc%/*}"
-		ln -s $rl$r "${rc%/*}/${rc##*/}"
-		repo="$TOPDIR/SOURCES/repos/${rc%/*}/${rc##*/}/"
-	    fi
-	    if test "$imagetype" != product ; then
-		echo "creating repodata for $repo"
-		chroot $BUILD_ROOT createrepo "$repo"
-	    fi
-	done
-	)
-    fi
+    ln -sf $TOPDIR/SOURCES/repos $BUILD_ROOT/repos
+    cd $BUILD_ROOT/$TOPDIR/SOURCES/repos
+    for r in */* ; do
+        test -L $r && continue
+        test -d $r || continue
+        repo="$TOPDIR/SOURCES/repos/$r/"
+        # create compatibility link for old kiwi versions
+        rc="${r//:/:/}"
+        if test "$rc" != "$r" ; then
+    	rl="${rc//[^\/]}"
+    	rl="${rl//?/../}"
+    	mkdir -p "${rc%/*}"
+    	ln -s $rl$r "${rc%/*}/${rc##*/}"
+    	repo="$TOPDIR/SOURCES/repos/${rc%/*}/${rc##*/}/"
+        fi
+        if test "$imagetype" != product ; then
+    	echo "creating repodata for $repo"
+    	chroot $BUILD_ROOT createrepo "$repo"
+        fi
+    done
     # unpack root tar
     for t in $BUILD_ROOT/$TOPDIR/SOURCES/root.tar* ; do
 	test -f $t || continue
@@ -172,9 +168,10 @@ if [ -e "$imageout.xenconfig" ]; then
 	tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" $imageout.xenconfig $imageout.raw initrd-*
 	SHAFILES="\$SHAFILES $imageout$buildnum-vmx.tar.bz2"
 fi
-for i in "$imageout.ovf"; do
-	[ -e \$i ] && SHAFILES="\$SHAFILES \$i"
-done
+if [ -e "$imageout.ovf" ]; then
+        mv "$imageout.ovf" "/$TOPDIR/KIWI/${imageout%.ovf}$buildnum.ovf"
+	SHAFILES="\$SHAFILES ${imageout%.ovf}$buildnum.ovf"
+fi
 # FIXME: do we need a single .raw file in any case ?
 
 cd /$TOPDIR/KIWI
