@@ -156,7 +156,7 @@ cd /$TOPDIR/KIWI-vmx
 # This option has a number of format parameters
 VMXFILES=""
 SHAFILES=""
-for i in "$imageout.vmx" "$imageout.vmdk" "$imageout-disk*.vmdk"; do
+for i in "$imageout.vmx" "$imageout.vmdk" "$imageout-disk*.vmdk" "$imageout.ovf"; do
 	ls \$i >& /dev/null && VMXFILES="\$VMXFILES \$i"
 done
 if [ -n "\$VMXFILES" ]; then
@@ -167,10 +167,6 @@ fi
 if [ -e "$imageout.xenconfig" ]; then
 	tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" $imageout.xenconfig $imageout.raw initrd-*
 	SHAFILES="\$SHAFILES $imageout$buildnum-vmx.tar.bz2"
-fi
-if [ -e "$imageout.ovf" ]; then
-        mv "$imageout.ovf" "/$TOPDIR/KIWI/${imageout%.ovf}$buildnum.ovf"
-	SHAFILES="\$SHAFILES ${imageout%.ovf}$buildnum.ovf"
 fi
 # FIXME: do we need a single .raw file in any case ?
 
