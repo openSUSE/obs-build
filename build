@@ -768,7 +768,7 @@ while test -n "$1"; do
       ;;
       *-oldpackages)
 	needarg
-	old_packages+=("$ARG")
+	old_packages=("${old_packages[@]}" "$ARG")
 	shift
       ;;
       *-dist)
@@ -1433,18 +1433,18 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		if [ "$kvm_virtio" = 1 ]; then
 		    qemu_args=(-drive file="$VM_IMAGE",if=virtio -hda "$VM_IMAGE")
 		    if [ -n "$VM_SWAP" ]; then
-			qemu_args+=("-drive")
-			qemu_args+=("file=$VM_SWAP,if=virtio")
+			qemu_args=("${qemu_args[@]}" "-drive")
+			qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=virtio")
 		    fi
 		else
 		    qemu_args=(-hda "$VM_IMAGE")
 		    if [ -n "$VM_SWAP" ]; then
-			qemu_args+=("-hdb")
-			qemu_args+=("$VM_SWAP")
+			qemu_args=("${qemu_args[@]}" "-hdb")
+			qemu_args=("${qemu_args[@]}" "$VM_SWAP")
 		    fi
 		fi
 		if [ -n "$BUILD_JOBS" -a "$icecream" = 0 ]; then
-		    qemu_args+=("-smp" "$BUILD_JOBS")
+		    qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS")
 		fi
 
 		set -- $qemu_bin -no-reboot -nographic -net none \
