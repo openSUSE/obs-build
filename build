@@ -1397,12 +1397,12 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	fi
 
 	if [ "$VM_TYPE" = 'xen' ]; then
-		XMROOT=file:$VM_IMAGE
+		XMROOT="file:$(readlink -f $VM_IMAGE)"
 		XMROOT=${XMROOT/#file:\/dev/phy:/dev}
 		XMROOT="disk=$XMROOT,hda1,w"
 		XMSWAP=
 		if test -n "$VM_SWAP" ; then
-		    XMSWAP=file:$VM_SWAP
+		    XMSWAP="file:$(readlink -f $VM_SWAP)"
 		    XMSWAP=${XMSWAP/#file:\/dev/phy:/dev}
 		    XMSWAP="disk=$XMSWAP,hda2,w"
 		fi
