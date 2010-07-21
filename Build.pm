@@ -151,6 +151,7 @@ sub read_config {
   $config->{'release'} = '<CI_CNT>.<B_CNT>';
   $config->{'repotype'} = [];
   $config->{'patterntype'} = [];
+  $config->{'fileprovides'} = {};
   for my $l (@spec) {
     $l = $l->[1] if ref $l;
     next unless defined $l;
@@ -187,6 +188,16 @@ sub read_config {
 	delete $config->{'substitute'}->{$1};
       } else {
 	$config->{'substitute'}->{$ll} = [ @l ];
+      }
+    } elsif ($l0 eq 'fileprovides:') {
+      next unless @l;
+      $ll = shift @l;
+      if ($ll eq '!*') {
+	$config->{'fileprovides'} = {};
+      } elsif ($ll =~ /^!(.*)$/) {
+	delete $config->{'fileprovides'}->{$1};
+      } else {
+	$config->{'fileprovides'}->{$ll} = [ @l ];
       }
     } elsif ($l0 eq 'exportfilter:') {
       next unless @l;
@@ -375,7 +386,6 @@ sub get_runscripts {
 sub readdeps {
   my ($config, $pkginfo, @depfiles) = @_;
 
-  my %whatprovides = ();
   my %requires = ();
   local *F;
   my %provides;
@@ -440,14 +450,27 @@ sub readdeps {
     }
     close F;
   }
-  for my $p (keys %provides) {
-    my @pp = @{$provides{$p}};
+  $config->{'providesh'} = \%provides;
+  $config->{'requiresh'} = \%requires;
+  makewhatprovidesh($config);
+}
+
+sub makewhatprovidesh {
+  my ($config) = @_;
+
+  my %whatprovides;
+  my $provides = $config->{'providesh'};
+
+  for my $p (keys %$provides) {
+    my @pp = @{$provides->{$p}};
     s/[ <=>].*// for @pp;
     push @{$whatprovides{$_}}, $p for unify(@pp);
   }
-  $config->{'providesh'} = \%provides;
+  for my $p (keys %{$config->{'fileprovides'}}) {
+    my @pp = map {@{$whatprovides{$_} || []}} @{$config->{'fileprovides'}->{$p}};
+    @{$whatprovides{$p}} = unify(@{$whatprovides{$p} || []}, @pp) if @pp;
+  }
   $config->{'whatprovidesh'} = \%whatprovides;
-  $config->{'requiresh'} = \%requires;
 }
 
 sub setdeps {
