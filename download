@@ -21,7 +21,6 @@ my $ua = LWP::UserAgent->new(
   timeout => 42);
 
 for my $url (@ARGV) {
-  my $dest = $dir;
   if ($url =~ /^zypp:\/\/([^\/]*)\/?/) {
     use Build::Zypp;
     my $repo = Build::Zypp::parsecfg($1);
@@ -34,7 +33,9 @@ for my $url (@ARGV) {
   } else {
     $url = URI->new($url);
   }
-  my $res = $ua->mirror($url, $dest.'/'.basename($url->path));
+  my $dest = "$dir/".basename($url->path);
+  unlink($dest);	# just in case
+  my $res = $ua->mirror($url, $dest);
   die "reqesting $url failed: ".$res->status_line."\n" unless $res->is_success;
 }
 
