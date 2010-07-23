@@ -29,7 +29,7 @@ if (!defined($specname) || ! -f $specname) {
 }
 
 
-open(S, "<$specname") or die;
+open(S, '<', $specname) or die;
 
 my $ifdef_level = 0;
 my $in_prep = 0;
@@ -112,7 +112,7 @@ $patchnum = 1 if ($c[$last_patch_in_global_index] =~ /Patch:/);
 
 # determine strip level
 my $striplevel = "";
-open(P, "<$diffname") or die;
+open(P, '<', $diffname) or die;
 while(<P>) {
     $striplevel = " -p1" if (m/^--- a/ or m/^--- [^\/]+-\d+\./);
     last if (/^--- /);
@@ -125,7 +125,7 @@ splice @c, $last_patch_in_prep_index+1, 0, ("\%patch$patchnum$striplevel\n");
 splice @c, $last_patch_in_global_index+1, 0,
     (sprintf "Patch%s:%s%s\n", $patchnum, ' ' x (10-length($patchnum)), $diffname);
 
-open(O, ">$specname.new") or die;
+open(O, '>', "$specname.new") or die;
 print O @c;
 close(O);
 
