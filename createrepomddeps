@@ -57,11 +57,12 @@ my $primaryparser = {
 	'rpm:obsoletes' => { 'rpm:entry' => { _start => \&primary_handle_package_obsoletes }, },
 	'rpm:buildhost' => { _text => \&primary_collect_text, _end => \&primary_store_text },
 	'rpm:sourcerpm' => { _text => \&primary_collect_text, _end => \&primary_store_text },
-	file => {
-	  _start => \&primary_handle_file_start,
-	  _text => \&primary_collect_text,
-	  _end => \&primary_handle_file_end
-	},
+### currently commented out, as we ignore file provides in createrpmdeps
+#	file => {
+#	  _start => \&primary_handle_file_start,
+#	  _text => \&primary_collect_text,
+#	  _end => \&primary_handle_file_end
+#	},
       },
       location => { _start => \&primary_handle_package_location },
     },
@@ -419,12 +420,16 @@ for my $url (@ARGV) {
 
     my $u = $dir . $f->{'location'};
     if ($url =~ /^http:\/\/([^\/]*)\/?/) {
-        system($INC[0].'/download', $dir . "repodata/", $baseurl . "repodata/" . basename($u));
+        if (system($INC[0].'/download', $dir . "repodata/", $baseurl . "repodata/" . basename($u))) {
+	  die("download failed\n");
+	}
     }
-    $u = 'gzip -cd ' . $u . '|' if ($u =~ /\.gz$/); # XXX
-
     my $fh;
-    open($fh, $u) or next;
+    if ($u =~ /\.gz$/) {
+      open($fh, '-|', 'gzip', '-cd', $u) or next;	# XXX
+    } else {
+      open($fh, '<', $u) or next;
+    }
     $p->parse($fh);
     close($fh);
   }
