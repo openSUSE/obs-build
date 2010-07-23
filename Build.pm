@@ -389,6 +389,7 @@ sub readdeps {
   my %requires = ();
   local *F;
   my %provides;
+  my $dofileprovides = %{$config->{'fileprovides'}};
   for my $depfile (@depfiles) {
     if (ref($depfile) eq 'HASH') {
       for my $rr (keys %$depfile) {
@@ -404,7 +405,7 @@ sub readdeps {
       my $s = shift @s;
       my @ss;
       while (@s) {
-	if ($s[0] =~ /^\//) {
+	if (!$dofileprovides && $s[0] =~ /^\//) {
 	  shift @s;
 	  next;
 	}
@@ -611,6 +612,7 @@ sub expand {
 	  if ($r eq $p) {
 	    push @rerror, "nothing provides $r";
 	  } else {
+	    next if $r =~ /^\//;
 	    push @rerror, "nothing provides $r needed by $p";
 	  }
 	  next;
