@@ -398,8 +398,9 @@ for my $url (@ARGV) {
   } elsif ($url =~ /^http:\/\/([^\/]*)\/?/) {
     my $repoid = md5_hex($url);
     $dir = "$cachedir/$repoid/";
-    getmetadata($url, $dir);
     $baseurl = $url;
+    $baseurl .= '/' unless $baseurl =~ /\/$/;
+    getmetadata($baseurl, $dir);
   } else {
     $dir = $url;
     $dir .= '/' unless $dir =~ /\/$/;
