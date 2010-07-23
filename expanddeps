@@ -137,6 +137,11 @@ if (!defined($dist) || $dist eq '') {
     $dist = 'default';
   } else {
     my $rpmfn = $fn{"rpm.$rpmarch"};
+    if ($rpmfn =~ /^[a-z]+:\/\//) {
+      require File::Temp;
+      my $tmpdir = File::Temp::tempdir('CLEANUP' => 1);
+      $rpmfn =~ s/.*\//$tmpdir\// unless system("$INC[0]/download", $tmpdir, $rpmfn);
+    }
     my $rpmdist = '';
     if ($rpmfn =~ /^\// && -e $rpmfn) {
       my %res = Build::Rpm::rpmq($rpmfn, 1010);
@@ -145,9 +150,14 @@ if (!defined($dist) || $dist eq '') {
     $rpmdist = lc($rpmdist);
     $rpmdist =~ s/-/_/g;
     $rpmdist =~ s/opensuse/suse linux/;
-    my $rpmdista = $rpmdist;
-    $rpmdista =~ s/.*\(//;
-    $rpmdista =~ s/\).*//;
+    my $rpmdista;
+    if ($rpmdist =~ /\(/) {
+      $rpmdista = $rpmdist;
+      $rpmdista =~ s/.*\(//;
+      $rpmdista =~ s/\).*//;
+    } else {
+      $rpmdista = $archs[0];
+    }
     $rpmdista =~ s/i[456]86/i386/;
     $rpmdist = '' unless $rpmdista =~ /^(i386|x86_64|ia64|ppc|ppc64|s390|s390x)$/;
     if ($rpmdist =~ /unitedlinux 1\.0.*/) {
