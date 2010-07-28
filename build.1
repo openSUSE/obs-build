@@ -73,6 +73,15 @@ What architectures to select from the RPMs.
 automatically sets this to a sensible value for your host if you
 don't specify this option.
 .TP
+.BI "\-\-repo " url_or_dir
+Also use the specified repository to create the build system.
+The repositories may be either of type rpmmd, yast2 (susetags),
+or a simple directory. Multiple --repo options may be given.
+As a special form, 'zypp://reponame' can be used to specify
+a system repository. 'zypp://' selects all enabled system
+repositories. This is also the default if BUILD_RPMS is not
+set and no --rpms or --repo option is used.
+.TP
 .BI "\-\-root " buildroot
 Specifies where the build system is set up. Overrides the
 BUILD_ROOT enviroment variable.
@@ -92,6 +101,14 @@ Print a short help text.
 .TP
 .B --verify
 verify the files in an existing build system.
+.TP
+.BI "\-\--dist " distribution
+Set the distribution. If this option is not given, build tries to
+calculate the distribution by looking at the rpm package used in the
+build.
+The specified distribution can either be a string
+like "11.2" or "sles9", or the pathname of the build configuration to
+use.
 
 .SH .spec FILE OPTIONS
 The
@@ -131,8 +148,7 @@ The directory where build should install the chrooted build system.
 .TP
 .B BUILD_RPMS
 Where build can find the SuSE Linux RPMs.  build needs them to create the
-build system.  "/media/dvd/suse" is the default value which will do
-the trick if you have the SuSE Linux DVD mounted.
+build system.
 .TP
 .B BUILD_RPM_BUILD_STAGE
 The rpm build stage (-ba, -bb, ...).  This is just passed through to
