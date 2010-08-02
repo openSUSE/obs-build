@@ -286,12 +286,21 @@ validate_cache_file()
 {
     local findonly=''
     maybe_add_all_zypp_repos
-    test "${repos[*]} ${BUILD_RPMS//:/ /}" != "$(cat $CACHE_FILE.id 2>/dev/null)" && rm -f $CACHE_FILE.id
-    test -f $CACHE_FILE || rm -f $CACHE_FILE.id
-    for SRC in "${repos[@]}" ${BUILD_RPMS//:/ /}; do
-	test -z "$SRC" && SRC=.
-	test "$SRC" -nt $CACHE_FILE && rm -f $CACHE_FILE.id
-    done
+    if ! test -f $CACHE_FILE || ! test -f $CACHE_FILE.id || \
+	test "${repos[*]} ${BUILD_RPMS//:/ /}" != "$(cat $CACHE_FILE.id 2>/dev/null)"; then
+	rm -f $CACHE_FILE.id
+    else
+	for SRC in "${repos[@]}" ${BUILD_RPMS//:/ /}; do
+	    test -n "$SRC" || SRC=.
+	    if [ "${SRC#zypp://}" != "$SRC" ]; then
+		SRC="/var/cache/zypp/raw" # XXX can't use name here as we'd need to parse the file
+	    fi
+	    if test "$SRC" -nt $CACHE_FILE; then
+		rm -f $CACHE_FILE.id
+		break
+	    fi
+	done
+    fi
     if ! test -f $CACHE_FILE.id ; then
 	test -z "$LIST_STATE" && echo initializing $CACHE_FILE ...
 	for SRC in "${repos[@]}" -- ${BUILD_RPMS//:/ /}; do
