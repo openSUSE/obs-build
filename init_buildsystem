@@ -614,6 +614,7 @@ else
     test -z "$RUNSCRIPTS_SEEN" && PACKAGES_TO_RUNSCRIPTS="$PACKAGES_TO_PREINSTALL"
 
     echo "$GUESSED_DIST" > $BUILD_ROOT/.guessed_dist
+    test -n "$BUILD_DIST" || BUILD_DIST="$GUESSED_DIST"
     PSUF=rpm
     test -L $BUILD_ROOT/.init_b_cache/rpms/rpm.rpm || PSUF=deb
 fi

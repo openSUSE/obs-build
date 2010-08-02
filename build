@@ -11,6 +11,7 @@ test -z "$BUILD_DIR" && BUILD_DIR=/usr/lib/build
 test -z "$BUILD_ROOT" && BUILD_ROOT=/var/tmp/build-root
 
 export BUILD_ARCH BUILD_HOST_ARCH BUILD_ROOT BUILD_RPMS BUILD_DIR BUILD_DEBUG
+export BUILD_DIST
 
 ccache=0
 icecream=0
@@ -774,7 +775,6 @@ while test -n "$1"; do
       *-dist)
 	needarg
 	BUILD_DIST="$ARG"
-	export BUILD_DIST
 	shift
       ;;
       *-xen|*-kvm|--uml|--qemu)
