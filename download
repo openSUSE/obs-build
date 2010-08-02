@@ -35,8 +35,14 @@ for my $url (@ARGV) {
   }
   my $dest = "$dir/".basename($url->path);
   unlink($dest);	# just in case
-  my $res = $ua->mirror($url, $dest);
-  die "reqesting $url failed: ".$res->status_line."\n" unless $res->is_success;
+  my $retry = 3;
+  while ($retry--) {
+    my $res = $ua->mirror($url, $dest);
+    last if $res->is_success;
+    # if it's a redirect we probably got a bad mirror and should just retry
+    die "reqesting $url failed: ".$res->status_line."\n" unless $retry && $res->previous;
+    warn "retrying $url\n";
+  }
 }
 
 # vim:sw=2
