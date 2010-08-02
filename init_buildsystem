@@ -271,10 +271,10 @@ maybe_add_all_zypp_repos()
     r=()
     for i in "${repos[@]}"; do
 	if [ "$i" = "zypp://" ]; then
-	    for j in `grep -l enabled=1 /etc/zypp/repos.d/*.repo`; do
+	    while read j; do
 		j="${j#/etc/zypp/repos.d/}"
 		r=("${r[@]}" "zypp://${j%.repo}")
-	    done
+	    done < <(grep -l enabled=1 /etc/zypp/repos.d/*.repo)
 	else
 	    r=("${r[@]}" "$i")
 	fi
@@ -369,7 +369,7 @@ downloadpkg()
     if [ "${url:0:7}" == "zypp://" ] ; then
 	cachedir="/var/cache/zypp/packages/"
 	SRC="$cachedir${url#zypp://}"
-	mkdir -p "$(dirname $SRC)"
+	mkdir -p "${SRC%/*}" || cleanup_and_exit 1
     elif [ "${url:0:7}" == "http://" -o "${url:0:8}" == "https://" -o "${url:0:6}" == "ftp://" -o "${url:0:7}" == "ftps://" ] ; then
 	cachedir="$(getcachedir "$url")"
 	local name="$(basename "$url")"

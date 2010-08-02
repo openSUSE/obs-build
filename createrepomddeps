@@ -424,11 +424,15 @@ for my $url (@ARGV) {
 	  die("download failed\n");
 	}
     }
+    if ($] > 5.007) {
+	require Encode;
+	utf8::downgrade($u);
+    }
     my $fh;
+    open($fh, '<', $u) or die "Error opening $u: $!\n";
     if ($u =~ /\.gz$/) {
-      open($fh, '-|', 'gzip', '-cd', $u) or next;	# XXX
-    } else {
-      open($fh, '<', $u) or next;
+	use IO::Uncompress::Gunzip qw($GunzipError);
+	$fh = new IO::Uncompress::Gunzip $fh or die "Error opening $u: $GunzipError\n";
     }
     $p->parse($fh);
     close($fh);
