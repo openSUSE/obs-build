@@ -33,7 +33,7 @@ sub parse {
   my $r = '(' . join('|', @needed) . '|Pkg):\s*(.*)';
 
   if (!open(F, '<', $file)) {
-    if (!open(F, '-|', "gzip -dc $file".'.gz')) {
+    if (!open(F, '-|', "gzip", "-dc", $file.'.gz')) {
       die "$file: $!";
     }
   }
