@@ -101,6 +101,7 @@ for my $arch (@archs) {
   $packs{$_} ||= "$_.$arch" for @{$packs_arch{$arch} || []};
 }
 
+# XXX: move to separate tool
 if (!defined($dist) || $dist eq '') {
   my $rpmarch = (grep {$fn{"rpm.$_"}} @archs)[0];
   if (!$rpmarch) {
@@ -117,33 +118,7 @@ if (!defined($dist) || $dist eq '') {
       my %res = Build::Rpm::rpmq($rpmfn, 1010);
       $rpmdist = $res{1010}->[0] || '';
     }
-    $rpmdist = lc($rpmdist);
-    $rpmdist =~ s/-/_/g;
-    $rpmdist =~ s/opensuse/suse linux/;
-    my $rpmdista;
-    if ($rpmdist =~ /\(/) {
-      $rpmdista = $rpmdist;
-      $rpmdista =~ s/.*\(//;
-      $rpmdista =~ s/\).*//;
-    } else {
-      $rpmdista = $archs[0];
-    }
-    $rpmdista =~ s/i[456]86/i386/;
-    $rpmdist = '' unless $rpmdista =~ /^(i386|x86_64|ia64|ppc|ppc64|s390|s390x)$/;
-    if ($rpmdist =~ /unitedlinux 1\.0.*/) {
-      $dist = "ul1-$rpmdista";
-    } elsif ($rpmdist =~ /suse sles_(\d+)/) {
-      $dist = "sles$1-$rpmdista";
-    } elsif ($rpmdist =~ /suse linux enterprise (\d+)/) {
-      $dist = "sles$1-$rpmdista";
-    } elsif ($rpmdist =~ /suse linux (\d+)\.(\d+)\.[4-9]\d/) {
-      # alpha version
-      $dist = "$1.".($2 + 1)."-$rpmdista";
-    } elsif ($rpmdist =~ /suse linux (\d+\.\d+)/) {
-      $dist = "$1-$rpmdista";
-    } else {
-      $dist = 'default';
-    }
+    $dist = Build::dist_canon($rpmdist, $archs[0]);
   }
   print STDERR "Warning: distribution not specified, assuming '$dist' (see $configdir).\n";
 }

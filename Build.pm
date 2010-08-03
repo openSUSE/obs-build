@@ -77,6 +77,38 @@ sub init_helper_hashes {
   $config->{'conflicth'} = \%conflicts;
 }
 
+# 'canonicalize' dist string as found in rpm dist tags
+sub dist_canon($$) {
+  my ($rpmdist, $arch) = @_;
+  $rpmdist = lc($rpmdist);
+  $rpmdist =~ s/-/_/g;
+  $rpmdist =~ s/opensuse/suse linux/;
+  my $rpmdista;
+  if ($rpmdist =~ /\(/) {
+    $rpmdista = $rpmdist;
+    $rpmdista =~ s/.*\(//;
+    $rpmdista =~ s/\).*//;
+  } else {
+    $rpmdista = $arch;
+  }
+  $rpmdista =~ s/i[456]86/i386/;
+  $rpmdist = '' unless $rpmdista =~ /^(i386|x86_64|ia64|ppc|ppc64|s390|s390x)$/;
+  my $dist = 'default';
+  if ($rpmdist =~ /unitedlinux 1\.0.*/) {
+    $dist = "ul1-$rpmdista";
+  } elsif ($rpmdist =~ /suse sles_(\d+)/) {
+    $dist = "sles$1-$rpmdista";
+  } elsif ($rpmdist =~ /suse linux enterprise (\d+)/) {
+    $dist = "sles$1-$rpmdista";
+  } elsif ($rpmdist =~ /suse linux (\d+)\.(\d+)\.[4-9]\d/) {
+    # alpha version
+    $dist = "$1.".($2 + 1)."-$rpmdista";
+  } elsif ($rpmdist =~ /suse linux (\d+\.\d+)/) {
+    $dist = "$1-$rpmdista";
+  }
+  return $dist;
+}
+
 sub read_config_dist {
   my ($dist, $archpath, $configdir) = @_;
 
@@ -86,11 +118,20 @@ sub read_config_dist {
   $arch = 'noarch' if $arch eq '';
   die("Please specify a distribution!\n") unless defined $dist;
   if ($dist !~ /\//) {
+    my $saved = $dist;
     $configdir = '.' unless defined $configdir;
     $dist =~ s/-.*//;
     $dist = "sl$dist" if $dist =~ /^\d/;
     $dist = "$configdir/$dist.conf";
-    $dist = "$configdir/default.conf" unless -e $dist;
+    if (! -e $dist) {
+      $dist =~ s/-.*//;
+      $dist = "sl$dist" if $dist =~ /^\d/;
+      $dist = "$configdir/$dist.conf";
+    }
+    if (! -e $dist) {
+      warn "$saved.conf not found, using default.conf\n" unless $saved eq 'default';
+      $dist = "$configdir/default.conf";
+    }
   }
   die("$dist: $!\n") unless -e $dist;
   my $cf = read_config($arch, $dist);

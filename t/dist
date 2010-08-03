@@ -1,0 +1,19 @@
+#!/usr/bin/perl -w
+
+use strict;
+use Test::More tests => 9;
+use Build;
+
+sub d {
+  Build::dist_canon($_[0], $_[1]||'i586');
+}
+
+is(d("UnitedLinux 1.0 (x86-64)"),       "ul1-x86_64");
+is(d("SuSE SLES-8 (ia64)"),             "sles8-ia64");
+is(d("SuSE Linux 8.2 (x86-64)"),        "8.2-x86_64");
+is(d("SuSE SLES-9 (x86-64)"),           "sles9-x86_64");
+is(d("SUSE Linux 10.1 (PPC64)"),        "10.1-ppc64");
+is(d("SUSE Linux Enterprise 10 (PPC)"), "sles10-ppc");
+is(d("openSUSE 10.3 (X86-64)"),         "10.3-x86_64");
+is(d("SUSE Linux Enterprise 11"),       "sles11-i386");
+is(d("openSUSE 11.3"),                  "11.3-i386");

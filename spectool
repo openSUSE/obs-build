@@ -170,16 +170,19 @@ if (!defined $archs) {
 }
 push @archs, 'noarch' unless grep {$_ eq 'noarch'} @archs;
 
-$dist = 'default' unless $dist;
+unless ($dist) {
+    $dist = `rpm -q --qf '%{DISTRIBUTION}' rpm 2>/dev/null`;
+    $dist = Build::dist_canon($dist||'', $archs[0]);
+}
 
 if($dist !~ /\// && !defined $configdir) {
   if($0 =~ /^\//) {
     use File::Basename qw/dirname/;
     $configdir = dirname($0).'/configs';
-    undef $configdir unless -e $configdir.'/default.conf';
+    undef $configdir unless -e $configdir.'/sl11.3.conf';
   } else {
     $configdir = $builddir.'/configs';
-    undef $configdir unless -e $configdir.'/default.conf';
+    undef $configdir unless -e $configdir.'/sl11.3.conf';
   }
   if(!defined $configdir) {
     print STDERR "please specify config dir\n";
