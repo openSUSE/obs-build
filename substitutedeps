@@ -125,12 +125,18 @@ for my $l (@$xspec) {
 	    $l =~ s/<B_CNT>/$b/;
 	  } elsif ($release =~ /(\d+)$/) {
 	    my $b = $1;
-	    $l =~ s/<B_CNT>/$b/ unless $l =~ s/<CI_CNT>/$b/;
+	    $b = '0' if $l =~ s/<CI_CNT>/$b/;
+	    $l =~ s/<B_CNT>/$b/;
 	  }
 	} else {
 	  $l =~ s/^(Release:\s*).*/$1$release/i;
 	}
       }
+    } else {
+      # remove macros, as rpm doesn't like them
+      $l =~ s/<RELEASE\d*>/0/;
+      $l =~ s/<CI_CNT>/0/;
+      $l =~ s/<B_CNT>/0/;
     }
     # this is to be compatible to legacy autobuild.
     # you can specify a releaseprg in the project configuration,
