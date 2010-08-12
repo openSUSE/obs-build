@@ -1092,6 +1092,10 @@ my @rpms;
 my @debugrpms;
 for my $rpm (@pkgs) {
   my $rpmn = $rpm;
+  unless (-f $rpm) {
+    warn ("$rpm does not exist, skipping\n");
+    next;
+  }
   next if $rpm =~ /\.(no)?src\.rpm$/;  # ignore source rpms
   next if $rpm =~ /\.spm$/;
   $rpmn =~ s/.*\///;   # Remove leading path info
