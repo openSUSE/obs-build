@@ -1788,7 +1788,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     BUILD_SUCCEEDED=false
 
     if test -n "$OVERLAY" ; then
-	if -d "$OVERLAY"; then
+	if test -d "$OVERLAY"; then
 	    pushd $OVERLAY
 	    echo "Copying overlay to BUILD_ROOT"
 	    tar -cpf - . | (cd $BUILD_ROOT ; tar -xvf -)
