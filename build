@@ -82,10 +82,16 @@ OVERLAY=
 RSYNCSRC=
 RSYNCDEST=
 RSYNCDONE=
-: ${EMULATOR_ARCHS:="armv4l armv5el armv6el armv7el sh4 ppc ppc64 mips mipsel"}
-: ${CACHE_DIR:=/var/cache/build}
 
+# list of archs which need emulator initialization
+: ${EMULATOR_ARCHS:="armv4l armv5el armv6el armv7el armv8el mips mipsel mips64 mips64el ppc ppc64 sh4"}
 export EMULATOR_ARCHS
+
+# list of devices registered by binfmt handlers in /proc/sys/fs/binfmt_misc
+: ${EMULATOR_DEVS:="arm mips mipsel mips64 mips64el ppc sh4 sparc"}
+export EMULATOR_DEVS
+
+: ${CACHE_DIR:=/var/cache/build}
 
 # This is for insserv
 export YAST_IS_RUNNING=instsys
