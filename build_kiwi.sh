@@ -133,10 +133,10 @@ if [ -e "$imageout.raw" ]; then
 	mv "$imageout.raw" "/$TOPDIR/KIWI/$imageout$buildnum.raw"
 	pushd /$TOPDIR/KIWI
 	echo "bzip2 raw file..."
-	tar cvjfS "$imageout$buildnum.raw.tar.bz2" "$imageout$buildnum.raw"
+	bzip2 "$imageout$buildnum.raw"
 	if [ -x /usr/bin/sha256sum ]; then
 	    echo "Create sha256 file..."
-	    /usr/bin/sha256sum "$imageout$buildnum.raw.tar.bz2" > "$imageout$buildnum.raw.tar.bz2.sha256"
+	    /usr/bin/sha256sum "$imageout$buildnum.raw.bz2" > "$imageout$buildnum.raw.bz2.sha256"
         fi
 	popd
 fi
