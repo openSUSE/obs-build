@@ -277,7 +277,7 @@ for my $spec (@specs) {
       for my $t (keys %$parsed) {
         next unless ($t =~ /^(?:source|patch)\d*/);
         my $url = $parsed->{$t};
-        next unless $url =~ /^(?:http|ftp):\/\//;
+        next unless $url =~ /^(?:https?|ftp):\/\//;
         my $file = $url;
         $file =~ s/.*\///;
         next if -e $file;
