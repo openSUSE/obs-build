@@ -44,6 +44,8 @@ install:
 	    initscript_qemu_vm \
 	    substitutedeps \
 	    debtransform \
+	    debtransformbz2 \
+	    debtransformzip \
 	    mkbaselibs \
 	    mkdrpms \
 	    createrepomddeps \

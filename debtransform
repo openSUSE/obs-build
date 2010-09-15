@@ -214,6 +214,23 @@ my $version = $tags->{'VERSION'};
 die("dsc file contains no version\n") unless defined($version);
 $version =~ s/^\d+://;	# no epoch in version, please
 
+# transform 
+my $tmptar;
+if ($tarfile =~ /\.tar\.bz2/) {
+    my $old = $tarfile;
+    $tarfile =~ s/\.tar\.bz2/\.tar\.gz/;
+    $tmptar = "$out/$tarfile";
+    print "converting $old to $tarfile\n";
+    system( ( "debtransformbz2", "$old", "$tmptar" )) == 0 || die("cannot transform .tar.bz2 to .tar.gz");
+}
+if ($tarfile =~ /\.zip/) {
+    my $old = $tarfile;
+    $tarfile =~ s/\.zip/\.tar\.gz/;
+    $tmptar = "$out/$tarfile";
+    print "converting $old to $tarfile\n";
+    system( ( "debtransformzip", "$old", "$tmptar" )) == 0 || die("cannot transform .zip to .tar.gz");
+}
+
 my $tardir = $tarfile;
 $tardir =~ s/\.orig\.tar/\.tar/;
 $tardir =~ s/\.tar.*?$//;
@@ -223,7 +240,12 @@ my $v = $version;
 $v =~ s/-[^-]*$//;
 $tarfile =~ /.*(\.tar.*?)$/;
 my $ntarfile = "${name}_$v.orig$1";
-link("$dir/$tarfile", "$out/$ntarfile") || die("link $dir/$tarfile $out/$ntarfile: $!\n");
+if( $tmptar ) {
+  link("$tmptar", "$out/$ntarfile") || die("link $dir/$tarfile $out/$ntarfile: $!\n");
+  unlink("$tmptar");
+} else {
+  link("$dir/$tarfile", "$out/$ntarfile") || die("link $dir/$tarfile $out/$ntarfile: $!\n");
+}
 push @files, addfile("$out/$ntarfile");
 
 open(DIFF, '>', "$out/${name}_$version.diff") || die("$out/${name}_$version.diff: $!\n");

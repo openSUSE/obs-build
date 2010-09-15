@@ -1,0 +1,14 @@
+#! /bin/bash
+
+if test $# -ne 2; then
+    exit 1
+fi
+
+zip="$1"
+tar="$2"
+
+tmp=$(mktemp -d)
+unzip -q -d "$tmp" -- "$zip" || exit 1
+( cd "$tmp" && tar czO * ) >"$tar" || exit 1
+rm -r "$tmp"
+exit 0

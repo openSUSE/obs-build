@@ -1,0 +1,11 @@
+#! /bin/bash
+
+if test $# -ne 2; then
+    exit 1
+fi
+
+bz="$1"
+tar="$2"
+
+bzcat "$bz" | gzip -f - >"$tar" || exit 1
+exit 0
