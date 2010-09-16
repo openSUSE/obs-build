@@ -109,7 +109,7 @@ if [ ! -e "$changelog" ]; then
 	touch $changelog
 fi
 
-tmpfile=`mktemp -q $changelog.XXXXXX`
+tmpfile=`mktemp -q $changelog.vctmp.XXXXXX`
 if [ $? -ne 0 ]; then
 	echo "$0: Can't create temp file, exiting..."
 	exit 1
