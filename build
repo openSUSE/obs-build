@@ -82,6 +82,7 @@ OVERLAY=
 RSYNCSRC=
 RSYNCDEST=
 RSYNCDONE=
+SIGNDUMMY=
 
 # list of archs which need emulator initialization
 : ${EMULATOR_ARCHS:="armv4l armv5el armv6el armv7el armv8el mips mipsel mips64 mips64el ppc ppc64 sh4"}
@@ -959,6 +960,9 @@ while test -n "$1"; do
 	  shell=1
 	  shift
       ;;
+      --signdummy)
+	SIGNDUMMY=1
+      ;;
       -*)
 	echo Unknown Option "$PARAM". Exit.
 	cleanup_and_exit 1
@@ -1359,6 +1363,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "BUILD_DIST='${BUILD_DIST//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "RELEASE='${RELEASE//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "BUILD_DEBUG='${BUILD_DEBUG//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+	echo "SIGNDUMMY='${SIGNDUMMY//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "DO_LINT='${DO_LINT//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "DO_CHECKS='${DO_CHECKS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "NOROOTFORBUILD='${NOROOTFORBUILD//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
@@ -1563,6 +1568,16 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     if test -e $BUILD_ROOT/usr/lib/rpm/rpmrc -a "$BUILD_ARCH" != "${BUILD_ARCH#i686}" ; then
 	mv $BUILD_ROOT/usr/lib/rpm/rpmrc $BUILD_ROOT/usr/lib/rpm/rpmrc_i586
 	sed -e 's/^buildarchtranslate: athlon.*/buildarchtranslate: athlon: i686/' -e 's/^buildarchtranslate: i686.*/buildarchtranslate: i686: i686/' < $BUILD_ROOT/usr/lib/rpm/rpmrc_i586 > $BUILD_ROOT/usr/lib/rpm/rpmrc
+    fi
+
+    #
+    # install dummy sign program if needed
+    #
+    test -f $BUILD_ROOT/usr/bin/sign_installed && mv $BUILD_ROOT/usr/bin/sign_installed $BUILD_ROOT/usr/bin/sign
+    if test -n "$SIGNDUMMY" ; then
+	test -f $BUILD_ROOT/usr/bin/sign && mv $BUILD_ROOT/usr/bin/sign $BUILD_ROOT/usr/bin/sign_installed
+	cp $BUILD_DIR/signdummy $BUILD_ROOT/usr/bin/sign
+	chmod 755 $BUILD_ROOT/usr/bin/sign
     fi
 
     #

@@ -1,0 +1,39 @@
+#!/usr/bin/perl
+
+# simple "sign" replacement that does nothing but
+# write a 2048 byte file with a fixed signature.
+# sign is used in kiwi builds to sign repositories
+
+my $mode;
+
+while (@ARGV) {
+  if ($ARGV[0] =~ /^-([cdr])$/) {
+    $mode = $1;
+    shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--') {
+    shift @ARGV;
+    last;
+  }
+  if ($ARGV[0] =~ /^-/) {
+    die("unsupported option $ARGV[0]\n");
+  }
+  last;
+}
+die("only detached mode possible\n") if !$mode || $mode ne 'd';
+die("filter mode not supported\n") unless @ARGV;
+
+for my $file (@ARGV) {
+  local *F;
+  open(F, '<', $file) || die("$file: $!\n");
+  my $buf = '';
+  1 while sysread(F, $buf, 16384, length($buf));
+  close(F) || die("$file: $!\n");
+  my $block = "sIGnMe!\n";
+  $block .= sprintf("%08x%08x\n", length($buf), unpack("%32C*", $buf));
+  $block .= "\0" x (2048 - length($block));
+  open(F, '>', "$file.asc") || die("$file.asc: $!\n");
+  (syswrite(F, $block) || 0) == 2048 || die("$file.asc: $!\n");
+  close(F) || die("$file.asc: $!\n");
+}
