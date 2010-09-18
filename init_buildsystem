@@ -349,25 +349,30 @@ validate_cache_file()
 
 #
 # Copy qemu static binaries for cross-build emulation mode.
+# Preferentially install from $BUILD_DIR (potentially provided by build
+# server) in preference to build worker's /usr/bin (fallback).
 # If initvm is available it will be in $BUILD_DIR; otherwise prepare to
 # fall back to initscript_qemu_vm shell script with corresponding static
 # bash and mount programs.
 #
 copy_qemu()
 {
-    local dev path
+    local dev dir path dest
 
     echo "copying qemu"
 
     mkdir -p $BUILD_ROOT/usr/bin
     for dev in $EMULATOR_DEVS; do
-	for path in /usr/bin/qemu-${dev}*; do
-	    if file $path | grep -q static; then
-		if [ -f "$path" -a ! -x "$BUILD_ROOT/$path" ]; then
-		    echo -n " $path"			# report copy
-		    install -m755 "$path" "$BUILD_ROOT/$path"
+	for dir in $BUILD_DIR /usr/bin; do
+	    for path in $dir/qemu-${dev}*; do
+		if file $path | grep -q static; then
+		    dest="$BUILD_ROOT/usr/bin/${path##*/}"
+		    if [ -f "$path" -a ! -x "$dest" ]; then
+			echo -n " $path"		# report copy
+			install -m755 "$path" "$dest"
+		    fi
 		fi
-	    fi
+	    done
 	done
     done
     echo ""
