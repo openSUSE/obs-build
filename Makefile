@@ -46,6 +46,7 @@ install:
 	    substitutedeps \
 	    debtransform \
 	    mkbaselibs \
+	    makedeltarpms \
 	    createrepomddeps \
 	    createyastdeps \
 	    changelog2spec \
