@@ -861,6 +861,12 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGE
     if test "$USE_FORCE" = true ; then
 	export ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --force"
     fi
+    # work around for cross-build installs, we must not overwrite the running rpm
+    if test "$PKG" = rpm ; then
+	for i in $BUILD_ROOT/.init_b_cache/preinstalls/rpm-x86-* ; do
+	    test -e "$i" && ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --justdb"
+	done
+    fi
     echo "installing ${PKGID%% *}"
     if ! test "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" -ef "$BUILD_ROOT/.init_b_cache/$PKG.rpm" ; then
 	rm -f $BUILD_ROOT/.init_b_cache/$PKG.rpm
