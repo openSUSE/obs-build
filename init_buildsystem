@@ -548,8 +548,6 @@ else
     PACKAGES_TO_VMINSTALL=
     PACKAGES_TO_CBPREINSTALL=
     PACKAGES_TO_CBINSTALL=
-    PACKAGES_TO_CBPREIGNORE=
-    PACKAGES_TO_CBIGNORE=
     RUNSCRIPTS_SEEN=
     GUESSED_DIST=unknown
     mkdir -p $BUILD_ROOT/.init_b_cache/rpms
@@ -573,18 +571,6 @@ else
 	if test "$PKG" = "cbinstall:" ; then
 	    if is_emulator_arch ; then
 		PACKAGES_TO_CBINSTALL=$SRC
-	    fi
-	    continue
-	fi
-	if test "$PKG" = "cbignore:" ; then
-	    if is_emulator_arch ; then
-		PACKAGES_TO_CBIGNORE=$SRC
-	    fi
-	    continue
-	fi
-	if test "$PKG" = "cbpreignore:" ; then
-	    if is_emulator_arch ; then
-		PACKAGES_TO_CBPREIGNORE=$SRC
 	    fi
 	    continue
 	fi
@@ -624,9 +610,6 @@ else
 
     test -n "$PACKAGES_TO_CBPREINSTALL" && echo "cbpreinstall: $PACKAGES_TO_CBPREINSTALL"
     test -n "$PACKAGES_TO_CBINSTALL" && echo "cbinstall   : $PACKAGES_TO_CBINSTALL"
-    test -n "$PACKAGES_TO_CBPREIGNORE" && echo "cbpreignore: $PACKAGES_TO_CBPREIGNORE"
-    test -n "$PACKAGES_TO_CBIGNORE" && echo "cbignore: $PACKAGES_TO_CBIGNORE"
-
     # compatibility...
     test -z "$RUNSCRIPTS_SEEN" && PACKAGES_TO_RUNSCRIPTS="$PACKAGES_TO_PREINSTALL"
 
@@ -654,14 +637,6 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
 	:> $BUILD_ROOT/var/log/dpkg.log
 	:> $BUILD_ROOT/etc/ld.so.conf
 	:> $BUILD_ROOT/etc/default/rcS
-    fi
-    # remove CBPREIGNORE 
-    if test -n "$PACKAGES_TO_CBPREIGNORE"; then
-        for preignore in $PACKAGES_TO_CBPREIGNORE; do
-          ${PACKAGES_TO_RUNSCRIPTS#preignore}
-          ${PACKAGES_TO_PREINSTALL#preignore}
-          echo "Removing $preignore from runscripts and preinstall (cbpreignore)."
-        done
     fi
     for PKG in $PACKAGES_TO_RUNSCRIPTS ; do
 	: > $BUILD_ROOT/.init_b_cache/scripts/$PKG.run
@@ -701,13 +676,6 @@ if test -n "$PREPARE_VM" ; then
     done
     # alreadyinstalled check will not work, but we have to live with
     # that...
-    # remove CBPREIGNORE 
-    if test -n "$PACKAGES_TO_CBIGNORE"; then
-        for ignore in $PACKAGES_TO_CBIGNORE; do
-          ${PACKAGES_TO_INSTALL#ignore}
-          echo "Removing $ignore from install (cbignore)."
-        done
-    fi
     echo -n 'reordering...'
     PACKAGES_TO_INSTALL=`reorder $PACKAGES_TO_INSTALL`
     echo 'done'
@@ -757,15 +725,8 @@ fi
 # reorder packages (already done in vm continuation)
 #
 if ! test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
-    # remove CBIGNORE 
-    if test -n "$PACKAGES_TO_CBIGNORE"; then
-        for ignore in $PACKAGES_TO_CBIGNORE; do
-          ${PACKAGES_TO_INSTALL#ignore}
-          echo "Removing $ignore from install (cbignore)."
-        done
-    fi
     echo -n 'reordering...'
-    # unused ? PACKAGES_TO_INSTALL_FIRST=`reorder $PACKAGES_TO_INSTALL_FIRST`
+    PACKAGES_TO_INSTALL_FIRST=`reorder $PACKAGES_TO_INSTALL_FIRST`
     PACKAGES_TO_INSTALL=`reorder $PACKAGES_TO_INSTALL`
     echo 'done'
 fi
@@ -797,8 +758,7 @@ for PKG in $BUILD_ROOT/.init_b_cache/alreadyinstalled/* ; do
     test "$PKG" = "*" && continue
     ln $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG $BUILD_ROOT/.init_b_cache/todelete/$PKG
 done
-# unused ? $PACKAGES_TO_INSTALL_FIRST
-for PKG in $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL ; do
+for PKG in $PACKAGES_TO_INSTALL_FIRST $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL ; do
     rm -f $BUILD_ROOT/.init_b_cache/todelete/$PKG
 done
 for PKG in $BUILD_ROOT/.init_b_cache/todelete/* ; do
@@ -825,8 +785,8 @@ RPMCHECKOPTS_HOST=
 # detect rpm4
 test -x $BUILD_ROOT/usr/bin/rpmsign && RPMCHECKOPTS="--nodigest --nosignature"
 test -x /usr/bin/rpmsign && RPMCHECKOPTS_HOST="--nodigest --nosignature"
-#$PACKAGES_TO_INSTALL_FIRST 
-for PKG in RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL; do
+
+for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL; do
 
     case $PKG in
       RUN_LDCONFIG)
