@@ -52,7 +52,7 @@ for my $file (@ARGV) {
   }
 
   my $bsize = 'xxxx';
-  ioctl(F, 2, $bsize) || die("FIGETBSZ: $!\n");
+  ioctl(F, 2, $bsize) || ioctl(F, 536870914, $bsize) || die("FIGETBSZ: $!\n");
   $bsize = unpack("L", $bsize);
 
   my @stat = stat(F);
@@ -66,7 +66,9 @@ for my $file (@ARGV) {
   for ($b = 0; $b < $blocks; ++$b) {
     my $block = pack('I', $b);
     if(not defined ioctl(F, 1, $block)) {
-      die "$file: $!";
+	if(not defined ioctl(F, 536870913, $block)) {
+	    die "$file: $!";
+	}
     }
     $block = unpack('I', $block);
     if($b == 0) {
