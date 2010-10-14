@@ -86,6 +86,19 @@ sub unify {
   return grep(delete($h{$_}), @_);
 }
 
+sub findFallBackArchs($$) {
+  my ($fallbackArchXML, $arch) = @_;
+  my @fa;
+
+  for my $a (@{$fallbackArchXML->{'arch'}||[]}) {
+    if ( $a->{'id'} eq $arch && $a->{'fallback'} ) {
+      @fa = unify( $a->{'fallback'}, findFallBackArchs($fallbackArchXML, $a->{'fallback'}));
+    }
+  }
+
+  return @fa
+};
+
 sub kiwiparse {
   my ($xml, $arch, $count) = @_;
   $count ||= 0;
@@ -217,6 +230,12 @@ sub kiwiparse {
     push @additionalarchs, split(',', $package->{'onlyarch'}) if $package->{'onlyarch'};
   }
   @requiredarch = unify(@requiredarch, @additionalarchs);
+  
+  my @fallbackarchs;
+  for my $arch (@requiredarch) {
+    push @fallbackarchs, findFallBackArchs($instsource->{'architectures'}[0], $arch) if $instsource->{'architectures'}[0];
+  }
+  @requiredarch = unify(@requiredarch, @fallbackarchs);
 
   if (!$instsource) {
     my $packman = $preferences->{'packagemanager'}->[0]->{'_content'};
