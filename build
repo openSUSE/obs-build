@@ -1988,10 +1988,10 @@ if test -n "$RPMS" \
 	fi
     fi
     if test -x "$BUILD_ROOT/usr/bin/makedeltarpm" \
-	-a -x $BUILD_ROOT/usr/lib/build/makedeltarpms; then
+	-a -x $BUILD_ROOT/usr/lib/build/mkdrpms; then
 	echo "... creating delta rpms"
 	ds=("$BUILD_ROOT/$TOPDIR"/RPMS/* "$BUILD_ROOT$TOPDIR/SRPMS")
-	chroot $BUILD_ROOT /usr/lib/build/makedeltarpms /.build.oldpackages "${ds[@]#$BUILD_ROOT}"
+	chroot $BUILD_ROOT /usr/lib/build/mkdrpms /.build.oldpackages "${ds[@]#$BUILD_ROOT}"
     fi
 fi
 
