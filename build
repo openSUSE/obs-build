@@ -2001,7 +2001,7 @@ if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
     args="--padstart 512 --padend 512 -v"
     case "$BUILDTYPE" in
 	spec)
-	    computeblocklists $args $TOPDIR/RPMS/*/*.rpm $TOPDIR/SRPMS/* > "$VM_SWAP"
+	    computeblocklists $args $TOPDIR/RPMS/*/*.{d,}rpm $TOPDIR/SRPMS/* > "$VM_SWAP"
 	    ;;
 	dsc)
 	    computeblocklists $args $TOPDIR/DEBS/*.deb $TOPDIR/SOURCES.DEB/* > "$VM_SWAP"

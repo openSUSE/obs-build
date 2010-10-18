@@ -64,7 +64,7 @@ for my $dir (@ARGV) {
 	    $r .= '_'.$q->{'release'} unless $r eq $q->{'release'};
 	    my $on = $old->{'file'};
 	    my $nn = $q->{'file'};
-	    my $dn = sprintf("%s-%s-%s.%s.delta.rpm", $q->{'name'}, $v, $r, $q->{'arch'});
+	    my $dn = sprintf("%s-%s-%s.%s.drpm", $q->{'name'}, $v, $r, $q->{'arch'});
 	    print "$dn ... ";
 	    $dn = $dir.'/'.$dn;
 	    my $ret = system('makedeltarpm', $on, $nn, $dn);
