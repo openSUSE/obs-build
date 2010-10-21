@@ -86,7 +86,7 @@ sub unify {
   return grep(delete($h{$_}), @_);
 }
 
-sub findFallBackArchs($$) {
+sub findFallBackArchs {
   my ($fallbackArchXML, $arch) = @_;
   my @fa;
 
