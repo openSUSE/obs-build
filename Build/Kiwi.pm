@@ -38,18 +38,19 @@ sub parsexml {
       $tag = substr($tag, 1);
       chop $tag;
     }
-    my @tag = split(/(=(?:\"[^\"]*\"|[^\"\s]*))?\s+/, "$tag ");
+    my @tag = split(/(=(?:\"[^\"]*\"|\'[^\']*\'|[^\"\s]*))?\s+/, "$tag ");
     $tag = shift @tag;
     shift @tag;
     push @tag, undef if @tag & 1;
     my %atts = @tag;
     for (values %atts) {
       next unless defined $_;
-      s/^=\"([^\"]*)\"$/=$1/s;
+      s/^=\"([^\"]*)\"$/=$1/s or s/^=\'([^\']*)\'$/=$1/s;
       s/^=//s;
       s/&lt;/</g;
       s/&gt;/>/g;
       s/&amp;/&/g;
+      s/&apos;/\'/g;
       s/&quot;/\"/g;
     }
     if ($mode == 0 || $mode == 2) {
