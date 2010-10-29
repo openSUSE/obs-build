@@ -98,7 +98,7 @@ sub findFallBackArchs {
   }
 
   return @fa
-};
+}
 
 sub kiwiparse {
   my ($xml, $arch, $count) = @_;
