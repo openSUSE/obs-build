@@ -7,6 +7,7 @@ BEGIN {
 use Build;
 use strict;
 
+my $limit = 80; # throw away deltas bigger than this percentage of the reference
 my %oldpkgs;
 
 sub query
@@ -28,6 +29,15 @@ sub query
 	return undef;
     }
     return { name => $res{'NAME'}->[0], file => $file, version => $res{'VERSION'}->[0], release => $res{'RELEASE'}->[0], arch => $arch};
+}
+
+while (@ARGV) {
+  if ($ARGV[0] eq '--limit') {
+    shift @ARGV || die "--limit needs an argument\n";
+    $limit = shift @ARGV;
+    next;
+  }
+  last;
 }
 
 my $prevbuild = shift @ARGV || die "USAGE: $0 <oldpkgdir> <directories...>";
@@ -74,12 +84,12 @@ for my $dir (@ARGV) {
 	    } else {
 		my $ns = (stat($dn))[7] || 1;
 		my $os = (stat($file))[7] || 1;
-		my $saved = int($ns / $os * 100);
-		if ($ns >= $os) {
-		    print "too big ($saved%), removed\n";
-		    unlink $file;
+		my $factor = int($ns / $os * 100);
+		if ($factor > $limit) {
+		    print "too big ($factor%), removed\n";
+		    unlink $ns;
 		} else {
-		    print "ok ($saved%)\n";
+		    print "ok ($factor%)\n";
 		}
 	    }
 	}
