@@ -87,7 +87,7 @@ for my $dir (@ARGV) {
 		my $factor = int($ns / $os * 100);
 		if ($factor > $limit) {
 		    print "too big ($factor%), removed\n";
-		    unlink $ns;
+		    unlink $dn;
 		} else {
 		    print "ok ($factor%)\n";
 		}
