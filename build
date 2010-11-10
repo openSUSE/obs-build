@@ -984,7 +984,7 @@ if test -n "$KILL" ; then
 	# mark job as failed so that we don't extract packages
 	echo -n "BUILDSTATUS1" >"$VM_SWAP"
     fi
-    (set -C; > "$BUILD_ROOT/exit" || true)
+    (set -C; > "$BUILD_ROOT/exit" 2>/dev/null || true)
     if test "$VM_TYPE" = 'lxc'; then
 	LXCID=${BUILD_ROOT##*/}
 	lxc-stop -n "$LXCID" || true
