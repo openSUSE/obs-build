@@ -1606,7 +1606,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    mkdir -p $BUILD_ROOT/home/abuild
 	    chown "$ABUILD_UID:$ABUILD_GID" $BUILD_ROOT/home/abuild
 	else
-	    if ! egrep "^abuild::${ABUILD_UID}:${ABUILD_GID}" >/dev/null <$BUILD_ROOT/etc/passwd ; then
+	    if ! egrep "^abuild:x?:${ABUILD_UID}:${ABUILD_GID}" >/dev/null <$BUILD_ROOT/etc/passwd ; then
 		echo "abuild user present in the buildroot ($BUILD_ROOT) but uid:gid does not match"
 		echo "buildroot currently using:"
 		egrep "^abuild:" <$BUILD_ROOT/etc/passwd
