@@ -812,6 +812,16 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGE
 	    perl -ne '$|=1;/^(Configuration file|Installing new config file|Selecting previously deselected|\(Reading database|Unpacking |Setting up|Creating config file|Preparing to replace dpkg)/||/^$/||print'
 	check_exit
 	echo "$PKGID debian" > $BUILD_ROOT/installed-pkg/$PKG
+        # ugly workaround for upstart system. some packages (procps) try
+        # to start a service in their configure phase. As we don't have
+        # a running upstart, we just link the start binary to /bin/true
+	if test -e "$BUILD_ROOT/sbin/start"; then
+	    if test "$BUILD_ROOT/sbin/start" -ef "$BUILD_ROOT/sbin/initctl" ; then
+		echo "linking /sbin/start to /bin/true"
+		mv "$BUILD_ROOT/sbin/start" "$BUILD_ROOT/sbin/start.disabled"
+		ln -s "/bin/true" "$BUILD_ROOT/sbin/start"
+	    fi
+	fi
 	continue
     fi
 
