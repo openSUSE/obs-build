@@ -54,6 +54,7 @@ install:
 	    download \
 	    spec_add_patch \
 	    spectool \
+	    signdummy \
 	    unrpm \
 	    $(DESTDIR)$(pkglibdir)
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build
