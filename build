@@ -500,6 +500,10 @@ copy_oldpackages()
     local i=0
     local d
     local dest
+    if [ -z "$old_packages" ]; then
+	rm -rf "$BUILD_ROOT"/.build.oldpackages*
+	return 0
+    fi
     for d in "${old_packages[@]}"; do
 	dest="$BUILD_ROOT/.build.oldpackages"
 	test "$i" = 0 || dest="$dest$i"
