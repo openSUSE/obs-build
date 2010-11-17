@@ -1998,7 +1998,8 @@ if test -n "$RPMS" \
 	    fi
 	fi
     fi
-    if test -x "$BUILD_ROOT/usr/bin/makedeltarpm" \
+    if test ! -e $BUILD_ROOT/.build/.same_result_marker \
+	-a -x "$BUILD_ROOT/usr/bin/makedeltarpm" \
 	-a -x $BUILD_ROOT/usr/lib/build/mkdrpms; then
 	echo "... creating delta rpms"
 	ds=("$BUILD_ROOT/$TOPDIR"/RPMS/* "$BUILD_ROOT$TOPDIR/SRPMS")
