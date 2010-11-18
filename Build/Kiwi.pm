@@ -180,7 +180,7 @@ sub kiwiparse {
   for my $repository (@repositories) {
     my $kiwisource = ($repository->{'source'} || [])->[0];
     next if $kiwisource->{'path'} eq '/var/lib/empty';	# grr
-    die("bad path: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
+    die("bad path using not obs:/ URL: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
     push @repos, "$1/$2";
   }
 
