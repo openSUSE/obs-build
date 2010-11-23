@@ -1512,6 +1512,17 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 			mkdir -p RPMS/$arch
 			mv "$i" RPMS/$arch/
 		    done
+                    # For built MS-Windows apps via cross built mechanism
+		    for i in *.exe ; do
+			test -e "$i" || continue
+			mkdir -p EXE
+			mv "$i" EXE/
+		    done
+		    for i in *.zip ; do
+			test -e "$i" || continue
+			mkdir -p ZIP
+			mv "$i" ZIP/
+		    done
 		elif test "$BUILDTYPE" = dsc ; then
 		    mkdir -p DEBS
 		    find . -type f | while read i; do mv "$i" DEBS/; done
@@ -1675,7 +1686,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     # now clean up RPM building directories
     #
     rm -rf $BUILD_ROOT$TOPDIR
-    for i in BUILD RPMS/`uname -m` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS BUILDROOT; do
+    for i in BUILD RPMS/`uname -m` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS BUILDROOT ZIP EXE; do
 	mkdir -p $BUILD_ROOT$TOPDIR/$i
     done
     chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
@@ -2001,7 +2012,7 @@ if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
     args="--padstart 512 --padend 512 -v"
     case "$BUILDTYPE" in
 	spec)
-	    computeblocklists $args $TOPDIR/RPMS/*/*.{d,}rpm $TOPDIR/SRPMS/* > "$VM_SWAP"
+	    computeblocklists $args $TOPDIR/RPMS/*/*.{d,}rpm $TOPDIR/SRPMS/* $TOPDIR/ZIP/* $TOPDIR/EXE/* > "$VM_SWAP"
 	    ;;
 	dsc)
 	    computeblocklists $args $TOPDIR/DEBS/*.deb $TOPDIR/SOURCES.DEB/* > "$VM_SWAP"
