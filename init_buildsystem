@@ -326,6 +326,7 @@ validate_cache_file()
 	    fi
 	    echo "$@" >&2
 	    "$@" || cleanup_and_exit 1
+	    echo D:
 	done > $CACHE_FILE.new
 
 	mv $CACHE_FILE.new $CACHE_FILE

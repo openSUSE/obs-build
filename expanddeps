@@ -75,24 +75,47 @@ my %repo;
 my %ids;
 
 my %packs_arch;
+my %packs_done;
 open(F, '<', $rpmdeps) || die("$rpmdeps: $!\n");
+# WARNING: the following code assumes that the 'I' tag comes last
+my ($pkgF, $pkgP, $pkgR);
 while(<F>) {
   chomp;
   if (/^F:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
+    $pkgF = $2;
     next if $fn{$1};
     $fn{$1} = $2;
     my $pack = $1;
     $pack =~ /^(.*)\.([^\.]+)$/ or die;
     push @{$packs_arch{$2}}, $1;
   } elsif (/^P:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
+    $pkgP = $2;
     next if $prov{$1};
     $prov{$1} = $2;
   } elsif (/^R:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
+    $pkgR = $2;
     next if $req{$1};
     $req{$1} = $2;
   } elsif (/^I:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
-    next if $ids{$1};
-    $ids{$1} = $2;
+    if ($ids{$1} && !$packs_done{$1} && defined($pkgF) && defined($pkgP) && defined($pkgR)) {
+      my $i = $1;
+      my $oldid = $ids{$1};
+      my $newid = $2;
+      if (Build::Rpm::verscmp($oldid, $newid) < 0) {
+        $ids{$i}  = $newid;
+        $fn{$i}   = $pkgF;
+        $prov{$i} = $pkgP;
+        $req{$i}  = $pkgR;
+      }
+    } else {
+      next if $ids{$1};
+      $ids{$1} = $2;
+    }
+    undef $pkgF;
+    undef $pkgP;
+    undef $pkgR;
+  } elsif ($_ eq 'D:') {
+    %packs_done = %ids;
   }
 }
 close F;

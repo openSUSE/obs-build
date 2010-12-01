@@ -18,7 +18,7 @@ sub parsecfg($)
       $name = $1;
     } else {
       my ($key, $value) = split(/=/,$_,2);
-      $repo->{$key} = $value;
+      $repo->{$key} = $value if defined $key;
     }
   }
   close(REPO);
