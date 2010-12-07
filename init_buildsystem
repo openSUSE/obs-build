@@ -129,7 +129,13 @@ preinstall()
     check_exit
     echo "preinstalling $1..."
     cd $BUILD_ROOT || cleanup_and_exit 1
-    CPIO="cpio --extract --unconditional --preserve-modification-time --make-directories --no-absolute-filenames --quiet"
+    if test -x /usr/bin/bsdtar ; then
+	CPIO="/usr/bin/bsdtar --chroot -x -f-"
+	TAR="/usr/bin/bsdtar --chroot -x"
+    else
+	CPIO="cpio --extract --unconditional --preserve-modification-time --make-directories --no-absolute-filenames --quiet"
+	TAR="tar -x"
+    fi
     if test -e "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" ; then
 	PAYLOADDECOMPRESS=cat
 	case `rpm -qp --nodigest --nosignature --qf "%{PAYLOADCOMPRESSOR}\n" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm"` in
@@ -151,22 +157,22 @@ preinstall()
 	else
 	    rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" | $PAYLOADDECOMPRESS | $CPIO
 	fi
-	if test -e .init_b_cache/scripts/$1.run ; then
-	    rpm -qp --nodigest --nosignature --qf "%{PREIN}" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" > .init_b_cache/scripts/$1.pre
-	    rpm -qp --nodigest --nosignature --qf "%{POSTIN}" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" > .init_b_cache/scripts/$1.post
+	if test -e ".init_b_cache/scripts/$1.run" ; then
+	    rpm -qp --nodigest --nosignature --qf "%{PREIN}" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" > ".init_b_cache/scripts/$1.pre"
+	    rpm -qp --nodigest --nosignature --qf "%{POSTIN}" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" > ".init_b_cache/scripts/$1.post"
 	    echo -n '(none)' > .init_b_cache/scripts/.none
-	    cmp -s .init_b_cache/scripts/$1.pre .init_b_cache/scripts/.none && rm -f .init_b_cache/scripts/$1.pre
-	    cmp -s .init_b_cache/scripts/$1.post .init_b_cache/scripts/.none && rm -f .init_b_cache/scripts/$1.post
+	    cmp -s ".init_b_cache/scripts/$1.pre" .init_b_cache/scripts/.none && rm -f ".init_b_cache/scripts/$1.pre"
+	    cmp -s ".init_b_cache/scripts/$1.post" .init_b_cache/scripts/.none && rm -f ".init_b_cache/scripts/$1.post"
 	    rm -f .init_b_cache/scripts/.none
 	fi
     elif test -e "$BUILD_ROOT/.init_b_cache/rpms/$1.deb" ; then
 	ar x "$BUILD_ROOT/.init_b_cache/rpms/$1.deb" control.tar.gz data.tar.gz
 	mkdir -p .init_b_cache/scripts/control
-	tar -C .init_b_cache/scripts/control -xzf control.tar.gz
-	tar xzf data.tar.gz
-	if test -e .init_b_cache/scripts/$1.run ; then
-	    test -e .init_b_cache/scripts/control/preinst && mv .init_b_cache/scripts/control/preinst .init_b_cache/scripts/$1.pre
-	    test -e .init_b_cache/scripts/control/postinst && mv .init_b_cache/scripts/control/postinst .init_b_cache/scripts/$1.post
+	$TAR -C .init_b_cache/scripts/control -z -f control.tar.gz
+	$TAR -z -f data.tar.gz
+	if test -e ".init_b_cache/scripts/$1.run" ; then
+	    test -e .init_b_cache/scripts/control/preinst && mv .init_b_cache/scripts/control/preinst ".init_b_cache/scripts/$1.pre"
+	    test -e .init_b_cache/scripts/control/postinst && mv .init_b_cache/scripts/control/postinst ".init_b_cache/scripts/$1.post"
 	fi
 	rm -rf .init_b_cache/scripts/control control.tar.gz data.tar.gz
     else
