@@ -130,8 +130,8 @@ preinstall()
     echo "preinstalling $1..."
     cd $BUILD_ROOT || cleanup_and_exit 1
     if test -x /usr/bin/bsdtar ; then
-	CPIO="/usr/bin/bsdtar --chroot -x -f-"
-	TAR="/usr/bin/bsdtar --chroot -x"
+	CPIO="/usr/bin/bsdtar --chroot -o -x -f-"
+	TAR="/usr/bin/bsdtar --chroot -o -x"
     else
 	CPIO="cpio --extract --unconditional --preserve-modification-time --make-directories --no-absolute-filenames --quiet"
 	TAR="tar -x"
