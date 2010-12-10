@@ -21,8 +21,12 @@ run_kiwi()
     	repo="$TOPDIR/SOURCES/repos/${rc%/*}/${rc##*/}/"
         fi
         if test "$imagetype" != product ; then
-    	echo "creating repodata for $repo"
-    	chroot $BUILD_ROOT createrepo "$repo"
+	    echo "creating repodata for $repo"
+	    if chroot $BUILD_ROOT createrepo --simple-md-filenames --help >/dev/null 2>&1 ; then
+		chroot $BUILD_ROOT createrepo --simple-md-filenames "$repo"
+	    else
+		chroot $BUILD_ROOT createrepo "$repo"
+	    fi
         fi
     done
     # unpack root tar
