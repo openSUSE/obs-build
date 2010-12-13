@@ -500,6 +500,7 @@ copy_oldpackages()
     local i=0
     local d
     local dest
+    [ -z "$RUNNING_IN_VM" ] || return 0
     if [ -z "$old_packages" ]; then
 	rm -rf "$BUILD_ROOT"/.build.oldpackages*
 	return 0
