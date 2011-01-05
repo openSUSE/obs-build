@@ -267,6 +267,7 @@ usage () {
 cleanup_and_exit () {
     trap EXIT
     test -z "$1" && set 0
+    rm -f $BUILD_ROOT/exit
     if test -n "$RUNNING_IN_VM" ; then
 	chown $browner $BUILD_ROOT
 	cd /
