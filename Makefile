@@ -36,7 +36,6 @@ install:
 	    extractbuild \
 	    getbinaryid \
 	    killchroot \
-	    xen.conf \
 	    getmacros \
 	    getoptflags \
 	    getchangetarget \
