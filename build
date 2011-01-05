@@ -29,8 +29,8 @@ vm_img_mkfs_ext2='mkfs.ext2 -m 0 -q -F'
 vm_img_tunefs_ext2='tune2fs -c 0'
 vm_img_mkfs_reiserfs='mkreiserfs -q -f'
 
-qemu_kernel=/boot/vmlinuz
-qemu_initrd=/boot/initrd
+vm_kernel=/boot/vmlinuz
+vm_initrd=/boot/initrd
 qemu_bin=/usr/bin/qemu
 uml_kernel=/boot/vmlinux-um
 uml_initrd=/boot/initrd-um
@@ -1021,6 +1021,24 @@ if test -n "$KILL" ; then
     cleanup_and_exit 0
 fi
 
+if [ "$VM_TYPE" = 'xen' -a -z "$RUNNING_IN_VM" ]; then
+    if [ -n "$VM_KERNEL" ]; then
+	vm_kernel="$VM_KERNEL"
+    else
+	vm_kernel="/boot/vmlinuz-xen"
+    fi
+    if [ -n "$VM_INITRD" ]; then
+	vm_initrd="$VM_INITRD"
+    else
+	vm_initrd="/boot/initrd-xen"
+    fi
+    if [ -n "$MEMSIZE" ]; then
+	vm_memory="$MEMSIZE"
+    else
+	vm_memory="64"
+    fi
+fi
+
 if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
     if [ ! -r /dev/kvm -o ! -x "$qemu_bin"-kvm ]; then
 	echo "host doesn't support kvm"
@@ -1028,7 +1046,7 @@ if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
     fi
     qemu_bin="$kvm_bin"
     if [ -n "$VM_KERNEL" ]; then
-	qemu_kernel="$VM_KERNEL"
+	vm_kernel="$VM_KERNEL"
     fi
 
     # check if a SUSE system with virtio initrd is running
@@ -1044,37 +1062,37 @@ if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
     fi
 
     if [ -n "$VM_INITRD" ]; then
-	qemu_initrd="$VM_INITRD"
+	vm_initrd="$VM_INITRD"
 	kvm_virtio=1
-    elif [ -e "${qemu_initrd}-build" ]; then
-	qemu_initrd="${qemu_initrd}-build"
+    elif [ -e "${vm_initrd}-build" ]; then
+	vm_initrd="${vm_initrd}-build"
 	kvm_virtio=1
     else
-	if [ -L "$qemu_initrd" ]; then
-	    qemu_initrd=`readlink -f "$qemu_initrd"` || cleanup_and_exit 3
+	if [ -L "$vm_initrd" ]; then
+	    vm_initrd=`readlink -f "$vm_initrd"` || cleanup_and_exit 3
 	fi
-	qemu_initrd_virtio="${qemu_initrd}-virtio"
+	vm_initrd_virtio="${vm_initrd}-virtio"
 
-	if [ ! -e ${qemu_initrd_virtio} -o $qemu_kernel -nt ${qemu_initrd_virtio} ]; then
+	if [ ! -e ${vm_initrd_virtio} -o $vm_kernel -nt ${vm_initrd_virtio} ]; then
 	    mkinitrd_virtio_cmd=(env rootfstype="$VMDISK_FILESYSTEM" \
 		    mkinitrd -d /dev/null \
 		    -m "binfmt_misc virtio_pci virtio_blk" \
-		    -k $qemu_kernel \
-		    -i ${qemu_initrd_virtio})
+		    -k $vm_kernel \
+		    -i ${vm_initrd_virtio})
 	    if [ ! -w /root -o -n "$RPMLIST" ]; then
 		echo "No initrd that provides virtio support found. virtio accelleration disabled."
 		echo "Run the following command as root to enable virtio:"
 		shellquote "${mkinitrd_virtio_cmd[@]}"
 		echo
 	    elif /sbin/modinfo virtio_pci >/dev/null 2>&1; then
-		echo "creating $qemu_initrd_virtio"
+		echo "creating $vm_initrd_virtio"
 		"${mkinitrd_virtio_cmd[@]}" || cleanup_and_exit 1
 		kvm_virtio=1
-		qemu_initrd="${qemu_initrd_virtio}"
+		vm_initrd="${vm_initrd_virtio}"
 	    fi
 	else
 	    kvm_virtio=1
-	    qemu_initrd="${qemu_initrd_virtio}"
+	    vm_initrd="${vm_initrd_virtio}"
 	fi
     fi
 
@@ -1432,7 +1450,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		   echo "Please report to your server admin, there might be multiple services running for same domain"
 		   cleanup_and_exit 3
 		fi
-		set -- xm create -c $BUILD_DIR/xen.conf name="build:$XENID" ${MEMSIZE:+memory=$MEMSIZE} $XMROOT $XMSWAP extra="quiet init="$vm_init_script" elevator=noop panic=1 console=ttyS0"
+		sed -i -e 's/^kernel = .*/kernel = "'$vm_kernel'"/' $BUILD_DIR/xen.conf
+		sed -i -e 's/^initrd = .*/initrd = "'$vm_initrd'"/' $BUILD_DIR/xen.conf
+		sed -i -e 's/^memory = .*/memory = '$vm_memory'/' $BUILD_DIR/xen.conf
+		sed -i -e 's/^vcpus = .*/vcpus = '$BUILD_JOBS'/' $BUILD_DIR/xen.conf
+		set -- xm create -c $BUILD_DIR/xen.conf name="build:$XENID" $XMROOT $XMSWAP extra="quiet init="$vm_init_script" elevator=noop panic=1 console=ttyS0"
 		if test "$PERSONALITY" != 0 ; then
 		    # have to switch back to PER_LINUX to make xm work
 		    set -- linux64 "$@"
@@ -1464,8 +1486,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		fi
 
 		set -- $qemu_bin -no-reboot -nographic -net none \
-		    -kernel $qemu_kernel \
-		    -initrd $qemu_initrd \
+		    -kernel $vm_kernel \
+		    -initrd $vm_initrd \
 		    -append "root=$qemu_rootdev panic=1 quiet no-kvmclock rw elevator=noop console=ttyS0 init=$vm_init_script" \
 		    ${MEMSIZE:+-m $MEMSIZE} \
 		    "${qemu_args[@]}"
