@@ -1004,6 +1004,7 @@ if test -n "$KILL" ; then
 	XENID="${VM_IMAGE%/root}"
 	XENID="${XENID%/tmpfs}"
 	XENID="${XENID##*/}"
+	XENID="${XENID#root_}"
 	if xm list "build:$XENID" >/dev/null 2>&1 ; then
 	    if ! xm destroy "build:$XENID" ; then
 		echo "could not kill xen build $XENID"
@@ -1162,6 +1163,7 @@ if test -z "$RUNNING_IN_VM" ; then
 	    XENID="${VM_IMAGE%/root}"
 	    XENID="${XENID%/tmpfs}"
 	    XENID="${XENID##*/}"
+	    XENID="${XENID#root_}"
 	    xm destroy "build:$XENID" >/dev/null 2>&1
 	fi
 	if test ! -e "$VM_IMAGE"; then
@@ -1444,6 +1446,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		XENID="${VM_IMAGE%/root}"
 		XENID="${XENID%/tmpfs}"
 		XENID="${XENID##*/}"
+	        XENID="${XENID#root_}"
 
 		echo "booting XEN kernel ..."
 		if xm list "build:$XENID" >/dev/null 2>&1 ; then
