@@ -171,8 +171,9 @@ if (!defined $archs) {
 push @archs, 'noarch' unless grep {$_ eq 'noarch'} @archs;
 
 unless ($dist) {
-    $dist = `rpm -q --qf '%{DISTRIBUTION}' rpm 2>/dev/null`;
-    $dist = Build::dist_canon($dist||'', $archs[0]);
+    $dist = 'spectool';
+#    $dist = `rpm -q --qf '%{DISTRIBUTION}' rpm 2>/dev/null`;
+#    $dist = Build::dist_canon($dist||'', $archs[0]);
 }
 
 if($dist !~ /\// && !defined $configdir) {
@@ -242,6 +243,7 @@ sub check_sum($$)
 
 #######################################################################
 
+my $ret = 0;
 for my $spec (@specs) {
   my $cf = Build::read_config_dist($dist, $archs[0], $configdir);
   my $parsed = Build::parse($cf, $spec);
@@ -340,6 +342,7 @@ for my $spec (@specs) {
           my $sum = check_sum($file, $files->{$file});
           if($sum) {
             print '! ';
+	    $ret = 1;
           } else {
             print '. ';
           }
@@ -353,3 +356,5 @@ for my $spec (@specs) {
     }
   }
 }
+
+exit $ret;
