@@ -133,6 +133,13 @@ preinstall()
 	CPIO="/usr/bin/bsdtar --chroot -o --numeric-owner -x -f-"
 	TAR="/usr/bin/bsdtar --chroot -o --numeric-owner -x"
     else
+	# cpio isn't safe so we require bsdtar for VMs. chroot is
+	# unsafe anyways so it's ok for that.
+	if [ -n "$PREPARE_VM" ]; then
+	    echo "Error: setting up a VM requires bsdtar for security reasons."
+	    echo "Please install bsdtar"
+	    cleanup_and_exit 1
+	fi
 	CPIO="cpio --extract --unconditional --preserve-modification-time --make-directories --no-absolute-filenames --quiet"
 	TAR="tar -x"
     fi
