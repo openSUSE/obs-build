@@ -4,13 +4,21 @@
 
 use strict;
 
-my $diffname = $ARGV[0];
-my $specname = $ARGV[1];
-
-if (!defined($diffname) || ! -f $diffname) {
-
-    print "$0: <diffname>\n";
+sub helpexit {
+    print "$0: <patches...> [file.spec]\n";
     exit 1;
+}
+
+my $specname;
+my %diffs;
+
+for my $arg (@ARGV) {
+	if ($arg =~ /\.spec$/) {
+		helpexit() if $specname;
+		$specname = $arg;
+		next;
+	}
+	$diffs{$arg} = 1;
 }
 
 sub find_specfile()
@@ -36,7 +44,6 @@ my $in_prep = 0;
 my $in_global = 1;
 my $last_patch_in_prep_index = 0;
 my $last_patch_in_global_index = 0;
-my $already_found_patch = 0;
 my @c = ();
 my $index = 0;
 
@@ -73,16 +80,16 @@ while(<S>)
 
     die if (($in_prep + $in_global) > 1);
 
-    if ($in_global && /^Patch(?:\d+)?:/) {
+    if ($in_global && /^Patch(?:\d+)?:\s+(.+)/) {
         $last_patch_in_global_index = $index;
+	if ($diffs{$1}) {
+	    print "$1 already in, skipped.";
+	    delete $diffs{$1};
+	}
     }
 
     if ($in_global && $ifdef_level == 0 && /^Source(?:\d+)?:/) {
         $last_patch_in_global_index = $index;
-    }
-
-    if ($in_global && /^Patch.*?:\s+$diffname/) {
-        $already_found_patch = 1;
     }
 
     if ($in_prep && $ifdef_level == 0 && /^\%patch/) {
@@ -92,10 +99,6 @@ while(<S>)
     $index++;
 }
 close(S);
-
-exit 0 if ($already_found_patch);
-
-print "Adding patch $diffname to $specname\n";
 
 die if ($ifdef_level > 0);
 die if ($in_global || $in_prep);
@@ -110,20 +113,27 @@ my $patchnum = 0;
 $patchnum = $1+1 if ($c[$last_patch_in_global_index] =~ /Patch(\d+):/);
 $patchnum = 1 if ($c[$last_patch_in_global_index] =~ /Patch:/);
 
-# determine strip level
-my $striplevel = "";
-open(P, '<', $diffname) or die;
-while(<P>) {
-    $striplevel = " -p1" if (m/^--- a/ or m/^--- [^\/]+-\d+\./);
-    last if (/^--- /);
+for my $diffname (keys %diffs) {
+    # determine strip level
+    my $striplevel = "";
+    open(P, '<', $diffname) or die "$diffname: $!\n";
+    while(<P>) {
+	$striplevel = " -p1" if (m/^--- a/ or m/^--- [^\/]+-\d+\./);
+	last if (/^--- /);
 
-}
-close(P);
+    }
+    close(P);
+
+    print "Adding patch$striplevel $diffname to $specname\n";
 
 
-splice @c, $last_patch_in_prep_index+1, 0, ("\%patch$patchnum$striplevel\n");
-splice @c, $last_patch_in_global_index+1, 0,
+    splice @c, $last_patch_in_prep_index+1, 0, ("\%patch$patchnum$striplevel\n");
+    splice @c, $last_patch_in_global_index+1, 0,
     (sprintf "Patch%s:%s%s\n", $patchnum, ' ' x (10-length($patchnum)), $diffname);
+    ++$last_patch_in_global_index;
+    $last_patch_in_prep_index+=2; # actually line number
+    ++$patchnum;
+}
 
 open(O, '>', "$specname.new") or die;
 print O @c;
