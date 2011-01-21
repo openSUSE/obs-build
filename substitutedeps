@@ -82,30 +82,30 @@ my $inchangelog = 0;
 my $mainpkg = '';
 my $pkg;
 
-for my $l (@$xspec) {
+for my $line (@$xspec) {
   $used = 1;
-  if (ref($l)) {
-    if (!defined($l->[1])) {
+  if (ref($line)) {
+    if (!defined($line->[1])) {
       $used = 0;
-      $l = $l->[0];
+      $line = $line->[0];
     } else {
-      $l = $l->[1];
+      $line = $line->[1];
     }
   }
 
   if ($inchangelog) {
-    $inchangelog = 0 if $l =~ /^\s*%[^%]/;
+    $inchangelog = 0 if $line =~ /^\s*%[^%]/;
     next if $inchangelog;
   }
-  if ($changelog && ($l =~ /\s*\%changelog\b/)) {
+  if ($changelog && ($line =~ /\s*\%changelog\b/)) {
     $inchangelog = 1;
     next;
   }
 
-  if ($l =~ /^Name\s*:\s*(\S+)/i) {
+  if ($line =~ /^Name\s*:\s*(\S+)/i) {
     $pkg = $mainpkg = $1 unless $mainpkg;
   }
-  if ($l =~ /^\s*%package\s+(-n\s+)?(\S+)/) {
+  if ($line =~ /^\s*%package\s+(-n\s+)?(\S+)/) {
     if ($1) {
       $pkg = $2;
     } else {
@@ -113,30 +113,30 @@ for my $l (@$xspec) {
     }
   }
 
-  if ($l =~ /^Release:/i) {
-    my $oldl = $l;
+  if ($line =~ /^Release:/i) {
+    my $oldl = $line;
     if (defined $release) {
-      if (!($l =~ s/<RELEASE\d*>/$release/g)) {
-	if ($l =~ /<(?:CI_CNT|B_CNT)>/) {
+      if (!($line =~ s/<RELEASE\d*>/$release/g)) {
+	if ($line =~ /<(?:CI_CNT|B_CNT)>/) {
 	  # XXX: should pass ci_cnt/b_cnt instead
 	  if ($release =~ /(\d+)\.(\d+)$/) {
 	    my ($ci, $b) = ($1, $2);
-	    $l =~ s/<CI_CNT>/$ci/;
-	    $l =~ s/<B_CNT>/$b/;
+	    $line =~ s/<CI_CNT>/$ci/;
+	    $line =~ s/<B_CNT>/$b/;
 	  } elsif ($release =~ /(\d+)$/) {
 	    my $b = $1;
-	    $b = '0' if $l =~ s/<CI_CNT>/$b/;
-	    $l =~ s/<B_CNT>/$b/;
+	    $b = '0' if $line =~ s/<CI_CNT>/$b/;
+	    $line =~ s/<B_CNT>/$b/;
 	  }
 	} else {
-	  $l =~ s/^(Release:\s*).*/$1$release/i;
+	  $line =~ s/^(Release:\s*).*/$1$release/i;
 	}
       }
     } else {
       # remove macros, as rpm doesn't like them
-      $l =~ s/<RELEASE\d*>/0/;
-      $l =~ s/<CI_CNT>/0/;
-      $l =~ s/<B_CNT>/0/;
+      $line =~ s/<RELEASE\d*>/0/;
+      $line =~ s/<CI_CNT>/0/;
+      $line =~ s/<B_CNT>/0/;
     }
     # this is to be compatible to legacy autobuild.
     # you can specify a releaseprg in the project configuration,
@@ -144,7 +144,7 @@ for my $l (@$xspec) {
     # output is used as a release.
     # use only if you really must.
     if ($cf->{'releaseprg'} && -f "$specdir$cf->{'releaseprg'}") {
-      my $newl = $l;
+      my $newl = $line;
       $newl =~ s/^Release:\s*//;
       $oldl =~ s/^Release:\s*//;
       my $project = expand($cf, "%?_project") || 'BUILD_BASENAME';
@@ -187,18 +187,18 @@ for my $l (@$xspec) {
       }
       if ($nl[0]) {
 	chomp $nl[0];
-	$l =~ s/^(Release:\s*).*/$1$nl[0]/i;
+	$line =~ s/^(Release:\s*).*/$1$nl[0]/i;
 	if (defined $release) {
-	  if (!($l =~ s/<RELEASE\d*>/$release/g)) {
-	    if ($l =~ /<(?:CI_CNT|B_CNT)>/) {
+	  if (!($line =~ s/<RELEASE\d*>/$release/g)) {
+	    if ($line =~ /<(?:CI_CNT|B_CNT)>/) {
 	      # XXX: should pass ci_cnt/b_cnt instead
 	      if ($release =~ /(\d+)\.(\d+)$/) {
 		my ($ci, $b) = ($1, $2);
-		$l =~ s/<CI_CNT>/$ci/;
-		$l =~ s/<B_CNT>/$b/;
+		$line =~ s/<CI_CNT>/$ci/;
+		$line =~ s/<B_CNT>/$b/;
 	      } elsif ($release =~ /(\d+)$/) {
 		my $b = $1;
-		$l =~ s/<B_CNT>/$b/ unless $l =~ s/<CI_CNT>/$b/;
+		$line =~ s/<B_CNT>/$b/ unless $line =~ s/<CI_CNT>/$b/;
 	      }
 	    }
 	  }
@@ -208,19 +208,19 @@ for my $l (@$xspec) {
     # all compat stuff done. we return to your scheduled program
   }
 
-  if (!$used || ($l !~ /^(?:Build)?Requires:/i)) {
-    print F "$l\n";
+  if (!$used || ($line !~ /^(?:Build)?Requires:/i)) {
+    print F "$line\n";
     next;
   }
-  if ($l =~ /%\(/) {
+  if ($line =~ /%\(/) {
     # too hard for us
-    print F "$l\n";
+    print F "$line\n";
     next;
   }
 
   my $isbuildrequires = 0;
-  $isbuildrequires = 1 if $l =~ /^BuildRequires:/i;
-  my $r = $l;
+  $isbuildrequires = 1 if $line =~ /^BuildRequires:/i;
+  my $r = $line;
   $r =~ s/^[^:]*:\s*//;
   my @deps = $r =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?[\s,]*/g;
   my @ndeps = ();
@@ -251,10 +251,10 @@ for my $l (@$xspec) {
     $replace = 1
   }
   if ($replace) {
-    $l =~ /^(.*?:\s*)/;
+    $line =~ /^(.*?:\s*)/;
     print F $1.join(' ', @ndeps)."\n" if @ndeps;
   } else {
-    print F "$l\n";
+    print F "$line\n";
   }
 }
 
