@@ -113,7 +113,8 @@ for my $line (@$xspec) {
     }
   }
 
-  if ($line =~ /^Release:/i) {
+  if ($line =~ /^Release:(.*)\s*$/i) {
+    my $spec_rel = $1; # User-provided value
     my $oldl = $line;
     if (defined $release) {
       if (!($line =~ s/<RELEASE\d*>/$release/g)) {
@@ -132,11 +133,13 @@ for my $line (@$xspec) {
 	  $line =~ s/^(Release:\s*).*/$1$release/i;
 	}
       }
+      $line =~ s/<SPEC_REL>/$spec_rel/;
     } else {
       # remove macros, as rpm doesn't like them
       $line =~ s/<RELEASE\d*>/0/;
       $line =~ s/<CI_CNT>/0/;
       $line =~ s/<B_CNT>/0/;
+      $line =~ s/<SPEC_REL>/0/;
     }
     # this is to be compatible to legacy autobuild.
     # you can specify a releaseprg in the project configuration,
