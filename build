@@ -1165,7 +1165,7 @@ if test -z "$RUNNING_IN_VM" ; then
 	if test ! -e "$VM_IMAGE"; then
 	    echo "Creating $VM_IMAGE (${VMDISK_ROOTSIZE}M)"
 	    mkdir -p "${VM_IMAGE%/*}"
-	    dd if=/dev/zero of="$VM_IMAGE" bs=1 count=1 seek=$(( ${VMDISK_ROOTSIZE} * 1024 * 1024 - 1 )) || cleanup_and_exit 3
+	    dd if=/dev/zero of="$VM_IMAGE" bs=1M count=0 seek="$VMDISK_ROOTSIZE" || cleanup_and_exit 3
 	    if test -z "$CLEAN_BUILD" ; then
 		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE" || cleanup_and_exit 3
 	    fi
@@ -1174,7 +1174,7 @@ if test -z "$RUNNING_IN_VM" ; then
 	    # setup VM_SWAP
 	    echo "Creating $VM_SWAP (${VMDISK_SWAPSIZE}M)"
 	    mkdir -p "${VM_SWAP%/*}"
-	    dd if=/dev/zero of="$VM_SWAP" bs=1 count=1 seek=$(( ${VMDISK_SWAPSIZE} * 1024 * 1024 - 1 )) || cleanup_and_exit 3
+	    dd if=/dev/zero of="$VM_SWAP" bs=1M count=0 seek="$VMDISK_SWAPSIZE" || cleanup_and_exit 3
 	fi
 	if test ! -e "$VM_IMAGE" ; then
 	    echo "you need to create $VM_IMAGE first"
