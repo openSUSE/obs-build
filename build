@@ -1170,7 +1170,7 @@ if test -z "$RUNNING_IN_VM" ; then
 		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE" || cleanup_and_exit 3
 	    fi
 	fi
-	if test ! -e "$VM_SWAP"; then
+	if test -n "$VM_SWAP" -a ! -e "$VM_SWAP"; then
 	    # setup VM_SWAP
 	    echo "Creating $VM_SWAP (${VMDISK_SWAPSIZE}M)"
 	    mkdir -p "${VM_SWAP%/*}"
