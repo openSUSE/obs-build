@@ -112,6 +112,15 @@ sub expr {
   }
 }
 
+# xspec may be passed as array ref to return the parsed spec files
+# an entry in the returned array can be
+# - a string: verbatim line from the original file
+# - a two element array ref:
+#   - [0] original line
+#   - [1] undef: line unused due to %if
+#   - [1] scalar: line after macro expansion. Only set if it's a build deps
+#                 line and build deps got modified or 'save_expanded' is set in
+#                 config
 sub parse {
   my ($config, $specfile, $xspec) = @_;
 
@@ -351,6 +360,10 @@ sub parse {
       my $what = $1;
       my $deps = $2;
       $ifdeps = 1 if $hasif;
+      # XXX: weird syntax addition. can append arch or project to dependency
+      # BuildRequire: foo > 17 [i586,x86_64]
+      # BuildRequire: foo [home:bar]
+      # BuildRequire: foo [!home:bar]
       my @deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
       my $replace = 0;
       my @ndeps = ();
