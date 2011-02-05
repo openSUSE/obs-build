@@ -363,7 +363,7 @@ copy_qemu()
 check_binfmt_registered()
 {
     local arch
-    for arch in arm $EMULATOR_ARCHS; do
+    for arch in $EMULATOR_DEVS; do
 	if test -e /proc/sys/fs/binfmt_misc/$arch; then
 	    return 0
 	fi
