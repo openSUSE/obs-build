@@ -1,5 +1,7 @@
 #!/bin/bash
 
+: ${CACHE_DIR:=/var/cache/build}
+
 set_build_arch()
 {
     : ${BUILD_HOST_ARCH:=`uname -m`}

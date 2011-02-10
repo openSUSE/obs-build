@@ -92,8 +92,6 @@ export EMULATOR_ARCHS
 : ${EMULATOR_DEVS:="arm mips mipsel mips64 mips64el ppc sh4 sparc"}
 export EMULATOR_DEVS
 
-: ${CACHE_DIR:=/var/cache/build}
-
 # This is for insserv
 export YAST_IS_RUNNING=instsys
 
