@@ -1449,7 +1449,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		   echo "Please report to your server admin, there might be multiple services running for same domain"
 		   cleanup_and_exit 3
 		fi
-		XEN_CONF_FILE=`mktemp build.xen.conf` || cleanup_and_exit 3
+		XEN_CONF_FILE=`mktemp /var/tmp/build.xen.conf-XXXXXXXXX` || cleanup_and_exit 3
 		echo "kernel = \"$vm_kernel\""                                           >  $XEN_CONF_FILE
 		echo "ramdisk = \"$vm_initrd\""                                          >> $XEN_CONF_FILE
 		echo "memory = ${MEMSIZE:-64}"                                           >> $XEN_CONF_FILE
@@ -1464,9 +1464,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		    # have to switch back to PER_LINUX to make xm work
 		    set -- linux64 "$@"
 		fi
-		rm "$XEN_CONF_FILE"
 		echo "$@"
 		"$@" || cleanup_and_exit 3
+		rm "$XEN_CONF_FILE"
 	elif [ "$VM_TYPE" = 'uml' ]; then
 		echo "booting UML kernel ..."
 		set -- $uml_kernel initrd=$uml_initrd root=/ubda init="$vm_init_script" panic=1 elevator=noop quiet ubd0=$VM_IMAGE ${MEMSIZE:+mem=$MEMSIZE}
