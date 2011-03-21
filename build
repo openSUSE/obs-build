@@ -1184,7 +1184,12 @@ if test -z "$RUNNING_IN_VM" ; then
 	fi
 	mkdir_build_root
 	if [ -w /root ]; then
-	    mount -o loop $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 3
+            if blkid $VM_IMAGE >& /dev/null; then
+                # mount device directly
+		mount $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 3
+	    else
+		mount -o loop $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 3
+            fi
 	else
 	    if ! mount $BUILD_ROOT; then
 		echo "mounting the build root failed. An fstab entry is probably missing or incorrect."
