@@ -735,6 +735,9 @@ if test -n "$PREPARE_VM" ; then
     Q="'\''"
     echo "PACKAGES_TO_INSTALL='${PACKAGES_TO_INSTALL//"'"/$Q}'" > $BUILD_ROOT/.build/init_buildsystem.data
     echo "PACKAGES_TO_RUNSCRIPTS='${PACKAGES_TO_RUNSCRIPTS//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
+    # needed for continuation in xen/kvm with rpm-x86
+    echo "PACKAGES_TO_PREINSTALL='${PACKAGES_TO_PREINSTALL//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
+    echo "PACKAGES_TO_CBPREINSTALL='${PACKAGES_TO_CBPREINSTALL//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
     echo "PSUF='$PSUF'" >> $BUILD_ROOT/.build/init_buildsystem.data
     rm -f $BUILD_IS_RUNNING
     cleanup_and_exit 0
