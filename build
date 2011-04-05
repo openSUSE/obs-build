@@ -2033,7 +2033,7 @@ if test -n "$RPMS" \
 	echo "... comparing built packages with the former built"
 	mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
 	if chroot $BUILD_ROOT /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/RPMS" "$TOPDIR/SRPMS"; then
-	    > $BUILD_ROOT/.build/.same_result_marker
+	    chroot $BUILD_ROOT touch /.build/.same_result_marker
 	    # XXX: dirty build service hack. fix bs_worker. Search for
 	    # 'same_result_marker' for traces of a first try to get rid of this
 	    if test -n "$REASON" -a -n "$DISTURL"; then
