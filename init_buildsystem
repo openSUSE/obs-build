@@ -513,6 +513,7 @@ fi
 # store that we start to build system
 #
 mkdir -p $BUILD_ROOT
+mkdir -p $BUILD_ROOT/.build
 touch $BUILD_IS_RUNNING
 
 if test -n "$PREPARE_VM" ; then
@@ -719,7 +720,6 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
 fi
 
 if test -n "$PREPARE_VM" ; then
-    mkdir -p $BUILD_ROOT/.build
     echo "copying packages..."
     for PKG in $PACKAGES_TO_INSTALL ; do
 	rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
