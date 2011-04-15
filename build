@@ -1938,9 +1938,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	# Checks to see if a build script should be used
 	# this allows the build environment to be manipulated
 	# and alternate build commands can be used
-	if [ -n "$BUILD_JOBS" ]; then
-	    DSC_BUILD_JOBS="-j$BUILD_JOBS"
-	fi
+# Debian policy requires to build with single CPU by default
+#	if [ -n "$BUILD_JOBS" ]; then
+#	    DSC_BUILD_JOBS="-j$BUILD_JOBS"
+#	fi
 	DSC_BUILD_CMD="dpkg-buildpackage -us -uc -rfakeroot-tcp $DSC_BUILD_JOBS"
 	if test -e $BUILD_ROOT/$TOPDIR/SOURCES/build.script ; then
 	    echo "Sourcing build.script to build - it should normally run 'dpkg-buildpackage -us -uc -rfakeroot-tcp'"
