@@ -333,7 +333,7 @@ validate_cache_file()
 	    elif [ ! -e "$SRC" ]; then
 		echo "*** $SRC does not exist" >&2
 		cleanup_and_exit 1
-	    elif [ -z "$findonly" -a -e "$SRC"/suse/setup/descr/packages -o -e "$SRC"/suse/setup/descr/packages.gz ]; then
+	    elif [ -z "$findonly" -a \( -e "$SRC"/suse/setup/descr/packages -o -e "$SRC"/suse/setup/descr/packages.gz \) ]; then
 		set -- $BUILD_DIR/createyastdeps "$SRC"
 	    elif [ -z "$findonly" -a -e "$SRC"/repodata/repomd.xml ]; then
 		set -- $BUILD_DIR/createrepomddeps "$SRC"
