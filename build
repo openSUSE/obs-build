@@ -28,7 +28,7 @@ vm_img_tunefs_ext3='tune2fs -c 0 -o journal_data_writeback'
 vm_img_mkfs_ext2='mkfs.ext2 -m 0 -q -F'
 vm_img_tunefs_ext2='tune2fs -c 0'
 vm_img_mkfs_reiserfs='mkreiserfs -q -f'
-vm_img_mkfs_btrfs="mkfs.btrfs"
+vm_img_mkfs_btrfs='mkfs.btrfs'
 
 vm_kernel=/boot/vmlinuz
 vm_initrd=/boot/initrd
