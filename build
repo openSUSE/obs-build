@@ -28,6 +28,7 @@ vm_img_tunefs_ext3='tune2fs -c 0 -o journal_data_writeback'
 vm_img_mkfs_ext2='mkfs.ext2 -m 0 -q -F'
 vm_img_tunefs_ext2='tune2fs -c 0'
 vm_img_mkfs_reiserfs='mkreiserfs -q -f'
+vm_img_mkfs_btrfs="mkfs.btrfs"
 
 vm_kernel=/boot/vmlinuz
 vm_initrd=/boot/initrd
@@ -1073,7 +1074,7 @@ if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
 	if [ ! -e ${vm_initrd_virtio} -o $vm_kernel -nt ${vm_initrd_virtio} ]; then
 	    mkinitrd_virtio_cmd=(env rootfstype="$VMDISK_FILESYSTEM" \
 		    mkinitrd -d /dev/null \
-		    -m "binfmt_misc virtio_pci virtio_blk" \
+		    -m "ext3 ext4 btrfs reiserfs binfmt_misc virtio_pci virtio_blk" \
 		    -k $vm_kernel \
 		    -i ${vm_initrd_virtio})
 	    if [ ! -w /root -o -n "$RPMLIST" ]; then
