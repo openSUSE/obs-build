@@ -34,6 +34,10 @@ sub query {
 
 sub lsrpms {
     local *D; 
+    if (-f "$_[0]") {
+      return ($_[0]) if $_[0] =~ /\.rpm$/;
+      return ();
+    }
     opendir(D, $_[0]) || return (); 
     my @r = grep {$_ ne '.' && $_ ne '..'} readdir(D);
     closedir D;
@@ -53,7 +57,7 @@ while (@ARGV) {
 my $prevbuild = shift @ARGV || die "USAGE: $0 <oldpkgdir> <directories...>";
 my @prevbuild = ($prevbuild);
 my $i = 1;
-while (-e $prevbuild.$i) {
+while (-d $prevbuild.$i) {
     push @prevbuild, $prevbuild.$i;
     ++$i;
 }
@@ -84,7 +88,9 @@ for my $dir (@ARGV) {
 	    my $dn = sprintf("%s-%s-%s.%s.drpm", $q->{'name'}, $v, $r, $q->{'arch'});
 	    my $sn = sprintf("%s-%s-%s.%s.dseq", $q->{'name'}, $v, $r, $q->{'arch'});
 	    print "$dn ... ";
-	    $dn = $dir.'/'.$dn;
+	    my $dndir = $q->{'file'};
+	    $dndir =~ s/[^\/]+$//s;
+	    $dn = "$dndir$dn";
 	    my $ret = system('makedeltarpm', '-s', $sn, $oq->{'file'}, $q->{'file'}, $dn);
 	    if ($ret || ! -e $dn) {
 		unlink($dn);
