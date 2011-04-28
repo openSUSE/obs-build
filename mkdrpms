@@ -10,17 +10,18 @@ use strict;
 my $limit = 80; # throw away deltas bigger than this percentage of the reference
 my %oldpkgs;
 
-sub query
-{
-    my $file = shift;
+sub query {
+    my ($file) = @_;
+
     return undef if $file =~ /\.(?:patch|delta)\.rpm$/; # XXX: rpmtags?
-    my %res = Build::Rpm::rpmq($file, qw/NAME VERSION RELEASE ARCH SOURCERPM NOSOURCE NOPATCH 1124/);
+    my %res = Build::Rpm::rpmq($file, qw/NAME EPOCH VERSION RELEASE ARCH SOURCERPM NOSOURCE NOPATCH 1124/);
     return undef unless %res;
     return undef if $res{'1124'}->[0] && $res{'1124'}->[0] eq 'drpm';
     my $arch;
     if ($res{'SOURCERPM'}->[0]) {
 	$arch = $res{'ARCH'}->[0];
     } else {
+        # no src rpm deltas for now
 #	if ($res{'NOSOURCE'}->[0] || $res{'NOPATCH'}->[0]) {
 #	    $arch = 'nosrc';
 #	} else {
@@ -28,16 +29,25 @@ sub query
 #	}
 	return undef;
     }
-    return { name => $res{'NAME'}->[0], file => $file, version => $res{'VERSION'}->[0], release => $res{'RELEASE'}->[0], arch => $arch};
+    return { file => $file, name => $res{'NAME'}->[0], epoch => $res{'EPOCH'} ? $res{'EPOCH'}->[0] : '', version => $res{'VERSION'}->[0], release => $res{'RELEASE'}->[0], arch => $arch};
+}
+
+sub lsrpms {
+    local *D; 
+    opendir(D, $_[0]) || return (); 
+    my @r = grep {$_ ne '.' && $_ ne '..'} readdir(D);
+    closedir D;
+    return map {"$_[0]/$_"} grep {/\.rpm$/} sort(@r);
 }
 
 while (@ARGV) {
-  if ($ARGV[0] eq '--limit') {
-    shift @ARGV || die "--limit needs an argument\n";
-    $limit = shift @ARGV;
-    next;
-  }
-  last;
+    if ($ARGV[0] eq '--limit') {
+	shift @ARGV;
+	die("--limit needs an argument\n") unless @ARGV;
+	$limit = shift @ARGV;
+	next;
+    }
+    last;
 }
 
 my $prevbuild = shift @ARGV || die "USAGE: $0 <oldpkgdir> <directories...>";
@@ -48,7 +58,7 @@ while (-e $prevbuild.$i) {
     ++$i;
 }
 for my $dir (@prevbuild) {
-    for my $file (glob $dir.'/*.rpm') {
+    for my $file (lsrpms($dir)) {
 	my $q = query($file);
 	next unless $q;
 	my $n = $q->{'name'}.'.'.$q->{'arch'};
@@ -58,37 +68,57 @@ for my $dir (@prevbuild) {
 
 my $sysret = 0;
 for my $dir (@ARGV) {
-    for my $file (glob $dir.'/*.rpm') {
+    for my $file (lsrpms($dir)) {
 	my $q = query($file);
 	next unless $q;
 	my $n = $q->{'name'}.'.'.$q->{'arch'};
-	next unless exists $oldpkgs{$n};
-	for my $old (@{$oldpkgs{$n}}) {
-	    my $v = $old->{'version'};
-	    my $r = $old->{'release'};
+	for my $oq (@{$oldpkgs{$n} || []}) {
+	    my $v = $oq->{'version'};
+	    my $r = $oq->{'release'};
 	    if ($v eq $q->{'version'} && $r eq $q->{'release'}) {
 		# skip if same version and release
 		next;
 	    }
 	    $v .= '_'.$q->{'version'} unless $v eq $q->{'version'};
 	    $r .= '_'.$q->{'release'} unless $r eq $q->{'release'};
-	    my $on = $old->{'file'};
-	    my $nn = $q->{'file'};
 	    my $dn = sprintf("%s-%s-%s.%s.drpm", $q->{'name'}, $v, $r, $q->{'arch'});
+	    my $sn = sprintf("%s-%s-%s.%s.dseq", $q->{'name'}, $v, $r, $q->{'arch'});
 	    print "$dn ... ";
 	    $dn = $dir.'/'.$dn;
-	    my $ret = system('makedeltarpm', $on, $nn, $dn);
+	    my $ret = system('makedeltarpm', '-s', $sn, $oq->{'file'}, $q->{'file'}, $dn);
 	    if ($ret || ! -e $dn) {
+		unlink($dn);
+		unlink($sn);
 		print "FAILED\n";
 		$sysret = 1;
 	    } else {
 		my $ns = (stat($dn))[7] || 1;
-		my $os = (stat($file))[7] || 1;
+		my $os = (stat($q->{'file'}))[7] || 1;
 		my $factor = int($ns / $os * 100);
 		if ($factor > $limit) {
 		    print "too big ($factor%), removed\n";
-		    unlink $dn;
+		    unlink($dn);
+		    unlink($sn);
 		} else {
+		    local *F;
+		    my $seq = '';
+		    if (!open(F, '<', $sn)) {
+			print "missing sequence file, removed\n";
+			unlink($dn);
+			unlink($sn);
+			next;
+		    }
+		    1 while sysread(F, $seq, 8192, length($seq));
+		    close F;
+		    chomp $seq;
+		    unlink($sn);
+		    $seq = "Name: $q->{'name'}\nEpoch: $q->{'epoch'}\nVersion: $q->{'version'}\nRelease: $q->{'release'}\nArch: $q->{'arch'}\nOldName: $oq->{'name'}\nOldEpoch: $oq->{'epoch'}\nOldVersion: $oq->{'version'}\nOldRelease: $oq->{'release'}\nOldArch: $oq->{'arch'}\nSeq: $seq\n";
+		    if (!open(F, '>', $sn) || syswrite(F, $seq) != length($seq) || !close(F)) {
+			print "sequence file write error, removed\n";
+			unlink($dn);
+			unlink($sn);
+			next;
+		    }
 		    print "ok ($factor%)\n";
 		}
 	    }
