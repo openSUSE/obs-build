@@ -1185,7 +1185,7 @@ if test -z "$RUNNING_IN_VM" ; then
 	fi
 	mkdir_build_root
 	if [ -w /root ]; then
-            if blkid $VM_IMAGE >& /dev/null; then
+            if -b $VM_IMAGE; then
                 # mount device directly
 		mount $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 3
 	    else
