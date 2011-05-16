@@ -1778,11 +1778,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	getmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$BUILD_DIR/configs" > $BUILD_ROOT/root/.rpmmacros
 	if test -n "$BUILD_DEBUG" ; then
 	    echo '
-%prep %?_suse_insert_debug_package%%prep
-%package %?_suse_insert_debug_package%%package
+%prep %{?!_suse_insert_debug_package_seen:%?_suse_insert_debug_package}%%prep
+%package %{?!_suse_insert_debug_package_seen:%?_suse_insert_debug_package}%%package
 %suse_insert_debug_package \
   %global _suse_insert_debug_package \\\
-    %%undefine _suse_insert_debug_package \\\
+    %%global _suse_insert_debug_package_seen 1 \\\
     %%debug_package
 
 ' >> $BUILD_ROOT/root/.rpmmacros
