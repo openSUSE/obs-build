@@ -267,12 +267,19 @@ cleanup_and_exit () {
     trap EXIT
     test -z "$1" && set 0
     rm -f $BUILD_ROOT/exit
+    BS=$1
+    if [ $BS -eq 1 -a -x /bin/df ]; then
+        # okay, it failed, but maybe because of me ? (no disk space)
+	if df $BUILD_ROOT 2>/dev/null | grep -q "100%"; then
+             BS=3
+        fi
+    fi
     if test -n "$RUNNING_IN_VM" ; then
 	chown $browner $BUILD_ROOT
 	cd /
 	if test -n "$VM_SWAP" -a -e "$VM_SWAP" ; then
 	    swapoff "$VM_SWAP" 2>/dev/null
-	    echo -n "BUILDSTATUS$1" >"$VM_SWAP"
+	    echo -n "BUILDSTATUS$BS" >"$VM_SWAP"
 	fi
 	exec >&0 2>&0        # so that the logging tee finishes
 	sleep 1                # wait till tee terminates
@@ -301,7 +308,7 @@ cleanup_and_exit () {
 	[ -n "$VM_IMAGE" ] && umount $BUILD_ROOT 2>/dev/null || true
     fi
 #    echo "pid $$ exit $1"
-    exit $1
+    exit $BS
 }
 
 fail_exit()
