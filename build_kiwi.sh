@@ -70,16 +70,24 @@ run_kiwi()
 	# runs always as abuild user
 	mkdir -p "$BUILD_ROOT/$TOPDIR/KIWIROOT"
 	chroot "$BUILD_ROOT" chown -R abuild.abuild "$TOPDIR"
-	# --instsource-local is only needed for openSUSE 11.1 and SLE 11 SP0 kiwi.
-	chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX /usr/sbin/kiwi --root $TOPDIR/KIWIROOT -v -v --logfile terminal -p $TOPDIR/SOURCES --instsource-local --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
-### This block is obsolete with current kiwi versions, only needed for kiwi 3.01 version
-#            for i in $BUILD_ROOT/$TOPDIR/KIWIROOT/main/* ; do
-#                test -d "$i" || continue
-#                n="${i##*/}"
-#                test "$n" = scripts && continue
-#                test "$n" != "${n%0}" && continue
-#                chroot $BUILD_ROOT su -c "suse-isolinux $TOPDIR/KIWIROOT/main/$n $TOPDIR/KIWI/$n.iso" - $BUILD_USER
-#            done
+	ver=`chroot "$BUILD_ROOT" su -c "/usr/sbin/kiwi --version | sed -n 's,.*kiwi version v\(.*\),\1,p'"`
+        if [ ${ver:0:1} == "3" ]; then
+          # old style kiwi 3 builds
+	  chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX /usr/sbin/kiwi --root $TOPDIR/KIWIROOT -v --logfile terminal -p $TOPDIR/SOURCES --instsource-local --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
+          if [ ${ver:2:2} == "01" ]; then
+            ## This block is obsolete with current kiwi versions, only needed for kiwi 3.01 version
+            for i in $BUILD_ROOT/$TOPDIR/KIWIROOT/main/* ; do
+                test -d "$i" || continue
+                n="${i##*/}"
+                test "$n" = scripts && continue
+                test "$n" != "${n%0}" && continue
+                chroot $BUILD_ROOT su -c "suse-isolinux $TOPDIR/KIWIROOT/main/$n $TOPDIR/KIWI/$n.iso" - $BUILD_USER
+            done
+          fi
+        else
+          # current default
+	  chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX /usr/sbin/kiwi --root $TOPDIR/KIWIROOT -v 2 --logfile terminal -p $TOPDIR/SOURCES --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
+        fi
 
 	# move created product to correct destination
 	for i in $BUILD_ROOT/$TOPDIR/KIWIROOT/main/* ; do
