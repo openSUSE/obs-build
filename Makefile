@@ -60,7 +60,7 @@ install:
 	    $(DESTDIR)$(pkglibdir)
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build
 	install -m644 qemu-reg $(DESTDIR)$(pkglibdir)
-	install -m644 *.pm baselibs_global*.conf $(DESTDIR)$(pkglibdir)
+	install -m644 *.pm baselibs_global*.conf lxc.conf $(DESTDIR)$(pkglibdir)
 	install -m644 configs/* $(DESTDIR)$(pkglibdir)/configs
 	install -m644 build.1 $(DESTDIR)$(man1dir)
 	ln -sf $(pkglibdir)/build $(DESTDIR)$(bindir)/build
