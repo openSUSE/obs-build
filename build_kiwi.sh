@@ -64,7 +64,6 @@ run_kiwi()
     fi
     rm -f $BUILD_ROOT/$TOPDIR/SOURCES/config.xml
     ln -s $SPECFILE $BUILD_ROOT/$TOPDIR/SOURCES/config.xml
-    chroot $BUILD_ROOT su -c "kiwi --version" -
     if test "$imagetype" = product ; then
 	echo "running kiwi --create-instsource..."
 	# runs always as abuild user
@@ -85,8 +84,13 @@ run_kiwi()
             done
           fi
         else
-          # current default
-	  chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX /usr/sbin/kiwi --root $TOPDIR/KIWIROOT -v --logfile terminal -p $TOPDIR/SOURCES --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
+          if [ ${ver:0:1} == "4" -a ${ver:2:2} -lt 90 ]; then
+            # broken kiwi version, not accepting verbose level
+	    chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX /usr/sbin/kiwi --root $TOPDIR/KIWIROOT -v --logfile terminal -p $TOPDIR/SOURCES --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
+          else
+            # current default
+	    chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX /usr/sbin/kiwi --root $TOPDIR/KIWIROOT -v 2 --logfile terminal -p $TOPDIR/SOURCES --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
+          fi
         fi
 
 	# move created product to correct destination
