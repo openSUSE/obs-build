@@ -1494,7 +1494,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		echo "booting $VM_TYPE ..."
 		if [ "$kvm_virtio" = 1 ]; then
 		    CACHE=""
-                    if [ "$VM_TYPE" = 'kvm' -a -b "$VM_IMAGE" ]
+                    if [ "$VM_TYPE" = 'kvm' -a -b "$VM_IMAGE" ]; then
                       # speed optimization when using kvm with raw devices
 		      CACHE=",cache=none"
                     fi
