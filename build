@@ -1493,10 +1493,15 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	elif [ "$VM_TYPE" = 'qemu' -o "$VM_TYPE" = 'kvm' ]; then
 		echo "booting $VM_TYPE ..."
 		if [ "$kvm_virtio" = 1 ]; then
-		    qemu_args=(-drive file="$VM_IMAGE",if=virtio -hda "$VM_IMAGE")
+		    CACHE=""
+                    if [ "$VM_TYPE" = 'kvm' -a -b "$VM_IMAGE" ]
+                      # speed optimization when using kvm with raw devices
+		      CACHE=",cache=none"
+                    fi
+		    qemu_args=(-drive file="$VM_IMAGE",if=virtio$CACHE -hda "$VM_IMAGE")
 		    if [ -n "$VM_SWAP" ]; then
 			qemu_args=("${qemu_args[@]}" "-drive")
-			qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=virtio")
+			qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=virtio$CACHE")
 		    fi
 		else
 		    qemu_args=(-hda "$VM_IMAGE")
