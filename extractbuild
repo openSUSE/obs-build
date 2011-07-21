@@ -50,8 +50,8 @@ while(<S>) {
   chomp;
   last unless length $_;
   my ($file, $filesize, $blksize, @blocks) = split(/ /);
-  if($#blocks == -1) {
-    die "invalid input\n";
+  if($#blocks == -1 && $filesize) {
+    die "invalid input '$_'\n";
   }
   $filesize = int($filesize);
   $blksize = int($blksize);
