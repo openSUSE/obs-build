@@ -112,6 +112,48 @@ sub expr {
   }
 }
 
+sub adaptmacros {
+  my ($macros, $optold, $optnew) = @_;
+  for (keys %$optold) {
+    delete $macros->{$_};
+  }
+  for (keys %$optnew) {
+    $macros->{$_} = $optnew->{$_};
+  }
+  return $optnew;
+}
+
+sub grabargs {
+  my ($macname, $getopt, @args) = @_;
+  my %m;
+  $m{'0'} = $macname;
+  $m{'**'} = join(' ', @args);
+  my %go = split(/(:?)/, $getopt);
+  while (@args && $args[0] =~ s/^-//) {
+    my $o = shift @args;
+    last if $o eq '-';
+    while ($o =~ /^(.)(.*)$/) {
+      if ($go{$1}) {
+	my $arg = $2;
+	$arg = shift(@args) if @args && $arg eq '';
+	$m{"-$1"} = "-$1 $arg";
+	$m{"-$1*"} = $arg;
+	last;
+      }
+      $m{"-$1"} = "-$1";
+      $o = $2;
+    }
+  }
+  $m{'#'} = scalar(@args);
+  my $i = 1;
+  for (@args) {
+    $m{$i} = $_;
+    $i++;
+  }
+  $m{'*'} = join(' ', @args);
+  return \%m;
+}
+
 # xspec may be passed as array ref to return the parsed spec files
 # an entry in the returned array can be
 # - a string: verbatim line from the original file
@@ -133,6 +175,7 @@ sub parse {
   my $hasnfb;
   my $nfbline;
   my %macros;
+  my %macros_args;
   my $ret = {};
   my $ifdeps;
 
@@ -191,10 +234,13 @@ sub parse {
       next unless $line =~ /^#!BuildIgnore/;
     }
     my $expandedline = '';
-    if (!$skip) {
+    if (!$skip && ($line =~ /%/)) {
       my $tries = 0;
+      my @expandstack;
+      my $optmacros = {};
       # newer perls: \{((?:(?>[^{}]+)|(?2))*)\}
-      while ($line =~ /^(.*?)%(\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\()(.*?)$/) {
+reexpand:
+      while ($line =~ /^(.*?)%(\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\*\*?|#|\()(.*?)$/) {
 	if ($tries++ > 1000) {
 	  print STDERR "Warning: spec file parser ",($lineno?" line $lineno":''),": macro too deeply nested\n" if $config->{'warnings'};
 	  $line = 'MACRO';
@@ -204,12 +250,25 @@ sub parse {
 	$line = $4;
 	my $macname = defined($3) ? $3 : $2;
 	my $macorig = $2;
-        if (defined($3) && $macname =~ /{/) {
-	  while (($macname =~ y/{/{/) > ($macname =~ y/}/}/)) {
-	    last unless $line =~ /^([^}]*)}(.*)$/;
-	    $macname .= "}$1";
-	    $macorig .= "$1}";
-	    $line = $2;
+	my $macdata;
+	my $macalt;
+	if (defined($3)) {
+	  if ($macname =~ /{/) {	# {
+	    while (($macname =~ y/{/{/) > ($macname =~ y/}/}/)) {
+	      last unless $line =~ /^([^}]*)}(.*)$/;
+	      $macname .= "}$1";
+	      $macorig .= "$1}";
+	      $line = $2;
+	    }
+	  }
+	  $macdata = '';
+	  if ($macname =~ /^([^\s:]+)([\s:])(.*)$/) {
+	    $macname = $1;
+	    if ($2 eq ':') {
+	      $macalt = $3;
+	    } else {
+	      $macdata = $3;
+	    }
 	  }
 	}
 	my $mactest = 0;
@@ -219,9 +278,6 @@ sub parse {
 	  $mactest = 1;
 	}
 	$macname =~ s/^[\!\?]+//;
-	$macname =~ s/^([^:\s]*)\s.*/$1/;
-	my $macalt;
-	($macname, $macalt) = split(':', $macname, 2);
 	if ($macname eq '%') {
 	  $expandedline .= '%';
 	  next;
@@ -234,7 +290,11 @@ sub parse {
 	    my $macname = $1;
 	    my $macargs = $2;
 	    my $macbody = $3;
-	    $macbody = undef if $macargs;
+	    if (defined $macargs) {
+	      $macros_args{$macname} = $macargs;
+	    } else {
+	      delete $macros_args{$macname};
+	    }
 	    $macros{$macname} = $macbody;
 	  }
 	  $line = '';
@@ -259,11 +319,30 @@ sub parse {
 	  }
 	  $args[0] = "with_$args[0]" if $macname eq 'with' || $macname eq 'without';
 	  $line = ((exists($macros{$args[0]}) ? 1 : 0) ^ ($macname eq 'undefined' || $macname eq 'without' ? 1 : 0)).$line;
+	} elsif ($macname eq 'expand') {
+	  $macalt = $macros{$macname} unless defined $macalt;
+	  $macalt = '' if $mactest == -1;
+	  push @expandstack, ($expandedline, $line, undef);
+	  $line = $macalt;
+	  $expandedline = '';
 	} elsif (exists($macros{$macname})) {
 	  if (!defined($macros{$macname})) {
 	    print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand '$macname'\n" if $config->{'warnings'};
 	    $line = 'MACRO';
 	    last;
+	  }
+	  if ($macros_args{$macname}) {
+	    # macro with args!
+	    if (!defined($macdata)) {
+	      $line =~ /^\s*([^\n]*).*?$/;
+	      $macdata = $1;
+	      $line = $2;
+	    }
+	    push @expandstack, ($expandedline, $line, $optmacros);
+	    $optmacros = adaptmacros(\%macros, $optmacros, grabargs($macname, $macros_args{$macname}, split(/ /, $macdata)));
+	    $line = $macros{$macname};
+	    $expandedline = '';
+	    next;
 	  }
 	  $macalt = $macros{$macname} unless defined $macalt;
 	  $macalt = '' if $mactest == -1;
@@ -272,11 +351,22 @@ sub parse {
 	  $macalt = '' if !defined($macalt) || $mactest == 1;
 	  $line = "$macalt$line";
 	} else {
-	  $expandedline .= "%$macorig";
+	  $expandedline .= "%$macorig" unless $macname =~ /^-/;
 	}
       }
+      $line = $expandedline . $line;
+      if (@expandstack) {
+	my $m = pop(@expandstack);
+	if ($m) {
+	  $optmacros = adaptmacros(\%macros, $optmacros, $m);
+	  $expandstack[-2] .= $line;
+	  $line = '';
+	}
+	$line = $line . pop(@expandstack);
+	$expandedline = pop(@expandstack);
+	goto reexpand;
+      }
     }
-    $line = $expandedline . $line;
     if ($line =~ /^\s*%else\b/) {
       $skip = 1 - $skip if $skip < 2;
       next;
