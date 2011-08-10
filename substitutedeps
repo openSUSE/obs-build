@@ -117,6 +117,7 @@ for my $line (@$xspec) {
     my $spec_rel = $1; # User-provided value
     my $oldl = $line;
     if (defined $release) {
+      $line =~ s/<SPEC_REL>/$spec_rel/;
       if (!($line =~ s/<RELEASE\d*>/$release/g)) {
 	if ($line =~ /<(?:CI_CNT|B_CNT)>/) {
 	  # XXX: should pass ci_cnt/b_cnt instead
@@ -133,7 +134,6 @@ for my $line (@$xspec) {
 	  $line =~ s/^(Release:\s*).*/$1$release/i;
 	}
       }
-      $line =~ s/<SPEC_REL>/$spec_rel/;
     } else {
       # remove macros, as rpm doesn't like them
       $line =~ s/<RELEASE\d*>/0/;
