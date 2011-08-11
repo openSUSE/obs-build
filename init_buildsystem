@@ -357,33 +357,49 @@ validate_cache_file()
 #
 copy_qemu()
 {
-    local dev dir path dest
+    local path dest
 
     echo "copying qemu"
 
     mkdir -p $BUILD_ROOT/usr/bin
-    for dev in $EMULATOR_DEVS; do
-	for dir in $BUILD_DIR /usr/bin; do
-	    for path in $dir/qemu-${dev}*; do
-		if file $path | grep -q static; then
-		    dest="$BUILD_ROOT/usr/bin/${path##*/}"
-		    if [ -f "$path" -a ! -x "$dest" ]; then
-			echo -n " $path"		# report copy
-			install -m755 "$path" "$dest"
-		    fi
+
+    if [ -e $BUILD_DIR/qemu-reg ]; then
+
+	for path in $BUILD_DIR/qemu-*; do
+	    if file $path | grep -q static; then
+		dest="$BUILD_ROOT/usr/bin/${path##*/}"
+		if [ -f "$path" -a ! -x "$dest" ]; then
+		    echo -n " $path"		# report copy
+		    #echo install -m755 "$path" "$dest"
+		    install -m755 "$path" "$dest"
 		fi
-	    done
+	    fi
 	done
-    done
+
+    else
+
+	for path in /usr/bin/qemu-*; do
+	    if file $path | grep -q static; then
+		dest="$BUILD_ROOT/usr/bin/${path##*/}"
+		if [ -f "$path" -a ! -x "$dest" ]; then
+		    echo -n " $path"		# report copy
+		    #echo install -m755 "$path" "$dest"
+		    install -m755 "$path" "$dest"
+		fi
+	    fi
+	done
+
+	if [ -e /usr/sbin/qemu-binfmt-conf.sh \
+	    -a ! -e $BUILD_ROOT/usr/sbin/qemu-binfmt-conf.sh ]; then
+	    echo " /usr/sbin/qemu-binfmt-conf.sh"		# report copy
+	    mkdir -p $BUILD_ROOT/usr/sbin
+	    install -m755 /usr/sbin/qemu-binfmt-conf.sh $BUILD_ROOT/usr/sbin
+	fi
+
+    fi
     echo ""
 
     # Below for backward compatibility when /.build/initvm is not present
-    if [ -e /usr/sbin/qemu-binfmt-conf.sh \
-	-a ! -e $BUILD_ROOT/usr/sbin/qemu-binfmt-conf.sh ]; then
-	echo " /usr/sbin/qemu-binfmt-conf.sh"		# report copy
-	mkdir -p $BUILD_ROOT/usr/sbin
-	install -m755 /usr/sbin/qemu-binfmt-conf.sh $BUILD_ROOT/usr/sbin
-    fi
 
     if [ -n "$PREPARE_VM" ]; then
 	if [ -x /bin/bash-static -a -x /bin/mount-static ]; then
@@ -576,16 +592,11 @@ else
 	if [ -z "$PREPARE_VM" ]; then
 	    if ! check_binfmt_registered; then
 		echo "registering binfmt handlers"
-		# prefer initvm over qemu-binfmt-conf.sh
-		success=false
-		for cmd in $BUILD_DIR/initvm /usr/sbin/qemu-binfmt-conf.sh
-		do
-		    if [ -x $cmd ] && $cmd; then
-			success=true
-			break
-		    fi
-		done
-		if [ success = false ]; then
+		if [ -x "$BUILD_DIR/initvm" -a -e "$BUILD_DIR/qemu-reg" ]; then
+		    $BUILD_DIR/initvm
+		elif [ -x /usr/sbin/qemu-binfmt-conf.sh ]; then
+		   /usr/sbin/qemu-binfmt-conf.sh
+		else
 		    echo "Warning: could not register binfmt handlers"
 		fi
 	    fi

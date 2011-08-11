@@ -86,11 +86,11 @@ RSYNCDONE=
 SIGNDUMMY=
 
 # list of archs which need emulator initialization
-: ${EMULATOR_ARCHS:="armv4l armv5el armv6el armv7el armv7hl armv8el mips mipsel mips64 mips64el ppc ppc64 sh4"}
+: ${EMULATOR_ARCHS:="armv4l armv5el armv6el armv7el armv7hl armv8el mips mipsel mips64 mips64el ppc ppc64 sh4 sparc sparc64 s390 s390x"}
 export EMULATOR_ARCHS
 
 # list of devices registered by binfmt handlers in /proc/sys/fs/binfmt_misc
-: ${EMULATOR_DEVS:="arm mips mipsel mips64 mips64el ppc sh4 sparc"}
+: ${EMULATOR_DEVS:="arm armeb mips mipsel mips64 mips64el ppc sh4 sh4eb sparc s390x"}
 export EMULATOR_DEVS
 
 # This is for insserv
@@ -1435,7 +1435,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	fi
 
 	if check_use_emulator; then
-	    if [ -e $BUILD_DIR/initvm ]; then
+	    if [ -x "$BUILD_DIR/initvm" -a -e "$BUILD_DIR/qemu-reg" ]; then
 		vm_init_script="/.build/initvm"
 	    elif [ -e $BUILD_DIR/initscript_qemu_vm ]; then
 		vm_init_script="/.build/initscript_qemu_vm"
