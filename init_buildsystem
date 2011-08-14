@@ -363,7 +363,7 @@ copy_qemu()
 
     mkdir -p $BUILD_ROOT/usr/bin
 
-    if [ -e $BUILD_DIR/qemu-reg ]; then
+    if [ -e $BUILD_DIR/qemu-reg -a -x $BUILD_DIR/initvm ]; then
 
 	for path in $BUILD_DIR/qemu-*; do
 	    if file $path | grep -q static; then
