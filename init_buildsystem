@@ -355,6 +355,19 @@ validate_cache_file()
 # fall back to initscript_qemu_vm shell script with corresponding static
 # bash and mount programs.
 #
+
+check_copy_qemu()
+{
+    local arch
+
+    for arch in $EMULATOR_DEVS; do
+	if test -e $BUILD_DIR/qemu-$arch; then
+	    return 0
+	fi
+    done
+    return 1
+}
+
 copy_qemu()
 {
     local path dest
@@ -363,7 +376,7 @@ copy_qemu()
 
     mkdir -p $BUILD_ROOT/usr/bin
 
-    if [ -e $BUILD_DIR/qemu-reg -a -x $BUILD_DIR/initvm ]; then
+    if check_copy_qemu; then
 
 	for path in $BUILD_DIR/qemu-*; do
 	    if file $path | grep -q static; then
