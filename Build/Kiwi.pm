@@ -231,6 +231,12 @@ sub kiwiparse {
     push @additionalarchs, split(',', $package->{'onlyarch'}) if $package->{'onlyarch'};
   }
   @requiredarch = unify(@requiredarch, @additionalarchs);
+
+  #### FIXME: kiwi files have no informations where to get -32bit packages from
+  push @requiredarch, "i586" if grep {/^ia64/} @requiredarch;
+  push @requiredarch, "i586" if grep {/^x86_64/} @requiredarch;
+  push @requiredarch, "ppc" if grep {/^ppc64/} @requiredarch;
+  push @requiredarch, "s390" if grep {/^s390x/} @requiredarch;
   
   my @fallbackarchs;
   for my $arch (@requiredarch) {
