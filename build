@@ -1513,13 +1513,13 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		if [ -n "$BUILD_JOBS" -a "$icecream" = 0 ]; then
 		    qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS")
 		fi
-                # workaround a bug in qemu-kvm where wrong cpuid can get set
-                KVM64_WORKAROUND=""
-	        if [ "$PERSONALITY" != 0 -a "$VM_TYPE" = 'kvm' ]; then
-                  KVM64_WORKAROUND="-cpu kvm64"
+                # cpuid is not set correctly in kvm without this
+                KVM_OPTIONS=""
+	        if [ "$VM_TYPE" = 'kvm' ]; then
+                  KVM_OPTIONS="-cpu host"
 		fi
 
-		set -- $qemu_bin -no-reboot -nographic -net none $KVM64_WORKAROUND \
+		set -- $qemu_bin -no-reboot -nographic -net none $KVM_OPTIONS \
 		    -kernel $vm_kernel \
 		    -initrd $vm_initrd \
 		    -append "root=$qemu_rootdev panic=1 quiet no-kvmclock rw elevator=noop console=ttyS0 init=$vm_init_script" \
