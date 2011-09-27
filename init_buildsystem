@@ -613,6 +613,9 @@ else
 		    echo "Warning: could not register binfmt handlers"
 		fi
 	    fi
+	    if [ -n "$PREPARE_VM" ]; then
+	        echo 0 > /proc/sys/vm/mmap_min_addr
+	    fi
 	    read mmap_min_addr < /proc/sys/vm/mmap_min_addr
 	    if [ "$mmap_min_addr" != 0 ]; then
 		echo "Warning: mmap_min_addr is != 0. If programs fail at mmap this could be the reason"
