@@ -1526,15 +1526,15 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		"$@"
 	elif [ "$VM_TYPE" = 'qemu' -o "$VM_TYPE" = 'kvm' ]; then
 		echo "booting $VM_TYPE ..."
+                if [ "$VM_TYPE" = 'kvm' -a -b "$VM_IMAGE" ]; then
+                  # speed optimization when using kvm with raw devices
+		  CACHE=",cache=none"
+                else
+                  # speed optimization when using kvm with raw files
+		  CACHE=",cache=unsafe"
+                fi
 		if [ "$kvm_virtio" = 1 ]; then
-                    if [ "$VM_TYPE" = 'kvm' -a -b "$VM_IMAGE" ]; then
-                      # speed optimization when using kvm with raw devices
-		      CACHE=",cache=none"
-                    else
-                      # speed optimization when using kvm with raw files
-		      CACHE=",cache=unsafe"
-                    fi
-		    qemu_args=(-drive file="$VM_IMAGE",if=virtio$CACHE -hda "$VM_IMAGE")
+		    qemu_args=(-drive file="$VM_IMAGE",if=virtio$CACHE -drive file="$VM_IMAGE",if=ide,index=0$CACHE)
 		    if [ -n "$VM_SWAP" ]; then
 			qemu_args=("${qemu_args[@]}" "-drive")
 			qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=virtio$CACHE")
@@ -1542,8 +1542,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		else
 		    qemu_args=(-hda "$VM_IMAGE")
 		    if [ -n "$VM_SWAP" ]; then
-			qemu_args=("${qemu_args[@]}" "-hdb")
-			qemu_args=("${qemu_args[@]}" "$VM_SWAP")
+			qemu_args=("${qemu_args[@]}" "-drive")
+			qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=ide,index=1$CACHE")
 		    fi
 		fi
 		if [ -n "$BUILD_JOBS" -a "$icecream" = 0 ]; then
