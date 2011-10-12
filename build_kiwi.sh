@@ -256,4 +256,8 @@ EOF
 	    rm -f $BUILD_ROOT/kiwi_post.sh
 	done
     fi
+    # Hook for running post kiwi build scripts like QA scripts if installed
+    if [ -x /usr/lib/build/kiwi_post_run ]; then
+        chroot $BUILD_ROOT su -c /usr/lib/build/kiwi_post_run || cleanup_and_exit 1
+    fi
 }
