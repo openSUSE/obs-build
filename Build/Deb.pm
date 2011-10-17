@@ -73,11 +73,11 @@ sub parse {
               $isneg = 1 if $q =~ s/^\!//;
               $bad = 1 if !defined($bad) && !$isneg;
               if ($isneg) {
-                if ($q eq $arch || $q eq "$os-$arch") {
+                if ($q eq $arch || $q eq 'any' || $q eq "$os-$arch" || $q eq "$os-any") {
                   $bad = 1;
                   last;
                 }
-              } elsif ($q eq $arch || $q eq "$os-$arch") {
+              } elsif ($q eq $arch || $q eq 'any' || $q eq "$os-$arch" || $q eq "$os-any") {
                 $bad = 0;
               }
             }
