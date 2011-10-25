@@ -217,7 +217,10 @@ init_db()
 {
     if test $PSUF = rpm ; then
 	echo initializing rpm db...
-	chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
+        if ! test -e $BUILD_ROOT/usr/lib/rpm/cpuinfo.yaml; then
+            # rpm v5 does not have initdb
+ 	    chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
+        fi
 	# hack: add nofsync to db config to speed up install
 	mkdir -p $BUILD_ROOT/root
 	echo '%__dbi_perms perms=0644 nofsync' > $BUILD_ROOT/.rpmmacros
