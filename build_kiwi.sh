@@ -84,7 +84,7 @@ run_kiwi()
             done
           fi
         else
-          if [ ${ver:0:1} == "4" -a ${ver:2:2} -lt 90 ]; then
+          if [ ${ver:0:1} == "4" -a ${ver:2:2} -lt 85 ]; then
             # broken kiwi version, not accepting verbose level
 	    chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX /usr/sbin/kiwi --root $TOPDIR/KIWIROOT -v --logfile terminal -p $TOPDIR/SOURCES --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
           else
