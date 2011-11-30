@@ -132,8 +132,10 @@ my (@opt_showtag, $opt_sources, $opt_update, $opt_download);
 sub parse_depfile;
 
 my ($dist, $rpmdeps, $archs, $configdir, $useusedforbuild);
+my %options;
 
 GetOptions (
+  \%options,
   "help" => sub { pod2usage(-exitstatus => 0, -verbose => 2) },
 
   "dist=s" => \$dist,
@@ -147,14 +149,27 @@ GetOptions (
   "sources" => \$opt_sources,
   "update" => \$opt_update,
   "download" => \$opt_download,
+  "download-force",
+  "download-recompress=s",
+  "download-outdir=s",
+  "download-compare=s",
+  "download-delete-identical",
 ) or pod2usage(1);
 
 pod2usage(1) unless @ARGV;
+
+my $ua;
 
 my @specs = @ARGV;
 
 die "--download must be used together with --sources\n" if ($opt_download && !$opt_sources);
 die "--update must be used together with --sources\n" if ($opt_update && !$opt_sources);
+
+$options{'download-recompress'} ||= 'auto';
+$options{'download-outdir'}.='/' if ($options{'download-outdir'} && $options{'download-outdir'} !~ /\/$/);
+$options{'download-outdir'} ||= '';
+$options{'download-compare'}.='/' if ($options{'download-compare'} && $options{'download-compare'} !~ /\/$/);
+$options{'download-compare'} ||= '';
 
 my @archs;
 if (!defined $archs) {
@@ -241,6 +256,20 @@ sub check_sum($$)
   return undef;
 }
 
+sub download($$)
+{
+  my ($url, $dest) = @_;
+  my $retry = 3;
+  while ($retry--) {
+    my $res = $ua->mirror($url, $dest);
+    last if $res->is_success;
+    # if it's a redirect we probably got a bad mirror and should just retry
+    return 0 unless $retry && $res->previous;
+    warn "retrying $url\n";
+  }
+  return 1;
+}
+
 #######################################################################
 
 my $ret = 0;
@@ -276,27 +305,44 @@ for my $spec (@specs) {
     my $files = {};
     my $srcfile = read_sources_digests($files, $spec);
     if ($opt_download) {
+      unless ($ua) {
+	use LWP::UserAgent;
+	$ua = LWP::UserAgent->new(
+	  agent => "openSUSE build service",
+	  env_proxy => 1,
+	  timeout => 42);
+      }
+
       for my $t (keys %$parsed) {
         next unless ($t =~ /^(?:source|patch)\d*/);
         my $url = $parsed->{$t};
         next unless $url =~ /^(?:https?|ftp):\/\//;
         my $file = $url;
         $file =~ s/.*\///;
-        next if -e $file;
+	my $src = $options{'download-compare'}.$file;
+        next if -e $src && !($options{'download-force'} || $options{'download-delete-identical'});
         print "Downloading $file...\n";
-        if(system('curl', '-f', '-L', '-#', '-o', $file, $url) != 0) {
+	my $dest = $options{'download-outdir'}.$file;
+	print "$url -> $dest\n";
+
+        if(!download($url, $dest) && $options{'download-recompress'} ne 'no') {
+	  # TODO
           # let's see if the file was recompressed
           if($url =~ s/\.bz2$/.gz/ && $file =~ s/\.bz2$/.gz/
-            && system('curl', '-f', '-L', '-#', '-o', $file, $url) == 0) {
-            if(system('bznew', $file) == 0) {
+            && !download($url, $dest)) {
+            if(system('bznew', $dest) == 0) {
               print STDERR "Used $file and recompressed to bz2 instead\n";
             } else {
-              unlink $file;
+              unlink $dest;
             }
           } else {
             print STDERR "Downloading $file failed\n";
           }
         }
+	if ($options{'download-delete-identical'} && $options{'download-outdir'}
+	&& system('cmp', '-s', $dest, $src) == 0) {
+	  unlink($dest);
+	}
       }
     }
     if ($opt_update) {
