@@ -2058,7 +2058,7 @@ if test -n "$RPMS" -a -d "$BUILD_ROOT/usr/lib/build/checks" ; then
     done
 fi
 
-if test -n "$RPMS" -a "$DO_CHECKS" != "false" -a -x "$BUILD_ROOT/opt/testing/bin/rpmlint" -a -d "$BUILD_ROOT/$TOPDIR/RPMS" ; then
+if test -n "$RPMS" -a "$DO_CHECKS" != "false" -a -x "$BUILD_ROOT/opt/testing/bin/rpmlint" ; then
     LINT_RPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/RPMS \
 	\( -name "*-debuginfo-*" -o -name "*-debugsource-*" \
 	-o -name "*-32bit-*" -o -name "*-64bit-*" \
@@ -2068,8 +2068,13 @@ if test -n "$RPMS" -a "$DO_CHECKS" != "false" -a -x "$BUILD_ROOT/opt/testing/bin
     echo
     echo "RPMLINT report:"
     echo "==============="
-    chroot $BUILD_ROOT /opt/testing/bin/rpmlint --info ${LINT_RPM_FILE_LIST[*]#$BUILD_ROOT} ${SRPM_FILE_LIST[*]#$BUILD_ROOT} || cleanup_and_exit 1
-    echo
+    rpmlint_logfile=$TOPDIR/OTHER/rpmlint.log
+    rm -f "$BUILD_ROOT$rpmlint_logfile"
+    chroot $BUILD_ROOT su -s /opt/testing/bin/rpmlint "$BUILD_USER" -- \
+	    --info ${LINT_RPM_FILE_LIST[*]#$BUILD_ROOT} \
+	    ${SRPM_FILE_LIST[*]#$BUILD_ROOT} > "$BUILD_ROOT$rpmlint_logfile" || cleanup_and_exit 1
+	    cat "$BUILD_ROOT$rpmlint_logfile"
+	    echo
 fi
 
 if test \( -n "$RPMS" -o -n "$DEBS" \) -a -n "$CREATE_BASELIBS"; then
