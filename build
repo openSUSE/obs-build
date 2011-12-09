@@ -68,6 +68,8 @@ VM_INITRD=
 VMDISK_ROOTSIZE=4096
 VMDISK_SWAPSIZE=1024
 VMDISK_FILESYSTEM=ext3
+# settings are for speed and not data safety, we format anyway on next run
+VMDISK_MOUNT_OPTIONS='-o data=writeback,nobarrier,commit=150,noatime'
 MEMSIZE=
 RUNNING_IN_VM=
 RPMLIST=
@@ -576,7 +578,7 @@ detect_vm_2nd_stage()
     RUNNING_IN_VM=true
     mount -orw -n -tproc none /proc
     if test "$VM_TYPE" != 'lxc'; then
-	mount -n -o remount,noatime,rw /
+	mount -n ${VMDISK_MOUNT_OPTIONS},remount,rw /
     fi
 # qemu inside of xen does not work, check again with kvm later before enabling this
 #    if [ -e /dev/kqemu ]; then
@@ -1227,9 +1229,9 @@ if test -z "$RUNNING_IN_VM" ; then
 	if [ -w /root ]; then
             if [ -b $VM_IMAGE ]; then
                 # mount device directly
-		mount $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 3
+		mount $VMDISK_MOUNT_OPTIONS $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 3
 	    else
-		mount -o loop $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 3
+		mount ${VMDISK_MOUNT_OPTIONS},loop $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 3
             fi
 	else
 	    if ! mount $BUILD_ROOT; then
