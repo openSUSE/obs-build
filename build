@@ -1560,7 +1560,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		set -- $qemu_bin -no-reboot -nographic -net none $KVM_OPTIONS \
 		    -kernel $vm_kernel \
 		    -initrd $vm_initrd \
-		    -append "root=$qemu_rootdev panic=1 quiet no-kvmclock rw elevator=noop console=$console init=$vm_init_script" \
+		    -append "root=$qemu_rootdev panic=1 quiet no-kvmclock nmi_watchdog=0 rw elevator=noop console=$console init=$vm_init_script" \
 		    ${MEMSIZE:+-m $MEMSIZE} \
 		    "${qemu_args[@]}"
 
