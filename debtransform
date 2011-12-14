@@ -220,15 +220,15 @@ if ($tarfile =~ /\.tar\.bz2/) {
     my $old = $tarfile;
     $tarfile =~ s/\.tar\.bz2/\.tar\.gz/;
     $tmptar = "$out/$tarfile";
-    print "converting $old to $tarfile\n";
-    system( ( "debtransformbz2", "$old", "$tmptar" )) == 0 || die("cannot transform .tar.bz2 to .tar.gz");
+    print "converting $dir/$old to $tarfile\n";
+    system( ( "debtransformbz2", "$dir/$old", "$tmptar" )) == 0 || die("cannot transform .tar.bz2 to .tar.gz");
 }
 if ($tarfile =~ /\.zip/) {
     my $old = $tarfile;
     $tarfile =~ s/\.zip/\.tar\.gz/;
     $tmptar = "$out/$tarfile";
-    print "converting $old to $tarfile\n";
-    system( ( "debtransformzip", "$old", "$tmptar" )) == 0 || die("cannot transform .zip to .tar.gz");
+    print "converting $dir/$old to $tarfile\n";
+    system( ( "debtransformzip", "$dir/$old", "$tmptar" )) == 0 || die("cannot transform .zip to .tar.gz");
 }
 
 my $tardir = $tarfile;
