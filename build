@@ -702,11 +702,32 @@ check_for_ppc()
     export kvm_bin="/usr/bin/qemu-system-ppc64"
     export console=hvc0
     # XXX check host CPU and adjust guest CPU accordingly
-    export KVM_OPTIONS="-enable-kvm -M pseries -cpu 970mp -m 512 -mem-path /hugetlbfs"
-    export VM_KERNEL=/root/obs_kernel/vmlinux
-    export VM_INITRD=/root/obs_kernel/initrd
+    export KVM_OPTIONS="-enable-kvm -M pseries -m 512 -mem-path /hugetlbfs"
+    export VM_KERNEL=/boot/vmlinux
+    export VM_INITRD=/boot/initrd
 
     # XXX complain when hugetlbfs is not mounted
+    cat /proc/mounts | grep "/hugetlbfs" &>/dev/null
+    if [ "$?" != "0" ];then
+	echo "hugetlbfs is not mounted"
+	exit 1
+    fi
+    PAGES_FREE=$(cat /sys/kernel/mm/hugepages/hugepages-16384kB/free_hugepages)
+    PAGES_REQ=$(( 512 / 16 ))
+    if [ "$PAGES_FREE" -lt "$PAGES_REQ" ];then
+	echo "not enough hugepages"
+	exit 1
+    fi
+    grep kvm_rma_count /proc/cmdline &>/dev/null
+    if [ "$?" != "0" ];then
+	echo "put kvm_rma_count=<VM number> to your boot options"
+	exit 1
+    fi
+    grep kvm_hpt_count /proc/cmdline &>/dev/null
+    if [ "$?" != "0" ];then
+	echo "put kvm_hpt_count=<VM number> to your boot options"
+	exit 1
+    fi
 }
 
 #### main ####
@@ -1542,19 +1563,31 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 			qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=virtio$CACHE")
 		    fi
 		else
-		    qemu_args=(-hda "$VM_IMAGE")
-		    if [ -n "$VM_SWAP" ]; then
-			qemu_args=("${qemu_args[@]}" "-drive")
-			qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=ide,index=1$CACHE")
-		    fi
+			if [ "$HOST_ARCH" = "ppc" ];then
+				qemu_args=( "-drive" )
+				qemu_args=("${qemu_args[@]}" "file=$VM_IMAGE,if=scsi,cache=unsafe")
+			else
+				qemu_args=(-hda "$VM_IMAGE")
+			fi
+			if [ -n "$VM_SWAP" ]; then
+				qemu_args=("${qemu_args[@]}" "-drive")
+				if [ "$HOST_ARCH" = "ppc" ];then
+					DISK_IF=scsi	
+				else
+					DISK_IF=ide
+				fi
+				qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=$DISK_IF,index=1$CACHE")
+			fi
 		fi
 		if [ -n "$BUILD_JOBS" -a "$icecream" = 0 ]; then
 		    qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS")
 		fi
-                # cpuid is not set correctly in kvm without this
-                KVM_OPTIONS=""
-	        if [ "$VM_TYPE" = 'kvm' ]; then
-                  KVM_OPTIONS="-cpu host"
+		# cpuid is not set correctly in kvm without this
+		if [ "$HOST_ARCH" != "ppc" ]; then
+			KVM_OPTIONS=""
+		fi
+		if [ "$VM_TYPE" = 'kvm' ]; then
+			KVM_OPTIONS="$KVM_OPTIONS -cpu host"
 		fi
 
 		set -- $qemu_bin -no-reboot -nographic -net none $KVM_OPTIONS \
