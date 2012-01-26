@@ -705,6 +705,28 @@ check_for_ppc()
     export KVM_OPTIONS="-enable-kvm -M pseries -mem-path /hugetlbfs"
     export VM_KERNEL=/boot/vmlinux
     export VM_INITRD=/boot/initrd
+    if [ "$VM_TYPE" = "kvm" ];then
+	    # XXX complain when hugetlbfs is not mounted
+	    cat /proc/mounts | grep "/hugetlbfs" &>/dev/null
+	    if [ "$?" != "0" ];then
+		echo "hugetlbfs is not mounted"
+		exit 1
+	    fi
+	    if [ $(cat /proc/sys/vm/nr_hugepages) -lt $(( 512 / 16 )) ];then
+		echo "please adjust nr_hugepages"
+		exit 1
+	    fi
+	    dmesg| grep kvm_rma_count &>/dev/null
+	    if [ "$?" != "0" ];then
+		echo "put kvm_rma_count=<VM number> to your boot options"
+		exit 1
+	    fi
+	    dmesg| grep kvm_hpt_count &>/dev/null
+	    if [ "$?" != "0" ];then
+		echo "put kvm_hpt_count=<VM number> to your boot options"
+		exit 1
+	    fi
+   fi
 }
 
 #### main ####
@@ -715,8 +737,6 @@ case `perl -V:archname` in
     *x86_64*) PERSONALITY_SYSCALL=135 ;;
     *i?86*)   PERSONALITY_SYSCALL=136 ;;
 esac
-
-check_for_ppc
 
 shopt -s nullglob
 
@@ -1012,6 +1032,8 @@ while test -n "$1"; do
       ;;
     esac
 done
+
+check_for_ppc
 
 if test "$VM_TYPE" = "lxc"; then
     VM_IMAGE=''
@@ -1549,7 +1571,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 			if [ -n "$VM_SWAP" ]; then
 				qemu_args=("${qemu_args[@]}" "-drive")
 				if [ "$HOST_ARCH" = "ppc" ];then
-					DISK_IF=scsi	
+					DISK_IF=scsi
 				else
 					DISK_IF=ide
 				fi
