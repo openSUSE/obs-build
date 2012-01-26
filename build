@@ -702,32 +702,9 @@ check_for_ppc()
     export kvm_bin="/usr/bin/qemu-system-ppc64"
     export console=hvc0
     # XXX check host CPU and adjust guest CPU accordingly
-    export KVM_OPTIONS="-enable-kvm -M pseries -m 512 -mem-path /hugetlbfs"
+    export KVM_OPTIONS="-enable-kvm -M pseries -mem-path /hugetlbfs"
     export VM_KERNEL=/boot/vmlinux
     export VM_INITRD=/boot/initrd
-
-    # XXX complain when hugetlbfs is not mounted
-    cat /proc/mounts | grep "/hugetlbfs" &>/dev/null
-    if [ "$?" != "0" ];then
-	echo "hugetlbfs is not mounted"
-	exit 1
-    fi
-    PAGES_FREE=$(cat /sys/kernel/mm/hugepages/hugepages-16384kB/free_hugepages)
-    PAGES_REQ=$(( 512 / 16 ))
-    if [ "$PAGES_FREE" -lt "$PAGES_REQ" ];then
-	echo "not enough hugepages"
-	exit 1
-    fi
-    grep kvm_rma_count /proc/cmdline &>/dev/null
-    if [ "$?" != "0" ];then
-	echo "put kvm_rma_count=<VM number> to your boot options"
-	exit 1
-    fi
-    grep kvm_hpt_count /proc/cmdline &>/dev/null
-    if [ "$?" != "0" ];then
-	echo "put kvm_hpt_count=<VM number> to your boot options"
-	exit 1
-    fi
 }
 
 #### main ####
