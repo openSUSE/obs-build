@@ -1472,6 +1472,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if test "$VM_TYPE" != 'lxc'; then
 	    test -n "$PERSONALITY_SYSCALL" && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
 	fi
+	if test "$(uname -m)" = 'ppc'; then
+            # ppc kernel never tells us if a 32bit personality is active
+            PERSONALITY="8"
+        fi
 	echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
 	echo "MYHOSTNAME='`hostname`'" >> $BUILD_ROOT/.build/build.data
 	echo -n "definesnstuff=(" >> $BUILD_ROOT/.build/build.data
