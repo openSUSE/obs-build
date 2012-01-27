@@ -733,11 +733,13 @@ check_for_ppc()
 
 trap fail_exit EXIT
 
-case `perl -V:archname` in
-    *x86_64*) PERSONALITY_SYSCALL=135 ;;
+archname=`perl -V:archname`
+archname="${archname#archname=?}"
+case "$archname" in
+    x86_64*) PERSONALITY_SYSCALL=135 ;;
     alpha*) PERSONALITY_SYSCALL=324 ;;
     sparc*) PERSONALITY_SYSCALL=191 ;;
-    *i?86*|ppc*|arm*|sh4|cris|m68k|s390*|unicore32|microblaze)   PERSONALITY_SYSCALL=136 ;;
+    i?86*|ppc*|arm*|sh4|cris|m68k|s390*|unicore32|microblaze)   PERSONALITY_SYSCALL=136 ;;
     *) echo "ARCHITECTURE PERSONALITY IS UNKNOWN"; exit 1;;
 esac
 
@@ -1474,7 +1476,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	fi
 	if test "$(uname -m)" = 'ppc'; then
             # ppc kernel never tells us if a 32bit personality is active
-            PERSONALITY="8"
+            PERSONALITY=8
         fi
 	echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
 	echo "MYHOSTNAME='`hostname`'" >> $BUILD_ROOT/.build/build.data
