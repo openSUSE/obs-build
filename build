@@ -735,7 +735,10 @@ trap fail_exit EXIT
 
 case `perl -V:archname` in
     *x86_64*) PERSONALITY_SYSCALL=135 ;;
-    *i?86*)   PERSONALITY_SYSCALL=136 ;;
+    alpha*) PERSONALITY_SYSCALL=324 ;;
+    sparc*) PERSONALITY_SYSCALL=191 ;;
+    *i?86*|ppc*|arm*|sh4|cris|m68k|s390*|unicore32|microblaze)   PERSONALITY_SYSCALL=136 ;;
+    *) echo "ARCHITECTURE PERSONALITY IS UNKNOWN"; exit 1;;
 esac
 
 shopt -s nullglob
