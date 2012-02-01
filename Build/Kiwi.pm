@@ -121,33 +121,35 @@ sub kiwiparse {
     $ret->{'name'} = $description->{'specification'}->[0]->{'_content'};
   }
   # take default version setting
-  my $preferences = (($kiwi->{'preferences'} || [])->[0]) || {};
-  if ($preferences->{'version'}) {
-    $ret->{'version'} = $preferences->{'version'}->[0]->{'_content'};
+  my $preferences = ($kiwi->{'preferences'} || []);
+  if ($preferences->[0]->{'version'}) {
+    $ret->{'version'} = $preferences->[0]->{'version'}->[0]->{'_content'};
   }
-  for my $type (@{$preferences->{'type'} || []}) {
-    next unless @{$preferences->{'type'}} == 1 || !$type->{'optional'};
-    if (defined $type->{'image'}) {
-      # for kiwi 4.1
-      push @types, $type->{'image'};
-    } else {
-      # for kiwi 3.8 and before
-      push @types, $type->{'_content'};
-    }
-    push @packages, "kiwi-filesystem:$type->{'filesystem'}" if $type->{'filesystem'};
-    if (defined $type->{'boot'}) {
-      if ($type->{'boot'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
-	next unless $bootcallback;
-	my ($bootxml, $xsrc) = $bootcallback->($1, $2);
-	next unless $bootxml;
-	push @extrasources, $xsrc if $xsrc;
-	my $bret = kiwiparse($bootxml, $arch, $count);
-	push @bootrepos, map {"$_->{'project'}/$_->{'repository'}"} @{$bret->{'path'} || []};
-	push @packages, @{$bret->{'deps'} || []};
-	push @extrasources, @{$bret->{'extrasource'} || []};
+  for my $pref (@{$preferences || []}) {
+    for my $type (@{$pref->{'type'} || []}) {
+      next unless @{$pref->{'type'}} == 1 || !$type->{'optional'};
+      if (defined $type->{'image'}) {
+        # for kiwi 4.1 and 5.x
+        push @types, $type->{'image'};
       } else {
-	die("bad boot reference: $type->{'boot'}\n") unless $type->{'boot'} =~ /^([^\/]+)\/([^\/]+)$/;
-	push @packages, "kiwi-boot:$1";
+        # for kiwi 3.8 and before
+        push @types, $type->{'_content'};
+      }
+      push @packages, "kiwi-filesystem:$type->{'filesystem'}" if $type->{'filesystem'};
+      if (defined $type->{'boot'}) {
+        if ($type->{'boot'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
+          next unless $bootcallback;
+          my ($bootxml, $xsrc) = $bootcallback->($1, $2);
+          next unless $bootxml;
+          push @extrasources, $xsrc if $xsrc;
+          my $bret = kiwiparse($bootxml, $arch, $count);
+          push @bootrepos, map {"$_->{'project'}/$_->{'repository'}"} @{$bret->{'path'} || []};
+          push @packages, @{$bret->{'deps'} || []};
+          push @extrasources, @{$bret->{'extrasource'} || []};
+        } else {
+          die("bad boot reference: $type->{'boot'}\n") unless $type->{'boot'} =~ /^([^\/]+)\/([^\/]+)$/;
+          push @packages, "kiwi-boot:$1";
+        }
       }
     }
   }
@@ -174,7 +176,7 @@ sub kiwiparse {
   }
 
   my @repositories = sort {$a->{'priority'} <=> $b->{'priority'}} @{$kiwi->{'repository'} || []};
-  if ($preferences->{'packagemanager'}->[0]->{'_content'} eq 'smart') {
+  if ($preferences->[0]->{'packagemanager'}->[0]->{'_content'} eq 'smart') {
     @repositories = reverse @repositories;
   }
   for my $repository (@repositories) {
@@ -245,7 +247,7 @@ sub kiwiparse {
   @requiredarch = unify(@requiredarch, @fallbackarchs);
 
   if (!$instsource) {
-    my $packman = $preferences->{'packagemanager'}->[0]->{'_content'};
+    my $packman = $preferences->[0]->{'packagemanager'}->[0]->{'_content'};
     push @packages, "kiwi-packagemanager:$packman";
   } else {
     push @packages, "kiwi-packagemanager:instsource";
