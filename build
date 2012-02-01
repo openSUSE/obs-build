@@ -710,14 +710,16 @@ check_for_ppc()
     export KVM_OPTIONS="-enable-kvm -M pseries -mem-path /hugetlbfs"
     export VM_KERNEL=/boot/vmlinux
     export VM_INITRD=/boot/initrd
-    if [ "$VM_TYPE" = "kvm" ];then
+    if [ -z "$RUNNING_IN_VM" -a "$VM_TYPE" = "kvm" ];then
 	    # XXX complain when hugetlbfs is not mounted
 	    cat /proc/mounts | grep "/hugetlbfs" &>/dev/null
 	    if [ "$?" != "0" ];then
 		echo "hugetlbfs is not mounted"
 		exit 1
 	    fi
-	    if [ $(cat /proc/sys/vm/nr_hugepages) -lt $(( 512 / 16 )) ];then
+            PAGES_FREE=$(cat /sys/kernel/mm/hugepages/hugepages-16384kB/free_hugepages)
+            PAGES_REQ=$(( $MEMSIZE / 16 ))
+	    if [ "$PAGES_FREE" -lt "$PAGES_REQ" ];then
 		echo "please adjust nr_hugepages"
 		exit 1
 	    fi
