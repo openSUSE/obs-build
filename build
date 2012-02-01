@@ -432,17 +432,22 @@ setmemorylimit()
 	return
     fi
     local mem
+    local limit
     while read mem; do
 	case "$mem" in
 	    MemTotal:*)
 		set -- $mem
-		eval "mem=\$(($2/3*4))"
-		ulimit -v $mem
-		echo "Memory limit set to ${mem}KB"
-		break;
+		eval "limit=\$(($2/3*4))"
+	    ;;
+	    SwapTotal:*)
+		set -- $mem
+		eval "limit=\$(($2/3*4+$limit))"
 	    ;;
 	esac
     done < <(cat /proc/meminfo) # cat for proc stuff
+
+    ulimit -v $limit
+    echo "Memory limit set to ${limit}KB"
 }
 
 create_baselibs()
