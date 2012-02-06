@@ -711,7 +711,6 @@ check_for_ppc()
     export VM_KERNEL=/boot/vmlinux
     export VM_INITRD=/boot/initrd
     if [ -z "$RUNNING_IN_VM" -a "$VM_TYPE" = "kvm" ];then
-	    # XXX complain when hugetlbfs is not mounted
 	    cat /proc/mounts | grep "/hugetlbfs" &>/dev/null
 	    if [ "$?" != "0" ];then
 		echo "hugetlbfs is not mounted"
@@ -723,12 +722,12 @@ check_for_ppc()
 		echo "please adjust nr_hugepages"
 		exit 1
 	    fi
-	    dmesg| grep kvm_rma_count &>/dev/null
+	    grep kvm_rma_count /proc/cmdline &>/dev/null
 	    if [ "$?" != "0" ];then
 		echo "put kvm_rma_count=<VM number> to your boot options"
 		exit 1
 	    fi
-	    dmesg| grep kvm_hpt_count &>/dev/null
+	    grep kvm_hpt_count /proc/cmdline &>/dev/null
 	    if [ "$?" != "0" ];then
 		echo "put kvm_hpt_count=<VM number> to your boot options"
 		exit 1
