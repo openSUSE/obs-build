@@ -783,15 +783,45 @@ setup_sys_root()
 {
 	for FILENAME in $RPMLIST_TARGET; do
 		BASENAME=$(basename ${FILENAME%.rpmlist})
-	        ARCH=${BASENAME#.}
+	        TARGET=${BASENAME#.}
 
-		test -n "$ARCH" || continue
+		test -n "$TARGET" || continue
 
-		mkdir -p $SYS_ROOT/$ARCH || fail_exit
+		mkdir -p $SYS_ROOT/$TARGET || fail_exit
 
-		init_buildsystem --root $SYS_ROOT/$ARCH --rpmlist $FILENAME $SPECFILE
+		init_buildsystem --root $SYS_ROOT/$TARGET --rpmlist $FILENAME "$MYSRCDIR/$SPECFILE"
 		ERR=$?
 		#TODO: make proper error handling
+	done
+}
+
+cross_build()
+{
+
+	for FILENAME in $RPMLIST_TARGET; do
+                BASENAME=$(basename ${FILENAME%.rpmlist})
+                TARGET=${BASENAME#.}
+
+		test -n "$TARGET" || continue
+
+		cp -p $BUILD_ROOT$TOPDIR/SOURCES/* $SYS_ROOT/$TARGET/$TOPDIR/SOURCES/ || fail_exit
+
+		rpmbopts[${#rpmbopts[@]}]="--target=$TARGET"
+
+		toshellscript $rpmbuild \
+		    "${definesnstuff[@]}" \
+		    "${rpmbopts[@]}" \
+		    "$SYS_ROOT/$TARGET/$TOPDIR/SOURCES/$SPECFILE" \
+		    > $SYS_ROOT/$TARGET/.build.command
+		chmod 755 $SYS_ROOT/$TARGET/.build.command
+		check_exit
+
+		if test -n "$shell"; then
+			chroot $SYS_ROOT/$TARGET su -
+		else
+			chroot $SYS_ROOT/$TARGET su -c /.build.command - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+		fi
+
 	done
 }
 
@@ -2268,6 +2298,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	else
 	    chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
 	fi
+
+	# create cross compile target RPMs
+	cross_build
     fi
 
     if test "$BUILDTYPE" = dsc ; then
