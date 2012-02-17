@@ -80,3 +80,25 @@ check_use_emulator()
     esac
     return 1
 }
+
+# usage:
+# progress_setup LIST
+# for I in $LIST; do
+#    progress_step LIST
+#    action $I 
+# done
+
+# $1 name of a textual list
+progress_setup() {
+    eval "$1__ARRAY__=(\$$1)"
+    eval "$1__INDEX__=1"
+    eval "$1__LENGTH__=\${#$1__ARRAY__[@]}"
+}
+
+# $1 name of a textual list
+# $2 optional, printf format for 2 numeric arguments (current, total)
+progress_step() {
+    local IDX=$1__INDEX__
+    local LEN=$1__LENGTH__
+    printf "${2-[%d/%d] }" $(($IDX++)) ${!LEN}
+}
