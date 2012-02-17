@@ -27,8 +27,6 @@ repos=()
 # should RPMs be installed with --force ?
 USE_FORCE=false
 
-BUILD_IS_RUNNING=$BUILD_ROOT/not-ready
-TMPFILE=$BUILD_ROOT/tmpfile
 #buildhost removed so that id can be generated from repo files
 #RPMIDFMT="%{NAME}-%{VERSION}-%{RELEASE} %{BUILDHOST}-%{BUILDTIME}\n"
 RPMIDFMT="%{NAME}-%{VERSION}-%{RELEASE} %{BUILDTIME}\n"
@@ -89,12 +87,19 @@ while test -n "$1" ; do
 	    CONFIG_DIR=$2
 	    shift 2
 	    ;;
+	--root)
+	    BUILD_ROOT="$2"
+	    shift 2
+	    ;;
 	*)
 	    break
 	    ;;
     esac
 done
 PKGS=("$@")
+
+BUILD_IS_RUNNING=$BUILD_ROOT/not-ready
+TMPFILE=$BUILD_ROOT/tmpfile
 
 #
 # needed functions
