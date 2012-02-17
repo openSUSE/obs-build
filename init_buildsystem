@@ -100,6 +100,7 @@ cleanup_and_exit()
     umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
     umount -n $BUILD_ROOT/proc 2> /dev/null || true
     umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
+	umount -n $BUILD_ROOT/dev/shm 2> /dev/null || true
     umount -n $BUILD_ROOT/mnt 2> /dev/null || true
     exit ${1:-0}
 }
@@ -110,6 +111,7 @@ clean_build_root()
 	    umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	    umount -n $BUILD_ROOT/proc 2> /dev/null || true
 	    umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
+	    umount -n $BUILD_ROOT/dev/shm 2> /dev/null || true
 	    umount -n $BUILD_ROOT/mnt 2> /dev/null || true
 	    rm -rf -- $BUILD_ROOT/*
 	    rm -rf -- $BUILD_ROOT/.build
@@ -252,7 +254,10 @@ create_devs()
 
     mkdir -m 755 -p $BUILD_ROOT/dev/pts
     test -f $BUILD_ROOT/dev/shm && rm -f $BUILD_ROOT/dev/shm
-    mkdir -m 755 -p $BUILD_ROOT/dev/shm
+	# Debian and Ubuntu migration for /var/run break with this
+	if test $PSUF != deb ; then 
+    	mkdir -m 755 -p $BUILD_ROOT/dev/shm
+	fi
     while read com file mode arg ; do
 	rm -f $BUILD_ROOT/dev/$file
 	if test $com = ln ; then
