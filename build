@@ -1207,6 +1207,9 @@ while test -n "$1"; do
     esac
 done
 
+# remove crossbuild target from list of emulated targets
+test -n "$CROSSBUILD" && EMULATOR_ARCHS=${EMULATOR_ARCHS//$ABUILD_TARGET/}
+
 check_for_ppc
 
 if test "$VM_TYPE" = "lxc"; then
