@@ -38,6 +38,7 @@ install:
 	    killchroot \
 	    getmacros \
 	    getoptflags \
+	    gettype \
 	    getchangetarget \
 	    common_functions \
 	    init_buildsystem \

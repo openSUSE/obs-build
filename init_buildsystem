@@ -699,8 +699,24 @@ else
 
     echo "$GUESSED_DIST" > $BUILD_ROOT/.guessed_dist
     test -n "$BUILD_DIST" || BUILD_DIST="$GUESSED_DIST"
-    PSUF=rpm
-    test -L $BUILD_ROOT/.init_b_cache/rpms/rpm.rpm || PSUF=deb
+    DIST_TYPE=`gettype --dist "$BUILD_DIST" --configdir "$BUILD_DIR/configs" --archpath "$BUILD_ARCH"`
+    if [ -n $DIST_TYPE ]; then
+            case $DIST_TYPE in
+            	spec)
+            		PSUF=rpm 
+            		;;
+            	dsc)
+            		PSUF=deb
+            		;;
+            	*)
+            	        PSUF=rpm
+	    		test -L $BUILD_TARGET/.init_b_cache/rpms/rpm.rpm || PSUF=deb
+			;;
+            esac            		
+    else
+	    PSUF=rpm
+	    test -L $BUILD_TARGET/.init_b_cache/rpms/rpm.rpm || PSUF=deb
+    fi
 fi
 
 #
