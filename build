@@ -80,7 +80,8 @@ HUGETLBFSPATH=
 MEMSIZE=
 RUNNING_IN_VM=
 RPMLIST=
-RPMLIST_TARGET=
+SYSROOTS=
+SYSROOT_TARGET=
 RELEASE=
 REASON=
 NOROOTFORBUILD=
@@ -781,15 +782,16 @@ mkdir_build_root()
 
 setup_sys_root()
 {
-	for FILENAME in $RPMLIST_TARGET; do
-		BASENAME=$(basename ${FILENAME%.rpmlist})
-	        TARGET=${BASENAME#.}
+	for SYSROOT in $SYSROOTS; do
+		local SYSROOT_PATH=${SYSROOT%%:*}
+		local SYSROOT_RPMS=${SYSROOT##*:}
 
-		test -n "$TARGET" || continue
+		test -n "$SYSROOT_PATH" || continue
+		test -n "$SYSROOT_RPMS" || continue
 
-		mkdir -p $SYS_ROOT/$TARGET || fail_exit
+		mkdir -p $SYSROOT_PATH || fail_exit
 
-		BUILD_ROOT=$SYS_ROOT/$TARGET init_buildsystem --rpmlist $FILENAME "$MYSRCDIR/$SPECFILE"
+		BUILD_ROOT=$BUILD_ROOT/$SYSROOT_PATH init_buildsystem --rpmlist $SYSROOT_RPMS "$MYSRCDIR/$SPECFILE"
 		ERR=$?
 		#TODO: make proper error handling
 	done
@@ -797,32 +799,9 @@ setup_sys_root()
 
 cross_build()
 {
+	cp -p $BUILD_ROOT$TOPDIR/SOURCES/* $BUILD_ROOT/$SYSROOT_TARGET/$TOPDIR/SOURCES/ || fail_exit
 
-	for FILENAME in $RPMLIST_TARGET; do
-                BASENAME=$(basename ${FILENAME%.rpmlist})
-                TARGET=${BASENAME#.}
-
-		test -n "$TARGET" || continue
-
-		cp -p $BUILD_ROOT$TOPDIR/SOURCES/* $SYS_ROOT/$TARGET/$TOPDIR/SOURCES/ || fail_exit
-
-		rpmbopts[${#rpmbopts[@]}]="--target=$TARGET"
-
-		toshellscript $rpmbuild \
-		    "${definesnstuff[@]}" \
-		    "${rpmbopts[@]}" \
-		    "$SYS_ROOT/$TARGET/$TOPDIR/SOURCES/$SPECFILE" \
-		    > $SYS_ROOT/$TARGET/.build.command
-		chmod 755 $SYS_ROOT/$TARGET/.build.command
-		check_exit
-
-		if test -n "$shell"; then
-			chroot $SYS_ROOT/$TARGET su -
-		else
-			chroot $SYS_ROOT/$TARGET su -c /.build.command - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
-		fi
-
-	done
+	#build command goes here
 }
 
 linux64()
@@ -1081,9 +1060,14 @@ while test -n "$1"; do
         HUGETLBFSPATH="$ARG"
 	shift
       ;;
-      *-rpmlist-target)
+      --sysroot)
 	needarg
-	RPMLIST_TARGET="$RPMLIST_TARGET $ARG"
+	SYSROOTS="$SYSROOTS $ARG"
+	shift
+      ;;
+      --sysroot-target)
+	needarg
+        SYSROOT_TARGET="$ARG"
 	shift
       ;;
       *-release)
