@@ -723,13 +723,24 @@ else
 
     echo "$GUESSED_DIST" > $BUILD_ROOT/.guessed_dist
     test -n "$BUILD_DIST" || BUILD_DIST="$GUESSED_DIST"
-    PSUF=
-    test -L $BUILD_ROOT/.init_b_cache/rpms/rpm.rpm && PSUF=rpm
-    test -L $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb && PSUF=deb
-    test -L $BUILD_ROOT/.init_b_cache/rpms/pacman.arch && PSUF=arch
-    if test -z "$PSUF" ; then
-	echo "unknown package manager" >&2
-	cleanup_and_exit 1
+    DIST_TYPE=`gettype --dist "$BUILD_DIST" --configdir "$BUILD_DIR/configs" --archpath "$BUILD_ARCH"`
+    if [ -n $DIST_TYPE ]; then
+	case $DIST_TYPE in
+		spec)
+			PSUF=rpm 
+			;;
+		dsc)
+			PSUF=deb
+			;;
+		*)
+		        PSUF=rpm
+			test -L $BUILD_TARGET/.init_b_cache/rpms/rpm.rpm || PSUF=deb
+		;;
+	esac
+    else
+	PSUF=rpm
+	test -L $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb && PSUF=deb
+	test -L $BUILD_ROOT/.init_b_cache/rpms/pacman.arch && PSUF=arch
     fi
 fi
 
