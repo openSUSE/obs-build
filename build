@@ -789,7 +789,7 @@ setup_sys_root()
 
 		mkdir -p $SYS_ROOT/$TARGET || fail_exit
 
-		$BUILD_ROOT=$SYS_ROOT/$TARGET init_buildsystem --rpmlist $FILENAME "$MYSRCDIR/$SPECFILE"
+		BUILD_ROOT=$SYS_ROOT/$TARGET init_buildsystem --rpmlist $FILENAME "$MYSRCDIR/$SPECFILE"
 		ERR=$?
 		#TODO: make proper error handling
 	done
