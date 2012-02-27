@@ -146,13 +146,20 @@ if [ -e "$imageout.iso" ]; then
 	popd
 fi
 if [ -e "$imageout.raw" ]; then
+        compress_tool="bzip2"
+        compress_suffix="bz2"
+	if [ -x /usr/bin/xz ]; then
+            # take xz to get support for sparse files
+            compress_tool="xz -2"
+            compress_suffix="xz"
+        fi
 	mv "$imageout.raw" "/$TOPDIR/KIWI/$imageout$buildnum.raw"
 	pushd /$TOPDIR/KIWI
-	echo "bzip2 raw file..."
-	bzip2 "$imageout$buildnum.raw"
+	echo "\$compress_tool raw file..."
+	\$compress_tool "$imageout$buildnum.raw"
 	if [ -x /usr/bin/sha256sum ]; then
 	    echo "Create sha256 file..."
-	    /usr/bin/sha256sum "$imageout$buildnum.raw.bz2" > "$imageout$buildnum.raw.bz2.sha256"
+	    /usr/bin/sha256sum "$imageout$buildnum.raw.\${compress_suffix}" > "$imageout$buildnum.raw.\${compress_suffix}.sha256"
         fi
 	popd
 fi
@@ -252,7 +259,7 @@ fi
 EOF
 		    ;;
 	    esac
-	    chroot $BUILD_ROOT su -c "sh -x -e /kiwi_post.sh" || cleanup_and_exit 1
+	    chroot $BUILD_ROOT su -c "sh -e /kiwi_post.sh" || cleanup_and_exit 1
 	    rm -f $BUILD_ROOT/kiwi_post.sh
 	done
     fi
