@@ -508,7 +508,7 @@ set_build_arch
 trap fail_exit EXIT
 
 if [ "$BUILD_ROOT" = / ]; then
-    read dummy dummy browner dummy < <(ls -ld /)
+    browner="$(stat -c %U /)"
 fi
 
 if [ -n "$CLEAN_BUILD" ]; then
