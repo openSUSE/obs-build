@@ -392,27 +392,23 @@ copy_qemu()
     if check_copy_qemu; then
 
 	for path in $BUILD_DIR/qemu-*; do
-	    if file $path | grep -q static; then
 		dest="$BUILD_ROOT/usr/bin/${path##*/}"
-		if [ -f "$path" -a ! -x "$dest" ]; then
+		if [ -e "$path" -a ! -x "$dest" ]; then
 		    echo -n " $path"		# report copy
 		    #echo install -m755 "$path" "$dest"
 		    install -m755 "$path" "$dest"
 		fi
-	    fi
 	done
 
     else
 
 	for path in /usr/bin/qemu-*; do
-	    if file $path | grep -q static; then
 		dest="$BUILD_ROOT/usr/bin/${path##*/}"
-		if [ -f "$path" -a ! -x "$dest" ]; then
+		if [ -e "$path" -a ! -x "$dest" ]; then
 		    echo -n " $path"		# report copy
 		    #echo install -m755 "$path" "$dest"
 		    install -m755 "$path" "$dest"
 		fi
-	    fi
 	done
 
 	if [ -e /usr/sbin/qemu-binfmt-conf.sh \
