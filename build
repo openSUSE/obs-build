@@ -77,6 +77,7 @@ HUGETLBFSPATH=
 MEMSIZE=
 RUNNING_IN_VM=
 RPMLIST=
+CROSSBUILD=
 SYSROOTS=
 SYSROOT_TARGET=
 RELEASE=
@@ -788,7 +789,7 @@ setup_sys_root()
 
 		mkdir -p $SYSROOT_PATH || fail_exit
 
-		BUILD_ROOT=$BUILD_ROOT/$SYSROOT_PATH init_buildsystem --rpmlist $SYSROOT_RPMS "$MYSRCDIR/$SPECFILE"
+		BUILD_ROOT=$BUILD_ROOT/$SYSROOT_PATH CROSSBUILD=1 init_buildsystem --rpmlist $SYSROOT_RPMS "$MYSRCDIR/$SPECFILE"
 		ERR=$?
 		#TODO: make proper error handling
 	done
@@ -2268,6 +2269,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    rpmbopts[${#rpmbopts[@]}]="RSYNCDONE 1"
 	fi
 
+	rpmbopts[${#rpmbopts[@]}]='-vv'
+
+	rpmbuild=rpmbuild
+
+	test -x $BUILD_ROOT/usr/bin/rpmbuild || rpmbuild=rpm
 	# su involves a shell which would require even more
 	# complicated quoting to bypass than this
 	toshellscript $rpmbuild \
