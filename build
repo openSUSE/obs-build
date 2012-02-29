@@ -920,6 +920,12 @@ while test -n "$1"; do
 	VMDISK_FILESYSTEM="$ARG"
 	shift
       ;;
+      *-vmdisk-mount-options|--vm-disk-mount-options)
+       needarg
+        # options needs to be quoted to handle argument which might start with "-o ..."
+       VMDISK_MOUNT_OPTIONS=$(echo $ARG | sed 's/^\"\(.*\)\"$/\1/g')
+       shift
+      ;;
       *-rpmlist)
 	needarg
 	RPMLIST="--rpmlist $ARG"
@@ -1476,6 +1482,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	# FIXME: this depends on the kernel and vm.
 	# could be hda2, sda2 for xen or hdb/sdb for qemu
 	test -n "$VM_SWAP" && echo "VM_SWAP='${VM_SWAPDEV:-/dev/hda2}'" >> $BUILD_ROOT/.build/build.data
+	test -n "$VMDISK_MOUNT_OPTIONS" && echo "VMDISK_MOUNT_OPTIONS='${VMDISK_MOUNT_OPTIONS}'" >> $BUILD_ROOT/.build/build.data
 	PERSONALITY=0
 	if test "$VM_TYPE" != 'lxc'; then
 	    test -n "$PERSONALITY_SYSCALL" && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
