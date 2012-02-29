@@ -787,7 +787,7 @@ setup_sys_root()
 		test -n "$SYSROOT_PATH" || continue
 		test -n "$SYSROOT_RPMS" || continue
 
-		mkdir -p $SYSROOT_PATH || fail_exit
+		mkdir -p $BUILD_ROOT/$SYSROOT_PATH || fail_exit
 
 		BUILD_ROOT=$BUILD_ROOT/$SYSROOT_PATH CROSSBUILD=1 init_buildsystem --rpmlist $SYSROOT_RPMS "$MYSRCDIR/$SPECFILE"
 		ERR=$?
@@ -1501,6 +1501,7 @@ if [ -z "$RUNNING_IN_VM" ]; then
     test -n "$BUILD_RPMS" && echo Using BUILD_RPMS=$BUILD_RPMS
     echo Using BUILD_ARCH=$BUILD_ARCH
     test -n "$VM_TYPE" && echo "Doing $VM_TYPE build${VM_IMAGE:+ in $VM_IMAGE}"
+    test -n "$CROSSBUILD" && echo "Doing crossbuild on $BUILD_ARCH for $ABUILD_TARGET"
     echo
 fi
 
@@ -2268,8 +2269,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    rpmbopts[${#rpmbopts[@]}]='--define'
 	    rpmbopts[${#rpmbopts[@]}]="RSYNCDONE 1"
 	fi
-
-	rpmbopts[${#rpmbopts[@]}]='-vv'
 
 	rpmbuild=rpmbuild
 
