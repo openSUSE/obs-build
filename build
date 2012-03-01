@@ -1189,8 +1189,7 @@ while test -n "$1"; do
     esac
 done
 
-# remove crossbuild target from list of emulated targets
-test -n "$CROSSBUILD" && EMULATOR_ARCHS=${EMULATOR_ARCHS//$ABUILD_TARGET/}
+test -n "$CROSSBUILD" && export ABUILD_INIT_WITH_IGNORE_ARCH=true # required for 00-check-install-rpms
 
 check_for_ppc
 
