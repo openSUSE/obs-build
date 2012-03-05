@@ -13,6 +13,7 @@
 # needed globals variables
 #
 export SRC
+export PKG_CACHE_DIR
 export YAST_IS_RUNNING="instsys"
 export DEBIAN_FRONTEND=noninteractive
 export DEBIAN_PRIORITY=critical
@@ -100,7 +101,6 @@ cleanup_and_exit()
     umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
     umount -n $BUILD_ROOT/proc 2> /dev/null || true
     umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
-	umount -n $BUILD_ROOT/dev/shm 2> /dev/null || true
     umount -n $BUILD_ROOT/mnt 2> /dev/null || true
     exit ${1:-0}
 }
@@ -111,7 +111,6 @@ clean_build_root()
 	    umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	    umount -n $BUILD_ROOT/proc 2> /dev/null || true
 	    umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
-	    umount -n $BUILD_ROOT/dev/shm 2> /dev/null || true
 	    umount -n $BUILD_ROOT/mnt 2> /dev/null || true
 	    rm -rf -- $BUILD_ROOT/*
 	    rm -rf -- $BUILD_ROOT/.build
@@ -218,22 +217,22 @@ run_pkg_scripts()
 init_db()
 {
     if test $PSUF = rpm ; then
-	echo initializing rpm db...
+		echo initializing rpm db...
         if ! test -e $BUILD_ROOT/usr/lib/rpm/cpuinfo.yaml; then
             # rpm v5 does not have initdb
  	    chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
         fi
-	# hack: add nofsync to db config to speed up install
-	mkdir -p $BUILD_ROOT/root
-	echo '%__dbi_perms perms=0644 nofsync' > $BUILD_ROOT/.rpmmacros
-	echo '%__dbi_perms perms=0644 nofsync' > $BUILD_ROOT/root/.rpmmacros
+		# hack: add nofsync to db config to speed up install
+		mkdir -p $BUILD_ROOT/root
+		echo '%__dbi_perms perms=0644 nofsync' > $BUILD_ROOT/.rpmmacros
+		echo '%__dbi_perms perms=0644 nofsync' > $BUILD_ROOT/root/.rpmmacros
     else
-	# force dpkg into database to make epoch test work
-	if ! test "$BUILD_ROOT/.init_b_cache/rpms/dpkg.deb" -ef "$BUILD_ROOT/.init_b_cache/dpkg.deb" ; then
-	    rm -f $BUILD_ROOT/.init_b_cache/dpkg.deb
-	    cp $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb $BUILD_ROOT/.init_b_cache/dpkg.deb || cleanup_and_exit 1
-	fi
-	chroot $BUILD_ROOT dpkg -i --force all .init_b_cache/dpkg.deb >/dev/null 2>&1
+		# force dpkg into database to make epoch test work
+		if ! test "$BUILD_ROOT/.init_b_cache/rpms/dpkg.deb" -ef "$BUILD_ROOT/.init_b_cache/dpkg.deb" ; then
+			rm -f $BUILD_ROOT/.init_b_cache/dpkg.deb
+			cp $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb $BUILD_ROOT/.init_b_cache/dpkg.deb || cleanup_and_exit 1
+		fi
+		chroot $BUILD_ROOT dpkg -i --force all .init_b_cache/dpkg.deb >/dev/null 2>&1
     fi
 }
 
@@ -254,10 +253,7 @@ create_devs()
 
     mkdir -m 755 -p $BUILD_ROOT/dev/pts
     test -f $BUILD_ROOT/dev/shm && rm -f $BUILD_ROOT/dev/shm
-	# Debian and Ubuntu migration for /var/run break with this
-	if test $PSUF != deb ; then 
-    	mkdir -m 755 -p $BUILD_ROOT/dev/shm
-	fi
+    mkdir -m 755 -p $BUILD_ROOT/dev/shm
     while read com file mode arg ; do
 	rm -f $BUILD_ROOT/dev/$file
 	if test $com = ln ; then
@@ -513,7 +509,7 @@ set_build_arch
 trap fail_exit EXIT
 
 if [ "$BUILD_ROOT" = / ]; then
-    read dummy dummy browner dummy < <(ls -ld /)
+    browner="$(stat -c %U /)"
 fi
 
 if [ -n "$CLEAN_BUILD" ]; then
@@ -560,10 +556,12 @@ if test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
     # vm continuation
     . $BUILD_ROOT/.build/init_buildsystem.data
     if ! test -e $BUILD_ROOT/.init_b_cache/preinstall_finished ; then
-	# finish preinstall
-	run_pkg_scripts
-	init_db
-	touch $BUILD_ROOT/.init_b_cache/preinstall_finished
+		# finish preinstall
+		if test ! $PSUF = deb ; then
+			run_pkg_scripts
+			init_db
+		fi
+	    touch $BUILD_ROOT/.init_b_cache/preinstall_finished
     fi
 else
     #
@@ -601,6 +599,13 @@ else
 	   test "$PKG" = "rpmid:" && continue
 	   echo "${SRC##*/}"
 	done < $BUILD_ROOT/.init_b_cache/rpmlist
+
+	#
+	# Real cache dir
+	#
+	read PKG SRC < $BUILD_ROOT/.init_b_cache/rpmlist
+	PKG_CACHE_DIR=`dirname $SRC | rev | cut -d"/" -f3- | rev`
+	
 	rm -rf $BUILD_ROOT/.init_b_cache
 	cleanup_and_exit 0
     fi
@@ -638,8 +643,15 @@ else
     PACKAGES_TO_CBPREINSTALL=
     PACKAGES_TO_CBINSTALL=
     RUNSCRIPTS_SEEN=
-    GUESSED_DIST=unknown
-    mkdir -p $BUILD_ROOT/.init_b_cache/rpms
+    GUESSED_DIST=unknow
+	
+	#
+	# Real cache dir
+	#
+	read PKG SRC < $RPMLIST
+	PKG_CACHE_DIR=`dirname $SRC | rev | cut -d"/" -f3- | rev`
+    
+	mkdir -p $BUILD_ROOT/.init_b_cache/rpms
     while read PKG SRC ; do
 	if test "$PKG" = "preinstall:" ; then
 	    PACKAGES_TO_PREINSTALL=$SRC
@@ -730,32 +742,56 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
     for PKG in $PACKAGES_TO_RUNSCRIPTS ; do
 	: > $BUILD_ROOT/.init_b_cache/scripts/$PKG.run
     done
-    progress_setup PACKAGES_TO_PREINSTALL
-    for PKG in $PACKAGES_TO_PREINSTALL ; do
-	progress_step PACKAGES_TO_PREINSTALL
-	preinstall ${PKG##*/}
-    done
-    if test -n "$PREPARE_VM" ; then
-	progress_setup PACKAGES_TO_VMINSTALL
-	for PKG in $PACKAGES_TO_VMINSTALL ; do
-	    progress_step PACKAGES_TO_VMINSTALL
-	    preinstall ${PKG##*/}
-	done
-    fi
-    # add cbpreinstall if cross HOST != TARGET
-    progress_setup PACKAGES_TO_CBPREINSTALL
-    for PKG in $PACKAGES_TO_CBPREINSTALL ; do
-	progress_step PACKAGES_TO_CBPREINSTALL
-        preinstall ${PKG##*/}
-    done
+	if test $PSUF = deb ; then
+		echo "Using debootstrap to preinstall deb based system"
+		
+		# Run local repos script
+		generate-obs-repos $PKG_CACHE_DIR
+		
+		# Assure all packages are included
+		FULL_PKG_LIST=""
+		for PKG in $PACKAGES_TO_PREINSTALL $PACKAGES_TO_CBPREINSTALL $PACKAGES_TO_INSTALL; do
+			FULL_PKG_LIST="$PKG,$FULL_PKG_LIST"
+		done
+
+		DEBOOT_ARCH=""
+		[ "$BUILD_ARCH" = "i586:i486:i386" ] && DEBOOT_ARCH="i386"
+		[ "$BUILD_ARCH" = "armv7l" ] && DEBOOT_ARCH="armhf"
+	
+		# Run debootstrap
+		set -- debootstrap --variant=buildd --arch=$DEBOOT_ARCH --include=$FULL_PKG_LIST obs $BUILD_ROOT file://$BUILD_ROOT/obs_repo
+		echo "$@ ..."
+		$@
+	else
+		progress_setup PACKAGES_TO_PREINSTALL
+		for PKG in $PACKAGES_TO_PREINSTALL ; do
+		progress_step PACKAGES_TO_PREINSTALL
+		preinstall ${PKG##*/}
+		done
+		if test -n "$PREPARE_VM" ; then
+		progress_setup PACKAGES_TO_VMINSTALL
+		for PKG in $PACKAGES_TO_VMINSTALL ; do
+			progress_step PACKAGES_TO_VMINSTALL
+			preinstall ${PKG##*/}
+		done
+		fi
+		# add cbpreinstall if cross HOST != TARGET
+		progress_setup PACKAGES_TO_CBPREINSTALL
+		for PKG in $PACKAGES_TO_CBPREINSTALL ; do
+		progress_step PACKAGES_TO_CBPREINSTALL
+			preinstall ${PKG##*/}
+		done
+	fi
     if [ -w /root ]; then
 	    test -c $BUILD_ROOT/dev/null || create_devs
     fi
     test -e $BUILD_ROOT/etc/fstab || touch $BUILD_ROOT/etc/fstab
     test -e $BUILD_ROOT/etc/ld.so.conf || cp $BUILD_ROOT/etc/ld.so.conf.in $BUILD_ROOT/etc/ld.so.conf
     if test -z "$PREPARE_VM" ; then
-	run_pkg_scripts
-	init_db
+	if test ! $PSUF = deb ; then
+		run_pkg_scripts
+		init_db
+	fi
 	touch $BUILD_ROOT/.init_b_cache/preinstall_finished
     fi
 fi
@@ -818,14 +854,17 @@ if test -f $BUILD_ROOT/var/lib/rpm/packages.rpm -o -f $BUILD_ROOT/var/lib/rpm/Pa
     )
 fi
 
-#
-# reorder packages (already done in vm continuation)
-#
-if ! test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
-    echo -n 'reordering...'
-    PACKAGES_TO_INSTALL_FIRST=`reorder $PACKAGES_TO_INSTALL_FIRST`
-    PACKAGES_TO_INSTALL=`reorder $PACKAGES_TO_INSTALL`
-    echo 'done'
+
+if ! test $PSUF = deb ; then
+	#
+	# reorder packages (already done in vm continuation)
+	#
+	if ! test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
+		echo -n 'reordering...'
+		PACKAGES_TO_INSTALL_FIRST=`reorder $PACKAGES_TO_INSTALL_FIRST`
+		PACKAGES_TO_INSTALL=`reorder $PACKAGES_TO_INSTALL`
+		echo 'done'
+	fi
 fi
 
 rpm_e()
@@ -885,123 +924,87 @@ test -x /usr/bin/rpmsign && RPMCHECKOPTS_HOST="--nodigest --nosignature"
 
 MAIN_LIST="$PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL"
 progress_setup MAIN_LIST
-for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL; do
-    progress_step MAIN_LIST
 
-    case $PKG in
-      RUN_LDCONFIG)
-	test -x $BUILD_ROOT/sbin/ldconfig && chroot $BUILD_ROOT /sbin/ldconfig 2>&1
-	continue
-      ;;
-    esac
+if test ! $PSUF = deb ; then
+	for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL; do
+		progress_step MAIN_LIST
 
-    test -f $BUILD_ROOT/installed-pkg/$PKG && continue
-
-    if test $PSUF = deb ; then
-	# debian world, install deb files
-	test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.deb || continue
-	if ! test "$BUILD_ROOT/.init_b_cache/rpms/$PKG.deb" -ef "$BUILD_ROOT/.init_b_cache/$PKG.deb" ; then
-	    rm -f $BUILD_ROOT/.init_b_cache/$PKG.deb
-	    cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.deb $BUILD_ROOT/.init_b_cache/$PKG.deb || cleanup_and_exit 1
-	fi
-	PKGID=`readlink $BUILD_ROOT/.init_b_cache/rpms/$PKG.deb`
-	PKGID="${PKGID##*/}"
-	PKGID="${PKGID%.deb}"
-	echo "installing ${PKGID%_*}"
-	( chroot $BUILD_ROOT dpkg --install --force all .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
-	    perl -ne '$|=1;/^(Configuration file|Installing new config file|Selecting previously deselected|\(Reading database|Unpacking |Setting up|Creating config file|Preparing to replace dpkg)/||/^$/||print'
-	check_exit
-	echo "$PKGID debian" > $BUILD_ROOT/installed-pkg/$PKG
-        # ugly workaround for upstart system. some packages (procps) try
-        # to start a service in their configure phase. As we don't have
-        # a running upstart, we just link the start binary to /bin/true
-	if test -e "$BUILD_ROOT/sbin/start"; then
-	    if test "$BUILD_ROOT/sbin/start" -ef "$BUILD_ROOT/sbin/initctl" ; then
-		echo "linking /sbin/start to /bin/true"
-		mv "$BUILD_ROOT/sbin/start" "$BUILD_ROOT/sbin/start.disabled"
-		ln -s "/bin/true" "$BUILD_ROOT/sbin/start"
-	    fi
-	fi
-	continue
-    fi
-
-    test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm || continue
-
-    if test -f $BUILD_ROOT/.init_b_cache/rpms/$PKG.id -a -f $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG ; then
-	read PKGID < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
-	read OLDPKGID < $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG
-	if test "$PKGID" = "$OLDPKGID" ; then
-	    #echo "keeping ${PKGID%% *}"
-	    echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
-	    continue
-	fi
-    fi
-
-    PKGID=`rpm -qp --qf "$RPMIDFMT" $RPMCHECKOPTS_HOST $BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm`
-
-    if test -f $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG ; then
-	read OLDPKGID < $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG
-	if test "$PKGID" != "$OLDPKGID" ; then
-	    echo deleting unwanted ${OLDPKGID%% *}
-	    rpm_e "$PKG"
-	elif test "$VERIFY_BUILD_SYSTEM" = true ; then
-	    chroot $BUILD_ROOT rpm --verify $PKG 2>&1 | tee $TMPFILE
-	    if grep ^missing $TMPFILE > /dev/null ; then
-		echo deleting incomplete ${PKGID%% *}
-		rpm_e "$PKG"
-	    else
-		#echo "keeping ${PKGID%% *}"
-		echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
+		case $PKG in
+		  RUN_LDCONFIG)
+		test -x $BUILD_ROOT/sbin/ldconfig && chroot $BUILD_ROOT /sbin/ldconfig 2>&1
 		continue
-	    fi
-	else
-	    #echo "keeping ${PKGID%% *}"
-	    echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
-	    continue
-	fi
-	if test -e "$BUILD_ROOT/.init_b_cache/preinstalls/$PKG" ; then
-	    preinstall "$PKG"
-	    # call for rpm-4.x and not rpm-devel
-	    test -z "${PKG##rpm-[0-9]*}" && chroot $BUILD_ROOT rpm --rebuilddb
-	    # also exec for exchanged rpm !  naming is rpm-x86-<target>-<ver>
-	    test -z "${PKG##rpm-x86-*[0-9]*}" && chroot $BUILD_ROOT rpm --rebuilddb
-	fi
-    fi
-    export ADDITIONAL_PARAMS=
-    if test "$USE_FORCE" = true ; then
-	export ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --force"
-    fi
-    # work around for cross-build installs, we must not overwrite the running rpm
-    if test "$PKG" = rpm ; then
-	for i in $BUILD_ROOT/.init_b_cache/preinstalls/rpm-x86-* ; do
-	    test -e "$i" && ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --justdb"
+		  ;;
+		esac
+
+		test -f $BUILD_ROOT/installed-pkg/$PKG && continue
+
+		test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm || continue
+
+		if test -f $BUILD_ROOT/.init_b_cache/rpms/$PKG.id -a -f $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG ; then
+		read PKGID < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
+		read OLDPKGID < $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG
+		if test "$PKGID" = "$OLDPKGID" ; then
+			#echo "keeping ${PKGID%% *}"
+			echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
+			continue
+		fi
+		fi
+
+		PKGID=`rpm -qp --qf "$RPMIDFMT" $RPMCHECKOPTS_HOST $BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm`
+
+		if test -f $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG ; then
+		read OLDPKGID < $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG
+		if test "$PKGID" != "$OLDPKGID" ; then
+			echo deleting unwanted ${OLDPKGID%% *}
+			rpm_e "$PKG"
+		elif test "$VERIFY_BUILD_SYSTEM" = true ; then
+			chroot $BUILD_ROOT rpm --verify $PKG 2>&1 | tee $TMPFILE
+			if grep ^missing $TMPFILE > /dev/null ; then
+			echo deleting incomplete ${PKGID%% *}
+			rpm_e "$PKG"
+			else
+			#echo "keeping ${PKGID%% *}"
+			echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
+			continue
+			fi
+		else
+			#echo "keeping ${PKGID%% *}"
+			echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
+			continue
+		fi
+		if test -e "$BUILD_ROOT/.init_b_cache/preinstalls/$PKG" ; then
+			preinstall "$PKG"
+			# call for rpm-4.x and not rpm-devel
+			test -z "${PKG##rpm-[0-9]*}" && chroot $BUILD_ROOT rpm --rebuilddb
+			# also exec for exchanged rpm !  naming is rpm-x86-<target>-<ver>
+			test -z "${PKG##rpm-x86-*[0-9]*}" && chroot $BUILD_ROOT rpm --rebuilddb
+		fi
+		fi
+		export ADDITIONAL_PARAMS=
+		if test "$USE_FORCE" = true ; then
+		export ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --force"
+		fi
+		# work around for cross-build installs, we must not overwrite the running rpm
+		if test "$PKG" = rpm ; then
+		for i in $BUILD_ROOT/.init_b_cache/preinstalls/rpm-x86-* ; do
+			test -e "$i" && ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --justdb"
+		done
+		fi
+		echo "installing ${PKGID%% *}"
+		if ! test "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" -ef "$BUILD_ROOT/.init_b_cache/$PKG.rpm" ; then
+		rm -f $BUILD_ROOT/.init_b_cache/$PKG.rpm
+		cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm $BUILD_ROOT/.init_b_cache/$PKG.rpm || cleanup_and_exit 1
+		fi
+		( chroot $BUILD_ROOT rpm --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
+			$ADDITIONAL_PARAMS .init_b_cache/$PKG.rpm 2>&1 || \
+		  touch $BUILD_ROOT/exit ) | \
+			  grep -v "^warning:.*saved as.*rpmorig$"
+		# delete link so package is only installed once
+		rm -f $BUILD_ROOT/.init_b_cache/$PKG.rpm
+		check_exit
+		echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
+
 	done
-    fi
-    echo "installing ${PKGID%% *}"
-    if ! test "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" -ef "$BUILD_ROOT/.init_b_cache/$PKG.rpm" ; then
-	rm -f $BUILD_ROOT/.init_b_cache/$PKG.rpm
-	cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm $BUILD_ROOT/.init_b_cache/$PKG.rpm || cleanup_and_exit 1
-    fi
-    ( chroot $BUILD_ROOT rpm --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
-		$ADDITIONAL_PARAMS .init_b_cache/$PKG.rpm 2>&1 || \
-	  touch $BUILD_ROOT/exit ) | \
-	      grep -v "^warning:.*saved as.*rpmorig$"
-    # delete link so package is only installed once
-    rm -f $BUILD_ROOT/.init_b_cache/$PKG.rpm
-    check_exit
-    echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
-
-done
-
-if test $PSUF = deb ; then
-    echo "configure all installed packages..."
-    # configure all packages after complete installation, not for each package like rpm does
-    # We need to run this twice, because of cyclic dependencies as it does not succeed on most
-    # debian based distros in the first attempt.
-    if ! chroot $BUILD_ROOT dpkg --configure --pending  2>&1; then
-       echo "first configure attempt failed, trying again..."
-       chroot $BUILD_ROOT dpkg --configure --pending  2>&1 || touch $BUILD_ROOT/exit
-    fi
 fi
 
 # devices can vanish if devs got uninstalled
