@@ -65,8 +65,8 @@ check_use_emulator()
     # register it with a static program or shell script
     case "$BUILD_HOST_ARCH" in
 	i?86|x86_64)
-	    if test -e /usr/lib/build/initvm && \
-		test -e /usr/lib/build/qemu-reg -o -e /.build/qemu-reg; then
+	    if test -e $BUILD_DIR/initvm && \
+		test -e $BUILD_DIR/qemu-reg; then
 		return 0	# prefer initvm to handle registration
 	    elif test -e /bin/bash-static \
 		-a -e /bin/mount-static \
