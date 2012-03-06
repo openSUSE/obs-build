@@ -1,17 +1,10 @@
-#!/bin/bash
+#!/bin/bash -x
 
 export REPOSDIR=${BUILD_ROOT}/obs_repo
 export DEBOOT_ARCH
 
 [ "$BUILD_ARCH" = "i586:i486:i386" ] && DEBOOT_ARCH="i386"
 [ "$BUILD_ARCH" = "armv7l" ] && DEBOOT_ARCH="armhf"
-
-mkdir -p ${REPOSDIR}/dists/obs/main/binary-${DEBOOT_ARCH}
-mkdir -p ${REPOSDIR}/cache
-mkdir -p ${REPOSDIR}/standard/${DEBOOT_ARCH}
-
-mkdir -p ${REPOSDIR}/dists/obs/main/binary-${DEBOOT_ARCH}
-mkdir -p ${REPOSDIR}/cache
 
 if [ -d ${BUILD_ROOT}/.pkgs ]; then
     mkdir -p ${REPOSDIR}/standard/${DEBOOT_ARCH}
@@ -23,6 +16,8 @@ else
     mkdir -p ${BUILD_ROOT}
     ln -s ${PKG_CACHE_DIR} ${BUILD_ROOT}/obs_repo
 fi
+    mkdir -p ${REPOSDIR}/dists/obs/main/binary-${DEBOOT_ARCH}
+    mkdir -p ${REPOSDIR}/cache
 
 # Create apt-ftparchive files
 cat >> ${REPOSDIR}/apt-ftparchive-obs.conf << EOF
