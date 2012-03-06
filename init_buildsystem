@@ -593,10 +593,6 @@ else
 	   echo "${SRC##*/}"
 	done < $BUILD_ROOT/.init_b_cache/rpmlist
 	
-	# Real cache dir
-	read PKG SRC < $BUILD_ROOT/.init_b_cache/rpmlist
-	PKG_CACHE_DIR=`dirname $SRC | rev | cut -d"/" -f3- | rev`
-	
 	rm -rf $BUILD_ROOT/.init_b_cache
 	cleanup_and_exit 0
     fi
@@ -634,8 +630,15 @@ else
     PACKAGES_TO_CBPREINSTALL=
     PACKAGES_TO_CBINSTALL=
     RUNSCRIPTS_SEEN=
-	GUESSED_DIST=unknown
-	mkdir -p $BUILD_ROOT/.init_b_cache/rpms
+    GUESSED_DIST=unknown
+    
+    #
+    # Real cache dir
+    #
+    read PKG SRC < $RPMLIST
+    PKG_CACHE_DIR=`dirname $SRC | rev | cut -d"/" -f3- | rev`
+
+    mkdir -p $BUILD_ROOT/.init_b_cache/rpms
     while read PKG SRC ; do
 	if test "$PKG" = "preinstall:" ; then
 	    PACKAGES_TO_PREINSTALL=$SRC
@@ -730,7 +733,7 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
 		echo "Using debootstrap to preinstall deb based system"
 		
 		# Run local repos script
-		generate-obs-repos $PKG_CACHE_DIR
+		generate-obs-repos
 		
 		# Assure all packages are included
 		FULL_PKG_LIST=""

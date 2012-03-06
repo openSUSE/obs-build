@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 export REPOSDIR=${BUILD_ROOT}/obs_repo
 export DEBOOT_ARCH
@@ -21,8 +21,7 @@ if [ -d ${BUILD_ROOT}/.pkgs ]; then
     done
 else
     mkdir -p ${BUILD_ROOT}
-    ln -s ${REPOSDIR} ${BUILD_ROOT}/obs_repo
-    exit
+    ln -s ${PKG_CACHE_DIR} ${BUILD_ROOT}/obs_repo
 fi
 
 # Create apt-ftparchive files
