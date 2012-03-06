@@ -217,22 +217,15 @@ run_pkg_scripts()
 init_db()
 {
     if test $PSUF = rpm ; then
-		echo initializing rpm db...
+	echo initializing rpm db...
         if ! test -e $BUILD_ROOT/usr/lib/rpm/cpuinfo.yaml; then
             # rpm v5 does not have initdb
  	    chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
         fi
-		# hack: add nofsync to db config to speed up install
-		mkdir -p $BUILD_ROOT/root
-		echo '%__dbi_perms perms=0644 nofsync' > $BUILD_ROOT/.rpmmacros
-		echo '%__dbi_perms perms=0644 nofsync' > $BUILD_ROOT/root/.rpmmacros
-    else
-		# force dpkg into database to make epoch test work
-		if ! test "$BUILD_ROOT/.init_b_cache/rpms/dpkg.deb" -ef "$BUILD_ROOT/.init_b_cache/dpkg.deb" ; then
-			rm -f $BUILD_ROOT/.init_b_cache/dpkg.deb
-			cp $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb $BUILD_ROOT/.init_b_cache/dpkg.deb || cleanup_and_exit 1
-		fi
-		chroot $BUILD_ROOT dpkg -i --force all .init_b_cache/dpkg.deb >/dev/null 2>&1
+	# hack: add nofsync to db config to speed up install
+	mkdir -p $BUILD_ROOT/root
+	echo '%__dbi_perms perms=0644 nofsync' > $BUILD_ROOT/.rpmmacros
+	echo '%__dbi_perms perms=0644 nofsync' > $BUILD_ROOT/root/.rpmmacros
     fi
 }
 
@@ -556,12 +549,12 @@ if test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
     # vm continuation
     . $BUILD_ROOT/.build/init_buildsystem.data
     if ! test -e $BUILD_ROOT/.init_b_cache/preinstall_finished ; then
-		# finish preinstall
+	# finish preinstall
 		if test ! $PSUF = deb ; then
 			run_pkg_scripts
 			init_db
 		fi
-	    touch $BUILD_ROOT/.init_b_cache/preinstall_finished
+    touch $BUILD_ROOT/.init_b_cache/preinstall_finished
     fi
 else
     #
@@ -599,10 +592,8 @@ else
 	   test "$PKG" = "rpmid:" && continue
 	   echo "${SRC##*/}"
 	done < $BUILD_ROOT/.init_b_cache/rpmlist
-
-	#
+	
 	# Real cache dir
-	#
 	read PKG SRC < $BUILD_ROOT/.init_b_cache/rpmlist
 	PKG_CACHE_DIR=`dirname $SRC | rev | cut -d"/" -f3- | rev`
 	
@@ -643,14 +634,7 @@ else
     PACKAGES_TO_CBPREINSTALL=
     PACKAGES_TO_CBINSTALL=
     RUNSCRIPTS_SEEN=
-    GUESSED_DIST=unknow
-	
-	#
-	# Real cache dir
-	#
-	read PKG SRC < $RPMLIST
-	PKG_CACHE_DIR=`dirname $SRC | rev | cut -d"/" -f3- | rev`
-    
+	GUESSED_DIST=unknown
 	mkdir -p $BUILD_ROOT/.init_b_cache/rpms
     while read PKG SRC ; do
 	if test "$PKG" = "preinstall:" ; then
@@ -853,7 +837,6 @@ if test -f $BUILD_ROOT/var/lib/rpm/packages.rpm -o -f $BUILD_ROOT/var/lib/rpm/Pa
 	done
     )
 fi
-
 
 if ! test $PSUF = deb ; then
 	#

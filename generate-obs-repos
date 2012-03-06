@@ -9,10 +9,21 @@ export DEBOOT_ARCH
 mkdir -p ${REPOSDIR}/dists/obs/main/binary-${DEBOOT_ARCH}
 mkdir -p ${REPOSDIR}/cache
 mkdir -p ${REPOSDIR}/standard/${DEBOOT_ARCH}
-for ORIG in `ls ${BUILD_ROOT}/.pkgs`; do
-	DEST="${ORIG%????}-1obs1_i386.deb"
-	cp -v ${BUILD_ROOT}/.pkgs/${ORIG} ${REPOSDIR}/standard/${DEBOOT_ARCH}/$DEST
-done
+
+mkdir -p ${REPOSDIR}/dists/obs/main/binary-${DEBOOT_ARCH}
+mkdir -p ${REPOSDIR}/cache
+
+if [ -d ${BUILD_ROOT}/.pkgs ]; then
+    mkdir -p ${REPOSDIR}/standard/${DEBOOT_ARCH}
+    for ORIG in `ls ${BUILD_ROOT}/.pkgs`; do
+        DEST=`echo $ORIG | sed -e "s,.deb,-1obs1_${DEBOOT_ARCH}.deb,g"`
+        cp ${BUILD_ROOT}/.pkgs/${ORIG} ${REPOSDIR}/standard/${DEBOOT_ARCH}/$DEST
+    done
+else
+    mkdir -p ${BUILD_ROOT}
+    ln -s ${REPOSDIR} ${BUILD_ROOT}/obs_repo
+    exit
+fi
 
 # Create apt-ftparchive files
 cat >> ${REPOSDIR}/apt-ftparchive-obs.conf << EOF
@@ -54,7 +65,5 @@ EOF
 
 apt-ftparchive generate ${REPOSDIR}/apt-ftparchive-obs.conf
 apt-ftparchive -c ${REPOSDIR}/obs-release.conf release ${REPOSDIR}/dists/obs/ > ${REPOSDIR}/dists/obs/Release
-
-#cp ${${BUILD_DIR}/obs-debootstrap /usr/share/debootstrap/scripts/obs
 
 echo "Done generate repos ..."
