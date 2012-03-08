@@ -2268,6 +2268,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    rpmbopts[${#rpmbopts[@]}]='--define'
 	    rpmbopts[${#rpmbopts[@]}]="RSYNCDONE 1"
 	fi
+	if [ -n "$CROSSBUILD" ] ; then
+		rpmbopts[${#rpmbopts[@]}]='--dbpath'
+		rpmbopts[${#rpmbopts[@]}]="/$SYSROOT_TARGET/var/lib/rpm"
+	fi
 
 	rpmbuild=rpmbuild
 
