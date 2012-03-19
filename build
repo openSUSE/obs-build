@@ -60,6 +60,7 @@ BUILD_JOBS=
 ABUILD_TARGET=
 CREATE_BASELIBS=
 USEUSEDFORBUILD=
+ADDPREREQS=
 LIST_STATE=
 VM_IMAGE=
 VM_SWAP=
@@ -165,6 +166,10 @@ Known Parameters:
               Specify what architectures to select from the RPMs
 
   --verify    Run verify when initializing the build root
+
+  --addprereqs
+              Also install packages required by PreReq, Requires(pre),
+              and Requires(post) in the build chroot.
 
   --extra-packs pack
               Also install package 'pack'
@@ -958,6 +963,9 @@ while test -n "$1"; do
       *-useusedforbuild)
 	USEUSEDFORBUILD="--useusedforbuild"
       ;;
+      *-addprereqs)
+	ADDPREREQS="--addprereqs"
+      ;;
       *-list*state)
 	LIST_STATE=true
       ;;
@@ -1217,7 +1225,7 @@ if test -n "$LIST_STATE" ; then
        }
        for SPECFILE in $BUILD_ROOT/usr/src/packages/SPECS/*.spec ; do : ; done
     fi
-    init_buildsystem --cachedir "$CACHE_DIR" --list-state "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $SPECFILE $BUILD_EXTRA_PACKS
+    init_buildsystem --cachedir "$CACHE_DIR" --list-state "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $ADDPREREQS $SPECFILE $BUILD_EXTRA_PACKS
     ERR=$?
     rm -rf $BUILD_ROOT
     cleanup_and_exit $ERR
@@ -1429,7 +1437,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if test "$DO_INIT" = true ; then
 	    # do fist stage of init_buildsystem
 	    rm -f $BUILD_ROOT/.build.success
-	    set -- init_buildsystem --cachedir "$CACHE_DIR" --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
+	    set -- init_buildsystem --cachedir "$CACHE_DIR" --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $ADDPREREQS $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
 	    echo "$* ..."
 	    "$@" || cleanup_and_exit 1
 	    check_exit
@@ -1702,7 +1710,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "BUILD_INCARNATION=$INCARNATION" > $BUILD_ROOT/.buildenv
 	CREATE_BUILD_BINARIES=
 	egrep '^#[       ]*needsbinariesforbuild[       ]*$' >/dev/null <$MYSRCDIR/$SPECFILE && CREATE_BUILD_BINARIES=--create-build-binaries
-	set -- init_buildsystem --cachedir "$CACHE_DIR" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
+	set -- init_buildsystem --cachedir "$CACHE_DIR" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $ADDPREREQS $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
 	"$@" || cleanup_and_exit 1
 	check_exit

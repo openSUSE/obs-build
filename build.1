@@ -96,6 +96,11 @@ same packages used for the srcrpm build.
 .B --norootforbuild
 
 .TP
+.B --addprereqs
+Also install packages required by PreReq, Requires(pre),
+and Requires(post) in the build chroot. Useful for running
+checks that execute the package scripts, like post-build-checks.
+.TP
 .B --help
 Print a short help text.
 .TP
