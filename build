@@ -792,6 +792,17 @@ setup_sys_root()
 		BUILD_ROOT=$BUILD_ROOT/$SYSROOT_PATH CROSSBUILD=1 init_buildsystem --rpmlist $SYSROOT_RPMS "$MYSRCDIR/$SPECFILE"
 		ERR=$?
 		#TODO: make proper error handling
+
+
+		# fix orphaned absolute path symlinks in sysroot environment
+		for LINK in $(find $BUILD_ROOT/$SYSROOT_PATH -type l); do
+			readlink -eq $LINK &>/dev/null; RC=$?
+
+			if [ "$RC" -ne "0" ]; then
+				local TARGET=$(readlink $LINK)
+				[[ $TARGET == /* ]] && ln -fs /$SYSROOT_PATH$TARGET $LINK
+			fi
+		done
 	done
 }
 
