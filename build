@@ -205,13 +205,13 @@ Known Parameters:
               Distribution to use
 
   --with X
-              enable feature X for build
+              Enable feature X for build
 
   --without X
-              disable feature X for build
+              Disable feature X for build
 
   --define 'X Y'
-              define macro X with value Y
+              Define macro X with value Y
 
   --release release
               Override Release in spec file
@@ -228,10 +228,11 @@ Known Parameters:
               VMs.
 
   --ccache
-              use ccache to speed up rebuilds
+              Use ccache to speed up rebuilds
 
   --icecream N
-              use N parallel build jobs with icecream
+              Use N parallel build jobs with icecream
+
   --overlay OVERLAY
               Copy overlay filesystem to buildroot after installing
               all RPMs. This must be a valid directory.
@@ -267,8 +268,8 @@ Known Parameters:
 
   --vm-swap FILE
               Use FILE as swap space for virtual machine. The swap space is
-              also used for retrieving packages from the VM so it's size must be
-              sufficiently large
+              also used for retrieving packages from the VM so its size must
+              be sufficiently large
 
   --vm-disk-size SIZEINMB
   --vm-swap-size SIZEINMB
@@ -283,7 +284,7 @@ Known Parameters:
               Kernel and initrd to use for VM (kvm and qemu only)
 
   --debug
-              enable creation of a debuginfo package
+              Enable creation of a debuginfo package
 
 Remember to have fun!
 
