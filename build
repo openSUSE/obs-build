@@ -142,12 +142,24 @@ Known Parameters:
 
   --help      You already got it :)
 
+  --kill      Instead of starting a build kill the one currently
+              running.
+
+  --shell     Instead of starting a build start a root shell in
+              the build root.
+
   --clean     Delete old build root before initializing it
 
   --no-init   Skip initialization of build root and start with build
               immediately.
 
   --no-checks Do not run post-build checks
+
+  --lint      Run rpmlint after build.
+
+  --logfile logfile
+              Capture build output to logfile. Defaults to
+              .build.log in the build root for non-VM builds.
 
   --repository PATH
 	      Use package repository at PATH. Supported formats are
@@ -167,6 +179,7 @@ Known Parameters:
   --verify    Run verify when initializing the build root
 
   --extra-packs pack
+  -X pack
               Also install package 'pack'
 
   --root rootdir
@@ -188,6 +201,9 @@ Known Parameters:
               List rpms that would be used to create a fresh build root.
               Does not create the build root or perform a build.
 
+  --dist dist
+              Distribution to use
+
   --with X
               Enable feature X for build
 
@@ -196,6 +212,20 @@ Known Parameters:
 
   --define 'X Y'
               Define macro X with value Y
+
+  --release release
+              Override Release in spec file
+
+  --stage -bSTAGE
+              Set stage for rpmbuild. Defaults to -ba.
+
+  --target platform
+              Set target platform for rpmbuild
+
+  --jobs N    Use N parallel processes during build.
+              Sets %jobs and %_smp_mflags macros and
+              defines the number of CPUs to use for
+              VMs.
 
   --ccache
               Use ccache to speed up rebuilds
@@ -245,6 +275,9 @@ Known Parameters:
   --vm-swap-size SIZEINMB
   --vm-disk-filesystem TYPE
               Defaults for automatic setup of VM root/swap files
+
+  --vm-memory SIZEINMB
+              Set amount of RAM for VMs
 
   --vm-kernel FILE
   --vm-initrd FILE
