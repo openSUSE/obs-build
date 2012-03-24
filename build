@@ -189,7 +189,7 @@ Known Parameters:
               Use 'cachedir' to cache remote repo's packages, the
               default cache dir is /var/cache/build, every repo
               given by --repository corresponds to a subdir named
-              as md5sum of its repo url, forx eaxmple:
+              as md5sum of its repo url, for example:
                  /var/cache/build/3e8ea9b47808629414a0cebc33ea285e
 
   --oldpackages oldpackagesdir
