@@ -26,6 +26,8 @@ sub parse {
   $arch = 'i386' if $arch =~ /^i[456]86$/;
   $arch = 'powerpc' if $arch eq 'ppc';
   $arch = 'amd64' if $arch eq 'x86_64';
+  $arch = 'armel' if $arch =~ /^armv[4567]l$/;
+  $arch = 'armhf' if $arch eq 'armv7hl';
 
   if (ref($fn) eq 'ARRAY') {
     @control = @$fn;
