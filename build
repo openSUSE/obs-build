@@ -1759,10 +1759,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
     if test $BUILD_USER = abuild ; then
 	if ! egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
-	    echo "abuild::${ABUILD_UID}:${ABUILD_GID}:Autobuild:/home/abuild:/bin/bash" >>$BUILD_ROOT/etc/passwd
+	    echo "abuild:x:${ABUILD_UID}:${ABUILD_GID}:Autobuild:/home/abuild:/bin/bash" >>$BUILD_ROOT/etc/passwd
 	    echo 'abuild:*:::::::' >>$BUILD_ROOT/etc/shadow # This is needed on Mandriva 2009
 	    echo 'abuild:*::' >>$BUILD_ROOT/etc/gshadow # This is needed on Ubuntu
-	    echo "abuild::${ABUILD_GID}:" >>$BUILD_ROOT/etc/group
+	    echo "abuild:x:${ABUILD_GID}:" >>$BUILD_ROOT/etc/group
 	    mkdir -p $BUILD_ROOT/home/abuild
 	    chown "$ABUILD_UID:$ABUILD_GID" $BUILD_ROOT/home/abuild
 	else
