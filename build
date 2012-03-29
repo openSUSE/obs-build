@@ -2002,8 +2002,15 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     if test "$BUILDTYPE" = spec ; then
 	test -z "$BUILD_RPM_BUILD_STAGE" && BUILD_RPM_BUILD_STAGE=-ba
 
+	rpmbuild=rpmbuild
+	test -x $BUILD_ROOT/usr/bin/rpmbuild || rpmbuild=rpm
+
 	# XXX: move _srcdefattr to macro file?
-	rpmbopts=("$BUILD_RPM_BUILD_STAGE" "--nosignature" "--define" "_srcdefattr (-,root,root)")
+	rpmbopts=("$BUILD_RPM_BUILD_STAGE" "--define" "_srcdefattr (-,root,root)")
+	if [ "$rpmbuild" == "rpmbuild" ]; then
+                # use only --nosignature for rpm v4
+		rpmbopts[${#rpmbopts[@]}]="--nosignature"
+	fi
 	if [ -n "$ABUILD_TARGET" ]; then
 		rpmbopts[${#rpmbopts[@]}]="--target=$ABUILD_TARGET"
 	fi
@@ -2024,9 +2031,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		rpmbopts[${#rpmbopts[@]}]="RSYNCDONE 1"
 	fi
 
-	rpmbuild=rpmbuild
-
-	test -x $BUILD_ROOT/usr/bin/rpmbuild || rpmbuild=rpm
 	# su involves a shell which would require even more
 	# complicated quoting to bypass than this
 	toshellscript $rpmbuild \
