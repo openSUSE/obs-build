@@ -1,0 +1,67 @@
+#!/usr/bin/perl -w
+
+# Archlinux support, based on the GSoC work of Nikolay Rysev <mad.f3ka@gmail.com>
+
+BEGIN {
+  unshift @INC, ($::ENV{"BUILD_DIR"} || "/usr/lib/build");
+}
+
+use strict;
+use Archive::Tar;
+use Build::Arch;
+use Digest::MD5;
+use File::Path;
+
+my $cachedir = "/var/cache/build";
+
+sub getrepodb {
+  my ($url, $reponame, $dir) = @_;
+  File::Path::mkpath($dir);
+  system($INC[0]."/download", $dir, "$url$reponame.db");
+}
+
+sub getreponame {
+  my ($url) = @_;
+  return $1 if "/$url/" =~ /.*\/([^\/]+)\/os\//;
+  return undef;
+}
+
+sub printpkginfo {
+  my ($d, $repourl)  = @_;
+  my $id = $d->{'name'} . "." . $d->{'arch'} . "-" . $d->{'buildtime'} . "/0/0";
+  my $pkgurl = $repourl . $d->{'filename'};
+  my $selfprovides = $d->{'name'};
+  $selfprovides .= "=$d->{'version'}" if defined $d->{'version'};
+  push @{$d->{'provides'}}, $selfprovides unless @{$d->{'provides'} || []} && $d->{'provides'}->[-1] eq $selfprovides;
+  print "F:$id: $pkgurl\n";
+  print "P:$id: " . join(' ', @{$d->{'provides'}}) . "\n" if $d->{'provides'};
+  print "R:$id: " . join(' ', @{$d->{'requires'}}) . "\n" if $d->{'requires'};
+  print "I:$id: $d->{name}-$d->{'version'} $d->{'buildtime'}\n";
+}
+
+for my $url (@ARGV) {
+  die("Not an Archlinux repo") unless $url =~ /^(ht|f)tp:\/\/([^\/]*)\/?/;
+  $url .= '/' unless $url =~ /\/$/;
+  my $reponame = getreponame($url);
+
+  my $repoid = Digest::MD5::md5_hex($url);
+  my $dir = "$cachedir/$repoid";
+  getrepodb($url, $reponame, $dir);
+
+  my $repodb = Archive::Tar->iter("$dir/$reponame.db", 1);
+  my $e;
+  my $lastfn = '';
+  my $d;
+  while ($e = $repodb->()) {
+    next unless $e->type() == Archive::Tar::Constant::FILE;
+    my $fn = $e->name();
+    next unless $fn =~ s/\/(?:depends|desc)$//s;
+    if ($lastfn ne $fn) {
+      printpkginfo($d, $url) if $d->{'name'};
+      $d = {};
+      $lastfn = $fn;
+    }
+    Build::Arch::parserepodata($d, $e->get_content());
+  }
+  printpkginfo($d, $url) if $d->{'name'};
+}

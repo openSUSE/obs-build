@@ -402,6 +402,8 @@ for my $url (@ARGV) {
     $baseurl = $url;
     $baseurl .= '/' unless $baseurl =~ /\/$/;
     getmetadata($baseurl, $dir);
+  } elsif ($url =~ /^arch\@/) {
+    exec ($INC[0].'/createarchdeps', substr($url, 5));
   } else {
     $dir = $url;
     $dir .= '/' unless $dir =~ /\/$/;

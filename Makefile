@@ -48,6 +48,7 @@ install:
 	    debtransformzip \
 	    mkbaselibs \
 	    mkdrpms \
+	    createarchdeps \
 	    createrepomddeps \
 	    createyastdeps \
 	    changelog2spec \
