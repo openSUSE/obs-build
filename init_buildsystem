@@ -182,6 +182,13 @@ preinstall()
 	    test -e .init_b_cache/scripts/control/postinst && mv .init_b_cache/scripts/control/postinst ".init_b_cache/scripts/$1.post"
 	fi
 	rm -rf .init_b_cache/scripts/control control.tar.gz data.tar.gz
+    elif test -e "$BUILD_ROOT/.init_b_cache/rpms/$1.arch" ; then
+	$TAR -z -f "$BUILD_ROOT/.init_b_cache/rpms/$1.arch"
+	if test -f .INSTALL ; then
+	    cat .INSTALL > ".init_b_cache/scripts/$1.post"
+	    echo 'type post_install >/dev/null 2>&1 && post_install' >> ".init_b_cache/scripts/$1.post"
+	fi
+	rm -f .PKGINFO .INSTALL
     else
 	echo "warning: package $1 does not exist"
     fi
@@ -225,7 +232,7 @@ init_db()
 	mkdir -p $BUILD_ROOT/root
 	echo '%__dbi_perms perms=0644 nofsync' > $BUILD_ROOT/.rpmmacros
 	echo '%__dbi_perms perms=0644 nofsync' > $BUILD_ROOT/root/.rpmmacros
-    else
+    elif test $PSUF = deb ; then
 	# force dpkg into database to make epoch test work
 	if ! test "$BUILD_ROOT/.init_b_cache/rpms/dpkg.deb" -ef "$BUILD_ROOT/.init_b_cache/dpkg.deb" ; then
 	    rm -f $BUILD_ROOT/.init_b_cache/dpkg.deb
@@ -328,6 +335,9 @@ validate_cache_file()
 	    if [ "${SRC#zypp://}" != "$SRC" ]; then
 		set -- $BUILD_DIR/createrepomddeps "$SRC"
 	    elif [ "${SRC#http://}" != "$SRC" -o "${SRC#https://}" != "$SRC" -o "${SRC#ftp://}" != "$SRC" -o "${SRC#ftps://}" != "$SRC" ]; then
+		mkdir -p "$(getcachedir "$SRC")"
+		set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
+	    elif [ "${SRC#arch@http://}" != "$SRC" -o "${SRC#arch@https://}" != "$SRC" -o "${SRC#arch@ftp://}" != "$SRC" -o "${SRC#arch@ftps://}" != "$SRC" ]; then
 		mkdir -p "$(getcachedir "$SRC")"
 		set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
 	    elif [ ! -e "$SRC" ]; then
@@ -456,6 +466,7 @@ downloadpkg()
     elif [ "${url:0:7}" == "http://" -o "${url:0:8}" == "https://" -o "${url:0:6}" == "ftp://" -o "${url:0:7}" == "ftps://" ] ; then
 	cachedir="$(getcachedir "$url")"
 	local name="$(basename "$url")"
+	name=${name/%pkg.tar.?z/arch}
 	SRC="$cachedir/$name"
     else
 	echo "Invalid url: $url"
@@ -472,12 +483,16 @@ downloadpkg()
 	    echo "expected $destfile after download but it's missing" >&2
 	    cleanup_and_exit 1
 	fi
-	rpm -K "$destfile" > $destfile.v || { echo "rpm verify failed" >&2; rm -rf "$destdir"; cleanup_and_exit 1; }
-	if grep "NOT OK" $destfile.v; then
-	    rm -rf "$destdir"
-	    cleanup_and_exit 1
-	fi
-	rm -f "$destfile.v"
+	case $destfile in
+	  *.rpm)
+	    rpm -K "$destfile" > $destfile.v || { echo "rpm verify failed" >&2; rm -rf "$destdir"; cleanup_and_exit 1; }
+	    if grep "NOT OK" $destfile.v; then
+		rm -rf "$destdir"
+		cleanup_and_exit 1
+	    fi
+	    rm -f "$destfile.v"
+	    ;;
+	esac
 	mv "$destfile" "$SRC" || cleanup_and_exit 1
     fi
 }
@@ -485,8 +500,11 @@ downloadpkg()
 getcachedir()
 {
     url=$1
+    case $url in
+      *.pkg.tar.?z) url="arch@$url" ;;
+    esac
     for repo in "${repos[@]}" ; do
-	if [ "${url:0:${#repo}}" == "$repo" ] ; then
+	if [ "${url:0:${#repo}}" == "$repo" -o "${url:0:${#repo}}" == "$repo" ] ; then
 	    read repoid dummy < <(echo -n "$repo" | md5sum)
 	    echo "$CACHE_DIR/$repoid"
 	    break
@@ -699,8 +717,14 @@ else
 
     echo "$GUESSED_DIST" > $BUILD_ROOT/.guessed_dist
     test -n "$BUILD_DIST" || BUILD_DIST="$GUESSED_DIST"
-    PSUF=rpm
-    test -L $BUILD_ROOT/.init_b_cache/rpms/rpm.rpm || PSUF=deb
+    PSUF=
+    test -L $BUILD_ROOT/.init_b_cache/rpms/rpm.rpm && PSUF=rpm
+    test -L $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb && PSUF=deb
+    test -L $BUILD_ROOT/.init_b_cache/rpms/pacman.arch && PSUF=arch
+    if test -z "$PSUF" ; then
+	echo "unknown package manager" >&2
+	cleanup_and_exit 1
+    fi
 fi
 
 #
@@ -747,7 +771,7 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
 	    test -c $BUILD_ROOT/dev/null || create_devs
     fi
     test -e $BUILD_ROOT/etc/fstab || touch $BUILD_ROOT/etc/fstab
-    test -e $BUILD_ROOT/etc/ld.so.conf || cp $BUILD_ROOT/etc/ld.so.conf.in $BUILD_ROOT/etc/ld.so.conf
+    test ! -e $BUILD_ROOT/etc/ld.so.conf -a -e $BUILD_ROOT/etc/ld.so.conf.in && cp $BUILD_ROOT/etc/ld.so.conf.in $BUILD_ROOT/etc/ld.so.conf
     if test -z "$PREPARE_VM" ; then
 	run_pkg_scripts
 	init_db
@@ -878,17 +902,16 @@ RPMCHECKOPTS_HOST=
 test -x $BUILD_ROOT/usr/bin/rpmsign && RPMCHECKOPTS="--nodigest --nosignature"
 test -x /usr/bin/rpmsign && RPMCHECKOPTS_HOST="--nodigest --nosignature"
 
-MAIN_LIST="$PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL"
+MAIN_LIST="$PACKAGES_TO_INSTALL_FIRST $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL"
 progress_setup MAIN_LIST
 for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL; do
-    progress_step MAIN_LIST
-
     case $PKG in
       RUN_LDCONFIG)
 	test -x $BUILD_ROOT/sbin/ldconfig && chroot $BUILD_ROOT /sbin/ldconfig 2>&1
 	continue
       ;;
     esac
+    progress_step MAIN_LIST
 
     test -f $BUILD_ROOT/installed-pkg/$PKG && continue
 
@@ -917,6 +940,24 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGE
 		ln -s "/bin/true" "$BUILD_ROOT/sbin/start"
 	    fi
 	fi
+	continue
+    fi
+
+    if test $PSUF = arch ; then
+	test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF || continue
+        if ! test "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" -ef "$BUILD_ROOT/.init_b_cache/$PKG.$PSUF" ; then 
+            rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
+            cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
+        fi
+        PKGID=`readlink $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF`
+        PKGID="${PKGID##*/}"
+        PKGID="${PKGID%.$PSUF}"
+        echo "installing ${PKGID%_*}"
+	# -d -d disables deps checking
+	( chroot $BUILD_ROOT pacman -Uf -d -d --noconfirm .init_b_cache/$PKG.$PSUF 2>&1 || touch $BUILD_ROOT/exit ) | \
+	    perl -ne '$|=1;/^(warning: could not get filesystem information for |loading packages|looking for inter-conflicts|Targets |Total Installed Size: |Net Upgrade Size: |Proceed with installation|checking package integrity|loading package files|checking available disk space|installing |upgrading |warning: database file for |warning:.*is up to date -- reinstalling|Optional dependencies for|    )/||/^$/||print'
+	check_exit
+        echo "$PKGID $PSUF" > $BUILD_ROOT/installed-pkg/$PKG
 	continue
     fi
 
@@ -1080,6 +1121,7 @@ for DIR in /usr/share/doc/packages \
 done
 
 for FILE in /var/run/utmp /var/log/wtmp /etc/fstab ; do
+    mkdir -p $BUILD_ROOT/${FILE%/*}
     touch $BUILD_ROOT/$FILE
 done
 

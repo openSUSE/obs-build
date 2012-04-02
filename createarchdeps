@@ -11,6 +11,9 @@ use Archive::Tar;
 use Build::Arch;
 use Digest::MD5;
 use File::Path;
+use Getopt::Long;
+
+Getopt::Long::Configure("no_ignore_case");
 
 my $cachedir = "/var/cache/build";
 
@@ -39,13 +42,15 @@ sub printpkginfo {
   print "I:$id: $d->{name}-$d->{'version'} $d->{'buildtime'}\n";
 }
 
+GetOptions("cachedir=s"  => \$cachedir) or exit(1);
+
+
 for my $url (@ARGV) {
   die("Not an Archlinux repo") unless $url =~ /^(ht|f)tp:\/\/([^\/]*)\/?/;
-  $url .= '/' unless $url =~ /\/$/;
   my $reponame = getreponame($url);
-
-  my $repoid = Digest::MD5::md5_hex($url);
+  my $repoid = Digest::MD5::md5_hex("arch\@$url");
   my $dir = "$cachedir/$repoid";
+  $url .= '/' unless $url =~ /\/$/;
   getrepodb($url, $reponame, $dir);
 
   my $repodb = Archive::Tar->iter("$dir/$reponame.db", 1);
@@ -55,7 +60,7 @@ for my $url (@ARGV) {
   while ($e = $repodb->()) {
     next unless $e->type() == Archive::Tar::Constant::FILE;
     my $fn = $e->name();
-    next unless $fn =~ s/\/(?:depends|desc)$//s;
+    next unless $fn =~ s/\/(?:depends|desc|files)$//s;
     if ($lastfn ne $fn) {
       printpkginfo($d, $url) if $d->{'name'};
       $d = {};

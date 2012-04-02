@@ -456,6 +456,9 @@ create_baselibs()
 
     BASELIBS_CFG=
 
+    if test "$BUILDTYPE" == "arch" ; then
+	return
+    fi
     if test "$BUILDTYPE" == "dsc" ; then
 	pkgs=($DEBS)
     else # spec and kiwi
@@ -1346,6 +1349,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
       *.spec|*.src.rpm) BUILDTYPE=spec ;;
       *.dsc) BUILDTYPE=dsc ;;
       *.kiwi) BUILDTYPE=kiwi ;;
+      PKGBUILD) BUILDTYPE=arch ;;
     esac
     if test -z "$BUILDTYPE" ; then
        echo "don't know how to build $SPECFILE"
@@ -1668,6 +1672,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		elif test "$BUILDTYPE" = dsc ; then
 		    mkdir -p DEBS
 		    find . -type f | while read i; do mv "$i" DEBS/; done
+		elif test "$BUILDTYPE" = arch ; then
+		    mkdir -p ARCHPKGS
+		    find . -type f | while read i; do mv "$i" ARCHPKGS/; done
 		else
 		    mkdir -p KIWI
 		    find . -type f | while read i; do mv "$i" KIWI/; done
@@ -1943,6 +1950,12 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	chroot $BUILD_ROOT su -c "dpkg-source -x $DEB_SOURCEDIR/$DEB_DSCFILE $TOPDIR/BUILD" - $BUILD_USER
     fi
 
+    if test "$BUILDTYPE" = arch ; then
+	echo "Preparing sources..."
+	chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && makepkg -s -o 2>&1 >/dev/null" - $BUILD_USER
+	mv $BUILD_ROOT/$TOPDIR/SOURCES/* -t $BUILD_ROOT/$TOPDIR/BUILD
+    fi
+
     chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
     cd $BUILD_ROOT$TOPDIR/SOURCES || cleanup_and_exit 1
 
@@ -2079,6 +2092,14 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	done < <(sed -ne '/^Files:/,$s/^ ................................ [0-9][0-9]* //p' < $BUILD_ROOT/$DEB_SOURCEDIR/$DEB_DSCFILE)
     fi
 
+    if test "$BUILDTYPE" = arch ; then
+	chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && makepkg -f" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+	mkdir -p $BUILD_ROOT/$TOPDIR/ARCHPKGS
+	for PKG in $BUILD_ROOT/$TOPDIR/BUILD/*.pkg.tar.?z ; do
+	    test -e "$PKG" && mv "$PKG" "$BUILD_ROOT/$TOPDIR/ARCHPKGS"
+	done
+    fi
+
     if test "$BUILDTYPE" = kiwi ; then
 	. $BUILD_DIR/build_kiwi.sh
 	run_kiwi
@@ -2189,6 +2210,9 @@ if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
 	    ;;
 	kiwi)
 	    computeblocklists $args $TOPDIR/KIWI/* $TOPDIR/OTHER/* > "$VM_SWAP"
+	    ;;
+	arch)
+	    computeblocklists $args $TOPDIR/ARCHPKGS/* $TOPDIR/OTHER/* > "$VM_SWAP"
 	    ;;
     esac || cleanup_and_exit 1
 fi

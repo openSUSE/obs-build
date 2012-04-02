@@ -63,12 +63,22 @@ sub parse {
   return $ret;
 }
 
+sub islzma {
+  my ($fn) = @_;
+  local *F;
+  return 0 unless open(F, '<', $fn);
+  my $h;
+  return 0 unless read(F, $h, 5) == 5;
+  close F;
+  return $h eq "\3757zXZ";
+}
+
 sub query {
   my ($handle, %opts) = @_;
   if (ref($handle)) {
     die("arch pkg query not implemented for file handles\n");
   }
-  if ($handle =~ /\.xz$/) {
+  if ($handle =~ /\.xz$/ || islzma($handle)) {
     my $nh;
     open($nh, '-|', 'xzdec', '-dc', $handle) || die("$handle: $!\n");
     $handle = $nh;
@@ -87,7 +97,7 @@ sub query {
   $ret->{'name'} = $vars{'pkgname'}->[0] if $vars{'pkgname'};
   $ret->{'hdrmd5'} = Digest::MD5::md5_hex($pkginfo);
   $ret->{'provides'} = $vars{'provides'} || [];
-  $ret->{'requires'} = $vars{'depends'} || [];
+  $ret->{'requires'} = $vars{'depend'} || [];
   if ($vars{'pkgname'}) {
     my $selfprovides = $vars{'pkgname'}->[0];
     $selfprovides .= "=$vars{'pkgver'}->[0]" if $vars{'pkgver'};
@@ -119,7 +129,7 @@ sub queryhdrmd5 {
   if (ref($handle)) {
     die("arch pkg query not implemented for file handles\n");
   }
-  if ($handle =~ /\.xz$/) {
+  if ($handle =~ /\.xz$/ || islzma($handle)) {
     my $nh;
     open($nh, '-|', 'xzdec', '-dc', $handle) || die("$handle: $!\n");
     $handle = $nh;

@@ -60,13 +60,17 @@ $configdir = '.' unless defined $configdir;
 $archs = '' unless defined $archs;
 die("you must specfiy a depfile!\n") unless defined $rpmdeps;
 
-my @extradeps = grep {!/\.(?:spec|dsc|kiwi)$/} @ARGV;
-my @specs = grep {/\.(?:spec|dsc|kiwi)$/} @ARGV;
+my @extradeps = grep {!/(^|\/)PKGBUILD$/ && !/\.(?:spec|dsc|kiwi)$/} @ARGV;
+my @specs = grep {/(^|\/)PKGBUILD$/ || /\.(?:spec|dsc|kiwi)$/} @ARGV;
 die("can only work with at most one spec\n") if @specs > 1;
 my $spec = $specs[0];
 
 my @archs = split(':', $archs);
-push @archs, 'noarch' unless grep {$_ eq 'noarch'} @archs;
+if ($spec =~ /(^|\/)PKGBUILD$/) {
+  push @archs, 'any' unless grep {$_ eq 'any'} @archs;
+} else {
+  push @archs, 'noarch' unless grep {$_ eq 'noarch'} @archs;
+}
 
 my (%fn, %prov, %req);
 
@@ -159,7 +163,7 @@ my $dofileprovides = %{$cf->{'fileprovides'}};
 for my $pack (keys %packs) {
   my $r = {};
   my (@s, $s, @pr, @re);
-  @s = split(' ', $prov{$packs{$pack}});
+  @s = split(' ', $prov{$packs{$pack}} || '');
   while (@s) {
     $s = shift @s;
     next if !$dofileprovides && $s =~ /^\//;
@@ -170,7 +174,7 @@ for my $pack (keys %packs) {
     push @pr, $s;
     splice(@s, 0, 2) if @s && $s[0] =~ /^[<=>]/;
   }
-  @s = split(' ', $req{$packs{$pack}});
+  @s = split(' ', $req{$packs{$pack}} || '');
   while (@s) {
     $s = shift @s;
     next if !$dofileprovides && $s =~ /^\//;

@@ -874,6 +874,7 @@ sub query {
   return Build::Deb::query($handle, %opts) if $do_deb && $binname =~ /\.deb$/;
   return Build::Kiwi::queryiso($handle, %opts) if $do_kiwi && $binname =~ /\.iso$/;
   return Build::Arch::query($handle, %opts) if $do_arch && $binname =~ /\.pkg\.tar(?:\.gz|\.xz)?$/;
+  return Build::Arch::query($handle, %opts) if $do_arch && $binname =~ /\.arch$/;
   return undef;
 }
 
@@ -885,6 +886,7 @@ sub queryhdrmd5 {
   return Build::Kiwi::queryhdrmd5(@_) if $do_kiwi && $binname =~ /\.raw$/;
   return Build::Kiwi::queryhdrmd5(@_) if $do_kiwi && $binname =~ /\.raw.install$/;
   return Build::Arch::queryhdrmd5(@_) if $do_arch && $binname =~ /\.pkg\.tar(?:\.gz|\.xz)?$/;
+  return Build::Arch::queryhdrmd5(@_) if $do_arch && $binname =~ /\.arch$/;
   return undef;
 }
 

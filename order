@@ -59,7 +59,7 @@ my %bins;
 
 for my $p (@p) {
   my $q;
-  for my $suf ('rpm', 'deb') {
+  for my $suf ('rpm', 'deb', 'arch') {
     next unless -f "$cachedir/$p.$suf";
     $q = Build::query("$cachedir/$p.$suf", 'filelist' => 1, 'alldeps' => 1);
     die("bad binary: $p.$suf\n") unless $q;

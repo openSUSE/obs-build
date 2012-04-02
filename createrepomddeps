@@ -403,7 +403,7 @@ for my $url (@ARGV) {
     $baseurl .= '/' unless $baseurl =~ /\/$/;
     getmetadata($baseurl, $dir);
   } elsif ($url =~ /^arch\@/) {
-    exec ($INC[0].'/createarchdeps', substr($url, 5));
+    exec ("$INC[0]/createarchdeps", "--cachedir=$cachedir", substr($url, 5));
   } else {
     $dir = $url;
     $dir .= '/' unless $dir =~ /\/$/;
