@@ -294,12 +294,14 @@ sub read_config {
     s/=$// for @{$config->{'substitute'}->{$l}};
   }
   init_helper_hashes($config);
-  if ( ! $config->{'type'}) {
+  if (!$config->{'type'}) {
     # Fallback to old guessing method if no type (spec, dsc or kiwi) is defined
     if (grep {$_ eq 'rpm'} @{$config->{'preinstall'} || []}) {
       $config->{'type'} = 'spec';
     } elsif (grep {$_ eq 'debianutils'} @{$config->{'preinstall'} || []}) {
       $config->{'type'} = 'dsc';
+    } elsif (grep {$_ eq 'pacman'} @{$config->{'preinstall'} || []}) {
+      $config->{'type'} = 'arch';
     } else {
       $config->{'type'} = 'UNDEFINED';
     }
