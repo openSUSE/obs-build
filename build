@@ -69,7 +69,7 @@ VMDISK_ROOTSIZE=4096
 VMDISK_SWAPSIZE=1024
 VMDISK_FILESYSTEM=ext3
 # settings are for speed and not data safety, we format anyway on next run
-VMDISK_MOUNT_OPTIONS='-o data=writeback,nobarrier,commit=150,noatime'
+VMDISK_MOUNT_OPTIONS=__default
 MEMSIZE=
 RUNNING_IN_VM=
 RPMLIST=
@@ -874,7 +874,9 @@ while test -n "$1"; do
 	needarg
 	VM_TYPE="$ARG"
 	case "$VM_TYPE" in
-	    xen|kvm|uml|qemu|lxc) ;;
+	    xen|kvm|uml|qemu|lxc)
+		test -z "$VM_IMAGE" && VM_IMAGE=1
+	        ;;
 	    none|chroot) VM_TYPE='' ;;
 	    *)
 		echo "VM $VM_TYPE not supported"
@@ -1058,6 +1060,14 @@ check_for_ppc
 if test "$VM_TYPE" = "lxc"; then
     VM_IMAGE=''
     VM_SWAP=''
+fi
+
+if test "$VMDISK_MOUNT_OPTIONS" = __default; then
+    if test "$VMDISK_FILESYSTEM" = reiserfs ; then
+	VMDISK_MOUNT_OPTIONS='-o data=writeback,commit=150,noatime'
+    else
+	VMDISK_MOUNT_OPTIONS='-o data=writeback,nobarrier,commit=150,noatime'
+    fi
 fi
 
 if test -n "$KILL" ; then

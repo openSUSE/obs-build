@@ -735,7 +735,7 @@ fi
 #
 # now test if there is already a build dir.
 #
-if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rpm/Packages ; then
+if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rpm/Packages -a ! -e $BUILD_ROOT/.build/init_buildsystem.data ; then
     mkdir -p $BUILD_ROOT/var/lib/rpm || cleanup_and_exit 1
     mkdir -p $BUILD_ROOT/usr/src/packages/SOURCES || cleanup_and_exit 1
     mkdir -p $BUILD_ROOT/etc || cleanup_and_exit 1
