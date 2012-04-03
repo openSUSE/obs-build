@@ -1702,7 +1702,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
 		;;
 	      *)
-		echo "No buildstatus set, either the packager broke the base system (glibc/bash/perl) or the build host has a kernel or hardware problem, OBS server will retry..."
+		echo "No buildstatus set, either the base system is broken (glibc/bash/perl)"
+		echo "or the build host has a kernel or hardware problem..."
 		cleanup_and_exit 3
 		;;
 	    esac
