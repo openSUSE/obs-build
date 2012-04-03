@@ -471,7 +471,7 @@ downloadpkg()
     elif [ "${url:0:7}" == "http://" -o "${url:0:8}" == "https://" -o "${url:0:6}" == "ftp://" -o "${url:0:7}" == "ftps://" ] ; then
 	cachedir="$(getcachedir "$url")"
 	local name="$(basename "$url")"
-	name=${name/%pkg.tar.?z/arch}
+	name=${name/%.pkg.tar.?z/.arch}
 	SRC="$cachedir/$name"
     else
 	echo "Invalid url: $url"
@@ -709,9 +709,10 @@ else
 		    cleanup_and_exit 1
 		    ;;
 	    esac
+	    # downloadpkg modified $SRC, so it has a right name for use
 	fi
-	# downloadpkg modified $SRC, so it has a right name for use
-	ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRC##*.}"
+	SRCSUF=${SRC/%.pkg.tar.?z/.arch}
+	ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
 	PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $PKG"
     done < $RPMLIST
 

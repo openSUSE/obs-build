@@ -73,15 +73,26 @@ sub islzma {
   return $h eq "\3757zXZ";
 }
 
+sub lzmadec {
+  my ($fn) = @_;
+  my $nh;
+  my $pid = open($nh, '-|');
+  return undef unless defined $pid;
+  if (!$pid) {
+    $SIG{'PIPE'} = 'DEFAULT';
+    exec('xzdec', '-dc', $fn);
+    die("xzdec: $!\n");
+  }
+  return $nh;
+}
+
 sub query {
   my ($handle, %opts) = @_;
   if (ref($handle)) {
     die("arch pkg query not implemented for file handles\n");
   }
   if ($handle =~ /\.xz$/ || islzma($handle)) {
-    my $nh;
-    open($nh, '-|', 'xzdec', '-dc', $handle) || die("$handle: $!\n");
-    $handle = $nh;
+    $handle = lzmadec($handle);
   }
   my $tar = Archive::Tar->new;
   my @read = $tar->read($handle, 1, {'filter' => '^\.PKGINFO$', 'limit' => 1});
@@ -130,9 +141,7 @@ sub queryhdrmd5 {
     die("arch pkg query not implemented for file handles\n");
   }
   if ($handle =~ /\.xz$/ || islzma($handle)) {
-    my $nh;
-    open($nh, '-|', 'xzdec', '-dc', $handle) || die("$handle: $!\n");
-    $handle = $nh;
+    $handle = lzmadec($handle);
   }
   my $tar = Archive::Tar->new;
   my @read = $tar->read($handle, 1, {'filter' => '^\.PKGINFO$', 'limit' => 1});
