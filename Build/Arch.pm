@@ -132,6 +132,9 @@ sub query {
   if ($opts{'description'}) {
     $ret->{'description'} = $vars{'pkgdesc'}->[0] if $vars{'pkgdesc'};
   }
+  # arch packages don't seem to have a source :(
+  # fake it so that the package isn't confused with a src package
+  $ret->{'source'} = $ret->{'name'} if defined $ret->{'name'};
   return $ret;
 }
 
