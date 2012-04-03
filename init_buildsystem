@@ -951,19 +951,20 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGE
 
     if test $PSUF = arch ; then
 	test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF || continue
-        if ! test "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" -ef "$BUILD_ROOT/.init_b_cache/$PKG.$PSUF" ; then 
-            rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
-            cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
-        fi
-        PKGID=`readlink $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF`
-        PKGID="${PKGID##*/}"
-        PKGID="${PKGID%.$PSUF}"
-        echo "installing ${PKGID%_*}"
+	if ! test "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" -ef "$BUILD_ROOT/.init_b_cache/$PKG.$PSUF" ; then 
+	    rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
+	    cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
+	fi
+	PKGID=`readlink $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF`
+	PKGID="${PKGID##*/}"
+	PKGID="${PKGID/%.pkg.tar.?z/.arch}"
+	PKGID="${PKGID%.$PSUF}"
+	echo "installing ${PKGID%_*}"
 	# -d -d disables deps checking
 	( chroot $BUILD_ROOT pacman -Uf -d -d --noconfirm .init_b_cache/$PKG.$PSUF 2>&1 || touch $BUILD_ROOT/exit ) | \
 	    perl -ne '$|=1;/^(warning: could not get filesystem information for |loading packages|looking for inter-conflicts|Targets |Total Installed Size: |Net Upgrade Size: |Proceed with installation|checking package integrity|loading package files|checking available disk space|installing |upgrading |warning:.*is up to date -- reinstalling|Optional dependencies for|    )/||/^$/||print'
 	check_exit
-        echo "$PKGID $PSUF" > $BUILD_ROOT/installed-pkg/$PKG
+	echo "$PKGID $PSUF" > $BUILD_ROOT/installed-pkg/$PKG
 	continue
     fi
 
