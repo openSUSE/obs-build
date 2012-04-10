@@ -8,7 +8,7 @@ use strict;
 
 use Build;
 
-my ($dist, $rpmdeps, $archs, $configdir, $useusedforbuild);
+my ($dist, $rpmdeps, $archs, $configdir, $useusedforbuild, $addprereqs);
 
 while (@ARGV)  {
   if ($ARGV[0] eq '--dist') {
@@ -34,6 +34,11 @@ while (@ARGV)  {
   if ($ARGV[0] eq '--useusedforbuild') {
     shift @ARGV;
     $useusedforbuild = 1;
+    next;
+  }
+  if ($ARGV[0] eq '--addprereqs') {
+    shift @ARGV;
+    $addprereqs = 1;
     next;
   }
   if ($ARGV[0] eq '--define') {
@@ -258,6 +263,8 @@ if ($spec) {
   $packvers = $d->{'version'};
   $subpacks = $d->{'subpacks'};
   @packdeps = @{$d->{'deps'} || []};
+  push(@packdeps, @{$d->{'prereqs'}})
+    if $addprereqs && $d->{'prereqs'};
 }
 
 Build::readdeps($cf, undef, \%repo);
