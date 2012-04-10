@@ -365,6 +365,7 @@ sub do_subst_vers {
   return @res;
 }
 
+# Delivers all packages which get used for building
 sub get_build {
   my ($config, $subpacks, @deps) = @_;
   my @ndeps = grep {/^-/} @deps;
@@ -384,6 +385,7 @@ sub get_build {
   return @deps;
 }
 
+# Delivers all packages which shall have an influence to other package builds (get_build reduced by support packages)
 sub get_deps {
   my ($config, $subpacks, @deps) = @_;
   my @ndeps = grep {/^-/} @deps;
