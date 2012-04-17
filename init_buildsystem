@@ -957,6 +957,8 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGE
 		ln -s "/bin/true" "$BUILD_ROOT/sbin/start"
 	    fi
 	fi
+	# another workaround, see bug bnc#733699
+	rm -f "$BUILD_ROOT/var/run/init.upgraded"
 	continue
     fi
 
