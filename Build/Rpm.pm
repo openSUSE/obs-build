@@ -762,8 +762,17 @@ sub verscmp_part {
   return 1 if !defined $s2;
   return 0 if $s1 eq $s2;
   while (1) {
-    $s1 =~ s/^[^a-zA-Z0-9]+//;
-    $s2 =~ s/^[^a-zA-Z0-9]+//;
+    $s1 =~ s/^[^a-zA-Z0-9~]+//;
+    $s2 =~ s/^[^a-zA-Z0-9~]+//;
+    if ($s1 =~ s/^~//) {
+      next if $s2 =~ s/^~//;
+      return -1;
+    }
+    return 1 if $s2 =~ /^~/;
+    if ($s1 eq '') {
+      return $s2 eq '' ? 0 : -1;
+    }
+    return 1 if $s2 eq '';
     my ($x1, $x2, $r);
     if ($s1 =~ /^([0-9]+)(.*?)$/) {
       $x1 = $1;
@@ -786,10 +795,6 @@ sub verscmp_part {
       $r = $x1 cmp $x2;
     }
     return $r > 0 ? 1 : -1 if $r;
-    if ($s1 eq '') {
-      return $s2 eq '' ? 0 : -1;
-    }
-    return 1 if $s2 eq ''
   }
 }
 
