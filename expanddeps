@@ -258,6 +258,7 @@ if ($spec) {
   $packvers = $d->{'version'};
   $subpacks = $d->{'subpacks'};
   @packdeps = @{$d->{'deps'} || []};
+  push(@packdeps, @{$d->{'prereqs'}}) if $d->{'prereqs'};
 }
 
 Build::readdeps($cf, undef, \%repo);
