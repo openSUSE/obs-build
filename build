@@ -54,6 +54,7 @@ DO_INIT=true
 DO_LINT=
 DO_CHECKS=true
 CLEAN_BUILD=
+USE_SYSTEM_QEMU=
 SPECFILES=()
 SRCDIR=
 BUILD_JOBS=
@@ -872,6 +873,9 @@ while test -n "$1"; do
       *-baselibs-internal)
 	CREATE_BASELIBS=internal
 	;;
+      *-use-system-qemu)
+	USE_SYSTEM_QEMU=true
+      ;;
       *-root)
 	needarg
 	BUILD_ROOT="$ARG"
@@ -1477,7 +1481,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if test "$DO_INIT" = true ; then
 	    # do fist stage of init_buildsystem
 	    rm -f $BUILD_ROOT/.build.success
-	    set -- init_buildsystem --cachedir "$CACHE_DIR" --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
+	    set -- init_buildsystem --cachedir "$CACHE_DIR" --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USE_SYSTEM_QEMU $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
 	    echo "$* ..."
 	    "$@" || cleanup_and_exit 1
 	    check_exit
@@ -1754,7 +1758,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "BUILD_INCARNATION=$INCARNATION" > $BUILD_ROOT/.buildenv
 	CREATE_BUILD_BINARIES=
 	egrep '^#[       ]*needsbinariesforbuild[       ]*$' >/dev/null <$MYSRCDIR/$SPECFILE && CREATE_BUILD_BINARIES=--create-build-binaries
-	set -- init_buildsystem --cachedir "$CACHE_DIR" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
+	set -- init_buildsystem --cachedir "$CACHE_DIR" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USE_SYSTEM_QEMU $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
 	"$@" || cleanup_and_exit 1
 	check_exit

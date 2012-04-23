@@ -34,6 +34,7 @@ TMPFILE=$BUILD_ROOT/tmpfile
 RPMIDFMT="%{NAME}-%{VERSION}-%{RELEASE} %{BUILDTIME}\n"
 
 PREPARE_VM=
+USE_SYSTEM_QEMU=
 USEUSEDFORBUILD=
 LIST_STATE=
 RPMLIST=
@@ -45,6 +46,10 @@ while test -n "$1" ; do
 	--prepare)
 	    shift
 	    PREPARE_VM=true
+	    ;;
+	--use-system-qemu)
+	    shift
+	    USE_SYSTEM_QEMU=true
 	    ;;
 	--create-build-binaries)
 	    shift
@@ -627,7 +632,7 @@ else
     # copy the QEMU emulator
     #
     if check_use_emulator; then
-	copy_qemu
+	[ -n "$USE_SYSTEM_QEMU" ] && copy_qemu
 	if [ -z "$PREPARE_VM" ]; then
 	    if ! check_binfmt_registered; then
 		echo "registering binfmt handlers"
