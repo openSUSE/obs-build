@@ -1148,20 +1148,22 @@ for FILE in /var/run/utmp /var/log/wtmp /etc/fstab ; do
 done
 
 echo now finalizing build dir...
-CHROOT_RETURN="`chroot $BUILD_ROOT /sbin/ldconfig 2>&1`"
-case "$CHROOT_RETURN" in
-    *warning:*)
-      chroot $BUILD_ROOT /sbin/ldconfig
-      echo
-      echo chroot $BUILD_ROOT /sbin/ldconfig
-      echo
-      echo "$CHROOT_RETURN"
-      echo
-      echo "Problem with ldconfig.  It's better to reinit the build system..."
-      echo
-      cleanup_and_exit 1
-    ;;
-esac
+if test -x $BUILD_ROOT/sbin/ldconfig ; then
+	CHROOT_RETURN="`chroot $BUILD_ROOT /sbin/ldconfig 2>&1`"
+	case "$CHROOT_RETURN" in
+	    *warning:*)
+	      chroot $BUILD_ROOT /sbin/ldconfig
+	      echo
+	      echo chroot $BUILD_ROOT /sbin/ldconfig
+	      echo
+	      echo "$CHROOT_RETURN"
+	      echo
+	      echo "Problem with ldconfig.  It's better to reinit the build system..."
+	      echo
+	      cleanup_and_exit 1
+	    ;;
+	esac
+fi
 test -x $BUILD_ROOT/usr/sbin/Check && chroot $BUILD_ROOT /usr/sbin/Check
 
 mkdir -p $BUILD_ROOT/var/adm/packages
