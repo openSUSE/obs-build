@@ -2,8 +2,10 @@ package Build::Arch;
 
 use strict;
 use Digest::MD5;
-use Data::Dumper;
-use Archive::Tar;
+
+eval { require Archive::Tar; };
+*Archive::Tar::new = sub {die("Archive::Tar is not available\n")} unless defined &Archive::Tar::new;
+
 
 # Archlinux support, based on the GSoC work of Nikolay Rysev <mad.f3ka@gmail.com>
 
