@@ -44,7 +44,7 @@ kvm_virtio=
 console=ttyS0
 
 # need to restore build root owner for non-root builds
-browner=0
+browner=
 
 # Default uid:gid for the build user
 ABUILD_UID=399
@@ -315,7 +315,7 @@ cleanup_and_exit () {
         fi
     fi
     if test -n "$RUNNING_IN_VM" ; then
-	chown $browner $BUILD_ROOT
+	test -n "$browner" && chown "$browner" $BUILD_ROOT
 	cd /
 	if test -n "$VM_SWAP" -a -e "$VM_SWAP" ; then
 	    swapoff "$VM_SWAP" 2>/dev/null
