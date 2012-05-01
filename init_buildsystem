@@ -986,12 +986,8 @@ fi
 
 test -e $BUILD_ROOT/.build/init_buildsystem.data || HOST=`hostname`
 test -e $BUILD_ROOT/etc/hosts || echo "127.0.0.1 localhost" > $BUILD_ROOT/etc/hosts
-if ! grep -F "127.0.0.1 $HOST" $BUILD_ROOT/etc/hosts > /dev/null ; then
-    # this makes a reverse lookup on 127.0.0.1 return the host name,
-    # which is bad, but 127.0.0.2 does not work on all unix systems
-    echo "127.0.0.1 $HOST" > $BUILD_ROOT/etc/hosts.new
-    test -f $BUILD_ROOT/etc/hosts && cat $BUILD_ROOT/etc/hosts >> $BUILD_ROOT/etc/hosts.new
-    mv $BUILD_ROOT/etc/hosts.new $BUILD_ROOT/etc/hosts
+if ! grep -F "127.0.1.1 $HOST" $BUILD_ROOT/etc/hosts > /dev/null ; then
+    echo "127.0.1.1 $(hostname -f) $HOST" >> $BUILD_ROOT/etc/hosts
 fi
 
 # XXX: still needed?
