@@ -488,6 +488,7 @@ setmemorylimit()
 create_baselibs()
 {
     local pkgs=()
+    local line
 
     BASELIBS_CFG=
 
@@ -546,7 +547,10 @@ create_baselibs()
 	fi
     fi
     echo "... creating baselibs$whichone"
-    chroot $BUILD_ROOT su -c "$mkbaselibs $BASELIBS_GLOBAL $BASELIBS_CFG ${pkgs[*]#$BUILD_ROOT}" - $BUILD_USER || cleanup_and_exit 1
+    while read line
+    do
+	chroot $BUILD_ROOT su -c "$mkbaselibs $BASELIBS_GLOBAL $BASELIBS_CFG $line" - $BUILD_USER || cleanup_and_exit 1
+    done < <(IFS=$'\n'; echo "${pkgs[*]#$BUILD_ROOT}" | xargs -n 1024)
     rm -rf $BUILD_ROOT/.mkbaselibs
 }
 
