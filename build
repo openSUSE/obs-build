@@ -1766,7 +1766,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "$* ..."
 	"$@" || cleanup_and_exit 1
 	check_exit
-	if df $BUILD_ROOT 2>/dev/null | grep -q "100%"; then
+	# arbitrary limit of 10MB
+	if test $((`stat -f -c "%a*%S/1024/1024" $BUILD_ROOT`)) -lt 10; then
 	    df -h $BUILD_ROOT
 	    echo "build does not work on a completely full filesystem"
 	    cleanup_and_exit 1
