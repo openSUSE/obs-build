@@ -182,6 +182,10 @@ SHAFILES=""
 for i in "$imageout.vmx" "$imageout.vmdk" "$imageout-disk*.vmdk" "$imageout.ovf"; do
 	ls \$i >& /dev/null && VMXFILES="\$VMXFILES \$i"
 done
+# take raw files as fallback
+if [ -z "\$VMXFILES" ]; then
+	ls "$imageout.raw" >& /dev/null && VMXFILES=""$imageout.raw"
+fi
 if [ -n "\$VMXFILES" ]; then
 	tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" \$VMXFILES
 	SHAFILES="\$SHAFILES $imageout$buildnum-vmx.tar.bz2"
