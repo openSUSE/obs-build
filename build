@@ -399,7 +399,6 @@ setupccache()
 	echo "export CCACHE_DIR=/.ccache" > "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
 	echo 'export PATH=/var/lib/build/ccache/bin:$PATH' >> "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
     else
-	rm -f "$BUILD_ROOT$builduserhome"/bin/{gcc,g++,cc,c++}
 	rm -f "$BUILD_ROOT"/var/lib/build/ccache/bin/{gcc,g++,cc,c++}
     fi
 }
