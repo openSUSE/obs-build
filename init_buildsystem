@@ -768,14 +768,12 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
     for PKG in $PACKAGES_TO_RUNSCRIPTS ; do
 	: > $BUILD_ROOT/.init_b_cache/scripts/$PKG.run
     done
-    PACKAGES_TO_PREINSTALL=`reorder $PACKAGES_TO_PREINSTALL`
     progress_setup PACKAGES_TO_PREINSTALL
     for PKG in $PACKAGES_TO_PREINSTALL ; do
 	progress_step PACKAGES_TO_PREINSTALL
 	preinstall ${PKG##*/}
     done
     if test -n "$PREPARE_VM" ; then
-	PACKAGES_TO_VMINSTALL=`reorder $PACKAGES_TO_VMINSTALL`
 	progress_setup PACKAGES_TO_VMINSTALL
 	for PKG in $PACKAGES_TO_VMINSTALL ; do
 	    progress_step PACKAGES_TO_VMINSTALL
@@ -812,6 +810,9 @@ if test -n "$PREPARE_VM" ; then
     # that...
     echo -n 'reordering...'
     PACKAGES_TO_INSTALL=`reorder $PACKAGES_TO_INSTALL`
+    PACKAGES_TO_PREINSTALL=`reorder $PACKAGES_TO_PREINSTALL`
+    PACKAGES_TO_VMINSTALL=`reorder $PACKAGES_TO_VMINSTALL`
+    PACKAGES_TO_CBINSTALL=`reorder $PACKAGES_TO_CBINSTALL`
     echo 'done'
     Q="'\''"
     echo "PACKAGES_TO_INSTALL='${PACKAGES_TO_INSTALL//"'"/$Q}'" > $BUILD_ROOT/.build/init_buildsystem.data
