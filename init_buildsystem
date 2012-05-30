@@ -139,8 +139,8 @@ preinstall()
     echo "preinstalling $1..."
     cd $BUILD_ROOT || cleanup_and_exit 1
     if test -x /usr/bin/bsdtar ; then
-	CPIO="/usr/bin/bsdtar --chroot -o --numeric-owner -x -f-"
-	TAR="/usr/bin/bsdtar --chroot -o --numeric-owner -x"
+	CPIO="/usr/bin/bsdtar -P --chroot -o --numeric-owner -x -f-"
+	TAR="/usr/bin/bsdtar -P --chroot -o --numeric-owner -x"
     else
 	# cpio isn't safe so we require bsdtar for VMs. chroot is
 	# unsafe anyways so it's ok for that.
