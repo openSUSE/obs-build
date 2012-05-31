@@ -279,6 +279,7 @@ sub read_config {
       $config->{'releaseprg'} = $l[0];
     } elsif ($l0 eq 'changetarget:' || $l0 eq 'target:') {
       $config->{'target'} = join(' ', @l);
+      push @macros, "%define _target_cpu ".(split('-', $config->{'target'}))[0] if $config->{'target'};
     } elsif ($l0 eq 'hostarch:') {
       $config->{'hostarch'} = join(' ', @l);
     } elsif ($l0 !~ /^[#%]/) {
