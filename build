@@ -1947,10 +1947,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    echo '
 %prep %{?!_suse_insert_debug_package_seen:%?_suse_insert_debug_package}%%prep
 %package %{?!_suse_insert_debug_package_seen:%?_suse_insert_debug_package}%%package
-%suse_insert_debug_package \
-  %global _suse_insert_debug_package \\\
-    %%global _suse_insert_debug_package_seen 1 \\\
-    %%debug_package
+%_suse_insert_debug_package \
+  %global _suse_insert_debug_package_seen 1 \
+  %debug_package
 
 ' >> $BUILD_ROOT/root/.rpmmacros
 	fi
@@ -2091,10 +2090,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if test -s "$BUILD_ROOT/usr/lib/rpm/mandriva/macros" ; then
 		rpmbopts[${#rpmbopts[@]}]='--eval'
 		rpmbopts[${#rpmbopts[@]}]="%undefine _enable_debug_packages"
-	fi
-	if [ -n "$BUILD_DEBUG" ]; then
-		rpmbopts[${#rpmbopts[@]}]='--eval'
-		rpmbopts[${#rpmbopts[@]}]="%suse_insert_debug_package"
 	fi
 	if [ -n "$RSYNCDONE" ] ; then
 		rpmbopts[${#rpmbopts[@]}]='--define'
