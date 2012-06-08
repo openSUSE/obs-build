@@ -732,12 +732,9 @@ else
 
     echo "$GUESSED_DIST" > $BUILD_ROOT/.guessed_dist
     test -n "$BUILD_DIST" || BUILD_DIST="$GUESSED_DIST"
-    DIST_TYPE=`gettype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
-    case "$DIST_TYPE" in
-	spec)  PSUF=rpm ;;
-	dsc)   PSUF=deb ;;
-	arch)  PSUF=arch ;;
-	*)
+    PSUF=`gettype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
+    case "$PSUF" in
+	UNKNOWN|'')
 	    # auto detect from packages
 	    PSUF=rpm
 	    test -L $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb && PSUF=deb

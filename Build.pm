@@ -267,8 +267,10 @@ sub read_config {
       }
     } elsif ($l0 eq 'repotype:') { #type of generated repository data
       $config->{'repotype'} = [ @l ];
-    } elsif ($l0 eq 'type:') { #kind of packaging system (spec, dsc or kiwi)
+    } elsif ($l0 eq 'type:') { #kind of packaging system (spec,dsc,arch,kiwi,...)
       $config->{'type'} = $l[0];
+    } elsif ($l0 eq 'binarytype:') { #rpm,deb,arch,...
+      $config->{'binarytype'} = $l[0];
     } elsif ($l0 eq 'patterntype:') { #kind of generated patterns in repository
       $config->{'patterntype'} = [ @l ];
     } elsif ($l0 eq 'release:') {
@@ -306,6 +308,12 @@ sub read_config {
     } else {
       $config->{'type'} = 'UNDEFINED';
     }
+  }
+  if (!$config->{'binarytype'}) {
+    $config->{'binarytype'} = 'rpm' if $config->{'type'} eq 'spec' || $config->{'type'} eq 'kiwi';
+    $config->{'binarytype'} = 'deb' if $config->{'type'} eq 'dsc';
+    $config->{'binarytype'} = 'arch' if $config->{'type'} eq 'arch';
+    $config->{'binarytype'} ||= 'UNDEFINED';
   }
   # add rawmacros to our macro list
   if ($config->{'rawmacros'} ne '') {
@@ -576,7 +584,7 @@ sub addproviders {
       if ($pp eq $rn) {
 	# debian: unversioned provides do not match
 	# kiwi: supports only rpm, so we need to hand it like it
-	next if $config->{'type'} eq 'dsc';
+	next if $config->{'binarytype'} eq 'deb';
 	push @p, $rp;
 	last;
       }
@@ -597,7 +605,7 @@ sub addproviders {
       $rr &= 5 unless $pf & 2;
       # verscmp for spec and kiwi types
       my $vv;
-      if ($config->{'type'} eq 'dsc') {
+      if ($config->{'binatytype'} eq 'deb') {
 	$vv = Build::Deb::verscmp($pv, $rv, 1);
       } else {
 	$vv = Build::Rpm::verscmp($pv, $rv, 1);
