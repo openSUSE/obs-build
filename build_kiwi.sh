@@ -114,10 +114,10 @@ run_kiwi()
 	for imgtype in $imagetype ; do
 	    echo "running kiwi --prepare for $imgtype..."
 	    # Do not use $BUILD_USER here, since we always need root permissions
-	    if chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT-$imgtype" - root < /dev/null ; then
+	    if chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && /usr/sbin/kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT-$imgtype" - root < /dev/null ; then
 		echo "running kiwi --create for $imgtype..."
 		mkdir -p $BUILD_ROOT/$TOPDIR/KIWI-$imgtype
-		chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --create $TOPDIR/KIWIROOT-$imgtype --logfile terminal --type $imgtype -d $TOPDIR/KIWI-$imgtype" - root < /dev/null || cleanup_and_exit 1
+		chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && /usr/sbin/kiwi --create $TOPDIR/KIWIROOT-$imgtype --logfile terminal --type $imgtype -d $TOPDIR/KIWI-$imgtype" - root < /dev/null || cleanup_and_exit 1
 	    else
 		cleanup_and_exit 1
 	    fi
