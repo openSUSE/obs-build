@@ -930,9 +930,9 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGE
 	continue
       ;;
     esac
-    progress_step MAIN_LIST
 
     test -f $BUILD_ROOT/installed-pkg/$PKG && continue
+    progress_step MAIN_LIST
 
     if test $PSUF = deb ; then
 	# debian world, install deb files
