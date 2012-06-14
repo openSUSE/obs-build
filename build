@@ -1948,10 +1948,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	getmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" > $BUILD_ROOT/root/.rpmmacros
 	if test -n "$BUILD_DEBUG" ; then
 	    echo '
-%prep %{?!_suse_insert_debug_package_seen:%?_suse_insert_debug_package}%%prep
-%package %{?!_suse_insert_debug_package_seen:%?_suse_insert_debug_package}%%package
+%prep %{?!__debug_package:%?_suse_insert_debug_package}%%prep
+%package %{?!__debug_package:%?_suse_insert_debug_package}%%package
 %_suse_insert_debug_package \
-  %global _suse_insert_debug_package_seen 1 \
+  %global __debug_package 1 \
+  %undefine _enable_debug_packages \
   %debug_package
 
 ' >> $BUILD_ROOT/root/.rpmmacros
@@ -2089,10 +2090,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if [ -n "$DISTURL" ]; then
 		rpmbopts[${#rpmbopts[@]}]='--define'
 		rpmbopts[${#rpmbopts[@]}]="disturl $DISTURL"
-	fi
-	if test -s "$BUILD_ROOT/usr/lib/rpm/mandriva/macros" ; then
-		rpmbopts[${#rpmbopts[@]}]='--eval'
-		rpmbopts[${#rpmbopts[@]}]="%undefine _enable_debug_packages"
 	fi
 	if [ -n "$RSYNCDONE" ] ; then
 		rpmbopts[${#rpmbopts[@]}]='--define'
