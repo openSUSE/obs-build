@@ -52,9 +52,12 @@ sub writedsc {
 }
 
 sub listtar {
-  my ($tar) = @_;
+  my ($tar, $skipdebiandir) = @_;
   local *F;
   my @c;
+  unless(defined($skipdebiandir)) {
+    $skipdebiandir = 1;
+  }
   open(F, '-|', 'tar', '--numeric-owner', '-tvf', $tar) || die("tar: $!\n");
   while(<F>) {
     next unless /^([-dlbcp])(.........)\s+\d+\/\d+\s+(\S+) \d\d\d\d-\d\d-\d\d \d\d:\d\d(?::\d\d)? (.*)$/;
@@ -63,24 +66,50 @@ sub listtar {
     die("debian tar contains link: $name\n") if $type eq 'l';
     die("debian tar contains unexpected file type: $name\n") if $type ne '-';
     $name =~ s/^\.\///;
-    $name =~ s/^debian\///;
+    $name =~ s/^debian\/// if $skipdebiandir eq 1;
     push @c, {'name' => $name, 'size' => $size};
   }
   close(F) || die("tar: $!\n");
   return @c;
 }
 
+sub extracttar {
+  my ($tar, $filename, $s) = @_;
+  local *F;
+  open(F, '-|', 'tar', '-xOf', $tar, $filename) || die("tar: $!\n");
+  my $file = '';
+  while ($s > 0) {
+    my $l = sysread(F, $file, $s, length($file));
+    die("tar read error\n") unless $l;
+    $s -= $l;
+  }
+  my @file = split("\n", $file);
+  close(F);
+  return @file;
+}
+
 sub dodiff {
-  my ($oldname, $newname, @content) = @_;
+  my ($oldname, $newname, $origtarfile, @content) = @_;
+  my @oldcontent;
+  for my $c (@{$origtarfile->{'content'}}) {
+      if ($c->{'name'} eq $newname) {
+          @oldcontent = extracttar($origtarfile->{'name'}, $c->{'name'}, $c->{'size'});
+      }
+  }
   return unless @content;
   print DIFF "--- $oldname\n";
   print DIFF "+++ $newname\n";
-  print DIFF "\@\@ -0,0 +1,".scalar(@content)." \@\@\n";
+  if (@oldcontent) {
+    print DIFF "\@\@ -1,".scalar(@oldcontent)." +1,".scalar(@content)." \@\@\n";
+    print DIFF "-$_\n" for @oldcontent;
+  } else {
+    print DIFF "\@\@ -0,0 +1,".scalar(@content)." \@\@\n";
+  }
   print DIFF "+$_\n" for @content;
 }
 
 sub dotar {
-  my ($tar, $tardir, $origin, @c) = @_;
+  my ($tar, $tardir, $origin, $origtarfile, @c) = @_;
   local *F;
   open(F, '-|', 'tar', '-xOf', $tar) || die("tar: $!\n");
   for my $c (@c) {
@@ -93,19 +122,19 @@ sub dotar {
     }
     next if $origin && $origin->{$c->{'name'}} ne $tar;
     my @file = split("\n", $file);
-    dodiff("$tardir.orig/debian/$c->{'name'}", "$tardir/debian/$c->{'name'}", @file);
+    dodiff("$tardir.orig/debian/$c->{'name'}", "$tardir/debian/$c->{'name'}", $origtarfile, @file);
   }
   close(F);
 }
 
 sub dofile {
-  my ($file, $tardir, $dfile) = @_;
+  my ($file, $tardir, $dfile, $origtarfile) = @_;
   local *F;
   open(F, '<', $file) || die("$file: $!\n");
   my @file = <F>;
   close F;
   chomp(@file);
-  dodiff("$tardir.orig/$dfile", "$tardir/$dfile", @file);
+  dodiff("$tardir.orig/$dfile", "$tardir/$dfile", $origtarfile, @file);
 }
 
 sub doseries {
@@ -233,6 +262,8 @@ if ($tarfile =~ /\.zip/) {
 }
 
 my $tardir = $tarfile;
+my @tarfilecontent = listtar($tarfile, 0);
+my $origtarfile = { 'name', $tarfile, 'content', \@tarfilecontent};
 $tardir =~ s/\.orig\.tar/\.tar/;
 $tardir =~ s/\.tar.*?$//;
 
@@ -265,17 +296,17 @@ for my $debtarfile (@debtarfiles) {
   }
 }
 
-dofile($changelog, $tardir, 'debian/changelog') if defined $changelog;
+dofile($changelog, $tardir, 'debian/changelog', $origtarfile) if defined $changelog;
 
 for my $debtarfile (@debtarfiles) {
-  dotar("$dir/$debtarfile", $tardir, \%debtarorigin, @{$debtarcontent{$debtarfile} });
+  dotar("$dir/$debtarfile", $tardir, \%debtarorigin, $origtarfile, @{$debtarcontent{$debtarfile} });
 }
 
 for my $file (grep {/^debian\./} @dir) {
   next if $file eq 'debian.series';
   next if $file =~ /\.tar$/;
   next if $file =~ /\.tar\./;
-  dofile("$dir/$file", $tardir, 'debian/'.substr($file, 7));
+  dofile("$dir/$file", $tardir, 'debian/'.substr($file, 7), $origtarfile);
 }
 
 if ($tags->{'DEBTRANSFORM-SERIES'}) {
