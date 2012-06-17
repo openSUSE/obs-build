@@ -96,6 +96,19 @@ sub dodiff {
           @oldcontent = extracttar($origtarfile->{'name'}, $c->{'name'}, $c->{'size'});
       }
   }
+  if ($newname eq $origtarfile->{'tardir'}."/debian/changelog") {
+    my $firstline = $content[0];
+    my $version = $firstline;
+    $version =~ s/.*\((.*)\).*/$1/g;
+    if ($version ne $origtarfile->{'version'}) {
+      $firstline =~ s/\(.*\)/($origtarfile->{'version'})/g;
+      my $date = `date -R`;
+      chomp($date);
+      my @newcontent = ($firstline, "", "  * version number update by debtransform", "", " -- debtransform <build\@opensuse.org>  ".$date, "");
+      push(@newcontent, @content);
+      @content = @newcontent;
+    }
+  }
   return unless @content;
   print DIFF "--- $oldname\n";
   print DIFF "+++ $newname\n";
@@ -262,10 +275,10 @@ if ($tarfile =~ /\.zip/) {
 }
 
 my $tardir = $tarfile;
-my @tarfilecontent = listtar($tarfile, 0);
-my $origtarfile = { 'name', $tarfile, 'content', \@tarfilecontent};
 $tardir =~ s/\.orig\.tar/\.tar/;
 $tardir =~ s/\.tar.*?$//;
+my @tarfilecontent = listtar($tarfile, 0);
+my $origtarfile = { 'name', $tarfile, 'content', \@tarfilecontent, 'version', $tags->{'VERSION'}, 'tardir', $tardir};
 
 my @files;
 my $v = $version;
