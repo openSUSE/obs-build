@@ -100,9 +100,9 @@ sub dofile {
   my @file = <F>;
   close F;
   chomp(@file);
+  return unless @file;
   print DIFF "--- $tardir.orig/$dfile\n";
   print DIFF "+++ $tardir/$dfile\n";
-  return unless @file;
   print DIFF "\@\@ -0,0 +1,".scalar(@file)." \@\@\n";
   print DIFF "+$_\n" for @file;
 }
