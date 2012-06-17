@@ -70,6 +70,15 @@ sub listtar {
   return @c;
 }
 
+sub dodiff {
+  my ($oldname, $newname, @content) = @_;
+  return unless @content;
+  print DIFF "--- $oldname\n";
+  print DIFF "+++ $newname\n";
+  print DIFF "\@\@ -0,0 +1,".scalar(@content)." \@\@\n";
+  print DIFF "+$_\n" for @content;
+}
+
 sub dotar {
   my ($tar, $tardir, $origin, @c) = @_;
   local *F;
@@ -84,11 +93,7 @@ sub dotar {
     }
     next if $origin && $origin->{$c->{'name'}} ne $tar;
     my @file = split("\n", $file);
-    print DIFF "--- $tardir.orig/debian/$c->{'name'}\n";
-    print DIFF "+++ $tardir/debian/$c->{'name'}\n";
-    next unless @file;
-    print DIFF "\@\@ -0,0 +1,".scalar(@file)." \@\@\n";
-    print DIFF "+$_\n" for @file;
+    dodiff("$tardir.orig/debian/$c->{'name'}", "$tardir/debian/$c->{'name'}", @file);
   }
   close(F);
 }
@@ -100,11 +105,7 @@ sub dofile {
   my @file = <F>;
   close F;
   chomp(@file);
-  return unless @file;
-  print DIFF "--- $tardir.orig/$dfile\n";
-  print DIFF "+++ $tardir/$dfile\n";
-  print DIFF "\@\@ -0,0 +1,".scalar(@file)." \@\@\n";
-  print DIFF "+$_\n" for @file;
+  dodiff("$tardir.orig/$dfile", "$tardir/$dfile", @file);
 }
 
 sub doseries {
