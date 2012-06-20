@@ -61,6 +61,10 @@ for my $p (@p) {
   my $q;
   for my $suf ('rpm', 'deb', 'arch') {
     next unless -f "$cachedir/$p.$suf";
+    if (! -s "$cachedir/$p.$suf") {
+      $q = {'provides' => [], 'requires' => []}; # package from preinstallimage, no need to order
+      last;
+    }
     $q = Build::query("$cachedir/$p.$suf", 'filelist' => 1, 'alldeps' => 1);
     die("bad binary: $p.$suf\n") unless $q;
     push @{$q->{'provides'}}, @{$q->{'filelist'}} if $suf eq 'rpm' && $q->{'filelist'};
