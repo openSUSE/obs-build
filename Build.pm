@@ -31,6 +31,10 @@ sub import {
   }
 }
 
+package Build::Features;
+our $preinstallimage = 1;	# on sale now
+package Build;
+
 my $std_macros = q{
 %define nil
 %define ix86 i386 i486 i586 i686 athlon
@@ -605,7 +609,7 @@ sub addproviders {
       $rr &= 5 unless $pf & 2;
       # verscmp for spec and kiwi types
       my $vv;
-      if ($config->{'binatytype'} eq 'deb') {
+      if ($config->{'binarytype'} eq 'deb') {
 	$vv = Build::Deb::verscmp($pv, $rv, 1);
       } else {
 	$vv = Build::Rpm::verscmp($pv, $rv, 1);
@@ -866,13 +870,21 @@ sub show {
   print "$_\n" for @$x;
 }
 
+sub parse_preinstallimage {
+  return undef unless $do_rpm;
+  my $d = Build::Rpm::parse(@_);
+  $d->{'name'} ||= 'preinstallimage';
+  return $d;
+}
+
 sub parse {
   my ($cf, $fn, @args) = @_;
   return Build::Rpm::parse($cf, $fn, @args) if $do_rpm && $fn =~ /\.spec$/;
   return Build::Deb::parse($cf, $fn, @args) if $do_deb && $fn =~ /\.dsc$/;
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /config\.xml$/;
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /\.kiwi$/;
-  return Build::Arch::parse($cf, $fn, @args) if $do_arch && $fn =~ /PKGBUILD$/;
+  return Build::Arch::parse($cf, $fn, @args) if $do_arch && $fn =~ /(^|\/|-)PKGBUILD$/;
+  return parse_preinstallimage($cf, $fn, @args) if $fn =~ /(^|\/|-)preinstallimage$/;
   return undef;
 }
 

@@ -539,7 +539,7 @@ reexpand:
       $$nfbline = [$$nfbline, undef ];
     }
   }
-  unshift @subpacks, $ret->{'name'};
+  unshift @subpacks, $ret->{'name'} if defined $ret->{'name'};
   $ret->{'subpacks'} = \@subpacks;
   $ret->{'exclarch'} = $exclarch if defined $exclarch;
   $ret->{'badarch'} = $badarch if defined $badarch;
