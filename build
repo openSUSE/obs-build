@@ -406,8 +406,8 @@ setupccache()
 setupicecream()
 {
     if [ "$icecream" -eq 0 ]; then
-	rm -rf "$BUILD_ROOT"/var/run/icecream
-	rm -f "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
+	rm -rf "$BUILD_ROOT/var/run/icecream"
+	rm -f "$BUILD_ROOT/etc/profile.d/build_icecream.sh"
 	return
     fi
 
@@ -437,8 +437,8 @@ setupicecream()
 	-o "$BUILD_ROOT/usr/bin/as" -nt "$BUILD_ROOT/$icecc_vers" \
 	-o "$BUILD_ROOT/lib/libc.so.6" -nt "$BUILD_ROOT/$icecc_vers" ]
     then
-	rm -rf $BUILD_ROOT/var/run/icecream
-	mkdir -p $BUILD_ROOT/var/run/icecream
+	rm -rf "$BUILD_ROOT/var/run/icecream"
+	mkdir -p "$BUILD_ROOT/var/run/icecream"
 	if [ -e "$BUILD_ROOT"/usr/bin/create-env ]; then
 	  createenv=/usr/bin/create-env
 	elif [ -e "$BUILD_ROOT"/usr/lib/icecc/icecc-create-env ]; then
@@ -528,8 +528,8 @@ create_baselibs()
 	# use external version
 	whichone=" (external)"
 	mkbaselibs="/.mkbaselibs/mkbaselibs"
-	rm -rf $BUILD_ROOT/.mkbaselibs
-	mkdir -p $BUILD_ROOT/.mkbaselibs
+	rm -rf "$BUILD_ROOT/.mkbaselibs"
+	mkdir -p "$BUILD_ROOT/.mkbaselibs"
 	cp -f $BUILD_DIR/mkbaselibs $BUILD_ROOT/.mkbaselibs/
 	if test "$BUILDTYPE" == "dsc" ; then
 	    cp -f $BUILD_DIR/baselibs_global-deb.conf $BUILD_ROOT/.mkbaselibs/baselibs_g.conf
@@ -551,7 +551,7 @@ create_baselibs()
     do
 	chroot $BUILD_ROOT su -c "$mkbaselibs $BASELIBS_GLOBAL $BASELIBS_CFG $line" - $BUILD_USER || cleanup_and_exit 1
     done < <(IFS=$'\n'; echo "${pkgs[*]#$BUILD_ROOT}" | xargs -n 1024)
-    rm -rf $BUILD_ROOT/.mkbaselibs
+    rm -rf "$BUILD_ROOT/.mkbaselibs"
 }
 
 copy_oldpackages()
@@ -720,11 +720,11 @@ mkdir_build_root()
 	cleanup_and_exit 3
     fi
 
-    rm -rf "$BUILD_ROOT"/.build.packages
+    rm -rf "$BUILD_ROOT/.build.packages"
     if [ -z "$VM_TYPE" -a -z "$RUNNING_IN_VM" ]; then
        # don't touch this in VM
-       rm -rf "$BUILD_ROOT"/.build
-       mkdir -p "$BUILD_ROOT"/.build
+       rm -rf "$BUILD_ROOT/.build"
+       mkdir -p "$BUILD_ROOT/.build"
     fi
 }
 
@@ -1266,18 +1266,18 @@ if test -n "$LIST_STATE" ; then
     test -d "$BUILD_ROOT" || cleanup_and_exit 3
     SPECFILE=$SPECFILES # only one specified anyways
     if test "$SPECFILE" != "${SPECFILE%.src.rpm}" ; then
-       rm -rf $BUILD_ROOT/usr/src/packages
+       rm -rf "$BUILD_ROOT/usr/src/packages"
        mkdir -p $BUILD_ROOT/usr/src/packages/SOURCES $BUILD_ROOT/usr/src/packages/SPECS
        rpm -i --nodigest --nosignature --root $BUILD_ROOT $SPECFILE || {
 	   echo "could not install $SPECFILE." 2>&1
-	   rm -rf $BUILD_ROOT
+	   rm -rf "$BUILD_ROOT"
 	   cleanup_and_exit 3
        }
        for SPECFILE in $BUILD_ROOT/usr/src/packages/SPECS/*.spec ; do : ; done
     fi
     init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --list-state "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $SPECFILE $BUILD_EXTRA_PACKS
     ERR=$?
-    rm -rf $BUILD_ROOT
+    rm -rf "$BUILD_ROOT"
     cleanup_and_exit $ERR
 fi
 
@@ -1405,6 +1405,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
       *.dsc) BUILDTYPE=dsc ;;
       *.kiwi) BUILDTYPE=kiwi ;;
       PKGBUILD) BUILDTYPE=arch ;;
+      preinstallimage) BUILDTYPE=preinstallimage ;;
     esac
     if test -z "$BUILDTYPE" ; then
        echo "don't know how to build $SPECFILE"
@@ -1432,8 +1433,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     if test "$SPECFILE" != "${SPECFILE%.src.rpm}" ; then
 	echo processing src rpm $SRCDIR/$SPECFILE ...
 	MYSRCDIR=$BUILD_ROOT/.build-srcdir
-	rm -rf $MYSRCDIR
-	mkdir -p $MYSRCDIR
+	rm -rf "$MYSRCDIR"
+	mkdir -p "$MYSRCDIR"
 	cd $MYSRCDIR || cleanup_and_exit 1
 	$BUILD_DIR/unrpm -q $SRCDIR/$SPECFILE || {
 	    echo "could not install $SPECFILE."
@@ -1483,8 +1484,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
 
     if test -n "$VM_TYPE" -a -z "$RUNNING_IN_VM"; then
-	rm -rf $BUILD_ROOT/.build
-	mkdir -p $BUILD_ROOT/.build
+	rm -rf "$BUILD_ROOT/.build"
+	mkdir -p "$BUILD_ROOT/.build"
 	if test "$DO_INIT" = true ; then
 	    # do fist stage of init_buildsystem
 	    rm -f $BUILD_ROOT/.build.success
@@ -1501,8 +1502,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	# start up xen, rerun ourself
 	cp -a $BUILD_DIR/. $BUILD_ROOT/.build
 	if ! test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
-	    rm -rf $BUILD_ROOT/.build-srcdir
-	    mkdir $BUILD_ROOT/.build-srcdir
+	    rm -rf "$BUILD_ROOT/.build-srcdir"
+	    mkdir "$BUILD_ROOT/.build-srcdir"
 	    if test "$BUILDTYPE" = kiwi ; then
 		cp -pRL "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
 	    else
@@ -1764,6 +1765,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	test -z "$INCARNATION" && INCARNATION=0
 	echo "BUILD_INCARNATION=$INCARNATION" > $BUILD_ROOT/.buildenv
 	CREATE_BUILD_BINARIES=
+	test "$BUILDTYPE" = preinstallimage && mkdir -p $BUILD_ROOT/.preinstall_image
 	egrep '^#[       ]*needsbinariesforbuild[       ]*$' >/dev/null <$MYSRCDIR/$SPECFILE && CREATE_BUILD_BINARIES=--create-build-binaries
 	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USE_SYSTEM_QEMU $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
@@ -1782,6 +1784,47 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	mount -n -tdevpts none $BUILD_ROOT/dev/pts
 
 	copy_oldpackages
+    fi
+
+    if test "$BUILDTYPE" = preinstallimage ; then
+	echo "creating preinstall image..."
+	test -d "$BUILD_ROOT/.preinstall_image" || cleanup_and_exit 1
+	cd $BUILD_ROOT || cleanup_and_exit 1
+	TAR="tar"
+	if test -x /usr/bin/bsdtar; then
+	    TAR="/usr/bin/bsdtar --chroot"
+	fi
+	TOPDIRS=
+	for DIR  in .* * ; do
+	  case "$DIR" in
+	    .|..) continue ;;
+	    .build*) continue ;;
+	    .preinstallimage*) continue ;;
+	    .srcfiles*) continue ;;
+	    .pkgs) continue ;;
+	    installed-pkg) continue ;;
+	    proc|sys) continue ;;
+	  esac
+	  TOPDIRS="$TOPDIRS $DIR"
+        done
+	if ! $TAR -czf .preinstallimage.$$.tar.gz --one-file-system $TOPDIRS ; then
+	    cleanup_and_exit 1
+	fi
+	echo "image created."
+	TOPDIR=/usr/src/packages
+	mkdir -p $BUILD_ROOT$TOPDIR/OTHER
+	rm -f $BUILD_ROOT$TOPDIR/OTHER/preinstallimage.info
+	for PKG in $BUILD_ROOT/.preinstall_image/* ; do
+	    PKG=${PKG##*/}
+	    read PKG_HDRMD5 PKGID < $BUILD_ROOT/.preinstall_image/$PKG
+	    test -n "$PKG_HDRMD5" || cleanup_and_exit 1
+	    echo "$PKG_HDRMD5  $PKG" >> $BUILD_ROOT$TOPDIR/OTHER/preinstallimage.info
+	done
+	mv $BUILD_ROOT/.preinstallimage.$$.tar.gz $BUILD_ROOT$TOPDIR/OTHER/preinstallimage.tar.gz
+	rm -f $BUILD_ROOT/.build.packages
+	ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
+	test -d "$SRCDIR" && cd "$SRCDIR"
+	continue
     fi
 
     if test -z "$BUILD_DIST" -a -e "$BUILD_ROOT/.guessed_dist" ; then
@@ -1855,7 +1898,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	ABUILD_UID=0
 	ABUILD_GID=0
 	if egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
-	    rm -rf $BUILD_ROOT/home/abuild
+	    rm -rf "$BUILD_ROOT/home/abuild"
 	    egrep -v '^abuild:' <$BUILD_ROOT/etc/passwd >$BUILD_ROOT/etc/passwd.new
 	    mv $BUILD_ROOT/etc/passwd.new $BUILD_ROOT/etc/passwd
 	    egrep -v '^abuild:' <$BUILD_ROOT/etc/group >$BUILD_ROOT/etc/group.new
@@ -1901,7 +1944,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     #
     # now clean up RPM building directories
     #
-    rm -rf $BUILD_ROOT$TOPDIR
+    rm -rf "$BUILD_ROOT$TOPDIR"
     for i in BUILD RPMS/`uname -m` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS BUILDROOT OTHER ; do
 	mkdir -p $BUILD_ROOT$TOPDIR/$i
     done
@@ -1976,7 +2019,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     if test -f $BUILD_ROOT/.spec.new ; then
 	if ! cmp -s $BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE $BUILD_ROOT/.spec.new ; then
 	    echo -----------------------------------------------------------------
-	    echo I have the following modifications for $SPECFILE:
+	    echo "I have the following modifications for $SPECFILE:"
 	    sed -e "/^%changelog/q" $BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE > $BUILD_ROOT/.spec.t1
 	    sed -e "/^%changelog/q" $BUILD_ROOT/.spec.new > $BUILD_ROOT/.spec.t2
 	    diff $BUILD_ROOT/.spec.t1 $BUILD_ROOT/.spec.t2
@@ -1988,7 +2031,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
 
     if test "$BUILDTYPE" = dsc ; then
-	rm -rf $BUILD_ROOT$TOPDIR/BUILD
+	rm -rf "$BUILD_ROOT$TOPDIR/BUILD"
 	mkdir -p $BUILD_ROOT$TOPDIR/SOURCES.DEB
 	chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
 	DEB_TRANSFORM=

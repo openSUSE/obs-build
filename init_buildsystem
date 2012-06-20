@@ -106,31 +106,75 @@ cleanup_and_exit()
     [ "$BUILD_ROOT" != / ] || chown $browner $BUILD_ROOT
     # umount so init_buildsystem can be used standalone
 # XXX: use stat -f /dev/pts/ -c %T  to check whether it's mounted and not suppress errors then?
-    umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
-    umount -n $BUILD_ROOT/proc 2> /dev/null || true
-    umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
-    umount -n $BUILD_ROOT/mnt 2> /dev/null || true
+    umount -n "$BUILD_ROOT/proc/sys/fs/binfmt_misc" 2> /dev/null || true
+    umount -n "$BUILD_ROOT/proc" 2> /dev/null || true
+    umount -n "$BUILD_ROOT/dev/pts" 2> /dev/null || true
+    umount -n "$BUILD_ROOT/mnt" 2> /dev/null || true
     exit ${1:-0}
 }
 
 clean_build_root()
 {
 	test -n "$BUILD_ROOT" && {
-	    umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
-	    umount -n $BUILD_ROOT/proc 2> /dev/null || true
-	    umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
-	    umount -n $BUILD_ROOT/mnt 2> /dev/null || true
-	    rm -rf -- $BUILD_ROOT/*
-	    rm -rf -- $BUILD_ROOT/.build
-	    rm -rf -- $BUILD_ROOT/.root
-	    rm -rf -- $BUILD_ROOT/.init_b_cache
-	    mkdir -p $BUILD_ROOT/proc
-	    mkdir -p $BUILD_ROOT/dev/pts
+	    umount -n "$BUILD_ROOT/proc/sys/fs/binfmt_misc" 2> /dev/null || true
+	    umount -n "$BUILD_ROOT/proc" 2> /dev/null || true
+	    umount -n "$BUILD_ROOT/dev/pts" 2> /dev/null || true
+	    umount -n "$BUILD_ROOT/mnt" 2> /dev/null || true
+	    rm -rf -- "$BUILD_ROOT"/*
+	    rm -rf -- "$BUILD_ROOT/.build"
+	    rm -rf -- "$BUILD_ROOT/.root"
+	    rm -rf -- "$BUILD_ROOT/.init_b_cache"
+	    rm -rf -- "$BUILD_ROOT/.preinstall_image/*"
+	    rm -rf -- "$BUILD_ROOT/.preinstallimage"*
+	    mkdir -p "$BUILD_ROOT/proc"
+	    mkdir -p "$BUILD_ROOT/dev/pts"
 	    if [ "$UID" = '0' ]; then
-		    mount -n -tproc none $BUILD_ROOT/proc
-		    mount -n -tdevpts none $BUILD_ROOT/dev/pts
+		    mount -n -tproc none "$BUILD_ROOT/proc"
+		    mount -n -tdevpts none "$BUILD_ROOT/dev/pts"
 	    fi
 	}
+}
+
+
+unsafe_preinstall_check()
+{
+    # cpio isn't safe so we require bsdtar for VMs. chroot is
+    # unsafe anyways so it's ok for that.
+    if test -n "$PREPARE_VM" ; then
+	echo "Error: setting up a VM requires bsdtar for security reasons."
+	echo "Please install bsdtar."
+	cleanup_and_exit 1
+    fi
+}
+
+preinstall_image_filter()
+{
+    for PKG in "$@" ; do
+	test -e "$BUILD_ROOT/.preinstall_image/$PKG" && continue
+	echo $PKG
+    done
+}
+
+preinstall_image()
+{
+    check_exit
+    if test -n "$2" ; then
+	echo "unpacking preinstall image $2..."
+    else
+	echo "unpacking preinstall image..."
+    fi
+    cd $BUILD_ROOT || cleanup_and_exit 1
+    if test -x /usr/bin/bsdtar ; then
+	TAR="/usr/bin/bsdtar -P --chroot -o --numeric-owner -x"
+    else
+	unsafe_preinstall_check
+	TAR="tar -x"
+    fi
+    # pipe output through perl to print a dot every 1000 lines
+    if ! $TAR -z --exclude .build --exclude .init_b_cache -f "$BUILD_ROOT/.init_b_cache/rpms/$1" -v > >(perl -e '$|=1; my $done=0; $done++ % 1000 or print "." while <STDIN>; print "\n";')  2>&1 ; then
+	echo "unpack failed."
+	cleanup_and_exit 1
+    fi
 }
 
 preinstall()
@@ -142,13 +186,7 @@ preinstall()
 	CPIO="/usr/bin/bsdtar -P --chroot -o --numeric-owner -x -f-"
 	TAR="/usr/bin/bsdtar -P --chroot -o --numeric-owner -x"
     else
-	# cpio isn't safe so we require bsdtar for VMs. chroot is
-	# unsafe anyways so it's ok for that.
-	if [ -n "$PREPARE_VM" ]; then
-	    echo "Error: setting up a VM requires bsdtar for security reasons."
-	    echo "Please install bsdtar"
-	    cleanup_and_exit 1
-	fi
+	unsafe_preinstall_check
 	CPIO="cpio --extract --unconditional --preserve-modification-time --make-directories --no-absolute-filenames --quiet"
 	TAR="tar -x"
     fi
@@ -596,8 +634,8 @@ else
     #
     # now make sure that all the packages are installed.
     #
-    rm -rf $BUILD_ROOT/.init_b_cache
-    mkdir -p $BUILD_ROOT/.init_b_cache/scripts
+    rm -rf "$BUILD_ROOT/.init_b_cache"
+    mkdir -p "$BUILD_ROOT/.init_b_cache/scripts"
 
     if test -z "$RPMLIST" ; then
 	#
@@ -628,7 +666,7 @@ else
 	   test "$PKG" = "rpmid:" && continue
 	   echo "${SRC##*/}"
 	done < $BUILD_ROOT/.init_b_cache/rpmlist
-	rm -rf $BUILD_ROOT/.init_b_cache
+	rm -rf "$BUILD_ROOT/.init_b_cache"
 	cleanup_and_exit 0
     fi
 
@@ -664,7 +702,10 @@ else
     PACKAGES_TO_VMINSTALL=
     PACKAGES_TO_CBPREINSTALL=
     PACKAGES_TO_CBINSTALL=
+    PREINSTALL_IMAGE=
+    PREINSTALL_IMAGE_SOURCE=
     RUNSCRIPTS_SEEN=
+    PACKAGES_FROM_PREINSTALLIMAGE=
     GUESSED_DIST=unknown
     mkdir -p $BUILD_ROOT/.init_b_cache/rpms
     while read PKG SRC ; do
@@ -674,6 +715,15 @@ else
 	fi
 	if test "$PKG" = "vminstall:" ; then
 	    PACKAGES_TO_VMINSTALL=$SRC
+	    continue
+	fi
+	if test "$PKG" = "preinstallimage:" ; then
+	    PREINSTALL_IMAGE=${SRC##*/}
+	    ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/${SRC##*/}"
+	    continue
+	fi
+	if test "$PKG" = "preinstallimagesource:" ; then
+	    PREINSTALL_IMAGE_SOURCE="$SRC"
 	    continue
 	fi
 	# these additional preinstall / install values are only set for 
@@ -707,6 +757,11 @@ else
 	    echo "Warning: ignoring unsupported tag '$PKG'" >&2
 	    continue
 	fi
+	if test "$SRC" = "preinstallimage" ; then
+	    PACKAGES_FROM_PREINSTALLIMAGE="$PACKAGES_FROM_PREINSTALLIMAGE $PKG"
+	    PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $PKG"
+	    continue
+	fi
 	if [ "${SRC#/}" = "$SRC" ]; then
 	    url="$SRC"
 	    case "$url" in
@@ -736,11 +791,23 @@ else
     case "$PSUF" in
 	UNKNOWN|'')
 	    # auto detect from packages
+	    if test -n "$PREINSTALL_IMAGE" ; then
+		echo "cannot autodetect build type when using a preinstall image" >&2
+		cleanup_and_exit 1
+	    fi
 	    PSUF=rpm
-	    test -L $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb && PSUF=deb
-	    test -L $BUILD_ROOT/.init_b_cache/rpms/pacman.arch && PSUF=arch
+	    test -e $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb && PSUF=deb
+	    test -e $BUILD_ROOT/.init_b_cache/rpms/pacman.arch && PSUF=arch
 	    ;;
     esac
+
+    if test -n "$PREINSTALL_IMAGE" ; then
+	for PKG in $PACKAGES_FROM_PREINSTALLIMAGE ; do
+	    # touch the file so that the copying works
+	    touch $BUILD_ROOT/.init_b_cache/rpms/"$PKG.$PSUF"
+	done
+    fi
+
 fi
 
 #
@@ -765,25 +832,35 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
     for PKG in $PACKAGES_TO_RUNSCRIPTS ; do
 	: > $BUILD_ROOT/.init_b_cache/scripts/$PKG.run
     done
-    PACKAGES_TO_PREINSTALL=`reorder $PACKAGES_TO_PREINSTALL`
-    progress_setup PACKAGES_TO_PREINSTALL
-    for PKG in $PACKAGES_TO_PREINSTALL ; do
-	progress_step PACKAGES_TO_PREINSTALL
+    PACKAGES_TO_PREINSTALL_FILTERED="$PACKAGES_TO_PREINSTALL"
+    PACKAGES_TO_VMINSTALL_FILTERED="$PACKAGES_TO_VMINSTALL"
+    PACKAGES_TO_CBPREINSTALL_FILTERED="$PACKAGES_TO_CBPREINSTALL"
+    rm -f "$BUILD_ROOT/.preinstall_image"/*
+    if test -n "$PREINSTALL_IMAGE" ; then
+	preinstall_image "$PREINSTALL_IMAGE" "$PREINSTALL_IMAGE_SOURCE"
+	PACKAGES_TO_PREINSTALL_FILTERED=`preinstall_image_filter $PACKAGES_TO_PREINSTALL_FILTERED`
+	PACKAGES_TO_VMINSTALL_FILTERED=`preinstall_image_filter $PACKAGES_TO_VMINSTALL_FILTERED`
+	PACKAGES_TO_CBPREINSTALL_FILTERED=`preinstall_image_filter $PACKAGES_TO_VMINSTALL_FILTERED`
+    fi
+    PACKAGES_TO_PREINSTALL_FILTERED=`reorder $PACKAGES_TO_PREINSTALL_FILTERED`
+    progress_setup PACKAGES_TO_PREINSTALL_FILTERED
+    for PKG in $PACKAGES_TO_PREINSTALL_FILTERED ; do
+	progress_step PACKAGES_TO_PREINSTALL_FILTERED
 	preinstall ${PKG##*/}
     done
     if test -n "$PREPARE_VM" ; then
-        PACKAGES_TO_VMINSTALL=`reorder $PACKAGES_TO_VMINSTALL`
-	progress_setup PACKAGES_TO_VMINSTALL
-	for PKG in $PACKAGES_TO_VMINSTALL ; do
-	    progress_step PACKAGES_TO_VMINSTALL
+        PACKAGES_TO_VMINSTALL_FILTERED=`reorder $PACKAGES_TO_VMINSTALL_FILTERED`
+	progress_setup PACKAGES_TO_VMINSTALL_FILTERED
+	for PKG in $PACKAGES_TO_VMINSTALL_FILTERED ; do
+	    progress_step PACKAGES_TO_VMINSTALL_FILTERED
 	    preinstall ${PKG##*/}
 	done
     fi
     # add cbpreinstall if cross HOST != TARGET
-    PACKAGES_TO_CBINSTALL=`reorder $PACKAGES_TO_CBINSTALL`
-    progress_setup PACKAGES_TO_CBPREINSTALL
-    for PKG in $PACKAGES_TO_CBPREINSTALL ; do
-	progress_step PACKAGES_TO_CBPREINSTALL
+    PACKAGES_TO_CBINSTALL_FILTERED=`reorder $PACKAGES_TO_CBINSTALL_FILTERED`
+    progress_setup PACKAGES_TO_CBPREINSTALL_FILTERED
+    for PKG in $PACKAGES_TO_CBPREINSTALL_FILTERED ; do
+	progress_step PACKAGES_TO_CBPREINSTALL_FILTERED
         preinstall ${PKG##*/}
     done
     if [ -w /root ]; then
@@ -806,8 +883,7 @@ if test -n "$PREPARE_VM" ; then
 	ln -s -f ../$PKG.$PSUF $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF
 	check_exit
     done
-    # alreadyinstalled check will not work, but we have to live with
-    # that...
+    # alreadyinstalled check will not work, but we have to live with that...
     echo -n 'reordering...'
     PACKAGES_TO_INSTALL=`reorder $PACKAGES_TO_INSTALL`
     echo 'done'
@@ -818,7 +894,7 @@ if test -n "$PREPARE_VM" ; then
     echo "PACKAGES_TO_PREINSTALL='${PACKAGES_TO_PREINSTALL//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
     echo "PACKAGES_TO_CBPREINSTALL='${PACKAGES_TO_CBPREINSTALL//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
     echo "PSUF='$PSUF'" >> $BUILD_ROOT/.build/init_buildsystem.data
-    rm -f $BUILD_IS_RUNNING
+    rm -f $BUILD_IS_RUNNIN]G
     cleanup_and_exit 0
 fi
 
@@ -830,7 +906,7 @@ mount -n -tdevpts none $BUILD_ROOT/dev/pts 2>/dev/null || true
 #
 # create .build.binaries directory if requested
 #
-rm -rf $BUILD_ROOT/.build.binaries
+rm -rf "$BUILD_ROOT/.build.binaries"
 if test -n "$CREATE_BUILD_BINARIES" ; then
     echo "creating .build.binaries directory..."
     mkdir -p "$BUILD_ROOT/.build.binaries"
@@ -861,7 +937,6 @@ fi
 #
 if ! test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
     echo -n 'reordering...'
-    PACKAGES_TO_INSTALL_FIRST=`reorder $PACKAGES_TO_INSTALL_FIRST`
     PACKAGES_TO_INSTALL=`reorder $PACKAGES_TO_INSTALL`
     echo 'done'
 fi
@@ -893,7 +968,7 @@ for PKG in $BUILD_ROOT/.init_b_cache/alreadyinstalled/* ; do
     test "$PKG" = "*" && continue
     ln $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG $BUILD_ROOT/.init_b_cache/todelete/$PKG
 done
-for PKG in $PACKAGES_TO_INSTALL_FIRST $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL ; do
+for PKG in $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL ; do
     rm -f $BUILD_ROOT/.init_b_cache/todelete/$PKG
 done
 for PKG in $BUILD_ROOT/.init_b_cache/todelete/* ; do
@@ -903,16 +978,16 @@ for PKG in $BUILD_ROOT/.init_b_cache/todelete/* ; do
     rpm_e "$PKG"
     check_exit
 done
-rm -rf $BUILD_ROOT/.init_b_cache/todelete
+rm -rf "$BUILD_ROOT/.init_b_cache/todelete"
 
-rm -rf $BUILD_ROOT/.init_b_cache/preinstalls
-mkdir -p $BUILD_ROOT/.init_b_cache/preinstalls
+rm -rf "$BUILD_ROOT/.init_b_cache/preinstalls"
+mkdir -p "$BUILD_ROOT/.init_b_cache/preinstalls"
 for PKG in $PACKAGES_TO_PREINSTALL $PACKAGES_TO_CBPREINSTALL; do
     touch "$BUILD_ROOT/.init_b_cache/preinstalls/$PKG"
 done
 
-rm -rf $BUILD_ROOT/installed-pkg
-mkdir -p $BUILD_ROOT/installed-pkg
+rm -rf "$BUILD_ROOT/installed-pkg"
+mkdir -p "$BUILD_ROOT/installed-pkg"
 
 RPMCHECKOPTS=
 RPMCHECKOPTS_HOST=
@@ -921,34 +996,52 @@ RPMCHECKOPTS_HOST=
 test -x $BUILD_ROOT/usr/bin/rpmsign && RPMCHECKOPTS="--nodigest --nosignature"
 test -x /usr/bin/rpmsign && RPMCHECKOPTS_HOST="--nodigest --nosignature"
 
-MAIN_LIST="$PACKAGES_TO_INSTALL_FIRST $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL"
-progress_setup MAIN_LIST
-for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL; do
-    case $PKG in
-      RUN_LDCONFIG)
-	test -x $BUILD_ROOT/sbin/ldconfig && chroot $BUILD_ROOT /sbin/ldconfig 2>&1
-	continue
-      ;;
-    esac
+test -x $BUILD_ROOT/sbin/ldconfig && chroot $BUILD_ROOT /sbin/ldconfig 2>&1
 
+MAIN_LIST="$PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL"
+progress_setup MAIN_LIST
+for PKG in $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL; do
     test -f $BUILD_ROOT/installed-pkg/$PKG && continue
     progress_step MAIN_LIST
 
+    if test -e "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" -a ! -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" ; then
+	# preinstallimage package, make sure it's 
+	if ! test -e $BUILD_ROOT/.preinstall_image/$PKG ; then
+	    echo "Package $PKG is missing from the preinstall image"
+	    cleanup_and_exit 1
+	fi
+	read PKG_HDRMD5 PKGID < $BUILD_ROOT/.preinstall_image/$PKG
+        if test $PSUF = deb -o $PSUF = arch ; then
+	    echo "preinstalled ${PKGID%_*}"
+	else
+	    echo "preinstalled ${PKGID%% *}"
+	fi
+	continue
+    fi
+    PKG_HDRMD5=
+    if test -d $BUILD_ROOT/.preinstall_image ; then
+	if ! test -e $BUILD_ROOT/.preinstall_image/$PKG ; then
+	    PKG_HDRMD5=`perl -I$BUILD_DIR -MBuild -e 'print Build::queryhdrmd5($ARGV[0])' $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF`
+	    test -n "$PKG_HDRMD5" || cleanup_and_exit 1
+	fi
+    fi
+    test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF || continue
+
     if test $PSUF = deb ; then
 	# debian world, install deb files
-	test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.deb || continue
 	if ! test "$BUILD_ROOT/.init_b_cache/rpms/$PKG.deb" -ef "$BUILD_ROOT/.init_b_cache/$PKG.deb" ; then
 	    rm -f $BUILD_ROOT/.init_b_cache/$PKG.deb
 	    cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.deb $BUILD_ROOT/.init_b_cache/$PKG.deb || cleanup_and_exit 1
 	fi
 	PKGID=`readlink $BUILD_ROOT/.init_b_cache/rpms/$PKG.deb`
 	PKGID="${PKGID##*/}"
-	PKGID="${PKGID%.deb}"
+	PKGID="${PKGID%.deb} debian"
 	echo "installing ${PKGID%_*}"
 	( chroot $BUILD_ROOT dpkg --install --force all .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
 	    perl -ne '$|=1;/^(Configuration file|Installing new config file|Selecting previously deselected|\(Reading database|Unpacking |Setting up|Creating config file|Preparing to replace dpkg)/||/^$/||print'
 	check_exit
-	echo "$PKGID debian" > $BUILD_ROOT/installed-pkg/$PKG
+	echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
+	test -n "$PKG_HDRMD5" && echo "$PKG_HDRMD5 $PKGID" > $BUILD_ROOT/.preinstall_image/$PKG
         # ugly workaround for upstart system. some packages (procps) try
         # to start a service in their configure phase. As we don't have
         # a running upstart, we just link the start binary to /bin/true
@@ -965,7 +1058,6 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGE
     fi
 
     if test $PSUF = arch ; then
-	test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF || continue
 	if ! test "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" -ef "$BUILD_ROOT/.init_b_cache/$PKG.$PSUF" ; then 
 	    rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
 	    cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
@@ -973,17 +1065,16 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGE
 	PKGID=`readlink $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF`
 	PKGID="${PKGID##*/}"
 	PKGID="${PKGID/%.pkg.tar.?z/.arch}"
-	PKGID="${PKGID%.$PSUF}"
+	PKGID="${PKGID%.$PSUF} $PSUF"
 	echo "installing ${PKGID%_*}"
 	# -d -d disables deps checking
 	( chroot $BUILD_ROOT pacman -Uf -d -d --noconfirm .init_b_cache/$PKG.$PSUF 2>&1 || touch $BUILD_ROOT/exit ) | \
 	    perl -ne '$|=1;/^(warning: could not get filesystem information for |loading packages|looking for inter-conflicts|Targets |Total Installed Size: |Net Upgrade Size: |Proceed with installation|checking package integrity|loading package files|checking available disk space|installing |upgrading |warning:.*is up to date -- reinstalling|Optional dependencies for|    )/||/^$/||print'
 	check_exit
-	echo "$PKGID $PSUF" > $BUILD_ROOT/installed-pkg/$PKG
+	echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
+	test -n "$PKG_HDRMD5" && echo "$PKG_HDRMD5 $PKGID" > $BUILD_ROOT/.preinstall_image/$PKG
 	continue
     fi
-
-    test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm || continue
 
     if test -f $BUILD_ROOT/.init_b_cache/rpms/$PKG.id -a -f $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG ; then
 	read PKGID < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
@@ -991,6 +1082,7 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGE
 	if test "$PKGID" = "$OLDPKGID" ; then
 	    #echo "keeping ${PKGID%% *}"
 	    echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
+	    test -n "$PKG_HDRMD5" && echo "$PKG_HDRMD5 $PKGID" > $BUILD_ROOT/.preinstall_image/$PKG
 	    continue
 	fi
     fi
@@ -1010,11 +1102,13 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGE
 	    else
 		#echo "keeping ${PKGID%% *}"
 		echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
+		test -n "$PKG_HDRMD5" && echo "$PKG_HDRMD5 $PKGID" > $BUILD_ROOT/.preinstall_image/$PKG
 		continue
 	    fi
 	else
 	    #echo "keeping ${PKGID%% *}"
 	    echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
+	    test -n "$PKG_HDRMD5" && echo "$PKG_HDRMD5 $PKGID" > $BUILD_ROOT/.preinstall_image/$PKG
 	    continue
 	fi
 	if test -e "$BUILD_ROOT/.init_b_cache/preinstalls/$PKG" ; then
@@ -1029,7 +1123,7 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGE
     if test "$USE_FORCE" = true ; then
 	export ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --force"
     fi
-    # work around for cross-build installs, we must not overwrite the running rpm
+    # FIXME: work around for cross-build installs, we must not overwrite the running rpm
     if test "$PKG" = rpm ; then
 	for i in $BUILD_ROOT/.init_b_cache/preinstalls/rpm-x86-* ; do
 	    test -e "$i" && ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --justdb"
@@ -1048,11 +1142,12 @@ for PKG in $PACKAGES_TO_INSTALL_FIRST RUN_LDCONFIG $PACKAGES_TO_INSTALL $PACKAGE
     rm -f $BUILD_ROOT/.init_b_cache/$PKG.rpm
     check_exit
     echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
+    test -n "$PKG_HDRMD5" && echo "$PKG_HDRMD5 $PKGID" > $BUILD_ROOT/.preinstall_image/$PKG
 
 done
 
 if test $PSUF = deb ; then
-    echo "configure all installed packages..."
+    echo "configuring all installed packages..."
     # configure all packages after complete installation, not for each package like rpm does
     # We need to run this twice, because of cyclic dependencies as it does not succeed on most
     # debian based distros in the first attempt.
@@ -1215,7 +1310,7 @@ fi
 #fi
 
 rm -f $BUILD_ROOT/.rpmmacros $BUILD_ROOT/root/.rpmmacros
-rm -rf $BUILD_ROOT/.init_b_cache
+rm -rf "$BUILD_ROOT/.init_b_cache"
 rm -f $BUILD_IS_RUNNING
 rm -f $TMPFILE
 
