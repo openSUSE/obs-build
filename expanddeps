@@ -60,8 +60,8 @@ $configdir = '.' unless defined $configdir;
 $archs = '' unless defined $archs;
 die("you must specfiy a depfile!\n") unless defined $rpmdeps;
 
-my @extradeps = grep {!/(^|\/)PKGBUILD$/ && !/\.(?:spec|dsc|kiwi)$/} @ARGV;
-my @specs = grep {/(^|\/)PKGBUILD$/ || /\.(?:spec|dsc|kiwi)$/} @ARGV;
+my @extradeps = grep {!/(^|\/)(?:PKGBUILD|preinstallimage)$/ && !/\.(?:spec|dsc|kiwi)$/} @ARGV;
+my @specs = grep {/(^|\/)(?:PKGBUILD|preinstallimage)$/ || /\.(?:spec|dsc|kiwi)$/} @ARGV;
 die("can only work with at most one spec\n") if @specs > 1;
 my $spec = $specs[0];
 
