@@ -1867,6 +1867,12 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
     test -n "$NOROOTFORBUILD" && BUILD_USER=abuild
 
+    # appliance builds must run as root
+    if test "$BUILDTYPE" = kiwi; then
+      imagetype=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $SPECFILE imagetype)
+      test "$imagetype" = 'product' || BUILD_USER=root
+    fi
+
     if test $BUILD_USER = abuild ; then
 	if ! egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
 	    echo "abuild:x:${ABUILD_UID}:${ABUILD_GID}:Autobuild:/home/abuild:/bin/bash" >>$BUILD_ROOT/etc/passwd
@@ -2304,7 +2310,7 @@ if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
 	    computeblocklists $args $TOPDIR/DEBS/*.deb $TOPDIR/SOURCES.DEB/* $TOPDIR/OTHER/* > "$VM_SWAP"
 	    ;;
 	kiwi)
-	    computeblocklists $args $TOPDIR/KIWI/* $TOPDIR/OTHER/* > "$VM_SWAP"
+	    computeblocklists $args $TOPDIR/KIWI/* $TOPDIR/RPMS/*/*.{d,}rpm $TOPDIR/OTHER/* > "$VM_SWAP"
 	    ;;
 	arch)
 	    computeblocklists $args $TOPDIR/ARCHPKGS/* $TOPDIR/OTHER/* > "$VM_SWAP"
