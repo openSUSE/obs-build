@@ -1731,7 +1731,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		elif test "$BUILDTYPE" = arch ; then
 		    mkdir -p ARCHPKGS
 		    find . -type f | while read i; do mv "$i" ARCHPKGS/; done
-		else
+		elif test "$BUILDTYPE" = kiwi ; then
 		    mkdir -p KIWI
 		    find . -type f | while read i; do mv "$i" KIWI/; done
 		fi
@@ -2314,6 +2314,9 @@ if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
 	    ;;
 	arch)
 	    computeblocklists $args $TOPDIR/ARCHPKGS/* $TOPDIR/OTHER/* > "$VM_SWAP"
+	    ;;
+	preinstallimage)
+	    computeblocklists $args $TOPDIR/OTHER/* > "$VM_SWAP"
 	    ;;
     esac || cleanup_and_exit 1
 fi
