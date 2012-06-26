@@ -159,9 +159,9 @@ preinstall_image()
 {
     check_exit
     if test -n "$2" ; then
-	echo "unpacking preinstall image $2..."
+	echo "unpacking preinstall image $2"
     else
-	echo "unpacking preinstall image..."
+	echo "unpacking preinstall image"
     fi
     cd $BUILD_ROOT || cleanup_and_exit 1
     if test -x /usr/bin/bsdtar ; then
