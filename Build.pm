@@ -884,7 +884,7 @@ sub parse {
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /config\.xml$/;
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /\.kiwi$/;
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $fn =~ /(^|\/|-)PKGBUILD$/;
-  return parse_preinstallimage($cf, $fn, @args) if $fn =~ /(^|\/|-)preinstallimage$/;
+  return parse_preinstallimage($cf, $fn, @args) if $fn =~ /(^|\/|-)_preinstallimage$/;
   return undef;
 }
 

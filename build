@@ -1405,7 +1405,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
       *.dsc) BUILDTYPE=dsc ;;
       *.kiwi) BUILDTYPE=kiwi ;;
       PKGBUILD) BUILDTYPE=arch ;;
-      preinstallimage) BUILDTYPE=preinstallimage ;;
+      _preinstallimage) BUILDTYPE=preinstallimage ;;
     esac
     if test -z "$BUILDTYPE" ; then
        echo "don't know how to build $SPECFILE"
