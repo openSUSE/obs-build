@@ -103,7 +103,7 @@ PKGS=("$@")
 cleanup_and_exit()
 {
     trap EXIT
-    [ "$BUILD_ROOT" != / ] || chown $browner $BUILD_ROOT
+    test "$BUILD_ROOT" = / -a -n "$browner" && chown "$browner" "$BUILD_ROOT"
     # umount so init_buildsystem can be used standalone
 # XXX: use stat -f /dev/pts/ -c %T  to check whether it's mounted and not suppress errors then?
     umount -n "$BUILD_ROOT/proc/sys/fs/binfmt_misc" 2> /dev/null || true
@@ -578,7 +578,7 @@ set_build_arch
 trap fail_exit EXIT
 
 if [ "$BUILD_ROOT" = / ]; then
-    browner="$(stat -c %U /)"
+    browner="$(stat -c %u /)"
 fi
 
 if [ -n "$CLEAN_BUILD" ]; then
