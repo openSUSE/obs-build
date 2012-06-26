@@ -2310,7 +2310,7 @@ if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
 	    computeblocklists $args $TOPDIR/DEBS/*.deb $TOPDIR/SOURCES.DEB/* $TOPDIR/OTHER/* > "$VM_SWAP"
 	    ;;
 	kiwi)
-	    computeblocklists $args $TOPDIR/KIWI/* $TOPDIR/RPMS/*/*.{d,}rpm $TOPDIR/OTHER/* > "$VM_SWAP"
+	    computeblocklists $args $TOPDIR/KIWI/* $TOPDIR/OTHER/* > "$VM_SWAP"
 	    ;;
 	arch)
 	    computeblocklists $args $TOPDIR/ARCHPKGS/* $TOPDIR/OTHER/* > "$VM_SWAP"
