@@ -1011,11 +1011,7 @@ for PKG in $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL; do
 	    cleanup_and_exit 1
 	fi
 	read PKG_HDRMD5 PKGID < $BUILD_ROOT/.preinstall_image/$PKG
-        if test $PSUF = deb -o $PSUF = arch ; then
-	    echo "preinstalled ${PKGID%_*}"
-	else
-	    echo "preinstalled ${PKGID%% *}"
-	fi
+	echo "preinstalled ${PKGID%% *}"
 	continue
     fi
     PKG_HDRMD5=
@@ -1036,7 +1032,7 @@ for PKG in $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL; do
 	PKGID=`readlink $BUILD_ROOT/.init_b_cache/rpms/$PKG.deb`
 	PKGID="${PKGID##*/}"
 	PKGID="${PKGID%.deb} debian"
-	echo "installing ${PKGID%_*}"
+	echo "installing ${PKGID%% *}"
 	( chroot $BUILD_ROOT dpkg --install --force all .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
 	    perl -ne '$|=1;/^(Configuration file|Installing new config file|Selecting previously deselected|\(Reading database|Unpacking |Setting up|Creating config file|Preparing to replace dpkg)/||/^$/||print'
 	check_exit
@@ -1065,8 +1061,8 @@ for PKG in $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL; do
 	PKGID=`readlink $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF`
 	PKGID="${PKGID##*/}"
 	PKGID="${PKGID/%.pkg.tar.?z/.arch}"
-	PKGID="${PKGID%.$PSUF} $PSUF"
-	echo "installing ${PKGID%_*}"
+	PKGID="${PKGID%.arch} arch"
+	echo "installing ${PKGID%% *}"
 	# -d -d disables deps checking
 	( chroot $BUILD_ROOT pacman -Uf -d -d --noconfirm .init_b_cache/$PKG.$PSUF 2>&1 || touch $BUILD_ROOT/exit ) | \
 	    perl -ne '$|=1;/^(warning: could not get filesystem information for |loading packages|looking for inter-conflicts|Targets |Total Installed Size: |Net Upgrade Size: |Proceed with installation|checking package integrity|loading package files|checking available disk space|installing |upgrading |warning:.*is up to date -- reinstalling|Optional dependencies for|    )/||/^$/||print'
