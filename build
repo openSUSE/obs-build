@@ -2318,6 +2318,9 @@ if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
 	preinstallimage)
 	    computeblocklists $args $TOPDIR/OTHER/* > "$VM_SWAP"
 	    ;;
+	*)
+            cleanup_and_exit 1
+	    ;;
     esac || cleanup_and_exit 1
 fi
 
