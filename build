@@ -72,6 +72,7 @@ VMDISK_SWAPSIZE=1024
 VMDISK_FILESYSTEM=ext3
 # settings are for speed and not data safety, we format anyway on next run
 VMDISK_MOUNT_OPTIONS=__default
+HUGETLBFSPATH=
 MEMSIZE=
 RUNNING_IN_VM=
 RPMLIST=
@@ -280,6 +281,9 @@ Known Parameters:
 
   --vm-memory SIZEINMB
               Set amount of RAM for VMs
+
+  --hugetlbfs HUGETLBFSPATH
+              Use hugetlb for memory management, path to mounted hugetlbfs.
 
   --vm-kernel FILE
   --vm-initrd FILE
@@ -979,6 +983,10 @@ while test -n "$1"; do
 	BUILD_RPMS=
 	shift
       ;;
+      *-hugetlbfs)
+        HUGETLBFSPATH="$ARG"
+	shift
+      ;;
       *-release)
 	needarg
 	RELEASE="$ARG"
@@ -1669,6 +1677,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		fi
 		if [ "$VM_TYPE" = 'kvm' ]; then
 			KVM_OPTIONS="$KVM_OPTIONS -cpu host"
+		        if [ -n "$HUGETLBFSPATH" ]; then
+			      KVM_OPTIONS="$KVM_OPTIONS -mem-path $HUGETLBFSPATH"
+		        fi
 		fi
 
 		set -- $qemu_bin -no-reboot -nographic -net none $KVM_OPTIONS \
