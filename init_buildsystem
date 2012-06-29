@@ -1012,6 +1012,7 @@ for PKG in $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL; do
 	fi
 	read PKG_HDRMD5 PKGID < $BUILD_ROOT/.preinstall_image/$PKG
 	echo "preinstalled ${PKGID%% *}"
+	echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
 	continue
     fi
     PKG_HDRMD5=
