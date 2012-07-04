@@ -993,8 +993,8 @@ RPMCHECKOPTS=
 RPMCHECKOPTS_HOST=
 # on Fedora 10 rpmbuild is in a separate package so we need something else to
 # detect rpm4
-test -x $BUILD_ROOT/usr/bin/rpmsign && RPMCHECKOPTS="--nodigest --nosignature"
-test -x /usr/bin/rpmsign && RPMCHECKOPTS_HOST="--nodigest --nosignature"
+test -x $BUILD_ROOT/usr/bin/rpmquery && RPMCHECKOPTS="--nodigest --nosignature"
+test -x /usr/bin/rpmquery && RPMCHECKOPTS_HOST="--nodigest --nosignature"
 
 test -x $BUILD_ROOT/sbin/ldconfig && chroot $BUILD_ROOT /sbin/ldconfig 2>&1
 
