@@ -2009,9 +2009,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	getmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" > $BUILD_ROOT/root/.rpmmacros
 	if test -n "$BUILD_DEBUG" ; then
 	    echo '
-%prep %{?!__debug_package:%?_suse_insert_debug_package}%%prep
-%package %{?!__debug_package:%?_suse_insert_debug_package}%%package
-%_suse_insert_debug_package \
+%prep %{?!__debug_package:%{?_build_create_debug:%?_build_insert_debug_package}}%%prep
+%package %{?!__debug_package:%{?_build_create_debug:%?_build_insert_debug_package}}%%package
+%_build_insert_debug_package \
   %global __debug_package 1 \
   %undefine _enable_debug_packages \
   %debug_package
@@ -2141,20 +2141,24 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
 	# XXX: move _srcdefattr to macro file?
 	rpmbopts=("$BUILD_RPM_BUILD_STAGE" "--define" "_srcdefattr (-,root,root)")
-	if [ "$rpmbuild" == "rpmbuild" ]; then
+	if test "$rpmbuild" == "rpmbuild" ; then
                 # use only --nosignature for rpm v4
-		rpmbopts[${#rpmbopts[@]}]="--nosignature"
+	    rpmbopts[${#rpmbopts[@]}]="--nosignature"
 	fi
-	if [ -n "$ABUILD_TARGET" ]; then
-		rpmbopts[${#rpmbopts[@]}]="--target=$ABUILD_TARGET"
+	if test -n "$ABUILD_TARGET" ; then
+	    rpmbopts[${#rpmbopts[@]}]="--target=$ABUILD_TARGET"
 	fi
-	if [ -n "$DISTURL" ]; then
-		rpmbopts[${#rpmbopts[@]}]='--define'
-		rpmbopts[${#rpmbopts[@]}]="disturl $DISTURL"
+	if test -n "$BUILD_DEBUG" ; then
+	    rpmbopts[${#rpmbopts[@]}]='--define'
+	    rpmbopts[${#rpmbopts[@]}]="_build_create_debug 1"
 	fi
-	if [ -n "$RSYNCDONE" ] ; then
-		rpmbopts[${#rpmbopts[@]}]='--define'
-		rpmbopts[${#rpmbopts[@]}]="RSYNCDONE 1"
+	if test -n "$DISTURL" ; then
+	    rpmbopts[${#rpmbopts[@]}]='--define'
+	    rpmbopts[${#rpmbopts[@]}]="disturl $DISTURL"
+	fi
+	if test -n "$RSYNCDONE" ; then
+	    rpmbopts[${#rpmbopts[@]}]='--define'
+	    rpmbopts[${#rpmbopts[@]}]="RSYNCDONE 1"
 	fi
 
 	# su involves a shell which would require even more
