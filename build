@@ -1382,9 +1382,14 @@ if test -n "$LOGFILE" -a -z "$shell" ; then
     # set start time, to be substracted for build log timestamps
     STARTTIME=`perl -e 'print time()'`
 
-    if test -n "$VM_IMAGE" ; then
+    if [ -n "$RUNNING_IN_VM" ]; then
+        # no additional timestamps in inner vm build system
+	exec 1> >(exec -a 'build logging' tee -a $LOGFILE) 2>&1
+    elif test -n "$VM_IMAGE" ; then
+        # external run of virtualization build
 	exec 1> >(exec -a 'build logging' perl -e 'open(F,">>",$ARGV[0])||die("$ARGV[0]: $!\n");$|=1;select(F);$|=1;while(<STDIN>){my $p=sprintf("[%5ds] ", time()-'$STARTTIME');print STDOUT $p.$_;s/^\r//s;s/\r\n/\n/gs;print F $p.$_}' $LOGFILE) 2>&1
     else
+        # plain chroot
 	exec 1> >(exec -a 'build logging' perl -e 'open(F,">>",$ARGV[0])||die("$ARGV[0]: $!\n");$|=1;select(F);$|=1;while(<STDIN>){my $p=sprintf("[%5ds] ", time()-'$STARTTIME');print STDOUT $p.$_;print F $p.$_}' $LOGFILE) 2>&1
     fi
 fi
