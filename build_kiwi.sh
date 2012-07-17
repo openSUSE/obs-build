@@ -136,6 +136,8 @@ run_kiwi()
 		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
 echo "compressing oem images... "
 cd /$TOPDIR/KIWI-oem
+# do not store compressed file _and_ uncompressed one
+[ -e "$imageout.gz" ] && rm -f "$imageout"
 if [ -e "$imageout.iso" ]; then
 	echo "take iso file and create sha256..."
 	mv "$imageout.iso" "/$TOPDIR/KIWI/$imageout$buildnum.iso"
@@ -210,6 +212,8 @@ EOF
 		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
 echo "compressing xen images... "
 cd /$TOPDIR/KIWI-xen
+# do not store compressed file _and_ uncompressed one
+[ -e "$imageout.gz" ] && rm -f "$imageout"
 tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-xen.tar.bz2" \
 	`grep ^kernel $imageout.xenconfig | cut -d'"'  -f2` \
 	`grep ^ramdisk $imageout.xenconfig | cut -d'"'  -f2` \
@@ -227,6 +231,8 @@ EOF
 		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
 echo "compressing pxe images... "
 cd /$TOPDIR/KIWI-pxe
+# do not store compressed file _and_ uncompressed one
+[ -e "$imageout.gz" ] && rm -f "$imageout"
 tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-pxe.tar.bz2" ${imageout}* initrd-*
 if [ -x /usr/bin/sha256sum ]; then
    echo "Create sha256 file..."
@@ -254,6 +260,8 @@ EOF
 		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
 echo "compressing unkown images... "
 cd /$TOPDIR/KIWI-$imgtype
+# do not store compressed file _and_ uncompressed one
+[ -e "$imageout.gz" ] && rm -f "$imageout"
 tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-$imgtype.tar.bz2" *
 if [ -x /usr/bin/sha256sum ]; then
    echo "Create sha256 file..."
