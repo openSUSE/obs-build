@@ -678,12 +678,14 @@ else
 	if [ -z "$PREPARE_VM" ]; then
 	    if ! check_binfmt_registered; then
 		echo "registering binfmt handlers"
+
 		if [ -x "$BUILD_DIR/initvm" -a -e "$BUILD_DIR/qemu-reg" ]; then
 		    $BUILD_DIR/initvm
 		elif [ -x /usr/sbin/qemu-binfmt-conf.sh ]; then
+	           [ -e /proc/sys/fs/binfmt_misc ] || mount -n binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
 		   /usr/sbin/qemu-binfmt-conf.sh
 		else
-		    echo "Warning: could not register binfmt handlers"
+		    echo "Warning: could not register binfmt handlers. Neither build-initvm nor /usr/sbin/qemu-binfmt-conf.sh exist"
 		fi
 	    fi
 	    if [ -n "$PREPARE_VM" ]; then
