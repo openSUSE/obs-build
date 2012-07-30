@@ -1120,6 +1120,8 @@ fi
 if test "$VMDISK_MOUNT_OPTIONS" = __default; then
     if test "$VMDISK_FILESYSTEM" = reiserfs ; then
 	VMDISK_MOUNT_OPTIONS='-o data=writeback,commit=150,noatime'
+    elif test "$VMDISK_FILESYSTEM" = btrfs ; then
+        VMDISK_MOUNT_OPTIONS='-o nobarrier,noatime'
     else
 	VMDISK_MOUNT_OPTIONS='-o data=writeback,nobarrier,commit=150,noatime'
     fi
