@@ -657,9 +657,6 @@ detect_vm_2nd_stage()
     fi
     HOST="$MYHOSTNAME"
 
-    # HOTFIX until bnc #772075 is fixed
-    rm -f /run/udev/queue.bin
-
     return 0
 }
 
