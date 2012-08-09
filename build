@@ -72,7 +72,7 @@ VMDISK_SWAPSIZE=1024
 VMDISK_FILESYSTEM=ext3
 # settings are for speed and not data safety, we format anyway on next run
 VMDISK_MOUNT_OPTIONS=__default
-VMDISK_ROOT_CLEAN=no
+VMDISK_CLEAN=
 HUGETLBFSPATH=
 MEMSIZE=
 RUNNING_IN_VM=
@@ -980,10 +980,9 @@ while test -n "$1"; do
        VMDISK_MOUNT_OPTIONS=$(echo $ARG | sed 's/^\"\(.*\)\"$/\1/g')
        shift
       ;;
-      *-vmdisk-cleanup)
-        needarg
-        VMDISK_ROOT_CLEAN="$ARG"
-        shift
+      *-vmdisk-clean)
+	# delete old root/swap to get rid of the old blocks
+        VMDISK_CLEAN=true
       ;;
       *-rpmlist)
 	needarg
@@ -1317,10 +1316,16 @@ if test -z "$RUNNING_IN_VM" ; then
 	    XENID="${XENID#root_}"
 	    xm destroy "build_$XENID" >/dev/null 2>&1
 	fi
-	if [ "$VMDISK_ROOT_CLEAN" = "yes" ]; then
-	    #delete VM image so later we can recreate a new one
-	    echo "Deleting $VM_IMAGE"
-	    rm -rf "$VM_IMAGE"
+	if test -n "$VMDISK_CLEAN" ; then
+	    # delete old root/swap to get rid of the old blocks
+	    if test -f "$VM_IMAGE" ; then
+		echo "Deleting old $VM_IMAGE"
+		rm -rf "$VM_IMAGE"
+	    fi
+	    if test -n "$VM_SWAP" -a -f "$VM_SWAP" ; then
+		echo "Deleting old $VM_SWAP"
+		rm -rf "$VM_SWAP"
+	    fi
 	fi
 	if test ! -e "$VM_IMAGE"; then
 	    echo "Creating $VM_IMAGE (${VMDISK_ROOTSIZE}M)"
