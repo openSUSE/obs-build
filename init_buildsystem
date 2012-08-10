@@ -768,7 +768,18 @@ else
 	    url="$SRC"
 	    case "$url" in
 		zypp://* | http://* | https://* | ftp://* | ftps://*)
-		    downloadpkg "$url"
+                    cachedir="$(getcachedir "$url")"
+                    pkgname="$(basename "$url")"
+                    pkgname=${pkgname/%.pkg.tar.?z/.arch}
+                    rpmpkg="$cachedir/$pkgname"
+                    if [ -e $rpmpkg ]
+                    then
+                        rpm -K --nosignature "$rpmpkg" > $rpmpkg.v || echo "$PKG $SRC" >>${RPMLIST}.download
+                        rpm -K --nosignature "$rpmpkg" > $rpmpkg.v && downloadpkg "$url"
+                        rm -f $rpmpkg.v
+                    else
+                        echo "$PKG $SRC" >>${RPMLIST}.download
+                    fi
 		    ;;
 		*)
 		    echo "unsupported url for '$PKG': $url" >&2
@@ -781,6 +792,19 @@ else
 	ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
 	PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $PKG"
     done < $RPMLIST
+    if [ -e ${RPMLIST}.download ]
+    then
+        PACKAGES_TO_DOWNLOAD=`cat ${RPMLIST}.download|awk '{print $2}'`
+        progress_setup PACKAGES_TO_DOWNLOAD
+        while read PKG SRC ; do
+            progress_step PACKAGES_TO_DOWNLOAD
+            downloadpkg "$SRC"
+            rm -f "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRC##*.}"
+            ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRC##*.}"
+        done < ${RPMLIST}.download
+        rm ${RPMLIST}.download -f
+        printf "\n"
+    fi
 
     test -n "$PACKAGES_TO_CBPREINSTALL" && echo "cbpreinstall: $PACKAGES_TO_CBPREINSTALL"
     test -n "$PACKAGES_TO_CBINSTALL" && echo "cbinstall   : $PACKAGES_TO_CBINSTALL"
@@ -850,6 +874,7 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
 	progress_step PACKAGES_TO_PREINSTALL_FILTERED
 	preinstall ${PKG##*/}
     done
+    printf "\n"
     if test -n "$PREPARE_VM" ; then
         PACKAGES_TO_VMINSTALL_FILTERED=`reorder $PACKAGES_TO_VMINSTALL_FILTERED`
 	progress_setup PACKAGES_TO_VMINSTALL_FILTERED
