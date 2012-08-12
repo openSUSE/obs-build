@@ -885,7 +885,7 @@ while test -n "$1"; do
 	CREATE_BASELIBS=internal
 	;;
       *-use-system-qemu)
-	USE_SYSTEM_QEMU=true
+        USE_SYSTEM_QEMU="--use-system-qemu"
       ;;
       *-root)
 	needarg
