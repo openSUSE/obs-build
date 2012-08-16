@@ -88,8 +88,9 @@ sub lzmadec {
   return $nh;
 }
 
-sub query {
-  my ($handle, %opts) = @_;
+sub queryvars {
+  my ($handle) = @_;
+
   if (ref($handle)) {
     die("arch pkg query not implemented for file handles\n");
   }
@@ -102,23 +103,50 @@ sub query {
   my $pkginfo = $read[0]->get_content;
   die("$handle: not an arch package file\n") unless $pkginfo;
   my %vars;
+  $vars{'_pkginfo'} = $pkginfo;
   for my $l (split('\n', $pkginfo)) {
     next unless $l =~ /^(.*?) = (.*)$/;
     push @{$vars{$1}}, $2;
   }
+  return \%vars;
+}
+
+sub queryfiles {
+  my ($handle) = @_;
+  if (ref($handle)) {
+    die("arch pkg query not implemented for file handles\n");
+  }
+  if ($handle =~ /\.xz$/ || islzma($handle)) {
+    $handle = lzmadec($handle);
+  }
+  my @files;
+  my $tar = Archive::Tar->new;
+  # we use filter_cb here so that Archive::Tar skips the file contents
+  $tar->read($handle, 1, {'filter_cb' => sub {
+    my ($entry) = @_;
+    push @files, $entry->name unless $entry->is_longlink || (@files && $files[-1] eq $entry->name);
+    return 0;
+  }});
+  shift @files if @files && $files[0] eq '.PKGINFO';
+  return \@files;
+}
+
+sub query {
+  my ($handle, %opts) = @_;
+  my $vars = queryvars($handle);
   my $ret = {};
-  $ret->{'name'} = $vars{'pkgname'}->[0] if $vars{'pkgname'};
-  $ret->{'hdrmd5'} = Digest::MD5::md5_hex($pkginfo);
-  $ret->{'provides'} = $vars{'provides'} || [];
-  $ret->{'requires'} = $vars{'depend'} || [];
-  if ($vars{'pkgname'}) {
-    my $selfprovides = $vars{'pkgname'}->[0];
-    $selfprovides .= "=$vars{'pkgver'}->[0]" if $vars{'pkgver'};
+  $ret->{'name'} = $vars->{'pkgname'}->[0] if $vars->{'pkgname'};
+  $ret->{'hdrmd5'} = Digest::MD5::md5_hex($vars->{'_pkginfo'});
+  $ret->{'provides'} = $vars->{'provides'} || [];
+  $ret->{'requires'} = $vars->{'depend'} || [];
+  if ($vars->{'pkgname'}) {
+    my $selfprovides = $vars->{'pkgname'}->[0];
+    $selfprovides .= "=$vars->{'pkgver'}->[0]" if $vars->{'pkgver'};
     push @{$ret->{'provides'}}, $selfprovides unless @{$ret->{'provides'} || []} && $ret->{'provides'}->[-1] eq $selfprovides;
   }
   if ($opts{'evra'}) {
-    if ($vars{'pkgver'}) {
-      my $evr = $vars{'pkgver'}->[0];
+    if ($vars->{'pkgver'}) {
+      my $evr = $vars->{'pkgver'}->[0];
       if ($evr =~ /^([0-9]+):(.*)$/) {
 	$ret->{'epoch'} = $1;
 	$evr = $2;
@@ -129,10 +157,10 @@ sub query {
 	$ret->{'release'} = $2;
       }
     }
-    $ret->{'arch'} = $vars{'arch'}->[0] if $vars{'arch'};
+    $ret->{'arch'} = $vars->{'arch'}->[0] if $vars->{'arch'};
   }
   if ($opts{'description'}) {
-    $ret->{'description'} = $vars{'pkgdesc'}->[0] if $vars{'pkgdesc'};
+    $ret->{'description'} = $vars->{'pkgdesc'}->[0] if $vars->{'pkgdesc'};
   }
   # arch packages don't seem to have a source :(
   # fake it so that the package isn't confused with a src package
