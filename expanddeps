@@ -258,7 +258,9 @@ if ($spec) {
   $packvers = $d->{'version'};
   $subpacks = $d->{'subpacks'};
   @packdeps = @{$d->{'deps'} || []};
-  push(@packdeps, @{$d->{'prereqs'}}) if $d->{'prereqs'};
+  for my $pr (@{$d->{'prereqs'} || []}) {
+    push @packdeps, $pr unless grep {$_ eq $pr} @$subpacks;
+  }
 }
 
 Build::readdeps($cf, undef, \%repo);
