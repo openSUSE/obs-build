@@ -258,8 +258,9 @@ if ($spec) {
   $packvers = $d->{'version'};
   $subpacks = $d->{'subpacks'};
   @packdeps = @{$d->{'deps'} || []};
-  for my $pr (@{$d->{'prereqs'} || []}) {
-    push @packdeps, $pr unless grep {$_ eq $pr} @$subpacks;
+  if ($d->{'prereqs'}) {
+    my %deps = map {$_ => 1} (@packdeps, @{$d->{'subpacks'} || []});
+    push @packdeps, grep {!$deps{$_} && !/^%/} @{$d->{'prereqs'}};
   }
 }
 
