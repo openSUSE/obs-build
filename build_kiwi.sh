@@ -256,6 +256,22 @@ if [ -x /usr/bin/sha256sum ]; then
 fi
 EOF
 		    ;;
+		tbz)
+		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
+cd /$TOPDIR/KIWI-tbz
+for i in *.tbz; do
+	file=\$(readlink -f "\$i")
+	mv "\$file" "/$TOPDIR/KIWI/\${i%.tbz}$buildnum.tbz"
+done
+if [ -x /usr/bin/sha256sum ]; then
+   echo "creating sha256 sum for tar balls... "
+   cd $TOPDIR/KIWI
+   for i in *.tbz; do
+	/usr/bin/sha256sum "\$i" > "\$i.sha256"
+   done
+fi
+EOF
+		    ;;
 		*)
 		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
 echo "compressing unkown images... "
