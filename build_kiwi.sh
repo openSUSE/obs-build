@@ -147,6 +147,15 @@ if [ -e "$imageout.iso" ]; then
         fi
 	popd
 fi
+if [ -e "$imageout.qcow2" ]; then
+	mv "$imageout.qcow2" "/$TOPDIR/KIWI/$imageout$buildnum.qcow2"
+	pushd /$TOPDIR/KIWI
+	if [ -x /usr/bin/sha256sum ]; then
+	    echo "Create sha256 file..."
+	    /usr/bin/sha256sum "$imageout$buildnum.qcow2" > "$imageout$buildnum.qcow2.sha256"
+        fi
+	popd
+fi
 if [ -e "$imageout.raw" ]; then
         compress_tool="bzip2"
         compress_suffix="bz2"
@@ -167,7 +176,7 @@ if [ -e "$imageout.raw" ]; then
 fi
 
 tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-raw.tar.bz2" \
-	--exclude="$imageout.iso" --exclude="$imageout.raw" *
+	--exclude="$imageout.iso" --exclude="$imageout.raw" --exclude="$imageout.qcow2" *
 cd /$TOPDIR/KIWI
 if [ -x /usr/bin/sha256sum ]; then
    /usr/bin/sha256sum "$imageout$buildnum-raw.tar.bz2" > "$imageout$buildnum-raw.tar.bz2.sha256"
@@ -181,18 +190,17 @@ cd /$TOPDIR/KIWI-vmx
 # This option has a number of format parameters
 VMXFILES=""
 SHAFILES=""
-for i in "$imageout.vmx" "$imageout.vmdk" "$imageout-disk*.vmdk" "$imageout.ovf"; do
-	ls \$i >& /dev/null && VMXFILES="\$VMXFILES \$i"
+for i in "$imageout.vmx" "$imageout.vmdk" "$imageout-disk*.vmdk" "$imageout.ovf" "$imageout.qcow2"; do
+	test -e \$i && VMXFILES="\$VMXFILES \$i"
 done
 # take raw files as fallback
 if [ -z "\$VMXFILES" ]; then
-	ls "$imageout.raw" >& /dev/null && VMXFILES="$imageout.raw"
+	test -e "$imageout.raw" && VMXFILES="$imageout.raw"
 fi
 if [ -n "\$VMXFILES" ]; then
 	tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" \$VMXFILES
 	SHAFILES="\$SHAFILES $imageout$buildnum-vmx.tar.bz2"
 fi
-
 if [ -e "$imageout.xenconfig" ]; then
 	tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" $imageout.xenconfig $imageout.raw initrd-*
 	SHAFILES="\$SHAFILES $imageout$buildnum-vmx.tar.bz2"
