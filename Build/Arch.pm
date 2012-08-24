@@ -12,18 +12,24 @@ eval { require Archive::Tar; };
 # parse a PKGBUILD file
 
 sub quote {
-  my ($str) = @_;
-  $str =~ s/([ \t\"\'])/sprintf("%%%02X", ord($1))/ge;
+  my ($str, $q, $vars) = @_;
+  if ($q ne "'" && $str =~ /\$/) {
+    $str =~ s/\$([a-zA-Z0-9_]+|\{([^\}]+)\})/$vars->{$2 || $1} ? join(' ', @{$vars->{$2 || $1}}) : "\$$1"/ge;
+  }
+  $str =~ s/([ \t\"\'\$])/sprintf("%%%02X", ord($1))/ge;
   return $str;
 }
 
 sub unquotesplit {
-  my ($str) = @_;
+  my ($str, $vars) = @_;
   $str =~ s/%/%25/g;
   $str =~ s/^[ \t]+//;
   while ($str =~ /([\"\'])/) {
     my $q = $1;
-    $str =~ s/$q(.*?)$q/quote($1)/e;
+    $str =~ s/$q(.*?)$q/quote($1, $q, $vars)/e;
+  }
+  if ($str =~ /\$/) {
+    $str =~ s/\$([a-zA-Z0-9_]+|\{([^\}]+)\})/$vars->{$2 || $1} ? join(' ', @{$vars->{$2 || $1}}) : "\$$1"/ge;
   }
   my @args = split(/[ \t]+/, $str);
   for (@args) {
@@ -56,13 +62,14 @@ sub parse {
 	$val .= ' ' . $nextline;
       }
     }
-    $vars{$var} = [ unquotesplit($val) ];
+    $vars{$var} = [ unquotesplit($val, \%vars) ];
   }
   close PKG;
   $ret->{'name'} = $vars{'pkgname'}->[0] if $vars{'pkgname'};
   $ret->{'version'} = $vars{'pkgver'}->[0] if $vars{'pkgver'};
   $ret->{'deps'} = $vars{'makedepends'} || [];
   push @{$ret->{'deps'}}, @{$vars{'depends'} || []};
+  $ret->{'source'} = $vars{'source'} if $vars{'source'};
   return $ret;
 }
 
