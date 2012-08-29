@@ -396,7 +396,7 @@ for my $url (@ARGV) {
     } else {
       die "unsupported repo type: $type\n";
     }
-  } elsif ($url =~ /^http:\/\/([^\/]*)\/?/) {
+  } elsif ($url =~ /^http[s]?:\/\/([^\/]*)\/?/) {
     my $repoid = md5_hex($url);
     $dir = "$cachedir/$repoid/";
     $baseurl = $url;
@@ -421,7 +421,7 @@ for my $url (@ARGV) {
     @cursor = ([undef, $primaryparser]);
 
     my $u = $dir . $f->{'location'};
-    if ($url =~ /^http:\/\/([^\/]*)\/?/) {
+    if ($url =~ /^http[s]?:\/\/([^\/]*)\/?/) {
         if (system($INC[0].'/download', $dir . "repodata/", $baseurl . "repodata/" . basename($u))) {
 	  die("download failed\n");
 	}
