@@ -765,7 +765,7 @@ check_for_ppc()
 		exit 1
 	    fi
             PAGES_FREE=$(cat /sys/kernel/mm/hugepages/hugepages-16384kB/free_hugepages)
-            PAGES_REQ=$(( $MEMSIZE / 16 ))
+            PAGES_REQ=$(( ${MEMSIZE:-64} / 16 ))
 	    if [ "$PAGES_FREE" -lt "$PAGES_REQ" ];then
 		echo "please adjust nr_hugepages"
 		exit 1
