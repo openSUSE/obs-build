@@ -301,7 +301,7 @@ reorder()
     for PKG in "$@" ; do
 	echo "$PKG" >> $BUILD_ROOT/.init_b_cache/order.manifest
     done
-    $BUILD_DIR/order --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir $CONFIG_DIR --manifest $BUILD_ROOT/.init_b_cache/order.manifest $BUILD_ROOT/.init_b_cache/rpms
+    $BUILD_DIR/order --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir $CONFIG_DIR --manifest $BUILD_ROOT/.init_b_cache/order.manifest $BUILD_ROOT/.init_b_cache/rpms || touch $BUILD_ROOT/exit
     rm -f $BUILD_ROOT/.init_b_cache/order.manifest
 }
 
@@ -865,6 +865,8 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
 	progress_step PACKAGES_TO_CBPREINSTALL_FILTERED
         preinstall ${PKG##*/}
     done
+    # for reorder
+    check_exit
     if [ -w /root ]; then
 	    test -c $BUILD_ROOT/dev/null || create_devs
     fi
@@ -888,6 +890,7 @@ if test -n "$PREPARE_VM" ; then
     # alreadyinstalled check will not work, but we have to live with that...
     echo -n 'reordering...'
     PACKAGES_TO_INSTALL=`reorder $PACKAGES_TO_INSTALL`
+    check_exit
     echo 'done'
     Q="'\''"
     echo "PACKAGES_TO_INSTALL='${PACKAGES_TO_INSTALL//"'"/$Q}'" > $BUILD_ROOT/.build/init_buildsystem.data
@@ -940,6 +943,7 @@ fi
 if ! test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
     echo -n 'reordering...'
     PACKAGES_TO_INSTALL=`reorder $PACKAGES_TO_INSTALL`
+    check_exit
     echo 'done'
 fi
 
