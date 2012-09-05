@@ -593,6 +593,7 @@ sub rpmq {
   my ($magic, $sigtype, $headmagic, $cnt, $cntdata, $lead, $head, $index, $data, $tag, $type, $offset, $count);
 
   local *RPM;
+  my $forcebinary;
   if (ref($rpm) eq 'ARRAY') {
     ($headmagic, $cnt, $cntdata) = unpack('N@8NN', $rpm->[0]);
     if ($headmagic != 0x8eade801) {
@@ -623,6 +624,7 @@ sub rpmq {
       close RPM unless ref($rpm);
       return ();
     }
+    $forcebinary = 1 if unpack('@6n', $lead) != 1;
     if (read(RPM, $head, 16) != 16) {
       warn("Bad rpm $rpm\n");
       close RPM unless ref($rpm);
@@ -718,6 +720,9 @@ sub rpmq {
 	return ();
       }
     }
+  }
+  if ($forcebinary && $stags{1044} && !$res{$stags{1044}}) {
+    $res{$stags{1044}} = [ '(none)' ];	# like rpm does...
   }
 
   if ($need_filenames) {
@@ -867,7 +872,7 @@ sub query {
     }
   }
 
-  $data->{'source'} = $src if $src ne '';
+  $data->{'source'} = $src eq '(none)' ? $data->{'name'} : $src if $src ne '';
   if ($opts{'evra'}) {
     my $arch = $res{'ARCH'}->[0];
     $arch = $res{'NOSOURCE'} || $res{'NOPATCH'} ? 'nosrc' : 'src' unless $src ne '';
