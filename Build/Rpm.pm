@@ -286,7 +286,7 @@ reexpand:
 	  $line = 'MACRO';
 	  last;
 	} elsif ($macname eq 'define' || $macname eq 'global') {
-	  if ($line =~ /^\s*([0-9a-zA-Z_]+)(\([^\)]*\))?\s*(.*?)$/) {
+	  if ($line =~ /^\s*([0-9a-zA-Z_]+)(?:\(([^\)]*)\))?\s*(.*?)$/) {
 	    my $macname = $1;
 	    my $macargs = $2;
 	    my $macbody = $3;
