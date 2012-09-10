@@ -165,7 +165,7 @@ preinstall_image()
     fi
     cd $BUILD_ROOT || cleanup_and_exit 1
     if test -x /usr/bin/bsdtar ; then
-	TAR="/usr/bin/bsdtar -P --chroot -o --numeric-owner -x"
+	TAR="/usr/bin/bsdtar -P --chroot --numeric-owner -x"
     else
 	unsafe_preinstall_check
 	TAR="tar -x"
