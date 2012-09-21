@@ -1004,12 +1004,60 @@ test -x /usr/bin/rpmquery && RPMCHECKOPTS_HOST="--nodigest --nosignature"
 
 test -x $BUILD_ROOT/sbin/ldconfig && chroot $BUILD_ROOT /sbin/ldconfig 2>&1
 
-MAIN_LIST="$PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL"
+typeset -ri suse_version=$(chroot $BUILD_ROOT /bin/rpm --eval '%{?suse_version}' 2>/dev/null)
+typeset -i num cumulate=-1
+typeset -a CUMULATED_LIST=()
+typeset -a CUMULATED_PIDS=()
+typeset -a CUMULATED_HMD5=()
+
+if ((suse_version >= 1220)) ; then
+    MAIN_LIST="$PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL CUMULATED"
+else
+    MAIN_LIST="$PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL"
+fi
 progress_setup MAIN_LIST
-for PKG in $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL; do
+for PKG in $MAIN_LIST; do
     test -f $BUILD_ROOT/installed-pkg/$PKG && continue
     progress_step MAIN_LIST
 
+    case $PKG in
+    CUMULATED)
+	#
+	# Use the features of rpm which are reordering the list of packages to
+	# satisfy dependencies and the final execution of the %posttrans scriplets
+	#
+	echo "now installing cumulated packages"
+	((cumulate < 0)) && continue
+	exec 4>$BUILD_ROOT/.init_b_cache/manifest
+	for ((num=0; num<=cumulate; num++)) ; do
+	    PKG=${CUMULATED_LIST[$num]##*/}
+	    test "$BUILD_ROOT/.init_b_cache/rpms/$PKG" -ef "$BUILD_ROOT/${CUMULATED_LIST[$num]}" && continue
+	    rm -f $BUILD_ROOT/${CUMULATED_LIST[$num]}
+	    cp $BUILD_ROOT/.init_b_cache/rpms/$PKG $BUILD_ROOT/${CUMULATED_LIST[$num]} || cleanup_and_exit 1
+	    echo ${CUMULATED_LIST[$num]} 1>&4
+	done
+	exec 4>&-
+	( chroot $BUILD_ROOT rpm --ignorearch --nodeps -U --oldpackage --ignoresize --verbose $RPMCHECKOPTS \
+		$ADDITIONAL_PARAMS .init_b_cache/manifest 2>&1 || touch $BUILD_ROOT/exit ) | \
+		grep -v "^warning:.*saved as.*rpmorig$"
+	for ((num=0; num<=cumulate; num++)) ; do
+	    rm -f $BUILD_ROOT/${CUMULATED_LIST[$num]}
+	done
+	rm -f .init_b_cache/manifest
+	check_exit
+	for ((num=0; num<=cumulate; num++)) ; do
+	    PKG=${CUMULATED_LIST[$num]##*/}
+	    echo "${CUMULATED_PIDS[$num]}" > $BUILD_ROOT/installed-pkg/${PKG%.rpm}
+	    test -n "${CUMULATED_HMD5[$num]}" || continue
+	    echo "${CUMULATED_HMD5[$num]} ${CUMULATED_PIDS[$num]}" > $BUILD_ROOT/.preinstall_image/${PKG%.rpm}
+	done
+	CUMULATED_LIST=()
+	CUMULATED_PIDS=()
+	CUMULATED_HMD5=()
+	let cumulate=-1
+	continue
+	;;
+    esac
     if test -e "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" -a ! -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" ; then
 	# preinstallimage package, make sure it's 
 	if ! test -e $BUILD_ROOT/.preinstall_image/$PKG ; then
@@ -1131,6 +1179,14 @@ for PKG in $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL; do
 	for i in $BUILD_ROOT/.init_b_cache/preinstalls/rpm-x86-* ; do
 	    test -e "$i" && ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --justdb"
 	done
+    fi
+    if ((suse_version >= 1220)) ; then
+	echo "cumulate ${PKGID%% *}"
+	let cumulate++
+	CUMULATED_LIST[$cumulate]=".init_b_cache/$PKG.rpm"
+	CUMULATED_PIDS[$cumulate]="$PKGID"
+	CUMULATED_HMD5[$cumulate]="$PKG_HDRMD5"
+	continue
     fi
     echo "installing ${PKGID%% *}"
     if ! test "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" -ef "$BUILD_ROOT/.init_b_cache/$PKG.rpm" ; then
