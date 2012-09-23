@@ -603,7 +603,7 @@ if test -e $BUILD_IS_RUNNING ; then
     echo "y - yes, cleanup the build root"
     echo "N - No, abort build (default on enter)"
     echo "c - Continue anyway with this build root"
-    echo -n "[y/N/c] "
+    echo "[y/N/c] "
     read ANSWER
     case "$ANSWER" in
 	c|C) rm -f $BUILD_IS_RUNNING ;;

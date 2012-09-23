@@ -1408,7 +1408,7 @@ if test -n "$LOGFILE" -a -z "$shell" ; then
 	exec 1> >(exec -a 'build logging' perl -e 'open(F,">>",$ARGV[0])||die("$ARGV[0]: $!\n");$|=1;select(F);$|=1;while(<STDIN>){my $p=sprintf("[%5ds] ", time()-'$STARTTIME');print STDOUT $p.$_;s/^\r//s;s/\r\n/\n/gs;print F $p.$_}' $LOGFILE) 2>&1
     else
         # plain chroot
-	exec 1> >(exec -a 'build logging' perl -e 'open(F,">>",$ARGV[0])||die("$ARGV[0]: $!\n");$|=1;select(F);$|=1;while(<STDIN>){my $p=sprintf("[%5ds] ", time()-'$STARTTIME');print STDOUT $p.$_;print F $p.$_}' $LOGFILE) 2>&1
+	exec 1> >(exec -a 'build logging' perl -e ' use IO::Handle;open(F,">>",$ARGV[0])||die("$ARGV[0]: $!\n");F->autoflush(1);;$|=1;select(F);$|=1;while(<STDIN>){my $p=sprintf("[%5ds] ", time()-'$STARTTIME');my $info = $_ ; $info =~ s/\n// if ($info =~ m#^\[y/N/c\] $#); print STDOUT $p.$info;print F $p.$info};$|=1' $LOGFILE) 2>&1
     fi
 fi
 
