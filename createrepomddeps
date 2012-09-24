@@ -34,8 +34,12 @@ my $repomdparser = {
   repomd => {
     data => {
       _start => \&repomd_handle_data_start,
+      _end => \&repomd_handle_data_end,
       location => {
 	_start => \&repomd_handle_location,
+      },
+      size => {
+	_text => \&repomd_handle_size,
       },
     },
   },
@@ -72,6 +76,7 @@ my $primaryparser = {
 # [ [tag, \%], ... ]
 my @cursor = ();
 
+my %datafile;
 sub repomd_handle_data_start
 {
   my $p = shift;
@@ -83,6 +88,14 @@ sub repomd_handle_data_start
   }
 }
 
+sub repomd_handle_data_end
+{
+  my $p = shift;
+  my $el = shift;
+  push @primaryfiles, {%datafile};
+}
+
+
 sub repomd_handle_location
 {
   my $p = shift;
@@ -90,9 +103,16 @@ sub repomd_handle_location
 
   my $attr = map_attrs(@_);
   if(exists $attr->{'href'}) {
-    push @primaryfiles, { location => $attr->{'href'} };
+    $datafile{location} = $attr->{'href'};
   }
 }
+sub repomd_handle_size
+{
+  my $p = shift;
+  my $el = shift;
+  $datafile{size} = $el;
+}
+
 
 sub generic_handle_start
 {
@@ -396,7 +416,7 @@ for my $url (@ARGV) {
     } else {
       die "unsupported repo type: $type\n";
     }
-  } elsif ($url =~ /^http:\/\/([^\/]*)\/?/) {
+  } elsif ($url =~ /^http[s]?:\/\/([^\/]*)\/?/) {
     my $repoid = md5_hex($url);
     $dir = "$cachedir/$repoid/";
     $baseurl = $url;
@@ -421,7 +441,13 @@ for my $url (@ARGV) {
     @cursor = ([undef, $primaryparser]);
 
     my $u = $dir . $f->{'location'};
-    if ($url =~ /^http:\/\/([^\/]*)\/?/) {
+    my $size = 0;
+    my $cached = 0;
+    if ( -e $u ) {
+        $size = (stat($u))[7];
+        $cached = 1 if ($f->{'size'} == $size);
+    }
+    if ($url =~ /^http[s]?:\/\/([^\/]*)\/?/ and !$cached) {
         if (system($INC[0].'/download', $dir . "repodata/", $baseurl . "repodata/" . basename($u))) {
 	  die("download failed\n");
 	}

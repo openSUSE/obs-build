@@ -46,7 +46,7 @@ is_emulator_arch()
 {
     local arch
     for arch in $EMULATOR_ARCHS; do
-	if test "$BUILD_ARCH" = "$arch" -a "$BUILD_HOST_ARCH" != "$arch"; then
+	if echo $BUILD_ARCH:|sed -n 's/:/\n/gp'|grep -q "^$arch$" && test "$BUILD_HOST_ARCH" != "$arch"; then
 	    return 0
 	fi
     done

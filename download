@@ -1,6 +1,8 @@
 #!/usr/bin/perl -w
 
+use Net::SSL ();
 BEGIN {
+  $ENV{PERL_LWP_SSL_VERIFY_HOSTNAME} = 0,
   unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
 }
 
@@ -17,7 +19,6 @@ my $dir = shift @ARGV;
 
 my $ua = LWP::UserAgent->new(
   agent => "openSUSE build script",
-  env_proxy => 1,
   timeout => 42);
 
 for my $url (@ARGV) {
@@ -33,6 +34,7 @@ for my $url (@ARGV) {
   } else {
     $url = URI->new($url);
   }
+  $ua->env_proxy  if $url->scheme ne 'https';
   my $dest = "$dir/".basename($url->path);
   unlink($dest);	# just in case
   my $retry = 3;
