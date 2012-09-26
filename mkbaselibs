@@ -424,7 +424,6 @@ sub parse_config {
       my $pm = $1;
       $pkgmatches = $pkgname =~ /$pm/;
       $match1 = $1 if defined $1;
-      $pkghasmatched |= $pkgmatches if $pkgname =~ /-debuginfo$/ && $target_matched{$target};
       next;
     }
     if (/^package\s+(.*?)$/) {
@@ -451,7 +450,7 @@ sub parse_config {
     if (/^autoreqprov\s+(.*?)$/) {$autoreqprov = $1; next; }
     die("bad line: $_\n");
   }
-  return $pkghasmatched;
+  return 1;
 }
 
 sub read_config {
@@ -480,32 +479,6 @@ sub get_targets {
   return @targets;
 }
 
-# Packages listed in config file
-sub get_pkgnames {
-  my %rpms;
-  for (split("\n", $config)) {
-    if (/^(.*\s+)?package\s+([-+_a-zA-Z0-9]+)\s*$/) {  # eg : arch ppc package libnuma-devel
-      $rpms{$2} = 1;
-    } elsif (/^\s*([-+_a-zA-Z0-9]+)\s*$/) { # eg: readline-devel
-      $rpms{$1} = 1;
-    }
-  }
-  return sort keys %rpms;
-}
-
-# Packages listed in config file - debian variant (can have "." in package names)
-sub get_debpkgnames {
-  my %debs;
-  for (split("\n", $config)) {
-    if (/^(.*\s+)?package\s+([-+_a-zA-Z0-9.]+)\s*$/) {  # eg : arch ppc package libnuma-devel
-      $debs{$2} = 1;
-    } elsif (/^\s*([-+_a-zA-Z0-9.]+)\s*$/) { # eg: readline-devel
-      $debs{$1} = 1;
-    }
-  }
-  return sort keys %debs;
-}
-
 sub handle_rpms {
  for $rpm (@_) {
 
@@ -530,7 +503,7 @@ sub handle_rpms {
   my @targets = get_targets($arch, $config);
   if (!@targets) {
     print "no targets for arch $arch, nothing to do\n";
-    exit(0);
+    next;
   }
   for my $target (@targets) {
 
@@ -912,6 +885,21 @@ sub handle_rpms {
     unlink($specfile);
   }
  }
+
+ # Remove X-debuginfo-32bit packages if X-32bit packages don't exist
+ my $TOPDIR=`rpm --eval '%_topdir'`;
+ my @rpms = split("\n", `find $TOPDIR/RPMS -type f -name "*.rpm" 2>/dev/null || true`);
+
+ for my $rpm (@rpms) {
+  next unless $rpm =~ /\.rpm$/;  # take only rpms
+  next if $rpm =~ /\.(no)?src\.rpm$/;  # ignore source rpms
+  next if $rpm =~ /\.srpm$/;
+  if ($rpm =~ /(.*)-debuginfo(-.*-[^-]+-[^-]+\.[^\.]+\.rpm)$/) {
+    unless (-e $1.$2) {
+      unlink($rpm);
+    }
+  }
+ }
 }
 
 ################################################################
@@ -1086,39 +1074,25 @@ while ($ARGV[0] eq '-c') {
   shift @ARGV;
 }
 
-my %goodpkgs = map {$_ => 1} get_pkgnames();  # These are packages named in the config file
 my @pkgs = @ARGV;
 my @rpms;
-my @debugrpms;
 for my $rpm (@pkgs) {
-  my $rpmn = $rpm;
   unless (-f $rpm) {
     warn ("$rpm does not exist, skipping\n");
     next;
   }
   next if $rpm =~ /\.(no)?src\.rpm$/;  # ignore source rpms
-  next if $rpm =~ /\.spm$/;
-  $rpmn =~ s/.*\///;   # Remove leading path info
-  $rpmn =~ s/-[^-]+-[^-]+\.[^\.]+\.rpm$/\.rpm/; # remove all version info
-  $rpmn =~ s/\.rpm$//; # remove extension
-  push @rpms, $rpm if $goodpkgs{$rpmn};
-  if ($rpmn =~ s/-debuginfo$//) {
-      push @debugrpms, $rpm if $goodpkgs{$rpmn};
-  }
+  next if $rpm =~ /\.srpm$/;
+  push @rpms, $rpm;
 }
 for (@rpms) {
     die("$_: need absolute path to package\n") unless /^\//;
 }
 
-my %debs_to_process = map {$_ => 1} get_debpkgnames();  # These are packages named in the config file
 my @debs;
-for my $deb (@pkgs) {
-  my $debn = $deb;
-  next unless $debn =~ /\.deb$/;
-  $debn =~ s/.*\///;   # Remove leading path info
-  $debn =~ s/_[^_]+_[^_]+\.deb$//; # remove all version info and extension
-  push @debs, $deb if $debs_to_process{$debn};
-  print "ignoring $deb as $debn not in baselibs.conf\n" if !$debs_to_process{$debn};
+for my $deb (@pkgs) {handle_rpms
+  next unless $deb =~ /\.deb$/;
+  push @debs, $deb;;
 }
 for (@debs) {
     die("$_: need absolute path to package\n") unless /^\//;
@@ -1131,7 +1105,6 @@ if (@rpms) {
     die("filesystem rpm is not installed\n") unless @filesystem;
 
     handle_rpms(@rpms);
-    handle_rpms(@debugrpms);
 }
 
 if (@debs) {
