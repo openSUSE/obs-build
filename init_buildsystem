@@ -1012,7 +1012,7 @@ typeset -a CUMULATED_LIST=()
 typeset -a CUMULATED_PIDS=()
 typeset -a CUMULATED_HMD5=()
 
-if ((suse_version >= 1220)) ; then
+if ((suse_version > 1220)) ; then
     MAIN_LIST="$PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL CUMULATED"
 else
     MAIN_LIST="$PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL"
@@ -1181,7 +1181,7 @@ for PKG in $MAIN_LIST; do
 	    test -e "$i" && ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --justdb"
 	done
     fi
-    if ((suse_version >= 1220)) ; then
+    if ((suse_version > 1220)) ; then
 	echo "cumulate ${PKGID%% *}"
 	let cumulate++
 	CUMULATED_LIST[$cumulate]=".init_b_cache/$PKG.rpm"
