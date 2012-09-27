@@ -63,8 +63,14 @@ sub listtar {
     next unless /^([-dlbcp])(.........)\s+\d+\/\d+\s+(\S+) \d\d\d\d-\d\d-\d\d \d\d:\d\d(?::\d\d)? (.*)$/;
     my ($type, $mode, $size, $name) = ($1, $2, $3, $4);
     next if $type eq 'd';
-    die("debian tar contains link: $name\n") if $type eq 'l';
-    die("debian tar contains unexpected file type: $name\n") if $type ne '-';
+    if ($type eq 'l') {
+      next if $skipdebiandir eq 0;
+      die("debian tar contains link: $name\n");
+    }
+    if ($type ne '-') {
+      next if $skipdebiandir eq 0;
+      die("debian tar contains unexpected file type: $name\n");
+    }
     $name =~ s/^\.\///;
     $name =~ s/^debian\/// if $skipdebiandir eq 1;
     push @c, {'name' => $name, 'size' => $size};
