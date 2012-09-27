@@ -124,6 +124,7 @@ clean_build_root()
 	    rm -rf -- "$BUILD_ROOT/.build"
 	    rm -rf -- "$BUILD_ROOT/.root"
 	    rm -rf -- "$BUILD_ROOT/.init_b_cache"
+	    rm -f -- $BUILD_ROOT/.srcfiles.cache*
 	    rm -rf -- "$BUILD_ROOT/.preinstall_image/*"
 	    rm -rf -- "$BUILD_ROOT/.preinstallimage"*
 	    mkdir -p "$BUILD_ROOT/proc"
