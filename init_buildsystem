@@ -712,6 +712,7 @@ else
     PACKAGES_FROM_PREINSTALLIMAGE=
     GUESSED_DIST=unknown
     mkdir -p $BUILD_ROOT/.init_b_cache/rpms
+    rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download
     while read PKG SRC ; do
 	if test "$PKG" = "preinstall:" ; then
 	    PACKAGES_TO_PREINSTALL=$SRC
@@ -766,45 +767,34 @@ else
 	    PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $PKG"
 	    continue
 	fi
+	PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $PKG"
 	if [ "${SRC#/}" = "$SRC" ]; then
-	    url="$SRC"
-	    case "$url" in
+	    case "$SRC" in
 		zypp://* | http://* | https://* | ftp://* | ftps://*)
-                    cachedir="$(getcachedir "$url")"
-                    pkgname="$(basename "$url")"
-                    pkgname=${pkgname/%.pkg.tar.?z/.arch}
-                    rpmpkg="$cachedir/$pkgname"
-                    if [ -e $rpmpkg ]
-                    then
-                        rpm -K --nosignature "$rpmpkg" > $rpmpkg.v || echo "$PKG $SRC" >>${RPMLIST}.download
-                        rpm -K --nosignature "$rpmpkg" > $rpmpkg.v && downloadpkg "$url"
-                        rm -f $rpmpkg.v
-                    else
-                        echo "$PKG $SRC" >>${RPMLIST}.download
-                    fi
+		    echo "$PKG $SRC" >>$BUILD_ROOT/.init_b_cache/rpmlist.download
+		    continue
 		    ;;
 		*)
-		    echo "unsupported url for '$PKG': $url" >&2
+		    echo "unsupported url for '$PKG': $SRC" >&2
 		    cleanup_and_exit 1
 		    ;;
 	    esac
-	    # downloadpkg modified $SRC, so it has a right name for use
 	fi
 	SRCSUF=${SRC/%.pkg.tar.?z/.arch}
 	ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
-	PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $PKG"
     done < $RPMLIST
-    if [ -e ${RPMLIST}.download ]
-    then
+    # now do the download of missing packages
+    if test -s $BUILD_ROOT/.init_b_cache/rpmlist.download ; then
         PACKAGES_TO_DOWNLOAD=`cat ${RPMLIST}.download|awk '{print $2}'`
         progress_setup PACKAGES_TO_DOWNLOAD
         while read PKG SRC ; do
             progress_step PACKAGES_TO_DOWNLOAD
             downloadpkg "$SRC"
-            rm -f "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRC##*.}"
-            ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRC##*.}"
-        done < ${RPMLIST}.download
-        rm ${RPMLIST}.download -f
+	    # downloadpkg modified $SRC, so it has a right name for use
+	    SRCSUF=${SRC/%.pkg.tar.?z/.arch}
+	    ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
+        done < $BUILD_ROOT/.init_b_cache/rpmlist.download
+        rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download
         printf "\n"
     fi
 
