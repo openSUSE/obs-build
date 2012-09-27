@@ -83,6 +83,7 @@ sub repomd_handle_data_start
   my $el = shift;
 
   my $attr = map_attrs(@_);
+  %datafile = ();
   if($attr->{'type'} ne 'primary') {
     pop @cursor;
   }
@@ -92,7 +93,7 @@ sub repomd_handle_data_end
 {
   my $p = shift;
   my $el = shift;
-  push @primaryfiles, {%datafile};
+  push @primaryfiles, { %datafile } if exists $datafile{'location'};
 }
 
 
@@ -102,15 +103,14 @@ sub repomd_handle_location
   my $el = shift;
 
   my $attr = map_attrs(@_);
-  if(exists $attr->{'href'}) {
-    $datafile{location} = $attr->{'href'};
-  }
+  $datafile{'location'} = $attr->{'href'} if defined $attr->{'href'};
 }
+
 sub repomd_handle_size
 {
   my $p = shift;
   my $el = shift;
-  $datafile{size} = $el;
+  $datafile{'size'} = $el;
 }
 
 
@@ -441,20 +441,19 @@ for my $url (@ARGV) {
     @cursor = ([undef, $primaryparser]);
 
     my $u = $dir . $f->{'location'};
-    my $size = 0;
-    my $cached = 0;
-    if ( -e $u ) {
-        $size = (stat($u))[7];
-        $cached = 1 if ($f->{'size'} == $size);
+    if ($] > 5.007) {
+	require Encode;
+	utf8::downgrade($u);
+    }
+    my $cached;
+    if (exists($f->{'size'}) && -e $u) {
+	# should actually check the checksum, it's hopefully already included in the file name
+        $cached = 1 if $f->{'size'} == -s _;
     }
     if ($url =~ /^http[s]?:\/\/([^\/]*)\/?/ and !$cached) {
         if (system($INC[0].'/download', $dir . "repodata/", $baseurl . "repodata/" . basename($u))) {
 	  die("download failed\n");
 	}
-    }
-    if ($] > 5.007) {
-	require Encode;
-	utf8::downgrade($u);
     }
     my $fh;
     open($fh, '<', $u) or die "Error opening $u: $!\n";
