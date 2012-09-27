@@ -507,7 +507,7 @@ fail_exit()
   cleanup_and_exit 1
 }
 
-# modify $SRC
+# modifies $SRC
 downloadpkg()
 {
     local url="$1"
@@ -553,8 +553,13 @@ downloadpkg()
 
 getcachedir()
 {
-    url=$1
+    local url=$1
     case $url in
+      zypp://*)
+	url=${url#zypp:/}
+	echo "/var/cache/zypp/packages/${url%/*}"
+	return 0;
+	;;
       *.pkg.tar.?z) url="arch@$url" ;;
     esac
     for repo in "${repos[@]}" ; do
@@ -771,8 +776,22 @@ else
 	if [ "${SRC#/}" = "$SRC" ]; then
 	    case "$SRC" in
 		zypp://* | http://* | https://* | ftp://* | ftps://*)
-		    echo "$PKG $SRC" >>$BUILD_ROOT/.init_b_cache/rpmlist.download
-		    continue
+		    if test "${SRC%.rpm}" != "$SRC" ; then
+			# check if we got the correct rpm in the cache
+			cachepkg="${SRC##*/}"
+			cachedir="$(getcachedir "$SRC")"
+			if test -s "$cachedir/$cachepkg" -a -s $BUILD_ROOT/.init_b_cache/rpms/$PKG.id ; then
+			    PKGID=`rpm -qp --qf "$RPMIDFMT" $RPMCHECKOPTS_HOST "$cachedir/$cachepkg"`
+			    read cachepkgid < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
+			    if test "$cachepkgid" = "$PKGID" ; then
+				SRC="$cachedir/$cachepkg"
+			    fi
+			fi
+		    fi
+		    if "${SRC#/}" = "$SRC" ; then
+			echo "$PKG $SRC" >>$BUILD_ROOT/.init_b_cache/rpmlist.download
+			continue
+		    fi
 		    ;;
 		*)
 		    echo "unsupported url for '$PKG': $SRC" >&2
