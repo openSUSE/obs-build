@@ -128,7 +128,7 @@ sub grabargs {
   my %m;
   $m{'0'} = $macname;
   $m{'**'} = join(' ', @args);
-  my %go = split(/(:?)/, $getopt);
+  my %go = (split(/(:?)/, $getopt, -1), undef);
   while (@args && $args[0] =~ s/^-//) {
     my $o = shift @args;
     last if $o eq '-';
@@ -331,7 +331,7 @@ reexpand:
 	    $line = 'MACRO';
 	    last;
 	  }
-	  if ($macros_args{$macname}) {
+	  if (defined($macros_args{$macname})) {
 	    # macro with args!
 	    if (!defined($macdata)) {
 	      $line =~ /^\s*([^\n]*).*?$/;
