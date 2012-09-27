@@ -788,7 +788,7 @@ else
 			    fi
 			fi
 		    fi
-		    if "${SRC#/}" = "$SRC" ; then
+		    if test "${SRC#/}" = "$SRC" ; then
 			echo "$PKG $SRC" >>$BUILD_ROOT/.init_b_cache/rpmlist.download
 			continue
 		    fi
