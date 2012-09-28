@@ -1,0 +1,24 @@
+grandorgue (0.3.0.6.10) unstable; urgency=low
+
+  * OBS build
+
+ -- Martin Koegler <mkoegler@auto.tuwien.ac.at>  Sat, 16 Jun 2012 13:08:51 +0200
+
+grandorgue (0.3.0.6.11) unstable; urgency=low
+
+  * OBS build
+
+ -- Martin Koegler <mkoegler@auto.tuwien.ac.at>  Sat, 16 Jun 2012 13:08:35 +0200
+
+grandorgue (0.3.0.6.10-1) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * OBS build
+
+ -- Martin Koegler <mkoegler@auto.tuwien.ac.at>  Sat, 16 Jun 2012 11:27:19 +0200
+
+grandorgue (0.3.0.6) unstable; urgency=low
+
+  * Initial version
+
+ -- Martin Koegler <martin.koegler@chello.at>  Sun, 06 Nov 2011 19:44:04 +0100
