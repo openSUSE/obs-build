@@ -1071,6 +1071,8 @@ DO_CUMULATE=
 if ((suse_version > 1220)) ; then
     DO_CUMULATE=true
 fi
+
+MAIN_LIST="$PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL"
 test -n "$DO_CUMULATE" && MAIN_LIST="$MAIN_LIST CUMULATED"
 progress_setup MAIN_LIST
 for PKG in $MAIN_LIST; do
