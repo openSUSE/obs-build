@@ -1040,17 +1040,17 @@ test -x /usr/bin/rpmquery && RPMCHECKOPTS_HOST="--nodigest --nosignature"
 
 test -x $BUILD_ROOT/sbin/ldconfig && chroot $BUILD_ROOT /sbin/ldconfig 2>&1
 
-typeset -ri suse_version=$(chroot $BUILD_ROOT /bin/rpm --eval '%{?suse_version}' 2>/dev/null)
+typeset -ri suse_version=$(chroot $BUILD_ROOT rpm --eval '%{?suse_version}' 2>/dev/null)
 typeset -i num cumulate=-1
 typeset -a CUMULATED_LIST=()
 typeset -a CUMULATED_PIDS=()
 typeset -a CUMULATED_HMD5=()
 
+DO_CUMULATE=
 if ((suse_version > 1220)) ; then
-    MAIN_LIST="$PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL CUMULATED"
-else
-    MAIN_LIST="$PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL"
+    DO_CUMULATE=true
 fi
+test -n "$DO_CUMULATE" && MAIN_LIST="$MAIN_LIST CUMULATED"
 progress_setup MAIN_LIST
 for PKG in $MAIN_LIST; do
     test -f $BUILD_ROOT/installed-pkg/$PKG && continue
@@ -1094,7 +1094,7 @@ for PKG in $MAIN_LIST; do
 	;;
     esac
     if test -e "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" -a ! -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" ; then
-	# preinstallimage package, make sure it's 
+	# preinstallimage package, make sure it's in the image
 	if ! test -e $BUILD_ROOT/.preinstall_image/$PKG ; then
 	    echo "Package $PKG is missing from the preinstall image"
 	    cleanup_and_exit 1
@@ -1215,7 +1215,7 @@ for PKG in $MAIN_LIST; do
 	    test -e "$i" && ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --justdb"
 	done
     fi
-    if ((suse_version > 1220)) ; then
+    if test -n "$DO_CUMULATE" -a "$ADDITIONAL_PARAMS" = "${ADDITIONAL_PARAMS%--justdb}"; then
 	echo "cumulate ${PKGID%% *}"
 	let cumulate++
 	CUMULATED_LIST[$cumulate]=".init_b_cache/$PKG.rpm"
