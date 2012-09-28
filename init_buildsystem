@@ -376,6 +376,11 @@ validate_cache_file()
 		rm -f $CACHE_FILE.id
 		break
 	    fi
+	    # always rebuild if we have remote repositories and --clean is given
+	    if test -n "$CLEAN_BUILD" -a "$SRC" != "${SRC#*://}" ; then
+		rm -f $CACHE_FILE.id
+		break
+	    fi
 	done
     fi
     if ! test -f $CACHE_FILE.id ; then
