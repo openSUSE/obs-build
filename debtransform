@@ -280,12 +280,6 @@ if ($tarfile =~ /\.zip/) {
     system( ( "debtransformzip", "$dir/$old", "$tmptar" )) == 0 || die("cannot transform .zip to .tar.gz");
 }
 
-my $tardir = $tarfile;
-$tardir =~ s/\.orig\.tar/\.tar/;
-$tardir =~ s/\.tar.*?$//;
-my @tarfilecontent = listtar($tarfile, 0);
-my $origtarfile = { 'name', $tarfile, 'content', \@tarfilecontent, 'version', $tags->{'VERSION'}, 'tardir', $tardir};
-
 my @files;
 my $v = $version;
 $v =~ s/-[^-]*$//;
@@ -298,6 +292,13 @@ if( $tmptar ) {
   link("$dir/$tarfile", "$out/$ntarfile") || die("link $dir/$tarfile $out/$ntarfile: $!\n");
 }
 push @files, addfile("$out/$ntarfile");
+
+my $tarpath = "$out/$ntarfile";
+my $tardir = $tarfile;
+$tardir =~ s/\.orig\.tar/\.tar/;
+$tardir =~ s/\.tar.*?$//;
+my @tarfilecontent = listtar($tarpath, 0);
+my $origtarfile = { 'name', $tarpath, 'content', \@tarfilecontent, 'version', $tags->{'VERSION'}, 'tardir', $tardir};
 
 open(DIFF, '>', "$out/${name}_$version.diff") || die("$out/${name}_$version.diff: $!\n");
 
