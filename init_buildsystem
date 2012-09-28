@@ -532,28 +532,26 @@ downloadpkg()
 	cleanup_and_exit 1
     fi
 
-    if [ ! -e "$SRC" ]; then
-	local destdir="$cachedir/tmp"
-	mkdir -p "$destdir"
-	echo "downloading $url ... ";
-	$BUILD_DIR/download "$destdir" "$url" || cleanup_and_exit 1
-	local destfile="$destdir/${url##*/}"
-	if [ ! -e "$destfile" ]; then
-	    echo "expected $destfile after download but it's missing" >&2
+    local destdir="$cachedir/tmp"
+    mkdir -p "$destdir"
+    echo "downloading $url ... ";
+    $BUILD_DIR/download "$destdir" "$url" || cleanup_and_exit 1
+    local destfile="$destdir/${url##*/}"
+    if [ ! -e "$destfile" ]; then
+	echo "expected $destfile after download but it's missing" >&2
+	cleanup_and_exit 1
+    fi
+    case $destfile in
+      *.rpm)
+	rpm -K "$destfile" > $destfile.v || { echo "rpm verify failed" >&2; rm -rf "$destdir"; cleanup_and_exit 1; }
+	if grep "NOT OK" $destfile.v; then
+	    rm -rf "$destdir"
 	    cleanup_and_exit 1
 	fi
-	case $destfile in
-	  *.rpm)
-	    rpm -K "$destfile" > $destfile.v || { echo "rpm verify failed" >&2; rm -rf "$destdir"; cleanup_and_exit 1; }
-	    if grep "NOT OK" $destfile.v; then
-		rm -rf "$destdir"
-		cleanup_and_exit 1
-	    fi
-	    rm -f "$destfile.v"
-	    ;;
-	esac
-	mv "$destfile" "$SRC" || cleanup_and_exit 1
-    fi
+	rm -f "$destfile.v"
+	;;
+    esac
+    mv "$destfile" "$SRC" || cleanup_and_exit 1
 }
 
 getcachedir()
@@ -781,22 +779,8 @@ else
 	if [ "${SRC#/}" = "$SRC" ]; then
 	    case "$SRC" in
 		zypp://* | http://* | https://* | ftp://* | ftps://*)
-		    if test "${SRC%.rpm}" != "$SRC" ; then
-			# check if we got the correct rpm in the cache
-			cachepkg="${SRC##*/}"
-			cachedir="$(getcachedir "$SRC")"
-			if test -s "$cachedir/$cachepkg" -a -s $BUILD_ROOT/.init_b_cache/rpms/$PKG.id ; then
-			    PKGID=`rpm -qp --qf "$RPMIDFMT" $RPMCHECKOPTS_HOST "$cachedir/$cachepkg"`
-			    read cachepkgid < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
-			    if test "$cachepkgid" = "$PKGID" ; then
-				SRC="$cachedir/$cachepkg"
-			    fi
-			fi
-		    fi
-		    if "${SRC#/}" = "$SRC" ; then
-			echo "$PKG $SRC" >>$BUILD_ROOT/.init_b_cache/rpmlist.download
-			continue
-		    fi
+		    echo "$PKG $SRC" >>$BUILD_ROOT/.init_b_cache/rpmlist.download
+		    continue
 		    ;;
 		*)
 		    echo "unsupported url for '$PKG': $SRC" >&2
@@ -807,6 +791,38 @@ else
 	SRCSUF=${SRC/%.pkg.tar.?z/.arch}
 	ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
     done < $RPMLIST
+
+    # check if we really can use cached versions for packages on the download list
+    if test -s $BUILD_ROOT/.init_b_cache/rpmlist.download ; then
+	rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download2
+        while read PKG SRC ; do
+	    cachepkg="${SRC##*/}"
+	    cachepkg="${cachepkg/%.pkg.tar.?z/.arch}"
+	    cachedir="$(getcachedir "$SRC")"
+	    if test -s "$cachedir/$cachepkg" ; then
+		if test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.id" -a "${SRC%.rpm}" != "$SRC" ; then
+		    PKGID=`rpm -qp --qf "$RPMIDFMT" $RPMCHECKOPTS_HOST "$cachedir/$cachepkg"`
+		    read cachepkgid < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
+		    if test "$cachepkgid" = "$PKGID" ; then
+			SRC="$cachedir/$cachepkg"
+		    else
+			rm -f "$cachedir/$cachepkg"
+		    fi
+		else
+		    $SRC="$cachedir/$cachepkg"
+		fi
+	    fi
+	    if test "${SRC#/}" = "$SRC" ; then
+		echo "$PKG $SRC" >>$BUILD_ROOT/.init_b_cache/rpmlist.download2
+	    else
+		SRCSUF=${SRC/%.pkg.tar.?z/.arch}
+		ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
+	    fi
+	done < $BUILD_ROOT/.init_b_cache/rpmlist.download
+	rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download
+	test -s $BUILD_ROOT/.init_b_cache/rpmlist.download2 && mv $BUILD_ROOT/.init_b_cache/rpmlist.download2 $BUILD_ROOT/.init_b_cache/rpmlist.download
+    fi
+
     # now do the download of missing packages
     if test -s $BUILD_ROOT/.init_b_cache/rpmlist.download ; then
         PACKAGES_TO_DOWNLOAD=`cat ${RPMLIST}.download|awk '{print $2}'`
