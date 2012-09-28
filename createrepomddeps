@@ -446,9 +446,10 @@ for my $url (@ARGV) {
 	utf8::downgrade($u);
     }
     my $cached;
-    if (exists($f->{'size'}) && -e $u) {
-	# should actually check the checksum, it's hopefully already included in the file name
-        $cached = 1 if $f->{'size'} == -s _;
+    if (-e $u) {
+      $cached = 1;
+      $cached = 0 if exists($f->{'size'}) && $f->{'size'} != (-s _);
+      $cached = 0 if !exists($f->{'size'}) && $u !~ /[0-9a-f]{32}-primary/;
     }
     if ($url =~ /^http[s]?:\/\/([^\/]*)\/?/ and !$cached) {
         if (system($INC[0].'/download', $dir . "repodata/", $baseurl . "repodata/" . basename($u))) {
