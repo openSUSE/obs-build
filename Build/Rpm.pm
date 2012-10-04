@@ -569,6 +569,7 @@ my %rpmstag = (
   "REQUIREVERSION" => 1050,
   "NOSOURCE"       => 1051,
   "NOPATCH"        => 1052,
+  "RPMVERSION"     => 1064,
   "PROVIDEFLAGS"   => 1112,
   "PROVIDEVERSION" => 1113,
   "DIRINDEXES"     => 1116,
@@ -722,7 +723,10 @@ sub rpmq {
     }
   }
   if ($forcebinary && $stags{1044} && !$res{$stags{1044}}) {
-    $res{$stags{1044}} = [ '(none)' ];	# like rpm does...
+    # don't force for rpm-5 rpms
+    if (!($stags{1064} && $res{$stags{1064}} && $res{$stags{1064}}->[0] =~ /^5/)) {
+      $res{$stags{1044}} = [ '(none)' ];	# like rpm does...
+    }
   }
 
   if ($need_filenames) {
@@ -832,7 +836,7 @@ sub verscmp {
 sub query {
   my ($handle, %opts) = @_;
 
-  my @tags = qw{NAME SOURCERPM NOSOURCE NOPATCH SIGTAG_MD5 PROVIDENAME PROVIDEFLAGS PROVIDEVERSION REQUIRENAME REQUIREFLAGS REQUIREVERSION};
+  my @tags = qw{NAME SOURCERPM NOSOURCE NOPATCH SIGTAG_MD5 PROVIDENAME PROVIDEFLAGS PROVIDEVERSION REQUIRENAME REQUIREFLAGS REQUIREVERSION RPMVERSION};
   push @tags, qw{EPOCH VERSION RELEASE ARCH};
   push @tags, qw{FILENAMES} if $opts{'filelist'};
   push @tags, qw{SUMMARY DESCRIPTION} if $opts{'description'};
