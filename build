@@ -2299,11 +2299,13 @@ if test -n "$RPMS" -a "$DO_CHECKS" != "false" -a -x "$BUILD_ROOT/opt/testing/bin
     rpmlint_logfile=$TOPDIR/OTHER/rpmlint.log
     rm -f "$BUILD_ROOT$rpmlint_logfile"
     ret=0
+    mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
     chroot $BUILD_ROOT su -s /opt/testing/bin/rpmlint "$BUILD_USER" -- \
 	    --info ${LINT_RPM_FILE_LIST[*]#$BUILD_ROOT} \
 	    ${SRPM_FILE_LIST[*]#$BUILD_ROOT} > "$BUILD_ROOT$rpmlint_logfile" || ret=1
 	    cat "$BUILD_ROOT$rpmlint_logfile"
 	    echo
+    umount -n $BUILD_ROOT/proc 2>/dev/null || true
     if test "$ret" = 1; then
 	cleanup_and_exit 1
     fi
