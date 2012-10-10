@@ -603,6 +603,20 @@ vm_img_mkfs()
 
 }
 
+background_monitor_process()
+{
+  max=0
+  while sleep 5; do
+    
+    c=(`df -m $1 | tail -n 1`)
+
+    if [ ${c[2]} -gt $max ]; then
+      max="${c[2]}"
+      echo $max > /.build/_statistics.df
+    fi
+  done
+}
+
 detect_vm_2nd_stage()
 {
     if ! test "$0" = "/.build/build" ; then
@@ -657,6 +671,9 @@ detect_vm_2nd_stage()
 	swapon -v "$VM_SWAP" || exit 1
     fi
     HOST="$MYHOSTNAME"
+
+    # fork a process monitoring max filesystem fillment during build
+    background_monitor_process / >& /dev/null &
 
     return 0
 }
@@ -2340,6 +2357,22 @@ if test -n "$RPMS" \
 fi
 
 if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
+    echo "... saving built statistics"
+    echo "# statistics about used resources during build" > $TOPDIR/OTHER/_statistics
+    if [ -e /.build/_statistics.df ]; then
+      echo -n "MAX_mb_used_on_disk: " >> $TOPDIR/OTHER/_statistics
+      cat /.build/_statistics.df >> $TOPDIR/OTHER/_statistics
+    fi
+    mount -n sys /sys -t sysfs
+    device="sda"
+    [ -e /dev/vda ] && device="vda"
+    disk=(`cat /sys/block/${device}/stat`)
+    echo "IO_requests_read: ${disk[0]}"  >> $TOPDIR/OTHER/_statistics
+    echo "IO_sectors_read: ${disk[2]}"   >> $TOPDIR/OTHER/_statistics
+    echo "IO_requests_write: ${disk[4]}" >> $TOPDIR/OTHER/_statistics
+    echo "IO_sectors_write: ${disk[6]}"  >> $TOPDIR/OTHER/_statistics
+    umount /sys
+
     echo "... saving built packages"
     swapoff "$VM_SWAP"
     args="--padstart 512 --padend 512 -v"
