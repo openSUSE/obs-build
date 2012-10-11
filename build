@@ -789,10 +789,15 @@ setup_sys_root()
 
 		mkdir -p $BUILD_ROOT/$SYSROOT_PATH || fail_exit
 
-		BUILD_ROOT=$BUILD_ROOT/$SYSROOT_PATH CROSSBUILD=1 init_buildsystem --rpmlist $SYSROOT_RPMS "$MYSRCDIR/$SPECFILE"
-		ERR=$?
-		#TODO: make proper error handling
+		if [[ "x$1" == "xprepare" ]]; then
+			HOST_BUILD_ROOT=$BUILD_ROOT BUILD_ROOT=$BUILD_ROOT/$SYSROOT_PATH CROSSBUILD=1 init_buildsystem --cachedir "$CACHE_DIR" --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD --rpmlist $SYSROOT_RPMS "$MYSRCDIR/$SPECFILE"
+			ERR=$?
+		else
+			HOST_BUILD_ROOT=$BUILD_ROOT BUILD_ROOT=$BUILD_ROOT/$SYSROOT_PATH CROSSBUILD=1 init_buildsystem --rpmlist $SYSROOT_RPMS "$MYSRCDIR/$SPECFILE"
+			ERR=$?
+		fi
 
+		[[ $ERR -ne 0 ]] && cleanup_and_exit $ERR
 
 		# fix orphaned absolute path symlinks in sysroot environment
 		for LINK in $(find $BUILD_ROOT/$SYSROOT_PATH -type l); do
