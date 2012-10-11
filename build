@@ -797,7 +797,7 @@ setup_sys_root()
 		# fix orphaned absolute path symlinks in sysroot environment
 		for LINK in $(find $BUILD_ROOT/$SYSROOT_PATH -type l); do
 			local TARGET=$(readlink $LINK)
-			[[ $TARGET == /* ]] && ln -fs /$SYSROOT_PATH$TARGET $LINK
+			[[ $TARGET == /* ]] && ln -fs /$SYSROOT_PATH$TARGET $LINK || fail_exit
 		done
 	done
 }
