@@ -31,6 +31,13 @@ USE_FORCE=false
 #RPMIDFMT="%{NAME}-%{VERSION}-%{RELEASE} %{BUILDHOST}-%{BUILDTIME}\n"
 RPMIDFMT="%{NAME}-%{VERSION}-%{RELEASE} %{BUILDTIME}\n"
 
+CALLRPM="chroot $BUILD_ROOT rpm";
+if [ -n "$CROSSBUILD" ]; then
+       CALLRPM="chroot $HOST_BUILD_ROOT rpm --root ${BUILD_ROOT:${#HOST_BUILD_ROOT}}";
+       echo -n "[TCC] rpm version: "
+       $CALLRPM --version;
+fi;
+
 PREPARE_VM=
 USE_SYSTEM_QEMU=
 USEUSEDFORBUILD=
@@ -1253,8 +1260,11 @@ for PKG in $MAIN_LIST; do
 	cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm $BUILD_ROOT/.init_b_cache/$PKG.rpm || cleanup_and_exit 1
     fi
     if [ -n "$CROSSBUILD" ]; then
-       ( rpm --root $BUILD_ROOT --noscripts --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
-                   $ADDITIONAL_PARAMS $BUILD_ROOT/.init_b_cache/$PKG.rpm 2>&1 || \
+       # XXX: Crossbuild difference is here to do not call any scripts - at least yet.
+       #      Later with tested mix of QEMU and crossbuild we might drop this conditional
+       #      and install without --noscripts
+       ( $CALLRPM --noscripts --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
+                   $ADDITIONAL_PARAMS ${BUILD_ROOT:${#HOST_BUILD_ROOT}}/.init_b_cache/$PKG.rpm 2>&1 || \
              touch $BUILD_ROOT/exit ) | \
                  grep -v "^warning:.*saved as.*rpmorig$"
     else
