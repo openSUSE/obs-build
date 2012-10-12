@@ -797,12 +797,16 @@ setup_sys_root()
 			ERR=$?
 		fi
 
-		[[ $ERR -ne 0 ]] && cleanup_and_exit $ERR
+		[[ $ERR -eq 0 ]] || cleanup_and_exit $ERR
 
 		# fix orphaned absolute path symlinks in sysroot environment
 		for LINK in $(find $BUILD_ROOT/$SYSROOT_PATH -type l); do
 			local TARGET=$(readlink $LINK)
-			[[ $TARGET == /* ]] && ln -fs /$SYSROOT_PATH$TARGET $LINK || fail_exit
+			if [[ $TARGET == /* ]]; then
+				# only fix links on normal files and directories
+				[[ -f /$SYSROOT_PATH$TARGET || -d /$SYSROOT_PATH$TARGET ]] || continue
+				ln -fs /$SYSROOT_PATH$TARGET $LINK || fail_exit
+			fi
 		done
 	done
 }
