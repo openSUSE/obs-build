@@ -606,13 +606,37 @@ vm_img_mkfs()
 background_monitor_process()
 {
   max=0
+  max_mem=0
   while sleep 5; do
-    
-    c=(`df -m $1 | tail -n 1`)
 
-    if [ ${c[2]} -gt $max ]; then
-      max="${c[2]}"
-      echo $max > /.build/_statistics.df
+    # memory usage
+    if [ -e /proc/meminfo ]; then
+      memtotal=0
+      while read key value unit; do
+        case $key in
+          MemTotal:|SwapTotal:)
+            memtotal=$(( $memtotal + $value ))
+            ;;
+          MemFree:|SwapFree:|SwapCached:|Cached:|Buffers:)
+            memtotal=$(( $memtotal - $value ))
+            ;;
+        esac
+      done < /proc/meminfo
+
+      if [ ${memtotal} -gt $max_mem ]; then
+        max_mem="${memtotal}"
+        echo $(( $max_mem / 1024 )) > /.build/_statistics.memory
+      fi
+    fi
+
+    # disk storage usage
+    if [ -x /usr/bin/df ]; then
+      c=(`/usr/bin/df -m $1 | tail -n 1`)
+
+      if [ ${c[2]} -gt $max ]; then
+        max="${c[2]}"
+        echo $max > /.build/_statistics.df
+      fi
     fi
   done
 }
@@ -2362,6 +2386,12 @@ if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
     if [ -e /.build/_statistics.df ]; then
       echo -n "MAX_mb_used_on_disk: " >> $TOPDIR/OTHER/_statistics
       cat /.build/_statistics.df >> $TOPDIR/OTHER/_statistics
+      rm /.build/_statistics.df
+    fi
+    if [ -e /.build/_statistics.memory ]; then
+      echo -n "MAX_mb_used_memory: " >> $TOPDIR/OTHER/_statistics
+      cat /.build/_statistics.memory >> $TOPDIR/OTHER/_statistics
+      rm /.build/_statistics.memory
     fi
     mount -n sys /sys -t sysfs
     device="sda"
