@@ -268,7 +268,8 @@ EOF
 		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
 cd /$TOPDIR/KIWI-tbz
 for i in *.tbz; do
-	file=\$(readlink -f "\$i")
+        file=\$(readlink -f "\$i")
+        [ -z "\$file" ] && echo readlink failed for $i
 	mv "\$file" "/$TOPDIR/KIWI/\${i%.tbz}$buildnum.tbz"
 done
 if [ -x /usr/bin/sha256sum ]; then
