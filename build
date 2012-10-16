@@ -355,6 +355,12 @@ cleanup_and_exit () {
 	umount -n $BUILD_ROOT/dev/pts 2>/dev/null || true
 	test "$VM_IMAGE" = 1 && VM_IMAGE=
 	[ -n "$VM_IMAGE" ] && umount $BUILD_ROOT 2>/dev/null || true
+        for SYSROOT in $SYSROOTS; do
+            local SYSROOT_PATH=${SYSROOT%%:*}
+            umount -n $BUILD_ROOT/$SYSROOT_PATH/proc/sys/fs/binfmt_misc 2> /dev/null || true
+            umount -n $BUILD_ROOT/$SYSROOT_PATH/proc 2>/dev/null || true
+            umount -n $BUILD_ROOT/$SYSROOT_PATH/dev/pts 2>/dev/null || true
+        done
     fi
 #    echo "pid $$ exit $1"
     exit $1
