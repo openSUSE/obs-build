@@ -2263,7 +2263,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	fi
 
 	mkdir -p $BUILD_ROOT/$TOPDIR/DEBS
-	for DEB in $BUILD_ROOT/$TOPDIR/*.deb ; do
+	for DEB in $BUILD_ROOT/$TOPDIR/BUILD/*.{deb,changes} ; do
 	    test -e "$DEB" && mv "$DEB" "$BUILD_ROOT/$TOPDIR/DEBS"
 	done
 	# link sources over
