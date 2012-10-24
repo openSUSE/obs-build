@@ -187,10 +187,21 @@ EOF
 		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
 echo "compressing vmx images... "
 cd /$TOPDIR/KIWI-vmx
+for suffix in "ovf" "qcow2"; do
+  if [ -e "$imageout.\$suffix" ]; then
+	mv "$imageout.\$suffix" "/$TOPDIR/KIWI/$imageout$buildnum.\$suffix"
+	pushd /$TOPDIR/KIWI
+	if [ -x /usr/bin/sha256sum ]; then
+	    echo "Create sha256 \$suffix file..."
+	    /usr/bin/sha256sum "$imageout$buildnum.\$suffix" > "$imageout$buildnum.\$suffix.sha256"
+        fi
+	popd
+  fi
+done
 # This option has a number of format parameters
 VMXFILES=""
 SHAFILES=""
-for i in "$imageout.vmx" "$imageout.vmdk" "$imageout-disk*.vmdk" "$imageout.ovf" "$imageout.qcow2"; do
+for i in "$imageout.vmx" "$imageout.vmdk" "$imageout-disk*.vmdk"; do
 	test -e \$i && VMXFILES="\$VMXFILES \$i"
 done
 # take raw files as fallback
