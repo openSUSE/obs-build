@@ -26,7 +26,7 @@ sub unquotesplit {
   $str =~ s/^[ \t]+//;
   while ($str =~ /([\"\'])/) {
     my $q = $1;
-    $str =~ s/$q(.*?)$q/quote($1, $q, $vars)/e;
+    last unless $str =~ s/$q(.*?)$q/quote($1, $q, $vars)/e;
   }
   if ($str =~ /\$/) {
     $str =~ s/\$([a-zA-Z0-9_]+|\{([^\}]+)\})/$vars->{$2 || $1} ? join(' ', @{$vars->{$2 || $1}}) : "\$$1"/ge;
