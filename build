@@ -1878,6 +1878,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    .preinstallimage*) continue ;;
 	    .srcfiles*) continue ;;
 	    .pkgs) continue ;;
+	    .rpm-cache) continue ;;
 	    installed-pkg) continue ;;
 	    proc|sys) continue ;;
 	  esac
