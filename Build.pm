@@ -202,6 +202,7 @@ sub read_config {
   $config->{'repotype'} = [];
   $config->{'patterntype'} = [];
   $config->{'fileprovides'} = {};
+  $config->{'constraint'} = [];
   for my $l (@spec) {
     $l = $l->[1] if ref $l;
     next unless defined $l;
@@ -288,6 +289,13 @@ sub read_config {
       push @macros, "%define _target_cpu ".(split('-', $config->{'target'}))[0] if $config->{'target'};
     } elsif ($l0 eq 'hostarch:') {
       $config->{'hostarch'} = join(' ', @l);
+    } elsif ($l0 eq 'constraint:') {
+      my $l = join(' ', @l);
+      if ($l eq '!*') {
+	$config->{'constraint'} = [];
+      } else {
+	push @{$config->{'constraint'}}, $l;
+      }
     } elsif ($l0 !~ /^[#%]/) {
       warn("unknown keyword in config: $l0\n");
     }
