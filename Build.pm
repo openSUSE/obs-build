@@ -390,15 +390,22 @@ sub do_subst_vers {
 sub get_build {
   my ($config, $subpacks, @deps) = @_;
   my @ndeps = grep {/^-/} @deps;
-  my %keep = map {$_ => 1} (@deps, @{$config->{'keep'} || []}, @{$config->{'preinstall'}});
-  for (@{$subpacks || []}) {
-    push @ndeps, "-$_" unless $keep{$_};
+  my @support = @{$config->{'support'}};
+  if (@{$config->{'keep'} || []}) {
+    my %keep = map {$_ => 1} (@deps, @{$config->{'keep'} || []}, @{$config->{'preinstall'}});
+    for (@{$subpacks || []}) {
+      push @ndeps, "-$_" unless $keep{$_};
+    }
+  } else {
+    # new "empty keep" mode, filter subpacks from support
+    my %subpacks = map {$_ => 1} @{$subpacks || []};
+    @support = grep {!$subpacks{$_}} @support;
   }
   my %ndeps = map {$_ => 1} @ndeps;
   @deps = grep {!$ndeps{$_}} @deps;
   push @deps, @{$config->{'preinstall'}};
   push @deps, @{$config->{'required'}};
-  push @deps, @{$config->{'support'}};
+  push @deps, @support;
   @deps = grep {!$ndeps{"-$_"}} @deps;
   @deps = do_subst($config, @deps);
   @deps = grep {!$ndeps{"-$_"}} @deps;
@@ -411,6 +418,7 @@ sub get_deps {
   my ($config, $subpacks, @deps) = @_;
   my @ndeps = grep {/^-/} @deps;
   my %keep = map {$_ => 1} (@deps, @{$config->{'keep'} || []}, @{$config->{'preinstall'}});
+  %keep = () unless @{$config->{'keep'} || []};
   for (@{$subpacks || []}) {
     push @ndeps, "-$_" unless $keep{$_};
   }
