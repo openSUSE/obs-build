@@ -1,5 +1,7 @@
 package Build::Rpm;
 
+our $unfilteredprereqs = 0;
+
 use strict;
 
 use Digest::MD5;
@@ -441,7 +443,7 @@ reexpand:
       my @deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
       while (@deps) {
 	my ($pack, $vers, $qual) = splice(@deps, 0, 3);
-	if ($pack =~ /^\//) {
+	if (!$unfilteredprereqs && $pack =~ /^\//) {
 	  $ifdeps = 1;
 	  next unless $config->{'fileprovides'}->{$_};
 	}
