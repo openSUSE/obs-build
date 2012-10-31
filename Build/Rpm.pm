@@ -441,7 +441,6 @@ reexpand:
       my @deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
       while (@deps) {
 	my ($pack, $vers, $qual) = splice(@deps, 0, 3);
-	next if $pack =~ /\//;
 	push @prereqs, $pack unless grep {$_ eq $pack} @prereqs;
       }
       next;
