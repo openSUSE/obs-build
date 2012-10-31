@@ -390,22 +390,21 @@ sub do_subst_vers {
 sub get_build {
   my ($config, $subpacks, @deps) = @_;
   my @ndeps = grep {/^-/} @deps;
-  my @support = @{$config->{'support'}};
+  my @extra = (@{$config->{'required'}}, @{$config->{'support'}});
   if (@{$config->{'keep'} || []}) {
     my %keep = map {$_ => 1} (@deps, @{$config->{'keep'} || []}, @{$config->{'preinstall'}});
     for (@{$subpacks || []}) {
       push @ndeps, "-$_" unless $keep{$_};
     }
   } else {
-    # new "empty keep" mode, filter subpacks from support
+    # new "empty keep" mode, filter subpacks from required/support
     my %subpacks = map {$_ => 1} @{$subpacks || []};
-    @support = grep {!$subpacks{$_}} @support;
+    @extra = grep {!$subpacks{$_}} @extra;
   }
   my %ndeps = map {$_ => 1} @ndeps;
   @deps = grep {!$ndeps{$_}} @deps;
   push @deps, @{$config->{'preinstall'}};
-  push @deps, @{$config->{'required'}};
-  push @deps, @support;
+  push @deps, @extra;
   @deps = grep {!$ndeps{"-$_"}} @deps;
   @deps = do_subst($config, @deps);
   @deps = grep {!$ndeps{"-$_"}} @deps;
@@ -417,14 +416,20 @@ sub get_build {
 sub get_deps {
   my ($config, $subpacks, @deps) = @_;
   my @ndeps = grep {/^-/} @deps;
-  my %keep = map {$_ => 1} (@deps, @{$config->{'keep'} || []}, @{$config->{'preinstall'}});
-  %keep = () unless @{$config->{'keep'} || []};
-  for (@{$subpacks || []}) {
-    push @ndeps, "-$_" unless $keep{$_};
+  my @extra = @{$config->{'required'}};
+  if (@{$config->{'keep'} || []}) {
+    my %keep = map {$_ => 1} (@deps, @{$config->{'keep'} || []}, @{$config->{'preinstall'}});
+    for (@{$subpacks || []}) {
+      push @ndeps, "-$_" unless $keep{$_};
+    }
+  } else {
+    # new "empty keep" mode, filter subpacks from required
+    my %subpacks = map {$_ => 1} @{$subpacks || []};
+    @extra = grep {!$subpacks{$_}} @extra;
   }
   my %ndeps = map {$_ => 1} @ndeps;
   @deps = grep {!$ndeps{$_}} @deps;
-  push @deps, @{$config->{'required'}};
+  push @deps, @extra;
   @deps = grep {!$ndeps{"-$_"}} @deps;
   @deps = do_subst($config, @deps);
   @deps = grep {!$ndeps{"-$_"}} @deps;
