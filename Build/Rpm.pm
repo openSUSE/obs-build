@@ -445,7 +445,7 @@ reexpand:
 	my ($pack, $vers, $qual) = splice(@deps, 0, 3);
 	if (!$unfilteredprereqs && $pack =~ /^\//) {
 	  $ifdeps = 1;
-	  next unless $config->{'fileprovides'}->{$_};
+	  next unless $config->{'fileprovides'}->{$pack};
 	}
 	push @prereqs, $pack unless grep {$_ eq $pack} @prereqs;
       }
