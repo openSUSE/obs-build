@@ -30,7 +30,13 @@ for my $url (@ARGV) {
     my $u = $repo->{'baseurl'};
     $u .= '/' unless substr($u, -1, 1) eq '/';
     $url =~ s/^zypp:\/\/[^\/]*\/*//;
-    $url = URI->new($u.$url)
+    $url = URI->new($u.$url);
+    if ($url->scheme eq 'dir') {
+      my $dest = "$dir/".basename($url->path);
+      unlink($dest);	# just in case
+      system('cp', $url->path, $dest) && die("cp $url->path $dest failed\n");
+      last;
+    }
   } else {
     $url = URI->new($url);
   }
@@ -42,7 +48,7 @@ for my $url (@ARGV) {
     my $res = $ua->mirror($url, $dest);
     last if $res->is_success;
     # if it's a redirect we probably got a bad mirror and should just retry
-    die "reqesting $url failed: ".$res->status_line."\n" unless $retry && $res->previous;
+    die "requesting $url failed: ".$res->status_line."\n" unless $retry && $res->previous;
     warn "retrying $url\n";
   }
 }
