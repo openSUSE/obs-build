@@ -204,6 +204,24 @@ sub read_config {
   $config->{'fileprovides'} = {};
   $config->{'constraint'} = [];
   $config->{'expandflags'} = [];
+  $config->{'targetsysroot'} = '';
+  $config->{'nopreinstall'} = [];
+  # remember removed packages for crossbuild
+  $config->{'novminstall'} = [];
+  $config->{'nocbpreinstall'} = [];
+  $config->{'nocbinstall'} = [];
+  $config->{'norunscripts'} = [];
+  $config->{'norequired'} = [];
+  $config->{'nosupport'} = [];
+  $config->{'nokeep'} = [];
+  $config->{'noprefer'} = [];
+  $config->{'noignore'} = [];
+  $config->{'noconflict'} = [];
+  # array with package that will get cross substituted
+  $config->{'crosssubst'} = [];
+  $config->{'nocrossbuild'} = [];
+
+
   for my $l (@spec) {
     $l = $l->[1] if ref $l;
     next unless defined $l;
@@ -220,13 +238,14 @@ sub read_config {
       }
       next;
     }
-    if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'cbpreinstall:' || $l0 eq 'cbinstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:' || $l0 eq 'expandflags') {
+    if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'cbpreinstall:' || $l0 eq 'cbinstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:' || $l0 eq 'expandflags' || $l0 eq 'nocrossbuild:') {
       my $t = substr($l0, 0, -1);
       for my $l (@l) {
 	if ($l eq '!*') {
 	  $config->{$t} = [];
 	} elsif ($l =~ /^!/) {
 	  $config->{$t} = [ grep {"!$_" ne $l} @{$config->{$t}} ];
+	  push @{$config->{'no'.$t}}, $l; #remember removed package
 	} else {
 	  push @{$config->{$t}}, $l;
 	}
@@ -240,6 +259,10 @@ sub read_config {
 	delete $config->{'substitute'}->{$1};
       } else {
 	$config->{'substitute'}->{$ll} = [ @l ];
+	if (grep { /^.*\[.*\].*$/ } @l)
+	{
+	  push @{$config->{'crosssubst'}}, $ll;
+	}
       }
     } elsif ($l0 eq 'fileprovides:') {
       next unless @l;
@@ -297,11 +320,13 @@ sub read_config {
       } else {
 	push @{$config->{'constraint'}}, $l;
       }
+    } elsif ($l0 eq 'targetsysroot:') {
+      $config->{'targetsysroot'} = $l[0];
     } elsif ($l0 !~ /^[#%]/) {
       warn("unknown keyword in config: $l0\n");
     }
   }
-  for my $l (qw{preinstall vminstall cbpreinstall cbinstall required support keep runscripts repotype patterntype}) {
+  for my $l (qw{preinstall vminstall cbpreinstall cbinstall required support keep runscripts repotype patterntype nocrossbuild}) {
     $config->{$l} = [ unify(@{$config->{$l}}) ];
   }
   for my $l (keys %{$config->{'substitute'}}) {
@@ -376,16 +401,37 @@ sub do_subst {
 }
 
 sub do_subst_vers {
-  my ($config, @deps) = @_;
+  my ($config, $is_buildrequires, @deps) = @_;
   my @res;
   my %done;
   my $subst = $config->{'substitute_vers'};
   while (@deps) {
     my ($d, $dv) = splice(@deps, 0, 2);
     next if $done{$d};
+    # Ignore subsituation for cross-subscriptions for Require: lines (subst_crossdeps == 0)
+    # Example:
+    # Subsitute: gcc cross-gcc-arm[host]
+    #
+    # Original Spec file line:
+    # Requires: gcc = 4.5.0
+    #
+    # Expected Spec file line:
+    # Requires: gcc = 4.5.0
+    #
+    # Not expected Spec file line:
+    # Requires: cross-gcc-arm[host]
+    #
+    my $is_cross_subst = 0;
     if ($subst->{$d}) {
+      $is_cross_subst = 1 if grep {defined($_) && $_ =~ /\[/} @{$subst->{$d}};
+    }
+
+    if ($subst->{$d} && ( not $is_cross_subst || $is_buildrequires ) ) {
       unshift @deps, map {defined($_) && $_ eq '=' ? $dv : $_} @{$subst->{$d}};
       push @res, $d, $dv if grep {defined($_) && $_ eq $d} @{$subst->{$d}};
+    } elsif ($is_cross_subst) {
+      # crossbuild substitutions will not be pushed to results list
+      # they must not be ending up as requirements in the spec file
     } else {
       push @res, $d, $dv;
     }
@@ -416,13 +462,40 @@ sub get_build {
   @deps = grep {!$ndeps{"-$_"}} @deps;
   @deps = do_subst($config, @deps);
   @deps = grep {!$ndeps{"-$_"}} @deps;
+  # cross dependencies have to be dropped before dependency expand.
+  @deps = drop_crossdeps(@deps);
   @deps = expand($config, @deps, @ndeps);
   return @deps;
 }
 
+# Extract cross dependencies
+# returns a hash with the sysroot-label as key and the package-name/-id as value
+sub extract_crossdeps {
+  my (@deps) = @_;
+  my %crossdeps;
+  for my $p (splice @deps) {
+    if (($p =~ /^(.*)\[(.*)\]$/)) {
+           my $name = $1;
+           my $deptree = $2;
+           push @{$crossdeps{$deptree} }, $name;
+    }
+  }
+  return %crossdeps;
+}
+
+# Drop cross dependencies
+# cross dependencies match somthing like this: package(whatever)
+sub drop_crossdeps {
+  my (@deps) = @_;
+  @deps = grep {!/^.*\[.*\]$/} @deps;
+  return @deps;
+}
+
+
 # Delivers all packages which shall have an influence to other package builds (get_build reduced by support packages)
-sub get_deps {
-  my ($config, $subpacks, @deps) = @_;
+sub prepare_deps {
+  my ($withcrossdeps, $config, $subpacks, @deps) = @_;
+  my %crossdeps;
   my @ndeps = grep {/^-/} @deps;
   my @extra = @{$config->{'required'}};
   if (@{$config->{'keep'} || []}) {
@@ -440,21 +513,75 @@ sub get_deps {
   push @deps, @extra;
   @deps = grep {!$ndeps{"-$_"}} @deps;
   @deps = do_subst($config, @deps);
+
+  # cross deps handling
+  if ($withcrossdeps) {
+    %crossdeps = extract_crossdeps(@deps);
+    # cross dependencies have to be dropped before expand
+    @deps = drop_crossdeps(@deps);
+  }
+
   @deps = grep {!$ndeps{"-$_"}} @deps;
   my %bdeps = map {$_ => 1} (@{$config->{'preinstall'}}, @{$config->{'support'}});
   delete $bdeps{$_} for @deps;
-  @deps = expand($config, @deps, @ndeps);
-  if (@deps && $deps[0]) {
-    my $r = shift @deps;
+  my $eok;
+  ($eok, @deps) = expand($config, @deps, @ndeps);
+  if (@deps && $eok) {
     @deps = grep {!$bdeps{$_}} @deps;
-    unshift @deps, $r;
   }
-  return @deps;
+  return ($eok, \@deps, \%crossdeps);
+}
+
+sub get_deps {
+  my ($config, $subpacks, @deps) = @_;
+  my ($eok, $deps, $crossdeps) = prepare_deps(0, $config, $subpacks, @deps);
+  return ($eok, @{$deps});
+}
+
+sub get_crossdeps {
+  my ($config, $subpacks, @deps) = @_;
+  my ($eok, $deps, $crossdeps) = prepare_deps(1, $config, $subpacks, @deps);
+  return ($eok, $crossdeps, @{$deps});
 }
 
 sub get_preinstalls {
   my ($config) = @_;
   return @{$config->{'preinstall'}};
+}
+
+sub get_supports {
+  my ($config) = @_;
+  return @{$config->{'support'}};
+}
+
+sub get_nocrossbuild {
+  my ($config) = @_;
+  return @{$config->{'nocrossbuild'}};
+}
+
+sub get_nosupports {
+  my ($config, $sysrootlabel) = @_;
+  my @nosupports = [];
+
+  if ($sysrootlabel) {
+    my %nosupports = extract_crossdeps(@{$config->{'nosupport'}});
+    if (defined $nosupports{$sysrootlabel}) {
+      @nosupports = @{$nosupports{$sysrootlabel}};
+    }
+  } else {
+    @nosupports = @{$config->{'nosupports'}};
+  }
+  return @nosupports;
+}
+
+sub get_required {
+  my ($config) = @_;
+  return @{$config->{'required'}};
+}
+
+sub get_crosssubst {
+  my ($config) = @_;
+  return $config->{'crosssubst'};
 }
 
 sub get_vminstalls {
