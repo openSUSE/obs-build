@@ -1148,7 +1148,9 @@ while test -n "$1"; do
 	USEUSEDFORBUILD="--useusedforbuild"
       ;;
       *-configdir)
+        needarg
 	CONFIG_DIR="$ARG"
+        shift
       ;;
       *-list*state)
 	LIST_STATE=true
