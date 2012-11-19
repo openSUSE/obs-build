@@ -625,7 +625,7 @@ background_monitor_process()
 
       if [ ${memtotal} -gt $max_mem ]; then
         max_mem="${memtotal}"
-        echo $(( $max_mem / 1024 )) > /.build/_statistics.memory
+        echo -n $(( $max_mem / 1024 )) > /.build/_statistics.memory
       fi
     fi
 
@@ -635,7 +635,7 @@ background_monitor_process()
 
       if [ ${c[2]} -gt $max ]; then
         max="${c[2]}"
-        echo $max > /.build/_statistics.df
+        echo -n $max > /.build/_statistics.df
       fi
     fi
   done
