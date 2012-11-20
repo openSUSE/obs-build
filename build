@@ -77,6 +77,9 @@ HUGETLBFSPATH=
 MEMSIZE=
 RUNNING_IN_VM=
 RPMLIST=
+CROSSBUILD=
+SYSROOTS=
+SYSROOT_TARGET=
 RELEASE=
 REASON=
 NOROOTFORBUILD=
@@ -352,6 +355,12 @@ cleanup_and_exit () {
 	umount -n $BUILD_ROOT/dev/pts 2>/dev/null || true
 	test "$VM_IMAGE" = 1 && VM_IMAGE=
 	[ -n "$VM_IMAGE" ] && umount $BUILD_ROOT 2>/dev/null || true
+        for SYSROOT in $SYSROOTS; do
+            local SYSROOT_PATH=${SYSROOT%%:*}
+            umount -n $BUILD_ROOT/$SYSROOT_PATH/proc/sys/fs/binfmt_misc 2> /dev/null || true
+            umount -n $BUILD_ROOT/$SYSROOT_PATH/proc 2>/dev/null || true
+            umount -n $BUILD_ROOT/$SYSROOT_PATH/dev/pts 2>/dev/null || true
+        done
     fi
 #    echo "pid $$ exit $1"
     exit $1
@@ -775,6 +784,46 @@ mkdir_build_root()
     fi
 }
 
+setup_sys_root()
+{
+	for SYSROOT in $SYSROOTS; do
+		local SYSROOT_PATH=${SYSROOT%%:*}
+		local SYSROOT_RPMS=${SYSROOT##*:}
+
+		test -n "$SYSROOT_PATH" || continue
+		test -n "$SYSROOT_RPMS" || continue
+
+		mkdir -p $BUILD_ROOT/$SYSROOT_PATH || fail_exit
+
+		if [[ "x$1" == "xprepare" ]]; then
+			HOST_BUILD_ROOT=$BUILD_ROOT BUILD_ROOT=$BUILD_ROOT/$SYSROOT_PATH CROSSBUILD=1 init_buildsystem --cachedir "$CACHE_DIR" --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD --rpmlist $SYSROOT_RPMS "$MYSRCDIR/$SPECFILE"
+			ERR=$?
+		else
+			HOST_BUILD_ROOT=$BUILD_ROOT BUILD_ROOT=$BUILD_ROOT/$SYSROOT_PATH CROSSBUILD=1 init_buildsystem --rpmlist $SYSROOT_RPMS "$MYSRCDIR/$SPECFILE"
+			ERR=$?
+		fi
+
+		[[ $ERR -eq 0 ]] || cleanup_and_exit 1
+
+		# fix orphaned absolute path symlinks in sysroot environment
+		for LINK in $(find $BUILD_ROOT/$SYSROOT_PATH -type l); do
+			local TARGET=$(readlink $LINK)
+			if [[ $TARGET == /* ]]; then
+				# only fix links on normal files and directories
+				[[ -f /$SYSROOT_PATH$TARGET || -d /$SYSROOT_PATH$TARGET ]] || continue
+				ln -fs /$SYSROOT_PATH$TARGET $LINK || fail_exit 1
+			fi
+		done
+	done
+}
+
+cross_build()
+{
+	cp -p $BUILD_ROOT$TOPDIR/SOURCES/* $BUILD_ROOT/$SYSROOT_TARGET/$TOPDIR/SOURCES/ || fail_exit
+
+	#build command goes here
+}
+
 linux64()
 {
 	perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' "$@"
@@ -897,7 +946,7 @@ while test -n "$1"; do
       *-verify)
 	export VERIFY_BUILD_SYSTEM=true
       ;;
-      *-target)
+      --target)
 	needarg
 	ABUILD_TARGET="$ARG"
 	shift
@@ -1031,6 +1080,16 @@ while test -n "$1"; do
         HUGETLBFSPATH="$ARG"
 	shift
       ;;
+      --sysroot)
+	needarg
+	SYSROOTS="$SYSROOTS $ARG"
+	shift
+      ;;
+      --sysroot-target)
+	needarg
+        SYSROOT_TARGET="$ARG"
+	shift
+      ;;
       *-release)
 	needarg
 	RELEASE="$ARG"
@@ -1151,6 +1210,8 @@ while test -n "$1"; do
       ;;
     esac
 done
+
+test -n "$CROSSBUILD" && export ABUILD_INIT_WITH_IGNORE_ARCH=true # required for 00-check-install-rpms
 
 check_for_ppc
 
@@ -1461,6 +1522,7 @@ if [ -z "$RUNNING_IN_VM" ]; then
     test -n "$BUILD_RPMS" && echo Using BUILD_RPMS=$BUILD_RPMS
     echo Using BUILD_ARCH=$BUILD_ARCH
     test -n "$VM_TYPE" && echo "Doing $VM_TYPE build${VM_IMAGE:+ in $VM_IMAGE}"
+    test -n "$CROSSBUILD" && echo "Doing crossbuild on $BUILD_ARCH for $ABUILD_TARGET"
     echo
 fi
 
@@ -1908,6 +1970,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	read BUILD_DIST < $BUILD_ROOT/.guessed_dist
     fi
 
+    # setup sys-root environment for cross compiling builds
+    setup_sys_root
+
     #
     # fix rpmrc if we are compiling for i686
     #
@@ -2225,7 +2290,14 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    rpmbopts[${#rpmbopts[@]}]='--define'
 	    rpmbopts[${#rpmbopts[@]}]="RSYNCDONE 1"
 	fi
+	if [ -n "$CROSSBUILD" ] ; then
+		rpmbopts[${#rpmbopts[@]}]='--dbpath'
+		rpmbopts[${#rpmbopts[@]}]="/$SYSROOT_TARGET/var/lib/rpm"
+	fi
 
+	rpmbuild=rpmbuild
+
+	test -x $BUILD_ROOT/usr/bin/rpmbuild || rpmbuild=rpm
 	# su involves a shell which would require even more
 	# complicated quoting to bypass than this
 	toshellscript $rpmbuild \
@@ -2240,6 +2312,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	else
 	    chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
 	fi
+
+	# create cross compile target RPMs
+	cross_build
     fi
 
     if test "$BUILDTYPE" = dsc ; then

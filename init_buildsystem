@@ -27,11 +27,16 @@ repos=()
 # should RPMs be installed with --force ?
 USE_FORCE=false
 
-BUILD_IS_RUNNING=$BUILD_ROOT/not-ready
-TMPFILE=$BUILD_ROOT/tmpfile
 #buildhost removed so that id can be generated from repo files
 #RPMIDFMT="%{NAME}-%{VERSION}-%{RELEASE} %{BUILDHOST}-%{BUILDTIME}\n"
 RPMIDFMT="%{NAME}-%{VERSION}-%{RELEASE} %{BUILDTIME}\n"
+
+CALLRPM="chroot $BUILD_ROOT rpm";
+if [ -n "$CROSSBUILD" ]; then
+       CALLRPM="chroot $HOST_BUILD_ROOT rpm --root ${BUILD_ROOT:${#HOST_BUILD_ROOT}}";
+       echo -n "[TCC] rpm version: "
+       $CALLRPM --version;
+fi;
 
 PREPARE_VM=
 USE_SYSTEM_QEMU=
@@ -95,6 +100,9 @@ while test -n "$1" ; do
     esac
 done
 PKGS=("$@")
+
+BUILD_IS_RUNNING=$BUILD_ROOT/not-ready
+TMPFILE=$BUILD_ROOT/tmpfile
 
 #
 # needed functions
@@ -214,8 +222,8 @@ preinstall()
 	    rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" | $PAYLOADDECOMPRESS | $CPIO
 	fi
 	if test -e ".init_b_cache/scripts/$1.run" ; then
-	    rpm -qp --nodigest --nosignature --qf "%{PREIN}" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" > ".init_b_cache/scripts/$1.pre"
-	    rpm -qp --nodigest --nosignature --qf "%{POSTIN}" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" > ".init_b_cache/scripts/$1.post"
+	    rpm --root $BUILD_ROOT -qp --nodigest --nosignature --qf "%{PREIN}" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" > ".init_b_cache/scripts/$1.pre"
+	    rpm --root $BUILD_ROOT -qp --nodigest --nosignature --qf "%{POSTIN}" "$BUILD_ROOT/.init_b_cache/rpms/$1.rpm" > ".init_b_cache/scripts/$1.post"
 	    echo -n '(none)' > .init_b_cache/scripts/.none
 	    cmp -s ".init_b_cache/scripts/$1.pre" .init_b_cache/scripts/.none && rm -f ".init_b_cache/scripts/$1.pre"
 	    cmp -s ".init_b_cache/scripts/$1.post" .init_b_cache/scripts/.none && rm -f ".init_b_cache/scripts/$1.post"
@@ -275,7 +283,7 @@ init_db()
 	echo initializing rpm db...
         if ! test -e $BUILD_ROOT/usr/lib/rpm/cpuinfo.yaml; then
             # rpm v5 does not have initdb
- 	    chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
+ 	    rpm --root $BUILD_ROOT --initdb || cleanup_and_exit 1
         fi
 	# hack: add nofsync to db config to speed up install
 	mkdir -p $BUILD_ROOT/root
@@ -987,7 +995,7 @@ fi
 #
 mkdir -p $BUILD_ROOT/.init_b_cache/alreadyinstalled
 if test -f $BUILD_ROOT/var/lib/rpm/packages.rpm -o -f $BUILD_ROOT/var/lib/rpm/Packages ; then
-    chroot $BUILD_ROOT rpm -qa --qf "%{NAME} $RPMIDFMT" | (
+    rpm --root $BUILD_ROOT -qa --qf "%{NAME} $RPMIDFMT" | (
 	while read pp ii; do
 	    echo "$ii" > "$BUILD_ROOT/.init_b_cache/alreadyinstalled/$pp"
 	done
@@ -1006,7 +1014,7 @@ fi
 
 rpm_e()
 {
-    chroot $BUILD_ROOT rpm --nodeps -e $PKG 2>&1 | \
+    rpm --root $BUILD_ROOT --nodeps -e $PKG 2>&1 | \
     while read line; do
 	case "$line" in
 
@@ -1015,7 +1023,7 @@ rpm_e()
 	    error:\ *scriptlet\ failed*)
 		echo "$line"
 	        echo "re-try deleting $PKG using --noscripts"
-		chroot $BUILD_ROOT rpm --nodeps --noscripts -e $PKG || true
+		rpm --root $BUILD_ROOT --nodeps --noscripts -e $PKG || true
 	    ;;
 	    *) echo "$line" ;;
 	esac
@@ -1204,7 +1212,7 @@ for PKG in $MAIN_LIST; do
 	    echo deleting unwanted ${OLDPKGID%% *}
 	    rpm_e "$PKG"
 	elif test "$VERIFY_BUILD_SYSTEM" = true ; then
-	    chroot $BUILD_ROOT rpm --verify $PKG 2>&1 | tee $TMPFILE
+	    rpm --root $BUILD_ROOT --verify $PKG 2>&1 | tee $TMPFILE
 	    if grep ^missing $TMPFILE > /dev/null ; then
 		echo deleting incomplete ${PKGID%% *}
 		rpm_e "$PKG"
@@ -1223,9 +1231,9 @@ for PKG in $MAIN_LIST; do
 	if test -e "$BUILD_ROOT/.init_b_cache/preinstalls/$PKG" ; then
 	    preinstall "$PKG"
 	    # call for rpm-4.x and not rpm-devel
-	    test -z "${PKG##rpm-[0-9]*}" && chroot $BUILD_ROOT rpm --rebuilddb
+	    test -z "${PKG##rpm-[0-9]*}" && rpm --root $BUILD_ROOT --rebuilddb
 	    # also exec for exchanged rpm !  naming is rpm-x86-<target>-<ver>
-	    test -z "${PKG##rpm-x86-*[0-9]*}" && chroot $BUILD_ROOT rpm --rebuilddb
+	    test -z "${PKG##rpm-x86-*[0-9]*}" && rpm --root $BUILD_ROOT --rebuilddb
 	fi
     fi
     export ADDITIONAL_PARAMS=
@@ -1251,10 +1259,20 @@ for PKG in $MAIN_LIST; do
 	rm -f $BUILD_ROOT/.init_b_cache/$PKG.rpm
 	cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm $BUILD_ROOT/.init_b_cache/$PKG.rpm || cleanup_and_exit 1
     fi
-    ( chroot $BUILD_ROOT rpm --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
-		$ADDITIONAL_PARAMS .init_b_cache/$PKG.rpm 2>&1 || \
-	  touch $BUILD_ROOT/exit ) | \
-	      grep -v "^warning:.*saved as.*rpmorig$"
+    if [ -n "$CROSSBUILD" ]; then
+       # XXX: Crossbuild difference is here to do not call any scripts - at least yet.
+       #      Later with tested mix of QEMU and crossbuild we might drop this conditional
+       #      and install without --noscripts
+       ( $CALLRPM --noscripts --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
+                   $ADDITIONAL_PARAMS ${BUILD_ROOT:${#HOST_BUILD_ROOT}}/.init_b_cache/$PKG.rpm 2>&1 || \
+             touch $BUILD_ROOT/exit ) | \
+                 grep -v "^warning:.*saved as.*rpmorig$"
+    else
+       ( rpm --root $BUILD_ROOT --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
+		   $ADDITIONAL_PARAMS $BUILD_ROOT/.init_b_cache/$PKG.rpm 2>&1 || \
+	     touch $BUILD_ROOT/exit ) | \
+	         grep -v "^warning:.*saved as.*rpmorig$"
+    fi
     # delete link so package is only installed once
     rm -f $BUILD_ROOT/.init_b_cache/$PKG.rpm
     check_exit
@@ -1359,48 +1377,46 @@ for FILE in /var/run/utmp /var/log/wtmp /etc/fstab ; do
     touch $BUILD_ROOT/$FILE
 done
 
-echo now finalizing build dir...
-if test -x $BUILD_ROOT/sbin/ldconfig ; then
-	CHROOT_RETURN="`chroot $BUILD_ROOT /sbin/ldconfig 2>&1`"
-	case "$CHROOT_RETURN" in
-	    *warning:*)
-	      chroot $BUILD_ROOT /sbin/ldconfig
-	      echo
-	      echo chroot $BUILD_ROOT /sbin/ldconfig
-	      echo
-	      echo "$CHROOT_RETURN"
-	      echo
-	      echo "Problem with ldconfig.  It's better to reinit the build system..."
-	      echo
-	      cleanup_and_exit 1
-	    ;;
-	esac
-fi
-test -x $BUILD_ROOT/usr/sbin/Check && chroot $BUILD_ROOT /usr/sbin/Check
+if [ -z "$CROSSBUILD" ]; then
+   echo now finalizing build dir...
+   CHROOT_RETURN="`chroot $BUILD_ROOT /sbin/ldconfig 2>&1`"
+   case "$CHROOT_RETURN" in
+       *warning:*)
+         chroot $BUILD_ROOT /sbin/ldconfig
+         echo
+         echo chroot $BUILD_ROOT /sbin/ldconfig
+         echo
+         echo "$CHROOT_RETURN"
+         echo
+         echo "Problem with ldconfig.  It's better to reinit the build system..."
+         echo
+         cleanup_and_exit 1
+       ;;
+   esac
+   test -x $BUILD_ROOT/usr/sbin/Check && chroot $BUILD_ROOT /usr/sbin/Check
 
-mkdir -p $BUILD_ROOT/var/adm/packages
-touch $BUILD_ROOT/var/adm/packages
-if test -x $BUILD_ROOT/sbin/SuSEconfig ; then
-    if grep norestarts $BUILD_ROOT/sbin/SuSEconfig > /dev/null ; then
-	chroot $BUILD_ROOT /sbin/SuSEconfig --norestarts --force
-    else
-	chroot $BUILD_ROOT /sbin/SuSEconfig --force
-    fi
-fi
+   mkdir -p $BUILD_ROOT/var/adm/packages
+   touch $BUILD_ROOT/var/adm/packages
+   if test -x $BUILD_ROOT/sbin/SuSEconfig ; then
+       if grep norestarts $BUILD_ROOT/sbin/SuSEconfig > /dev/null ; then
+	   chroot $BUILD_ROOT /sbin/SuSEconfig --norestarts --force
+       else
+	   chroot $BUILD_ROOT /sbin/SuSEconfig --force
+       fi
+   fi
 
-if test -x $BUILD_ROOT/usr/X11R6/bin/switch2mesasoft ; then
-    chroot $BUILD_ROOT /usr/X11R6/bin/switch2mesasoft
-fi
+   if test -x $BUILD_ROOT/usr/X11R6/bin/switch2mesasoft ; then
+       chroot $BUILD_ROOT /usr/X11R6/bin/switch2mesasoft
+   fi
 
-for PROG in /usr/bin/TeX/texhash /usr/bin/texhash ; do
-    test -x $BUILD_ROOT/$PROG && \
-	chroot $BUILD_ROOT bash -c ". /etc/profile ; $PROG"
-done
+   for PROG in /usr/bin/TeX/texhash /usr/bin/texhash ; do
+       test -x $BUILD_ROOT/$PROG && \
+	   chroot $BUILD_ROOT bash -c ". /etc/profile ; $PROG"
+   done
 
-if test -e $BUILD_ROOT/usr/share/zoneinfo/UTC ; then
-    for PROG in /usr/sbin/zic /usr/bin/zic /bin/zic /sbin/zic ; do
-        test -x $BUILD_ROOT/$PROG  && chroot $BUILD_ROOT $PROG -l UTC
-    done
+   if test -e $BUILD_ROOT/usr/share/zoneinfo/UTC ; then
+       chroot $BUILD_ROOT zic -l UTC
+   fi
 fi
 
 test -e $BUILD_ROOT/.build/init_buildsystem.data || HOST=`hostname`
@@ -1415,9 +1431,9 @@ fi
 
 if test -x $BUILD_ROOT/bin/rpm -a ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rpm/Packages ; then
     echo "initializing rpm db..."
-    chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
+    rpm --root $BUILD_ROOT --initdb || cleanup_and_exit 1
     # create provides index
-    chroot $BUILD_ROOT rpm -q --whatprovides rpm >/dev/null 2>&1
+    rpm --root $BUILD_ROOT -q --whatprovides rpm >/dev/null 2>&1
 fi
 
 # create modules.dep in kvm/xen

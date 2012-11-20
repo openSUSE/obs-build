@@ -386,6 +386,9 @@ sub do_subst_vers {
     if ($subst->{$d}) {
       unshift @deps, map {defined($_) && $_ eq '=' ? $dv : $_} @{$subst->{$d}};
       push @res, $d, $dv if grep {defined($_) && $_ eq $d} @{$subst->{$d}};
+    } elsif ($is_cross_subst) {
+      # crossbuild substitutions will not be pushed to results list
+      # they must not be ending up as requirements in the spec file
     } else {
       push @res, $d, $dv;
     }
