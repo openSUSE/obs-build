@@ -228,11 +228,12 @@ for my $line (@$xspec) {
   my @deps = $r =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?[\s,]*/g;
   my @ndeps = ();
   my $replace = 0;
-  my @f2 = Build::do_subst_vers($cf, @deps);
+  my @f2 = Build::do_subst_vers($cf, $isbuildrequires, @deps);
   my %f2 = @f2;
   if ($isbuildrequires) {
     delete $f2{$_} for @neg;
     delete $f2{$_} for grep {/^-/} keys %f2;
+    delete $f2{$_} for grep {/^.*\[.*\]$/} keys %f2; # drop crossdeps
   }
   while (@deps) {
     my ($pack, $vers) = splice(@deps, 0, 2);
