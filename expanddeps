@@ -276,4 +276,8 @@ if (!shift @bdeps) {
   exit(1);
 }
 
+# make sure all preinstalls are in bdeps;
+# XXX: also add vmdeps?
+@bdeps = Build::unify(@bdeps, Build::get_preinstalls($cf));
+
 print_rpmlist(@bdeps);
