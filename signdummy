@@ -7,7 +7,7 @@
 my $mode;
 
 while (@ARGV) {
-  if ($ARGV[0] =~ /^-([cdr])$/) {
+  if ($ARGV[0] =~ /^-([cdrp])$/) {
     $mode = $1;
     shift @ARGV;
     next;
@@ -20,6 +20,12 @@ while (@ARGV) {
     die("unsupported option $ARGV[0]\n");
   }
   last;
+}
+if ($mode eq 'p') {
+  my $block = "sIGnMeP\n";
+  $block .= "\0" x (8192 - length($block));
+  (syswrite(STDOUT, $block) || 0) == 8192 || die("pubkey write: $!\n");
+  exit 0;
 }
 die("only detached mode possible\n") if !$mode || $mode ne 'd';
 die("filter mode not supported\n") unless @ARGV;
