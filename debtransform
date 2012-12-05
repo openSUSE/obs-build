@@ -318,6 +318,12 @@ for my $debtarfile (@debtarfiles) {
 
 dofile($changelog, $tardir, 'debian/changelog', $origtarfile) if defined $changelog;
 
+if ($tags->{'DEBTRANSFORM-FILES'}) {
+  for my $file (split(' ', $tags->{'DEBTRANSFORM-FILES'})) {
+    dofile("$dir/$file", $tardir, $file, $origtarfile);
+  }
+}
+
 for my $debtarfile (@debtarfiles) {
   dotar("$dir/$debtarfile", $tardir, \%debtarorigin, $origtarfile, @{$debtarcontent{$debtarfile} });
 }
@@ -354,5 +360,6 @@ $tags->{'FILES'} = "\n".join("\n", @files);
 delete $tags->{'DEBTRANSFORM-SERIES'};
 delete $tags->{'DEBTRANSFORM-TAR'};
 delete $tags->{'DEBTRANSFORM-FILES-TAR'};
+delete $tags->{'DEBTRANSFORM-FILES'};
 writedsc("$out/${name}_$version.dsc", $tags);
 exit(0);
