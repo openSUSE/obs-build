@@ -239,7 +239,7 @@ if ($tags->{'DEBTRANSFORM-FILES-TAR'}) {
 }
 
 if (!$tarfile || !@debtarfiles) {
-  my @tars = grep {/\.tar(?:\.gz|\.bz2)?$/} @dir;
+  my @tars = grep {/\.tgz$|\.tar(?:\.gz|\.bz2)?$/} @dir;
   my @debtars = grep {/^debian\.tar(?:\.gz|\.bz2)?$/} @tars;
   if (!$tarfile) {
     @tars = grep {!/^debian\.tar(?:\.gz|\.bz2)?$/} @tars;
@@ -278,6 +278,13 @@ if ($tarfile =~ /\.zip/) {
     $tmptar = "$out/$tarfile";
     print "converting $dir/$old to $tarfile\n";
     system( ( "debtransformzip", "$dir/$old", "$tmptar" )) == 0 || die("cannot transform .zip to .tar.gz");
+}
+if ($tarfile =~ /\.tgz$/) {
+    my $old = $tarfile;
+    $tarfile =~ s/\.tgz/\.tar.gz/;
+    $tmptar = "$out/$tarfile";
+    print "renaming $dir/$old to $tarfile\n";
+    system ( ("mv",  "$dir/$old",  "$tmptar" ) ) == 0 || die("cannot rename .tgz to .tar.gz");
 }
 
 my @files;
