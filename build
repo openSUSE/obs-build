@@ -1423,7 +1423,7 @@ if [ -w /root ]; then
     mkdir -p $BUILD_ROOT/proc
     mkdir -p $BUILD_ROOT/dev/pts
     mount -n -tproc none $BUILD_ROOT/proc || true
-    mount -n -tdevpts none $BUILD_ROOT/dev/pts
+    mount -n -tdevpts -omode=0620,gid=5 none $BUILD_ROOT/dev/pts
 fi
 
 if test -z "$VM_IMAGE" -a -z "$LOGFILE"; then
@@ -1857,7 +1857,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    fi
 	fi
 	mount -n -tproc none $BUILD_ROOT/proc || true
-	mount -n -tdevpts none $BUILD_ROOT/dev/pts
+	mount -n -tdevpts -omode=0620,gid=5 none $BUILD_ROOT/dev/pts
 
 	copy_oldpackages
     fi
@@ -2012,7 +2012,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
 
     mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
-    mount -n -tdevpts none $BUILD_ROOT/dev/pts 2> /dev/null
+    mount -n -tdevpts -omode=0620,gid=5 none $BUILD_ROOT/dev/pts 2> /dev/null
 
     setupicecream
 
