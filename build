@@ -2390,11 +2390,13 @@ if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
     if [ -e /.build/_statistics.df ]; then
       echo -n "MAX_mb_used_on_disk: " >> $TOPDIR/OTHER/_statistics
       cat /.build/_statistics.df >> $TOPDIR/OTHER/_statistics
+      echo "" >> $TOPDIR/OTHER/_statistics
       rm /.build/_statistics.df
     fi
     if [ -e /.build/_statistics.memory ]; then
       echo -n "MAX_mb_used_memory: " >> $TOPDIR/OTHER/_statistics
       cat /.build/_statistics.memory >> $TOPDIR/OTHER/_statistics
+      echo "" >> $TOPDIR/OTHER/_statistics
       rm /.build/_statistics.memory
     fi
     mount -n sys /sys -t sysfs
