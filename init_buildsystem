@@ -275,7 +275,8 @@ init_db()
 	echo initializing rpm db...
         if ! test -e $BUILD_ROOT/usr/lib/rpm/cpuinfo.yaml; then
             # rpm v5 does not have initdb
- 	    chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
+            # rpmdb --initdb is recommended and exists since SL9
+ 	    chroot $BUILD_ROOT rpmdb --initdb || chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
         fi
 	# hack: add nofsync to db config to speed up install
 	mkdir -p $BUILD_ROOT/root
@@ -1415,7 +1416,7 @@ fi
 
 if test -x $BUILD_ROOT/bin/rpm -a ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rpm/Packages ; then
     echo "initializing rpm db..."
-    chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
+    chroot $BUILD_ROOT rpmdb --initdb || chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
     # create provides index
     chroot $BUILD_ROOT rpm -q --whatprovides rpm >/dev/null 2>&1
 fi
