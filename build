@@ -844,11 +844,11 @@ esac
 
 shopt -s nullglob
 
+export PATH=$BUILD_DIR:/sbin:/usr/sbin:$PATH
+
 if detect_vm_2nd_stage ; then
     set "/.build-srcdir/$SPECFILE"
 fi
-
-export PATH=$BUILD_DIR:/sbin:/usr/sbin:$PATH
 
 . $BUILD_DIR/common_functions || exit 1
 
