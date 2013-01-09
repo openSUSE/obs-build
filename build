@@ -16,6 +16,7 @@ export BUILD_DIST
 
 ccache=0
 icecream=0
+statistics=0
 shell=
 definesnstuff=()
 repos=()
@@ -261,6 +262,9 @@ Known Parameters:
               Specify the uid and gid to use for the abuild user.
               This is useful if you are hacking in the buildroot.
               This must be set to the same value if the buildroot is re-used.
+
+  --statistics
+              monitor used resources during build inside VM
 
   --vm-type TYPE
               Use virtual machine instead of chroot
@@ -1087,6 +1091,9 @@ while test -n "$1"; do
       ;;
       --ccache)
 	ccache=1
+      ;;
+      --statistics)
+	statistics=1
       ;;
       --debug)
 	BUILD_DEBUG=1
@@ -2390,7 +2397,7 @@ if test -n "$RPMS" \
     fi
 fi
 
-if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
+if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP" -a "$statistics" = 1; then
     echo "... saving built statistics"
     echo "# statistics about used resources during build" > $TOPDIR/OTHER/_statistics
     if [ -e /.build/_statistics.df ]; then
