@@ -1414,7 +1414,7 @@ if test -z "$RUNNING_IN_VM" ; then
 	test -w /root || become_root_or_fail
     fi
     if test -n "$VM_SWAP" ; then
-	dd if=/dev/zero of="$VM_SWAP" bs=12 count=1 conv=notrunc 2>/dev/null
+	dd if=/dev/zero of="$VM_SWAP" bs=1024 count=1 conv=notrunc 2>/dev/null
 	echo "mkswap $VM_SWAP"
 	mkswap "$VM_SWAP"
     fi
@@ -2397,30 +2397,32 @@ if test -n "$RPMS" \
     fi
 fi
 
-if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP" -a "$statistics" = 1; then
-    echo "... saving built statistics"
-    echo "# statistics about used resources during build" > $TOPDIR/OTHER/_statistics
-    if [ -e /.build/_statistics.df ]; then
-      echo -n "MAX_mb_used_on_disk: " >> $TOPDIR/OTHER/_statistics
-      cat /.build/_statistics.df >> $TOPDIR/OTHER/_statistics
-      echo "" >> $TOPDIR/OTHER/_statistics
-      rm /.build/_statistics.df
+if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
+    if "$statistics" = 1; then
+         echo "... saving built statistics"
+         echo "# statistics about used resources during build" > $TOPDIR/OTHER/_statistics
+         if [ -e /.build/_statistics.df ]; then
+           echo -n "MAX_mb_used_on_disk: " >> $TOPDIR/OTHER/_statistics
+           cat /.build/_statistics.df >> $TOPDIR/OTHER/_statistics
+           echo "" >> $TOPDIR/OTHER/_statistics
+           rm /.build/_statistics.df
+         fi
+         if [ -e /.build/_statistics.memory ]; then
+           echo -n "MAX_mb_used_memory: " >> $TOPDIR/OTHER/_statistics
+           cat /.build/_statistics.memory >> $TOPDIR/OTHER/_statistics
+           echo "" >> $TOPDIR/OTHER/_statistics
+           rm /.build/_statistics.memory
+         fi
+         mount -n sys /sys -t sysfs
+         device="sda"
+         [ -e /dev/vda ] && device="vda"
+         disk=(`cat /sys/block/${device}/stat`)
+         echo "IO_requests_read: ${disk[0]}"  >> $TOPDIR/OTHER/_statistics
+         echo "IO_sectors_read: ${disk[2]}"   >> $TOPDIR/OTHER/_statistics
+         echo "IO_requests_write: ${disk[4]}" >> $TOPDIR/OTHER/_statistics
+         echo "IO_sectors_write: ${disk[6]}"  >> $TOPDIR/OTHER/_statistics
+         umount /sys
     fi
-    if [ -e /.build/_statistics.memory ]; then
-      echo -n "MAX_mb_used_memory: " >> $TOPDIR/OTHER/_statistics
-      cat /.build/_statistics.memory >> $TOPDIR/OTHER/_statistics
-      echo "" >> $TOPDIR/OTHER/_statistics
-      rm /.build/_statistics.memory
-    fi
-    mount -n sys /sys -t sysfs
-    device="sda"
-    [ -e /dev/vda ] && device="vda"
-    disk=(`cat /sys/block/${device}/stat`)
-    echo "IO_requests_read: ${disk[0]}"  >> $TOPDIR/OTHER/_statistics
-    echo "IO_sectors_read: ${disk[2]}"   >> $TOPDIR/OTHER/_statistics
-    echo "IO_requests_write: ${disk[4]}" >> $TOPDIR/OTHER/_statistics
-    echo "IO_sectors_write: ${disk[6]}"  >> $TOPDIR/OTHER/_statistics
-    umount /sys
 
     echo "... saving built packages"
     swapoff "$VM_SWAP"
