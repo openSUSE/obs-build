@@ -2398,7 +2398,7 @@ if test -n "$RPMS" \
 fi
 
 if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
-    if "$statistics" = 1; then
+    if test "$statistics" = 1; then
          echo "... saving built statistics"
          echo "# statistics about used resources during build" > $TOPDIR/OTHER/_statistics
          if [ -e /.build/_statistics.df ]; then
