@@ -703,7 +703,9 @@ detect_vm_2nd_stage()
     HOST="$MYHOSTNAME"
 
     # fork a process monitoring max filesystem fillment during build
-    background_monitor_process &
+    if test "$statistics" = "1"; then
+        background_monitor_process &
+    fi
 
     return 0
 }
@@ -1643,6 +1645,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo ")" >> $BUILD_ROOT/.build/build.data
 	echo "VM_TYPE='$VM_TYPE'" >> $BUILD_ROOT/.build/build.data
 	echo "shell='$shell'" >> $BUILD_ROOT/.build/build.data
+	echo "statistics='$statistics'" >> $BUILD_ROOT/.build/build.data
 	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	umount -n $BUILD_ROOT/proc 2> /dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
