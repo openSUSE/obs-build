@@ -872,6 +872,7 @@ export PATH=$BUILD_DIR:/sbin:/usr/sbin:$PATH
 
 if detect_vm_2nd_stage ; then
     set "/.build-srcdir/$SPECFILE"
+    export PATH=/.build:$PATH
 fi
 
 . $BUILD_DIR/common_functions || exit 1
@@ -1532,6 +1533,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo
 	test -n "$REASON" && echo "$REASON"
 	echo
+        TIME_START_TIME=`date +%s` # for statistics
     fi
 
     #
@@ -1603,8 +1605,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    rm -f $BUILD_ROOT/.build.success
 	    set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USE_SYSTEM_QEMU $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
 	    echo "$* ..."
+            start_time=`date +%s`
 	    "$@" || cleanup_and_exit 1
 	    check_exit
+            TIME_PREINSTALL=$(( `date +%s` - $start_time ))
+            unset start_time
 	    if [ ! -w /root ]; then
 		# remove setuid bit if files belong to user to make e.g. mount work
 		find $BUILD_ROOT/{bin,sbin,usr/bin,usr/sbin} -type f -uid $UID -perm +4000 -print0 | xargs -0 --no-run-if-empty chmod -s
@@ -1826,6 +1831,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
 		cleanup_and_exit "$BUILDSTATUS"
 	fi
+
 	if test -n "$VM_SWAP" ; then
 	    BUILDSTATUS=`dd if="$VM_SWAP" bs=12 count=1 2>/dev/null`
 	    case $BUILDSTATUS in
@@ -1866,6 +1872,13 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 			*) mkdir -p OTHER ; mv $i OTHER/ ;;
 		    esac
 		done
+                if test "$statistics" = 1; then
+                    mkdir -p OTHER
+                    mv _statistics OTHER/
+                    [ -n "$TIME_PREINSTALL" ] && echo "TIME_preinstall: $TIME_PREINSTALL"  >> OTHER/_statistics
+                    TIME_TOTAL=$(( `date +%s` - $TIME_START_TIME ))
+                    echo "TIME_total: $TIME_TOTAL"  >> OTHER/_statistics
+                fi
 		cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
 		;;
 	      BUILDSTATUS*)
@@ -1883,6 +1896,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
 
     if test "$DO_INIT" = true ; then
+        start_time=`date +%s`
 	#
 	# create legacy .buildenv file
 	#
@@ -1893,8 +1907,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	egrep '^#[       ]*needsbinariesforbuild[       ]*$' >/dev/null <$MYSRCDIR/$SPECFILE && CREATE_BUILD_BINARIES=--create-build-binaries
 	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USE_SYSTEM_QEMU $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
+        start_time=`date +%s`
 	"$@" || cleanup_and_exit 1
 	check_exit
+        TIME_INSTALL=$(( `date +%s` - $start_time ))
+        unset start_time
 	# arbitrary limit of 10MB
 	if test $((`stat -f -c "%a*%S/1024/1024" $BUILD_ROOT`)) -lt 10; then
             # ensure that old stat is not failing (RHEL4)
@@ -2246,6 +2263,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	fi
     fi
 
+    start_time=`date +%s`
     if test "$BUILDTYPE" = spec ; then
 	test -z "$BUILD_RPM_BUILD_STAGE" && BUILD_RPM_BUILD_STAGE=-ba
 
@@ -2334,6 +2352,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	. $BUILD_DIR/build_kiwi.sh
 	run_kiwi
     fi
+    echo "TIME_main_build: $(( `date +%s` - $start_time ))"  >> $TOPDIR/OTHER/_statistics
+    unset start_time
 
     test "$BUILD_SUCCEEDED" = true || cleanup_and_exit 1
     test -d "$SRCDIR" && cd "$SRCDIR"
@@ -2439,7 +2459,7 @@ fi
 if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
     if test "$statistics" = 1; then
          echo "... saving built statistics"
-         echo "# statistics about used resources during build" > $TOPDIR/OTHER/_statistics
+         [ -n "$TIME_INSTALL" ] && echo "TIME_install: $TIME_INSTALL"  >> $BUILD_ROOT$TOPDIR/OTHER/_statistics
          if [ -e /.build/_statistics.df ]; then
            echo -n "MAX_mb_used_on_disk: " >> $TOPDIR/OTHER/_statistics
            cat /.build/_statistics.df >> $TOPDIR/OTHER/_statistics
