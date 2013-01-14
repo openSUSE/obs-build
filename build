@@ -788,6 +788,28 @@ linux64()
 	perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' "$@"
 }
 
+check_for_arm()
+{
+    local uname
+
+    uname=$(uname -m)
+
+    if [ "$uname" != "armv7l" ]; then
+        return
+    fi
+
+    export HOST_ARCH=armv7l
+
+#-nographic -enable-kvm -M vexpress-a15 -kernel ~/zImage.arm -append 'console=ttyAMA0 root=/dev/vda2 init=/bin/bash' -m 1G -cpu cortex-a15 -machine kernel_irqchip=on -dtb ~/a15-guest.dtb  -device virtio-blk,transport=virtio-mmio.0,drive=disk -drive file=/dev/mmcblk1,id=disk,cache=unsafe,snapshot=on
+
+
+    export kvm_bin="/usr/bin/qemu-system-arm"
+    export console=ttyAMA0
+    export KVM_OPTIONS="-enable-kvm -M vexpress-a15 -dtb /boot/a15-guest.dtb -cpu cortex-a15 -m 1500"
+    export VM_KERNEL=/boot/zImage.vexpress
+    export VM_INITRD=/boot/initrd
+}
+
 check_for_ppc()
 {
     local uname
@@ -1164,6 +1186,7 @@ while test -n "$1"; do
 done
 
 check_for_ppc
+check_for_arm
 
 if test "$VM_TYPE" = "lxc"; then
     VM_IMAGE=''
@@ -1294,6 +1317,11 @@ if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
     if [ "$HOST_ARCH" = ppc ]; then
         # KVM on PPC can not run virtio yet, so we need to use the default vio
         kvm_virtio=
+    fi
+
+    if [ "$HOST_ARCH" = armv7l ]; then
+        # KVM on ARM can only do virtio
+        kvm_virtio=1
     fi
 
     if [ "$kvm_virtio" = 1 ]; then
@@ -1722,11 +1750,19 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                   # speed optimization when using kvm with raw files
 		  CACHE=",cache=unsafe"
                 fi
+
 		if [ "$kvm_virtio" = 1 ]; then
 		    qemu_args=(-drive file="$VM_IMAGE",if=virtio$CACHE -drive file="$VM_IMAGE",if=ide,index=0$CACHE)
 		    if [ -n "$VM_SWAP" ]; then
 			qemu_args=("${qemu_args[@]}" "-drive")
 			qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=virtio$CACHE")
+		    fi
+		    if [ "$HOST_ARCH" = "armv7l" ]; then
+			qemu_args=(-drive file="$VM_IMAGE",if=none,id=disk$CACHE -device virtio-blk,transport=virtio-mmio.0,drive=disk)
+			qemu_args=("${qemu_args[@]}" "-drive")
+			qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=none,id=swap$CACHE")
+			qemu_args=("${qemu_args[@]}" "-device")
+			qemu_args=("${qemu_args[@]}" "virtio-blk,transport=virtio-mmio.1,drive=swap")
 		    fi
 		else
 			if [ "$HOST_ARCH" = "ppc" ];then
@@ -1745,14 +1781,14 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 				qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=$DISK_IF,index=1$CACHE")
 			fi
 		fi
-		if [ -n "$BUILD_JOBS" -a "$icecream" = 0 ]; then
+		if [ -n "$BUILD_JOBS" -a "$icecream" = 0 -a "$HOST_ARCH" != "armv7l" ]; then
 		    qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS")
 		fi
 		# cpuid is not set correctly in kvm without this
-		if [ "$HOST_ARCH" != "ppc" ]; then
+		if [ "$HOST_ARCH" != "ppc" -a "$HOST_ARCH" != "armv7l" ]; then
 			KVM_OPTIONS=""
 		fi
-		if [ "$VM_TYPE" = 'kvm' ]; then
+		if [ "$VM_TYPE" = 'kvm' -a "$HOST_ARCH" != "armv7l" ]; then
 			KVM_OPTIONS="$KVM_OPTIONS -cpu host"
 		        if [ -n "$HUGETLBFSPATH" ]; then
 			      KVM_OPTIONS="$KVM_OPTIONS -mem-path $HUGETLBFSPATH"
