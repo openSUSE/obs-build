@@ -217,7 +217,7 @@ init_db()
 {
     if test $PSUF = rpm ; then
 	echo initializing rpm db...
-	chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
+	chroot $BUILD_ROOT rpmdb --initdb || chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
 	# hack: add nofsync to db config to speed up install
 	mkdir -p $BUILD_ROOT/root
 	echo '%__dbi_perms perms=0644 nofsync' > $BUILD_ROOT/.rpmmacros
@@ -1123,7 +1123,7 @@ fi
 
 if test -x $BUILD_ROOT/bin/rpm -a ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rpm/Packages ; then
     echo "initializing rpm db..."
-    chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
+    chroot $BUILD_ROOT rpmdb --initdb || chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
     # create provides index
     chroot $BUILD_ROOT rpm -q --whatprovides rpm >/dev/null 2>&1
 fi
