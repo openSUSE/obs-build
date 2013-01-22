@@ -2275,13 +2275,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    chown "$ABUILD_UID:$ABUILD_GID" $BUILD_ROOT/home/abuild
 	else
 	    if ! egrep "^abuild:x?:${ABUILD_UID}:${ABUILD_GID}" >/dev/null <$BUILD_ROOT/etc/passwd ; then
-		echo "abuild user present in the buildroot ($BUILD_ROOT) but uid:gid does not match"
-		echo "buildroot currently using:"
-		egrep "^abuild:" <$BUILD_ROOT/etc/passwd
-		echo "build script attempting to use:"
-		echo "abuild::${ABUILD_UID}:${ABUILD_GID}:..."
-		echo "build aborting"
-		cleanup_and_exit 1
+                sed -i '/^abuild:/d' $BUILD_ROOT/etc/passwd
+                sed -i '/^abuild:/d' $BUILD_ROOT/etc/group
+                echo "abuild:x:${ABUILD_UID}:${ABUILD_GID}:Autobuild:/home/abuild:/bin/bash" >>$BUILD_ROOT/etc/passwd
+                echo "abuild:x:${ABUILD_GID}:" >>$BUILD_ROOT/etc/group
+                chown "$ABUILD_UID:$ABUILD_GID" $BUILD_ROOT/home/abuild -R
 	    fi
 	fi
 	if test -f $BUILD_ROOT/etc/shadow ; then
