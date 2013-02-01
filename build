@@ -2364,7 +2364,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	. $BUILD_DIR/build_kiwi.sh
 	run_kiwi
     fi
-    echo "TIME_main_build: $(( `date +%s` - $start_time ))"  >> $TOPDIR/OTHER/_statistics
+    if test "$statistics" = 1; then
+        mkdir -p $TOPDIR/OTHER
+        echo "TIME_main_build: $(( `date +%s` - $start_time ))"  >> $TOPDIR/OTHER/_statistics
+    fi
     unset start_time
 
     test "$BUILD_SUCCEEDED" = true || cleanup_and_exit 1
