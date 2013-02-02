@@ -707,8 +707,10 @@ detect_vm_2nd_stage()
         background_monitor_process &
     fi
 
-    # set date to now on broken systems (ARM without RTC)
-    [ -e /.build/.date ] && date -s `cat /.build/.date`
+    # set date to build start on broken systems (now < build start)
+    if [ $(date '+%s') -lt $(date -r /.build/build '+%s') ]; then
+        date -s $(date -r /.build/build '+@%s')
+    fi
 
     return 0
 }
@@ -1690,11 +1692,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	umount -n $BUILD_ROOT/proc 2> /dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
 	umount -n $BUILD_ROOT/mnt 2> /dev/null || true
-
-        if [ "$HOST_ARCH" = armv7l ]; then
-            # work around missing RTC on ARM KVM VM
-            date '+@%s' > $BUILD_ROOT/.build/.date
-        fi
 
 	if [ -n "$VM_IMAGE" ]; then
 	    check_exit
