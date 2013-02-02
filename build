@@ -709,6 +709,7 @@ detect_vm_2nd_stage()
 
     # set date to build start on broken systems (now < build start)
     if [ $(date '+%s') -lt $(date -r /.build/build '+%s') ]; then
+        echo "WARNING: system has a broken clock, setting it to a newer time"
         date -s $(date -r /.build/build '+@%s')
     fi
 
