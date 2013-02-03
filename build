@@ -1408,7 +1408,7 @@ if test -z "$RUNNING_IN_VM" ; then
 	if test "$VM_IMAGE" = 1 ; then
 	    VM_IMAGE="$BUILD_ROOT.img"
 	    echo "using $VM_IMAGE as vm image"
-	    if test -z "$VM_SWAP"; then
+	    if test -z "$VM_SWAP" -a "$VM_TYPE" != "emulator"; then
 		VM_SWAP="$BUILD_ROOT.swap"
 		echo "using $VM_SWAP as vm swap"
 	    fi
