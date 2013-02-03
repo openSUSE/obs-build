@@ -7,6 +7,11 @@
 #
 # (c) 1997-2008 SuSE GmbH Nuernberg, Germany
 
+# some VMs do not allow to specify the init process...
+if test "$0" = "/sbin/init" ; then
+   exec /.build/build "$@"
+fi
+
 test -z "$BUILD_DIR" && BUILD_DIR=/usr/lib/build
 test -z "$BUILD_ROOT" && BUILD_ROOT=/var/tmp/build-root
 test -z "$CONFIG_DIR" && CONFIG_DIR="$BUILD_DIR/configs"
@@ -266,6 +271,21 @@ Known Parameters:
   --statistics
               monitor used resources during build inside VM
 
+  --kvm
+              Use KVM to secure build process. Your hardware needs to support
+              virtualization
+
+  --xen
+              Use XEN to secure build process, you to run in a XEN Dom0 environment.
+
+  --lxc
+              Use Linux Containers to isolate the process. This may not be 100% safe.
+
+  --emulator
+              Use any generic emulator to isolate the build process. You need to write
+              an emulator/emulator.sh script and put it next to the build script sources.
+              You must NOT use any vm swap file for this.
+
   --vm-type TYPE
               Use virtual machine instead of chroot
               TYPE is one of xen|kvm|uml|qemu|lxc
@@ -325,6 +345,7 @@ cleanup_and_exit () {
         fi
     fi
     if test -n "$RUNNING_IN_VM" ; then
+	echo "$1" >  /.build/_exitcode
 	test -n "$browner" && chown "$browner" $BUILD_ROOT
 	cd /
 	if test -n "$VM_SWAP" -a -e "$VM_SWAP" ; then
@@ -806,9 +827,6 @@ check_for_arm()
 
     export HOST_ARCH=armv7l
 
-#-nographic -enable-kvm -M vexpress-a15 -kernel ~/zImage.arm -append 'console=ttyAMA0 root=/dev/vda2 init=/bin/bash' -m 1G -cpu cortex-a15 -machine kernel_irqchip=on -dtb ~/a15-guest.dtb  -device virtio-blk,transport=virtio-mmio.0,drive=disk -drive file=/dev/mmcblk1,id=disk,cache=unsafe,snapshot=on
-
-
     export kvm_bin="/usr/bin/qemu-system-arm"
     export console=ttyAMA0
     export KVM_OPTIONS="-enable-kvm -M vexpress-a15 -dtb /boot/a15-guest.dtb -cpu cortex-a15 -m 1500"
@@ -981,7 +999,7 @@ while test -n "$1"; do
 	BUILD_DIST="$ARG"
 	shift
       ;;
-      *-xen|*-kvm|--uml|--qemu)
+      *-xen|*-kvm|--uml|--qemu|--emulator)
 	VM_TYPE=${PARAM##*-}
 	if [ -n "$ARG" ]; then
 	    VM_IMAGE="$ARG"
@@ -1626,6 +1644,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    fi
 	    copy_oldpackages
 	fi
+
 	# start up xen, rerun ourself
 	cp -a $BUILD_DIR/. $BUILD_ROOT/.build
 	if ! test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
@@ -1712,7 +1731,18 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    vm_init_script="/.build/build"
 	fi
 
-	if [ "$VM_TYPE" = 'xen' ]; then
+	if [ "$VM_TYPE" = 'emulator' ]; then
+                # generic emulator hook. an external script is needed to define
+                # the emulator startup
+                sync
+		set -- ./emulator/emulator.sh "$VM_IMAGE"
+		echo "$@"
+		if ! "$@"; then
+                     echo "ERROR: The emulator return with an failure"
+                     cleanup_and_exit 3
+                fi
+
+	elif [ "$VM_TYPE" = 'xen' ]; then
 		XMROOT="file:$(readlink -f $VM_IMAGE)"
 		XMROOT=${XMROOT/#file:\/dev/phy:/dev}
 		XMROOT="disk=$XMROOT,hda1,w"
@@ -1842,7 +1872,26 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		cleanup_and_exit "$BUILDSTATUS"
 	fi
 
-	if test -n "$VM_SWAP" ; then
+        # Exctract build resutls from VM
+	if [ "$VM_TYPE" = 'emulator' ]; then
+            # Emulators may not offer to use a second swap space.
+            # So we just mount the filesystem.
+            # WARNING: This is not safe against attacks.
+
+	    mkdir -p $BUILD_ROOT/.build.packages
+	    cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
+            mkdir -p .mount
+            mount $VM_IMAGE -o loop .mount
+            if [ -e .mount/.build.packages ]; then
+              cp -a .mount/.build.packages/* .
+            fi
+            exitcode=`cat .mount/.build/_exitcode`
+            umount .mount
+            rmdir .mount
+
+	    cleanup_and_exit "$exitcode"
+
+	elif test -n "$VM_SWAP" ; then
 	    BUILDSTATUS=`dd if="$VM_SWAP" bs=12 count=1 2>/dev/null`
 	    case $BUILDSTATUS in
 	      BUILDSTATUS[02])
@@ -1900,8 +1949,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		cleanup_and_exit 3
 		;;
 	    esac
+
 	    cleanup_and_exit 1
 	fi
+
 	cleanup_and_exit 0
     fi
 
@@ -2469,7 +2520,7 @@ if test -n "$RPMS" \
     fi
 fi
 
-if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
+if test -n "$RUNNING_IN_VM"; then
     if test "$statistics" = 1; then
          echo "... saving built statistics"
          [ -n "$TIME_INSTALL" ] && echo "TIME_install: $TIME_INSTALL"  >> $BUILD_ROOT$TOPDIR/OTHER/_statistics
@@ -2496,29 +2547,34 @@ if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
          umount /sys
     fi
 
-    echo "... saving built packages"
-    swapoff "$VM_SWAP"
-    args="--padstart 512 --padend 512 -v"
-    case "$BUILDTYPE" in
-	spec)
-	    computeblocklists $args $TOPDIR/RPMS/*/*.{d,}rpm $TOPDIR/SRPMS/* $TOPDIR/OTHER/* > "$VM_SWAP"
-	    ;;
-	dsc)
-	    computeblocklists $args $TOPDIR/DEBS/*.deb $TOPDIR/SOURCES.DEB/* $TOPDIR/OTHER/* > "$VM_SWAP"
-	    ;;
-	kiwi)
-	    computeblocklists $args $TOPDIR/KIWI/* $TOPDIR/OTHER/* > "$VM_SWAP"
-	    ;;
-	arch)
-	    computeblocklists $args $TOPDIR/ARCHPKGS/* $TOPDIR/OTHER/* > "$VM_SWAP"
-	    ;;
-	preinstallimage)
-	    computeblocklists $args $TOPDIR/OTHER/* > "$VM_SWAP"
-	    ;;
-	*)
-            cleanup_and_exit 1
-	    ;;
-    esac || cleanup_and_exit 1
+    if test -n "$VM_SWAP"; then
+         echo "... saving built packages"
+         swapoff "$VM_SWAP"
+         args="--padstart 512 --padend 512 -v"
+         case "$BUILDTYPE" in
+             spec)
+                 computeblocklists $args $TOPDIR/RPMS/*/*.{d,}rpm $TOPDIR/SRPMS/* $TOPDIR/OTHER/* > "$VM_SWAP"
+                 ;;
+             dsc)
+                 computeblocklists $args $TOPDIR/DEBS/*.deb $TOPDIR/SOURCES.DEB/* $TOPDIR/OTHER/* > "$VM_SWAP"
+                 ;;
+             kiwi)
+                 computeblocklists $args $TOPDIR/KIWI/* $TOPDIR/OTHER/* > "$VM_SWAP"
+                 ;;
+             arch)
+                 computeblocklists $args $TOPDIR/ARCHPKGS/* $TOPDIR/OTHER/* > "$VM_SWAP"
+                 ;;
+             preinstallimage)
+                 computeblocklists $args $TOPDIR/OTHER/* > "$VM_SWAP"
+                 ;;
+             *)
+                 cleanup_and_exit 1
+                 ;;
+         esac || cleanup_and_exit 1
+    else
+         # quit inside of the emulator
+         cleanup_and_exit "$exitcode"
+    fi
 fi
 
 echo
