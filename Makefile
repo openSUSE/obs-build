@@ -23,6 +23,7 @@ install:
 	install -m755 -d \
 	    $(DESTDIR)$(pkglibdir)/configs \
 	    $(DESTDIR)$(pkglibdir)/Build \
+	    $(DESTDIR)$(pkglibdir)/emulator \
 	    $(DESTDIR)$(bindir) \
 	    $(DESTDIR)$(man1dir)
 	install -m755 \
@@ -60,6 +61,7 @@ install:
 	    signdummy \
 	    unrpm \
 	    $(DESTDIR)$(pkglibdir)
+	install -m755 emulator/emulator.sh $(DESTDIR)$(pkglibdir)/emulator/
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build
 	install -m644 qemu-reg $(DESTDIR)$(pkglibdir)
 	install -m644 *.pm baselibs_global*.conf lxc.conf $(DESTDIR)$(pkglibdir)
