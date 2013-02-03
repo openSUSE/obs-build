@@ -1015,7 +1015,7 @@ while test -n "$1"; do
 	needarg
 	VM_TYPE="$ARG"
 	case "$VM_TYPE" in
-	    xen|kvm|uml|qemu|lxc)
+	    xen|kvm|uml|qemu|lxc|emulator)
 		test -z "$VM_IMAGE" && VM_IMAGE=1
 	        ;;
 	    none|chroot) VM_TYPE='' ;;
@@ -1629,7 +1629,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	rm -rf "$BUILD_ROOT/.build"
 	mkdir -p "$BUILD_ROOT/.build"
 	if test "$DO_INIT" = true ; then
-	    # do fist stage of init_buildsystem
+	    # do first stage of init_buildsystem
 	    rm -f $BUILD_ROOT/.build.success
 	    set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USE_SYSTEM_QEMU $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
 	    echo "$* ..."
@@ -1708,6 +1708,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "VM_TYPE='$VM_TYPE'" >> $BUILD_ROOT/.build/build.data
 	echo "shell='$shell'" >> $BUILD_ROOT/.build/build.data
 	echo "statistics='$statistics'" >> $BUILD_ROOT/.build/build.data
+	if [ "$VM_TYPE" = 'emulator' ]; then
+            ln -sf /.build/build $BUILD_ROOT/sbin/init
+        fi
 	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	umount -n $BUILD_ROOT/proc 2> /dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
@@ -1735,12 +1738,15 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                 # generic emulator hook. an external script is needed to define
                 # the emulator startup
                 sync
-		set -- ./emulator/emulator.sh "$VM_IMAGE"
+                pushd $BUILD_DIR/emulator
+		set -- ./emulator.sh "$VM_IMAGE"
 		echo "$@"
 		if ! "$@"; then
+                     popd
                      echo "ERROR: The emulator return with an failure"
                      cleanup_and_exit 3
                 fi
+                popd
 
 	elif [ "$VM_TYPE" = 'xen' ]; then
 		XMROOT="file:$(readlink -f $VM_IMAGE)"
