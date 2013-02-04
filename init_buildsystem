@@ -1381,7 +1381,9 @@ if test -x $BUILD_ROOT/sbin/ldconfig ; then
 	    ;;
 	esac
 fi
-test -x $BUILD_ROOT/usr/sbin/Check && chroot $BUILD_ROOT /usr/sbin/Check
+if test -x $BUILD_ROOT/usr/sbin/Check && ! grep -q "/usr/sbin/Check is obsolete" $BUILD_ROOT/usr/sbin/Check; then
+  chroot $BUILD_ROOT /usr/sbin/Check
+fi
 
 mkdir -p $BUILD_ROOT/var/adm/packages
 touch $BUILD_ROOT/var/adm/packages
