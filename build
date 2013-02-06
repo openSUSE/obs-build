@@ -100,6 +100,7 @@ RSYNCDEST=
 RSYNCDONE=
 SIGNDUMMY=
 HOST_ARCH=
+EMULATOR_SCRIPT=
 
 # list of archs which need emulator initialization
 : ${EMULATOR_ARCHS:="armv4l armv5l armv6l armv7l armv5el armv6el armv7el armv7hl armv8el mips mipsel mips64 mips64el ppc ppc64 sh4 sparc sparc64 s390 s390x"}
@@ -281,10 +282,13 @@ Known Parameters:
   --lxc
               Use Linux Containers to isolate the process. This may not be 100% safe.
 
-  --emulator
+  --emulator 
               Use any generic emulator to isolate the build process. You need to write
               an emulator/emulator.sh script and put it next to the build script sources.
               You must NOT use any vm swap file for this.
+
+  --emulator-script SCRIPT
+              specify another emulator instead of emulator.sh
 
   --vm-type TYPE
               Use virtual machine instead of chroot
@@ -997,6 +1001,11 @@ while test -n "$1"; do
       *-dist)
 	needarg
 	BUILD_DIST="$ARG"
+	shift
+      ;;
+      *-emulator-script)
+	needarg
+	EMULATOR_SCRIPT="$ARG"
 	shift
       ;;
       *-xen|*-kvm|--uml|--qemu|--emulator)
@@ -1739,7 +1748,12 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                 # the emulator startup
                 sync
                 pushd $BUILD_DIR/emulator
-		set -- ./emulator.sh "$VM_IMAGE"
+                if [ -z "$EMULATOR_SCRIPT" ]; then
+                   EMULATOR_SCRIPT="./emulator.sh"
+                elif [ "${EMULATOR_SCRIPT:0:1}" != "/" ]; then
+                   EMULATOR_SCRIPT="./$EMULATOR_SCRIPT"
+                fi
+		set -- "$EMULATOR_SCRIPT" "$VM_IMAGE"
 		echo "$@"
 		if ! "$@"; then
                      popd
