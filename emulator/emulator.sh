@@ -12,7 +12,7 @@ LOG=$(mktemp)
 ./Foundation_v8 --image ./img-foundation.axf \
                  --block-device "$1" \
                  --network=none &> $LOG &
-while test $(grep -c terminal_0: $LOG ) -lt 1; do
+while test 0$(grep -c terminal_0: $LOG ) -lt 1; do
     echo ".."
     sleep 1
 done
