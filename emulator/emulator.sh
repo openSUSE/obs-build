@@ -20,6 +20,7 @@ cat $LOG
 # terminal_0: Listening for serial connection on port 5012
 PORT=$(grep terminal_0: $LOG | head -n 1 | cut -d " " -f 8)
 rm -f $LOG
-telnet 127.0.0.1 $PORT
+# telnet dies when emulator is quiting
+telnet 127.0.0.1 $PORT || exit 0
 
 
