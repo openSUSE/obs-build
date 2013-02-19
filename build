@@ -746,9 +746,9 @@ detect_vm_2nd_stage()
     fi
 
     # set date to build start on broken systems (now < build start)
-    if [ $(date '+%s') -lt $(date -r /.build/build '+%s') ]; then
-        echo "WARNING: system has a broken clock, setting it to a newer time"
-        date -s $(date -r /.build/build '+@%s')
+    if [ $(date '+%s') -lt $(date -r /.build/.date '+%s') ]; then
+        echo -n "WARNING: system has a broken clock, setting it to a newer time: "
+        date -s `cat /.build/.date`
     fi
 
     return 0
@@ -1844,6 +1844,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "VM_TYPE='$VM_TYPE'" >> $BUILD_ROOT/.build/build.data
 	echo "shell='$shell'" >> $BUILD_ROOT/.build/build.data
 	echo "statistics='$statistics'" >> $BUILD_ROOT/.build/build.data
+        # fallback time for broken hosts
+        date '+@%s' > $BUILD_ROOT/.build/.date
 	if [ "$VM_TYPE" = 'emulator' ]; then
             ln -sf /.build/build $BUILD_ROOT/sbin/init
         fi
