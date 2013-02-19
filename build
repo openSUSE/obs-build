@@ -379,6 +379,9 @@ cleanup_and_exit () {
 	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	umount -n $BUILD_ROOT/proc 2>/dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2>/dev/null || true
+        umount -n $BUILD_ROOT/run/shm 2>/dev/null || true
+        umount -n $BUILD_ROOT/run/lock 2>/dev/null || true
+        umount -n $BUILD_ROOT/run 2>/dev/null || true
 	test "$VM_IMAGE" = 1 && VM_IMAGE=
 	[ -n "$VM_IMAGE" ] && umount $BUILD_ROOT 2>/dev/null || true
     fi
@@ -1724,6 +1727,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	umount -n $BUILD_ROOT/proc 2> /dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
 	umount -n $BUILD_ROOT/mnt 2> /dev/null || true
+	umount -n $BUILD_ROOT/run/shm 2>/dev/null || true
+	umount -n $BUILD_ROOT/run/lock 2>/dev/null || true
+	umount -n $BUILD_ROOT/run 2>/dev/null || true
 
 	if [ -n "$VM_IMAGE" ]; then
 	    check_exit
