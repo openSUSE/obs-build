@@ -424,94 +424,6 @@ validate_cache_file()
     fi
 }
 
-#
-# Copy qemu static binaries for cross-build emulation mode.
-# Preferentially install from $BUILD_DIR (potentially provided by build
-# server) in preference to build worker's /usr/bin (fallback).
-# If initvm is available it will be in $BUILD_DIR; otherwise prepare to
-# fall back to initscript_qemu_vm shell script with corresponding static
-# bash and mount programs.
-#
-
-check_copy_qemu()
-{
-    local arch
-
-    for arch in $EMULATOR_DEVS; do
-	if test -e $BUILD_DIR/qemu-$arch; then
-	    return 0
-	fi
-    done
-    return 1
-}
-
-copy_qemu()
-{
-    local path dest
-
-    echo "copying qemu"
-
-    mkdir -p $BUILD_ROOT/usr/bin
-
-    if check_copy_qemu; then
-
-	for path in $BUILD_DIR/qemu-*; do
-	    if file $path | grep -q static; then
-		dest="$BUILD_ROOT/usr/bin/${path##*/}"
-		if [ -f "$path" -a ! -x "$dest" ]; then
-		    echo -n " $path"		# report copy
-		    #echo install -m755 "$path" "$dest"
-		    install -m755 "$path" "$dest"
-		fi
-	    fi
-	done
-
-    else
-
-	for path in /usr/bin/qemu-*; do
-	    if file $path | grep -q static; then
-		dest="$BUILD_ROOT/usr/bin/${path##*/}"
-		if [ -f "$path" -a ! -x "$dest" ]; then
-		    echo -n " $path"		# report copy
-		    #echo install -m755 "$path" "$dest"
-		    install -m755 "$path" "$dest"
-		fi
-	    fi
-	done
-
-	if [ -e /usr/sbin/qemu-binfmt-conf.sh \
-	    -a ! -e $BUILD_ROOT/usr/sbin/qemu-binfmt-conf.sh ]; then
-	    echo " /usr/sbin/qemu-binfmt-conf.sh"		# report copy
-	    mkdir -p $BUILD_ROOT/usr/sbin
-	    install -m755 /usr/sbin/qemu-binfmt-conf.sh $BUILD_ROOT/usr/sbin
-	fi
-
-    fi
-    echo ""
-
-    # Below for backward compatibility when /.build/initvm is not present
-
-    if [ -n "$PREPARE_VM" ]; then
-	if [ -x /bin/bash-static -a -x /bin/mount-static ]; then
-	    echo " /bin/bash-static /bin/mount-static"	# report copy
-	    mkdir -p $BUILD_ROOT/bin
-	    install -m755 /bin/bash-static $BUILD_ROOT/bin
-	    install -m755 /bin/mount-static $BUILD_ROOT/bin
-	fi
-    fi
-}
-
-check_binfmt_registered()
-{
-    local arch
-    for arch in $EMULATOR_DEVS; do
-	if test -e /proc/sys/fs/binfmt_misc/$arch; then
-	    return 0
-	fi
-    done
-    return 1
-}
-
 fail_exit()
 {
   cleanup_and_exit 1
@@ -686,23 +598,21 @@ else
     fi
 
     #
-    # copy the QEMU emulator
+    # register the QEMU emulator
     #
     if check_use_emulator; then
-	[ -n "$USE_SYSTEM_QEMU" ] && copy_qemu
 	if [ -z "$PREPARE_VM" ]; then
-	    if ! check_binfmt_registered; then
-		echo "registering binfmt handlers"
+	    echo "registering binfmt handlers"
 
-		if [ -x "$BUILD_DIR/initvm" -a -e "$BUILD_DIR/qemu-reg" ]; then
-		    $BUILD_DIR/initvm
-		elif [ -x /usr/sbin/qemu-binfmt-conf.sh ]; then
-	           [ -e /proc/sys/fs/binfmt_misc ] || mount -n binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
-		   /usr/sbin/qemu-binfmt-conf.sh
-		else
-		    echo "Warning: could not register binfmt handlers. Neither build-initvm nor /usr/sbin/qemu-binfmt-conf.sh exist"
-		fi
+	    if [ -x "$BUILD_DIR/initvm" -a -e "$BUILD_DIR/qemu-reg" ]; then
+	        $BUILD_DIR/initvm
+	    elif [ -x /usr/sbin/qemu-binfmt-conf.sh ]; then
+	       [ -e /proc/sys/fs/binfmt_misc ] || mount -n binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
+	       /usr/sbin/qemu-binfmt-conf.sh
+	    else
+	        echo "Warning: could not register binfmt handlers. Neither build-initvm nor /usr/sbin/qemu-binfmt-conf.sh exist"
 	    fi
+
 	    if [ -n "$PREPARE_VM" ]; then
 	        echo 0 > /proc/sys/vm/mmap_min_addr
 	    fi
@@ -742,20 +652,6 @@ else
 	fi
 	if test "$PKG" = "preinstallimagesource:" ; then
 	    PREINSTALL_IMAGE_SOURCE="$SRC"
-	    continue
-	fi
-	# these additional preinstall / install values are only set for 
-	# emulated "CrossBuild" setups - thus CB(pre)install
-	if test "$PKG" = "cbpreinstall:" ; then
-	    if is_emulator_arch ; then
-		PACKAGES_TO_CBPREINSTALL=$SRC
-	    fi
-	    continue
-	fi
-	if test "$PKG" = "cbinstall:" ; then
-	    if is_emulator_arch ; then
-		PACKAGES_TO_CBINSTALL=$SRC
-	    fi
 	    continue
 	fi
 	if test "$PKG" = "runscripts:" ; then
@@ -843,8 +739,6 @@ else
         printf "\n"
     fi
 
-    test -n "$PACKAGES_TO_CBPREINSTALL" && echo "cbpreinstall: $PACKAGES_TO_CBPREINSTALL"
-    test -n "$PACKAGES_TO_CBINSTALL" && echo "cbinstall   : $PACKAGES_TO_CBINSTALL"
     # compatibility...
     test -z "$RUNSCRIPTS_SEEN" && PACKAGES_TO_RUNSCRIPTS="$PACKAGES_TO_PREINSTALL"
 
