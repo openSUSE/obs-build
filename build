@@ -36,12 +36,22 @@ vm_img_mkfs_ext2='mkfs.ext2 -m 0 -q -F'
 vm_img_tunefs_ext2='tune2fs -c 0'
 vm_img_mkfs_reiserfs='mkreiserfs -q -f'
 vm_img_mkfs_btrfs='mkfs.btrfs'
+vm_img_mkfs_xfs='mkfs.xfs -f'
 
 vm_kernel=/boot/vmlinuz
 vm_initrd=/boot/initrd
 qemu_bin=/usr/bin/qemu
 uml_kernel=/boot/vmlinux-um
 uml_initrd=/boot/initrd-um
+
+# z/VM: use default kernel image from local machine
+# lets go with the default parameters. However zvm_initrd will be a required parameter
+#zvm_kernel=/boot/image
+#zvm_initrd=/boot/initrd_worker
+zvm_param="root=/dev/disk/by-path/ccw-0.0.0150-part1 hvc_iucv=8 console=hvc0"
+zvm_mult_pass="THR4ME"
+#zvm_worker_nr="1"
+zvm_init_script="/.build/build"
 
 kvm_bin=/usr/bin/qemu-kvm
 # whether we have virtio support
@@ -284,7 +294,15 @@ Known Parameters:
 
   --vm-type TYPE
               Use virtual machine instead of chroot
-              TYPE is one of xen|kvm|uml|qemu|lxc
+              TYPE is one of xen|kvm|uml|qemu|lxc|zvm
+
+  --vm-worker GUEST
+              GUEST is a z/VM build worker controlled by the controlling
+	      z/VM build machine. 
+
+  --vm-worker-nr N
+              Each worker in z/VM needs a uniq number. This is needed to 
+              calculate uniq device addresses for root and swap device.
 
   --vm-disk FILE
               Use FILE as disk for virtual machine.
@@ -699,6 +717,9 @@ detect_vm_2nd_stage()
 #        # allow abuild user to run qemu
 #        chmod 0666 /dev/kqemu
 #    fi
+    if test "$VM_TYPE" = 'zvm' ; then
+        VM_SWAP='/dev/dasdb1'
+    fi
     if test -n "$VM_SWAP" ; then
 	for i in 1 2 3 4 5 6 7 8 9 10 ; do
 	    test -e "$VM_SWAP" && break
@@ -896,6 +917,7 @@ if detect_vm_2nd_stage ; then
 fi
 
 . $BUILD_DIR/common_functions || exit 1
+. $BUILD_DIR/zvm_functions || exit 1
 
 export HOST
 
@@ -1009,6 +1031,10 @@ while test -n "$1"; do
 	    VM_IMAGE=1
 	fi
       ;;
+      *-zvm)
+        VM_TYPE="zvm"
+	shift
+      ;;
       --lxc)
 	VM_TYPE=${PARAM##*-}
       ;;
@@ -1016,6 +1042,7 @@ while test -n "$1"; do
 	needarg
 	VM_TYPE="$ARG"
 	case "$VM_TYPE" in
+            zvm) ;;
 	    xen|kvm|uml|qemu|lxc|emulator)
 		test -z "$VM_IMAGE" && VM_IMAGE=1
 	        ;;
@@ -1026,6 +1053,16 @@ while test -n "$1"; do
 	    ;;
 	esac
 	shift
+      ;;
+      --vm-worker)
+        needarg
+        VM_WORKER="$ARG"
+        shift
+      ;;
+      --vm-worker-nr)
+        needarg
+        zvm_worker_nr="$ARG"
+        shift
       ;;
       --vm-disk)
 	needarg
@@ -1219,6 +1256,11 @@ if test "$VM_TYPE" = "lxc"; then
     VM_SWAP=''
 fi
 
+if test "$VM_TYPE" = "zvm"; then
+    VM_IMAGE='/dev/dasda1'
+    VM_SWAP='/dev/dasdb1'
+fi
+
 if test "$VMDISK_MOUNT_OPTIONS" = __default; then
     if test "$VMDISK_FILESYSTEM" = reiserfs ; then
 	VMDISK_MOUNT_OPTIONS='-o data=writeback,commit=150,noatime'
@@ -1228,6 +1270,8 @@ if test "$VMDISK_MOUNT_OPTIONS" = __default; then
 	VMDISK_MOUNT_OPTIONS='-o data=writeback,nobarrier,commit=150,noatime'
     elif test "$VMDISK_FILESYSTEM" = "ext2" ; then
 	VMDISK_MOUNT_OPTIONS='-o noacl,noatime'
+    elif test "$VMDISK_FILESYSTEM" = "xfs" ; then
+	VMDISK_MOUNT_OPTIONS='-o noatime'
     else
 	VMDISK_MOUNT_OPTIONS='-o noatime'
     fi
@@ -1237,7 +1281,9 @@ if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
     if test -n "$VM_IMAGE" -a -n "$VM_SWAP" -a -n "$VM_TYPE"; then
 	# mark job as failed so that we don't extract packages
-	echo -n "BUILDSTATUS1" >"$VM_SWAP"
+	if test "$VM_TYPE" != "zvm"; then
+	    echo -n "BUILDSTATUS1" >"$VM_SWAP"
+        fi
     fi
     (set -C; > "$BUILD_ROOT/exit" 2>/dev/null || true)
     if test "$VM_TYPE" = 'lxc'; then
@@ -1260,6 +1306,13 @@ if test -n "$KILL" ; then
 		cleanup_and_exit 1
 	    fi
 	fi
+    elif test "$VM_TYPE" = 'zvm'; then
+	if vmcp q "$VM_WORKER" > /dev/nulll 2>&1 ; then
+            if ! zvm_cp destroy $VM_WORKER ; then
+	        echo "could not kill zvm worker $VM_WORKER"
+		cleanup_and_exit 1
+            fi
+        fi
     elif test -n "$VM_TYPE"; then
 	if ! fuser -k -TERM "$VM_IMAGE"; then
 	    echo "could not kill build in $VM_IMAGE"
@@ -1283,6 +1336,56 @@ if [ "$VM_TYPE" = 'xen' -a -z "$RUNNING_IN_VM" ]; then
 	vm_initrd="$VM_INITRD"
     elif [ -e "/boot/initrd-xen" ]; then
 	vm_initrd="/boot/initrd-xen"
+    fi
+fi
+
+if [ "$VM_TYPE" = 'zvm' -a -z "$RUNNING_IN_VM" ]; then
+    # verify settings
+    # In z/VM, this is a 4 digit hex number instead of a linux device.
+    # This is the root disk defined in user direct
+    # This number can be given with the parameter --root NR.
+    if [ -z "$VM_VOLUME_ROOT" ]; then
+        if [ -n "$BUILD_ROOT" -a ${#BUILD_ROOT} -le 4 ]; then
+            VM_VOLUME_ROOT="$BUILD_ROOT"
+        else
+            VM_VOLUME_ROOT="0150"
+        fi
+    fi
+    # In z/VM, this is a 4 digit hex number instead of a linux device.
+    # This is the swap disk defined in user direct
+    # This number can be given with the parameter --swap NR.
+    if [ -z "$VM_VOLUME_SWAP" ]; then
+        if [ -n "$VM_SWAP" -a ${#VM_SWAP} -le 4 ]; then
+            VM_VOLUME_SWAP="$VM_SWAP"
+        else
+            VM_VOLUME_SWAP="0250"
+        fi
+    fi
+    # z/VM guest name that is already defined in z/VM
+    if [ -z "$VM_WORKER" ]; then
+        echo "ERROR: No z/VM worker id specified"
+	cleanup_and_exit 3
+    fi
+    if [ -z "$zvm_worker_nr" ]; then
+        echo "ERROR: No z/VM worker number specified"
+        cleanup_and_exit 3
+    fi
+    # need the name for a kernel in zvm
+    if [ -n "$VM_KERNEL" ]; then
+        vm_kernel="$VM_KERNEL"
+    elif [ -e "/boot/vmlinux.gz" ]; then
+        vm_kernel="/boot/vmlinux.gz"
+    else
+        echo "ERROR: No z/VM kernel specified"
+	cleanup_and_exit 3
+    fi
+    # need the name for an initrd in zvm
+    # this normally will not be the local initrd
+    if [ -n "$VM_INITRD" ]; then
+        vm_initrd="$VM_INITRD"
+    else
+        echo "ERROR: No z/VM initrd specified"
+	cleanup_and_exit 3
     fi
 fi
 
@@ -1404,6 +1507,36 @@ if test -n "$LIST_STATE" ; then
     cleanup_and_exit $ERR
 fi
 
+# z/VM:
+# 1. make sure that no buildjob exists anymore by doing an ipl of cms
+# 2. detach the root device from the worker
+# 3. link the device to the controlling guest
+#    -> Need a uniq worker id to calculate a uniq device address for linking
+#    -> VM_IMAGE is the resulting block device
+echo "***********************************"
+echo "VM_TYPE: $VM_TYPE script: $0"
+if [ "$VM_TYPE" = 'zvm' ]; then
+    if [ ! "$0" = "/.build/build" ] ; then
+	echo "in controlling guest"
+        zvm_cp worker_init $VM_WORKER $VM_VOLUME_ROOT $VM_VOLUME_SWAP $zvm_worker_nr
+        zvm_cp volume_detach $VM_WORKER $VM_VOLUME_ROOT
+        zvm_cp volume_detach $VM_WORKER $VM_VOLUME_SWAP
+        VM_IMAGE=$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_ROOT $zvm_mult_pass $zvm_worker_nr )
+        VM_SWAP=$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_SWAP $zvm_mult_pass $zvm_worker_nr )
+        if [ ! "${VM_IMAGE}" = "dasd${VM_IMAGE#dasd}" -o ! "${VM_SWAP}" = "dasd${VM_SWAP#dasd}" ]; then
+            echo "did not get a real device for VM_IMAGES: $VM_IMAGE $VM_SWAP"
+            cleanup_and_exit 3
+        else 
+echo "FIRST: VM_IMAGE: $VM_IMAGE, VM_SWAP: $VM_SWAP"
+            VM_IMAGE="/dev/"${VM_IMAGE}
+	    VM_SWAP="/dev/"${VM_SWAP}
+        fi
+    fi
+fi
+
+echo "VM_IMAGE: $VM_IMAGE, VM_SWAP: $VM_SWAP"
+
+# doing setup
 if test -z "$RUNNING_IN_VM" ; then
     if test -n "$VM_IMAGE" ; then
 	if test "$VM_IMAGE" = 1 ; then
@@ -1441,7 +1574,7 @@ if test -z "$RUNNING_IN_VM" ; then
 		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE" || cleanup_and_exit 3
 	    fi
 	fi
-	if test -n "$VM_SWAP" -a ! -e "$VM_SWAP"; then
+	if test -n "$VM_SWAP" -a ! -e "$VM_SWAP" -a ! -b "$VM_SWAP"; then
 	    # setup VM_SWAP
 	    echo "Creating $VM_SWAP (${VMDISK_SWAPSIZE}M)"
 	    mkdir -p "${VM_SWAP%/*}"
@@ -1613,6 +1746,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     test "$ccache" = '0' || ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
     test "$icecream" = 0 || ADDITIONAL_PACKS="$ADDITIONAL_PACKS icecream gcc-c++"
     test -z "$DO_LINT" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS rpmlint-Factory"
+    test "$VMDISK_FILESYSTEM" = 'xfs' && ADDITIONAL_PACKS="$ADDITIONAL_PACKS libblkid1"
+    test "$VM_TYPE" = 'zvm' && ADDITIONAL_PACKS="$ADDITIONAL_PACKS udev libcap2"
 
     if test -n "$CHANGELOG" -a -z "$RUNNING_IN_VM" ; then
 	rm -f $BUILD_ROOT/.build-changelog
@@ -1712,6 +1847,19 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if [ "$VM_TYPE" = 'emulator' ]; then
             ln -sf /.build/build $BUILD_ROOT/sbin/init
         fi
+        if [ "$VM_TYPE" = 'zvm' ]; then
+            # initrd is created in obsstoragesetup.
+            # If it is desired to use a project dependent kernel, use make_guestinitrd from zvm_functions.
+            # have to copy kernel/initrd and run zipl to be able to IPL
+            # have to set init_script before unmounting, thus doing it statically for now.
+            zvm_init_script="/.build/build"
+            mkdir -p $BUILD_ROOT/boot
+            cp $vm_kernel $vm_initrd $BUILD_ROOT/boot
+            mkdir -p $BUILD_ROOT/boot/zipl
+             # finally, install bootloader to the worker disk
+             zipl -t $BUILD_ROOT/boot/zipl -i ${BUILD_ROOT}${vm_kernel} -r ${BUILD_ROOT}${vm_initrd} \
+                --parameters "${zvm_param} init=$zvm_init_script rootfsopts=noatime"
+        fi
 	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	umount -n $BUILD_ROOT/proc 2> /dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
@@ -1721,6 +1869,13 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    check_exit
 	    # needs to work otherwise we have a corrupted file system
 	    umount $BUILD_ROOT || cleanup_and_exit 1
+	    if [ "$VM_TYPE" = "zvm" ]; then
+		# detach the worker root and swap locally and link it in the worker
+		zvm_cp volume_detach_local $VM_VOLUME_ROOT ${zvm_worker_nr}
+		zvm_cp volume_detach_local $VM_VOLUME_SWAP ${zvm_worker_nr}
+		zvm_cp volume_attach $VM_WORKER $VM_VOLUME_ROOT
+		zvm_cp volume_attach $VM_WORKER $VM_VOLUME_SWAP
+	    fi
 	fi
 
 	if check_use_emulator; then
@@ -1882,6 +2037,21 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		BUILDSTATUS="$?"
 		test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
 		cleanup_and_exit "$BUILDSTATUS"
+        elif [ "$VM_TYPE" = 'zvm' ]; then
+                echo "booting $VM_TYPE ..."
+                zvm_cp ipl $VM_WORKER $VM_VOLUME_ROOT
+                # start IUCV Console
+                # IPL needs some time until IPL really starts...
+                 sleep 2
+                 # start iucv console. This blocks until build process is finished.
+                iucvconn $VM_WORKER lnxhvc0
+                # Take root and swap devices from worker
+                # This might be critical regarding timing (IUCV_CONSOLE down, but machine still running)
+                sleep 5
+                zvm_cp volume_detach $VM_WORKER $VM_VOLUME_ROOT
+                zvm_cp volume_detach $VM_WORKER $VM_VOLUME_SWAP
+                VM_IMAGE="/dev/$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_ROOT $zvm_mult_pass $zvm_worker_nr)"
+                VM_SWAP="/dev/$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_SWAP $zvm_mult_pass $zvm_worker_nr)"
 	fi
 
         # Exctract build resutls from VM
@@ -1950,12 +2120,27 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                     TIME_TOTAL=$(( `date +%s` - $TIME_START_TIME ))
                     echo "TIME_total: $TIME_TOTAL"  >> OTHER/_statistics
                 fi
+		if [ "$VM_TYPE" = 'zvm' ]; then
+		    # free worker devices
+		    zvm_cp volume_detach_local $VM_VOLUME_ROOT ${zvm_worker_nr}
+		    zvm_cp volume_detach_local $VM_VOLUME_SWAP ${zvm_worker_nr}
+		fi
 		cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
 		;;
 	      BUILDSTATUS*)
+		if [ "$VM_TYPE" = 'zvm' ]; then
+		    # free worker devices
+		    zvm_cp volume_detach_local $VM_VOLUME_ROOT ${zvm_worker_nr}
+		    zvm_cp volume_detach_local $VM_VOLUME_SWAP ${zvm_worker_nr}
+		fi
 		cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
 		;;
 	      *)
+		if [ "$VM_TYPE" = 'zvm' ]; then
+		    # free worker devices
+		    zvm_cp volume_detach_local $VM_VOLUME_ROOT ${zvm_worker_nr}
+		    zvm_cp volume_detach_local $VM_VOLUME_SWAP ${zvm_worker_nr}
+		fi
 		echo "No buildstatus set, either the base system is broken (glibc/bash/perl)"
 		echo "or the build host has a kernel or hardware problem..."
 		cleanup_and_exit 3
@@ -2551,6 +2736,7 @@ if test -n "$RUNNING_IN_VM"; then
          mount -n sys /sys -t sysfs
          device="sda"
          [ -e /dev/vda ] && device="vda"
+         [ -e /dev/dasda ] && device="dasda"
          disk=(`cat /sys/block/${device}/stat`)
          echo "IO_requests_read: ${disk[0]}"  >> $TOPDIR/OTHER/_statistics
          echo "IO_sectors_read: ${disk[2]}"   >> $TOPDIR/OTHER/_statistics
