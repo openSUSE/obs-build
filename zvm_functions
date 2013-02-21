@@ -1,0 +1,223 @@
+#!/bin/bash
+
+zvm_cleanup_and_exit()
+{
+    if test -n "$1"; then
+        echo "$1"
+        umount ${BUILD_ROOT}/proc
+        umount ${BUILD_ROOT}/dev/pts
+        cleanup_and_exit 1
+    else
+        exit 0
+        cleanup_and_exit 1
+    fi
+}
+
+prevent_detach()
+{
+    if test "$1" = "150" -o "$1" = "0150"; then
+        echo "don't detach local root"
+        zvm_cleanup_and_exit 1
+    fi
+}
+
+zvm_memset()
+{
+    # defining the worker also resets the operating system. Be careful
+    # $1: user name
+    # $2: amount in MB
+    # Note, that this is also limited by the worker definition in the user directory
+    if test -n "$2"; then
+        if ! vmcp send $1 define storage ${2}M ; then
+            zvm_cleanup_and_exit "Could not redefine storage of $1 to ${2}M"
+        fi
+    fi
+}
+
+zvm_logon()
+{
+    # kill machine if it already runs
+    # autolog machine
+    # Needs machine name as $1
+    if test -n "$1"; then
+        if $(vmcp q "$1" >& /dev/null); then
+            vmcp force $1
+            sleep 1
+        fi
+        if ! $(vmcp q "$1" >& /dev/null); then
+            if ! $(vmcp xautolog $1 >& /dev/null); then
+                zvm_cleanup_and_exit "Could not start machine $1. Is $1 defined in the user directory?"
+            else
+                # give the worker a moment to initialize
+                sleep 2
+                zvm_memset $1 $MEMSIZE
+		sleep 2
+            fi
+        fi
+    fi
+}
+
+zvm_ipl()
+{
+    # IPL worker. Needs user as $1 and ipl device as $2.
+    if test -n "$1" -a -n "$2"; then
+        if ! $(vmcp q "$1" >& /dev/null); then
+            zvm_cleanup_and_exit "User $1 not logged on."
+        else
+            if ! $(vmcp send $1 ipl $2); then
+                 zvm_cleanup_and_exit "Could not send command to $1"
+            fi
+        fi
+    else
+        zvm_cleanup_and_exit "Not enough arguments for ipl. Need user and device number."
+    fi
+}
+
+
+zvm_destroy()
+{
+    # Destroy build. Done by killing the worker machine.
+    # needs user as $1
+    if test -n "$1"; then
+        if ! $(vmcp force $1 ); then
+            zvm_cleanup_and_exit "Could not force $1"
+        fi
+    fi
+}
+
+zvm_get_local_devnr()
+{
+    # $1 is base address, either 150 or 250
+    # $2 is worker number
+    # there is room for up to 100 workers for this controlling guest, however in our setup I expect only up to 10 workers.
+    #echo "Debug: zvm_get_local_devnr: arg1: $1 arg2: $2"
+    if test $2 -ge 100 ; then
+        zvm_cleanup_and_exit "Not more than 100 workers supported by one controlling guest."
+    fi
+    if test "$1" = "0150" -o "$1" = "150" ; then 
+        DEVNR=$((300+$2))
+    else
+        if test "$1" = "0250" -o "$1" = "250" ; then 
+            DEVNR=$((400+$2))
+        else
+            zvm_cleanup_and_exit "The disk devices for root and swap must be 150 and 250 respectively."
+        fi
+    fi
+    echo $DEVNR
+}
+
+zvm_volume_link_local()
+{
+    # attach worker disk to local system as preparation for 
+    # a) prepare worker for build
+    # b) get rpms of the swap disk after build finished
+    # disk must be detached from worker first
+    # The following arguments are needed:
+    # 1. Worker user name
+    # 2. Worker disk device number
+    # 3. Mult password for the disk
+    # 4. Worker number to generate a uniq local device number
+    if test -n "$4"; then
+        DEVNR=$(zvm_get_local_devnr $2 $4)
+        if ! vmcp link $1 $2 $DEVNR MW pass=THR4ME >& /dev/null ; then
+            zvm_cleanup_and_exit "Could not link disk $2 from user $1 to local device $DEVNR."
+        fi
+        dasd_configure 0.0.0$DEVNR 1 0 >& /dev/null
+	udevadm settle
+        DEVICE=$(ls /sys/bus/ccw/devices/0.0.0$DEVNR/block/)
+        if ! test -b /dev/${DEVICE}1 ; then
+            zvm_cleanup_and_exit "The device /sys/bus/ccw/devices/0.0.0$DEVNR has not been setup correctly."
+        fi
+        echo "${DEVICE}1"
+    else
+        zvm_cleanup_and_exit "Not enough arguments given to volume_link_local."
+    fi 
+}
+
+zvm_volume_detach_local()
+{
+    # we need
+    # 1. worker device number
+    # 2. worker number
+    DEVNR=$(zvm_get_local_devnr $1 $2)
+    prevent_detach $DEVNR
+    dasd_configure 0.0.0$DEVNR 0 0
+    if ! vmcp detach $DEVNR >& /dev/null ; then
+        zvm_cleanup_and_exit "Could not locally detach disk number $1 from worker $2"
+    fi
+}
+
+zvm_volume_attach()
+{
+    # link the local disk of the worker 
+    # $1: user name
+    # $2: disk device number
+    # send link * nr nr
+    if ! vmcp send $1 link \* $2 $2 ; then
+        zvm_cleanup_and_exit "Could not link remote worker disk number $2 from user $1"
+    fi 
+}
+
+zvm_volume_detach()
+{
+    # send machine detach nr
+    # $1: user name
+    # $2: disk
+    if ! vmcp send $1 detach $2 ; then
+        zvm_cleanup_and_exit "Could not detach disk $2 on worker $1"
+    fi
+}
+
+zvm_worker_init()
+{
+    # 1. Worker user name
+    # 2. Worker root device number
+    # 3. Worker swap device number
+    # 4. Worker number to generate a uniq local device number
+    # Check for: 
+    # - still mounted dasd
+    # - configured dasd
+    # - linked dasd
+    # - reset worker with force and autolog 
+    DEVNR_ROOT=$(zvm_get_local_devnr $2 $4) 
+    DEVNR_SWAP=$(zvm_get_local_devnr $3 $4)
+    # First, check for mounts:
+    for DEVNR in $DEVNR_ROOT $DEVNR_SWAP; do
+        if [ -d /sys/bus/ccw/devices/0.0.0$DEVNR/block ]; then
+            DEV=$(ls /sys/bus/ccw/devices/0.0.0$DEVNR/block/)
+            echo "Found device of worker $1 available at $DEVNR, device is /dev/$DEV."
+            grep "/dev/$DEV" /proc/mounts >& /dev/null && umount /dev/${DEV}1
+        fi
+    done
+    # Second, check if devices are online
+    for DEVNR in $DEVNR_ROOT $DEVNR_SWAP; do
+        lsdasd $DEVNR | grep $DEVNR && dasd_configure 0.0.0$DEVNR 0 0
+    done
+    # Third, remove stale links
+    for DEVNR in $DEVNR_ROOT $DEVNR_SWAP; do
+        prevent_detach $DEVNR
+        if vmcp q v $DEVNR 2> /dev/null; then
+            vmcp detach $DEVNR
+        fi
+    done
+    # Fourth, reset worker
+    zvm_logon $1
+}
+
+zvm_cp()
+{
+    modprobe vmcp || zvm_cleanup_and_exit "Cannod load vmcp module"
+    if test -n $1 ; then
+        case "$1" in 
+            start)                shift ; zvm_logon $*          ;;
+            ipl)                  shift ; zvm_ipl $*            ;;
+            destroy)              shift ; zvm_destroy $*        ;;
+            volume_attach)        shift ; zvm_volume_attach $*  ;;
+            volume_detach)        shift ; zvm_volume_detach $*  ;;
+            volume_link_local)    shift ; zvm_volume_link_local $*   ;;
+            volume_detach_local)  shift ; zvm_volume_detach_local $* ;;
+            memset)               shift ; zvm_memset $*         ;;
+            worker_init)          shift ; zvm_worker_init $*    ;;
+        esac
+    fi
+}
