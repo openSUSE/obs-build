@@ -67,6 +67,7 @@ install:
 	install -m644 *.pm baselibs_global*.conf lxc.conf $(DESTDIR)$(pkglibdir)
 	install -m644 configs/* $(DESTDIR)$(pkglibdir)/configs
 	install -m644 build.1 $(DESTDIR)$(man1dir)
+	install -m755  zvm_functions $(DESTDIR)$(pkglibdir)
 	ln -sf $(pkglibdir)/build $(DESTDIR)$(bindir)/build
 	ln -sf $(pkglibdir)/vc    $(DESTDIR)$(bindir)/buildvc
 	ln -sf $(pkglibdir)/unrpm $(DESTDIR)$(bindir)/unrpm
