@@ -60,6 +60,7 @@ install:
 	    spectool \
 	    signdummy \
 	    unrpm \
+	    zvm_functions \
 	    $(DESTDIR)$(pkglibdir)
 	install -m755 emulator/emulator.sh $(DESTDIR)$(pkglibdir)/emulator/
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build
