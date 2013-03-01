@@ -1966,7 +1966,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                 fi
 
 		if [ "$kvm_virtio" = 1 ]; then
-		    qemu_args=(-drive file="$VM_IMAGE",if=virtio$CACHE -drive file="$VM_IMAGE",if=ide,index=0$CACHE)
+		    qemu_args=(-drive file="$VM_IMAGE",if=virtio$CACHE)
 		    if [ -n "$VM_SWAP" ]; then
 			qemu_args=("${qemu_args[@]}" "-drive")
 			qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=virtio$CACHE")
