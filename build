@@ -111,6 +111,7 @@ RSYNCDONE=
 SIGNDUMMY=
 HOST_ARCH=
 EMULATOR_SCRIPT=
+KVM_OPTIONS=
 
 # This is for insserv
 export YAST_IS_RUNNING=instsys
@@ -861,34 +862,30 @@ check_for_ppc()
         return
     fi
 
-    export HOST_ARCH=ppc
+    grep -q "PowerNV" /proc/cpuinfo && export HOST_ARCH=power7 || export HOST_ARCH=ppc970
 
-    # XXX is this ok for ppc32 hosts? do we care?
     export kvm_bin="/usr/bin/qemu-system-ppc64"
     export console=hvc0
-    # XXX check host CPU and adjust guest CPU accordingly
     export KVM_OPTIONS="-enable-kvm -M pseries -mem-path /hugetlbfs"
     export VM_KERNEL=/boot/vmlinux
     export VM_INITRD=/boot/initrd
     if [ -z "$RUNNING_IN_VM" -a "$VM_TYPE" = "kvm" ];then
-	    if ! grep "/hugetlbfs" /proc/mounts; then
-		echo "hugetlbfs is not mounted"
-		exit 1
-	    fi
-            PAGES_FREE=$(cat /sys/kernel/mm/hugepages/hugepages-16384kB/free_hugepages)
-            PAGES_REQ=$(( ${MEMSIZE:-64} / 16 ))
-	    if [ "$PAGES_FREE" -lt "$PAGES_REQ" ];then
-		echo "please adjust nr_hugepages"
-		exit 1
-	    fi
-	    if ! grep -q kvm_rma_count /proc/cmdline; then
-		echo "put kvm_rma_count=<VM number> to your boot options"
-		exit 1
-	    fi
-	    if ! grep -q kvm_hpt_count /proc/cmdline; then
-		echo "put kvm_hpt_count=<VM number> to your boot options"
-		exit 1
-	    fi
+      if ! grep -q "/hugetlbfs" /proc/mounts; then
+         echo "hugetlbfs is not mounted"
+         exit 1
+      fi
+         PAGES_FREE=$(cat /sys/kernel/mm/hugepages/hugepages-16384kB/free_hugepages)
+         PAGES_REQ=$(( ${MEMSIZE:-64} / 16 ))
+      if [ "$PAGES_FREE" -lt "$PAGES_REQ" ];then
+         echo "please adjust nr_hugepages"
+         exit 1
+      fi
+      if [ "$HOST_ARCH" = "ppc970" ];then
+          if ! grep -q -E 'kvm_rma_count.*kvm_hpt_count)|(kvm_hpt_count.*kvm_rma_count)' /proc/cmdline; then
+             echo "put kvm_rma_count=<VM number> or kvm_hpt_count=<> to your boot options"
+             exit 1
+          fi
+      fi
    fi
 }
 
@@ -1447,15 +1444,10 @@ if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
 	fi
     fi
 
-    if [ "$HOST_ARCH" = ppc ]; then
-        # KVM on PPC can not run virtio yet, so we need to use the default vio
-        kvm_virtio=
-    fi
-
-    if [ "$HOST_ARCH" = armv7l ]; then
-        # KVM on ARM can only do virtio
-        kvm_virtio=1
-    fi
+    case $HOST_ARCH in
+        power7|armv7l) kvm_virtio=1;;
+        ppc970) kvm_virtio=;;
+    esac
 
     if [ "$kvm_virtio" = 1 ]; then
 	VM_SWAPDEV=/dev/vdb
@@ -1979,7 +1971,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 			qemu_args=("${qemu_args[@]}" "virtio-blk,transport=virtio-mmio.1,drive=swap")
 		    fi
 		else
-			if [ "$HOST_ARCH" = "ppc" ];then
+			if [ "$HOST_ARCH" = "ppc970" ];then
 				qemu_args=( "-drive" )
 				qemu_args=("${qemu_args[@]}" "file=$VM_IMAGE,if=scsi,cache=unsafe")
 			else
@@ -1987,7 +1979,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 			fi
 			if [ -n "$VM_SWAP" ]; then
 				qemu_args=("${qemu_args[@]}" "-drive")
-				if [ "$HOST_ARCH" = "ppc" ];then
+				if [ "$HOST_ARCH" = "ppc970" ];then
 					DISK_IF=scsi
 				else
 					DISK_IF=ide
@@ -1997,10 +1989,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		fi
 		if [ -n "$BUILD_JOBS" -a "$icecream" = 0 -a "$HOST_ARCH" != "armv7l" ]; then
 		    qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS")
-		fi
-		# cpuid is not set correctly in kvm without this
-		if [ "$HOST_ARCH" != "ppc" -a "$HOST_ARCH" != "armv7l" ]; then
-			KVM_OPTIONS=""
 		fi
 		if [ "$VM_TYPE" = 'kvm' -a "$HOST_ARCH" != "armv7l" ]; then
 			KVM_OPTIONS="$KVM_OPTIONS -cpu host"
