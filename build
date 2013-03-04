@@ -2726,12 +2726,12 @@ if test -n "$RUNNING_IN_VM"; then
          mount -n sys /sys -t sysfs
          device="sda"
          [ -e /dev/vda ] && device="vda"
-         [ -e /dev/dasda ] && device="dasda"
+         [ -e /dev/dasda ] && device="dasda" # in z/VM
          disk=(`cat /sys/block/${device}/stat`)
-         echo "IO_requests_read: ${disk[0]}"  >> $TOPDIR/OTHER/_statistics
-         echo "IO_sectors_read: ${disk[2]}"   >> $TOPDIR/OTHER/_statistics
-         echo "IO_requests_write: ${disk[4]}" >> $TOPDIR/OTHER/_statistics
-         echo "IO_sectors_write: ${disk[6]}"  >> $TOPDIR/OTHER/_statistics
+         [ "0${disk[0]}" -gt 0 ] && echo "IO_requests_read: ${disk[0]}"  >> $TOPDIR/OTHER/_statistics
+         [ "0${disk[2]}" -gt 0 ] && echo "IO_sectors_read: ${disk[2]}"   >> $TOPDIR/OTHER/_statistics
+         [ "0${disk[4]}" -gt 0 ] && echo "IO_requests_write: ${disk[4]}" >> $TOPDIR/OTHER/_statistics
+         [ "0${disk[6]}" -gt 0 ] && echo "IO_sectors_write: ${disk[6]}"  >> $TOPDIR/OTHER/_statistics
          umount /sys
     fi
 
