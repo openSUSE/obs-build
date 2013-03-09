@@ -881,7 +881,7 @@ check_for_ppc()
          exit 1
       fi
       if [ "$HOST_ARCH" = "ppc970" ];then
-          if ! grep -q -E 'kvm_rma_count.*kvm_hpt_count)|(kvm_hpt_count.*kvm_rma_count)' /proc/cmdline; then
+          if ! grep -q -E '(kvm_rma_count.*kvm_hpt_count)|(kvm_hpt_count.*kvm_rma_count)' /proc/cmdline; then
              echo "put kvm_rma_count=<VM number> or kvm_hpt_count=<> to your boot options"
              exit 1
           fi
