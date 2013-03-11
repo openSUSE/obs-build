@@ -72,6 +72,7 @@ DO_LINT=
 DO_CHECKS=true
 CLEAN_BUILD=
 USE_SYSTEM_QEMU=
+KEEP_PACKS=
 SPECFILES=()
 SRCDIR=
 BUILD_JOBS=
@@ -994,6 +995,9 @@ while test -n "$1"; do
       *-use-system-qemu)
 	USE_SYSTEM_QEMU="--use-system-qemu"
       ;;
+      --keep-packs)
+	KEEP_PACKS="--keep-packs"
+      ;;
       *-root)
 	needarg
 	BUILD_ROOT="$ARG"
@@ -1761,7 +1765,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	if test "$DO_INIT" = true ; then
 	    # do first stage of init_buildsystem
 	    rm -f $BUILD_ROOT/.build.success
-	    set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USE_SYSTEM_QEMU $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
+	    set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USE_SYSTEM_QEMU $KEEP_PACKS $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
 	    echo "$* ..."
             start_time=`date +%s`
 	    "$@" || cleanup_and_exit 1
@@ -2155,7 +2159,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	CREATE_BUILD_BINARIES=
 	test "$BUILDTYPE" = preinstallimage && mkdir -p $BUILD_ROOT/.preinstall_image
 	egrep '^#[       ]*needsbinariesforbuild[       ]*$' >/dev/null <$MYSRCDIR/$SPECFILE && CREATE_BUILD_BINARIES=--create-build-binaries
-	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USE_SYSTEM_QEMU $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
+	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USE_SYSTEM_QEMU $KEEP_PACKS $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
         start_time=`date +%s`
 	"$@" || cleanup_and_exit 1
@@ -2275,13 +2279,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    chown "$ABUILD_UID:$ABUILD_GID" $BUILD_ROOT/home/abuild
 	else
 	    if ! egrep "^abuild:x?:${ABUILD_UID}:${ABUILD_GID}" >/dev/null <$BUILD_ROOT/etc/passwd ; then
-		echo "abuild user present in the buildroot ($BUILD_ROOT) but uid:gid does not match"
-		echo "buildroot currently using:"
-		egrep "^abuild:" <$BUILD_ROOT/etc/passwd
-		echo "build script attempting to use:"
-		echo "abuild::${ABUILD_UID}:${ABUILD_GID}:..."
-		echo "build aborting"
-		cleanup_and_exit 1
+                sed -i '/^abuild:/d' $BUILD_ROOT/etc/passwd
+                sed -i '/^abuild:/d' $BUILD_ROOT/etc/group
+                echo "abuild:x:${ABUILD_UID}:${ABUILD_GID}:Autobuild:/home/abuild:/bin/bash" >>$BUILD_ROOT/etc/passwd
+                echo "abuild:x:${ABUILD_GID}:" >>$BUILD_ROOT/etc/group
+                chown "$ABUILD_UID:$ABUILD_GID" $BUILD_ROOT/home/abuild -R
 	    fi
 	fi
 	if test -f $BUILD_ROOT/etc/shadow ; then
