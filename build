@@ -1989,7 +1989,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 				qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=$DISK_IF,index=1$CACHE")
 			fi
 		fi
-		if [ -n "$BUILD_JOBS" -a "$icecream" = 0 -a "$HOST_ARCH" != "armv7l" ]; then
+		if [ -n "$BUILD_JOBS" -a "$icecream" = 0 ]; then
 		    qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS")
 		fi
 		if [ "$VM_TYPE" = 'kvm' -a "$HOST_ARCH" != "armv7l" ]; then
