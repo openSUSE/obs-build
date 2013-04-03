@@ -1957,7 +1957,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                 else
                   # speed optimization when using kvm with raw files
 		  CACHE=",cache=unsafe"
-                fi
+		fi
+
+		# we do not want to have sound inside the VMs
+		export QEMU_AUDIO_DRV=none
 
 		if [ "$kvm_virtio" = 1 ]; then
 		    qemu_args=(-drive file="$VM_IMAGE",if=virtio$CACHE -drive file="$VM_IMAGE",if=ide,index=0$CACHE)
