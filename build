@@ -1019,7 +1019,7 @@ while test -n "$1"; do
 	EMULATOR_SCRIPT="$ARG"
 	shift
       ;;
-      *-xen|*-kvm|--uml|--qemu|--emulator)
+      *-xen|*-kvm|--uml|--qemu|*-emulator)
 	VM_TYPE=${PARAM##*-}
 	if [ -n "$ARG" ]; then
 	    VM_IMAGE="$ARG"
