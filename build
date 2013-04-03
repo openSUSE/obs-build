@@ -1286,7 +1286,9 @@ if test "$VMDISK_MOUNT_OPTIONS" = __default; then
 	VMDISK_MOUNT_OPTIONS='-o data=writeback,commit=150,noatime'
     elif test "$VMDISK_FILESYSTEM" = btrfs ; then
         VMDISK_MOUNT_OPTIONS='-o nobarrier,noatime'
-    elif test "$VMDISK_FILESYSTEM" = "ext4" -o "$VMDISK_FILESYSTEM" = "ext3" ; then
+    elif test "$VMDISK_FILESYSTEM" = "ext4" ; then
+	VMDISK_MOUNT_OPTIONS='-o noatime'
+    elif test "$VMDISK_FILESYSTEM" = "ext3" ; then
 	VMDISK_MOUNT_OPTIONS='-o data=writeback,nobarrier,commit=150,noatime'
     elif test "$VMDISK_FILESYSTEM" = "ext2" ; then
 	VMDISK_MOUNT_OPTIONS='-o noacl,noatime'
