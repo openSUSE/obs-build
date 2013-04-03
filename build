@@ -893,7 +893,7 @@ check_for_ppc()
 
     export kvm_bin="/usr/bin/qemu-system-ppc64"
     export console=hvc0
-    export KVM_OPTIONS="-enable-kvm -M pseries -mem-path /hugetlbfs -vga none"
+    export KVM_OPTIONS="-enable-kvm -M pseries -mem-path /hugetlbfs"
     export VM_KERNEL=/boot/vmlinux
     export VM_INITRD=/boot/initrd
     if [ -z "$RUNNING_IN_VM" -a "$VM_TYPE" = "kvm" ];then
@@ -2027,7 +2027,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		        fi
 		fi
 
-		set -- $qemu_bin -no-reboot -nographic -net none $KVM_OPTIONS \
+		set -- $qemu_bin -no-reboot -nographic -vga none -net none $KVM_OPTIONS \
 		    -kernel $vm_kernel \
 		    -initrd $vm_initrd \
 		    -append "root=$qemu_rootdev panic=1 quiet no-kvmclock nmi_watchdog=0 rw elevator=noop console=$console init=$vm_init_script" \
