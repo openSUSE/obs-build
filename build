@@ -28,8 +28,10 @@ repos=()
 old_packages=()
 
 # defaults for vm_img_mkfs
-vm_img_mkfs_ext4='mkfs.ext4 -m 0 -q -F'
-vm_img_tunefs_ext4='tune2fs -c 0 -O ^has_journal'
+vm_img_mkfs_ext4_options='-O ^has_journal,^huge_file,^resize_inode,sparse_super'
+vm_img_mkfs_ext4_extra='-E lazy_itable_init,discard'
+vm_img_mkfs_ext4="mkfs.ext4 -m 0 -q -F $vm_img_mkfs_ext4_options $vm_img_mkfs_ext4_extra"
+vm_img_tunefs_ext4='tune2fs -c 0'
 vm_img_mkfs_ext3='mkfs.ext3 -m 0 -q -F'
 vm_img_tunefs_ext3='tune2fs -c 0 -o journal_data_writeback'
 vm_img_mkfs_ext2='mkfs.ext2 -m 0 -q -F'
@@ -621,6 +623,26 @@ copy_oldpackages()
     done
 }
 
+vm_img_create()
+{
+    local img="$1"
+    local size="$2"
+
+    echo "Creating $img (${size}M)"
+    mkdir -p "${img%/*}" || cleanup_and_exit 3
+
+    # prefer fallocate, which avoids fragmentation
+    r=1
+    if type -p fallocate > /dev/null; then
+        fallocate -l "${size}M" "$img"
+        r=$?
+    fi
+    # fall back to dd method if fallocate is not supported
+    if [ "$r" -gt "0" ]; then
+        dd if=/dev/zero of="$img" bs=1M count=0 seek="$size" || cleanup_and_exit 3
+    fi
+}
+
 vm_img_mkfs()
 {
     local fs="$1"
@@ -640,7 +662,6 @@ vm_img_mkfs()
     if test -n "$tunefs" ; then
 	$tunefs "$img" || cleanup_and_exit 3
     fi
-
 }
 
 background_monitor_process()
@@ -671,7 +692,7 @@ background_monitor_process()
 
     # disk storage usage
     if type -p df >& /dev/null; then
-      c=(`df -m / | tail -n 1`)
+      c=(`df -m / 2>/dev/null | tail -n 1`)
 
       if [ ${c[2]} -gt $max_disk ]; then
         max_disk="${c[2]}"
@@ -1271,7 +1292,9 @@ if test "$VMDISK_MOUNT_OPTIONS" = __default; then
 	VMDISK_MOUNT_OPTIONS='-o data=writeback,commit=150,noatime'
     elif test "$VMDISK_FILESYSTEM" = btrfs ; then
         VMDISK_MOUNT_OPTIONS='-o nobarrier,noatime'
-    elif test "$VMDISK_FILESYSTEM" = "ext4" -o "$VMDISK_FILESYSTEM" = "ext3" ; then
+    elif test "$VMDISK_FILESYSTEM" = "ext4" ; then
+	VMDISK_MOUNT_OPTIONS='-o noatime'
+    elif test "$VMDISK_FILESYSTEM" = "ext3" ; then
 	VMDISK_MOUNT_OPTIONS='-o data=writeback,nobarrier,commit=150,noatime'
     elif test "$VMDISK_FILESYSTEM" = "ext2" ; then
 	VMDISK_MOUNT_OPTIONS='-o noacl,noatime'
@@ -1567,18 +1590,14 @@ if test -z "$RUNNING_IN_VM" ; then
 	    fi
 	fi
 	if test ! -e "$VM_IMAGE"; then
-	    echo "Creating $VM_IMAGE (${VMDISK_ROOTSIZE}M)"
-	    mkdir -p "${VM_IMAGE%/*}"
-	    dd if=/dev/zero of="$VM_IMAGE" bs=1M count=0 seek="$VMDISK_ROOTSIZE" || cleanup_and_exit 3
+	    vm_img_create "$VM_IMAGE" "$VMDISK_ROOTSIZE"
+
 	    if test -z "$CLEAN_BUILD" ; then
-		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE" || cleanup_and_exit 3
+		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE"
 	    fi
 	fi
 	if test -n "$VM_SWAP" -a ! -e "$VM_SWAP" -a ! -b "$VM_SWAP"; then
-	    # setup VM_SWAP
-	    echo "Creating $VM_SWAP (${VMDISK_SWAPSIZE}M)"
-	    mkdir -p "${VM_SWAP%/*}"
-	    dd if=/dev/zero of="$VM_SWAP" bs=1M count=0 seek="$VMDISK_SWAPSIZE" || cleanup_and_exit 3
+	    vm_img_create "$VM_SWAP" "$VMDISK_SWAPSIZE"
 	fi
 	if test ! -e "$VM_IMAGE" ; then
 	    echo "you need to create $VM_IMAGE first"
