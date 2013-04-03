@@ -485,15 +485,15 @@ setupicecream()
 	rm -rf "$BUILD_ROOT/var/run/icecream"
 	mkdir -p "$BUILD_ROOT/var/run/icecream"
 	if [ -e "$BUILD_ROOT"/usr/bin/create-env ]; then
-	  createenv=/usr/bin/create-env
+	    createenv=/usr/bin/create-env
 	elif [ -e "$BUILD_ROOT"/usr/lib/icecc/icecc-create-env ]; then
-	  createenv="/usr/lib/icecc/icecc-create-env /usr/bin/gcc /usr/bin/g++" # XXX
+	    createenv="/usr/lib/icecc/icecc-create-env /usr/bin/gcc /usr/bin/g++" # XXX
 	elif [ -e "$BUILD_ROOT"/usr/lib64/icecc/icecc-create-env ]; then
-	  createenv="/usr/lib64/icecc/icecc-create-env /usr/bin/gcc /usr/bin/g++" # XXX
+	    createenv="/usr/lib64/icecc/icecc-create-env /usr/bin/gcc /usr/bin/g++" # XXX
 	else
-	  echo "create-env not found"
-	  false
-	  return
+	    echo "create-env not found"
+	    false
+	    return
 	fi
 	chroot $BUILD_ROOT bash -c "cd /var/run/icecream; $createenv" || cleanup_and_exit 1
 	icecc_vers=(`shopt -s nullglob; echo $BUILD_ROOT/var/run/icecream/*.tar.{bz2,gz}`)
@@ -502,7 +502,7 @@ setupicecream()
 	echo "reusing existing icecream environment $icecc_vers"
     fi
     if [ -n "$icecc_vers" ]; then
-      echo "export ICECC_VERSION=$icecc_vers" >> "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
+        echo "export ICECC_VERSION=$icecc_vers" >> "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
     fi
 }
 
@@ -822,9 +822,9 @@ mkdir_build_root()
 
     rm -rf "$BUILD_ROOT/.build.packages"
     if [ -z "$VM_TYPE" -a -z "$RUNNING_IN_VM" ]; then
-       # don't touch this in VM
-       rm -rf "$BUILD_ROOT/.build"
-       mkdir -p "$BUILD_ROOT/.build"
+	# don't touch this in VM
+	rm -rf "$BUILD_ROOT/.build"
+	mkdir -p "$BUILD_ROOT/.build"
     fi
 }
 
@@ -859,7 +859,7 @@ check_for_ppc()
     uname=$(uname -m)
 
     if [ "$uname" != "ppc" -a "$uname" != "ppc64" ]; then
-        return
+	return
     fi
 
     grep -q "PowerNV" /proc/cpuinfo && export HOST_ARCH=power7 || export HOST_ARCH=ppc970
@@ -870,23 +870,23 @@ check_for_ppc()
     export VM_KERNEL=/boot/vmlinux
     export VM_INITRD=/boot/initrd
     if [ -z "$RUNNING_IN_VM" -a "$VM_TYPE" = "kvm" ];then
-      if ! grep -q "/hugetlbfs" /proc/mounts; then
-         echo "hugetlbfs is not mounted"
-         exit 1
-      fi
-         PAGES_FREE=$(cat /sys/kernel/mm/hugepages/hugepages-16384kB/free_hugepages)
-         PAGES_REQ=$(( ${MEMSIZE:-64} / 16 ))
-      if [ "$PAGES_FREE" -lt "$PAGES_REQ" ];then
-         echo "please adjust nr_hugepages"
-         exit 1
-      fi
-      if [ "$HOST_ARCH" = "ppc970" ];then
-          if ! grep -q -E '(kvm_rma_count.*kvm_hpt_count)|(kvm_hpt_count.*kvm_rma_count)' /proc/cmdline; then
-             echo "put kvm_rma_count=<VM number> or kvm_hpt_count=<> to your boot options"
-             exit 1
-          fi
-      fi
-   fi
+	if ! grep -q "/hugetlbfs" /proc/mounts; then
+	    echo "hugetlbfs is not mounted"
+	    exit 1
+	fi
+	PAGES_FREE=$(cat /sys/kernel/mm/hugepages/hugepages-16384kB/free_hugepages)
+	PAGES_REQ=$(( ${MEMSIZE:-64} / 16 ))
+	if [ "$PAGES_FREE" -lt "$PAGES_REQ" ];then
+	    echo "please adjust nr_hugepages"
+	    exit 1
+	fi
+	if [ "$HOST_ARCH" = "ppc970" ];then
+	    if ! grep -q -E '(kvm_rma_count.*kvm_hpt_count)|(kvm_hpt_count.*kvm_rma_count)' /proc/cmdline; then
+		echo "put kvm_rma_count=<VM number> or kvm_hpt_count=<> to your boot options"
+		exit 1
+	    fi
+	fi
+    fi
 }
 
 #### main ####
@@ -1264,7 +1264,7 @@ if test "$VMDISK_MOUNT_OPTIONS" = __default; then
     if test "$VMDISK_FILESYSTEM" = reiserfs ; then
 	VMDISK_MOUNT_OPTIONS='-o data=writeback,commit=150,noatime'
     elif test "$VMDISK_FILESYSTEM" = btrfs ; then
-        VMDISK_MOUNT_OPTIONS='-o nobarrier,noatime'
+	VMDISK_MOUNT_OPTIONS='-o nobarrier,noatime'
     elif test "$VMDISK_FILESYSTEM" = "ext4" -o "$VMDISK_FILESYSTEM" = "ext3" ; then
 	VMDISK_MOUNT_OPTIONS='-o data=writeback,nobarrier,commit=150,noatime'
     elif test "$VMDISK_FILESYSTEM" = "ext2" ; then
@@ -1311,7 +1311,7 @@ if test -n "$KILL" ; then
 	        echo "could not kill zvm worker $VM_WORKER"
 		cleanup_and_exit 1
             fi
-        fi
+	fi
     elif test -n "$VM_TYPE"; then
 	if ! fuser -k -TERM "$VM_IMAGE"; then
 	    echo "could not kill build in $VM_IMAGE"
@@ -1486,14 +1486,14 @@ if test -n "$LIST_STATE" ; then
     test -d "$BUILD_ROOT" || cleanup_and_exit 3
     SPECFILE=$SPECFILES # only one specified anyways
     if test "$SPECFILE" != "${SPECFILE%.src.rpm}" ; then
-       rm -rf "$BUILD_ROOT/usr/src/packages"
-       mkdir -p $BUILD_ROOT/usr/src/packages/SOURCES $BUILD_ROOT/usr/src/packages/SPECS
-       rpm -i --nodigest --nosignature --root $BUILD_ROOT $SPECFILE || {
-	   echo "could not install $SPECFILE." 2>&1
-	   rm -rf "$BUILD_ROOT"
-	   cleanup_and_exit 3
-       }
-       for SPECFILE in $BUILD_ROOT/usr/src/packages/SPECS/*.spec ; do : ; done
+	rm -rf "$BUILD_ROOT/usr/src/packages"
+	mkdir -p $BUILD_ROOT/usr/src/packages/SOURCES $BUILD_ROOT/usr/src/packages/SPECS
+	rpm -i --nodigest --nosignature --root $BUILD_ROOT $SPECFILE || {
+	    echo "could not install $SPECFILE." 2>&1
+	    rm -rf "$BUILD_ROOT"
+	    cleanup_and_exit 3
+	}
+	for SPECFILE in $BUILD_ROOT/usr/src/packages/SPECS/*.spec ; do : ; done
     fi
     init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --list-state "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $SPECFILE $BUILD_EXTRA_PACKS
     ERR=$?
@@ -1677,8 +1677,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
       _preinstallimage) BUILDTYPE=preinstallimage ;;
     esac
     if test -z "$BUILDTYPE" ; then
-       echo "don't know how to build $SPECFILE"
-       cleanup_and_exit 1
+	echo "don't know how to build $SPECFILE"
+	cleanup_and_exit 1
     fi
 
     cd "$SRCDIR"
@@ -1696,8 +1696,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     # first setup building directory...
     #
     test -s "$SPECFILE" || {
-       echo "$SPECFILE" is empty.  This should not happen...
-       cleanup_and_exit 1
+	echo "$SPECFILE" is empty.  This should not happen...
+	cleanup_and_exit 1
     }
 
     if test "$SPECFILE" != "${SPECFILE%.src.rpm}" ; then
@@ -1887,63 +1887,59 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	fi
 
 	if [ "$VM_TYPE" = 'emulator' ]; then
-                # generic emulator hook. an external script is needed to define
-                # the emulator startup
-                sync
-                pushd $BUILD_DIR/emulator
-                if [ -z "$EMULATOR_SCRIPT" ]; then
-                   EMULATOR_SCRIPT="./emulator.sh"
-                elif [ "${EMULATOR_SCRIPT:0:1}" != "/" ]; then
-                   EMULATOR_SCRIPT="./$EMULATOR_SCRIPT"
-                fi
-		set -- "$EMULATOR_SCRIPT" "$VM_IMAGE"
-		echo "$@"
-		if ! "$@"; then
-                     popd
-                     echo "ERROR: The emulator return with an failure"
-                     cleanup_and_exit 3
-                fi
-                popd
-
+	    pushd $BUILD_DIR/emulator
+	    if [ -z "$EMULATOR_SCRIPT" ]; then
+		EMULATOR_SCRIPT="./emulator.sh"
+	    elif [ "${EMULATOR_SCRIPT:0:1}" != "/" ]; then
+		EMULATOR_SCRIPT="./$EMULATOR_SCRIPT"
+	    fi
+	    set -- "$EMULATOR_SCRIPT" "$VM_IMAGE"
+	    echo "$@"
+	    if ! "$@"; then
+		popd
+		echo "ERROR: The emulator return with an failure"
+		cleanup_and_exit 3
+	    fi
+	    popd
 	elif [ "$VM_TYPE" = 'xen' ]; then
-		XMROOT="file:$(readlink -f $VM_IMAGE)"
-		XMROOT=${XMROOT/#file:\/dev/phy:/dev}
-		XMROOT="disk=$XMROOT,hda1,w"
-		XMSWAP=
-		if test -n "$VM_SWAP" ; then
-		    XMSWAP="file:$(readlink -f $VM_SWAP)"
-		    XMSWAP=${XMSWAP/#file:\/dev/phy:/dev}
-		    XMSWAP="disk=$XMSWAP,hda2,w"
-		fi
-		XENID="${VM_IMAGE%/root}"
-		XENID="${XENID%/tmpfs}"
-		XENID="${XENID##*/}"
-	        XENID="${XENID#root_}"
+	    XMROOT="file:$(readlink -f $VM_IMAGE)"
+	    XMROOT=${XMROOT/#file:\/dev/phy:/dev}
+	    XMROOT="disk=$XMROOT,hda1,w"
+	    XMSWAP=
+	    if test -n "$VM_SWAP" ; then
+		XMSWAP="file:$(readlink -f $VM_SWAP)"
+		XMSWAP=${XMSWAP/#file:\/dev/phy:/dev}
+		XMSWAP="disk=$XMSWAP,hda2,w"
+	    fi
+	    XENID="${VM_IMAGE%/root}"
+	    XENID="${XENID%/tmpfs}"
+	    XENID="${XENID##*/}"
+	    XENID="${XENID#root_}"
 
-		echo "booting XEN kernel ..."
-		if xm list "build_$XENID" >/dev/null 2>&1 ; then
-		   echo "Instance already exist, something really went wrong..."
-		   echo "Please report to your server admin, there might be multiple services running for same domain"
-		   cleanup_and_exit 3
-		fi
-		XEN_CONF_FILE=`mktemp /var/tmp/build.xen.conf-XXXXXXXXX` || cleanup_and_exit 3
-		echo "kernel = \"$vm_kernel\""                                           >  $XEN_CONF_FILE
-		echo "ramdisk = \"$vm_initrd\""                                          >> $XEN_CONF_FILE
-		echo "memory = ${MEMSIZE:-64}"                                           >> $XEN_CONF_FILE
-		echo "vcpus = $BUILD_JOBS"                                               >> $XEN_CONF_FILE
-		echo "root = \"/dev/hda1 ro\""                                           >> $XEN_CONF_FILE
-		echo "extra = \"init=/bin/bash console=ttyS0 panic=1 udev_timeout=360\"" >> $XEN_CONF_FILE
-		echo "on_poweroff = 'destroy'"                                           >> $XEN_CONF_FILE
-		echo "on_reboot = 'destroy'"                                             >> $XEN_CONF_FILE
-		echo "on_crash = 'destroy'"                                              >> $XEN_CONF_FILE
-		set -- xm create -c $XEN_CONF_FILE name="build_$XENID" $XMROOT $XMSWAP extra="quiet init="$vm_init_script" elevator=noop panic=1 console=ttyS0"
-		if test "$PERSONALITY" != 0 ; then
-		    # have to switch back to PER_LINUX to make xm work
-		    set -- linux64 "$@"
-		fi
-		echo "$@"
-		"$@" || cleanup_and_exit 3
-		rm "$XEN_CONF_FILE"
+	    echo "booting XEN kernel ..."
+	    if xm list "build_$XENID" >/dev/null 2>&1 ; then
+		echo "Instance already exist, something really went wrong..."
+		echo "Please report to your server admin, there might be multiple services running for same domain"
+		cleanup_and_exit 3
+	    fi
+	    XEN_CONF_FILE=`mktemp /var/tmp/build.xen.conf-XXXXXXXXX` || cleanup_and_exit 3
+	    echo "kernel = \"$vm_kernel\""                                           >  $XEN_CONF_FILE
+	    echo "ramdisk = \"$vm_initrd\""                                          >> $XEN_CONF_FILE
+	    echo "memory = ${MEMSIZE:-64}"                                           >> $XEN_CONF_FILE
+	    echo "vcpus = $BUILD_JOBS"                                               >> $XEN_CONF_FILE
+	    echo "root = \"/dev/hda1 ro\""                                           >> $XEN_CONF_FILE
+	    echo "extra = \"init=/bin/bash console=ttyS0 panic=1 udev_timeout=360\"" >> $XEN_CONF_FILE
+	    echo "on_poweroff = 'destroy'"                                           >> $XEN_CONF_FILE
+	    echo "on_reboot = 'destroy'"                                             >> $XEN_CONF_FILE
+	    echo "on_crash = 'destroy'"                                              >> $XEN_CONF_FILE
+	    set -- xm create -c $XEN_CONF_FILE name="build_$XENID" $XMROOT $XMSWAP extra="quiet init="$vm_init_script" elevator=noop panic=1 console=ttyS0"
+	    if test "$PERSONALITY" != 0 ; then
+		# have to switch back to PER_LINUX to make xm work
+		set -- linux64 "$@"
+	    fi
+	    echo "$@"
+	    "$@" || cleanup_and_exit 3
+	    rm "$XEN_CONF_FILE"
 	elif [ "$VM_TYPE" = 'uml' ]; then
 		echo "booting UML kernel ..."
 		set -- $uml_kernel initrd=$uml_initrd root=/ubda init="$vm_init_script" panic=1 elevator=noop quiet ubd0=$VM_IMAGE ${MEMSIZE:+mem=$MEMSIZE}
@@ -1951,13 +1947,13 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		"$@"
 	elif [ "$VM_TYPE" = 'qemu' -o "$VM_TYPE" = 'kvm' ]; then
 		echo "booting $VM_TYPE ..."
-                if [ "$VM_TYPE" = 'kvm' -a -b "$VM_IMAGE" ]; then
-                  # speed optimization when using kvm with raw devices
-		  CACHE=",cache=none"
-                else
-                  # speed optimization when using kvm with raw files
-		  CACHE=",cache=unsafe"
-                fi
+		if [ "$VM_TYPE" = 'kvm' -a -b "$VM_IMAGE" ]; then
+		    # speed optimization when using kvm with raw devices
+		    CACHE=",cache=none"
+		else
+		    # speed optimization when using kvm with raw files
+		    CACHE=",cache=unsafe"
+		fi
 
 		if [ "$kvm_virtio" = 1 ]; then
 		    qemu_args=(-drive file="$VM_IMAGE",if=virtio$CACHE -drive file="$VM_IMAGE",if=ide,index=0$CACHE)
@@ -2030,45 +2026,45 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
 		cleanup_and_exit "$BUILDSTATUS"
         elif [ "$VM_TYPE" = 'zvm' ]; then
-                echo "booting $VM_TYPE ..."
-                zvm_cp ipl $VM_WORKER $VM_VOLUME_ROOT
-                # start IUCV Console
-                # IPL needs some time until IPL really starts...
-                 sleep 2
-                 # start iucv console. This blocks until build process is finished.
-                iucvconn $VM_WORKER lnxhvc0
-                # Take root and swap devices from worker
-                # This might be critical regarding timing (IUCV_CONSOLE down, but machine still running)
-                sleep 5
-                zvm_cp volume_detach $VM_WORKER $VM_VOLUME_ROOT
-                zvm_cp volume_detach $VM_WORKER $VM_VOLUME_SWAP
-                VM_IMAGE="/dev/$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_ROOT $zvm_mult_pass $zvm_worker_nr)"
-                VM_SWAP="/dev/$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_SWAP $zvm_mult_pass $zvm_worker_nr)"
+	    echo "booting $VM_TYPE ..."
+	    zvm_cp ipl $VM_WORKER $VM_VOLUME_ROOT
+	    # start IUCV Console
+	    # IPL needs some time until IPL really starts...
+	    sleep 2
+	    # start iucv console. This blocks until build process is finished.
+	    iucvconn $VM_WORKER lnxhvc0
+	    # Take root and swap devices from worker
+	    # This might be critical regarding timing (IUCV_CONSOLE down, but machine still running)
+	    sleep 5
+	    zvm_cp volume_detach $VM_WORKER $VM_VOLUME_ROOT
+	    zvm_cp volume_detach $VM_WORKER $VM_VOLUME_SWAP
+	    VM_IMAGE="/dev/$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_ROOT $zvm_mult_pass $zvm_worker_nr)"
+	    VM_SWAP="/dev/$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_SWAP $zvm_mult_pass $zvm_worker_nr)"
 	fi
 
         # Exctract build resutls from VM
 	if [ "$VM_TYPE" = 'emulator' ]; then
-            # Emulators may not offer to use a second swap space.
-            # So we just mount the filesystem.
-            # WARNING: This is not safe against attacks.
+	    # Emulators may not offer to use a second swap space.
+	    # So we just mount the filesystem.
+	    # WARNING: This is not safe against attacks.
 
 	    mkdir -p $BUILD_ROOT/.build.packages
 	    cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
-            mkdir -p .mount
-            mount $VM_IMAGE -o loop .mount
-            if [ -e .mount/.build.packages ]; then
-              cp -a .mount/.build.packages/* .
-            fi
-            exitcode=`cat .mount/.build/_exitcode`
-            umount .mount
-            rmdir .mount
+	    mkdir -p .mount
+	    mount $VM_IMAGE -o loop .mount
+	    if [ -e .mount/.build.packages ]; then
+		cp -a .mount/.build.packages/* .
+	    fi
+	    exitcode=`cat .mount/.build/_exitcode`
+	    umount .mount
+	    rmdir .mount
 
 	    cleanup_and_exit "$exitcode"
 
 	elif test -n "$VM_SWAP" ; then
 	    BUILDSTATUS=`dd if="$VM_SWAP" bs=12 count=1 2>/dev/null`
 	    case $BUILDSTATUS in
-	      BUILDSTATUS[02])
+		BUILDSTATUS[02])
 		mkdir -p $BUILD_ROOT/.build.packages
 		cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
 		echo "build: extracting built packages..."
@@ -2146,7 +2142,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
 
     if test "$DO_INIT" = true ; then
-        start_time=`date +%s`
+	start_time=`date +%s`
 	#
 	# create legacy .buildenv file
 	#
@@ -2164,8 +2160,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
         unset start_time
 	# arbitrary limit of 10MB
 	if test $((`stat -f -c "%a*%S/1024/1024" $BUILD_ROOT`)) -lt 10; then
-            # ensure that old stat is not failing (RHEL4)
-            if df $BUILD_ROOT 2>/dev/null | grep -q "100%"; then
+	    # ensure that old stat is not failing (RHEL4)
+	    if df $BUILD_ROOT 2>/dev/null | grep -q "100%"; then
 		df -h $BUILD_ROOT
 		echo "build does not work on a completely full filesystem"
 		cleanup_and_exit 1
@@ -2711,30 +2707,30 @@ fi
 
 if test -n "$RUNNING_IN_VM"; then
     if test "$statistics" = 1; then
-         echo "... saving built statistics"
-         [ -n "$TIME_INSTALL" ] && echo "TIME_install: $TIME_INSTALL"  >> $BUILD_ROOT$TOPDIR/OTHER/_statistics
-         if [ -e /.build/_statistics.df ]; then
-           echo -n "MAX_mb_used_on_disk: " >> $TOPDIR/OTHER/_statistics
-           cat /.build/_statistics.df >> $TOPDIR/OTHER/_statistics
-           echo "" >> $TOPDIR/OTHER/_statistics
-           rm /.build/_statistics.df
-         fi
-         if [ -e /.build/_statistics.memory ]; then
-           echo -n "MAX_mb_used_memory: " >> $TOPDIR/OTHER/_statistics
-           cat /.build/_statistics.memory >> $TOPDIR/OTHER/_statistics
-           echo "" >> $TOPDIR/OTHER/_statistics
-           rm /.build/_statistics.memory
-         fi
-         mount -n sys /sys -t sysfs
-         device="sda"
-         [ -e /dev/vda ] && device="vda"
-         [ -e /dev/dasda ] && device="dasda" # in z/VM
-         disk=(`cat /sys/block/${device}/stat`)
-         [ "0${disk[0]}" -gt 0 ] && echo "IO_requests_read: ${disk[0]}"  >> $TOPDIR/OTHER/_statistics
-         [ "0${disk[2]}" -gt 0 ] && echo "IO_sectors_read: ${disk[2]}"   >> $TOPDIR/OTHER/_statistics
-         [ "0${disk[4]}" -gt 0 ] && echo "IO_requests_write: ${disk[4]}" >> $TOPDIR/OTHER/_statistics
-         [ "0${disk[6]}" -gt 0 ] && echo "IO_sectors_write: ${disk[6]}"  >> $TOPDIR/OTHER/_statistics
-         umount /sys
+	echo "... saving built statistics"
+	[ -n "$TIME_INSTALL" ] && echo "TIME_install: $TIME_INSTALL"  >> $BUILD_ROOT$TOPDIR/OTHER/_statistics
+	if [ -e /.build/_statistics.df ]; then
+	    echo -n "MAX_mb_used_on_disk: " >> $TOPDIR/OTHER/_statistics
+	    cat /.build/_statistics.df >> $TOPDIR/OTHER/_statistics
+	    echo "" >> $TOPDIR/OTHER/_statistics
+	    rm /.build/_statistics.df
+	fi
+	if [ -e /.build/_statistics.memory ]; then
+	    echo -n "MAX_mb_used_memory: " >> $TOPDIR/OTHER/_statistics
+	    cat /.build/_statistics.memory >> $TOPDIR/OTHER/_statistics
+	    echo "" >> $TOPDIR/OTHER/_statistics
+	    rm /.build/_statistics.memory
+	fi
+	mount -n sys /sys -t sysfs
+	device="sda"
+	[ -e /dev/vda ] && device="vda"
+	[ -e /dev/dasda ] && device="dasda" # in z/VM
+	disk=(`cat /sys/block/${device}/stat`)
+	[ "0${disk[0]}" -gt 0 ] && echo "IO_requests_read: ${disk[0]}"  >> $TOPDIR/OTHER/_statistics
+	[ "0${disk[2]}" -gt 0 ] && echo "IO_sectors_read: ${disk[2]}"   >> $TOPDIR/OTHER/_statistics
+	[ "0${disk[4]}" -gt 0 ] && echo "IO_requests_write: ${disk[4]}" >> $TOPDIR/OTHER/_statistics
+	[ "0${disk[6]}" -gt 0 ] && echo "IO_sectors_write: ${disk[6]}"  >> $TOPDIR/OTHER/_statistics
+	umount /sys
     fi
 
     if test -n "$VM_SWAP"; then
