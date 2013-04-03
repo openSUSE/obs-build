@@ -847,9 +847,15 @@ check_for_arm()
 
     export kvm_bin="/usr/bin/qemu-system-arm"
     export console=ttyAMA0
-    export KVM_OPTIONS="-enable-kvm -M vexpress-a15 -dtb /boot/a15-guest.dtb -cpu cortex-a15 -m 1500"
+    export KVM_OPTIONS="-enable-kvm -M vexpress-a15 -dtb /boot/a15-guest.dtb -cpu cortex-a15"
     export VM_KERNEL=/boot/zImage.vexpress
-    export VM_INITRD=/boot/initrd
+    # prefer the vexpress initrd
+    if [ -e /boot/initrd.vexpress ]; then
+        VM_INITRD=/boot/initrd.vexpress
+    else
+        VM_INITRD=/boot/initrd
+    fi
+    export VM_INITRD
 }
 
 check_for_ppc()
