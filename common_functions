@@ -66,7 +66,7 @@ check_use_emulator()
         return 0	# as backup use /usr/sbin/qemu-binfmt.conf.sh
     else
         # XXX: error?
-        echo "Warning: cross compile not possible due to missing static binaries"
+        echo "Warning: cross compile not possible due to missing static binaries. please install build-initvm package for that purpose."
     fi
     return 1
 }
