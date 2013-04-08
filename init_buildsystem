@@ -627,8 +627,6 @@ else
     PACKAGES_TO_PREINSTALL=
     PACKAGES_TO_RUNSCRIPTS=
     PACKAGES_TO_VMINSTALL=
-    PACKAGES_TO_CBPREINSTALL=
-    PACKAGES_TO_CBINSTALL=
     PREINSTALL_IMAGE=
     PREINSTALL_IMAGE_SOURCE=
     RUNSCRIPTS_SEEN=
@@ -791,13 +789,11 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
     done
     PACKAGES_TO_PREINSTALL_FILTERED="$PACKAGES_TO_PREINSTALL"
     PACKAGES_TO_VMINSTALL_FILTERED="$PACKAGES_TO_VMINSTALL"
-    PACKAGES_TO_CBPREINSTALL_FILTERED="$PACKAGES_TO_CBPREINSTALL"
     rm -f "$BUILD_ROOT/.preinstall_image"/*
     if test -n "$PREINSTALL_IMAGE" ; then
 	preinstall_image "$PREINSTALL_IMAGE" "$PREINSTALL_IMAGE_SOURCE"
 	PACKAGES_TO_PREINSTALL_FILTERED=`preinstall_image_filter $PACKAGES_TO_PREINSTALL_FILTERED`
 	PACKAGES_TO_VMINSTALL_FILTERED=`preinstall_image_filter $PACKAGES_TO_VMINSTALL_FILTERED`
-	PACKAGES_TO_CBPREINSTALL_FILTERED=`preinstall_image_filter $PACKAGES_TO_VMINSTALL_FILTERED`
     fi
     PACKAGES_TO_PREINSTALL_FILTERED=`reorder $PACKAGES_TO_PREINSTALL_FILTERED`
     progress_setup PACKAGES_TO_PREINSTALL_FILTERED
@@ -814,13 +810,6 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
 	    preinstall ${PKG##*/}
 	done
     fi
-    # add cbpreinstall if cross HOST != TARGET
-    PACKAGES_TO_CBINSTALL_FILTERED=`reorder $PACKAGES_TO_CBINSTALL_FILTERED`
-    progress_setup PACKAGES_TO_CBPREINSTALL_FILTERED
-    for PKG in $PACKAGES_TO_CBPREINSTALL_FILTERED ; do
-	progress_step PACKAGES_TO_CBPREINSTALL_FILTERED
-        preinstall ${PKG##*/}
-    done
     # for reorder
     check_exit
     if [ -w /root ]; then
@@ -853,7 +842,6 @@ if test -n "$PREPARE_VM" ; then
     echo "PACKAGES_TO_RUNSCRIPTS='${PACKAGES_TO_RUNSCRIPTS//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
     # needed for continuation in xen/kvm with rpm-x86
     echo "PACKAGES_TO_PREINSTALL='${PACKAGES_TO_PREINSTALL//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
-    echo "PACKAGES_TO_CBPREINSTALL='${PACKAGES_TO_CBPREINSTALL//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
     echo "PSUF='$PSUF'" >> $BUILD_ROOT/.build/init_buildsystem.data
     rm -f $BUILD_IS_RUNNING
     cleanup_and_exit 0
@@ -930,7 +918,7 @@ for PKG in $BUILD_ROOT/.init_b_cache/alreadyinstalled/* ; do
     test "$PKG" = "*" && continue
     ln $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG $BUILD_ROOT/.init_b_cache/todelete/$PKG
 done
-for PKG in $PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL ; do
+for PKG in $PACKAGES_TO_INSTALL; do
     rm -f $BUILD_ROOT/.init_b_cache/todelete/$PKG
 done
 for PKG in $BUILD_ROOT/.init_b_cache/todelete/* ; do
@@ -944,7 +932,7 @@ rm -rf "$BUILD_ROOT/.init_b_cache/todelete"
 
 rm -rf "$BUILD_ROOT/.init_b_cache/preinstalls"
 mkdir -p "$BUILD_ROOT/.init_b_cache/preinstalls"
-for PKG in $PACKAGES_TO_PREINSTALL $PACKAGES_TO_CBPREINSTALL; do
+for PKG in $PACKAGES_TO_PREINSTALL; do
     touch "$BUILD_ROOT/.init_b_cache/preinstalls/$PKG"
 done
 
@@ -971,7 +959,7 @@ if ((suse_version > 1220)) ; then
     DO_CUMULATE=true
 fi
 
-MAIN_LIST="$PACKAGES_TO_INSTALL $PACKAGES_TO_CBINSTALL"
+MAIN_LIST="$PACKAGES_TO_INSTALL"
 test -n "$DO_CUMULATE" && MAIN_LIST="$MAIN_LIST CUMULATED"
 progress_setup MAIN_LIST
 for PKG in $MAIN_LIST; do
