@@ -1335,7 +1335,7 @@ if test -n "$KILL" ; then
 	    fi
 	fi
     elif test "$VM_TYPE" = 'zvm'; then
-	if vmcp q "$VM_WORKER" > /dev/nulll 2>&1 ; then
+	if vmcp q "$VM_WORKER" > /dev/null 2>&1 ; then
             if ! zvm_cp destroy $VM_WORKER ; then
 	        echo "could not kill zvm worker $VM_WORKER"
 		cleanup_and_exit 1
@@ -1540,8 +1540,6 @@ fi
 # 3. link the device to the controlling guest
 #    -> Need a uniq worker id to calculate a uniq device address for linking
 #    -> VM_IMAGE is the resulting block device
-echo "***********************************"
-echo "VM_TYPE: $VM_TYPE script: $0"
 if [ "$VM_TYPE" = 'zvm' ]; then
     if [ ! "$0" = "/.build/build" ] ; then
 	echo "in controlling guest"
@@ -1554,7 +1552,6 @@ if [ "$VM_TYPE" = 'zvm' ]; then
             echo "did not get a real device for VM_IMAGES: $VM_IMAGE $VM_SWAP"
             cleanup_and_exit 3
         else 
-echo "FIRST: VM_IMAGE: $VM_IMAGE, VM_SWAP: $VM_SWAP"
             VM_IMAGE="/dev/"${VM_IMAGE}
 	    VM_SWAP="/dev/"${VM_SWAP}
         fi
