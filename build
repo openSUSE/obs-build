@@ -70,6 +70,7 @@ ABUILD_UID=399
 ABUILD_GID=399
 
 DO_INIT=true
+DO_PREINSTALL=true
 DO_LINT=
 DO_CHECKS=true
 CLEAN_BUILD=
@@ -114,6 +115,8 @@ SIGNDUMMY=
 HOST_ARCH=
 EMULATOR_SCRIPT=
 KVM_OPTIONS=
+BUILD_EC2_TYPE="t1.micro"
+
 
 # This is for insserv
 export YAST_IS_RUNNING=instsys
@@ -287,6 +290,12 @@ Known Parameters:
   --lxc
               Use Linux Containers to isolate the process. This may not be 100% safe.
 
+  --openstack 
+              Cloud build
+
+  --ec2 
+              Cloud build
+
   --emulator 
               Use any generic emulator to isolate the build process. You need to write
               an emulator/emulator.sh script and put it next to the build script sources.
@@ -297,7 +306,7 @@ Known Parameters:
 
   --vm-type TYPE
               Use virtual machine instead of chroot
-              TYPE is one of xen|kvm|uml|qemu|lxc|zvm
+              TYPE is one of xen|kvm|uml|qemu|lxc|zvm|openstack|ec2
 
   --vm-worker GUEST
               GUEST is a z/VM build worker controlled by the controlling
@@ -306,6 +315,12 @@ Known Parameters:
   --vm-worker-nr N
               Each worker in z/VM needs a uniq number. This is needed to 
               calculate uniq device addresses for root and swap device.
+
+  --vm-region NAME
+              EC2 only: defines amazon control server
+
+  --vm-server NAME
+              openstack only: defines control server name
 
   --vm-disk FILE
               Use FILE as disk for virtual machine.
@@ -352,6 +367,7 @@ usage () {
 #                 3 -> something wrong with build host
 #
 cleanup_and_exit () {
+echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     trap EXIT
     test -z "$1" && set 0
     rm -f $BUILD_ROOT/exit
@@ -389,12 +405,24 @@ cleanup_and_exit () {
 	    echo "Warning: clean shut down of the VM didn't work"
 	fi
     else
+        # nop if unused
+        cloud_volume_detach "$VM_SERVER" "$VM_VOLUME_NAME"
+        cloud_volume_detach "$VM_SERVER" "$VM_VOLUME_SWAP"
+        cloud_volume_detach "$VM_SERVER" "$EC2_EXTRACT_VOLUME_root"
+        cloud_volume_detach "$VM_SERVER" "$EC2_EXTRACT_VOLUME_swap"
+
+        [ -n "$EC2_SNAP_root" ] && ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_root"
+        [ -n "$EC2_SNAP_swap" ] && ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_swap"
+        [ -n "$EC2_EXTRACT_VOLUME_root" ] && ec2-delete-volume --region "$BUILD_EC2_REGION" "$EC2_EXTRACT_VOLUME_root"
+        [ -n "$EC2_EXTRACT_VOLUME_swap" ] && ec2-delete-volume --region "$BUILD_EC2_REGION" "$EC2_EXTRACT_VOLUME_swap"
+
 	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	umount -n $BUILD_ROOT/proc 2>/dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2>/dev/null || true
 	test "$VM_IMAGE" = 1 && VM_IMAGE=
 	[ -n "$VM_IMAGE" ] && umount $BUILD_ROOT 2>/dev/null || true
     fi
+
 #    echo "pid $$ exit $1"
     exit $1
 }
@@ -706,10 +734,13 @@ background_monitor_process()
 
 detect_vm_2nd_stage()
 {
-    if ! test "$0" = "/.build/build" ; then
+    if test -e /.build/build.data; then
+        . /.build/build.data
+    fi
+    if test -z "$VM_TYPE" ; then
 	return 1
     fi
-    if test $$ -eq 1 ; then
+    if test $$ -eq 1 || test $$ -eq 2; then
 	# ignore special init signals if we're init
 	# we're using ' ' instead of '' so that the signal handlers
 	# are reset in the child processes
@@ -720,7 +751,6 @@ detect_vm_2nd_stage()
     echo "2nd stage started in virtual machine"
     BUILD_ROOT=/
     BUILD_DIR=/.build
-    . $BUILD_DIR/build.data
     echo "machine type: `uname -m`"
     if test "$PERSONALITY" != 0 -a -z "$PERSONALITY_SET" ; then
 	export PERSONALITY_SET=true
@@ -741,6 +771,12 @@ detect_vm_2nd_stage()
 #    fi
     if test "$VM_TYPE" = 'zvm' ; then
         VM_SWAP='/dev/dasdb1'
+    fi
+    if test "$VM_TYPE" = 'ec2' ; then
+        VM_SWAP='/dev/sdb1'
+        # Usually the external system is writing the swap signature, but EC2 volume
+        # attach is very slow, so let's do it in the VM for now.
+        mkswap "$VM_SWAP"
     fi
     if test -n "$VM_SWAP" ; then
 	for i in 1 2 3 4 5 6 7 8 9 10 ; do
@@ -847,6 +883,100 @@ mkdir_build_root()
        rm -rf "$BUILD_ROOT/.build"
        mkdir -p "$BUILD_ROOT/.build"
     fi
+}
+
+ec2_volume_state()
+{
+    local VM_VOL_NAME="$1"
+    temp_file=`mktemp`
+    ec2-describe-volumes "$VM_VOL_NAME" --region "$BUILD_EC2_REGION" > $temp_file
+
+    if grep -q ^ATTACHMENT "$temp_file"; then
+      grep ^ATTACHMENT "$temp_file" | awk '{ print $5 }'
+    else
+      grep ^VOLUME "$temp_file" | awk '{ print $5 }'
+    fi
+    rm "$temp_file"
+}
+
+cloud_volume_attach()
+{
+    local VM_SERVER="$1"
+    local VM_VOL_NAME="$2"
+    local VM_VOL_DEV="$3"
+
+    if [ "$VM_TYPE" = 'openstack' ]; then
+      if ! nova volume-attach "$VM_SERVER" "$VM_VOL_NAME" "$VM_VOL_DEV"; then
+          echo "ERROR: nova attach failed. $?" >&2
+          return 3
+      fi
+      while true; do
+          state=`nova volume-show "$VM_VOL_NAME" | sed -n 's,^|[ ]*status[ ]*|[ ]*\([^ ]*\).*,\1,p'`
+          [ "$state" == "in-use" ] && break
+          if [ -z "$state" ]; then
+             echo "ERROR: unable to find state of volume $VM_VOL_NAME" >&2
+             return 3
+          fi
+          if [ "$state" == "available" ]; then
+             echo "WARNING: volume $VM_VOL_NAME got not attached, retrying" >&2
+             if ! nova volume-attach "$VM_SERVER" "$VM_VOL_NAME" "$VM_VOL_DEV"; then
+                 echo "ERROR: nova attach failed. $?" >&2
+                 return 3
+             fi
+          fi
+          sleep 3
+      done
+
+      if [ ! -e "$VM_VOL_DEV" ]; then
+          #GROSS HACK: kernel does not care about the given device name
+#          VM_VOL_DEV="/dev/"`dmesg| sed -n 's,.*\(vd.\): unknown partition tab.*,\1,p' | tail -n 1`
+          VM_VOL_DEV=`ls -1 /dev/vd? | tail -n 1`
+      fi
+      echo "$VM_VOL_DEV"
+    elif [ "$VM_TYPE" = 'ec2' ]; then
+      temp_file=`mktemp`
+      if ! ec2-attach-volume "$VM_VOL_NAME" -d /dev/sdz -i `ec2-instance-id` --region $BUILD_EC2_REGION > "$temp_file"; then
+         rm "$temp_file"
+         cleanup_and_exit 1
+      fi
+      # wait that it becomes available
+      while true; do
+        state=`ec2_volume_state "$VM_VOL_NAME"`
+        [ "$state" = "attached" ] && break
+        sleep 1
+      done
+      # print device node
+      grep ^ATTACHMENT "$temp_file" | awk '{ print $4 }'
+      rm "$temp_file"
+    fi
+}
+
+cloud_volume_detach()
+{
+    local VM_SERVER="$1"
+    local VM_VOL_NAME="$2"
+echo "-----> DETACH $VM_VOL_NAME"
+    if [ "$VM_TYPE" = 'openstack' ]; then
+      # needed at all?
+      nova volume-show "$VM_VOL_NAME" | grep -q in-use || return 0
+
+      # umount seems not to be enough
+      sync
+
+      if ! nova volume-detach "$VM_SERVER" "$VM_VOL_NAME"; then
+          echo "ERROR: nova detach of $VM_VOL_NAME failed." >&2
+          return 3
+      fi
+      while nova volume-show "$VM_VOL_NAME" | grep -q availabe; do
+          sleep 3
+      done
+    elif [ "$VM_TYPE" = 'ec2' ]; then
+       state=`ec2_volume_state "$VM_VOL_NAME"`
+       if [ "$state" != "available" ]; then
+         ec2-detach-volume "$VM_VOL_NAME" --region $BUILD_EC2_REGION || return 3
+       fi
+    fi
+    return 0
 }
 
 linux64()
@@ -957,6 +1087,8 @@ while test -n "$1"; do
   PARAM="$1"
   ARG="$2"
   [ "$ARG" = "${ARG#-}" ] || ARG=""
+  ARG2="$3"
+  [ "$ARG2" = "${ARG2#-}" ] || ARG2=""
   shift
   case $PARAM in
     *-*=*)
@@ -1067,7 +1199,14 @@ while test -n "$1"; do
 	VM_TYPE="$ARG"
 	case "$VM_TYPE" in
             zvm) ;;
-	    xen|kvm|uml|qemu|lxc|emulator)
+            ec2)
+		test -z "$VM_IMAGE" && VM_IMAGE=1
+                . /etc/profile.d/ec2.sh
+                EC2_INSTANCE_ID=`ec2-instance-id`
+                BUILD_EC2_ZONE=`ec2-meta-data placement/availability-zone`
+                BUILD_EC2_REGION=${BUILD_EC2_ZONE%?}
+	        ;;
+	    xen|kvm|uml|qemu|lxc|emulator|openstack)
 		test -z "$VM_IMAGE" && VM_IMAGE=1
 	        ;;
 	    none|chroot) VM_TYPE='' ;;
@@ -1087,6 +1226,19 @@ while test -n "$1"; do
         needarg
         zvm_worker_nr="$ARG"
         shift
+      ;;
+      --vm-server|--vm-region)
+	needarg
+	VM_SERVER="$ARG"
+	shift
+      ;;
+      --vm-volumes)
+	needarg
+	VM_VOLUME_NAME="$ARG"
+	shift
+	needarg
+	VM_VOLUME_SWAP="$ARG2"
+	shift
       ;;
       --vm-disk)
 	needarg
@@ -1287,6 +1439,34 @@ if test "$VM_TYPE" = "zvm"; then
     VM_SWAP='/dev/dasdb1'
 fi
 
+if test "$VM_TYPE" = "ec2"; then
+    # We can not use bash hashes because old bash does not support it
+    # This is always the x86_64 loader, we use also by default the
+    # local x86_64 kernel, which should be able to run a 32bit system
+    if [ "$BUILD_EC2_ZONE" = "us-east-1" ]; then
+        BUILD_EC2_AKI="aki-88aa75e1"
+    elif [ "$BUILD_EC2_ZONE" = "us-west-1" ]; then
+        BUILD_EC2_AKI="aki-f77e26b2"
+    elif [ "$BUILD_EC2_ZONE" = "us-west-2" ]; then
+        BUILD_EC2_AKI="aki-fc37bacc"
+    elif [ "$BUILD_EC2_ZONE" = "eu-west-1" ]; then
+        BUILD_EC2_AKI="aki-71665e05"
+    elif [ "$BUILD_EC2_ZONE" = "ap-southeast-1" ]; then
+        BUILD_EC2_AKI="aki-fe1354ac"
+    elif [ "$BUILD_EC2_ZONE" = "ap-southeast-2" ]; then
+        BUILD_EC2_AKI="aki-3f990e05"
+    elif [ "$BUILD_EC2_ZONE" = "ap-northeast-1" ]; then
+        BUILD_EC2_AKI="aki-44992845"
+    elif [ "$BUILD_EC2_ZONE" = "sa-east-1" ]; then
+        BUILD_EC2_AKI="aki-c48f51d9"
+    elif [ "$BUILD_EC2_ZONE" = "us-gov-west-1" ]; then
+        BUILD_EC2_AKI="aki-79a4c05a"
+    else
+        echo "Unknown Amazon EC2 Zone: $BUILD_EC2_ZONE"
+        exit 1
+    fi
+fi
+
 if test "$VMDISK_MOUNT_OPTIONS" = __default; then
     if test "$VMDISK_FILESYSTEM" = reiserfs ; then
 	VMDISK_MOUNT_OPTIONS='-o data=writeback,commit=150,noatime'
@@ -1341,6 +1521,20 @@ if test -n "$KILL" ; then
 		cleanup_and_exit 1
             fi
         fi
+    elif test "$VM_TYPE" = 'ec2'; then
+	if ec2-describe-instance-status "$VM_BUILD_INSTANCE" --region $BUILD_EC2_REGION >/dev/null 2>&1 ; then
+	    if ec2-terminate-instances "$VM_BUILD_INSTANCE" >/dev/null 2>&1 ; then
+		echo "could not kill EC2 instance $VM_BUILD_INSTANCE"
+		cleanup_and_exit 1
+	    fi
+	fi
+    elif test "$VM_TYPE" = 'openstack'; then
+	if nova show "$VM_VOLUME_NAME" >/dev/null 2>&1 ; then
+	    if ! nova delete "$VM_VOLUME_NAME" ; then
+		echo "could not kill openstack vm build $VM_VOLUME_NAME"
+		cleanup_and_exit 1
+	    fi
+	fi
     elif test -n "$VM_TYPE"; then
 	if ! fuser -k -TERM "$VM_IMAGE"; then
 	    echo "could not kill build in $VM_IMAGE"
@@ -1417,6 +1611,58 @@ if [ "$VM_TYPE" = 'zvm' -a -z "$RUNNING_IN_VM" ]; then
     fi
 fi
 
+if [ "$VM_TYPE" = 'ec2' -a -z "$RUNNING_IN_VM" ]; then
+    # verify settings
+    if [ -z "$AWS_ACCESS_KEY" -o -z "$AWS_ACCESS_KEY" ]; then
+	echo "ERROR:No amazon EC2 environment set. Set AWS_ACCESS_KEY and AWS_SECRET_KEY."
+	cleanup_and_exit 3
+    fi
+    if [ -z "$BUILD_EC2_AKI"  ]; then
+	echo "ERROR: No image refering to kernel and ramdisk is defined in BUILD_EC2_AKI env."
+	cleanup_and_exit 3
+    fi
+    if [ -z "$VM_VOLUME_NAME" ]; then
+	echo "ERROR: No worker root VM volume name specified."
+	cleanup_and_exit 3
+    fi
+    if [ -z "$VM_VOLUME_SWAP" ]; then
+	echo "ERROR: No worker swap VM volume name specified."
+	cleanup_and_exit 3
+    fi
+
+    # go
+    VM_IMAGE=`cloud_volume_attach "$VM_SERVER" "$VM_VOLUME_NAME" "$VM_IMAGE"`
+    [ "${VM_IMAGE:0:5}" == "/dev/" ] || cleanup_and_exit 3
+fi
+
+if [ "$VM_TYPE" = 'openstack' -a -z "$RUNNING_IN_VM" ]; then
+    # verify settings
+    if [ -z "$OS_AUTH_URL" ]; then
+	echo "ERROR:No openstack environment set. This vm-type works only inside of an openstack VM."
+	cleanup_and_exit 3
+    fi
+    if [ -z "$OBS_OPENSTACK_KERNEL_IMAGE_ID" ]; then
+	echo "ERROR: No image refering to kernel and ramdisk is defined in OBS_OPENSTACK_KERNEL_IMAGE_ID env."
+	cleanup_and_exit 3
+    fi
+    if [ -z "$VM_VOLUME_NAME" ]; then
+	echo "ERROR: No worker root VM volume name specified."
+	cleanup_and_exit 3
+    fi
+    if [ -z "$VM_VOLUME_SWAP" ]; then
+	echo "ERROR: No worker swap VM volume name specified."
+	cleanup_and_exit 3
+    fi
+    if [ -z "$VM_SERVER" ]; then
+	echo "ERROR: No VM server nod name specified (usually this instance)."
+	cleanup_and_exit 3
+    fi
+
+    # go
+    VM_IMAGE=`cloud_volume_attach "$VM_SERVER" "$VM_VOLUME_NAME" "$VM_IMAGE"`
+    [ "${VM_IMAGE:0:5}" == "/dev/" ] || cleanup_and_exit 3
+fi
+
 if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
     if [ ! -r /dev/kvm -o ! -x "$kvm_bin" ]; then
 	echo "host doesn't support kvm"
@@ -1487,6 +1733,11 @@ if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
 	VM_SWAPDEV=/dev/sdb
 	qemu_rootdev=/dev/sda
     fi
+fi
+
+if [ "$VM_TYPE" = 'openstack' ]; then
+    VM_SWAPDEV=/dev/vdb
+    qemu_rootdev=/dev/vda
 fi
 
 if [ "$VM_TYPE" = 'qemu' ]; then
@@ -1592,7 +1843,6 @@ if test -z "$RUNNING_IN_VM" ; then
 	fi
 	if test ! -e "$VM_IMAGE"; then
 	    vm_img_create "$VM_IMAGE" "$VMDISK_ROOTSIZE"
-
 	    if test -z "$CLEAN_BUILD" ; then
 		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE"
 	    fi
@@ -1630,6 +1880,7 @@ if test -z "$RUNNING_IN_VM" ; then
 	dd if=/dev/zero of="$VM_SWAP" bs=1024 count=1 conv=notrunc 2>/dev/null
 	echo "mkswap $VM_SWAP"
 	mkswap "$VM_SWAP"
+        [ "$VM_TYPE" = 'openstack' ] && openstack_volume_detach "$VM_SERVER" "$VM_VOLUME_SWAP"
     fi
 fi
 
@@ -1887,19 +2138,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
 	umount -n $BUILD_ROOT/mnt 2> /dev/null || true
 
-	if [ -n "$VM_IMAGE" ]; then
-	    check_exit
-	    # needs to work otherwise we have a corrupted file system
-	    umount $BUILD_ROOT || cleanup_and_exit 1
-	    if [ "$VM_TYPE" = "zvm" ]; then
-		# detach the worker root and swap locally and link it in the worker
-		zvm_cp volume_detach_local $VM_VOLUME_ROOT ${zvm_worker_nr}
-		zvm_cp volume_detach_local $VM_VOLUME_SWAP ${zvm_worker_nr}
-		zvm_cp volume_attach $VM_WORKER $VM_VOLUME_ROOT
-		zvm_cp volume_attach $VM_WORKER $VM_VOLUME_SWAP
-	    fi
-	fi
-
 	if check_use_emulator; then
 	    if [ -x "$BUILD_DIR/initvm" -a -e "$BUILD_DIR/qemu-reg" ]; then
 		vm_init_script="/.build/initvm"
@@ -1931,7 +2169,54 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                 fi
                 popd
 
-	elif [ "$VM_TYPE" = 'xen' ]; then
+	fi
+
+        if [ "$VM_TYPE" = 'openstack' -o "$VM_TYPE" = 'ec2' ]; then
+            # No way to handle this via init= parameter here....
+            echo "#!/bin/sh"               >  "$BUILD_ROOT/sbin/init"
+            echo 'exec /.build/build "$@"' >> "$BUILD_ROOT/sbin/init"
+            chmod 0755 "$BUILD_ROOT/sbin/init"
+        fi
+        if [ "$VM_TYPE" = 'ec2' ]; then
+            # use the instance kernel, if no kernel got installed via preinstall
+            if ! test -e "$BUILD_ROOT/boot/vmlinuz"; then
+                cp /boot/vmlinuz-ec2 "$BUILD_ROOT/boot/vmlinuz"
+                cp /boot/initrd-ec2 "$BUILD_ROOT/boot/initrd"
+            fi
+            # install menu.lst for pv grub
+            if ! test -e "$BUILD_ROOT/boot/grub/menu.lst"; then
+                mkdir -p "$BUILD_ROOT/boot/grub"
+                echo "serial --unit=0 --speed=9600"                                                   >  "$BUILD_ROOT/boot/grub/menu.lst"
+                echo "terminal --dumb serial"                                                         >> "$BUILD_ROOT/boot/grub/menu.lst"
+                echo "default 0"                                                                      >> "$BUILD_ROOT/boot/grub/menu.lst"
+                echo "timeout 0"                                                                      >> "$BUILD_ROOT/boot/grub/menu.lst"
+                echo "hiddenmenu"                                                                     >> "$BUILD_ROOT/boot/grub/menu.lst"
+                echo ""                                                                               >> "$BUILD_ROOT/boot/grub/menu.lst"
+                echo "title default"                                                                  >> "$BUILD_ROOT/boot/grub/menu.lst"
+                echo "   root (hd0)"                                                                  >> "$BUILD_ROOT/boot/grub/menu.lst"
+                echo "   kernel /boot/vmlinuz root=/dev/sda1 xencons=xvc0 console=xvc0 splash=silent" >> "$BUILD_ROOT/boot/grub/menu.lst"
+                echo "   initrd /boot/initrd"                                                         >> "$BUILD_ROOT/boot/grub/menu.lst"
+            fi
+        fi
+	if [ -n "$VM_IMAGE" ]; then
+	    check_exit
+	    # needs to work otherwise we have a corrupted file system
+	    umount $BUILD_ROOT || cleanup_and_exit 3
+	fi
+
+        if [ "$VM_TYPE" = 'openstack' -o "$VM_TYPE" = 'ec2' ]; then
+          cloud_volume_detach "$VM_SERVER" "$VM_VOLUME_NAME" || cleanup_and_exit 3
+        fi
+
+	if [ -n "$VM_IMAGE" -a "$VM_TYPE" = "zvm" ]; then
+	   # detach the worker root and swap locally and link it in the worker
+	   zvm_cp volume_detach_local $VM_VOLUME_ROOT ${zvm_worker_nr}
+	   zvm_cp volume_detach_local $VM_VOLUME_SWAP ${zvm_worker_nr}
+	   zvm_cp volume_attach $VM_WORKER $VM_VOLUME_ROOT
+	   zvm_cp volume_attach $VM_WORKER $VM_VOLUME_SWAP
+	fi
+
+	if [ "$VM_TYPE" = 'xen' ]; then
 		XMROOT="file:$(readlink -f $VM_IMAGE)"
 		XMROOT=${XMROOT/#file:\/dev/phy:/dev}
 		XMROOT="disk=$XMROOT,hda1,w"
@@ -2041,6 +2326,80 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		fi
 		echo "$@"
 		"$@"
+	elif [ "$VM_TYPE" = 'ec2' ]; then
+		echo "booting $VM_TYPE ..."
+                EC2_SNAP_root=`ec2-create-snapshot --region "$BUILD_EC2_REGION" "$VM_VOLUME_NAME" | awk '{ print $2 }'`
+                if [ "$EC2_SNAP_root" == "${EC2_SNAP_root#snap-}" ]; then
+                    echo "ERROR: Failed to create snapshot for root disk $VM_VOLUME_NAME"
+                    cleanup_and_exit 3
+                fi
+                EC2_SNAP_swap=`ec2-create-snapshot --region "$BUILD_EC2_REGION" "$VM_VOLUME_SWAP" | awk '{ print $2 }'`
+                if [ "$EC2_SNAP_swap" == "${EC2_SNAP_swap#snap-}" ]; then
+                    echo "ERROR: Failed to create snapshot for swap disk $VM_VOLUME_SWAP"
+                    ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_root"
+                    cleanup_and_exit 3
+                fi
+                # wait for snapshots being processed
+                while true; do
+                    c=`ec2-describe-snapshots --region "$BUILD_EC2_REGION" "$EC2_SNAP_root" "$EC2_SNAP_swap" | grep completed | wc -l`
+                    [ "$c" == "2" ] && break
+                done
+                EC2_AMI=`ec2-register --region "$BUILD_EC2_REGION" -n build-$VM_VOLUME_NAME  -a x86_64 -b "/dev/sda1=$EC2_SNAP_root::false" -b "/dev/sdb1=$EC2_SNAP_swap::false" --kernel "$BUILD_EC2_AKI" | awk '{ print $2 }'`
+                if [ "$EC2_AMI" == "${EC2_AMI#ami-}" ]; then
+                    echo "ERROR: Failed to register the AMI"
+                    ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_root"
+                    ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_swap"
+                    cleanup_and_exit 3
+                fi
+                INSTANCE=`ec2-run-instances --region "$BUILD_EC2_REGION" -z "$BUILD_EC2_ZONE" -t $BUILD_EC2_TYPE --kernel "$BUILD_EC2_AKI" --instance-initiated-shutdown-behavior terminate "$EC2_AMI" | grep ^INSTANCE | awk '{ print $2 }'`
+                if [ "$INSTANCE" == "${INSTANCE#i-}" ]; then
+                    echo "ERROR: Failed to run the instance for AMI $EC2_AMI"
+                    ec2-deregister --region "$BUILD_EC2_REGION" "$EC2_AMI"
+                    ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_root"
+                    ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_swap"
+                    cleanup_and_exit 3
+                fi
+                echo "Waiting for finishing the build. No log file until then on EC2 ...."
+                I=0
+                L=0
+                EC2_EXTRACT_VOLUME_root=""
+                EC2_EXTRACT_VOLUME_swap=""
+                temp_file=`mktemp`
+                while true; do
+                    ec2-describe-instances --region "$BUILD_EC2_REGION" "$INSTANCE" > $temp_file
+                    state=`grep ^INSTANCE "$temp_file"`
+                    if [ -z "$EC2_EXTRACT_VOLUME_root" ]; then
+                        EC2_EXTRACT_VOLUME_root=`grep ^BLOCKDEVICE $temp_file | grep /dev/sda1 | awk '{ print $3 }'`
+                        EC2_EXTRACT_VOLUME_swap=`grep ^BLOCKDEVICE $temp_file | grep /dev/sdb1 | awk '{ print $3 }'`
+                    fi
+                    # the column of the state is at a differen position depending on the state :/
+#                    [ "$state" == "${state/stopped/}" ] || break
+                    [ "$state" == "${state/terminated/}" ] || break
+                    I=$(( $I + 1 ))
+                    if [ $I -gt 10 ]; then
+                       echo -n .
+                       I="0"
+                       L=$(( $L + 1 ))
+                    fi
+                    if [ $L -gt 10 ]; then
+                       # dump entire console log as raw here
+                       ec2-get-console-output --region "$BUILD_EC2_REGION" -r "$INSTANCE"
+                       L="0"
+                    fi
+                    sleep 1
+                done
+                rm "$temp_file"
+                echo
+                ec2-deregister --region "$BUILD_EC2_REGION" "$EC2_AMI"
+                # snapshots get deleted after extract
+	elif [ "$VM_TYPE" = 'openstack' ]; then
+		echo "booting $VM_TYPE ..."
+                nova boot --image $OBS_OPENSTACK_KERNEL_IMAGE_ID --flavor m1.small --block_device_mapping vda=${VM_VOLUME_NAME}::$(( $VMDISK_ROOTSIZE / 1024 )):0 --block_device_mapping vdb=${VM_VOLUME_SWAP}::1:0 --poll "build-$VM_VOLUME_NAME" || cleanup_and_exit 3
+                
+#                while [ `nova show "build-$VM_VOLUME_NAME" | sed -n -e 's,|[ ]*status[ ]*|[ ]*\([^ ]*\).*,\1,p'` == "ACTIVE" ]; do
+#                  sleep 5
+#                done
+                nova console-log "build-$VM_VOLUME_NAME"
 	elif [ "$VM_TYPE" = 'lxc' ]; then
 		echo "booting $VM_TYPE ..."
 		LXCCONF="$BUILD_ROOT/.build.lxc.conf"
@@ -2074,6 +2433,19 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                 VM_IMAGE="/dev/$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_ROOT $zvm_mult_pass $zvm_worker_nr)"
                 VM_SWAP="/dev/$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_SWAP $zvm_mult_pass $zvm_worker_nr)"
 	fi
+
+	if [ "$VM_TYPE" = 'openstack' ]; then
+           VM_IMAGE=`cloud_volume_attach "$VM_SERVER" "$VM_VOLUME_NAME" "$VM_IMAGE"`
+           [ "${VM_IMAGE:0:5}" == "/dev/" ] || cleanup_and_exit 3
+           VM_SWAP=`cloud_volume_attach "$VM_SERVER" "$VM_VOLUME_SWAP" "$VM_SWAP"`
+           [ "${VM_SWAP:0:5}" == "/dev/" ] || cleanup_and_exit 3
+        fi
+	if [ "$VM_TYPE" = 'ec2' ]; then
+           VM_IMAGE=`cloud_volume_attach "$VM_SERVER" "$EC2_EXTRACT_VOLUME_root" "$VM_IMAGE"`
+           [ "${VM_IMAGE:0:5}" == "/dev/" ] || cleanup_and_exit 3
+           VM_SWAP=`cloud_volume_attach "$VM_SERVER" "$EC2_EXTRACT_VOLUME_swap" "$VM_SWAP"`
+           [ "${VM_SWAP:0:5}" == "/dev/" ] || cleanup_and_exit 3
+        fi
 
         # Exctract build resutls from VM
 	if [ "$VM_TYPE" = 'emulator' ]; then
@@ -2146,6 +2518,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		    zvm_cp volume_detach_local $VM_VOLUME_ROOT ${zvm_worker_nr}
 		    zvm_cp volume_detach_local $VM_VOLUME_SWAP ${zvm_worker_nr}
 		fi
+	        if [ "$VM_TYPE" = 'openstack' ]; then
+                    cloud_volume_detach "$VM_SERVER" "$VM_VOLUME_NAME"
+                    cloud_volume_detach "$VM_SERVER" "$VM_VOLUME_SWAP"
+                fi
 		cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
 		;;
 	      BUILDSTATUS*)
