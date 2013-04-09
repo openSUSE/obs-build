@@ -435,7 +435,7 @@ setupccache()
 		test -e $BUILD_ROOT/usr/bin/$i || continue
 		echo '#! /bin/sh' > $BUILD_ROOT/var/lib/build/ccache/bin/$i
 		echo "test -e /usr/bin/$i || exit 1" >> $BUILD_ROOT/var/lib/build/ccache/bin/$i
-		echo 'export PATH=/usr/lib/icecream/bin:/opt/icecream/bin:/usr/bin:$PATH' >> $BUILD_ROOT/var/lib/build/ccache/bin/$i
+		echo 'export PATH=/usr/lib/icecc/bin:/opt/icecream/bin:/usr/bin:$PATH' >> $BUILD_ROOT/var/lib/build/ccache/bin/$i
 		echo "ccache $i \"\$@\"" >> $BUILD_ROOT/var/lib/build/ccache/bin/$i
 		chmod 755 $BUILD_ROOT/var/lib/build/ccache/bin/$i
 		echo "Installed ccache wrapper as $BUILD_ROOT/var/lib/build/ccache/bin/$i"
@@ -467,9 +467,9 @@ setupicecream()
     echo "using icecream with $icecream jobs"
 
     if [ "$ccache" -ne 1 ]; then
-	echo 'export PATH=/usr/lib/icecream/bin:/opt/icecream/bin:$PATH' > "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
+	echo 'export PATH=/usr/lib/icecc/bin:/opt/icecream/bin:$PATH' > "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
     else
-	echo 'export CCACHE_PATH=/usr/lib/icecream/bin:/opt/icecream/bin' > "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
+	echo 'export CCACHE_PATH=/usr/lib/icecc/bin:/opt/icecream/bin' > "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
     fi
 
     local icecc_vers=(`shopt -s nullglob; echo $BUILD_ROOT/var/run/icecream/*.tar.{bz2,gz}`)
