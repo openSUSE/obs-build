@@ -1494,6 +1494,10 @@ if [ "$VM_TYPE" = 'qemu' ]; then
     qemu_rootdev=/dev/sda
 fi
 
+if [ "$VM_TYPE" = 'uml' ]; then
+    VM_SWAPDEV=/dev/ubdb
+fi
+
 if [ -z "$RPMLIST" -a -z "$RUNNING_IN_VM" ]; then
     if [ -z "$repos" -a -z "$BUILD_RPMS" ]; then
 	repos=(--repository 'zypp://')
@@ -1971,7 +1975,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		rm "$XEN_CONF_FILE"
 	elif [ "$VM_TYPE" = 'uml' ]; then
 		echo "booting UML kernel ..."
-		set -- $uml_kernel initrd=$uml_initrd root=/ubda init="$vm_init_script" panic=1 elevator=noop quiet ubd0=$VM_IMAGE ${MEMSIZE:+mem=$MEMSIZE}
+		set -- $uml_kernel initrd=$uml_initrd root=ubda init="$vm_init_script" panic=1 elevator=noop quiet ubda=$VM_IMAGE ubdb=$VM_SWAP ${MEMSIZE:+mem=$MEMSIZE}
 		echo "$@"
 		"$@"
 	elif [ "$VM_TYPE" = 'qemu' -o "$VM_TYPE" = 'kvm' ]; then
