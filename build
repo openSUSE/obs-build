@@ -30,7 +30,7 @@ old_packages=()
 # defaults for vm_img_mkfs
 vm_img_mkfs_ext4_options='-O ^has_journal,^huge_file,^resize_inode,sparse_super'
 vm_img_mkfs_ext4_extra='-E lazy_itable_init,discard'
-vm_img_mkfs_ext4="mkfs.ext4 -m 0 -q -F $vm_img_mkfs_ext4_options $vm_img_mkfs_ext4_extra"
+vm_img_mkfs_ext4="mkfs.ext4 -m 0 -q -F $vm_img_mkfs_ext4_options"
 vm_img_tunefs_ext4='tune2fs -c 0'
 vm_img_mkfs_ext3='mkfs.ext3 -m 0 -q -F'
 vm_img_tunefs_ext3='tune2fs -c 0 -o journal_data_writeback'
@@ -649,6 +649,7 @@ vm_img_mkfs()
     local img="$2"
     local mkfs tunefs
     eval "mkfs=\"\$vm_img_mkfs_${fs}\""
+    eval "mkfs_exta_options=\"\$vm_img_mkfs_${fs}_extra\""
     eval "tunefs=\"\$vm_img_tunefs_${fs}\""
 
     if test -z "$mkfs"; then
@@ -658,7 +659,14 @@ vm_img_mkfs()
 
 
     echo "Creating $fs filesystem on $img"
-    $mkfs "$img"
+    if ! $mkfs $mkfs_exta_options "$img"; then
+        if test -z "$mkfs_exta_options"; then
+            cleanup_and_exit 3
+        else
+            echo "Format call failed, trying again without extra options..."
+            $mkfs "$img" || cleanup_and_exit 3
+        fi
+    fi
     if test -n "$tunefs" ; then
 	$tunefs "$img" || cleanup_and_exit 3
     fi
