@@ -70,6 +70,7 @@ ABUILD_UID=399
 ABUILD_GID=399
 
 DO_INIT=true
+DO_PREINSTALL=true
 DO_LINT=
 DO_CHECKS=true
 CLEAN_BUILD=
@@ -366,6 +367,7 @@ usage () {
 #                 3 -> something wrong with build host
 #
 cleanup_and_exit () {
+echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     trap EXIT
     test -z "$1" && set 0
     rm -f $BUILD_ROOT/exit
