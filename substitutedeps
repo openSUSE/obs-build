@@ -113,11 +113,10 @@ for my $line (@$xspec) {
     }
   }
 
-  if ($line =~ /^Release:(.*)\s*$/i) {
+  if ($line =~ /^Release\s*:\s*(.*?)\s*$/i) {
     my $spec_rel = $1; # User-provided value
     my $oldl = $line;
     if (defined $release) {
-      $line =~ s/<SPEC_REL>/$spec_rel/;
       if (!($line =~ s/<RELEASE\d*>/$release/g)) {
 	if ($line =~ /<(?:CI_CNT|B_CNT)>/) {
 	  # XXX: should pass ci_cnt/b_cnt instead
@@ -131,15 +130,17 @@ for my $line (@$xspec) {
 	    $line =~ s/<B_CNT>/$b/;
 	  }
 	} else {
-	  $line =~ s/^(Release:\s*).*/$1$release/i;
+	  # no special replacement rules in the line, simply replace
+	  $line =~ s/^(Release\s*:\s*).*/$1$release/i;
+	  $line =~ s/<SPEC_REL>/$spec_rel/g;
 	}
       }
+      $line =~ s/<SPEC_REL>//g;	# no recursion please
     } else {
       # remove macros, as rpm doesn't like them
       $line =~ s/<RELEASE\d*>/0/;
       $line =~ s/<CI_CNT>/0/;
       $line =~ s/<B_CNT>/0/;
-      $line =~ s/<SPEC_REL>/0/;
     }
     # this is to be compatible to legacy autobuild.
     # you can specify a releaseprg in the project configuration,
