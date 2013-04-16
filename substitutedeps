@@ -113,11 +113,12 @@ for my $line (@$xspec) {
     }
   }
 
-  if ($line =~ /^Release:(.*)\s*$/i) {
-    my $spec_rel = $1; # User-provided value
+  if ($line =~ /^Release:(\s+)(.*)\s*$/i) {
+    my $indent = $1;   # indent before release value
+    my $spec_rel = $2; # release value from spec
     my $oldl = $line;
     if (defined $release) {
-      $line =~ s/<SPEC_REL>/$spec_rel/;
+      $release =~ s/<SPEC_REL>/$spec_rel/;
       if (!($line =~ s/<RELEASE\d*>/$release/g)) {
 	if ($line =~ /<(?:CI_CNT|B_CNT)>/) {
 	  # XXX: should pass ci_cnt/b_cnt instead
@@ -131,7 +132,7 @@ for my $line (@$xspec) {
 	    $line =~ s/<B_CNT>/$b/;
 	  }
 	} else {
-	  $line =~ s/^(Release:\s*).*/$1$release/i;
+	  $line =~ s/^(Release:\s*).*/$indent$release/i;
 	}
       }
     } else {
