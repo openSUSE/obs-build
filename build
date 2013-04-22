@@ -2514,7 +2514,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		done
                 if test "$statistics" = 1; then
                     mkdir -p OTHER
-                    mv _statistics OTHER/
                     [ -n "$TIME_PREINSTALL" ] && echo "TIME_preinstall: $TIME_PREINSTALL"  >> OTHER/_statistics
                     TIME_TOTAL=$(( `date +%s` - $TIME_START_TIME ))
                     echo "TIME_total: $TIME_TOTAL"  >> OTHER/_statistics
