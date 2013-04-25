@@ -284,8 +284,9 @@ init_db()
         fi
 	# hack: add nofsync to db config to speed up install
 	mkdir -p $BUILD_ROOT/root
-	echo '%__dbi_perms perms=0644 nofsync' > $BUILD_ROOT/.rpmmacros
-	echo '%__dbi_perms perms=0644 nofsync' > $BUILD_ROOT/root/.rpmmacros
+	DBI_OTHER=`rpm --eval '%__dbi_other'`
+	echo "%__dbi_other $DBI_OTHER nofsync" > $BUILD_ROOT/.rpmmacros
+	echo "%__dbi_other $DBI_OTHER nofsync" > $BUILD_ROOT/root/.rpmmacros
     elif test $PSUF = deb ; then
 	# force dpkg into database to make epoch test work
 	if ! test "$BUILD_ROOT/.init_b_cache/rpms/dpkg.deb" -ef "$BUILD_ROOT/.init_b_cache/dpkg.deb" ; then
