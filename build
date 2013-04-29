@@ -1028,11 +1028,11 @@ check_for_ppc()
 
     export kvm_bin="/usr/bin/qemu-system-ppc64"
     export console=hvc0
-    export KVM_OPTIONS="-enable-kvm -M pseries -mem-path /hugetlbfs"
+    export KVM_OPTIONS="-enable-kvm -M pseries"
     export VM_KERNEL=/boot/vmlinux
     export VM_INITRD=/boot/initrd
-    if [ -z "$RUNNING_IN_VM" -a "$VM_TYPE" = "kvm" ];then
-      if ! grep -q "/hugetlbfs" /proc/mounts; then
+    if [ -z "$RUNNING_IN_VM" -a -n "$HUGETLBFSPATH" ];then
+      if ! grep -q "$HUGETLBFSPATH" /proc/mounts; then
          echo "hugetlbfs is not mounted"
          exit 1
       fi
