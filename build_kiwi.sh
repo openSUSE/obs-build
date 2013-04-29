@@ -147,12 +147,39 @@ if [ -e "$imageout.iso" ]; then
         fi
 	popd
 fi
+if [ -e "$imageout.install.iso" ]; then
+	echo "take install.iso file and create sha256..."
+	mv "$imageout.install.iso" "/$TOPDIR/KIWI/$imageout$buildnum.install.iso"
+	pushd /$TOPDIR/KIWI
+	if [ -x /usr/bin/sha256sum ]; then
+           /usr/bin/sha256sum "$imageout$buildnum.install.iso" > "$imageout$buildnum.install.iso.sha256"
+        fi
+	popd
+fi
 if [ -e "$imageout.qcow2" ]; then
 	mv "$imageout.qcow2" "/$TOPDIR/KIWI/$imageout$buildnum.qcow2"
 	pushd /$TOPDIR/KIWI
 	if [ -x /usr/bin/sha256sum ]; then
 	    echo "Create sha256 file..."
 	    /usr/bin/sha256sum "$imageout$buildnum.qcow2" > "$imageout$buildnum.qcow2.sha256"
+        fi
+	popd
+fi
+if [ -e "$imageout.raw.install.raw" ]; then
+        compress_tool="bzip2"
+        compress_suffix="bz2"
+	if [ -x /usr/bin/xz ]; then
+            # take xz to get support for sparse files
+            compress_tool="xz -2"
+            compress_suffix="xz"
+        fi
+	mv "$imageout.raw.install.raw" "/$TOPDIR/KIWI/$imageout$buildnum.raw.install.raw"
+	pushd /$TOPDIR/KIWI
+	echo "\$compress_tool raw.install.raw file..."
+	\$compress_tool "$imageout$buildnum.raw.install.raw"
+	if [ -x /usr/bin/sha256sum ]; then
+	    echo "Create sha256 file..."
+	    /usr/bin/sha256sum "$imageout$buildnum.raw.install.raw.\${compress_suffix}" > "$imageout$buildnum.raw.install.raw.\${compress_suffix}.sha256"
         fi
 	popd
 fi
