@@ -961,7 +961,6 @@ cloud_volume_detach()
 {
     local VM_SERVER="$1"
     local VM_VOL_NAME="$2"
-echo "-----> DETACH $VM_VOL_NAME"
     if [ "$VM_TYPE" = 'openstack' ]; then
       # needed at all?
       nova volume-show "$VM_VOL_NAME" | grep -q in-use || return 0
