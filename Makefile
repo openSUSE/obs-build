@@ -77,7 +77,7 @@ install:
 # build-initvm-static) whereas the build scripts package is noarch.
 
 initvm: initvm.c
-	$(CC) -o $@ -static $(CFLAGS) initvm.c
+	$(CC) -o $@.$(shell uname -m) -static $(CFLAGS) initvm.c
 
 initvm-all: initvm
 
@@ -85,7 +85,7 @@ initvm-build: initvm
 
 initvm-install: initvm
 	install -m755 -d $(DESTDIR)$(pkglibdir)
-	install -m755 initvm $(DESTDIR)$(pkglibdir)/initvm
+	install -m755 initvm.$(shell uname -m) $(DESTDIR)$(pkglibdir)/initvm.$(shell uname -m)
 
 
 dist:

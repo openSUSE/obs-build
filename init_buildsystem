@@ -605,8 +605,8 @@ else
 	if [ -z "$PREPARE_VM" ]; then
 	    echo "registering binfmt handlers"
 
-	    if [ -x "$BUILD_DIR/initvm" -a -e "$BUILD_DIR/qemu-reg" ]; then
-	        $BUILD_DIR/initvm
+	    if [ -x "$BUILD_DIR/initvm.`uname -m`" -a -e "$BUILD_DIR/qemu-reg" ]; then
+	        $BUILD_DIR/initvm.`uname -m`
 	    elif [ -x /usr/sbin/qemu-binfmt-conf.sh ]; then
 	       [ -e /proc/sys/fs/binfmt_misc ] || mount -n binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
 	       /usr/sbin/qemu-binfmt-conf.sh
