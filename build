@@ -2986,6 +2986,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    chroot $BUILD_ROOT su -
 	else
 	    chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+	    if test "$BUILD_SUCCEEDED" = true -a "$DO_CHECKS" != "false"; then
+		DEB_CHANGESFILE=${SPECFILE%.dsc}_$(dpkg-architecture -qDEB_BUILD_ARCH).changes
+		chroot $BUILD_ROOT su -c "which lintian > /dev/null && cd $TOPDIR && echo Running lintian && lintian -i $DEB_CHANGESFILE" - $BUILD_USER < /dev/null
+	    fi
 	fi
 
 	mkdir -p $BUILD_ROOT/$TOPDIR/DEBS
