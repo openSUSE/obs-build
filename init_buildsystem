@@ -284,7 +284,7 @@ init_db()
         fi
 	# hack: add nofsync to db config to speed up install
 	mkdir -p $BUILD_ROOT/root
-	DBI_OTHER=`rpm --eval '%{?__dbi_other}'`
+	DBI_OTHER=`chroot $BUILD_ROOT rpm --eval '%{?__dbi_other}'`
 	echo "%__dbi_other $DBI_OTHER nofsync" > $BUILD_ROOT/.rpmmacros
 	echo "%__dbi_other $DBI_OTHER nofsync" > $BUILD_ROOT/root/.rpmmacros
     elif test $PSUF = deb ; then
