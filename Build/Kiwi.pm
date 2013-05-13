@@ -189,7 +189,10 @@ sub kiwiparse {
   # Find packages and possible additional required architectures
   my @additionalarchs;
   my @pkgs;
-  push @pkgs, @{$kiwi->{'packages'}->[0]->{'package'}} if $kiwi->{'packages'};
+  for my $packages (@{$kiwi->{'packages'}}) {
+    next if $packages->{'type'} and $packages->{'type'} ne 'image' and $packages->{'type'} ne 'bootstrap';
+    push @pkgs, @{$packages->{'package'}} if $packages->{'package'};
+  }
   if ($instsource) {
     push @pkgs, @{$instsource->{'metadata'}->[0]->{'repopackage'} || []} if $instsource->{'metadata'};
     push @pkgs, @{$instsource->{'repopackages'}->[0]->{'repopackage'} || []} if $instsource->{'repopackages'};
