@@ -175,6 +175,15 @@ sub kiwiparse {
     }
   }
 
+  # set default values for priority
+  for (@{$kiwi->{'repository'} || []}) {
+    next if defined $_->{'priority'};
+    if ($preferences->[0]->{'packagemanager'}->[0]->{'_content'} eq 'smart') {
+       $_->{'priority'} = 0;
+    } else {
+       $_->{'priority'} = 99;
+    }
+  }
   my @repositories = sort {$a->{'priority'} <=> $b->{'priority'}} @{$kiwi->{'repository'} || []};
   if ($preferences->[0]->{'packagemanager'}->[0]->{'_content'} eq 'smart') {
     @repositories = reverse @repositories;
