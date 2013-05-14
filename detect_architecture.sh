@@ -1,10 +1,8 @@
 #!/bin/bash
 
-arch=`uname -m`
+source common_functions
 
-case "$arch" in
-	i686) arch="i586";;
-esac
+build_host_arch
 
-echo $arch
+echo $BUILD_HOST_ARCH
 
