@@ -3,6 +3,8 @@ SCM=$(shell if test -d .svn; then echo svn; elif test -d .git; then echo git; fi
 DATE=$(shell date +%Y%m%d%H%M)
 BUILD=build
 
+INITVM_ARCH=$(shell bash detect_architecture.sh)
+
 ifeq ($(SCM),svn)
 SVNVER=_SVN$(shell LANG=C svnversion .)
 endif
@@ -77,7 +79,7 @@ install:
 # build-initvm-static) whereas the build scripts package is noarch.
 
 initvm: initvm.c
-	$(CC) -o $@.$(shell uname -m) -static $(CFLAGS) initvm.c
+	$(CC) -o $@.$(INITVM_ARCH) -static $(CFLAGS) initvm.c
 
 initvm-all: initvm
 
@@ -85,7 +87,7 @@ initvm-build: initvm
 
 initvm-install: initvm
 	install -m755 -d $(DESTDIR)$(pkglibdir)
-	install -m755 initvm.$(shell uname -m) $(DESTDIR)$(pkglibdir)/initvm.$(shell uname -m)
+	install -m755 initvm.$(INITVM_ARCH) $(DESTDIR)$(pkglibdir)/initvm.$(INITVM_ARCH)
 
 
 dist:
