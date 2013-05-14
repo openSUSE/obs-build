@@ -2144,8 +2144,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	umount -n $BUILD_ROOT/mnt 2> /dev/null || true
 
 	if check_use_emulator; then
-	    if [ -x "$BUILD_DIR/initvm" -a -e "$BUILD_DIR/qemu-reg" ]; then
-		vm_init_script="/.build/initvm"
+	    if [ -e $BUILD_DIR/initvm.$BUILD_HOST_ARCH -a -e "$BUILD_DIR/qemu-reg" ]; then
+                chmod 0755 "$BUILD_DIR/initvm.$BUILD_HOST_ARCH"
+                vm_init_script="/.build/initvm.$BUILD_HOST_ARCH"
 	    elif [ -e $BUILD_DIR/initscript_qemu_vm ]; then
 		vm_init_script="/.build/initscript_qemu_vm"
 	    else
