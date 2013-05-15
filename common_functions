@@ -62,7 +62,11 @@ check_use_emulator()
 
     # to run the qemu initialization in the XEN chroot, we need to
     # register it with a static program or shell script
-    if test -e $BUILD_DIR/initvm.$BUILD_HOST_ARCH && \
+    if [ -z "$VM_IMAGE" ]; then
+        if [ -x /usr/sbin/qemu-binfmt-conf.sh ]; then
+            return 0
+        fi
+    elif test -e $BUILD_DIR/initvm.$BUILD_HOST_ARCH && \
         test -e $BUILD_DIR/qemu-reg; then
         return 0	# prefer initvm to handle registration
     elif test -e /bin/bash-static \
