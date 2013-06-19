@@ -530,7 +530,7 @@ sub readdeps {
 	if ($pkginfo) {
 	  # extract ver and rel from self provides
 	  my ($v, $r) = map { /\Q$pkgid\E = ([^-]+)(?:-(.+))?$/ } @ss;
-	  die("$pkgid: no self provides\n") unless $v;
+	  die("$pkgid: no self provides\n") unless defined($v) && $v ne '';
 	  $pkginfo->{$pkgid}->{'name'} = $pkgid;
 	  $pkginfo->{$pkgid}->{'version'} = $v;
 	  $pkginfo->{$pkgid}->{'release'} = $r if defined($r);
