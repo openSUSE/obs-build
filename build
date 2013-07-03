@@ -1013,13 +1013,17 @@ check_for_arm()
     export kvm_bin="/usr/bin/qemu-system-arm"
     export console=ttyAMA0
     export KVM_OPTIONS="-enable-kvm -M vexpress-a15 -dtb /boot/a15-guest.dtb -cpu cortex-a15"
-    export VM_KERNEL=/boot/zImage.vexpress
-    # prefer the vexpress initrd
-    if [ -e /boot/initrd.vexpress ]; then
-        VM_INITRD=/boot/initrd.vexpress
-    else
-        VM_INITRD=/boot/initrd
+    VM_KERNEL=/boot/zImage
+    VM_INITRD=/boot/initrd
+    # prefer the guest kernel
+    if [ -e /boot/zImage.guest ]; then
+        VM_KERNEL=/boot/zImage.guest
     fi
+    # prefer the guest initrd
+    if [ -e /boot/initrd.guest ]; then
+        VM_INITRD=/boot/initrd.guest
+    fi
+    export VM_KERNEL
     export VM_INITRD
 }
 
