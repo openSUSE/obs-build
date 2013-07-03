@@ -65,6 +65,9 @@ console=ttyS0
 # need to restore build root owner for non-root builds
 browner=
 
+# additional kiwi parameters, used for appliance builds with obsrepositories:/ directive
+KIWI_PARAMETERS=
+
 # Default uid:gid for the build user
 ABUILD_UID=399
 ABUILD_GID=399
@@ -1152,6 +1155,11 @@ while test -n "$1"; do
       *-baselibs)
 	CREATE_BASELIBS=true
 	;;
+      --kiwi-parameter)
+	needarg
+	KIWI_PARAMETERS="$KIWI_PARAMETERS $ARG")
+	shift
+	;;
       *-baselibs-internal)
 	CREATE_BASELIBS=internal
 	;;
@@ -2097,6 +2105,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "INCARNATION='${INCARNATION//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "DISTURL='${DISTURL//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	echo "DO_INIT='${DO_INIT//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+	echo "KIWI_PARAMETERS='${KIWI_PARAMETERS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
 	# FIXME: this depends on the kernel and vm.
 	# could be hda2, sda2 for xen or hdb/sdb for qemu
 	test -n "$VM_SWAP" && echo "VM_SWAP='${VM_SWAPDEV:-/dev/hda2}'" >> $BUILD_ROOT/.build/build.data
