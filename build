@@ -1093,6 +1093,7 @@ needarg()
 
 while test -n "$1"; do
   PARAM="$1"
+  UNSTRIPPED_ARG="$2"
   ARG="$2"
   [ "$ARG" = "${ARG#-}" ] || ARG=""
   ARG2="$3"
@@ -1156,8 +1157,7 @@ while test -n "$1"; do
 	CREATE_BASELIBS=true
 	;;
       --kiwi-parameter)
-	needarg
-	KIWI_PARAMETERS="$KIWI_PARAMETERS $ARG")
+	KIWI_PARAMETERS="$KIWI_PARAMETERS $UNSTRIPPED_ARG"
 	shift
 	;;
       *-baselibs-internal)

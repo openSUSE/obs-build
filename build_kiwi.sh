@@ -22,8 +22,8 @@ run_kiwi()
         fi
         if test "$imagetype" != product -a "$DO_INIT" != "false" ; then
 	    echo "creating repodata for $repo"
-	    if chroot $BUILD_ROOT createrepo --simple-md-filenames --help >/dev/null 2>&1 ; then
-		chroot $BUILD_ROOT createrepo --simple-md-filenames "$repo"
+	    if chroot $BUILD_ROOT createrepo --no-database --simple-md-filenames --help >/dev/null 2>&1 ; then
+		chroot $BUILD_ROOT createrepo --no-database --simple-md-filenames "$repo"
 	    else
 		chroot $BUILD_ROOT createrepo "$repo"
 	    fi
