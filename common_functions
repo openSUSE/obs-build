@@ -19,6 +19,7 @@ set_build_arch()
 
     case $BUILD_ARCH in
       armv7hl) BUILD_ARCH="armv7hl:armv7l:armv5tel" ;;
+      armv6hl) BUILD_ARCH="armv6hl:armv6l:armv5tel" ;;
       armv7l) BUILD_ARCH="armv7l:armv5tel" ;;
       armv5tel) BUILD_ARCH="armv5tel" ;;
       i686) BUILD_ARCH="i686:i586:i486:i386" ;;
