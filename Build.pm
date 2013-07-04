@@ -38,8 +38,8 @@ package Build;
 my $std_macros = q{
 %define nil
 %define ix86 i386 i486 i586 i686 athlon
-%define arm armv4l armv5l armv6l armv7l armv4b armv5l armv5b armv5el armv5eb armv5tel armv5teb armv6el armv6eb armv7el armv7eb armv7hl armv7nhl armv8el
-%define arml armv4l armv5l armv6l armv7l armv5tel armv5el armv6el armv7el armv7hl armv7nhl armv8el
+%define arm armv4l armv5l armv6l armv7l armv4b armv5l armv5b armv5el armv5eb armv5tel armv5teb armv6hl armv6el armv6eb armv7el armv7eb armv7hl armv7nhl armv8el
+%define arml armv4l armv5l armv6l armv7l armv5tel armv5el armv6el armv6hl armv7el armv7hl armv7nhl armv8el
 %define armb armv4b armv5b armv5teb armv5eb armv6eb armv7eb
 %define sparc sparc sparcv8 sparcv9 sparcv9v sparc64 sparc64v
 };
