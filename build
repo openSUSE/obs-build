@@ -420,6 +420,7 @@ cleanup_and_exit () {
 	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	umount -n $BUILD_ROOT/proc 2>/dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2>/dev/null || true
+	umount -n $BUILD_ROOT/dev/shm 2>/dev/null || true
 	test "$VM_IMAGE" = 1 && VM_IMAGE=
 	[ -n "$VM_IMAGE" ] && umount $BUILD_ROOT 2>/dev/null || true
     fi
@@ -2150,6 +2151,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	umount -n $BUILD_ROOT/proc 2> /dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
+	umount -n $BUILD_ROOT/dev/shm 2> /dev/null || true
 	umount -n $BUILD_ROOT/mnt 2> /dev/null || true
 
 	if check_use_emulator; then
@@ -2748,6 +2750,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
     mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
     mount -n -tdevpts -omode=0620,gid=5 none $BUILD_ROOT/dev/pts 2> /dev/null
+    # needed for POSIX semaphores
+    mount -n -ttmpfs none $BUILD_ROOT/dev/shm 2> /dev/null
 
     setupicecream
 
