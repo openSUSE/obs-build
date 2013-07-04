@@ -812,6 +812,12 @@ detect_vm_2nd_stage()
         background_monitor_process &
     fi
 
+    if [ ! -e /dev/.udev ]; then
+        echo "WARNING: udev not running, creating extra device nodes"
+        test -e /dev/fd || ln -sf /proc/self/fd /dev/fd
+        test -e /etc/mtab || ln -sf /proc/mounts /etc/mtab
+    fi
+
     # set date to build start on broken systems (now < build start)
     if [ $(date '+%s') -lt $(date -r /.build/.date '+%s') ]; then
         echo -n "WARNING: system has a broken clock, setting it to a newer time: "
