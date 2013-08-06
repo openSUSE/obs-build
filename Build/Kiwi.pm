@@ -114,11 +114,11 @@ sub kiwiparse {
   my @extrasources;
   my @requiredarch;
   my $schemaversion = 0;
-  my $schemaversion56 = version->parse("5.6");
+  my $schemaversion56 = version->new("5.6");
   my $kiwi = parsexml($xml);
   die("not a kiwi config\n") unless $kiwi && $kiwi->{'image'};
   $kiwi = $kiwi->{'image'}->[0];
-  $schemaversion = version->parse($kiwi->{'schemaversion'}) if $kiwi->{'schemaversion'}; 
+  $schemaversion = version->new($kiwi->{'schemaversion'}) if $kiwi->{'schemaversion'}; 
   $ret->{'filename'} = $kiwi->{'name'} if $kiwi->{'name'};
   my $description = (($kiwi->{'description'} || [])->[0]) || {};
   if ($description->{'specification'}) {
