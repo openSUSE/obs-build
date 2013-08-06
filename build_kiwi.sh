@@ -232,9 +232,10 @@ for i in "$imageout.vmx" "$imageout.vmdk" "$imageout-disk*.vmdk"; do
 	test -e \$i && VMXFILES="\$VMXFILES \$i"
 done
 # take raw files as fallback
-if [ -z "\$VMXFILES" ]; then
-	test -e "$imageout.raw" && VMXFILES="$imageout.raw"
-fi
+# do not do that, it may overwrite files when multiple -vmx flavors are configured
+#if [ -z "\$VMXFILES" ]; then
+#	test -e "$imageout.raw" && VMXFILES="$imageout.raw"
+#fi
 if [ -n "\$VMXFILES" ]; then
 	tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" \$VMXFILES
 	SHAFILES="\$SHAFILES $imageout$buildnum-vmx.tar.bz2"
