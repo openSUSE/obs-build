@@ -1,6 +1,7 @@
 package Build::Kiwi;
 
 use strict;
+use version;
 
 our $bootcallback;
 
@@ -112,9 +113,12 @@ sub kiwiparse {
   my @packages;
   my @extrasources;
   my @requiredarch;
+  my $schemaversion = 0;
+  my $schemaversion56 = version->parse("5.6");
   my $kiwi = parsexml($xml);
   die("not a kiwi config\n") unless $kiwi && $kiwi->{'image'};
   $kiwi = $kiwi->{'image'}->[0];
+  $schemaversion = version->parse($kiwi->{'schemaversion'}) if $kiwi->{'schemaversion'}; 
   $ret->{'filename'} = $kiwi->{'name'} if $kiwi->{'name'};
   my $description = (($kiwi->{'description'} || [])->[0]) || {};
   if ($description->{'specification'}) {
@@ -131,11 +135,12 @@ sub kiwiparse {
       if (defined $type->{'image'}) {
         # for kiwi 4.1 and 5.x
         push @types, $type->{'image'};
+        push @packages, "kiwi-image:$type->{'image'}" if $schemaversion >= $schemaversion56;
       } else {
         # for kiwi 3.8 and before
         push @types, $type->{'_content'};
+        push @packages, "kiwi-filesystem:$type->{'filesystem'}" if $type->{'filesystem'};
       }
-      push @packages, "kiwi-filesystem:$type->{'filesystem'}" if $type->{'filesystem'};
       if (defined $type->{'boot'}) {
         if ($type->{'boot'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
           next unless $bootcallback;
