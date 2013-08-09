@@ -1,7 +1,6 @@
 package Build::Kiwi;
 
 use strict;
-use version;
 
 our $bootcallback;
 
@@ -101,6 +100,19 @@ sub findFallBackArchs {
   return @fa
 }
 
+# sles10 perl does not have the version.pm
+# implement own hack
+sub versionstring {
+  my ($str) = @_;
+  my @xstr = split (/\./,$str);
+  my $result = 0;
+  while (my $digit = shift(@xstr)) {
+    $result = $result * 100;
+    $result += $digit;
+  }
+  return $result;
+}
+
 sub kiwiparse {
   my ($xml, $arch, $count) = @_;
   $count ||= 0;
@@ -114,11 +126,11 @@ sub kiwiparse {
   my @extrasources;
   my @requiredarch;
   my $schemaversion = 0;
-  my $schemaversion56 = version->new("5.6");
+  my $schemaversion56 = versionstring("5.6");
   my $kiwi = parsexml($xml);
   die("not a kiwi config\n") unless $kiwi && $kiwi->{'image'};
   $kiwi = $kiwi->{'image'}->[0];
-  $schemaversion = version->new($kiwi->{'schemaversion'}) if $kiwi->{'schemaversion'}; 
+  $schemaversion = versionstring($kiwi->{'schemaversion'}) if $kiwi->{'schemaversion'}; 
   $ret->{'filename'} = $kiwi->{'name'} if $kiwi->{'name'};
   my $description = (($kiwi->{'description'} || [])->[0]) || {};
   if ($description->{'specification'}) {
