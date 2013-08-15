@@ -602,23 +602,10 @@ else
     # register the QEMU emulator
     #
     if check_use_emulator; then
-	if [ -z "$PREPARE_VM" ]; then
-	    echo "WARNING: registering binfmt handlers system wide."
-
-	    if [ -x /usr/sbin/qemu-binfmt-conf.sh ]; then
-	       [ -e /proc/sys/fs/binfmt_misc ] || mount -n binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
-	       /usr/sbin/qemu-binfmt-conf.sh
-	    else
-	        echo "Warning: could not register binfmt handlers. /usr/sbin/qemu-binfmt-conf.sh does not exist. You may want to use KVM/XEN for using vminit instead"
-	    fi
-        else
 	    echo "registering binfmt handlers for VM"
 
 	    if [ -x "$BUILD_DIR/initvm.`uname -m`" -a -e "$BUILD_DIR/qemu-reg" ]; then
 	        $BUILD_DIR/initvm.`uname -m`
-	    elif [ -x /usr/sbin/qemu-binfmt-conf.sh ]; then
-	       [ -e /proc/sys/fs/binfmt_misc ] || mount -n binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
-	       /usr/sbin/qemu-binfmt-conf.sh
 	    else
 	        echo "Warning: could not register binfmt handlers. Neither build-initvm nor /usr/sbin/qemu-binfmt-conf.sh exist"
 	    fi
@@ -628,7 +615,6 @@ else
 	    if [ "$mmap_min_addr" != 0 ]; then
 		echo "Warning: mmap_min_addr is != 0. If programs fail at mmap this could be the reason"
 	    fi
-	fi
     fi
 
     PACKAGES_TO_INSTALL=

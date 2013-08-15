@@ -2168,8 +2168,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    if [ -e $BUILD_DIR/initvm.$BUILD_HOST_ARCH -a -e "$BUILD_DIR/qemu-reg" ]; then
                 chmod 0755 "$BUILD_DIR/initvm.$BUILD_HOST_ARCH"
                 vm_init_script="/.build/initvm.$BUILD_HOST_ARCH"
-	    elif [ -e $BUILD_DIR/initscript_qemu_vm ]; then
-		vm_init_script="/.build/initscript_qemu_vm"
 	    else
 		echo "Warning: can't find initscript to register binfmts"
 	    fi

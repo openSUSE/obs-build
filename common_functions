@@ -64,18 +64,13 @@ check_use_emulator()
 
     # to run the qemu initialization in the XEN chroot, we need to
     # register it with a static program or shell script
-    if [ -z "$VM_IMAGE" ]; then
-        if [ -x /usr/sbin/qemu-binfmt-conf.sh ]; then
-            return 0
-        fi
-    elif test -e $BUILD_DIR/initvm.$BUILD_HOST_ARCH && \
+    if test -e $BUILD_DIR/initvm.$BUILD_HOST_ARCH && \
         test -e $BUILD_DIR/qemu-reg; then
-        return 0	# prefer initvm to handle registration
-    elif test -e /bin/bash-static \
-        -a -e /bin/mount-static \
-        -a -e /usr/sbin/qemu-binfmt-conf.sh; then
-        echo "WARNING: using legacy static binaries to register emulator. Please use build-initvm instead."
-        return 0	# as backup use /usr/sbin/qemu-binfmt.conf.sh
+	chmod 0755 "$BUILD_DIR/initvm.$BUILD_HOST_ARCH"
+        if [ -z "$PREPARE_VM" ]; then
+             return 0	# chroot build, we need to run
+        fi
+        # emulator in vm already registered during startup
     else
         # XXX: error?
         echo "Warning: cross compile not possible due to missing static binaries. please install build-initvm package for that purpose."

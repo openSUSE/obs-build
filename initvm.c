@@ -23,6 +23,7 @@
  */
 
 #include <sys/mount.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -252,6 +253,7 @@ skip:
 int main(int argc, char* argv[], char* env[])
 {
 	int retval;
+	char buf[BUFSIZ];
 
 	/* mount proc filesystem if it isn't already */
 	if (mount("proc", "/proc", "proc", MS_MGC_VAL, NULL) == -1) {
@@ -296,14 +298,19 @@ int main(int argc, char* argv[], char* env[])
 		exit(1);
 	}
 
-	/* setup all done, do the registration */
-	if (!binfmt_register(BINFMT_REGF_0, SYSFS_BINFMT_MISC_REG)) {
-		fprintf(stderr, "%s: failed. Trying alternate binfmt file\n",
-			BINFMT_REGF_0);
-		if (!binfmt_register(BINFMT_REGF_1, SYSFS_BINFMT_MISC_REG)) {
-			fprintf(stderr, "%s: binfmt registration failed\n",
-				BINFMT_REGF_1);
-			exit(1);
+	if (getenv("BUILD_DIR"))
+	    sprintf(buf, "%s/qemu-reg", getenv("BUILD_DIR"));
+
+        if (!buf || !binfmt_register(buf, SYSFS_BINFMT_MISC_REG)) {
+		/* setup all done, do the registration */
+		if (!binfmt_register(BINFMT_REGF_0, SYSFS_BINFMT_MISC_REG)) {
+			fprintf(stderr, "%s: failed. Trying alternate binfmt file\n",
+				BINFMT_REGF_0);
+			if (!binfmt_register(BINFMT_REGF_1, SYSFS_BINFMT_MISC_REG)) {
+				fprintf(stderr, "%s: binfmt registration failed\n",
+					BINFMT_REGF_1);
+				exit(1);
+			}
 		}
 	}
 
