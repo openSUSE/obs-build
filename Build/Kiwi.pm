@@ -151,8 +151,8 @@ sub kiwiparse {
       } else {
         # for kiwi 3.8 and before
         push @types, $type->{'_content'};
-        push @packages, "kiwi-filesystem:$type->{'filesystem'}" if $type->{'filesystem'};
       }
+      push @packages, "kiwi-filesystem:$type->{'filesystem'}" if $type->{'filesystem'};
       if (defined $type->{'boot'}) {
         if ($type->{'boot'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
           next unless $bootcallback;
