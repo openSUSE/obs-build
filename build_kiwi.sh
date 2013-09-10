@@ -99,6 +99,7 @@ run_kiwi()
 	    f=${i##*/}
 	    case $f in
 		*.iso) mv $i $BUILD_ROOT/$TOPDIR/KIWI/. ;;
+		*.packages) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
 		scripts) ;;
 		*0) ;;
 		*) test -d $i && mv $i $BUILD_ROOT/$TOPDIR/KIWI/. ;;
@@ -335,6 +336,17 @@ fi
 EOF
 		    ;;
 	    esac
+	    cat >> $BUILD_ROOT/kiwi_post.sh << EOF
+cd /$TOPDIR/KIWI-$imgtype
+if [ -e "$imageout.packages" ]; then
+   echo "Found kiwi package list file, exporting as well..."
+   cp "$imageout.packages" "/$TOPDIR/OTHER/$imageout$buildnum-$imgtype.packages"
+fi
+if [ -e "$imageout.verified" ]; then
+   echo "Found rpm verification report, exporting as well..."
+   cp "$imageout.verified" "/$TOPDIR/OTHER/$imageout$buildnum-$imgtype.verified"
+fi
+EOF
 	    chroot $BUILD_ROOT su -c "sh -e /kiwi_post.sh" || cleanup_and_exit 1
 	    rm -f $BUILD_ROOT/kiwi_post.sh
 	done
