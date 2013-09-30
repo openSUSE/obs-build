@@ -244,11 +244,19 @@ $subpacks = [];
 if ($spec) {
   my $d;
   if ($spec =~ /\.kiwi$/) {
-    # just set up kiwi root for now
-    $d = {
-      'deps' => [ 'kiwi', 'zypper', 'createrepo', 'squashfs' ],
-      'subpacks' => [],
-    };
+    # lets see if this is a product or image build
+    $d = Build::parse($cf, $spec) || {};
+    my $type = $d->{'imagetype'} && $d->{'imagetype'}->[0] eq 'product' ? 'product' : 'image';
+    my @kdeps;
+    if ($type eq 'image') {
+      @kdeps = @{$cf->{'substitute'}->{'kiwi-setup:image'} || []};
+      @kdeps = ('kiwi', 'createrepo', 'tar') unless @kdeps;
+    } else {
+      @kdeps = @{$cf->{'substitute'}->{'kiwi-setup:product'} || []};
+      @kdeps = ('kiwi') unless @kdeps;
+    }
+    push @kdeps, grep {/^kiwi-.*:/} @{$d->{'deps'} || []};
+    $d = { 'deps' => \@kdeps, 'subpacks' => [] };
   } else {
     $d = Build::parse($cf, $spec);
   }
