@@ -133,6 +133,24 @@ set +e
 	elif [ ! $just_edit ]; then
 		echo "- "
 		echo
+		if [ "$(which osc 2>/dev/null)" ]; then
+			OSC_STATUS="$(cd "$pkgpath" &> /dev/null; osc st)"
+			ADDED="$(sed -n 's/^A[[:blank:]]\+\([^[:blank:]].*\.\(patch\|diff\)\)$/  * \1/p' <<< "$OSC_STATUS")"
+			DELETED="$(sed -n 's/^D[[:blank:]]\+\([^[:blank:]].*\.\(patch\|diff\)\)$/  * \1/p' <<< "$OSC_STATUS")"
+			MODIFIED="$(sed -n 's/^M[[:blank:]]\+\([^[:blank:]].*\.\(patch\|diff\)\)$/  * \1/p' <<< "$OSC_STATUS")"
+			if [ -n "$ADDED" ]; then
+			    echo "- added patches:"
+			    echo "$ADDED"
+			fi
+			if [ -n "$DELETED" ]; then
+			    echo "- removed patches:"
+			    echo "$DELETED"
+			fi
+			if [ -n "$MODIFIED" ]; then
+			    echo "- modified patches:"
+			    echo "$MODIFIED"
+			fi
+		fi
 	fi
 	cat $changelog
 } >> "$tmpfile"
