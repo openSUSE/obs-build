@@ -1076,7 +1076,7 @@ case "$archname" in
     alpha*) PERSONALITY_SYSCALL=324 ;;
     sparc*) PERSONALITY_SYSCALL=191 ;;
     ia64*) PERSONALITY_SYSCALL=1140 ;;
-    i?86*|ppc*|aarch64*|arm*|sh4|cris|m68k|s390*|unicore32|microblaze)   PERSONALITY_SYSCALL=136 ;;
+    i?86*|ppc*|aarch64*|arm*|sh4|cris|m68k*|s390*|unicore32|microblaze)   PERSONALITY_SYSCALL=136 ;;
     *) echo "ARCHITECTURE PERSONALITY IS UNKNOWN"; exit 1;;
 esac
 
