@@ -164,8 +164,9 @@ while (<>) {
   next if (/^--------------/);
   next if (/^========================/);
   if (/^(?:\* )?([A-Za-z]+\s+[A-Za-z]+\s+[0-9][^-]*?[0-9][0-9][0-9][0-9])(.*\@.*$)/) {
+    # suse :    * Fri Jun 07 2013 First Last <first.last@example.com>
+    # tizen:    * Fri Jun 07 2013 First Last <first.last@example.com> tagname@commitid
     $format = 'suse';
-
   } elsif (/^(\w[-+0-9a-z.]*) \(([^\(\) \t]+)\)((\s+[-+0-9a-z.]+)+)\;.*$/) {
     $format = 'debian';
   } else {
