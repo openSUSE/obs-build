@@ -215,7 +215,7 @@ EOF
 		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
 echo "compressing vmx images... "
 cd /$TOPDIR/KIWI-vmx
-for suffix in "ovf" "qcow2"; do
+for suffix in "ovf" "qcow2" "ova"; do
   if [ -e "$imageout.\$suffix" ]; then
 	mv "$imageout.\$suffix" "/$TOPDIR/KIWI/$imageout$buildnum.\$suffix"
 	pushd /$TOPDIR/KIWI
