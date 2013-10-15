@@ -247,6 +247,11 @@ if [ -e "$imageout.xenconfig" ]; then
 fi
 # FIXME: do we need a single .raw file in any case ?
 
+if [ -e "$imageout.ova" ]; then
+        mv "$imageout.ova" "/$TOPDIR/KIWI/$imageout$buildnum.ova"
+        SHAFILES="\$SHAFILES $imageout$buildnum.ova"
+fi
+
 cd /$TOPDIR/KIWI
 if [ -n "\$SHAFILES" -a -x /usr/bin/sha256sum ]; then
 	for i in \$SHAFILES; do
