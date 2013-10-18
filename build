@@ -1911,7 +1911,7 @@ fi
 mkdir_build_root
 
 if [ "$BUILD_ROOT" = / ]; then
-    read dummy dummy browner dummy < <(ls -ld /)
+    browner="$(stat -c %u /)"
 fi
 
 rm -f $BUILD_ROOT/exit
