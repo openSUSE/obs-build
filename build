@@ -2613,7 +2613,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	cd $BUILD_ROOT || cleanup_and_exit 1
 	TAR="tar"
 	if test -x /usr/bin/bsdtar; then
-	    TAR="/usr/bin/bsdtar --chroot"
+	    TAR="/usr/bin/bsdtar --format gnutar --chroot"
 	fi
 	TOPDIRS=
 	for DIR  in .* * ; do
