@@ -233,13 +233,23 @@ for i in "$imageout.vmx" "$imageout.vmdk" "$imageout-disk*.vmdk"; do
 	test -e \$i && VMXFILES="\$VMXFILES \$i"
 done
 # take raw files as fallback
-# do not do that, it may overwrite files when multiple -vmx flavors are configured
-#if [ -z "\$VMXFILES" ]; then
-#	test -e "$imageout.raw" && VMXFILES="$imageout.raw"
-#fi
 if [ -n "\$VMXFILES" ]; then
 	tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" \$VMXFILES
 	SHAFILES="\$SHAFILES $imageout$buildnum-vmx.tar.bz2"
+elif [ -e  "$imageout.raw" ]; then
+        compress_tool="bzip2"
+        compress_suffix="bz2"
+	if [ -x /usr/bin/xz ]; then
+            # take xz to get support for sparse files
+            compress_tool="xz -2"
+            compress_suffix="xz"
+        fi
+	mv "$imageout.raw" "/$TOPDIR/KIWI/$imageout$buildnum-vmx.raw"
+	pushd /$TOPDIR/KIWI
+	echo "\$compress_tool raw file..."
+	\$compress_tool "$imageout$buildnum-vmx.raw"
+	SHAFILES="\$SHAFILES $imageout$buildnum-vmx.raw.\$compress_suffix"
+	popd
 fi
 if [ -e "$imageout.xenconfig" ]; then
 	tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" $imageout.xenconfig $imageout.raw initrd-*
