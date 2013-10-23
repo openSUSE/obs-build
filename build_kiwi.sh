@@ -248,7 +248,7 @@ elif [ -e  "$imageout.raw" ]; then
 	pushd /$TOPDIR/KIWI
 	echo "\$compress_tool raw file..."
 	\$compress_tool "$imageout$buildnum-vmx.raw"
-	SHAFILES="\$SHAFILES $imageout$buildnum-vmx.raw.\$compress_suffix"
+	SHAFILES="\$SHAFILES $imageout$buildnum-vmx.raw.\${compress_suffix}"
 	popd
 fi
 if [ -e "$imageout.xenconfig" ]; then
