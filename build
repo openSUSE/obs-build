@@ -248,6 +248,8 @@ Known Parameters:
               defines the number of CPUs to use for
               VMs.
 
+  --threads N sets number of threads for VM
+
   --ccache
               Use ccache to speed up rebuilds
 
@@ -1154,6 +1156,11 @@ while test -n "$1"; do
       *-jobs)
 	needarg
 	BUILD_JOBS="$ARG"
+	shift
+      ;;
+      *-threads)
+	needarg
+	BUILD_THREADS="$ARG"
 	shift
       ;;
       *-extra*packs|-X)
@@ -2328,8 +2335,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 				qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=$DISK_IF,index=1$CACHE")
 			fi
 		fi
-		if [ -n "$BUILD_JOBS" -a "$icecream" = 0 ]; then
+		if [ -n "$BUILD_JOBS" -a "$icecream" = 0 -a -z "$BUILD_THREADS" ]; then
 		    qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS")
+		elif [ -n "$BUILD_JOBS" -a -n "$BUILD_THREADS" ]; then
+		    qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS,threads=$BUILD_THREADS")
 		fi
 		if [ "$VM_TYPE" = 'kvm' -a "$HOST_ARCH" != "armv7l" ]; then
 			KVM_OPTIONS="$KVM_OPTIONS -cpu host"
