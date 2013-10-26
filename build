@@ -2767,6 +2767,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
     mount -n -tdevpts -omode=0620,gid=5 none $BUILD_ROOT/dev/pts 2> /dev/null
     # needed for POSIX semaphores
+    mkdir -p $BUILD_ROOT/dev/shm
     mount -n -ttmpfs none $BUILD_ROOT/dev/shm 2> /dev/null
 
     setupicecream
