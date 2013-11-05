@@ -101,7 +101,7 @@ sub dist_canon($$) {
     $rpmdista = $arch;
   }
   $rpmdista =~ s/i[456]86/i386/;
-  $rpmdist = '' unless $rpmdista =~ /^(i386|x86_64|ia64|ppc|ppc64|s390|s390x)$/;
+  $rpmdist = '' unless $rpmdista =~ /^(i386|x86_64|ia64|ppc|ppc64|ppc64le|s390|s390x)$/;
   my $dist = 'default';
   if ($rpmdist =~ /unitedlinux 1\.0.*/) {
     $dist = "ul1-$rpmdista";

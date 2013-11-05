@@ -1036,17 +1036,21 @@ check_for_ppc()
 
     uname=$(uname -m)
 
-    if [ "$uname" != "ppc" -a "$uname" != "ppc64" ]; then
-        return
-    fi
+    case $uname in
+         ppc|ppc64) export VM_KERNEL=/boot/vmlinux
+                    export VM_INITRD=/boot/initrd
+                    ;;
+         ppc64le)   export VM_INITRD=/boot/vmlinuxle
+                    export VM_INITRD=/boot/initrdle
+                    ;;
+         *)         return ;;
+    esac
 
     grep -q "PowerNV" /proc/cpuinfo && export HOST_ARCH=power7 || export HOST_ARCH=ppc970
 
     export kvm_bin="/usr/bin/qemu-system-ppc64"
     export console=hvc0
     export KVM_OPTIONS="-enable-kvm -M pseries"
-    export VM_KERNEL=/boot/vmlinux
-    export VM_INITRD=/boot/initrd
     if [ -z "$RUNNING_IN_VM" -a -n "$HUGETLBFSPATH" ];then
       if ! grep -q "$HUGETLBFSPATH" /proc/mounts; then
          echo "hugetlbfs is not mounted"
