@@ -215,9 +215,13 @@ EOF
 		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
 echo "compressing vmx images... "
 cd /$TOPDIR/KIWI-vmx
-for suffix in "ovf" "qcow2" "ova"; do
+for suffix in "ovf" "qcow2" "ova" "tar"; do
   if [ -e "$imageout.\$suffix" ]; then
-	mv "$imageout.\$suffix" "/$TOPDIR/KIWI/$imageout$buildnum.\$suffix"
+	if [ "\$suffix" == "ovf" ]; then 
+		mv "$imageout.\${suffix}/$imageout.\$suffix" "/$TOPDIR/KIWI/$imageout$buildnum.\$suffix"
+	else 
+		mv "$imageout.\$suffix" "/$TOPDIR/KIWI/$imageout$buildnum.\$suffix"
+	fi
 	pushd /$TOPDIR/KIWI
 	if [ -x /usr/bin/sha256sum ]; then
 	    echo "Create sha256 \$suffix file..."
