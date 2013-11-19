@@ -170,5 +170,3 @@ user=`stat -c "%G:%U" "$changelog"`
 mv "$tmpfile" "$changelog"
 chmod $mode "$changelog"
 chown $user "$changelog"
-mv "$tmpfile" "$changelog"
-chmod $mode "$changelog"
