@@ -637,6 +637,7 @@ sub handle_rpms {
 	delete $alldirs{"$prefix$fn"};
       }
     }
+    delete $alldirs{$_} for keys %symlinks;
     $ad = $prefix;
     delete $alldirs{$ad};
     delete $alldirs{$ad} while $ad =~ s/\/[^\/]+$//;
