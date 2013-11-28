@@ -1032,11 +1032,7 @@ check_for_arm()
 
 check_for_ppc()
 {
-    local uname
-
-    uname=$(uname -m)
-
-    case $uname in
+    case $BUILD_ARCH in
          ppc|ppc64) export VM_KERNEL=/boot/vmlinux
                     export VM_INITRD=/boot/initrd
                     ;;
