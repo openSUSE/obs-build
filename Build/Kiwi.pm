@@ -173,7 +173,7 @@ sub kiwiparse {
 
   my $instsource = ($kiwi->{'instsource'} || [])->[0];
   if ($instsource) {
-    foreach my $repository(sort {$a->{priority} <=> $b->{priority}} @{$instsource->{'instrepo'} || []}) {
+    for my $repository(sort {$a->{priority} <=> $b->{priority}} @{$instsource->{'instrepo'} || []}) {
       my $kiwisource = ($repository->{'source'} || [])->[0];
       if ($kiwisource->{'path'} eq 'obsrepositories:/') {
          # special case, OBS will expand it.
@@ -183,10 +183,16 @@ sub kiwiparse {
       die("bad instsource path: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
       push @repos, "$1/$2";
     }
+    $ret->{'sourcemedium'} = -1;
+    $ret->{'debugmedium'} = -1;
     if ($instsource->{'productoptions'}) {
       my $productoptions = $instsource->{'productoptions'}->[0] || {};
       for my $po (@{$productoptions->{'productvar'} || []}) {
 	$ret->{'version'} = $po->{'_content'} if $po->{'name'} eq 'VERSION';
+      }
+      for my $po (@{$productoptions->{'productoption'} || []}) {
+	$ret->{'sourcemedium'} = $po->{'_content'} if $po->{'name'} eq 'SOURCEMEDIUM';
+	$ret->{'debugmedium'} = $po->{'_content'} if $po->{'name'} eq 'DEBUGMEDIUM';
       }
     }
     if ($instsource->{'architectures'}) {
