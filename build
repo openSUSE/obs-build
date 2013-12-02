@@ -1032,7 +1032,8 @@ check_for_arm()
 
 check_for_ppc()
 {
-    grep -q "PowerNV" /proc/cpuinfo && export HOST_ARCH=power7 || export HOST_ARCH=ppc970
+    grep -q "PowerNV" /proc/cpuinfo && export HOST_ARCH=power7 
+    grep -q "PPC970MP" /proc/cpuinfo && export HOST_ARCH=ppc970
 
     case $BUILD_ARCH in
          ppc|ppc64) export VM_KERNEL=/boot/vmlinux
