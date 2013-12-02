@@ -1039,7 +1039,7 @@ check_for_ppc()
          ppc|ppc64) export VM_KERNEL=/boot/vmlinux
                     export VM_INITRD=/boot/initrd
                     ;;
-         ppc64le)   export VM_INITRD=/boot/vmlinuxle
+         ppc64le)   export VM_KERNEL=/boot/vmlinuxle
                     export VM_INITRD=/boot/initrdle
                     export HOST_ARCH=power7le
                     ;;
