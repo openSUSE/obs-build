@@ -2185,27 +2185,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    vm_init_script="/.build/build"
 	fi
 
-	if [ "$VM_TYPE" = 'emulator' ]; then
-                # generic emulator hook. an external script is needed to define
-                # the emulator startup
-                sync
-                pushd $BUILD_DIR/emulator
-                if [ -z "$EMULATOR_SCRIPT" ]; then
-                   EMULATOR_SCRIPT="./emulator.sh"
-                elif [ "${EMULATOR_SCRIPT:0:1}" != "/" ]; then
-                   EMULATOR_SCRIPT="./$EMULATOR_SCRIPT"
-                fi
-		set -- "$EMULATOR_SCRIPT" "$VM_IMAGE"
-		echo "$@"
-		if ! "$@"; then
-                     popd
-                     echo "ERROR: The emulator return with an failure"
-                     cleanup_and_exit 3
-                fi
-                popd
-
-	fi
-
         if [ "$VM_TYPE" = 'openstack' -o "$VM_TYPE" = 'ec2' ]; then
             # No way to handle this via init= parameter here....
             echo "#!/bin/sh"               >  "$BUILD_ROOT/sbin/init"
@@ -2468,6 +2447,24 @@ for SPECFILE in "${SPECFILES[@]}" ; do
                 zvm_cp volume_detach $VM_WORKER $VM_VOLUME_SWAP
                 VM_IMAGE="/dev/$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_ROOT $zvm_mult_pass $zvm_worker_nr)"
                 VM_SWAP="/dev/$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_SWAP $zvm_mult_pass $zvm_worker_nr)"
+	elif [ "$VM_TYPE" = 'emulator' ]; then
+                # generic emulator hook. an external script is needed to define
+                # the emulator startup
+                pushd $BUILD_DIR/emulator
+                if [ -z "$EMULATOR_SCRIPT" ]; then
+                   EMULATOR_SCRIPT="./emulator.sh"
+                elif [ "${EMULATOR_SCRIPT:0:1}" != "/" ]; then
+                   EMULATOR_SCRIPT="./$EMULATOR_SCRIPT"
+                fi
+		set -- "$EMULATOR_SCRIPT" "$VM_IMAGE"
+		echo "$@"
+		if ! "$@"; then
+                     popd
+                     echo "ERROR: The emulator returned with a failure"
+                     cleanup_and_exit 3
+                fi
+                popd
+
 	fi
 
 	if [ "$VM_TYPE" = 'openstack' ]; then
@@ -2770,6 +2767,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
     mount -n -tdevpts -omode=0620,gid=5 none $BUILD_ROOT/dev/pts 2> /dev/null
     # needed for POSIX semaphores
+    mkdir -p $BUILD_ROOT/dev/shm
     mount -n -ttmpfs none $BUILD_ROOT/dev/shm 2> /dev/null
 
     setupicecream
