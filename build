@@ -1032,17 +1032,18 @@ check_for_arm()
 
 check_for_ppc()
 {
+    grep -q "PowerNV" /proc/cpuinfo && export HOST_ARCH=power7 || export HOST_ARCH=ppc970
+
     case $BUILD_ARCH in
          ppc|ppc64) export VM_KERNEL=/boot/vmlinux
                     export VM_INITRD=/boot/initrd
                     ;;
          ppc64le)   export VM_INITRD=/boot/vmlinuxle
                     export VM_INITRD=/boot/initrdle
+                    export HOST_ARCH=power7le
                     ;;
          *)         return ;;
     esac
-
-    grep -q "PowerNV" /proc/cpuinfo && export HOST_ARCH=power7 || export HOST_ARCH=ppc970
 
     export kvm_bin="/usr/bin/qemu-system-ppc64"
     export console=hvc0
@@ -1754,7 +1755,7 @@ if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
 
     case $HOST_ARCH in
         power7|armv7l) kvm_virtio=1;;
-        ppc970) kvm_virtio=;;
+        ppc970|power7le) kvm_virtio=;;
     esac
 
     if [ "$kvm_virtio" = 1 ]; then
