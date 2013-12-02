@@ -1032,6 +1032,7 @@ check_for_arm()
 
 check_for_ppc()
 {
+
     grep -q "PowerNV" /proc/cpuinfo && export HOST_ARCH=power7 
     grep -q "PPC970MP" /proc/cpuinfo && export HOST_ARCH=ppc970
 
@@ -2306,7 +2307,6 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
 		# we do not want to have sound inside the VMs
 		export QEMU_AUDIO_DRV=none
-
 		if [ "$kvm_virtio" = 1 ]; then
 		    qemu_args=(-drive file="$VM_IMAGE",if=virtio$CACHE -drive file="$VM_IMAGE",if=ide,index=0$CACHE)
 		    if [ -n "$VM_SWAP" ]; then
@@ -2321,7 +2321,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 			qemu_args=("${qemu_args[@]}" "virtio-blk,transport=virtio-mmio.1,drive=swap")
 		    fi
 		else
-			if [ "$HOST_ARCH" = "ppc970" ];then
+			if [ "$HOST_ARCH" = "ppc970" -o "$HOST_ARCH" = "power7le" ];then
 				qemu_args=( "-drive" )
 				qemu_args=("${qemu_args[@]}" "file=$VM_IMAGE,if=scsi,cache=unsafe")
 			else
@@ -2329,7 +2329,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 			fi
 			if [ -n "$VM_SWAP" ]; then
 				qemu_args=("${qemu_args[@]}" "-drive")
-				if [ "$HOST_ARCH" = "ppc970" ];then
+				if [ "$HOST_ARCH" = "ppc970" -o "$HOST_ARCH" = "power7le" ];then
 					DISK_IF=scsi
 				else
 					DISK_IF=ide
