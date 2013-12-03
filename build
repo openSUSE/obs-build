@@ -2153,6 +2153,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
         # fallback time for broken hosts
         date '+@%s' > $BUILD_ROOT/.build/.date
 	if [ "$VM_TYPE" = 'emulator' ]; then
+            # emulator may not be able to hand over kernel parameters
             ln -sf /.build/build $BUILD_ROOT/sbin/init
         fi
         if [ "$VM_TYPE" = 'zvm' ]; then
@@ -2164,9 +2165,9 @@ for SPECFILE in "${SPECFILES[@]}" ; do
             mkdir -p $BUILD_ROOT/boot
             cp $vm_kernel $vm_initrd $BUILD_ROOT/boot
             mkdir -p $BUILD_ROOT/boot/zipl
-             # finally, install bootloader to the worker disk
-             zipl -t $BUILD_ROOT/boot/zipl -i ${BUILD_ROOT}${vm_kernel} -r ${BUILD_ROOT}${vm_initrd} \
-                --parameters "${zvm_param} init=$zvm_init_script rootfsopts=noatime"
+            # finally, install bootloader to the worker disk
+            zipl -t $BUILD_ROOT/boot/zipl -i ${BUILD_ROOT}${vm_kernel} -r ${BUILD_ROOT}${vm_initrd} \
+               --parameters "${zvm_param} init=$zvm_init_script rootfsopts=noatime"
         fi
 	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	umount -n $BUILD_ROOT/proc 2> /dev/null || true
@@ -2213,9 +2214,32 @@ for SPECFILE in "${SPECFILES[@]}" ; do
             fi
         fi
 	if [ -n "$VM_IMAGE" ]; then
+            # copy out kernel & initrd (if they exist) during unmounting VM image
+	    KERNEL_TEMP_DIR=
+            if [ -e  $BUILD_ROOT/.build.kernel."$VM_TYPE" ]; then
+	      KERNEL_TEMP_DIR=`mktemp -d`
+              cp $BUILD_ROOT/.build.kernel."$VM_TYPE" "$KERNEL_TEMP_DIR/kernel"
+              if [ -e  $BUILD_ROOT/.build.initrd."$VM_TYPE" ]; then
+                cp $BUILD_ROOT/.build.initrd."$VM_TYPE" "$KERNEL_TEMP_DIR/initrd"
+              fi
+            fi
 	    check_exit
 	    # needs to work otherwise we have a corrupted file system
-	    umount $BUILD_ROOT || cleanup_and_exit 3
+	    if ! umount $BUILD_ROOT; then
+              rm -rf "$KERNEL_TEMP_DIR"
+              cleanup_and_exit 3
+	    fi
+            # copy back the kernel and set it for VM
+            if [ -n "$KERNEL_TEMP_DIR" ]; then
+               mkdir -p $BUILD_ROOT/boot
+               mv $KERNEL_TEMP_DIR/kernel $BUILD_ROOT/boot/kernel
+               vm_kernel=$BUILD_ROOT/boot/kernel
+               if [ -e $KERNEL_TEMP_DIR/initrd ]; then
+                 mv $KERNEL_TEMP_DIR/initrd $BUILD_ROOT/boot/initrd
+                 vm_initrd=$BUILD_ROOT/boot/initrd
+               fi
+               rmdir "$KERNEL_TEMP_DIR"
+            fi
 	fi
 
         if [ "$VM_TYPE" = 'openstack' -o "$VM_TYPE" = 'ec2' ]; then

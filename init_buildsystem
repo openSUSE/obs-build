@@ -122,6 +122,7 @@ clean_build_root()
 	    umount -n "$BUILD_ROOT/mnt" 2> /dev/null || true
 	    rm -rf -- "$BUILD_ROOT"/*
 	    rm -rf -- "$BUILD_ROOT/.build"
+	    rm -rf -- "$BUILD_ROOT/.build.kernel.*"
 	    rm -rf -- "$BUILD_ROOT/.root"
 	    rm -rf -- "$BUILD_ROOT/.init_b_cache"
 	    rm -rf -- "$BUILD_ROOT/.preinstall_image/*"
@@ -1306,12 +1307,6 @@ if test -x $BUILD_ROOT/bin/rpm -a ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a !
     # create provides index
     chroot $BUILD_ROOT rpm -q --whatprovides rpm >/dev/null 2>&1
 fi
-
-# create modules.dep in kvm/xen
-# This can not work, until we use the native repository kernel
-#if [ $BUILD_ROOT = "/" -a -x /sbin/depmod ]; then
-#  /sbin/depmod -a
-#fi
 
 rm -f $BUILD_ROOT/.rpmmacros $BUILD_ROOT/root/.rpmmacros
 rm -rf "$BUILD_ROOT/.init_b_cache"
