@@ -7,6 +7,7 @@ BEGIN {
 use strict;
 
 use Build;
+use File::Basename;
 
 my ($dist, $rpmdeps, $archs, $configdir, $useusedforbuild);
 
@@ -80,18 +81,64 @@ my %ids;
 
 my %packs_arch;
 my %packs_done;
+
+# XXX: move to separate tool
+if (!defined($dist) || $dist eq '') {
+  my $rpmarch = (grep {$fn{"rpm.$_"}} @archs)[0];
+  if (!$rpmarch) {
+    $dist = 'default';
+  } else {
+    my $rpmfn = $fn{"rpm.$rpmarch"};
+    if ($rpmfn =~ /^[a-z]+:\/\//) {
+      require File::Temp;
+      my $tmpdir = File::Temp::tempdir('CLEANUP' => 1);
+      $rpmfn =~ s/.*\//$tmpdir\// unless system("$INC[0]/download", $tmpdir, $rpmfn);
+    }
+    my $rpmdist = '';
+    if ($rpmfn =~ /^\// && -e $rpmfn) {
+      my %res = Build::Rpm::rpmq($rpmfn, 1010);
+      $rpmdist = $res{1010}->[0] || '';
+    }
+    $dist = Build::dist_canon($rpmdist, $archs[0]);
+    # need some extra work for sles11 :(
+    if ($dist =~ /^sles11-/) {
+      my %res = Build::Rpm::rpmq($rpmfn, 1049);
+      $dist =~ s/^sles11-/sles11sp2-/ if grep {/^liblzma/} @{$res{1049} || []};
+    }
+  }
+  print STDERR "Warning: distribution not specified, assuming '$dist' (see $configdir).\n";
+}
+
+my $cf = Build::read_config_dist($dist, $archs[0], $configdir);
+$cf->{'warnings'} = 1;
+
+my $dofileprovides = %{$cf->{'fileprovides'}};
+
+my %exportfilters = %{$cf->{'exportfilter'}};
 open(F, '<', $rpmdeps) || die("$rpmdeps: $!\n");
 # WARNING: the following code assumes that the 'I' tag comes last
 my ($pkgF, $pkgP, $pkgR);
 while(<F>) {
   chomp;
   if (/^F:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
+    my $pkgname = basename($2);
     $pkgF = $2;
     next if $fn{$1};
     $fn{$1} = $2;
     my $pack = $1;
     $pack =~ /^(.*)\.([^\.]+)$/ or die;
     push @{$packs_arch{$2}}, $1;
+    my $basename = $1;
+    my $arch = $2;
+    for(keys %exportfilters) {
+      next if ($pkgname !~ /$_/);
+      for (@{$exportfilters{$_}}) {
+        my $target_arch = $_;
+        next if ($target_arch eq ".");
+        next if (! grep ($_ eq $target_arch, @archs));
+        $packs{$basename} = "$basename.$arch"
+      }
+    }
   } elsif (/^P:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
     $pkgP = $2;
     next if $prov{$1};
@@ -127,39 +174,6 @@ close F;
 for my $arch (@archs) {
   $packs{$_} ||= "$_.$arch" for @{$packs_arch{$arch} || []};
 }
-
-# XXX: move to separate tool
-if (!defined($dist) || $dist eq '') {
-  my $rpmarch = (grep {$fn{"rpm.$_"}} @archs)[0];
-  if (!$rpmarch) {
-    $dist = 'default';
-  } else {
-    my $rpmfn = $fn{"rpm.$rpmarch"};
-    if ($rpmfn =~ /^[a-z]+:\/\//) {
-      require File::Temp;
-      my $tmpdir = File::Temp::tempdir('CLEANUP' => 1);
-      $rpmfn =~ s/.*\//$tmpdir\// unless system("$INC[0]/download", $tmpdir, $rpmfn);
-    }
-    my $rpmdist = '';
-    if ($rpmfn =~ /^\// && -e $rpmfn) {
-      my %res = Build::Rpm::rpmq($rpmfn, 1010);
-      $rpmdist = $res{1010}->[0] || '';
-    }
-    $dist = Build::dist_canon($rpmdist, $archs[0]);
-    # need some extra work for sles11 :(
-    if ($dist =~ /^sles11-/) {
-      my %res = Build::Rpm::rpmq($rpmfn, 1049);
-      $dist =~ s/^sles11-/sles11sp2-/ if grep {/^liblzma/} @{$res{1049} || []};
-    }
-  }
-  print STDERR "Warning: distribution not specified, assuming '$dist' (see $configdir).\n";
-}
-
-my $cf = Build::read_config_dist($dist, $archs[0], $configdir);
-$cf->{'warnings'} = 1;
-
-my $dofileprovides = %{$cf->{'fileprovides'}};
-
 for my $pack (keys %packs) {
   my $r = {};
   my (@s, $s, @pr, @re);
