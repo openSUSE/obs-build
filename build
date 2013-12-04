@@ -2651,6 +2651,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	for DIR  in .* * ; do
 	  case "$DIR" in
 	    .|..) continue ;;
+	    .build.kernel*) ;; # to be packaged
+	    .build.initrd*) ;; # to be packaged
 	    .build*) continue ;;
 	    .preinstallimage*) continue ;;
 	    .srcfiles*) continue ;;
