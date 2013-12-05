@@ -133,7 +133,7 @@ set +e
 	elif [ ! $just_edit ]; then
 		echo "- "
 		echo
-		if [ -d .osc ] && which osc 2>/dev/null; then
+		if [ -d .osc -a -n "$(which osc 2>/dev/null)" ]; then
 			OSC_STATUS="$(cd "$pkgpath" &> /dev/null; osc st)"
 			ADDED="$(sed -n 's/^A[[:blank:]]\+\([^[:blank:]].*\.\(patch\|diff\)\)$/  * \1/p' <<< "$OSC_STATUS")"
 			DELETED="$(sed -n 's/^D[[:blank:]]\+\([^[:blank:]].*\.\(patch\|diff\)\)$/  * \1/p' <<< "$OSC_STATUS")"
