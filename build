@@ -2749,10 +2749,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    fi
 	fi
 	if test -f $BUILD_ROOT/etc/shadow ; then
-	    sed -e "s@^root::@root:*:@" < $BUILD_ROOT/etc/shadow > $BUILD_ROOT/etc/shadow.t && mv $BUILD_ROOT/etc/shadow.t $BUILD_ROOT/etc/shadow
+	    sed -i -e "s@^root::@root:*:@" $BUILD_ROOT/etc/shadow
 	fi
 	if test -f $BUILD_ROOT/etc/gshadow ; then
-	    sed -e "s@^root::@root:*:@" < $BUILD_ROOT/etc/gshadow > $BUILD_ROOT/etc/gshadow.t && mv $BUILD_ROOT/etc/gshadow.t $BUILD_ROOT/etc/gshadow
+	    sed -i -e "s@^root::@root:*:@" $BUILD_ROOT/etc/gshadow
 	fi
 	BUILD_USER_ABUILD_USED=true
     else
@@ -2761,17 +2761,13 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	ABUILD_GID=0
 	if egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
 	    rm -rf "$BUILD_ROOT/home/abuild"
-	    egrep -v '^abuild:' <$BUILD_ROOT/etc/passwd >$BUILD_ROOT/etc/passwd.new
-	    mv $BUILD_ROOT/etc/passwd.new $BUILD_ROOT/etc/passwd
-	    egrep -v '^abuild:' <$BUILD_ROOT/etc/group >$BUILD_ROOT/etc/group.new
-	    mv $BUILD_ROOT/etc/group.new $BUILD_ROOT/etc/group
+	    sed -i -e '/^abuild:/d' $BUILD_ROOT/etc/passwd
+	    sed -i -e '/^abuild:/d' $BUILD_ROOT/etc/group
 	    if test -f $BUILD_ROOT/etc/shadow ; then
-	      egrep -v '^abuild:' <$BUILD_ROOT/etc/shadow >$BUILD_ROOT/etc/shadow.new
-	      mv $BUILD_ROOT/etc/shadow.new $BUILD_ROOT/etc/shadow
+	      sed -i -e '/^abuild:/d' $BUILD_ROOT/etc/shadow
 	    fi
 	    if test -f $BUILD_ROOT/etc/gshadow ; then
-	      egrep -v '^abuild:' <$BUILD_ROOT/etc/gshadow >$BUILD_ROOT/etc/gshadow.new
-	      mv $BUILD_ROOT/etc/gshadow.new $BUILD_ROOT/etc/gshadow
+	      sed -i -e '/^abuild:/d' $BUILD_ROOT/etc/gshadow
 	    fi
 	fi
     fi
