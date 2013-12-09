@@ -56,8 +56,8 @@ zvm_mult_pass="THR4ME"
 zvm_init_script="/.build/build"
 
 kvm_bin=/usr/bin/qemu-kvm
-# whether we have virtio support
-kvm_virtio=
+# by default we have virtio support
+kvm_virtio=1
 
 # guest visible console device name
 console=ttyS0
@@ -1727,10 +1727,8 @@ if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
 
     if [ -n "$VM_INITRD" ]; then
 	vm_initrd="$VM_INITRD"
-	kvm_virtio=1
     elif [ -e "${vm_initrd}-build" ]; then
 	vm_initrd="${vm_initrd}-build"
-	kvm_virtio=1
     else
 	if [ -L "$vm_initrd" ]; then
 	    vm_initrd=`readlink -f "$vm_initrd"` || cleanup_and_exit 3
@@ -1747,15 +1745,14 @@ if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
 		echo "No initrd that provides virtio support found. virtio accelleration disabled."
 		echo "Run the following command as root to enable virtio:"
 		shellquote "${mkinitrd_virtio_cmd[@]}"
+		kvm_virtio=
 		echo
 	    elif /sbin/modinfo virtio_pci >/dev/null 2>&1; then
 		echo "creating $vm_initrd_virtio"
 		"${mkinitrd_virtio_cmd[@]}" || cleanup_and_exit 1
-		kvm_virtio=1
 		vm_initrd="${vm_initrd_virtio}"
 	    fi
 	else
-	    kvm_virtio=1
 	    vm_initrd="${vm_initrd_virtio}"
 	fi
     fi
