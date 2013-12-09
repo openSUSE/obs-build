@@ -39,6 +39,7 @@ install:
 	    extractbuild \
 	    getbinaryid \
 	    killchroot \
+	    queryconfig \
 	    getmacros \
 	    getoptflags \
 	    gettype \

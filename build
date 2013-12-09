@@ -90,7 +90,7 @@ VM_KERNEL=
 VM_INITRD=
 VMDISK_ROOTSIZE=4096
 VMDISK_SWAPSIZE=1024
-VMDISK_FILESYSTEM=ext4
+VMDISK_FILESYSTEM=
 # settings are for speed and not data safety, we format anyway on next run
 VMDISK_MOUNT_OPTIONS=__default
 VMDISK_CLEAN=
@@ -1462,6 +1462,11 @@ done
 
 check_for_ppc
 check_for_arm
+
+if test -z "$VMDISK_FILESYSTEM" -a -n "$VM_TYPE"; then
+  VMDISK_FILESYSTEM=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags vmfstype`
+  test -z "$VMDISK_FILESYSTEM" && VMDISK_FILESYSTEM="ext4"
+fi
 
 if test "$VM_TYPE" = "lxc"; then
     VM_IMAGE=''

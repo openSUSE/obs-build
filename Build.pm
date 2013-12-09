@@ -204,6 +204,7 @@ sub read_config {
   $config->{'fileprovides'} = {};
   $config->{'constraint'} = [];
   $config->{'expandflags'} = [];
+  $config->{'buildflags'} = [];
   for my $l (@spec) {
     $l = $l->[1] if ref $l;
     next unless defined $l;
@@ -220,7 +221,7 @@ sub read_config {
       }
       next;
     }
-    if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:' || $l0 eq 'expandflags:') {
+    if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:' || $l0 eq 'expandflags:' || $l0 eq 'buildflags:') {
       my $t = substr($l0, 0, -1);
       for my $l (@l) {
 	if ($l eq '!*') {
@@ -349,6 +350,13 @@ sub read_config {
       $config->{"expandflags:$1"} = $2;
     } else {
       $config->{"expandflags:$_"} = 1;
+    }
+  }
+  for (@{$config->{'buildflags'} || []}) {
+    if (/^([^:]+):(.*)$/s) {
+      $config->{"buildflags:$1"} = $2;
+    } else {
+      $config->{"buildflags:$_"} = 1;
     }
   }
   return $config;
