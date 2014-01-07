@@ -737,7 +737,7 @@ else
 
     echo "$GUESSED_DIST" > $BUILD_ROOT/.guessed_dist
     test -n "$BUILD_DIST" || BUILD_DIST="$GUESSED_DIST"
-    PSUF=`gettype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
+    PSUF=`queryconfig binarytype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
     case "$PSUF" in
 	UNKNOWN|'')
 	    # auto detect from packages

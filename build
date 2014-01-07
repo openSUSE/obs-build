@@ -2855,7 +2855,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	fi
 	substitutedeps "${args[@]}" --root "$BUILD_ROOT" --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" $CHANGELOGARGS "$BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE" "$BUILD_ROOT/.spec.new" || cleanup_and_exit 1
 	# extract macros from configuration
-	getmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" > $BUILD_ROOT/root/.rpmmacros
+	queryconfig rawmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" > $BUILD_ROOT/root/.rpmmacros
 	if test -n "$BUILD_DEBUG" ; then
 	    echo '
 %prep %{?!__debug_package:%{?_build_create_debug:%?_build_insert_debug_package}}%%prep
@@ -2879,7 +2879,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	getoptflags --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" ${BUILD_DEBUG:+--debug} > $BUILD_ROOT/root/.rpmrc
 	test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/.rpmrc $BUILD_ROOT/home/abuild/.rpmrc
 	if test -z "$ABUILD_TARGET"; then
-	    ABUILD_TARGET=$(getchangetarget --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" )
+	    ABUILD_TARGET=$(queryonfig target --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" )
 	    test -z "$ABUILD_TARGET" || echo "build target is $ABUILD_TARGET"
 	fi
     fi

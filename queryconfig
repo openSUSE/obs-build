@@ -39,6 +39,9 @@ if ($type eq 'buildflags') {
 
   my $result = $cf->{"buildflags:$argument"};
   print "$result\n" if defined $result;
+} elsif ($type eq 'target' || $type eq 'binarytype' || $type eq 'rawmacros') {
+  my $cf = Build::read_config_dist($dist, $archs, $configdir);
+  print "$cf->{$type}\n" if $cf->{$type};
 } else {
   die("unsupported query type: $type\n");
 }

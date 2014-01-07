@@ -40,10 +40,7 @@ install:
 	    getbinaryid \
 	    killchroot \
 	    queryconfig \
-	    getmacros \
 	    getoptflags \
-	    gettype \
-	    getchangetarget \
 	    common_functions \
 	    init_buildsystem \
 	    initscript_qemu_vm \
