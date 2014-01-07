@@ -1,0 +1,47 @@
+#!/usr/bin/perl -w
+
+BEGIN {
+  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+}
+
+use strict;
+
+use Build;
+
+my ($dist, $archs, $configdir, $debug);
+
+while (@ARGV)  {
+  if ($ARGV[0] eq '--dist') {
+    shift @ARGV;
+    $dist = shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--archpath') {
+    shift @ARGV;
+    $archs = shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--configdir') {
+    shift @ARGV;
+    $configdir = shift @ARGV;
+    next;
+  }
+  last;
+}
+
+my $cf = Build::read_config_dist($dist, $archs, $configdir);
+die("Unable to read config\n") unless $cf;
+
+my $type = shift @ARGV;
+if ($type eq 'buildflags') {
+  my $argument = shift @ARGV; 
+  die("Specify which buildflag to query\n") unless $argument;
+
+  my $result = $cf->{"buildflags:$argument"};
+  print "$result\n" if defined $result;
+} else {
+  die("unsupported query type: $type\n");
+}
+
+exit(0);
+
