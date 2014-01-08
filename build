@@ -423,6 +423,7 @@ cleanup_and_exit () {
 	umount -n $BUILD_ROOT/proc 2>/dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2>/dev/null || true
 	umount -n $BUILD_ROOT/dev/shm 2>/dev/null || true
+	umount -n $BUILD_ROOT/sys 2>/dev/null || true
 	test "$VM_IMAGE" = 1 && VM_IMAGE=
 	[ -n "$VM_IMAGE" ] && umount $BUILD_ROOT 2>/dev/null || true
     fi
@@ -772,6 +773,7 @@ detect_vm_2nd_stage()
     fi
     RUNNING_IN_VM=true
     test -e /proc/version || mount -orw -n -tproc none /proc
+    test -e /sys/block || mount -orw -n -tsysfs sysfs /sys
     if test "$VM_TYPE" != 'lxc'; then
 	mount -n ${VMDISK_MOUNT_OPTIONS},remount,rw /
     fi
@@ -1931,8 +1933,10 @@ rm -f $BUILD_ROOT/exit
 if [ -w /root ]; then
     mkdir -p $BUILD_ROOT/proc
     mkdir -p $BUILD_ROOT/dev/pts
+    mkdir -p $BUILD_ROOT/sys
     mount -n -tproc none $BUILD_ROOT/proc || true
     mount -n -tdevpts -omode=0620,gid=5 none $BUILD_ROOT/dev/pts
+    test -e $BUILD_ROOT/sys/block || mount -orw -n -tsysfs sysfs $BUILD_ROOT/sys
 fi
 
 if test -z "$VM_IMAGE" -a -z "$LOGFILE"; then
