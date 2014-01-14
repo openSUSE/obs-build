@@ -1933,10 +1933,8 @@ rm -f $BUILD_ROOT/exit
 if [ -w /root ]; then
     mkdir -p $BUILD_ROOT/proc
     mkdir -p $BUILD_ROOT/dev/pts
-    mkdir -p $BUILD_ROOT/sys
     mount -n -tproc none $BUILD_ROOT/proc || true
     mount -n -tdevpts -omode=0620,gid=5 none $BUILD_ROOT/dev/pts
-    test -e $BUILD_ROOT/sys/block || mount -orw -n -tsysfs sysfs $BUILD_ROOT/sys
 fi
 
 if test -z "$VM_IMAGE" -a -z "$LOGFILE"; then
