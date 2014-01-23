@@ -403,6 +403,8 @@ cleanup_and_exit () {
 		    echo "Warning: VM doesn't support sysrq and /sbin/halt not installed"
 		fi
 	    else
+                # halt from systemd is not syncing anymore.
+	        sync
 		halt -f -p
 	    fi
 	    echo "Warning: clean shut down of the VM didn't work"
