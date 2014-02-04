@@ -127,7 +127,7 @@ run_kiwi()
 	# create tar.gz of images, in case it makes sense
 	imagearch=`uname -m`
 	buildnum=""
-	  if test -n "$RELEASE"; then
+	if test -n "$RELEASE"; then
 	    buildnum="-Build$RELEASE"
 	fi
 	imageout="$imagename.$imagearch-$imageversion"
