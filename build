@@ -749,6 +749,9 @@ background_monitor_process()
 
 detect_vm_2nd_stage()
 {
+    if test -n "$BUILD_IGNORE_2ND_STAGE" ; then
+	return 1
+    fi
     if test -e /.build/build.data; then
         . /.build/build.data
     fi
