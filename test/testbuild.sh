@@ -6,21 +6,9 @@
 . ${0%/*}/common
 REPO="$1"
 shift
-DISTRO="$1"
-shift
-ARCH="$1"
-shift
 
 if [ -z "$REPO" ]; then
   echo "No local path to binary packages is given as argument"
-  exit 1
-fi
-if [ -z "$DISTRO" ]; then
-  echo "No distribution is given as argument ( eg '13.1' or 'fedora11' )"
-  exit 1
-fi
-if [ -z "$ARCH" ]; then
-  echo "No architecture is given as argument ( eg 'i386' or 'x86_64' )"
   exit 1
 fi
 
@@ -28,5 +16,4 @@ fi
 
 repo "$REPO"
 
-run_build --dist "${DISTRO}-${ARCH}" \
-	"$@"
+run_build "$@"
