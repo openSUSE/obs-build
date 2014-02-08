@@ -22,6 +22,8 @@ if [ -e ${0%/*}/config.local ]; then
 	. ${0%/*}/config.local
 fi
 
+: ${BUILD_DIR:=/usr/lib/build}
+
 #if [ ! -e "$build_vm_img" ]; then
 #	sudo dd if=/dev/zero of="$build_vm_img" bs=512 count=0 seek=$((build_vm_image_size*2*1024))
 #fi
@@ -89,8 +91,10 @@ run_build()
 			build_args+=("$i")
 		fi
 	done
-	set -- $linux32 sudo env \
-		/usr/bin/build \
+        SU_WRAPPER=""
+        [ -x /usr/bin/sudo ] && SU_WRAPPER="sudo env"
+	set -- $linux32 $SU_WRAPPER \
+		$BUILD_DIR/build \
 		--root "${build_root}" \
 		"${repos[@]}" \
 		"${build_args[@]}"
