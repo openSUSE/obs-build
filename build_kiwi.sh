@@ -4,6 +4,7 @@ run_kiwi()
     imagetype=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE imagetype)
     imagename=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE filename)
     imageversion=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE version)
+    drop_repo=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$SPECFILE Ddrop_repository)
     # prepare rpms as source and createrepo on the repositories
     ln -sf $TOPDIR/SOURCES/repos $BUILD_ROOT/repos
     cd $BUILD_ROOT/$TOPDIR/SOURCES/repos
@@ -102,7 +103,7 @@ run_kiwi()
 		*.packages) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
 		scripts) ;;
 		*0) ;;
-		*) test -d $i && mv $i $BUILD_ROOT/$TOPDIR/KIWI/. ;;
+		*) test -d $i && [ "$drop_repo" != "true" ] && mv $i $BUILD_ROOT/$TOPDIR/KIWI/. ;;
 	    esac
 	done
     else

@@ -188,6 +188,7 @@ sub kiwiparse {
     if ($instsource->{'productoptions'}) {
       my $productoptions = $instsource->{'productoptions'}->[0] || {};
       for my $po (@{$productoptions->{'productvar'} || []}) {
+	$ret->{'drop_repository'} = $po->{'_content'} if $po->{'name'} eq 'DROP_REPOSITORY';
 	$ret->{'version'} = $po->{'_content'} if $po->{'name'} eq 'VERSION';
       }
       for my $po (@{$productoptions->{'productoption'} || []}) {
