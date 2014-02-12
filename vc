@@ -125,7 +125,7 @@ set +e
 		echo
 	fi
 	if [ -n "$message" ]; then
-		echo "- $message"
+		echo -e "- $message"
 		echo
 	elif [ -n "$content" ]; then
 		cat "$content"
