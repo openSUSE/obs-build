@@ -2326,11 +2326,14 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 			qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=virtio$CACHE")
 		    fi
 		    if [ "$HOST_ARCH" = "armv7l" ]; then
-			qemu_args=(-drive file="$VM_IMAGE",if=none,id=disk$CACHE -device virtio-blk,transport=virtio-mmio.0,drive=disk)
+			qemu_args=(                  "-drive")
+			qemu_args=("${qemu_args[@]}" "file="$VM_IMAGE",if=none,id=disk$CACHE")
 			qemu_args=("${qemu_args[@]}" "-drive")
 			qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=none,id=swap$CACHE")
 			qemu_args=("${qemu_args[@]}" "-device")
-			qemu_args=("${qemu_args[@]}" "virtio-blk,transport=virtio-mmio.1,drive=swap")
+			qemu_args=("${qemu_args[@]}" "virtio-blk-device,drive=swap")
+			qemu_args=("${qemu_args[@]}" "-device")
+			qemu_args=("${qemu_args[@]}" "virtio-blk-device,drive=disk")
 		    fi
 		else
 			if [ "$HOST_ARCH" = "ppc970" -o "$HOST_ARCH" = "power7le" ];then
