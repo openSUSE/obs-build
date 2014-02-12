@@ -216,24 +216,34 @@ EOF
 		    cat > $BUILD_ROOT/kiwi_post.sh << EOF
 echo "compressing vmx images... "
 cd /$TOPDIR/KIWI-vmx
+compress_tool="bzip2"
+compress_suffix="bz2"
+if [ -x /usr/bin/xz ]; then
+    # take xz to get support for sparse files
+    compress_tool="xz -2"
+    compress_suffix="xz"
+fi
+VMXFILES=""
+SHAFILES=""
 for suffix in "ovf" "qcow2" "ova" "tar" "vhdfixed" "vhd"; do
   if [ -e "$imageout.\$suffix" ]; then
-	if [ "\$suffix" == "ovf" ]; then 
+	if [ "\$suffix" == "vhd" -o "\$suffix" == "vhdfixed" ]; then 
+		mv "$imageout.\$suffix" "/$TOPDIR/KIWI/$imageout$buildnum.\$suffix"
+		pushd /$TOPDIR/KIWI
+		echo "\$compress_tool \$suffix file..."
+		\$compress_tool "$imageout$buildnum.\$suffix"
+		SHAFILES="\$SHAFILES $imageout$buildnum.\$suffix.\${compress_suffix}"
+	        popd
+	elif [ "\$suffix" == "ovf" ]; then 
 		mv "$imageout.\${suffix}/$imageout.\$suffix" "/$TOPDIR/KIWI/$imageout$buildnum.\$suffix"
+	        SHAFILES="\$SHAFILES $imageout$buildnum.\$suffix"
 	else 
 		mv "$imageout.\$suffix" "/$TOPDIR/KIWI/$imageout$buildnum.\$suffix"
+	        SHAFILES="\$SHAFILES $imageout$buildnum.\$suffix"
 	fi
-	pushd /$TOPDIR/KIWI
-	if [ -x /usr/bin/sha256sum ]; then
-	    echo "Create sha256 \$suffix file..."
-	    /usr/bin/sha256sum "$imageout$buildnum.\$suffix" > "$imageout$buildnum.\$suffix.sha256"
-        fi
-	popd
   fi
 done
 # This option has a number of format parameters
-VMXFILES=""
-SHAFILES=""
 for i in "$imageout.vmx" "$imageout.vmdk" "$imageout-disk*.vmdk"; do
 	test -e \$i && VMXFILES="\$VMXFILES \$i"
 done
@@ -241,14 +251,7 @@ done
 if [ -n "\$VMXFILES" ]; then
 	tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" \$VMXFILES
 	SHAFILES="\$SHAFILES $imageout$buildnum-vmx.tar.bz2"
-elif [ -e  "$imageout.raw" ]; then
-        compress_tool="bzip2"
-        compress_suffix="bz2"
-	if [ -x /usr/bin/xz ]; then
-            # take xz to get support for sparse files
-            compress_tool="xz -2"
-            compress_suffix="xz"
-        fi
+elif [ -z "\$SHAFILES" -a -e  "$imageout.raw" ]; then
 	mv "$imageout.raw" "/$TOPDIR/KIWI/$imageout$buildnum-vmx.raw"
 	pushd /$TOPDIR/KIWI
 	echo "\$compress_tool raw file..."
