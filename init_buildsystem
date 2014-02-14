@@ -224,15 +224,19 @@ preinstall()
 	    rm -f .init_b_cache/scripts/.none
 	fi
     elif test -e "$BUILD_ROOT/.init_b_cache/rpms/$1.deb" ; then
-	ar x "$BUILD_ROOT/.init_b_cache/rpms/$1.deb" control.tar.gz data.tar.gz
+	ar x "$BUILD_ROOT/.init_b_cache/rpms/$1.deb"
 	mkdir -p .init_b_cache/scripts/control
 	$TAR -C .init_b_cache/scripts/control -z -f control.tar.gz
-	$TAR -z -f data.tar.gz
+	if [ -f "data.tar.gz" ]; then
+	    $TAR -z -f data.tar.gz
+	elif [ -f "data.tar.xz" ]; then
+	    $TAR -J -f data.tar.xz
+	fi
 	if test -e ".init_b_cache/scripts/$1.run" ; then
 	    test -e .init_b_cache/scripts/control/preinst && mv .init_b_cache/scripts/control/preinst ".init_b_cache/scripts/$1.pre"
 	    test -e .init_b_cache/scripts/control/postinst && mv .init_b_cache/scripts/control/postinst ".init_b_cache/scripts/$1.post"
 	fi
-	rm -rf .init_b_cache/scripts/control control.tar.gz data.tar.gz
+	rm -rf .init_b_cache/scripts/control control.tar.gz data.tar.{g,x}z
     elif test -e "$BUILD_ROOT/.init_b_cache/rpms/$1.arch" ; then
 	$TAR -f "$BUILD_ROOT/.init_b_cache/rpms/$1.arch"
 	if test -f .INSTALL ; then
