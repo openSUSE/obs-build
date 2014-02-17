@@ -20,6 +20,7 @@
  *
  * AUTHOR
  *	James Perkins <james.perkins@linuxfoundation.org>
+ *	Adrian Schroeter <adrian@suse.de>
  */
 
 #include <sys/mount.h>
@@ -210,7 +211,24 @@ enum okfail binfmt_register(char *datafile, char *regfile)
 			continue;
 		}
 
-		int ret=access(f[interpreter], X_OK);
+		int ret;
+                /* Is an interpreter for this arch already registered? */
+		snprintf(path, sizeof(path), SYSFS_BINFMT_MISC "/%s", f[name]);
+		ret=access(path, X_OK);
+			fprintf(stderr, 
+				"interpreter for '%s' is %d\n",
+				f[name], ret);
+		if (ret == 0) {
+#ifdef DEBUG
+			fprintf(stderr, 
+				"interpreter for '%s' already registered, ignoring\n",
+				f[name]);
+#endif /* DEBUG */
+			continue;
+		}
+
+                /* Does the interpreter exists? */
+		ret=access(f[interpreter], X_OK);
 		if (ret != 0) {
 #ifdef DEBUG
 			fprintf(stderr, 
