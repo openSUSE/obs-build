@@ -778,7 +778,10 @@ detect_vm_2nd_stage()
     fi
     RUNNING_IN_VM=true
     test -e /proc/version || mount -orw -n -tproc none /proc
-    test -e /sys/block || mount -orw -n -tsysfs sysfs /sys
+    if ! test -e /sys/block; then
+       mkdir -p /sys
+       mount -orw -n -tsysfs sysfs /sys
+    fi
     if test "$VM_TYPE" != 'lxc'; then
 	mount -n ${VMDISK_MOUNT_OPTIONS},remount,rw /
     fi
