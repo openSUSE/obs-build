@@ -1026,6 +1026,21 @@ check_for_arm()
     export kvm_bin="/usr/bin/qemu-system-arm"
     export console=ttyAMA0
     export KVM_OPTIONS="-enable-kvm -M vexpress-a15 -dtb /boot/a15-guest.dtb -cpu cortex-a15"
+
+    if [ -z "$RUNNING_IN_VM" -a -n "$HUGETLBFSPATH" ]; then
+        if ! grep -q "$HUGETLBFSPATH" /proc/mounts; then
+            echo "hugetlbfs is not mounted"
+            exit 1
+        fi
+        PAGES_FREE=$(cat /sys/kernel/mm/hugepages/hugepages-2048kB/free_hugepages)
+        PAGES_REQ=$(( ${MEMSIZE:-64} / 2 ))
+        if [ "$PAGES_FREE" -lt "$PAGES_REQ" ]; then
+            echo "expected $PAGES_REQ to be available (have $PAGES_FREE)"
+            echo "please adjust nr_hugepages"
+            exit 1
+        fi
+    fi
+
     VM_KERNEL=/boot/zImage
     VM_INITRD=/boot/initrd
     # prefer the guest kernel
@@ -2360,11 +2375,13 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		elif [ -n "$BUILD_JOBS" -a -n "$BUILD_THREADS" ]; then
 		    qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS,threads=$BUILD_THREADS")
 		fi
-		if [ "$VM_TYPE" = 'kvm' -a "$HOST_ARCH" != "armv7l" ]; then
-			KVM_OPTIONS="$KVM_OPTIONS -cpu host"
-		        if [ -n "$HUGETLBFSPATH" ]; then
-			      KVM_OPTIONS="$KVM_OPTIONS -mem-path $HUGETLBFSPATH"
-		        fi
+		if [ "$VM_TYPE" = 'kvm' ]; then
+                    if [ "$HOST_ARCH" != "armv7l" ]; then
+                        KVM_OPTIONS="$KVM_OPTIONS -cpu host"
+                    fi
+                    if [ -n "$HUGETLBFSPATH" ]; then
+                        KVM_OPTIONS="$KVM_OPTIONS -mem-path $HUGETLBFSPATH"
+                    fi
 		fi
 
 		set -- $qemu_bin -no-reboot -nographic -vga none -net none $KVM_OPTIONS \
