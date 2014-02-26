@@ -778,14 +778,15 @@ detect_vm_2nd_stage()
     fi
     RUNNING_IN_VM=true
     test -e /proc/version || mount -orw -n -tproc none /proc
-    if ! test -e /sys/block; then
-       mkdir -p /sys
-       mount -orw -n -tsysfs sysfs /sys
-    fi
     if test "$VM_TYPE" != 'lxc'; then
 	mount -n ${VMDISK_MOUNT_OPTIONS},remount,rw /
     fi
     umount /run >/dev/null 2>&1
+    # mount /sys
+    if ! test -e /sys/block; then
+       mkdir -p /sys
+       mount -orw -n -tsysfs sysfs /sys
+    fi
 # qemu inside of xen does not work, check again with kvm later before enabling this
 #    if [ -e /dev/kqemu ]; then
 #        # allow abuild user to run qemu
