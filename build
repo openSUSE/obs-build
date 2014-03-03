@@ -174,7 +174,7 @@ Known Parameters:
   --no-init   Skip initialization of build root and start with build
               immediately.
 
-  --no-checks Do not run post-build checks
+  --no-checks Do not run checks (postbuild and %check)
 
   --lint      Run rpmlint after build.
 
@@ -236,9 +236,6 @@ Known Parameters:
 
   --release release
               Override Release in spec file
-
-  --no-checks --nochecks
-              Skip runing checks (for rpm only)
 
   --stage -bSTAGE
               Set stage for rpmbuild. Defaults to -ba.
@@ -1380,10 +1377,6 @@ while test -n "$1"; do
       ;;
       *-norootforbuild)
 	NOROOTFORBUILD=true
-      ;;
-      --nochecks|--no-checks)
-	BUILD_RPM_NO_CHECKS="1"
-	shift
       ;;
       *-stage)
 	needarg
@@ -3026,7 +3019,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
 	# XXX: move _srcdefattr to macro file?
 	rpmbopts=("$BUILD_RPM_BUILD_STAGE" "--define" "_srcdefattr (-,root,root)")
-	if test -n "$BUILD_RPM_NO_CHECKS" ; then
+	if test -n "$DO_CHECKS" ; then
 	    rpmbopts[${#rpmbopts[@]}]="--no-checks"
 	fi
 	if test "$rpmbuild" == "rpmbuild" ; then
