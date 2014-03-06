@@ -705,7 +705,7 @@ else
 			rm -f "$cachedir/$cachepkg"
 		    fi
 		else
-		    $SRC="$cachedir/$cachepkg"
+		    SRC="${cachedir}/$cachepkg"
 		fi
 	    fi
 	    if test "${SRC#/}" = "$SRC" ; then
