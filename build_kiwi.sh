@@ -101,6 +101,7 @@ run_kiwi()
 	    case $f in
 		*.iso) mv $i $BUILD_ROOT/$TOPDIR/KIWI/. ;;
 		*.packages) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
+		*.channel) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
 		scripts) ;;
 		*0) ;;
 		*) test -d $i && [ "$drop_repo" != "true" ] && mv $i $BUILD_ROOT/$TOPDIR/KIWI/. ;;
@@ -356,6 +357,10 @@ EOF
 	    esac
 	    cat >> $BUILD_ROOT/kiwi_post.sh << EOF
 cd /$TOPDIR/KIWI-$imgtype
+if [ -e "$imageout.channel" ]; then
+   echo "Found kiwi channel list file, exporting as well..."
+   cp "$imageout.channel" "/$TOPDIR/OTHER/$imageout$buildnum-$imgtype.channel"
+fi
 if [ -e "$imageout.packages" ]; then
    echo "Found kiwi package list file, exporting as well..."
    cp "$imageout.packages" "/$TOPDIR/OTHER/$imageout$buildnum-$imgtype.packages"
