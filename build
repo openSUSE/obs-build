@@ -352,7 +352,7 @@ cleanup_and_exit () {
 }
 
 fail_exit() {
-  cleanup_and_exit 1
+    cleanup_and_exit 1
 }
 
 shellquote() {
