@@ -105,14 +105,14 @@ vm_parse_options() {
 	fi
       ;;
       -zvm|-lxc)
-        VM_TYPE=zvm
+        VM_TYPE=${PARAM##*-}
 	shift
       ;;
       -vm-type)
 	needarg
 	VM_TYPE="$ARG"
 	case "$VM_TYPE" in
-            zvm) ;;
+            zvm|lxc) ;;
             ec2)
 		test -z "$VM_IMAGE" && VM_IMAGE=1
                 . /etc/profile.d/ec2.sh
@@ -120,7 +120,7 @@ vm_parse_options() {
                 BUILD_EC2_ZONE=`ec2-meta-data placement/availability-zone`
                 BUILD_EC2_REGION=${BUILD_EC2_ZONE%?}
 	        ;;
-	    xen|kvm|uml|qemu|lxc|emulator|openstack)
+	    xen|kvm|uml|qemu|emulator|openstack)
 		test -z "$VM_IMAGE" && VM_IMAGE=1
 	        ;;
 	    none|chroot) VM_TYPE= ;;
@@ -467,7 +467,7 @@ vm_setup() {
     test "$VM_TYPE" = xen && vm_purge_xen
     if test -n "$VMDISK_CLEAN" ; then
 	# delete old root/swap to get rid of the old blocks
-	if test -f "$VM_IMAGE" ; then
+	if test -n "$VM_IMAGE" -a -f "$VM_IMAGE" ; then
 	    echo "Deleting old $VM_IMAGE"
 	    rm -rf "$VM_IMAGE"
 	fi

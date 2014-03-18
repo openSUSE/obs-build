@@ -968,7 +968,7 @@ if test -n "$LIST_STATE" ; then
 fi
 
 # do vm setup if needed
-if test -z "$RUNNING_IN_VM" -a -n "$VM_TYPE" ; then
+if test -z "$RUNNING_IN_VM" -a -n "$VM_TYPE" -a -n "$VM_IMAGE" ; then
     vm_setup
 fi
 
