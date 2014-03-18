@@ -315,7 +315,7 @@ vm_fixup_zvm() {
 }
 
 vm_attach_root_zvm() {
-    VM_IMAGE=$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_ROOT $zvm_mult_pass $VM_WORKER_NR )
+    VM_IMAGE=$(ZVM_CLEANUP=1 zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_ROOT $zvm_mult_pass $VM_WORKER_NR )
     if test "${VM_IMAGE}" = "${VM_IMAGE#dasd}" ; then
 	echo "did not get a real device for VM_IMAGE: $VM_IMAGE"
 	cleanup_and_exit 3
@@ -324,7 +324,7 @@ vm_attach_root_zvm() {
 }
 
 vm_attach_swap_zvm() {
-    VM_SWAP=$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_SWAP $zvm_mult_pass $VM_WORKER_NR )
+    VM_SWAP=$(ZVM_CLEANUP=1 zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_SWAP $zvm_mult_pass $VM_WORKER_NR )
     if test "${VM_SWAP}" = "${VM_SWAP#dasd}" ; then
 	echo "did not get a real device for VM_SWAP: $VM_SWAP"
 	cleanup_and_exit 3
