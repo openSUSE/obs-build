@@ -991,7 +991,7 @@ if test -z "$VM_IMAGE" -a -z "$LOGFILE"; then
     LOGFILE="$BUILD_ROOT/.build.log"
 fi
 
-if test -n "$LOGFILE" -a -z "RUN_SHELL" ; then
+if test -n "$LOGFILE" -a -z "$RUN_SHELL" ; then
     echo  logging output to $LOGFILE...
     rm -f $LOGFILE
     touch $LOGFILE
