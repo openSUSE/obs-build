@@ -667,7 +667,7 @@ vm_first_stage() {
 		for i in *.rpm ; do
 		    test -e "$i" || continue
 		    arch=${i%.rpm}
-		    arch=${i%.delta}
+		    arch=${arch%.delta}
 		    arch=${arch##*\.}
 		    mkdir -p RPMS/$arch
 		    mv "$i" RPMS/$arch/
