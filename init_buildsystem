@@ -130,7 +130,7 @@ clean_build_root()
 	    rm -rf -- "$BUILD_ROOT"/.preinstallimage*
 	    mkdir -p "$BUILD_ROOT/proc"
 	    mkdir -p "$BUILD_ROOT/dev/pts"
-	    if [ "$UID" = '0' ]; then
+	    if test "$UID" = '0' ; then
 		    mount -n -tproc none "$BUILD_ROOT/proc"
 		    mount -n -tdevpts -omode=0620,gid=5 none "$BUILD_ROOT/dev/pts"
 	    fi
@@ -227,9 +227,9 @@ preinstall()
 	ar x "$BUILD_ROOT/.init_b_cache/rpms/$1.deb"
 	mkdir -p .init_b_cache/scripts/control
 	$TAR -C .init_b_cache/scripts/control -z -f control.tar.gz
-	if [ -f "data.tar.gz" ]; then
+	if test -f "data.tar.gz" ; then
 	    $TAR -z -f data.tar.gz
-	elif [ -f "data.tar.xz" ]; then
+	elif test -f "data.tar.xz" ; then
 	    $TAR -J -f data.tar.xz
 	fi
 	if test -e ".init_b_cache/scripts/$1.run" ; then
@@ -282,7 +282,7 @@ init_db()
         if ! test -e $BUILD_ROOT/usr/lib/rpm/cpuinfo.yaml; then
             # rpm v5 does not have initdb
             # rpmdb --initdb is recommended and exists since SL9
-            if [ -x $BUILD_ROOT/usr/bin/rpmdb ]; then
+            if test -x $BUILD_ROOT/usr/bin/rpmdb ; then
    	      chroot $BUILD_ROOT /usr/bin/rpmdb --initdb || cleanup_and_exit 1
             else
  	      chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
@@ -359,7 +359,7 @@ maybe_add_all_zypp_repos()
     local i j
     r=()
     for i in "${repos[@]}"; do
-	if [ "$i" = "zypp://" ]; then
+	if test "$i" = "zypp://" ; then
 	    while read j; do
 		j="${j#/etc/zypp/repos.d/}"
 		r=("${r[@]}" "zypp://${j%.repo}")
@@ -381,7 +381,7 @@ validate_cache_file()
     else
 	for SRC in "${repos[@]}" ${BUILD_RPMS//:/ /}; do
 	    test -n "$SRC" || SRC=.
-	    if [ "${SRC#zypp://}" != "$SRC" ]; then
+	    if test "${SRC#zypp://}" != "$SRC" ; then
 		SRC="/var/cache/zypp/raw" # XXX can't use name here as we'd need to parse the file
 	    fi
 	    if test "$SRC" -nt $CACHE_FILE; then
@@ -403,20 +403,20 @@ validate_cache_file()
 		continue
 	    fi
 	    test -z "$SRC" && SRC=`pwd`
-	    if [ "${SRC#zypp://}" != "$SRC" ]; then
+	    if test "${SRC#zypp://}" != "$SRC" ; then
 		set -- $BUILD_DIR/createrepomddeps "$SRC"
-	    elif [ "${SRC#http://}" != "$SRC" -o "${SRC#https://}" != "$SRC" -o "${SRC#ftp://}" != "$SRC" -o "${SRC#ftps://}" != "$SRC" ]; then
+	    elif test "${SRC#http://}" != "$SRC" -o "${SRC#https://}" != "$SRC" -o "${SRC#ftp://}" != "$SRC" -o "${SRC#ftps://}" != "$SRC" ; then
 		mkdir -p "$(getcachedir "$SRC")"
 		set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
-	    elif [ "${SRC#arch@http://}" != "$SRC" -o "${SRC#arch@https://}" != "$SRC" -o "${SRC#arch@ftp://}" != "$SRC" -o "${SRC#arch@ftps://}" != "$SRC" ]; then
+	    elif test "${SRC#arch@http://}" != "$SRC" -o "${SRC#arch@https://}" != "$SRC" -o "${SRC#arch@ftp://}" != "$SRC" -o "${SRC#arch@ftps://}" != "$SRC" ; then
 		mkdir -p "$(getcachedir "$SRC")"
 		set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
-	    elif [ ! -e "$SRC" ]; then
+	    elif test ! -e "$SRC" ; then
 		echo "*** $SRC does not exist" >&2
 		cleanup_and_exit 1
-	    elif [ -z "$findonly" -a \( -e "$SRC"/suse/setup/descr/packages -o -e "$SRC"/suse/setup/descr/packages.gz \) ]; then
+	    elif test -z "$findonly" -a \( -e "$SRC"/suse/setup/descr/packages -o -e "$SRC"/suse/setup/descr/packages.gz \) ; then
 		set -- $BUILD_DIR/createyastdeps "$SRC"
-	    elif [ -z "$findonly" -a -e "$SRC"/repodata/repomd.xml ]; then
+	    elif test -z "$findonly" -a -e "$SRC"/repodata/repomd.xml ; then
 		set -- $BUILD_DIR/createrepomddeps "$SRC"
 	    else
 		set -- $BUILD_DIR/createrpmdeps "$SRC"
@@ -442,11 +442,11 @@ downloadpkg()
     local url="$1"
     local cachedir
 
-    if [ "${url:0:7}" == "zypp://" ] ; then
+    if test "${url:0:7}" == "zypp://"  ; then
 	cachedir="/var/cache/zypp/packages/"
 	SRC="$cachedir${url#zypp://}"
 	mkdir -p "${SRC%/*}" || cleanup_and_exit 1
-    elif [ "${url:0:7}" == "http://" -o "${url:0:8}" == "https://" -o "${url:0:6}" == "ftp://" -o "${url:0:7}" == "ftps://" ] ; then
+    elif test "${url:0:7}" == "http://" -o "${url:0:8}" == "https://" -o "${url:0:6}" == "ftp://" -o "${url:0:7}" == "ftps://" ; then
 	cachedir="$(getcachedir "$url")"
 	local name="$(basename "$url")"
 	name=${name/%.pkg.tar.?z/.arch}
@@ -461,7 +461,7 @@ downloadpkg()
     echo "downloading $url ... ";
     $BUILD_DIR/download "$destdir" "$url" || cleanup_and_exit 1
     local destfile="$destdir/${url##*/}"
-    if [ ! -e "$destfile" ]; then
+    if test ! -e "$destfile" ; then
 	echo "expected $destfile after download but it's missing" >&2
 	cleanup_and_exit 1
     fi
@@ -490,7 +490,7 @@ getcachedir()
       *.pkg.tar.?z) url="arch@$url" ;;
     esac
     for repo in "${repos[@]}" ; do
-	if [ "${url:0:${#repo}}" == "$repo" -o "${url:0:${#repo}}" == "$repo" ] ; then
+	if test "${url:0:${#repo}}" == "$repo" -o "${url:0:${#repo}}" == "$repo" ; then
 	    read repoid dummy < <(echo -n "$repo" | md5sum)
 	    echo "$CACHE_DIR/$repoid"
 	    break
@@ -511,11 +511,11 @@ set_build_arch
 
 trap fail_exit EXIT
 
-if [ "$BUILD_ROOT" = / ]; then
+if test "$BUILD_ROOT" = / ; then
     browner="$(stat -c %u /)"
 fi
 
-if [ -n "$CLEAN_BUILD" ]; then
+if test -n "$CLEAN_BUILD" ; then
     clean_build_root
 fi
 
@@ -605,23 +605,19 @@ else
     fi
 
     #
-    # register the QEMU emulator
+    # register the QEMU emulator if needed
+    # (we do not need this for the prepare step, as we do not run scripts in this case)
     #
-    if check_use_emulator; then
+    if test -z "$PREPARE_VM" ; then
+	if check_use_emulator ; then
 	    echo "registering binfmt handlers for VM"
-
-	    if [ -x "$BUILD_DIR/initvm.`uname -m`" -a -e "$BUILD_DIR/qemu-reg" ]; then
-	        $BUILD_DIR/initvm.`uname -m`
-            else
-                echo "Warning: could not register binfmt handlers. "
-                echo "Either build-initvm or $BUILD_DIR/qemu-reg missing."
-            fi
-
+	    "$BUILD_DIR/$INITVM_NAME"
 	    echo 0 > /proc/sys/vm/mmap_min_addr
 	    read mmap_min_addr < /proc/sys/vm/mmap_min_addr
-	    if [ "$mmap_min_addr" != 0 ]; then
+	    if test "$mmap_min_addr" != 0 ; then
 		echo "Warning: mmap_min_addr is != 0. If programs fail at mmap this could be the reason"
 	    fi
+	fi
     fi
 
     PACKAGES_TO_INSTALL=
@@ -676,7 +672,7 @@ else
 	    continue
 	fi
 	PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $PKG"
-	if [ "${SRC#/}" = "$SRC" ]; then
+	if test "${SRC#/}" = "$SRC" ; then
 	    case "$SRC" in
 		zypp://* | http://* | https://* | ftp://* | ftps://*)
 		    echo "$PKG $SRC" >>$BUILD_ROOT/.init_b_cache/rpmlist.download
@@ -813,7 +809,7 @@ if test ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rp
     fi
     # for reorder
     check_exit
-    if [ -w /root ]; then
+    if test -w /root ; then
 	    test -c $BUILD_ROOT/dev/null || create_devs
     fi
     test -e $BUILD_ROOT/etc/fstab || touch $BUILD_ROOT/etc/fstab
@@ -1175,56 +1171,6 @@ cp /proc/mounts $BUILD_ROOT/etc/mtab
 chmod 644 $BUILD_ROOT/etc/mtab
 
 #
-# to be sure, path is set correctly, we have to source /etc/profile before
-# starting rpm.
-#
-# XXX
-#rm -f $BUILD_ROOT/bin/rpm.sh
-#cp $BUILD_LIBDIR/lib/rpm.sh $BUILD_ROOT/bin/rpm.sh
-#chmod 755 $BUILD_ROOT/bin/rpm.sh
-#test -f $BUILD_ROOT/bin/rpm -a ! -L $BUILD_ROOT/bin/rpm && \
-#    mv $BUILD_ROOT/bin/rpm $BUILD_ROOT/bin/rpm.bin
-#rm -f $BUILD_ROOT/bin/rpm
-#ln -s rpm.sh $BUILD_ROOT/bin/rpm
-
-#
-# some packages use uname -r to decide which kernel is used to build for.
-# this does not work in autobuild always.  Here is a wrapper script, that
-# gets Version from kernel sources.
-#
-# XXX
-#rm -f $BUILD_ROOT/bin/uname.sh
-#cp -v $BUILD_LIBDIR/lib/uname.sh $BUILD_ROOT/bin/uname.sh
-#chmod 755 $BUILD_ROOT/bin/uname.sh
-#test -f $BUILD_ROOT/bin/uname -a ! -L $BUILD_ROOT/bin/uname && \
-#    mv $BUILD_ROOT/bin/uname $BUILD_ROOT/bin/uname.bin
-#rm -f $BUILD_ROOT/bin/uname
-#ln -s uname.sh $BUILD_ROOT/bin/uname
-
-#
-# some distributions have a /etc/rpmrc or /etc/rpm/macros and some not.
-# make sure, that it is setup correctly.
-#
-# XXX
-#rm -f $BUILD_ROOT/etc/rpmrc
-#if test -e $BUILD_LIBDIR/lib/rpmrc.$BUILD_BASENAME ; then
-#    cp -v $BUILD_LIBDIR/lib/rpmrc.$BUILD_BASENAME $BUILD_ROOT/etc/rpmrc
-#elif test -e $BUILD_LIBDIR/lib/rpmrc ; then
-#    cp -v $BUILD_LIBDIR/lib/rpmrc $BUILD_ROOT/etc/rpmrc
-#fi
-
-# XXX
-#rm -f $BUILD_ROOT/etc/rpm/macros $BUILD_ROOT/etc/rpm/suse_macros
-#mkdir -p $BUILD_ROOT/etc/rpm
-#if test -e $BUILD_LIBDIR/lib/macros.$BUILD_BASENAME ; then
-#    cp -v $BUILD_LIBDIR/lib/macros.$BUILD_BASENAME $BUILD_ROOT/etc/rpm/macros
-#    cp -v $BUILD_LIBDIR/lib/macros.$BUILD_BASENAME $BUILD_ROOT/etc/rpm/suse_macros
-#elif test -e $BUILD_LIBDIR/lib/macros ; then
-#    cp -v $BUILD_LIBDIR/lib/macros $BUILD_ROOT/etc/rpm/macros
-#    cp -v $BUILD_LIBDIR/lib/macros $BUILD_ROOT/etc/rpm/suse_macros
-#fi
-
-#
 # make sure, that our nis is not present in the chroot system
 #
 test -e $BUILD_ROOT/etc/nsswitch.conf && {
@@ -1305,7 +1251,7 @@ fi
 
 if test -x $BUILD_ROOT/bin/rpm -a ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rpm/Packages ; then
     echo "initializing rpm db..."
-    if [ -x $BUILD_ROOT/usr/bin/rpmdb ]; then
+    if test -x $BUILD_ROOT/usr/bin/rpmdb ; then
       chroot $BUILD_ROOT /usr/bin/rpmdb --initdb || cleanup_and_exit 1
     else
       chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1

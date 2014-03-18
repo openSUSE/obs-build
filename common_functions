@@ -2,21 +2,19 @@
 
 : ${CACHE_DIR:=/var/cache/build}
 
-build_host_arch()
-{
+build_host_arch() {
     : ${BUILD_HOST_ARCH:=`uname -m`}
+    BUILD_INITVM_ARCH="$BUILD_HOST_ARCH"
     # avoid multiple initvm.* helpers for i586 and i686
-    test i686 != "$BUILD_HOST_ARCH" || BUILD_HOST_ARCH=i586
+    test i686 != "$BUILD_INITVM_ARCH" || BUILD_INITVM_ARCH=i586
 }
 
-set_build_arch()
-{
+set_build_arch() {
     build_host_arch
 
-    if [ -z "$BUILD_ARCH" ]; then
+    if test -z "$BUILD_ARCH" ; then
 	BUILD_ARCH="$BUILD_HOST_ARCH"
     fi
-
     case $BUILD_ARCH in
       armv7hl) BUILD_ARCH="armv7hl:armv7l:armv6hl:armv6l:armv5tel" ;;
       armv7l) BUILD_ARCH="armv7l:armv6l:armv5tel" ;;
@@ -47,36 +45,31 @@ set_build_arch()
     fi
 }
 
-check_exit()
-{
+check_exit() {
     if test -e $BUILD_ROOT/exit; then
 	echo "exit ..."
 	cleanup_and_exit 1
     fi
 }
 
-check_use_emulator()
-{
+check_use_emulator() {
+    INITVM_NAME=
     arch=":$BUILD_ARCH:"
     if test "$arch" != "${arch/:$BUILD_HOST_ARCH:/}"; then
         # native supported arch, no emulator
         return 1
     fi
-
-    # to run the qemu initialization in the XEN chroot, we need to
+    # to run the qemu initialization in the vm, we need to
     # register it with a static program or shell script
-    if test -e $BUILD_DIR/initvm.$BUILD_HOST_ARCH && \
-        test -e $BUILD_DIR/qemu-reg; then
-	chmod 0755 "$BUILD_DIR/initvm.$BUILD_HOST_ARCH"
-        if [ -z "$PREPARE_VM" ]; then
-             return 0	# chroot build, we need to run
-        fi
-        # emulator in vm already registered during startup
-    else
-        # XXX: error?
-        echo "Warning: cross compile not possible due to missing static binaries. please install build-initvm package for that purpose."
-        echo "         check that the right architecture is available for your build host, you need initvm.$BUILD_HOST_ARCH for this one."
+    INITVM_NAME="initvm.$BUILD_INITVM_ARCH"
+    if test -e "$BUILD_DIR/$INITVM_NAME" -a -e "$BUILD_DIR/qemu-reg" ; then
+	chmod 0755 "$BUILD_DIR/$INITVM_NAME"
+	return 0	# chroot build, we need to run
     fi
+    # XXX: error?
+    echo "Warning: cross compile not possible due to missing static binaries. please install build-initvm package for that purpose."
+    echo "         check that the right architecture is available for your build host, you need $INITVM_NAME for this one."
+    INITVM_NAME=
     return 1
 }
 

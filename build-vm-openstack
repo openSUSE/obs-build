@@ -1,0 +1,128 @@
+#
+# Openstack specific functions
+#
+# (C) 2014 SUSE, Inc
+#
+
+cloud_volume_attach_openstack() {
+    local VM_SERVER="$1"
+    local VM_VOL_NAME="$2"
+    local VM_VOL_DEV="$3"
+
+    if ! nova volume-attach "$VM_SERVER" "$VM_VOL_NAME" "$VM_VOL_DEV"; then
+	echo "ERROR: nova attach failed. $?" >&2
+	return 3
+    fi
+    while true; do
+	state=`nova volume-show "$VM_VOL_NAME" | sed -n 's,^|[ ]*status[ ]*|[ ]*\([^ ]*\).*,\1,p'`
+	test "$state" = "in-use" && break
+        if test -z "$state" ; then
+	    echo "ERROR: unable to find state of volume $VM_VOL_NAME" >&2
+            return 3
+        fi
+        if test "$state" = available ; then
+	    echo "WARNING: volume $VM_VOL_NAME got not attached, retrying" >&2
+            if ! nova volume-attach "$VM_SERVER" "$VM_VOL_NAME" "$VM_VOL_DEV"; then
+		echo "ERROR: nova attach failed. $?" >&2
+                return 3
+            fi
+        fi
+        sleep 3
+    done
+    if test ! -e "$VM_VOL_DEV" ; then
+	#GROSS HACK: kernel does not care about the given device name
+#       VM_VOL_DEV="/dev/"`dmesg| sed -n 's,.*\(vd.\): unknown partition tab.*,\1,p' | tail -n 1`
+        VM_VOL_DEV=`ls -1 /dev/vd? | tail -n 1`
+    fi
+    echo "$VM_VOL_DEV"
+}
+
+cloud_volume_detach_openstack() {
+    local VM_SERVER="$1"
+    local VM_VOL_NAME="$2"
+
+    # needed at all?
+    nova volume-show "$VM_VOL_NAME" | grep -q in-use || return 0
+    # umount seems not to be enough
+    sync
+    if ! nova volume-detach "$VM_SERVER" "$VM_VOL_NAME"; then
+	echo "ERROR: nova detach of $VM_VOL_NAME failed." >&2
+        return 3
+    fi
+    while nova volume-show "$VM_VOL_NAME" | grep -q availabe; do
+	sleep 3
+    done
+    return 0
+}
+
+vm_verify_options_openstack() {
+    # verify settings
+    if test -z "$OS_AUTH_URL" ; then
+	echo "ERROR: No openstack environment set. This vm-type works only inside of an openstack VM."
+	cleanup_and_exit 3
+    fi
+    if test -z "$OBS_OPENSTACK_KERNEL_IMAGE_ID" ; then
+	echo "ERROR: No image refering to kernel and ramdisk is defined in OBS_OPENSTACK_KERNEL_IMAGE_ID env."
+	cleanup_and_exit 3
+    fi
+    if test -z "$VM_VOLUME_NAME" ; then
+	echo "ERROR: No worker root VM volume name specified."
+	cleanup_and_exit 3
+    fi
+    if test -z "$VM_VOLUME_SWAP" ; then
+	echo "ERROR: No worker swap VM volume name specified."
+	cleanup_and_exit 3
+    fi
+    if test -z "$VM_SERVER" ; then
+	echo "ERROR: No VM server nod name specified (usually this instance)."
+	cleanup_and_exit 3
+    fi
+
+    # XXX why here?
+    VM_SWAPDEV=/dev/vdb
+    qemu_rootdev=/dev/vda
+}
+
+vm_attach_root_openstack() {
+    VM_IMAGE=`cloud_volume_attach_openstack "$VM_SERVER" "$VM_VOLUME_NAME" "$VM_IMAGE"`
+    test "${VM_IMAGE:0:5}" = "/dev/" || cleanup_and_exit 3
+}
+
+vm_attach_swap_openstack() {
+    VM_SWAP=`cloud_volume_attach_openstack "$VM_SERVER" "$VM_VOLUME_SWAP" "$VM_SWAP"`
+    test "${VM_SWAP:0:5}" = /dev/ || cleanup_and_exit 3
+}
+
+vm_detach_root_openstack() {
+    cloud_volume_detach_openstack "$VM_SERVER" "$VM_VOLUME_NAME"
+}
+
+vm_detach_swap_openstack() {
+    cloud_volume_detach_openstack "$VM_SERVER" "$VM_VOLUME_SWAP"
+}
+
+vm_cleanup_openstack() {
+    cloud_volume_detach_openstack "$VM_SERVER" "$VM_VOLUME_NAME"
+    cloud_volume_detach_openstack "$VM_SERVER" "$VM_VOLUME_SWAP"
+}
+
+vm_fixup_openstack() {
+    # No way to handle this via init= parameter here....
+    echo "#!/bin/sh"               >  "$BUILD_ROOT/sbin/init"
+    echo 'exec /.build/build "$@"' >> "$BUILD_ROOT/sbin/init"
+    chmod 0755 "$BUILD_ROOT/sbin/init"
+}
+
+vm_kill_openstack() {
+    if nova show "$VM_VOLUME_NAME" >/dev/null 2>&1 ; then
+	if ! nova delete "$VM_VOLUME_NAME" ; then
+	    echo "could not kill openstack vm build $VM_VOLUME_NAME"
+            cleanup_and_exit 1
+	fi
+    fi
+}
+
+vm_startup_openstack() {
+    nova boot --image $OBS_OPENSTACK_KERNEL_IMAGE_ID --flavor m1.small --block_device_mapping vda=${VM_VOLUME_NAME}::$(( $VMDISK_ROOTSIZE / 1024 )):0 --block_device_mapping vdb=${VM_VOLUME_SWAP}::1:0 --poll "build-$VM_VOLUME_NAME" || cleanup_and_exit 3
+    nova console-log "build-$VM_VOLUME_NAME"
+}

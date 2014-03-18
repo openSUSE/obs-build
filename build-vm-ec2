@@ -1,0 +1,210 @@
+#
+# EC2 specific functions
+#
+# (C) 2014 SUSE, Inc
+#
+
+BUILD_EC2_TYPE="t1.micro"
+
+cloud_volume_attach_ec2() {
+    local VM_SERVER="$1"
+    local VM_VOL_NAME="$2"
+    local VM_VOL_DEV="$3"
+
+    temp_file=`mktemp`
+    if ! ec2-attach-volume "$VM_VOL_NAME" -d /dev/sdz -i `ec2-instance-id` --region "$BUILD_EC2_REGION" > "$temp_file"; then
+        rm -f "$temp_file"
+        cleanup_and_exit 1
+    fi
+    # wait that it becomes available
+    while true; do
+        state=`ec2_volume_state "$VM_VOL_NAME"`
+        test "$state" = attached && break
+        sleep 1
+    done
+    # print device node
+    grep ^ATTACHMENT "$temp_file" | awk '{ print $4 }'
+    rm -f "$temp_file"
+}
+
+cloud_volume_detach_ec2() {
+    local VM_SERVER="$1"
+    local VM_VOL_NAME="$2"
+    state=`ec2_volume_state "$VM_VOL_NAME"`
+    if test "$state" != available ; then
+        ec2-detach-volume "$VM_VOL_NAME" --region "$BUILD_EC2_REGION" || return 3
+    fi
+    return 0
+}
+
+vm_verify_options_ec2() {
+    # verify settings
+    if test -z "$AWS_ACCESS_KEY" -o -z "$AWS_ACCESS_KEY" ; then
+        echo "ERROR: No amazon EC2 environment set. Set AWS_ACCESS_KEY and AWS_SECRET_KEY."
+        cleanup_and_exit 3
+    fi
+    EC2_INSTANCE_ID=`ec2-instance-id`
+    BUILD_EC2_AKI=
+    BUILD_EC2_ZONE=`ec2-meta-data placement/availability-zone`
+    BUILD_EC2_REGION=${BUILD_EC2_ZONE%?}
+    case "$BUILD_EC2_ZONE" in
+        us-east-1)      BUILD_EC2_AKI=aki-88aa75e1 ;;
+        us-west-1)      BUILD_EC2_AKI=aki-f77e26b2 ;;
+        us-west-2)      BUILD_EC2_AKI=aki-fc37bacc ;;
+        eu-west-1)      BUILD_EC2_AKI=aki-71665e05 ;;
+        ap-southeast-1) BUILD_EC2_AKI=aki-fe1354ac ;;
+        ap-southeast-2) BUILD_EC2_AKI=aki-3f990e05 ;;
+        ap-northeast-1) BUILD_EC2_AKI=aki-44992845 ;;
+        sa-east-1)      BUILD_EC2_AKI=aki-c48f51d9 ;;
+        us-gov-west-1)  BUILD_EC2_AKI=aki-79a4c05a ;;
+    esac
+    if test -z "$BUILD_EC2_AKI" ; then
+        echo "Unknown Amazon EC2 Zone: $BUILD_EC2_ZONE"
+	cleanup_and_exit 1
+    fi
+    if test -z "$BUILD_EC2_AKI" ; then
+        echo "ERROR: No image refering to kernel and ramdisk is defined in BUILD_EC2_AKI env."
+        cleanup_and_exit 3
+    fi
+    if test -z "$VM_VOLUME_NAME" ; then
+        echo "ERROR: No worker root VM volume name specified."
+        cleanup_and_exit 3
+    fi
+    if test -z "$VM_VOLUME_SWAP" ; then
+        echo "ERROR: No worker swap VM volume name specified."
+        cleanup_and_exit 3
+    fi
+
+    VM_SWAPDEV=/dev/sdb1	# in the vm
+}
+
+vm_attach_root_ec2() {
+    VM_IMAGE=`cloud_volume_attach_ec2 "$VM_SERVER" "$VM_VOLUME_NAME" "$VM_IMAGE"`
+    test "${VM_IMAGE:0:5}" = /dev/ || cleanup_and_exit 3
+}
+
+vm_attach_swap_ec2() {
+    VM_SWAP=`cloud_volume_attach_ec2 "$VM_SERVER" "$EC2_EXTRACT_VOLUME_swap" "$VM_SWAP"`
+    test "${VM_SWAP:0:5}" = /dev/ || cleanup_and_exit 3
+}
+
+vm_detach_root_ec2() {
+    cloud_volume_detach_ec2 "$VM_SERVER" "$VM_VOLUME_NAME"
+}
+
+vm_detach_swap_ec2() {
+    cloud_volume_detach_ec2 "$VM_SERVER" "$VM_VOLUME_SWAP"
+}
+
+vm_fixup_ec2() {
+    # No way to handle this via init= parameter here....
+    echo "#!/bin/sh"               >  "$BUILD_ROOT/sbin/init"
+    echo 'exec /.build/build "$@"' >> "$BUILD_ROOT/sbin/init"
+    chmod 0755 "$BUILD_ROOT/sbin/init"
+    # use the instance kernel, if no kernel got installed via preinstall
+    if ! test -e "$BUILD_ROOT/boot/vmlinuz"; then
+	cp /boot/vmlinuz-ec2 "$BUILD_ROOT/boot/vmlinuz"
+	cp /boot/initrd-ec2 "$BUILD_ROOT/boot/initrd"
+    fi
+    # install menu.lst for pv grub
+    if ! test -e "$BUILD_ROOT/boot/grub/menu.lst"; then
+	mkdir -p "$BUILD_ROOT/boot/grub"
+	echo "serial --unit=0 --speed=9600"                                                   >  "$BUILD_ROOT/boot/grub/menu.lst"
+	echo "terminal --dumb serial"                                                         >> "$BUILD_ROOT/boot/grub/menu.lst"
+	echo "default 0"                                                                      >> "$BUILD_ROOT/boot/grub/menu.lst"
+	echo "timeout 0"                                                                      >> "$BUILD_ROOT/boot/grub/menu.lst"
+	echo "hiddenmenu"                                                                     >> "$BUILD_ROOT/boot/grub/menu.lst"
+	echo ""                                                                               >> "$BUILD_ROOT/boot/grub/menu.lst"
+	echo "title default"                                                                  >> "$BUILD_ROOT/boot/grub/menu.lst"
+	echo "   root (hd0)"                                                                  >> "$BUILD_ROOT/boot/grub/menu.lst"
+	echo "   kernel /boot/vmlinuz root=/dev/sda1 xencons=xvc0 console=xvc0 splash=silent" >> "$BUILD_ROOT/boot/grub/menu.lst"
+	echo "   initrd /boot/initrd"                                                         >> "$BUILD_ROOT/boot/grub/menu.lst"
+    fi
+}
+
+vm_cleanup_ec2() {
+    cloud_volume_detach_ec2 "$VM_SERVER" "$VM_VOLUME_NAME"
+    cloud_volume_detach_ec2 "$VM_SERVER" "$VM_VOLUME_SWAP"
+    test -n "$EC2_EXTRACT_VOLUME_root" && cloud_volume_detach_ec2 "$VM_SERVER" "$EC2_EXTRACT_VOLUME_root"
+    test -n "$EC2_EXTRACT_VOLUME_swap" && cloud_volume_detach_ec2 "$VM_SERVER" "$EC2_EXTRACT_VOLUME_swap"
+    test -n "$EC2_SNAP_root" && ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_root"
+    test -n "$EC2_SNAP_swap" && ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_swap"
+    test -n "$EC2_EXTRACT_VOLUME_root" && ec2-delete-volume --region "$BUILD_EC2_REGION" "$EC2_EXTRACT_VOLUME_root"
+    test -n "$EC2_EXTRACT_VOLUME_swap" && ec2-delete-volume --region "$BUILD_EC2_REGION" "$EC2_EXTRACT_VOLUME_swap"
+}
+
+vm_kill_ec2() {
+    if ec2-describe-instance-status "$VM_BUILD_INSTANCE" --region "$BUILD_EC2_REGION" >/dev/null 2>&1 ; then
+	if ec2-terminate-instances "$VM_BUILD_INSTANCE" >/dev/null 2>&1 ; then
+	    echo "could not kill EC2 instance $VM_BUILD_INSTANCE"
+	    cleanup_and_exit 1
+	fi
+    fi
+}
+
+vm_startup_ec2() {
+    EC2_SNAP_root=`ec2-create-snapshot --region "$BUILD_EC2_REGION" "$VM_VOLUME_NAME" | awk '{ print $2 }'`
+    if test "$EC2_SNAP_root" = "${EC2_SNAP_root#snap-}" ; then
+	echo "ERROR: Failed to create snapshot for root disk $VM_VOLUME_NAME"
+	cleanup_and_exit 3
+    fi
+    EC2_SNAP_swap=`ec2-create-snapshot --region "$BUILD_EC2_REGION" "$VM_VOLUME_SWAP" | awk '{ print $2 }'`
+    if test "$EC2_SNAP_swap" = "${EC2_SNAP_swap#snap-}" ; then
+	echo "ERROR: Failed to create snapshot for swap disk $VM_VOLUME_SWAP"
+	ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_root"
+	cleanup_and_exit 3
+    fi
+    # wait for snapshots being processed
+    while true; do
+	c=`ec2-describe-snapshots --region "$BUILD_EC2_REGION" "$EC2_SNAP_root" "$EC2_SNAP_swap" | grep completed | wc -l`
+	test "$c" = 2 && break
+    done
+    EC2_AMI=`ec2-register --region "$BUILD_EC2_REGION" -n build-$VM_VOLUME_NAME  -a x86_64 -b "/dev/sda1=$EC2_SNAP_root::false" -b "/dev/sdb1=$EC2_SNAP_swap::false" --kernel "$BUILD_EC2_AKI" | awk '{ print $2 }'`
+    if test "$EC2_AMI" == "${EC2_AMI#ami-}" ; then
+	echo "ERROR: Failed to register the AMI"
+	ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_root"
+	ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_swap"
+	cleanup_and_exit 3
+    fi
+    INSTANCE=`ec2-run-instances --region "$BUILD_EC2_REGION" -z "$BUILD_EC2_ZONE" -t $BUILD_EC2_TYPE --kernel "$BUILD_EC2_AKI" --instance-initiated-shutdown-behavior terminate "$EC2_AMI" | grep ^INSTANCE | awk '{ print $2 }'`
+    if test "$INSTANCE" == "${INSTANCE#i-}" ; then
+	echo "ERROR: Failed to run the instance for AMI $EC2_AMI"
+	ec2-deregister --region "$BUILD_EC2_REGION" "$EC2_AMI"
+	ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_root"
+	ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_swap"
+	cleanup_and_exit 3
+    fi
+    echo "Waiting for finishing the build. No log file until then on EC2 ...."
+    I=0
+    L=0
+    EC2_EXTRACT_VOLUME_root=
+    EC2_EXTRACT_VOLUME_swap=
+    temp_file=`mktemp`
+    while true; do
+	ec2-describe-instances --region "$BUILD_EC2_REGION" "$INSTANCE" > $temp_file
+	state=`grep ^INSTANCE "$temp_file"`
+	if test -z "$EC2_EXTRACT_VOLUME_root" ; then
+	    EC2_EXTRACT_VOLUME_root=`grep ^BLOCKDEVICE $temp_file | grep /dev/sda1 | awk '{ print $3 }'`
+	    EC2_EXTRACT_VOLUME_swap=`grep ^BLOCKDEVICE $temp_file | grep /dev/sdb1 | awk '{ print $3 }'`
+	fi
+	# the column of the state is at a differen position depending on the state :/
+#       test "$state" = "${state/stopped/}" || break
+	test "$state" = "${state/terminated/}" || break
+	I=$(( $I + 1 ))
+	if test $I -gt 10 ; then
+	   echo -n .
+	   I=0
+	   L=$(( $L + 1 ))
+	fi
+	if test $L -gt 10 ; then
+	   # dump entire console log as raw here
+	   ec2-get-console-output --region "$BUILD_EC2_REGION" -r "$INSTANCE"
+	   L=0
+	fi
+	sleep 1
+    done
+    rm -f "$temp_file"
+    echo
+    ec2-deregister --region "$BUILD_EC2_REGION" "$EC2_AMI"
+    # snapshots get deleted after extract
+}

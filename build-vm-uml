@@ -1,0 +1,50 @@
+#
+# UML specific functions
+#
+# (C) 2014 SUSE, Inc
+#
+
+uml_kernel=/boot/vmlinux-um
+uml_initrd=/boot/initrd-um
+
+vm_verify_options_uml() {
+    VM_SWAPDEV=/dev/sdb
+}
+
+vm_startup_uml() {
+    set -- $uml_kernel initrd=$uml_initrd root=ubda init="$vm_init_script" panic=1 elevator=noop quiet ubda=$VM_IMAGE ubdb=$VM_SWAP ${VM_MEMSIZE:+mem=$VM_MEMSIZE}
+    echo "$@"
+    "$@"
+}
+
+vm_kill_uml() {
+    if ! fuser -k -TERM "$VM_IMAGE"; then
+        echo "could not kill build in $VM_IMAGE"
+        cleanup_and_exit 1
+    fi
+}
+
+vm_fixup_uml() {
+    :
+}
+
+vm_attach_root_uml() {
+    :
+}
+
+vm_attach_swap_uml() {
+    :
+}
+
+vm_detach_root_uml() {
+    :
+}
+
+vm_detach_swap_uml() {
+    :
+}
+
+vm_cleanup_uml() {
+    :
+}
+

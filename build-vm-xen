@@ -1,0 +1,116 @@
+#
+# XEN specific functions
+#
+# (C) 2014 SUSE, Inc
+#
+
+vm_verify_options_xen() {
+    vm_kernel=/boot/vmlinuz
+    vm_initrd=/boot/initrd
+    test -e /boot/vmlinuz-xen && vm_kernel=/boot/vmlinuz-xen
+    test -e /boot/initrd-xen && vm_initrd=/boot/initrd-xen
+    test -n "$VM_KERNEL" && vm_kernel="$VM_KERNEL"
+    test -n "$VM_INITRD" && vm_initrd="$VM_INITRD"
+}
+
+vm_startup_xen() {
+    XMCMD=xm
+    test ! -x /usr/sbin/xm -a -x /usr/sbin/xl && XMCMD=xl
+    XMROOT="file:$(readlink -f $VM_IMAGE)"
+    XMROOT=${XMROOT/#file:\/dev/phy:/dev}
+    XMROOT="disk=$XMROOT,hda1,w"
+    XMSWAP=
+    if test -n "$VM_SWAP" ; then
+	XMSWAP="file:$(readlink -f $VM_SWAP)"
+	XMSWAP=${XMSWAP/#file:\/dev/phy:/dev}
+	XMSWAP="disk=$XMSWAP,hda2,w"
+    fi
+    XENID="${VM_IMAGE%/root}"
+    XENID="${XENID%/tmpfs}"
+    XENID="${XENID##*/}"
+    XENID="${XENID#root_}"
+
+    if $XMCMD list "build_$XENID" >/dev/null 2>&1 ; then
+       echo "Instance already exists, something really went wrong..."
+       echo "Please report to your server admin, there might be multiple services running for same domain"
+       cleanup_and_exit 3
+    fi
+    XEN_CONF_FILE=`mktemp /var/tmp/build.xen.conf-XXXXXXXXX` || cleanup_and_exit 3
+    
+    echo "kernel = \"$vm_kernel\""                                           >  $XEN_CONF_FILE
+    echo "ramdisk = \"$vm_initrd\""                                          >> $XEN_CONF_FILE
+    echo "memory = ${VM_MEMSIZE:-64}"                                        >> $XEN_CONF_FILE
+    test -n "$BUILD_JOBS" && echo "vcpus = $BUILD_JOBS"                      >> $XEN_CONF_FILE
+    echo "root = \"/dev/hda1 ro\""                                           >> $XEN_CONF_FILE
+    echo "extra = \"init=/bin/bash console=ttyS0 panic=1 udev_timeout=360\"" >> $XEN_CONF_FILE
+    echo "on_poweroff = \"destroy\""                                         >> $XEN_CONF_FILE
+    echo "on_reboot = \"destroy\""                                           >> $XEN_CONF_FILE
+    echo "on_crash = \"destroy\""                                            >> $XEN_CONF_FILE
+    if test "$XMCMD" = xm ; then
+	set -- xm create -c $XEN_CONF_FILE name="build_$XENID" $XMROOT $XMSWAP extra="quiet init="$vm_init_script" elevator=noop panic=1 console=ttyS0"
+    else
+	XLDISK=
+	XLDISK="\"${XMROOT#disk=}\""
+	test -n "$XMSWAP" && XLDISK="$XLDISK, \"${XMSWAP#disk=}\""
+	set -- xl create -c $XEN_CONF_FILE name="\"build_$XENID\"" "disk=[ $XLDISK ]" extra=\""quiet init="$vm_init_script" elevator=noop panic=1 console=ttyS0"\"
+    fi
+    if test "$PERSONALITY" != 0 ; then
+	# have to switch back to PER_LINUX to make xm work
+	set -- linux64 "$@"
+    fi
+    echo "$@"
+    "$@" || cleanup_and_exit 3
+    rm -f "$XEN_CONF_FILE"
+}
+
+vm_kill_xen() {
+    XMCMD=xm
+    test ! -x /usr/sbin/xm -a -x /usr/sbin/xl && XMCMD=xl
+    XENID="${VM_IMAGE%/root}"
+    XENID="${XENID%/tmpfs}"
+    XENID="${XENID##*/}"
+    XENID="${XENID#root_}"
+    if $XMCMD list "build_$XENID" >/dev/null 2>&1 ; then 
+	if ! $XMCMD destroy "build_$XENID" ; then 
+	    echo "could not kill xen build $XENID"
+	    cleanup_and_exit 1
+	fi
+    fi
+}
+
+# XEN only
+vm_purge_xen() {
+    # this should not be needed, but sometimes a xen instance gets lost
+    XMCMD=xm
+    test ! -x /usr/sbin/xm -a -x /usr/sbin/xl && XMCMD=xl
+    XENID="${VM_IMAGE%/root}"
+    XENID="${XENID%/tmpfs}"
+    XENID="${XENID##*/}"
+    XENID="${XENID#root_}"
+    $XMCMD destroy "build_$XENID" >/dev/null 2>&1
+}
+
+vm_fixup_xen() {
+    :
+}
+
+vm_attach_root_xen() {
+    :
+}
+
+vm_attach_swap_xen() {
+    :
+}
+
+vm_detach_root_xen() {
+    :
+}
+
+vm_detach_swap_xen() {
+    :
+}
+
+vm_cleanup_xen() {
+    :
+}
+

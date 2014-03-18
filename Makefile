@@ -3,7 +3,7 @@ SCM=$(shell if test -d .svn; then echo svn; elif test -d .git; then echo git; fi
 DATE=$(shell date +%Y%m%d%H%M)
 BUILD=build
 
-INITVM_ARCH=$(shell bash detect_architecture.sh)
+INITVM_ARCH=$(shell bash -c '. common_functions ; build_host_arch; echo $$BUILD_INITVM_ARCH')
 
 ifeq ($(SCM),svn)
 SVNVER=_SVN$(shell LANG=C svnversion .)
@@ -43,7 +43,6 @@ install:
 	    getoptflags \
 	    common_functions \
 	    init_buildsystem \
-	    initscript_qemu_vm \
 	    substitutedeps \
 	    debtransform \
 	    debtransformbz2 \
@@ -60,11 +59,11 @@ install:
 	    spectool \
 	    signdummy \
 	    unrpm \
-	    zvm_functions \
 	    $(DESTDIR)$(pkglibdir)
 	install -m755 emulator/emulator.sh $(DESTDIR)$(pkglibdir)/emulator/
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build
 	install -m644 qemu-reg $(DESTDIR)$(pkglibdir)
+	install -m644 build-vm build-vm-* $(DESTDIR)$(pkglibdir)
 	install -m644 *.pm baselibs_global*.conf lxc.conf $(DESTDIR)$(pkglibdir)
 	install -m644 configs/* $(DESTDIR)$(pkglibdir)/configs
 	install -m644 build.1 $(DESTDIR)$(man1dir)

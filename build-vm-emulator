@@ -1,0 +1,70 @@
+#
+# generic emulator specific functions
+#
+# (C) 2014 SUSE, Inc
+#
+
+vm_verify_options_emulator() {
+    VM_SWAP=
+}
+
+vm_startup_emulator() {
+    pushd "$BUILD_DIR/emulator"
+    if test -z "$EMULATOR_SCRIPT" ; then
+       EMULATOR_SCRIPT=./emulator.sh
+    elif test "${EMULATOR_SCRIPT:0:1}" != / ; then
+       EMULATOR_SCRIPT="./$EMULATOR_SCRIPT"
+    fi
+    set -- "$EMULATOR_SCRIPT" "$VM_IMAGE"
+    echo "$@"
+    if ! "$@"; then
+	 popd
+	 echo "ERROR: The emulator returned with a failure"
+	 cleanup_and_exit 3
+    fi
+    popd
+
+    # Emulators may not offer to use a second swap space.
+    # So we just mount the filesystem.
+    # WARNING: This is not safe against attacks.
+    mkdir -p $BUILD_ROOT/.build.packages
+    cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
+    mkdir -p .mount
+    mount $VM_IMAGE -o loop .mount
+    if test -e .mount/.build.packages ; then
+        cp -a .mount/.build.packages/* .
+    fi
+    exitcode=`cat .mount/.build/_exitcode`
+    umount .mount
+    rmdir .mount
+    cleanup_and_exit "$exitcode"
+}
+
+vm_kill_emulator() {
+    if ! fuser -k -TERM "$VM_IMAGE" ; then
+        echo "could not kill build in $VM_IMAGE"
+        cleanup_and_exit 1
+    fi
+}
+
+vm_fixup_emulator() {
+    # emulator may not be able to hand over kernel parameters
+    ln -sf /.build/build $BUILD_ROOT/sbin/init
+}
+
+vm_attach_root_emulator() {
+    :
+}
+vm_attach_swap_emulator() {
+    :
+} 
+vm_detach_root_emulator() {
+    :
+}
+vm_detach_swap_emulator() {
+    :
+}
+vm_cleanup_emulator() {
+    :
+}
+

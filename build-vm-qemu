@@ -1,0 +1,44 @@
+#
+# qemu specific functions
+#
+# (C) 2014 SUSE, Inc
+#
+
+# just forward everything to kvm...
+
+vm_verify_options_qemu() {
+    vm_verify_options_kvm
+}
+
+vm_startup_qemu() {
+    vm_startup_kvm
+}
+
+vm_kill_qemu() {
+    vm_kill_kvm
+}
+
+vm_fixup_qemu() {
+    vm_setup_kvm
+}
+
+vm_attach_root_qemu() {
+    vm_attach_root_kvm
+}
+
+vm_attach_swap_qemu() {
+    vm_attach_swap_kvm
+}
+
+vm_detach_root_qemu() {
+    vm_detach_root_kvm
+}
+
+vm_detach_swap_qemu() {
+    vm_detach_swap_kvm
+}
+
+vm_cleanup_qemu() {
+    vm_cleanup_kvm
+}
+

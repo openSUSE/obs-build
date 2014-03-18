@@ -8,10 +8,11 @@
 # (c) 1997-2008 SuSE GmbH Nuernberg, Germany
 
 # some VMs do not allow to specify the init process...
-if test "$0" = "/sbin/init" ; then
-   exec /.build/build "$@"
+if test "$0" = /sbin/init ; then
+    exec /.build/build "$@"
 fi
 
+test -z "$BUILD_DIR" -a -e /.build/build.data -a -z "$BUILD_IGNORE_2ND_STAGE" && BUILD_DIR=/.build
 test -z "$BUILD_DIR" && BUILD_DIR=/usr/lib/build
 test -z "$BUILD_ROOT" && BUILD_ROOT=/var/tmp/build-root
 test -z "$CONFIG_DIR" && CONFIG_DIR="$BUILD_DIR/configs"
@@ -21,46 +22,12 @@ export BUILD_DIST
 
 ccache=0
 icecream=0
-statistics=0
-shell=
 definesnstuff=()
 repos=()
 old_packages=()
 
-# defaults for vm_img_mkfs
-vm_img_mkfs_ext4_options='-O ^has_journal,^huge_file,^resize_inode,sparse_super'
-vm_img_mkfs_ext4_extra='-E lazy_itable_init,discard'
-vm_img_mkfs_ext4="mkfs.ext4 -m 0 -q -F $vm_img_mkfs_ext4_options"
-vm_img_tunefs_ext4='tune2fs -c 0'
-vm_img_mkfs_ext3='mkfs.ext3 -m 0 -q -F'
-vm_img_tunefs_ext3='tune2fs -c 0 -o journal_data_writeback'
-vm_img_mkfs_ext2='mkfs.ext2 -m 0 -q -F'
-vm_img_tunefs_ext2='tune2fs -c 0'
-vm_img_mkfs_reiserfs='mkreiserfs -q -f'
-vm_img_mkfs_btrfs='mkfs.btrfs'
-vm_img_mkfs_xfs='mkfs.xfs -f'
-
-vm_kernel=/boot/vmlinuz
-vm_initrd=/boot/initrd
-qemu_bin=/usr/bin/qemu
-uml_kernel=/boot/vmlinux-um
-uml_initrd=/boot/initrd-um
-
-# z/VM: use default kernel image from local machine
-# lets go with the default parameters. However zvm_initrd will be a required parameter
-#zvm_kernel=/boot/image
-#zvm_initrd=/boot/initrd_worker
-zvm_param="root=/dev/disk/by-path/ccw-0.0.0150-part1 hvc_iucv=8 console=hvc0"
-zvm_mult_pass="THR4ME"
-#zvm_worker_nr="1"
-zvm_init_script="/.build/build"
-
-kvm_bin=/usr/bin/qemu-kvm
-# by default we have virtio support
-kvm_virtio=1
-
-# guest visible console device name
-console=ttyS0
+# slurp in vm support
+. "$BUILD_DIR/build-vm"
 
 # need to restore build root owner for non-root builds
 browner=
@@ -84,18 +51,7 @@ ABUILD_TARGET=
 CREATE_BASELIBS=
 USEUSEDFORBUILD=
 LIST_STATE=
-VM_IMAGE=
-VM_SWAP=
-VM_KERNEL=
-VM_INITRD=
-VMDISK_ROOTSIZE=4096
-VMDISK_SWAPSIZE=1024
-VMDISK_FILESYSTEM=
-# settings are for speed and not data safety, we format anyway on next run
-VMDISK_MOUNT_OPTIONS=__default
-VMDISK_CLEAN=
-HUGETLBFSPATH=
-MEMSIZE=
+
 RUNNING_IN_VM=
 RPMLIST=
 RELEASE=
@@ -114,10 +70,8 @@ RSYNCSRC=
 RSYNCDEST=
 RSYNCDONE=
 SIGNDUMMY=
-HOST_ARCH=
-EMULATOR_SCRIPT=
-KVM_OPTIONS=
-BUILD_EC2_TYPE="t1.micro"
+DO_STATISTICS=
+RUN_SHELL=
 
 
 # This is for insserv
@@ -358,6 +312,7 @@ Remember to have fun!
 [*] Maximum RPM: http://www.rpm.org/max-rpm/
 EOT
 }
+
 usage () {
     echo "Usage: `basename $0` [--no-init|--clean|--rpms path|--verify|--help] [dir-to-build|spec-to-build]"
     cleanup_and_exit 1
@@ -383,65 +338,25 @@ cleanup_and_exit () {
     if test -n "$RUNNING_IN_VM" ; then
 	echo "$1" >  /.build/_exitcode
 	test -n "$browner" && chown "$browner" $BUILD_ROOT
-	cd /
-	if test -n "$VM_SWAP" -a -e "$VM_SWAP" ; then
-	    swapoff "$VM_SWAP" 2>/dev/null
-	    echo -n "BUILDSTATUS$1" >"$VM_SWAP"
-	fi
-	exec >&0 2>&0        # so that the logging tee finishes
-	sleep 1                # wait till tee terminates
-	if test "$VM_TYPE" != lxc; then
-	    kill -9 -1        # goodbye cruel world
-	    if ! test -x /sbin/halt ; then
-		test -e /proc/sysrq-trigger || mount -n -tproc none /proc
-		sync
-		sleep 2	# like halt does
-		if test -e /proc/sysrq-trigger; then
-		    echo o > /proc/sysrq-trigger
-		    sleep 5 # wait for sysrq to take effect
-		else
-		    echo "Warning: VM doesn't support sysrq and /sbin/halt not installed"
-		fi
-	    else
-                # halt from systemd is not syncing anymore.
-	        sync
-		halt -f -p
-	    fi
-	    echo "Warning: clean shut down of the VM didn't work"
-	fi
+	vm_shutdown "$1"
     else
-        # nop if unused
-        cloud_volume_detach "$VM_SERVER" "$VM_VOLUME_NAME"
-        cloud_volume_detach "$VM_SERVER" "$VM_VOLUME_SWAP"
-        cloud_volume_detach "$VM_SERVER" "$EC2_EXTRACT_VOLUME_root"
-        cloud_volume_detach "$VM_SERVER" "$EC2_EXTRACT_VOLUME_swap"
-
-        [ -n "$EC2_SNAP_root" ] && ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_root"
-        [ -n "$EC2_SNAP_swap" ] && ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_swap"
-        [ -n "$EC2_EXTRACT_VOLUME_root" ] && ec2-delete-volume --region "$BUILD_EC2_REGION" "$EC2_EXTRACT_VOLUME_root"
-        [ -n "$EC2_EXTRACT_VOLUME_swap" ] && ec2-delete-volume --region "$BUILD_EC2_REGION" "$EC2_EXTRACT_VOLUME_swap"
-
 	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
 	umount -n $BUILD_ROOT/proc 2>/dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2>/dev/null || true
 	umount -n $BUILD_ROOT/dev/shm 2>/dev/null || true
 	umount -n $BUILD_ROOT/sys 2>/dev/null || true
-	test "$VM_IMAGE" = 1 && VM_IMAGE=
-	[ -n "$VM_IMAGE" ] && umount $BUILD_ROOT 2>/dev/null || true
+	test -n "$VM_IMAGE" -a "$VM_IMAGE" != 1 && umount $BUILD_ROOT 2>/dev/null || true
+	test -n "$VM_TYPE" && vm_cleanup
     fi
-
-#    echo "pid $$ exit $1"
     exit $1
 }
 
-fail_exit()
-{
+fail_exit() {
   cleanup_and_exit 1
 }
 
-shellquote()
-{
-    for arg; do
+shellquote() {
+    for arg ; do
 	arg=${arg/\\/\\\\}
 	arg=${arg/\$/\\\$}
 	arg=${arg/\"/\\\"}
@@ -452,17 +367,15 @@ shellquote()
 
 # create a shell script from command line. Used for preserving arguments
 # through /bin/su -c
-toshellscript()
-{
-	echo "#!/bin/sh -x"
-	echo -n exec
-	shellquote "$@"
-	echo
+toshellscript() {
+    echo "#!/bin/sh -x"
+    echo -n exec
+    shellquote "$@"
+    echo
 }
 
-setupccache()
-{
-    if [ "$ccache" = 1 ]; then
+setupccache() {
+    if test "$ccache" = 1 ; then
 	if mkdir -p $BUILD_ROOT/var/lib/build/ccache/bin; then
 	    for i in $(ls $BUILD_ROOT/usr/bin | grep -E '^(cc|gcc|[cg][+][+])([-]?[234][.]?[0-9])*$'); do
 #                ln -sf /usr/bin/ccache $BUILD_ROOT/var/lib/build/ccache/bin/$i
@@ -476,7 +389,7 @@ setupccache()
 		echo "Installed ccache wrapper as $BUILD_ROOT/var/lib/build/ccache/bin/$i"
 	    done
 	fi
-	mkdir -p "$BUILD_ROOT"/.ccache
+	mkdir -p "$BUILD_ROOT/.ccache"
 	chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.ccache"
 	echo "export CCACHE_DIR=/.ccache" > "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
 	echo 'export PATH=/var/lib/build/ccache/bin:$PATH' >> "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
@@ -485,23 +398,21 @@ setupccache()
     fi
 }
 
-setupicecream()
-{
-    if [ "$icecream" -eq 0 ]; then
+setupicecream() {
+    if test "$icecream" -eq 0 ; then
 	rm -rf "$BUILD_ROOT/var/run/icecream"
 	rm -f "$BUILD_ROOT/etc/profile.d/build_icecream.sh"
-	return
+	return 0
     fi
 
     if ! chroot "$BUILD_ROOT" rpm -q icecream >/dev/null 2>/dev/null; then
 	echo "*** icecream package not installed ***"
-	false
-	return
+	return 1
     fi
 
     echo "using icecream with $icecream jobs"
 
-    if [ "$ccache" -ne 1 ]; then
+    if test "$ccache" -ne 1 ; then
 	echo 'export PATH=/usr/lib/icecc/bin:/opt/icecream/bin:$PATH' > "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
     else
 	echo 'export CCACHE_PATH=/usr/lib/icecc/bin:/opt/icecream/bin' > "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
@@ -512,25 +423,24 @@ setupicecream()
 
     # XXX use changelog like autobuild does instead?
     # only run create-env if compiler or glibc changed
-    if [ -z "$icecc_vers" \
+    if test -z "$icecc_vers" \
 	-o ! -e "$BUILD_ROOT/$icecc_vers" \
 	-o "$BUILD_ROOT/usr/bin/gcc" -nt "$BUILD_ROOT/$icecc_vers" \
 	-o "$BUILD_ROOT/usr/bin/g++" -nt "$BUILD_ROOT/$icecc_vers" \
 	-o "$BUILD_ROOT/usr/bin/as" -nt "$BUILD_ROOT/$icecc_vers" \
-	-o "$BUILD_ROOT/lib/libc.so.6" -nt "$BUILD_ROOT/$icecc_vers" ]
+	-o "$BUILD_ROOT/lib/libc.so.6" -nt "$BUILD_ROOT/$icecc_vers"
     then
 	rm -rf "$BUILD_ROOT/var/run/icecream"
 	mkdir -p "$BUILD_ROOT/var/run/icecream"
-	if [ -e "$BUILD_ROOT"/usr/bin/create-env ]; then
-	  createenv=/usr/bin/create-env
-	elif [ -e "$BUILD_ROOT"/usr/lib/icecc/icecc-create-env ]; then
-	  createenv="/usr/lib/icecc/icecc-create-env /usr/bin/gcc /usr/bin/g++" # XXX
-	elif [ -e "$BUILD_ROOT"/usr/lib64/icecc/icecc-create-env ]; then
-	  createenv="/usr/lib64/icecc/icecc-create-env /usr/bin/gcc /usr/bin/g++" # XXX
+	if test -e "$BUILD_ROOT"/usr/bin/create-env ; then
+	    createenv=/usr/bin/create-env
+	elif test -e "$BUILD_ROOT"/usr/lib/icecc/icecc-create-env ; then
+	    createenv="/usr/lib/icecc/icecc-create-env /usr/bin/gcc /usr/bin/g++" # XXX
+	elif test -e "$BUILD_ROOT"/usr/lib64/icecc/icecc-create-env ; then
+	    createenv="/usr/lib64/icecc/icecc-create-env /usr/bin/gcc /usr/bin/g++" # XXX
 	else
-	  echo "create-env not found"
-	  false
-	  return
+	    echo "create-env not found"
+	    return 1
 	fi
 	chroot $BUILD_ROOT bash -c "cd /var/run/icecream; $createenv" || cleanup_and_exit 1
 	icecc_vers=(`shopt -s nullglob; echo $BUILD_ROOT/var/run/icecream/*.tar.{bz2,gz}`)
@@ -538,14 +448,13 @@ setupicecream()
     else
 	echo "reusing existing icecream environment $icecc_vers"
     fi
-    if [ -n "$icecc_vers" ]; then
-      echo "export ICECC_VERSION=$icecc_vers" >> "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
+    if test -n "$icecc_vers" ; then
+	echo "export ICECC_VERSION=$icecc_vers" >> "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
     fi
 }
 
-setmemorylimit()
-{
-    if [ -n "$VM_IMAGE" -o -n "$RUNNING_IN_VM" ]; then
+setmemorylimit() {
+    if test -n "$VM_IMAGE" -o -n "$RUNNING_IN_VM" ; then
 	return
     fi
     local mem
@@ -567,17 +476,16 @@ setmemorylimit()
     echo "Memory limit set to ${limit}KB"
 }
 
-create_baselibs()
-{
+create_baselibs() {
     local pkgs=()
     local line
 
     BASELIBS_CFG=
 
-    if test "$BUILDTYPE" == "arch" ; then
+    if test "$BUILDTYPE" == arch ; then
 	return
     fi
-    if test "$BUILDTYPE" == "dsc" ; then
+    if test "$BUILDTYPE" == dsc ; then
 	pkgs=($DEBS)
     else # spec and kiwi
 	if test -e $BUILD_ROOT$TOPDIR/SOURCES/baselibs.conf ; then
@@ -636,20 +544,19 @@ create_baselibs()
     rm -rf "$BUILD_ROOT/.mkbaselibs"
 }
 
-copy_oldpackages()
-{
+copy_oldpackages() {
     local i=0
     local d
     local dest
-    [ -z "$RUNNING_IN_VM" ] || return 0
-    if [ -z "$old_packages" ]; then
+    test -z "$RUNNING_IN_VM" || return 0
+    if test -z "$old_packages" ; then
 	rm -rf "$BUILD_ROOT"/.build.oldpackages*
 	return 0
     fi
     for d in "${old_packages[@]}"; do
 	dest="$BUILD_ROOT/.build.oldpackages"
 	test "$i" = 0 || dest="$dest$i"
-	if [ -d "$d" -a "$d" != "$dest" ] ; then
+	if test -d "$d" -a "$d" != "$dest" ; then
 	    rm -rf "$dest"
 	    mkdir -p "$dest"
 	    cp -L $d/* "$dest"
@@ -658,215 +565,31 @@ copy_oldpackages()
     done
 }
 
-vm_img_create()
-{
-    local img="$1"
-    local size="$2"
-
-    echo "Creating $img (${size}M)"
-    mkdir -p "${img%/*}" || cleanup_and_exit 3
-
-    # prefer fallocate, which avoids fragmentation
-    r=1
-    if type -p fallocate > /dev/null; then
-        fallocate -l "${size}M" "$img"
-        r=$?
-    fi
-    # fall back to dd method if fallocate is not supported
-    if [ "$r" -gt "0" ]; then
-        dd if=/dev/zero of="$img" bs=1M count=0 seek="$size" || cleanup_and_exit 3
-    fi
-}
-
-vm_img_mkfs()
-{
-    local fs="$1"
-    local img="$2"
-    local mkfs tunefs
-    eval "mkfs=\"\$vm_img_mkfs_${fs}\""
-    eval "mkfs_exta_options=\"\$vm_img_mkfs_${fs}_extra\""
-    eval "tunefs=\"\$vm_img_tunefs_${fs}\""
-
-    if test -z "$mkfs"; then
-	echo "filesystem \"$fs\" isn't supported"
-	cleanup_and_exit 3
-    fi
-
-
-    echo "Creating $fs filesystem on $img"
-    if ! $mkfs $mkfs_exta_options "$img"; then
-        if test -z "$mkfs_exta_options"; then
-            cleanup_and_exit 3
-        else
-            echo "Format call failed, trying again without extra options..."
-            $mkfs "$img" || cleanup_and_exit 3
-        fi
-    fi
-    if test -n "$tunefs" ; then
-	$tunefs "$img" || cleanup_and_exit 3
-    fi
-}
-
-background_monitor_process()
-{
-  max_disk=0
-  max_mem=0
-  while sleep 5; do
-
-    # memory usage
-    if [ -e /proc/meminfo ]; then
-      memtotal=0
-      while read key value unit; do
-        case $key in
-          MemTotal:|SwapTotal:)
-            memtotal=$(( $memtotal + $value ))
-            ;;
-          MemFree:|SwapFree:|SwapCached:|Cached:|Buffers:)
-            memtotal=$(( $memtotal - $value ))
-            ;;
-        esac
-      done < /proc/meminfo
-
-      if [ ${memtotal} -gt $max_mem ]; then
-        max_mem="${memtotal}"
-        echo -n $(( $max_mem / 1024 )) > /.build/_statistics.memory.new && mv /.build/_statistics.memory.new /.build/_statistics.memory
-      fi
-    fi
-
-    # disk storage usage
-    if type -p df >& /dev/null; then
-      c=(`df -m / 2>/dev/null | tail -n 1`)
-
-      if [ ${c[2]} -gt $max_disk ]; then
-        max_disk="${c[2]}"
-        echo -n $max_disk > /.build/_statistics.df.new && mv /.build/_statistics.df.new /.build/_statistics.df
-      fi
-    fi
-
-    [ -e /.build/_statistics.exit ] && exit 0
-  done
-}
-
-detect_vm_2nd_stage()
-{
-    if test -n "$BUILD_IGNORE_2ND_STAGE" ; then
-	return 1
-    fi
-    if test -e /.build/build.data; then
-        . /.build/build.data
-    fi
-    if test -z "$VM_TYPE" ; then
-	return 1
-    fi
-    if test $$ -eq 1 || test $$ -eq 2; then
-	# ignore special init signals if we're init
-	# we're using ' ' instead of '' so that the signal handlers
-	# are reset in the child processes
-	trap ' ' HUP TERM
-	$0 "$@"
-	cleanup_and_exit $?
-    fi
-    echo "2nd stage started in virtual machine"
-    BUILD_ROOT=/
-    BUILD_DIR=/.build
-    echo "machine type: `uname -m`"
-    if test "$PERSONALITY" != 0 -a -z "$PERSONALITY_SET" ; then
-	export PERSONALITY_SET=true
-	echo "switching personality to $PERSONALITY..."
-	# this is 32bit perl/glibc, thus the 32bit syscall number
-	exec perl -e 'syscall(136, '$PERSONALITY') == -1 && warn("personality: $!\n");exec "/.build/build" || die("/.build/build: $!\n")'
-    fi
-    RUNNING_IN_VM=true
-    test -e /proc/version || mount -orw -n -tproc none /proc
-    if test "$VM_TYPE" != 'lxc'; then
-	mount -n ${VMDISK_MOUNT_OPTIONS},remount,rw /
-    fi
-    umount /run >/dev/null 2>&1
-    # mount /sys
-    if ! test -e /sys/block; then
-       mkdir -p /sys
-       mount -orw -n -tsysfs sysfs /sys
-    fi
-# qemu inside of xen does not work, check again with kvm later before enabling this
-#    if [ -e /dev/kqemu ]; then
-#        # allow abuild user to run qemu
-#        chmod 0666 /dev/kqemu
-#    fi
-    if test "$VM_TYPE" = 'zvm' ; then
-        VM_SWAP='/dev/dasdb1'
-    fi
-    if test "$VM_TYPE" = 'ec2' ; then
-        VM_SWAP='/dev/sdb1'
-        # Usually the external system is writing the swap signature, but EC2 volume
-        # attach is very slow, so let's do it in the VM for now.
-        mkswap "$VM_SWAP"
-    fi
-    if test -n "$VM_SWAP" ; then
-	for i in 1 2 3 4 5 6 7 8 9 10 ; do
-	    test -e "$VM_SWAP" && break
-	    test $i = 1 && echo "waiting for $VM_SWAP to appear"
-	    echo -n .
-	    sleep 1
-	done
-	test $i = 1 || echo
-	# recreate the swap device manually if it didn't exist for some
-	# reason, hardcoded to hda2 atm
-	if ! test -b "$VM_SWAP" ; then
-	    rm -f "$VM_SWAP"
-	    umask 027
-	    mknod "$VM_SWAP" b 3 2
-	    umask 022
-	fi
-	swapon -v "$VM_SWAP" || exit 1
-    fi
-    HOST="$MYHOSTNAME"
-
-    # fork a process monitoring max filesystem fillment during build
-    if test "$statistics" = "1"; then
-        background_monitor_process &
-    fi
-
-    if [ ! -e /dev/.udev ]; then
-        echo "WARNING: udev not running, creating extra device nodes"
-        test -e /dev/fd || ln -sf /proc/self/fd /dev/fd
-        test -e /etc/mtab || ln -sf /proc/mounts /etc/mtab
-    fi
-
-    # set date to build start on broken systems (now < build start)
-    if [ $(date '+%s') -lt $(date -r /.build/.date '+%s') ]; then
-        echo -n "WARNING: system has a broken clock, setting it to a newer time: "
-        date -s `cat /.build/.date`
-    fi
-
-    return 0
-}
-
-find_spec_files()
-{
+find_spec_files() {
     local spec files
-    if [ -z "$SPECFILES" ]; then
+    if test -z "$SPECFILES" ; then
 	set -- "`pwd`"
     else
 	set -- "${SPECFILES[@]}"
     fi
     SPECFILES=()
-    for spec in "$@"; do
-	if [ "$spec" = "${spec#/}" ]; then
+    for spec in "$@" ; do
+	if test "$spec" = "${spec#/}" ; then
 	    spec="`pwd`/$spec"
 	fi
 
-	if [ -d "$spec" ]; then
+	if test -d "$spec" ; then
 	    specs=("$spec"/*.spec)
-	    if [ -n "$specs" ]; then
+	    if test -n "$specs" ; then
 		SPECFILES=("${SPECFILES[@]}" "${specs[@]}")
 	    else
 		specs=("$spec"/*.spec)
-		if [ -n "$specs" ]; then
+		if test -n "$specs" ; then
 		    SPECFILES=("${SPECFILES[@]}" "${specs[@]}")
 		fi
 	    fi
 	else
-	    SPECFILES[${#SPECFILES[@]}]="$spec";
+	    SPECFILES[${#SPECFILES[@]}]="$spec"
 	fi
     done
 
@@ -876,224 +599,40 @@ find_spec_files()
     fi
 }
 
-become_root_or_fail()
-{
-    if [ ! -w /root ]; then
+become_root_or_fail() {
+    if test ! -w /root ; then
 	echo "You have to be root to use $0" >&2
 	exit 1
     fi
     cleanup_and_exit 1
 }
 
-mkdir_build_root()
-{
-    if [ -d "$BUILD_ROOT" ]; then
+mkdir_build_root() {
+    if test -d "$BUILD_ROOT" ; then
 	# check if it is owned by root
-	if [ -z "$RUNNING_IN_VM" -a \! -O "$BUILD_ROOT" -a "`stat -c %u $BUILD_ROOT`" -ne 0 ]; then
+	if test -z "$RUNNING_IN_VM" -a \! -O "$BUILD_ROOT" -a "`stat -c %u $BUILD_ROOT`" -ne 0 ; then
 	    echo "BUILD_ROOT=$BUILD_ROOT must be owned by root. Exit..."
 	    cleanup_and_exit 1
 	fi
     else
 	test "$BUILD_ROOT" != "${BUILD_ROOT%/*}" && mkdir -p "${BUILD_ROOT%/*}"
-	if ! mkdir $BUILD_ROOT; then
+	if ! mkdir $BUILD_ROOT ; then
 	    echo "can not create BUILD_ROOT=$BUILD_ROOT. Exit..."
 	    cleanup_and_exit 1
 	fi
     fi
 
-    if [ ! -w "$BUILD_ROOT" ]; then
+    if test ! -w "$BUILD_ROOT" ; then
 	echo "Error: BUILD_ROOT=$BUILD_ROOT not writeable, try --clean."
 	cleanup_and_exit 3
     fi
 
     rm -rf "$BUILD_ROOT/.build.packages"
-    if [ -z "$VM_TYPE" -a -z "$RUNNING_IN_VM" ]; then
-       # don't touch this in VM
-       rm -rf "$BUILD_ROOT/.build"
-       mkdir -p "$BUILD_ROOT/.build"
+    if test -z "$VM_TYPE" -a -z "$RUNNING_IN_VM" ; then
+         # don't touch this in VM
+         rm -rf "$BUILD_ROOT/.build"
+         mkdir -p "$BUILD_ROOT/.build"
     fi
-}
-
-ec2_volume_state()
-{
-    local VM_VOL_NAME="$1"
-    temp_file=`mktemp`
-    ec2-describe-volumes "$VM_VOL_NAME" --region "$BUILD_EC2_REGION" > $temp_file
-
-    if grep -q ^ATTACHMENT "$temp_file"; then
-      grep ^ATTACHMENT "$temp_file" | awk '{ print $5 }'
-    else
-      grep ^VOLUME "$temp_file" | awk '{ print $5 }'
-    fi
-    rm "$temp_file"
-}
-
-cloud_volume_attach()
-{
-    local VM_SERVER="$1"
-    local VM_VOL_NAME="$2"
-    local VM_VOL_DEV="$3"
-
-    if [ "$VM_TYPE" = 'openstack' ]; then
-      if ! nova volume-attach "$VM_SERVER" "$VM_VOL_NAME" "$VM_VOL_DEV"; then
-          echo "ERROR: nova attach failed. $?" >&2
-          return 3
-      fi
-      while true; do
-          state=`nova volume-show "$VM_VOL_NAME" | sed -n 's,^|[ ]*status[ ]*|[ ]*\([^ ]*\).*,\1,p'`
-          [ "$state" == "in-use" ] && break
-          if [ -z "$state" ]; then
-             echo "ERROR: unable to find state of volume $VM_VOL_NAME" >&2
-             return 3
-          fi
-          if [ "$state" == "available" ]; then
-             echo "WARNING: volume $VM_VOL_NAME got not attached, retrying" >&2
-             if ! nova volume-attach "$VM_SERVER" "$VM_VOL_NAME" "$VM_VOL_DEV"; then
-                 echo "ERROR: nova attach failed. $?" >&2
-                 return 3
-             fi
-          fi
-          sleep 3
-      done
-
-      if [ ! -e "$VM_VOL_DEV" ]; then
-          #GROSS HACK: kernel does not care about the given device name
-#          VM_VOL_DEV="/dev/"`dmesg| sed -n 's,.*\(vd.\): unknown partition tab.*,\1,p' | tail -n 1`
-          VM_VOL_DEV=`ls -1 /dev/vd? | tail -n 1`
-      fi
-      echo "$VM_VOL_DEV"
-    elif [ "$VM_TYPE" = 'ec2' ]; then
-      temp_file=`mktemp`
-      if ! ec2-attach-volume "$VM_VOL_NAME" -d /dev/sdz -i `ec2-instance-id` --region $BUILD_EC2_REGION > "$temp_file"; then
-         rm "$temp_file"
-         cleanup_and_exit 1
-      fi
-      # wait that it becomes available
-      while true; do
-        state=`ec2_volume_state "$VM_VOL_NAME"`
-        [ "$state" = "attached" ] && break
-        sleep 1
-      done
-      # print device node
-      grep ^ATTACHMENT "$temp_file" | awk '{ print $4 }'
-      rm "$temp_file"
-    fi
-}
-
-cloud_volume_detach()
-{
-    local VM_SERVER="$1"
-    local VM_VOL_NAME="$2"
-    if [ "$VM_TYPE" = 'openstack' ]; then
-      # needed at all?
-      nova volume-show "$VM_VOL_NAME" | grep -q in-use || return 0
-
-      # umount seems not to be enough
-      sync
-
-      if ! nova volume-detach "$VM_SERVER" "$VM_VOL_NAME"; then
-          echo "ERROR: nova detach of $VM_VOL_NAME failed." >&2
-          return 3
-      fi
-      while nova volume-show "$VM_VOL_NAME" | grep -q availabe; do
-          sleep 3
-      done
-    elif [ "$VM_TYPE" = 'ec2' ]; then
-       state=`ec2_volume_state "$VM_VOL_NAME"`
-       if [ "$state" != "available" ]; then
-         ec2-detach-volume "$VM_VOL_NAME" --region $BUILD_EC2_REGION || return 3
-       fi
-    fi
-    return 0
-}
-
-linux64()
-{
-	perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' "$@"
-}
-
-check_for_arm()
-{
-    local uname
-
-    uname=$(uname -m)
-
-    if [ "$uname" != "armv7l" ]; then
-        return
-    fi
-
-    export HOST_ARCH=armv7l
-
-    export kvm_bin="/usr/bin/qemu-system-arm"
-    export console=ttyAMA0
-    export KVM_OPTIONS="-enable-kvm -M vexpress-a15 -dtb /boot/a15-guest.dtb -cpu cortex-a15"
-
-    if [ -z "$RUNNING_IN_VM" -a -n "$HUGETLBFSPATH" ]; then
-        if ! grep -q "$HUGETLBFSPATH" /proc/mounts; then
-            echo "hugetlbfs is not mounted"
-            exit 1
-        fi
-        PAGES_FREE=$(cat /sys/kernel/mm/hugepages/hugepages-2048kB/free_hugepages)
-        PAGES_REQ=$(( ${MEMSIZE:-64} / 2 ))
-        if [ "$PAGES_FREE" -lt "$PAGES_REQ" ]; then
-            echo "expected $PAGES_REQ to be available (have $PAGES_FREE)"
-            echo "please adjust nr_hugepages"
-            exit 1
-        fi
-    fi
-
-    VM_KERNEL=/boot/zImage
-    VM_INITRD=/boot/initrd
-    # prefer the guest kernel
-    if [ -e /boot/zImage.guest ]; then
-        VM_KERNEL=/boot/zImage.guest
-    fi
-    # prefer the guest initrd
-    if [ -e /boot/initrd.guest ]; then
-        VM_INITRD=/boot/initrd.guest
-    fi
-    export VM_KERNEL
-    export VM_INITRD
-}
-
-check_for_ppc()
-{
-
-    grep -q "PowerNV" /proc/cpuinfo && export HOST_ARCH=power7 
-    grep -q "PPC970MP" /proc/cpuinfo && export HOST_ARCH=ppc970
-
-    case $BUILD_ARCH in
-         ppc|ppc64) export VM_KERNEL=/boot/vmlinux
-                    export VM_INITRD=/boot/initrd
-                    ;;
-         ppc64le)   export VM_KERNEL=/boot/vmlinuxle
-                    export VM_INITRD=/boot/initrdle
-                    export HOST_ARCH=power7le
-                    ;;
-         *)         return ;;
-    esac
-
-    export kvm_bin="/usr/bin/qemu-system-ppc64"
-    export console=hvc0
-    export KVM_OPTIONS="-enable-kvm -M pseries"
-    if [ -z "$RUNNING_IN_VM" -a -n "$HUGETLBFSPATH" ];then
-      if ! grep -q "$HUGETLBFSPATH" /proc/mounts; then
-         echo "hugetlbfs is not mounted"
-         exit 1
-      fi
-         PAGES_FREE=$(cat /sys/kernel/mm/hugepages/hugepages-16384kB/free_hugepages)
-         PAGES_REQ=$(( ${MEMSIZE:-64} / 16 ))
-      if [ "$PAGES_FREE" -lt "$PAGES_REQ" ];then
-         echo "please adjust nr_hugepages"
-         exit 1
-      fi
-      if [ "$HOST_ARCH" = "ppc970" ];then
-          if ! grep -q -E '(kvm_rma_count.*kvm_hpt_count)|(kvm_hpt_count.*kvm_rma_count)' /proc/cmdline; then
-             echo "put kvm_rma_count=<VM number> or kvm_hpt_count=<> to your boot options"
-             exit 1
-          fi
-      fi
-   fi
 }
 
 #### main ####
@@ -1115,350 +654,215 @@ shopt -s nullglob
 
 export PATH=$BUILD_DIR:/sbin:/usr/sbin:$PATH
 
-if detect_vm_2nd_stage ; then
+if vm_detect_2nd_stage ; then
     set "/.build-srcdir/$SPECFILE"
     export PATH=/.build:$PATH
 fi
 
 . $BUILD_DIR/common_functions || exit 1
-. $BUILD_DIR/zvm_functions || exit 1
 
 export HOST
 
-needarg()
-{
-  if [ -z "$ARG" ]; then
-    echo "$PARAM needs an agrument" >&2
-    cleanup_and_exit 1
-  fi
+needarg() {
+    if test -z "$ARG" ; then
+	echo "$PARAM needs an agrument" >&2
+	cleanup_and_exit 1
+    fi
 }
 
 while test -n "$1"; do
-  PARAM="$1"
-  UNSTRIPPED_ARG="$2"
-  ARG="$2"
-  [ "$ARG" = "${ARG#-}" ] || ARG=""
-  ARG2="$3"
-  [ "$ARG2" = "${ARG2#-}" ] || ARG2=""
-  shift
-  case $PARAM in
-    *-*=*)
-      ARG=${PARAM#*=}
-      PARAM=${PARAM%%=*}
-      set -- "----noarg=$PARAM" "$@"
-  esac
-  case $PARAM in
-      *-help|-h)
+    PARAM="$1"
+    UNSTRIPPED_ARG="$2"
+    ARG="$2"
+    test "$ARG" = "${ARG#-}" || ARG=
+    shift
+    case $PARAM in
+      *-*=*)
+	ARG=${PARAM#*=}
+	PARAM=${PARAM%%=*}
+	set -- "----noarg=$PARAM" "$@"
+	;;
+    esac
+    case ${PARAM/#--/-} in
+      -help|-h)
 	echo_help
 	cleanup_and_exit
       ;;
-      *-no*init)
+      -noinit|-no-init)
 	DO_INIT=false
       ;;
-      *-no*checks)
+      -nochecks|-no-checks)
 	DO_CHECKS=false
       ;;
-      -clean|--clean)
+      -clean)
 	CLEAN_BUILD='--clean'
       ;;
-      *-kill)
+      -kill)
 	KILL=true
       ;;
-      *-rpms)
+      -rpms)
 	needarg
 	BUILD_RPMS="$ARG"
 	shift
       ;;
-      *-arch)
+      -arch)
 	needarg
 	BUILD_ARCH="$ARG"
 	shift
       ;;
-      *-verify)
+      -verify)
 	export VERIFY_BUILD_SYSTEM=true
       ;;
-      *-target)
+      -target)
 	needarg
 	ABUILD_TARGET="$ARG"
 	shift
       ;;
-      *-jobs)
+      -jobs)
 	needarg
 	BUILD_JOBS="$ARG"
 	shift
       ;;
-      *-threads)
+      -threads)
 	needarg
 	BUILD_THREADS="$ARG"
 	shift
       ;;
-      *-extra*packs|-X)
+      -extrapacks|-extra-packs|-X)
 	needarg
 	BUILD_EXTRA_PACKS="$BUILD_EXTRA_PACKS $ARG"
 	shift
       ;;
-      *-lint)
+      -lint)
 	DO_LINT=true
 	;;
-      *-baselibs)
+      -baselibs)
 	CREATE_BASELIBS=true
 	;;
-      --kiwi-parameter)
+      -kiwi-parameter)
 	KIWI_PARAMETERS="$KIWI_PARAMETERS $UNSTRIPPED_ARG"
 	shift
 	;;
-      *-baselibs-internal)
+      -baselibs-internal)
 	CREATE_BASELIBS=internal
 	;;
-      *-use-system-qemu)
+      -use-system-qemu)
 	USE_SYSTEM_QEMU="--use-system-qemu"
       ;;
-      *-root)
+      -root)
 	needarg
 	BUILD_ROOT="$ARG"
 	shift
       ;;
-      *-cachedir)
+      -cachedir)
 	needarg
 	CACHE_DIR="$ARG"
 	shift
       ;;
-      *-oldpackages)
+      -oldpackages)
 	needarg
 	old_packages=("${old_packages[@]}" "$ARG")
 	shift
       ;;
-      *-dist)
+      -dist)
 	needarg
 	BUILD_DIST="$ARG"
 	shift
       ;;
-      *-emulator-script)
-	needarg
-	EMULATOR_SCRIPT="$ARG"
-	shift
-      ;;
-      *-xen|*-kvm|--uml|--qemu|--emulator)
-	VM_TYPE=${PARAM##*-}
-	if [ -n "$ARG" ]; then
-	    VM_IMAGE="$ARG"
-	    shift
-	else
-	    VM_IMAGE=1
-	fi
-      ;;
-      *-zvm)
-        VM_TYPE="zvm"
-	shift
-      ;;
-      --lxc)
-	VM_TYPE=${PARAM##*-}
-      ;;
-      --vm-type)
-	needarg
-	VM_TYPE="$ARG"
-	case "$VM_TYPE" in
-            zvm) ;;
-            ec2)
-		test -z "$VM_IMAGE" && VM_IMAGE=1
-                . /etc/profile.d/ec2.sh
-                EC2_INSTANCE_ID=`ec2-instance-id`
-                BUILD_EC2_ZONE=`ec2-meta-data placement/availability-zone`
-                BUILD_EC2_REGION=${BUILD_EC2_ZONE%?}
-	        ;;
-	    xen|kvm|uml|qemu|lxc|emulator|openstack)
-		test -z "$VM_IMAGE" && VM_IMAGE=1
-	        ;;
-	    none|chroot) VM_TYPE='' ;;
-	    *)
-		echo "VM $VM_TYPE not supported"
-		cleanup_and_exit
-	    ;;
-	esac
-	shift
-      ;;
-      --vm-worker)
-        needarg
-        VM_WORKER="$ARG"
-        shift
-      ;;
-      --vm-worker-nr)
-        needarg
-        zvm_worker_nr="$ARG"
-        shift
-      ;;
-      --vm-server|--vm-region)
-	needarg
-	VM_SERVER="$ARG"
-	shift
-      ;;
-      --vm-volumes)
-	needarg
-	VM_VOLUME_NAME="$ARG"
-	shift
-	needarg
-	VM_VOLUME_SWAP="$ARG2"
-	shift
-      ;;
-      --vm-disk)
-	needarg
-	VM_IMAGE="$ARG"
-	shift
-      ;;
-      *-xenswap|*-swap)
-	needarg
-	VM_SWAP="$ARG"
-	shift
-      ;;
-      *-xenmemory|*-memory)
-	needarg
-	MEMSIZE="$ARG"
-	shift
-      ;;
-      *-vm-kernel)
-	needarg
-	VM_KERNEL="$ARG"
-	shift
-      ;;
-      *-vm-initrd)
-	needarg
-	VM_INITRD="$ARG"
-	shift
-      ;;
-      *-vmdisk-rootsize|--vm-disk-size)
-	needarg
-	VMDISK_ROOTSIZE="$ARG"
-	shift
-      ;;
-      *-vmdisk-swapsize|--vm-swap-size)
-	needarg
-	VMDISK_SWAPSIZE="$ARG"
-	shift
-      ;;
-      *-vmdisk-filesystem|--vm-disk-filesystem)
-	needarg
-	VMDISK_FILESYSTEM="$ARG"
-	shift
-      ;;
-      *-vmdisk-mount-options|--vm-disk-mount-options)
-       needarg
-        # options needs to be quoted to handle argument which might start with "-o ..."
-       VMDISK_MOUNT_OPTIONS=$(echo $ARG | sed 's/^\"\(.*\)\"$/\1/g')
-       shift
-      ;;
-      *-vmdisk-clean)
-	# delete old root/swap to get rid of the old blocks
-        VMDISK_CLEAN=true
-      ;;
-      *-rpmlist)
-	needarg
-	RPMLIST="--rpmlist $ARG"
-	BUILD_RPMS=
-	shift
-      ;;
-      *-hugetlbfs)
-        HUGETLBFSPATH="$ARG"
-	shift
-      ;;
-      *-release)
+      -release)
 	needarg
 	RELEASE="$ARG"
 	shift
       ;;
-      *-logfile)
+      -logfile)
 	needarg
 	LOGFILE="$ARG"
 	shift
       ;;
-      *-reason)
+      -reason)
 	needarg
 	REASON="$ARG"
 	shift
       ;;
-      *-norootforbuild)
+      -norootforbuild)
 	NOROOTFORBUILD=true
       ;;
-      *-stage)
+      -stage)
 	needarg
 	BUILD_RPM_BUILD_STAGE="$ARG"
 	shift
       ;;
-      *-useusedforbuild)
+      -useusedforbuild)
 	USEUSEDFORBUILD="--useusedforbuild"
       ;;
-      *-configdir)
+      -configdir)
         needarg
 	CONFIG_DIR="$ARG"
         shift
       ;;
-      *-list*state)
+      -list*state)
 	LIST_STATE=true
       ;;
-      --define|--with|--without)
+      -define|-with|-without)
 	needarg
-	definesnstuff[${#definesnstuff[@]}]="$PARAM";
-	definesnstuff[${#definesnstuff[@]}]="$ARG";
+        PARAM="-${PARAM/#--/-}"
+	definesnstuff[${#definesnstuff[@]}]="$PARAM"
+	definesnstuff[${#definesnstuff[@]}]="$ARG"
 	shift
       ;;
-      --repository|--repo)
+      -repository|-repo)
 	needarg
-	repos[${#repos[@]}]="$PARAM";
-	repos[${#repos[@]}]="$ARG";
+	repos[${#repos[@]}]="--repository"
+	repos[${#repos[@]}]="$ARG"
 	shift
       ;;
-      --icecream)
+      -icecream)
 	needarg
 	icecream="$ARG"
-	if [ "$icecream" -gt 0 ]; then
-		BUILD_JOBS="$ARG"
-	fi
+	test "$icecream" -gt 0 && BUILD_JOBS="$ARG"
 	shift
       ;;
-      --ccache)
+      -ccache)
 	ccache=1
       ;;
-      --statistics)
-	statistics=1
+      -statistics)
+	DO_STATISTICS=1
       ;;
-      --debug)
+      -debug)
 	BUILD_DEBUG=1
       ;;
-      --incarnation)
+      -incarnation)
 	needarg
 	INCARNATION=$ARG
 	shift
       ;;
-      --disturl)
+      -disturl)
 	needarg
 	DISTURL=$ARG
 	shift
       ;;
-      --linksources)
+      -linksources)
 	LINKSOURCES=true
       ;;
-      ----noarg)
-	echo "$ARG does not take an argument"
-	cleanup_and_exit
-      ;;
-      *-changelog)
+      -changelog)
 	CHANGELOG=true
       ;;
-      --overlay)
+      -overlay)
 	needarg
 	OVERLAY=$ARG
 	shift
       ;;
-      --rsync-src)
+      -rsync-src)
 	needarg
 	RSYNCSRC=$ARG
 	shift
       ;;
-      --rsync-dest)
+      -rsync-dest)
 	needarg
 	RSYNCDEST=$ARG
 	shift
       ;;
-      --uid)
+      -uid)
 	needarg
 	ABUILD_ID="$ARG"
 	if test -n "${ABUILD_ID//[0-9:]/}"; then
@@ -1469,350 +873,66 @@ while test -n "$1"; do
 	ABUILD_GID=${ABUILD_ID#*:}
 	shift
       ;;
-      --shell)
-	  shell=1
-	  shift
+      -rpmlist)
+	needarg
+	RPMLIST="--rpmlist $ARG"
+	BUILD_RPMS=
+	shift
+      ;;  
+      -shell)
+	RUN_SHELL=1
+	shift
       ;;
-      --signdummy)
+      -signdummy)
 	SIGNDUMMY=1
       ;;
+      ---noarg)
+	echo "$ARG does not take an argument"
+	cleanup_and_exit
+      ;;
       -*)
-	echo Unknown Option "$PARAM". Exit.
-	cleanup_and_exit 1
+	if ! vm_parse_options "$@"; then
+	    echo "Unknown option '$PARAM'. Exit."
+	    cleanup_and_exit 1
+	fi
+        set -- "${nextargs[@]}"
       ;;
       *)
-	SPECFILES[${#SPECFILES[@]}]="$PARAM";
+	SPECFILES[${#SPECFILES[@]}]="$PARAM"
       ;;
     esac
 done
-
-check_for_ppc
-check_for_arm
-
-if test -z "$VMDISK_FILESYSTEM" -a -n "$VM_TYPE"; then
-  VMDISK_FILESYSTEM=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags vmfstype`
-  test -z "$VMDISK_FILESYSTEM" && VMDISK_FILESYSTEM="ext4"
-fi
-
-if test "$VM_TYPE" = "lxc"; then
-    VM_IMAGE=''
-    VM_SWAP=''
-fi
-
-if test "$VM_TYPE" = "zvm"; then
-    VM_IMAGE='/dev/dasda1'
-    VM_SWAP='/dev/dasdb1'
-fi
-
-if test "$VM_TYPE" = "ec2"; then
-    # We can not use bash hashes because old bash does not support it
-    # This is always the x86_64 loader, we use also by default the
-    # local x86_64 kernel, which should be able to run a 32bit system
-    if [ "$BUILD_EC2_ZONE" = "us-east-1" ]; then
-        BUILD_EC2_AKI="aki-88aa75e1"
-    elif [ "$BUILD_EC2_ZONE" = "us-west-1" ]; then
-        BUILD_EC2_AKI="aki-f77e26b2"
-    elif [ "$BUILD_EC2_ZONE" = "us-west-2" ]; then
-        BUILD_EC2_AKI="aki-fc37bacc"
-    elif [ "$BUILD_EC2_ZONE" = "eu-west-1" ]; then
-        BUILD_EC2_AKI="aki-71665e05"
-    elif [ "$BUILD_EC2_ZONE" = "ap-southeast-1" ]; then
-        BUILD_EC2_AKI="aki-fe1354ac"
-    elif [ "$BUILD_EC2_ZONE" = "ap-southeast-2" ]; then
-        BUILD_EC2_AKI="aki-3f990e05"
-    elif [ "$BUILD_EC2_ZONE" = "ap-northeast-1" ]; then
-        BUILD_EC2_AKI="aki-44992845"
-    elif [ "$BUILD_EC2_ZONE" = "sa-east-1" ]; then
-        BUILD_EC2_AKI="aki-c48f51d9"
-    elif [ "$BUILD_EC2_ZONE" = "us-gov-west-1" ]; then
-        BUILD_EC2_AKI="aki-79a4c05a"
-    else
-        echo "Unknown Amazon EC2 Zone: $BUILD_EC2_ZONE"
-        exit 1
-    fi
-fi
-
-if test "$VMDISK_MOUNT_OPTIONS" = __default; then
-    if test "$VMDISK_FILESYSTEM" = reiserfs ; then
-	VMDISK_MOUNT_OPTIONS='-o data=writeback,commit=150,noatime'
-    elif test "$VMDISK_FILESYSTEM" = btrfs ; then
-        VMDISK_MOUNT_OPTIONS='-o nobarrier,noatime'
-    elif test "$VMDISK_FILESYSTEM" = "ext4" ; then
-	VMDISK_MOUNT_OPTIONS='-o noatime'
-    elif test "$VMDISK_FILESYSTEM" = "ext3" ; then
-	VMDISK_MOUNT_OPTIONS='-o data=writeback,nobarrier,commit=150,noatime'
-    elif test "$VMDISK_FILESYSTEM" = "ext2" ; then
-	VMDISK_MOUNT_OPTIONS='-o noacl,noatime'
-    elif test "$VMDISK_FILESYSTEM" = "xfs" ; then
-	VMDISK_MOUNT_OPTIONS='-o noatime'
-    else
-	VMDISK_MOUNT_OPTIONS='-o noatime'
-    fi
-fi
 
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
     if test -n "$VM_IMAGE" -a -n "$VM_SWAP" -a -n "$VM_TYPE"; then
 	# mark job as failed so that we don't extract packages
-	if test "$VM_TYPE" != "zvm"; then
+	if test "$VM_TYPE" != zvm ; then
 	    echo -n "BUILDSTATUS1" >"$VM_SWAP"
         fi
     fi
     (set -C; > "$BUILD_ROOT/exit" 2>/dev/null || true)
-    if test "$VM_TYPE" = 'lxc'; then
-	LXCID=${BUILD_ROOT##*/}
-	lxc-stop -n "$LXCID" || true
-	lxc-destroy -n "$LXCID"
-    elif test -z "$VM_IMAGE" ; then
+    if test -n "$VM_TYPE" ; then
+        vm_kill
+    else
 	if ! $BUILD_DIR/killchroot -s 9 $BUILD_ROOT ; then
 	    echo "could not kill build in $BUILD_ROOT"
 	    cleanup_and_exit 1
 	fi
-    elif test "$VM_TYPE" = 'xen'; then
-	XENID="${VM_IMAGE%/root}"
-	XENID="${XENID%/tmpfs}"
-	XENID="${XENID##*/}"
-	XENID="${XENID#root_}"
-	if xm list "build_$XENID" >/dev/null 2>&1 ; then
-	    if ! xm destroy "build_$XENID" ; then
-		echo "could not kill xen build $XENID"
-		cleanup_and_exit 1
-	    fi
-	fi
-    elif test "$VM_TYPE" = 'zvm'; then
-	if vmcp q "$VM_WORKER" > /dev/null 2>&1 ; then
-            if ! zvm_cp destroy $VM_WORKER ; then
-	        echo "could not kill zvm worker $VM_WORKER"
-		cleanup_and_exit 1
-            fi
-        fi
-    elif test "$VM_TYPE" = 'ec2'; then
-	if ec2-describe-instance-status "$VM_BUILD_INSTANCE" --region $BUILD_EC2_REGION >/dev/null 2>&1 ; then
-	    if ec2-terminate-instances "$VM_BUILD_INSTANCE" >/dev/null 2>&1 ; then
-		echo "could not kill EC2 instance $VM_BUILD_INSTANCE"
-		cleanup_and_exit 1
-	    fi
-	fi
-    elif test "$VM_TYPE" = 'openstack'; then
-	if nova show "$VM_VOLUME_NAME" >/dev/null 2>&1 ; then
-	    if ! nova delete "$VM_VOLUME_NAME" ; then
-		echo "could not kill openstack vm build $VM_VOLUME_NAME"
-		cleanup_and_exit 1
-	    fi
-	fi
-    elif test -n "$VM_TYPE"; then
-	if ! fuser -k -TERM "$VM_IMAGE"; then
-	    echo "could not kill build in $VM_IMAGE"
-	    cleanup_and_exit 1
-	fi
-    else
-	echo "don't know how to kill this build job"
-	cleanup_and_exit 1
     fi
     cleanup_and_exit 0
 fi
 
-if [ "$VM_TYPE" = 'xen' -a -z "$RUNNING_IN_VM" ]; then
-    # XXX: merge with kvm path?
-    if [ -n "$VM_KERNEL" ]; then
-	vm_kernel="$VM_KERNEL"
-    elif [ -e "/boot/vmlinuz-xen" ]; then
-	vm_kernel="/boot/vmlinuz-xen"
+if test -n "$VM_TYPE" -a -z "$RUNNING_IN_VM" ; then
+    if test -z "$VMDISK_FILESYSTEM" -a -n "$BUILD_DIST" ; then
+	VMDISK_FILESYSTEM=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags vmfstype`
     fi
-    if [ -n "$VM_INITRD" ]; then
-	vm_initrd="$VM_INITRD"
-    elif [ -e "/boot/initrd-xen" ]; then
-	vm_initrd="/boot/initrd-xen"
-    fi
+    test -n "$VMDISK_FILESYSTEM" || VMDISK_FILESYSTEM=ext3
+    vm_verify_options
 fi
 
-if [ "$VM_TYPE" = 'zvm' -a -z "$RUNNING_IN_VM" ]; then
-    # verify settings
-    # In z/VM, this is a 4 digit hex number instead of a linux device.
-    # This is the root disk defined in user direct
-    # This number can be given with the parameter --root NR.
-    if [ -z "$VM_VOLUME_ROOT" ]; then
-        if [ -n "$BUILD_ROOT" -a ${#BUILD_ROOT} -le 4 ]; then
-            VM_VOLUME_ROOT="$BUILD_ROOT"
-        else
-            VM_VOLUME_ROOT="0150"
-        fi
-    fi
-    # In z/VM, this is a 4 digit hex number instead of a linux device.
-    # This is the swap disk defined in user direct
-    # This number can be given with the parameter --swap NR.
-    if [ -z "$VM_VOLUME_SWAP" ]; then
-        if [ -n "$VM_SWAP" -a ${#VM_SWAP} -le 4 ]; then
-            VM_VOLUME_SWAP="$VM_SWAP"
-        else
-            VM_VOLUME_SWAP="0250"
-        fi
-    fi
-    # z/VM guest name that is already defined in z/VM
-    if [ -z "$VM_WORKER" ]; then
-        echo "ERROR: No z/VM worker id specified"
-	cleanup_and_exit 3
-    fi
-    if [ -z "$zvm_worker_nr" ]; then
-        echo "ERROR: No z/VM worker number specified"
-        cleanup_and_exit 3
-    fi
-    # need the name for a kernel in zvm
-    if [ -n "$VM_KERNEL" ]; then
-        vm_kernel="$VM_KERNEL"
-    elif [ -e "/boot/vmlinux.gz" ]; then
-        vm_kernel="/boot/vmlinux.gz"
-    else
-        echo "ERROR: No z/VM kernel specified"
-	cleanup_and_exit 3
-    fi
-    # need the name for an initrd in zvm
-    # this normally will not be the local initrd
-    if [ -n "$VM_INITRD" ]; then
-        vm_initrd="$VM_INITRD"
-    else
-        echo "ERROR: No z/VM initrd specified"
-	cleanup_and_exit 3
-    fi
-fi
-
-if [ "$VM_TYPE" = 'ec2' -a -z "$RUNNING_IN_VM" ]; then
-    # verify settings
-    if [ -z "$AWS_ACCESS_KEY" -o -z "$AWS_ACCESS_KEY" ]; then
-	echo "ERROR:No amazon EC2 environment set. Set AWS_ACCESS_KEY and AWS_SECRET_KEY."
-	cleanup_and_exit 3
-    fi
-    if [ -z "$BUILD_EC2_AKI"  ]; then
-	echo "ERROR: No image refering to kernel and ramdisk is defined in BUILD_EC2_AKI env."
-	cleanup_and_exit 3
-    fi
-    if [ -z "$VM_VOLUME_NAME" ]; then
-	echo "ERROR: No worker root VM volume name specified."
-	cleanup_and_exit 3
-    fi
-    if [ -z "$VM_VOLUME_SWAP" ]; then
-	echo "ERROR: No worker swap VM volume name specified."
-	cleanup_and_exit 3
-    fi
-
-    # go
-    VM_IMAGE=`cloud_volume_attach "$VM_SERVER" "$VM_VOLUME_NAME" "$VM_IMAGE"`
-    [ "${VM_IMAGE:0:5}" == "/dev/" ] || cleanup_and_exit 3
-fi
-
-if [ "$VM_TYPE" = 'openstack' -a -z "$RUNNING_IN_VM" ]; then
-    # verify settings
-    if [ -z "$OS_AUTH_URL" ]; then
-	echo "ERROR:No openstack environment set. This vm-type works only inside of an openstack VM."
-	cleanup_and_exit 3
-    fi
-    if [ -z "$OBS_OPENSTACK_KERNEL_IMAGE_ID" ]; then
-	echo "ERROR: No image refering to kernel and ramdisk is defined in OBS_OPENSTACK_KERNEL_IMAGE_ID env."
-	cleanup_and_exit 3
-    fi
-    if [ -z "$VM_VOLUME_NAME" ]; then
-	echo "ERROR: No worker root VM volume name specified."
-	cleanup_and_exit 3
-    fi
-    if [ -z "$VM_VOLUME_SWAP" ]; then
-	echo "ERROR: No worker swap VM volume name specified."
-	cleanup_and_exit 3
-    fi
-    if [ -z "$VM_SERVER" ]; then
-	echo "ERROR: No VM server nod name specified (usually this instance)."
-	cleanup_and_exit 3
-    fi
-
-    # go
-    VM_IMAGE=`cloud_volume_attach "$VM_SERVER" "$VM_VOLUME_NAME" "$VM_IMAGE"`
-    [ "${VM_IMAGE:0:5}" == "/dev/" ] || cleanup_and_exit 3
-fi
-
-if [ "$VM_TYPE" = 'kvm' -a -z "$RUNNING_IN_VM" ]; then
-    if [ ! -r /dev/kvm -o ! -x "$kvm_bin" ]; then
-	echo "host doesn't support kvm"
-	echo "either the kvm kernel-module is not loaded or kvm is not installed or hardware virtualization is deactivated in the BIOS."
-	cleanup_and_exit 3
-    fi
-    qemu_bin="$kvm_bin"
-    if [ -n "$VM_KERNEL" ]; then
-	vm_kernel="$VM_KERNEL"
-    fi
-
-    # check if a SUSE system with virtio initrd is running
-    if [ -z "$VM_INITRD" -a -e /etc/sysconfig/kernel ]; then
-       a=$( source /etc/sysconfig/kernel; echo $INITRD_MODULES )
-       have_virtio_pci=""
-       have_virtio_blk=""
-       for i in $a; do
-          [ "$i" == "virtio_pci" ] && have_virtio_pci="1"
-          [ "$i" == "virtio_blk" ] && have_virtio_blk="1"
-       done
-       [ -n "$have_virtio_pci" -a -n "$have_virtio_blk" ] && VM_INITRD="/boot/initrd"
-    fi
-
-    if [ -n "$VM_INITRD" ]; then
-	vm_initrd="$VM_INITRD"
-    elif [ -e "${vm_initrd}-build" ]; then
-	vm_initrd="${vm_initrd}-build"
-    else
-	if [ -L "$vm_initrd" ]; then
-	    vm_initrd=`readlink -f "$vm_initrd"` || cleanup_and_exit 3
-	fi
-	vm_initrd_virtio="${vm_initrd}-virtio"
-
-	if [ ! -e ${vm_initrd_virtio} -o $vm_kernel -nt ${vm_initrd_virtio} ]; then
-	    mkinitrd_virtio_cmd=(env rootfstype="$VMDISK_FILESYSTEM" \
-		    mkinitrd -d /dev/null \
-		    -m "ext3 ext4 btrfs reiserfs binfmt_misc virtio_pci virtio_blk" \
-		    -k $vm_kernel \
-		    -i ${vm_initrd_virtio})
-	    if [ ! -w /root -o -n "$RPMLIST" ]; then
-		echo "No initrd that provides virtio support found. virtio accelleration disabled."
-		echo "Run the following command as root to enable virtio:"
-		shellquote "${mkinitrd_virtio_cmd[@]}"
-		kvm_virtio=
-		echo
-	    elif /sbin/modinfo virtio_pci >/dev/null 2>&1; then
-		echo "creating $vm_initrd_virtio"
-		"${mkinitrd_virtio_cmd[@]}" || cleanup_and_exit 1
-		vm_initrd="${vm_initrd_virtio}"
-	    fi
-	else
-	    vm_initrd="${vm_initrd_virtio}"
-	fi
-    fi
-
-    case $HOST_ARCH in
-        power7|armv7l) kvm_virtio=1;;
-        ppc970|power7le) kvm_virtio=;;
-    esac
-
-    if [ "$kvm_virtio" = 1 ]; then
-	VM_SWAPDEV=/dev/vdb
-	qemu_rootdev=/dev/vda
-    else
-	VM_SWAPDEV=/dev/sdb
-	qemu_rootdev=/dev/sda
-    fi
-fi
-
-if [ "$VM_TYPE" = 'openstack' ]; then
-    VM_SWAPDEV=/dev/vdb
-    qemu_rootdev=/dev/vda
-fi
-
-if [ "$VM_TYPE" = 'qemu' ]; then
-    VM_SWAPDEV=/dev/sdb
-    qemu_rootdev=/dev/sda
-fi
-
-if [ "$VM_TYPE" = 'uml' ]; then
-    VM_SWAPDEV=/dev/ubdb
-fi
-
-if [ -z "$RPMLIST" -a -z "$RUNNING_IN_VM" ]; then
-    if [ -z "$repos" -a -z "$BUILD_RPMS" ]; then
+if test -z "$RPMLIST" -a -z "$RUNNING_IN_VM" ; then
+    if test -z "$repos" -a -z "$BUILD_RPMS" ; then
 	repos=(--repository 'zypp://')
     fi
 else
@@ -1821,7 +941,7 @@ fi
 
 set_build_arch
 
-if [ -n "$CLEAN_BUILD" ]; then
+if test -n "$CLEAN_BUILD" ; then
     DO_INIT=true
 fi
 
@@ -1847,114 +967,20 @@ if test -n "$LIST_STATE" ; then
     cleanup_and_exit $ERR
 fi
 
-# z/VM:
-# 1. make sure that no buildjob exists anymore by doing an ipl of cms
-# 2. detach the root device from the worker
-# 3. link the device to the controlling guest
-#    -> Need a uniq worker id to calculate a uniq device address for linking
-#    -> VM_IMAGE is the resulting block device
-if [ "$VM_TYPE" = 'zvm' ]; then
-    if [ ! "$0" = "/.build/build" ] ; then
-	echo "in controlling guest"
-        zvm_cp worker_init $VM_WORKER $VM_VOLUME_ROOT $VM_VOLUME_SWAP $zvm_worker_nr
-        zvm_cp volume_detach $VM_WORKER $VM_VOLUME_ROOT
-        zvm_cp volume_detach $VM_WORKER $VM_VOLUME_SWAP
-        VM_IMAGE=$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_ROOT $zvm_mult_pass $zvm_worker_nr )
-        VM_SWAP=$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_SWAP $zvm_mult_pass $zvm_worker_nr )
-        if [ ! "${VM_IMAGE}" = "dasd${VM_IMAGE#dasd}" -o ! "${VM_SWAP}" = "dasd${VM_SWAP#dasd}" ]; then
-            echo "did not get a real device for VM_IMAGES: $VM_IMAGE $VM_SWAP"
-            cleanup_and_exit 3
-        else 
-            VM_IMAGE="/dev/"${VM_IMAGE}
-	    VM_SWAP="/dev/"${VM_SWAP}
-        fi
-    fi
-fi
-
-echo "VM_IMAGE: $VM_IMAGE, VM_SWAP: $VM_SWAP"
-
-# doing setup
-if test -z "$RUNNING_IN_VM" ; then
-    if test -n "$VM_IMAGE" ; then
-	if test "$VM_IMAGE" = 1 ; then
-	    VM_IMAGE="$BUILD_ROOT.img"
-	    echo "using $VM_IMAGE as vm image"
-	    if test -z "$VM_SWAP" -a "$VM_TYPE" != "emulator"; then
-		VM_SWAP="$BUILD_ROOT.swap"
-		echo "using $VM_SWAP as vm swap"
-	    fi
-	fi
-	if [ "$VM_TYPE" = 'xen' ]; then
-	    # this should not be needed, but sometimes a xen instance got lost
-	    XENID="${VM_IMAGE%/root}"
-	    XENID="${XENID%/tmpfs}"
-	    XENID="${XENID##*/}"
-	    XENID="${XENID#root_}"
-	    xm destroy "build_$XENID" >/dev/null 2>&1
-	fi
-	if test -n "$VMDISK_CLEAN" ; then
-	    # delete old root/swap to get rid of the old blocks
-	    if test -f "$VM_IMAGE" ; then
-		echo "Deleting old $VM_IMAGE"
-		rm -rf "$VM_IMAGE"
-	    fi
-	    if test -n "$VM_SWAP" -a -f "$VM_SWAP" ; then
-		echo "Deleting old $VM_SWAP"
-		rm -rf "$VM_SWAP"
-	    fi
-	fi
-	if test ! -e "$VM_IMAGE"; then
-	    vm_img_create "$VM_IMAGE" "$VMDISK_ROOTSIZE"
-	    if test -z "$CLEAN_BUILD" ; then
-		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE"
-	    fi
-	fi
-	if test -n "$VM_SWAP" -a ! -e "$VM_SWAP" -a ! -b "$VM_SWAP"; then
-	    vm_img_create "$VM_SWAP" "$VMDISK_SWAPSIZE"
-	fi
-	if test ! -e "$VM_IMAGE" ; then
-	    echo "you need to create $VM_IMAGE first"
-	    cleanup_and_exit 3
-	fi
-	if test -n "$CLEAN_BUILD" ; then
-	    vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE" || cleanup_and_exit 3
-	fi
-	mkdir_build_root
-	if [ -w /root ]; then
-            if [ -b $VM_IMAGE ]; then
-                # mount device directly
-		mount $VMDISK_MOUNT_OPTIONS $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 3
-	    else
-		mount ${VMDISK_MOUNT_OPTIONS},loop $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 3
-            fi
-	else
-	    if ! mount $BUILD_ROOT; then
-		echo "mounting the build root failed. An fstab entry is probably missing or incorrect."
-		echo "/etc/fstab should contain an entry like this:"
-		echo "$VM_IMAGE $BUILD_ROOT auto noauto,user,loop 0 0"
-		cleanup_and_exit 3
-	    fi
-	fi
-    else
-	test -w /root || become_root_or_fail
-    fi
-    if test -n "$VM_SWAP" ; then
-	dd if=/dev/zero of="$VM_SWAP" bs=1024 count=1 conv=notrunc 2>/dev/null
-	echo "mkswap $VM_SWAP"
-	mkswap "$VM_SWAP"
-        [ "$VM_TYPE" = 'openstack' ] && openstack_volume_detach "$VM_SERVER" "$VM_VOLUME_SWAP"
-    fi
+# do vm setup if needed
+if test -z "$RUNNING_IN_VM" -a -n "$VM_TYPE" ; then
+    vm_setup
 fi
 
 mkdir_build_root
 
-if [ "$BUILD_ROOT" = / ]; then
+if test "$BUILD_ROOT" = / ; then
     browner="$(stat -c %u /)"
 fi
 
 rm -f $BUILD_ROOT/exit
 
-if [ -w /root ]; then
+if test -w /root ; then
     mkdir -p $BUILD_ROOT/proc
     mkdir -p $BUILD_ROOT/dev/pts
     mount -n -tproc none $BUILD_ROOT/proc || true
@@ -1965,14 +991,14 @@ if test -z "$VM_IMAGE" -a -z "$LOGFILE"; then
     LOGFILE="$BUILD_ROOT/.build.log"
 fi
 
-if test -n "$LOGFILE" -a -z "$shell" ; then
+if test -n "$LOGFILE" -a -z "RUN_SHELL" ; then
     echo  logging output to $LOGFILE...
     rm -f $LOGFILE
     touch $LOGFILE
     # set start time, to be substracted for build log timestamps
     STARTTIME=`perl -e 'print time()'`
 
-    if [ -n "$RUNNING_IN_VM" ]; then
+    if test -n "$RUNNING_IN_VM" ; then
         # no additional timestamps in inner vm build system
 	exec 1> >(exec -a 'build logging' tee -a $LOGFILE) 2>&1
     elif test -n "$VM_IMAGE" ; then
@@ -1991,7 +1017,7 @@ setmemorylimit
 #
 test -z "$HOST" && HOST=`hostname`
 
-if [ -z "$RUNNING_IN_VM" ]; then
+if test -z "$RUNNING_IN_VM" ; then
     echo Using BUILD_ROOT=$BUILD_ROOT
     test -n "$BUILD_RPMS" && echo Using BUILD_RPMS=$BUILD_RPMS
     echo Using BUILD_ARCH=$BUILD_ARCH
@@ -2009,11 +1035,11 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
     BUILDTYPE=
     case $SPECFILE in
-      *.spec|*.src.rpm) BUILDTYPE=spec ;;
-      *.dsc) BUILDTYPE=dsc ;;
-      *.kiwi) BUILDTYPE=kiwi ;;
-      PKGBUILD) BUILDTYPE=arch ;;
-      _preinstallimage) BUILDTYPE=preinstallimage ;;
+	*.spec|*.src.rpm) BUILDTYPE=spec ;;
+	*.dsc) BUILDTYPE=dsc ;;
+	*.kiwi) BUILDTYPE=kiwi ;;
+	PKGBUILD) BUILDTYPE=arch ;;
+	_preinstallimage) BUILDTYPE=preinstallimage ;;
     esac
     if test -z "$BUILDTYPE" ; then
        echo "don't know how to build $SPECFILE"
@@ -2022,7 +1048,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
     cd "$SRCDIR"
 
-    if [ -z "$RUNNING_IN_VM" ]; then
+    if test -z "$RUNNING_IN_VM" ; then
 	echo
 	echo "$HOST started \"build $SPECFILE\" at `date --utc`."
 	echo
@@ -2076,17 +1102,17 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     ADDITIONAL_PACKS=""
     test -z "$BUILD_EXTRA_PACKS" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS $BUILD_EXTRA_PACKS"
     test -z "$CREATE_BASELIBS" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS build"
-    test "$ccache" = '0' || ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
+    test "$ccache" = 0 || ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
     test "$icecream" = 0 || ADDITIONAL_PACKS="$ADDITIONAL_PACKS icecream gcc-c++"
     test -z "$DO_LINT" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS rpmlint-Factory"
-    test "$VMDISK_FILESYSTEM" = 'xfs' && ADDITIONAL_PACKS="$ADDITIONAL_PACKS libblkid1"
-    test "$VM_TYPE" = 'zvm' && ADDITIONAL_PACKS="$ADDITIONAL_PACKS udev libcap2"
+    test "$VMDISK_FILESYSTEM" = xfs && ADDITIONAL_PACKS="$ADDITIONAL_PACKS libblkid1"
+    test "$VM_TYPE" = zvm && ADDITIONAL_PACKS="$ADDITIONAL_PACKS udev libcap2"
 
     if test -n "$CHANGELOG" -a -z "$RUNNING_IN_VM" ; then
 	rm -f $BUILD_ROOT/.build-changelog
 	case $SPECFILE in
-	  *.dsc) CFFORMAT=debian ;;
-	  *) CFFORMAT=rpm ;;
+	    *.dsc) CFFORMAT=debian ;;
+	    *) CFFORMAT=rpm ;;
 	esac
 	echo "running changelog2spec --target $CFFORMAT --file $MYSRCDIR/$SPECFILE"
 	if ! $BUILD_DIR/changelog2spec --target $CFFORMAT --file "$MYSRCDIR/$SPECFILE" > $BUILD_ROOT/.build-changelog ; then
@@ -2095,549 +1121,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
 
     if test -n "$VM_TYPE" -a -z "$RUNNING_IN_VM"; then
-	rm -rf "$BUILD_ROOT/.build"
-	mkdir -p "$BUILD_ROOT/.build"
-	if test "$DO_INIT" = true ; then
-	    # do first stage of init_buildsystem
-	    rm -f $BUILD_ROOT/.build.success
-	    set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USE_SYSTEM_QEMU $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
-	    echo "$* ..."
-            start_time=`date +%s`
-	    "$@" || cleanup_and_exit 1
-	    check_exit
-            TIME_PREINSTALL=$(( `date +%s` - $start_time ))
-            unset start_time
-	    if [ ! -w /root ]; then
-		# remove setuid bit if files belong to user to make e.g. mount work
-		find $BUILD_ROOT/{bin,sbin,usr/bin,usr/sbin} -type f -uid $UID -perm +4000 -print0 | xargs -0 --no-run-if-empty chmod -s
-	    fi
-	    copy_oldpackages
-	fi
-
-	# start up xen, rerun ourself
-	cp -a $BUILD_DIR/. $BUILD_ROOT/.build
-	if ! test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
-	    rm -rf "$BUILD_ROOT/.build-srcdir"
-	    mkdir "$BUILD_ROOT/.build-srcdir"
-	    if test "$BUILDTYPE" = kiwi ; then
-		cp -pRL "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
-	    else
-		cp -p "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
-	    fi
-	    MYSRCDIR=$BUILD_ROOT/.build-srcdir
-	else
-	    # cwd is at $BUILD_ROOT/.build-srcdir which we want to
-	    # umount later so step aside
-	    cd "$SRCDIR"
-	fi
-	Q="'\''"
-	echo "SPECFILE='${SPECFILE//"'"/$Q}'" > $BUILD_ROOT/.build/build.data
-	echo "BUILD_JOBS='${BUILD_JOBS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	echo "BUILD_ARCH='${BUILD_ARCH//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	echo "BUILD_RPMS='${BUILD_RPMS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	case $BUILD_DIST in
-	    */*)
-		cp $BUILD_DIST $BUILD_ROOT/.build/build.dist
-		BUILD_DIST=/.build/build.dist
-		;;
-	esac
-	echo "BUILD_DIST='${BUILD_DIST//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	echo "RELEASE='${RELEASE//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	echo "BUILD_DEBUG='${BUILD_DEBUG//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	echo "SIGNDUMMY='${SIGNDUMMY//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	echo "DO_LINT='${DO_LINT//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	echo "DO_CHECKS='${DO_CHECKS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	echo "NOROOTFORBUILD='${NOROOTFORBUILD//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	echo "CREATE_BASELIBS='$CREATE_BASELIBS'" >> $BUILD_ROOT/.build/build.data
-	echo "REASON='${REASON//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	echo "CHANGELOG='${CHANGELOG//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	echo "INCARNATION='${INCARNATION//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	echo "DISTURL='${DISTURL//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	echo "DO_INIT='${DO_INIT//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	echo "KIWI_PARAMETERS='${KIWI_PARAMETERS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-	# FIXME: this depends on the kernel and vm.
-	# could be hda2, sda2 for xen or hdb/sdb for qemu
-	test -n "$VM_SWAP" && echo "VM_SWAP='${VM_SWAPDEV:-/dev/hda2}'" >> $BUILD_ROOT/.build/build.data
-	test -n "$VMDISK_MOUNT_OPTIONS" && echo "VMDISK_MOUNT_OPTIONS='${VMDISK_MOUNT_OPTIONS}'" >> $BUILD_ROOT/.build/build.data
-	PERSONALITY=0
-	if test "$VM_TYPE" != 'lxc'; then
-	    test -n "$PERSONALITY_SYSCALL" && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
-	fi
-	if test "$(uname -m)" = 'ppc'; then
-            # ppc kernel never tells us if a 32bit personality is active
-            PERSONALITY=8
-        fi
-	echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
-	echo "MYHOSTNAME='`hostname`'" >> $BUILD_ROOT/.build/build.data
-	echo -n "definesnstuff=(" >> $BUILD_ROOT/.build/build.data
-	shellquote "${definesnstuff[@]}" >> $BUILD_ROOT/.build/build.data
-	echo ")" >> $BUILD_ROOT/.build/build.data
-	echo -n "repos=(" >> $BUILD_ROOT/.build/build.data
-	shellquote "${repos[@]}" >> $BUILD_ROOT/.build/build.data
-	echo ")" >> $BUILD_ROOT/.build/build.data
-	echo "VM_TYPE='$VM_TYPE'" >> $BUILD_ROOT/.build/build.data
-	echo "shell='$shell'" >> $BUILD_ROOT/.build/build.data
-	echo "statistics='$statistics'" >> $BUILD_ROOT/.build/build.data
-        # fallback time for broken hosts
-        date '+@%s' > $BUILD_ROOT/.build/.date
-	if [ "$VM_TYPE" = 'emulator' ]; then
-            # emulator may not be able to hand over kernel parameters
-            ln -sf /.build/build $BUILD_ROOT/sbin/init
-        fi
-        if [ "$VM_TYPE" = 'zvm' ]; then
-            # initrd is created in obsstoragesetup.
-            # If it is desired to use a project dependent kernel, use make_guestinitrd from zvm_functions.
-            # have to copy kernel/initrd and run zipl to be able to IPL
-            # have to set init_script before unmounting, thus doing it statically for now.
-            zvm_init_script="/.build/build"
-            mkdir -p $BUILD_ROOT/boot
-            cp $vm_kernel $vm_initrd $BUILD_ROOT/boot
-            mkdir -p $BUILD_ROOT/boot/zipl
-            # finally, install bootloader to the worker disk
-            zipl -t $BUILD_ROOT/boot/zipl -i ${BUILD_ROOT}${vm_kernel} -r ${BUILD_ROOT}${vm_initrd} \
-               --parameters "${zvm_param} init=$zvm_init_script rootfsopts=noatime"
-        fi
-	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
-	umount -n $BUILD_ROOT/proc 2> /dev/null || true
-	umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
-	umount -n $BUILD_ROOT/dev/shm 2> /dev/null || true
-	umount -n $BUILD_ROOT/mnt 2> /dev/null || true
-
-	if check_use_emulator; then
-	    if [ -e $BUILD_DIR/initvm.$BUILD_HOST_ARCH -a -e "$BUILD_DIR/qemu-reg" ]; then
-                chmod 0755 "$BUILD_DIR/initvm.$BUILD_HOST_ARCH"
-                vm_init_script="/.build/initvm.$BUILD_HOST_ARCH"
-	    else
-		echo "Warning: can't find initscript to register binfmts"
-	    fi
-	else
-	    vm_init_script="/.build/build"
-	fi
-
-        if [ "$VM_TYPE" = 'openstack' -o "$VM_TYPE" = 'ec2' ]; then
-            # No way to handle this via init= parameter here....
-            echo "#!/bin/sh"               >  "$BUILD_ROOT/sbin/init"
-            echo 'exec /.build/build "$@"' >> "$BUILD_ROOT/sbin/init"
-            chmod 0755 "$BUILD_ROOT/sbin/init"
-        fi
-        if [ "$VM_TYPE" = 'ec2' ]; then
-            # use the instance kernel, if no kernel got installed via preinstall
-            if ! test -e "$BUILD_ROOT/boot/vmlinuz"; then
-                cp /boot/vmlinuz-ec2 "$BUILD_ROOT/boot/vmlinuz"
-                cp /boot/initrd-ec2 "$BUILD_ROOT/boot/initrd"
-            fi
-            # install menu.lst for pv grub
-            if ! test -e "$BUILD_ROOT/boot/grub/menu.lst"; then
-                mkdir -p "$BUILD_ROOT/boot/grub"
-                echo "serial --unit=0 --speed=9600"                                                   >  "$BUILD_ROOT/boot/grub/menu.lst"
-                echo "terminal --dumb serial"                                                         >> "$BUILD_ROOT/boot/grub/menu.lst"
-                echo "default 0"                                                                      >> "$BUILD_ROOT/boot/grub/menu.lst"
-                echo "timeout 0"                                                                      >> "$BUILD_ROOT/boot/grub/menu.lst"
-                echo "hiddenmenu"                                                                     >> "$BUILD_ROOT/boot/grub/menu.lst"
-                echo ""                                                                               >> "$BUILD_ROOT/boot/grub/menu.lst"
-                echo "title default"                                                                  >> "$BUILD_ROOT/boot/grub/menu.lst"
-                echo "   root (hd0)"                                                                  >> "$BUILD_ROOT/boot/grub/menu.lst"
-                echo "   kernel /boot/vmlinuz root=/dev/sda1 xencons=xvc0 console=xvc0 splash=silent" >> "$BUILD_ROOT/boot/grub/menu.lst"
-                echo "   initrd /boot/initrd"                                                         >> "$BUILD_ROOT/boot/grub/menu.lst"
-            fi
-        fi
-	if [ -n "$VM_IMAGE" ]; then
-            # copy out kernel & initrd (if they exist) during unmounting VM image
-	    KERNEL_TEMP_DIR=
-            if [ -e  $BUILD_ROOT/.build.kernel."$VM_TYPE" ]; then
-	      KERNEL_TEMP_DIR=`mktemp -d`
-              cp $BUILD_ROOT/.build.kernel."$VM_TYPE" "$KERNEL_TEMP_DIR/kernel"
-              if [ -e  $BUILD_ROOT/.build.initrd."$VM_TYPE" ]; then
-                cp $BUILD_ROOT/.build.initrd."$VM_TYPE" "$KERNEL_TEMP_DIR/initrd"
-              fi
-            fi
-	    check_exit
-	    # needs to work otherwise we have a corrupted file system
-	    if ! umount $BUILD_ROOT; then
-              rm -rf "$KERNEL_TEMP_DIR"
-              cleanup_and_exit 3
-	    fi
-            # copy back the kernel and set it for VM
-            if [ -n "$KERNEL_TEMP_DIR" ]; then
-               mkdir -p $BUILD_ROOT/boot
-               mv $KERNEL_TEMP_DIR/kernel $BUILD_ROOT/boot/kernel
-               vm_kernel=$BUILD_ROOT/boot/kernel
-               if [ -e $KERNEL_TEMP_DIR/initrd ]; then
-                 mv $KERNEL_TEMP_DIR/initrd $BUILD_ROOT/boot/initrd
-                 vm_initrd=$BUILD_ROOT/boot/initrd
-               fi
-               rmdir "$KERNEL_TEMP_DIR"
-            fi
-	fi
-
-        if [ "$VM_TYPE" = 'openstack' -o "$VM_TYPE" = 'ec2' ]; then
-          cloud_volume_detach "$VM_SERVER" "$VM_VOLUME_NAME" || cleanup_and_exit 3
-        fi
-
-	if [ -n "$VM_IMAGE" -a "$VM_TYPE" = "zvm" ]; then
-	   # detach the worker root and swap locally and link it in the worker
-	   zvm_cp volume_detach_local $VM_VOLUME_ROOT ${zvm_worker_nr}
-	   zvm_cp volume_detach_local $VM_VOLUME_SWAP ${zvm_worker_nr}
-	   zvm_cp volume_attach $VM_WORKER $VM_VOLUME_ROOT
-	   zvm_cp volume_attach $VM_WORKER $VM_VOLUME_SWAP
-	fi
-
-	if [ "$VM_TYPE" = 'xen' ]; then
-		XMROOT="file:$(readlink -f $VM_IMAGE)"
-		XMROOT=${XMROOT/#file:\/dev/phy:/dev}
-		XMROOT="disk=$XMROOT,hda1,w"
-		XMSWAP=
-		if test -n "$VM_SWAP" ; then
-		    XMSWAP="file:$(readlink -f $VM_SWAP)"
-		    XMSWAP=${XMSWAP/#file:\/dev/phy:/dev}
-		    XMSWAP="disk=$XMSWAP,hda2,w"
-		fi
-		XENID="${VM_IMAGE%/root}"
-		XENID="${XENID%/tmpfs}"
-		XENID="${XENID##*/}"
-	        XENID="${XENID#root_}"
-
-		echo "booting XEN kernel ..."
-		if xm list "build_$XENID" >/dev/null 2>&1 ; then
-		   echo "Instance already exist, something really went wrong..."
-		   echo "Please report to your server admin, there might be multiple services running for same domain"
-		   cleanup_and_exit 3
-		fi
-		XEN_CONF_FILE=`mktemp /var/tmp/build.xen.conf-XXXXXXXXX` || cleanup_and_exit 3
-		echo "kernel = \"$vm_kernel\""                                           >  $XEN_CONF_FILE
-		echo "ramdisk = \"$vm_initrd\""                                          >> $XEN_CONF_FILE
-		echo "memory = ${MEMSIZE:-64}"                                           >> $XEN_CONF_FILE
-		echo "vcpus = $BUILD_JOBS"                                               >> $XEN_CONF_FILE
-		echo "root = \"/dev/hda1 ro\""                                           >> $XEN_CONF_FILE
-		echo "extra = \"init=/bin/bash console=ttyS0 panic=1 udev_timeout=360\"" >> $XEN_CONF_FILE
-		echo "on_poweroff = 'destroy'"                                           >> $XEN_CONF_FILE
-		echo "on_reboot = 'destroy'"                                             >> $XEN_CONF_FILE
-		echo "on_crash = 'destroy'"                                              >> $XEN_CONF_FILE
-		set -- xm create -c $XEN_CONF_FILE name="build_$XENID" $XMROOT $XMSWAP extra="quiet init="$vm_init_script" elevator=noop panic=1 console=ttyS0"
-		if test "$PERSONALITY" != 0 ; then
-		    # have to switch back to PER_LINUX to make xm work
-		    set -- linux64 "$@"
-		fi
-		echo "$@"
-		"$@" || cleanup_and_exit 3
-		rm "$XEN_CONF_FILE"
-	elif [ "$VM_TYPE" = 'uml' ]; then
-		echo "booting UML kernel ..."
-		set -- $uml_kernel initrd=$uml_initrd root=ubda init="$vm_init_script" panic=1 elevator=noop quiet ubda=$VM_IMAGE ubdb=$VM_SWAP ${MEMSIZE:+mem=$MEMSIZE}
-		echo "$@"
-		"$@"
-	elif [ "$VM_TYPE" = 'qemu' -o "$VM_TYPE" = 'kvm' ]; then
-		echo "booting $VM_TYPE ..."
-                if [ "$VM_TYPE" = 'kvm' -a -b "$VM_IMAGE" ]; then
-                  # speed optimization when using kvm with raw devices
-		  CACHE=",cache=none"
-                else
-                  # speed optimization when using kvm with raw files
-		  CACHE=",cache=unsafe"
-		fi
-
-		# we do not want to have sound inside the VMs
-		export QEMU_AUDIO_DRV=none
-		if [ "$kvm_virtio" = 1 ]; then
-		    qemu_args=(-drive file="$VM_IMAGE",if=virtio$CACHE -drive file="$VM_IMAGE",if=ide,index=0$CACHE)
-		    if [ -n "$VM_SWAP" ]; then
-			qemu_args=("${qemu_args[@]}" "-drive")
-			qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=virtio$CACHE")
-		    fi
-		    if [ "$HOST_ARCH" = "armv7l" ]; then
-			qemu_args=(                  "-drive")
-			qemu_args=("${qemu_args[@]}" "file="$VM_IMAGE",if=none,id=disk$CACHE")
-			qemu_args=("${qemu_args[@]}" "-drive")
-			qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=none,id=swap$CACHE")
-			qemu_args=("${qemu_args[@]}" "-device")
-			qemu_args=("${qemu_args[@]}" "virtio-blk-device,drive=swap")
-			qemu_args=("${qemu_args[@]}" "-device")
-			qemu_args=("${qemu_args[@]}" "virtio-blk-device,drive=disk")
-		    fi
-		else
-			if [ "$HOST_ARCH" = "ppc970" -o "$HOST_ARCH" = "power7le" ];then
-				qemu_args=( "-drive" )
-				qemu_args=("${qemu_args[@]}" "file=$VM_IMAGE,if=scsi,cache=unsafe")
-			else
-				qemu_args=(-hda "$VM_IMAGE")
-			fi
-			if [ -n "$VM_SWAP" ]; then
-				qemu_args=("${qemu_args[@]}" "-drive")
-				if [ "$HOST_ARCH" = "ppc970" -o "$HOST_ARCH" = "power7le" ];then
-					DISK_IF=scsi
-				else
-					DISK_IF=ide
-				fi
-				qemu_args=("${qemu_args[@]}" "file=$VM_SWAP,if=$DISK_IF,index=1$CACHE")
-			fi
-		fi
-		if [ -n "$BUILD_JOBS" -a "$icecream" = 0 -a -z "$BUILD_THREADS" ]; then
-		    qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS")
-		elif [ -n "$BUILD_JOBS" -a -n "$BUILD_THREADS" ]; then
-		    qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS,threads=$BUILD_THREADS")
-		fi
-		if [ "$VM_TYPE" = 'kvm' ]; then
-                    if [ "$HOST_ARCH" != "armv7l" ]; then
-                        KVM_OPTIONS="$KVM_OPTIONS -cpu host"
-                    fi
-                    if [ -n "$HUGETLBFSPATH" ]; then
-                        KVM_OPTIONS="$KVM_OPTIONS -mem-path $HUGETLBFSPATH"
-                    fi
-		fi
-
-		set -- $qemu_bin -no-reboot -nographic -vga none -net none $KVM_OPTIONS \
-		    -kernel $vm_kernel \
-		    -initrd $vm_initrd \
-		    -append "root=$qemu_rootdev panic=1 quiet no-kvmclock nmi_watchdog=0 rw elevator=noop console=$console init=$vm_init_script" \
-		    ${MEMSIZE:+-m $MEMSIZE} \
-		    "${qemu_args[@]}"
-
-		if test "$PERSONALITY" != 0 ; then
-		    # have to switch back to PER_LINUX to make qemu work
-		    set -- linux64 "$@"
-		fi
-		echo "$@"
-		"$@"
-	elif [ "$VM_TYPE" = 'ec2' ]; then
-		echo "booting $VM_TYPE ..."
-                EC2_SNAP_root=`ec2-create-snapshot --region "$BUILD_EC2_REGION" "$VM_VOLUME_NAME" | awk '{ print $2 }'`
-                if [ "$EC2_SNAP_root" == "${EC2_SNAP_root#snap-}" ]; then
-                    echo "ERROR: Failed to create snapshot for root disk $VM_VOLUME_NAME"
-                    cleanup_and_exit 3
-                fi
-                EC2_SNAP_swap=`ec2-create-snapshot --region "$BUILD_EC2_REGION" "$VM_VOLUME_SWAP" | awk '{ print $2 }'`
-                if [ "$EC2_SNAP_swap" == "${EC2_SNAP_swap#snap-}" ]; then
-                    echo "ERROR: Failed to create snapshot for swap disk $VM_VOLUME_SWAP"
-                    ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_root"
-                    cleanup_and_exit 3
-                fi
-                # wait for snapshots being processed
-                while true; do
-                    c=`ec2-describe-snapshots --region "$BUILD_EC2_REGION" "$EC2_SNAP_root" "$EC2_SNAP_swap" | grep completed | wc -l`
-                    [ "$c" == "2" ] && break
-                done
-                EC2_AMI=`ec2-register --region "$BUILD_EC2_REGION" -n build-$VM_VOLUME_NAME  -a x86_64 -b "/dev/sda1=$EC2_SNAP_root::false" -b "/dev/sdb1=$EC2_SNAP_swap::false" --kernel "$BUILD_EC2_AKI" | awk '{ print $2 }'`
-                if [ "$EC2_AMI" == "${EC2_AMI#ami-}" ]; then
-                    echo "ERROR: Failed to register the AMI"
-                    ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_root"
-                    ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_swap"
-                    cleanup_and_exit 3
-                fi
-                INSTANCE=`ec2-run-instances --region "$BUILD_EC2_REGION" -z "$BUILD_EC2_ZONE" -t $BUILD_EC2_TYPE --kernel "$BUILD_EC2_AKI" --instance-initiated-shutdown-behavior terminate "$EC2_AMI" | grep ^INSTANCE | awk '{ print $2 }'`
-                if [ "$INSTANCE" == "${INSTANCE#i-}" ]; then
-                    echo "ERROR: Failed to run the instance for AMI $EC2_AMI"
-                    ec2-deregister --region "$BUILD_EC2_REGION" "$EC2_AMI"
-                    ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_root"
-                    ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_swap"
-                    cleanup_and_exit 3
-                fi
-                echo "Waiting for finishing the build. No log file until then on EC2 ...."
-                I=0
-                L=0
-                EC2_EXTRACT_VOLUME_root=""
-                EC2_EXTRACT_VOLUME_swap=""
-                temp_file=`mktemp`
-                while true; do
-                    ec2-describe-instances --region "$BUILD_EC2_REGION" "$INSTANCE" > $temp_file
-                    state=`grep ^INSTANCE "$temp_file"`
-                    if [ -z "$EC2_EXTRACT_VOLUME_root" ]; then
-                        EC2_EXTRACT_VOLUME_root=`grep ^BLOCKDEVICE $temp_file | grep /dev/sda1 | awk '{ print $3 }'`
-                        EC2_EXTRACT_VOLUME_swap=`grep ^BLOCKDEVICE $temp_file | grep /dev/sdb1 | awk '{ print $3 }'`
-                    fi
-                    # the column of the state is at a differen position depending on the state :/
-#                    [ "$state" == "${state/stopped/}" ] || break
-                    [ "$state" == "${state/terminated/}" ] || break
-                    I=$(( $I + 1 ))
-                    if [ $I -gt 10 ]; then
-                       echo -n .
-                       I="0"
-                       L=$(( $L + 1 ))
-                    fi
-                    if [ $L -gt 10 ]; then
-                       # dump entire console log as raw here
-                       ec2-get-console-output --region "$BUILD_EC2_REGION" -r "$INSTANCE"
-                       L="0"
-                    fi
-                    sleep 1
-                done
-                rm "$temp_file"
-                echo
-                ec2-deregister --region "$BUILD_EC2_REGION" "$EC2_AMI"
-                # snapshots get deleted after extract
-	elif [ "$VM_TYPE" = 'openstack' ]; then
-		echo "booting $VM_TYPE ..."
-                nova boot --image $OBS_OPENSTACK_KERNEL_IMAGE_ID --flavor m1.small --block_device_mapping vda=${VM_VOLUME_NAME}::$(( $VMDISK_ROOTSIZE / 1024 )):0 --block_device_mapping vdb=${VM_VOLUME_SWAP}::1:0 --poll "build-$VM_VOLUME_NAME" || cleanup_and_exit 3
-                
-#                while [ `nova show "build-$VM_VOLUME_NAME" | sed -n -e 's,|[ ]*status[ ]*|[ ]*\([^ ]*\).*,\1,p'` == "ACTIVE" ]; do
-#                  sleep 5
-#                done
-                nova console-log "build-$VM_VOLUME_NAME"
-	elif [ "$VM_TYPE" = 'lxc' ]; then
-		echo "booting $VM_TYPE ..."
-		LXCCONF="$BUILD_ROOT/.build.lxc.conf"
-		rm -f "$LXCCONF"
-		cat $BUILD_DIR/lxc.conf > "$LXCCONF"
-		cat >> "$LXCCONF" <<-EOF
-		lxc.rootfs = $BUILD_ROOT
-		EOF
-		# XXX: do this always instead of leaking the hosts' one?
-		echo "rootfs / rootfs rw 0 0" > $BUILD_ROOT/etc/mtab
-		LXCID=${BUILD_ROOT##*/}
-		lxc-destroy -n "$LXCID" >/dev/null 2>&1 || true
-		lxc-create -n "$LXCID" -f "$LXCCONF" || cleanup_and_exit 1
-		lxc-start -n "$LXCID" "$vm_init_script"
-		BUILDSTATUS="$?"
-		test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
-		cleanup_and_exit "$BUILDSTATUS"
-        elif [ "$VM_TYPE" = 'zvm' ]; then
-                echo "booting $VM_TYPE ..."
-                zvm_cp ipl $VM_WORKER $VM_VOLUME_ROOT
-                # start IUCV Console
-                # IPL needs some time until IPL really starts...
-                 sleep 2
-                 # start iucv console. This blocks until build process is finished.
-                iucvconn $VM_WORKER lnxhvc0
-                # Take root and swap devices from worker
-                # This might be critical regarding timing (IUCV_CONSOLE down, but machine still running)
-                sleep 5
-                zvm_cp volume_detach $VM_WORKER $VM_VOLUME_ROOT
-                zvm_cp volume_detach $VM_WORKER $VM_VOLUME_SWAP
-                VM_IMAGE="/dev/$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_ROOT $zvm_mult_pass $zvm_worker_nr)"
-                VM_SWAP="/dev/$(zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_SWAP $zvm_mult_pass $zvm_worker_nr)"
-	elif [ "$VM_TYPE" = 'emulator' ]; then
-                # generic emulator hook. an external script is needed to define
-                # the emulator startup
-                pushd $BUILD_DIR/emulator
-                if [ -z "$EMULATOR_SCRIPT" ]; then
-                   EMULATOR_SCRIPT="./emulator.sh"
-                elif [ "${EMULATOR_SCRIPT:0:1}" != "/" ]; then
-                   EMULATOR_SCRIPT="./$EMULATOR_SCRIPT"
-                fi
-		set -- "$EMULATOR_SCRIPT" "$VM_IMAGE"
-		echo "$@"
-		if ! "$@"; then
-                     popd
-                     echo "ERROR: The emulator returned with a failure"
-                     cleanup_and_exit 3
-                fi
-                popd
-
-	fi
-
-	if [ "$VM_TYPE" = 'openstack' ]; then
-           VM_IMAGE=`cloud_volume_attach "$VM_SERVER" "$VM_VOLUME_NAME" "$VM_IMAGE"`
-           [ "${VM_IMAGE:0:5}" == "/dev/" ] || cleanup_and_exit 3
-           VM_SWAP=`cloud_volume_attach "$VM_SERVER" "$VM_VOLUME_SWAP" "$VM_SWAP"`
-           [ "${VM_SWAP:0:5}" == "/dev/" ] || cleanup_and_exit 3
-        fi
-	if [ "$VM_TYPE" = 'ec2' ]; then
-           VM_IMAGE=`cloud_volume_attach "$VM_SERVER" "$EC2_EXTRACT_VOLUME_root" "$VM_IMAGE"`
-           [ "${VM_IMAGE:0:5}" == "/dev/" ] || cleanup_and_exit 3
-           VM_SWAP=`cloud_volume_attach "$VM_SERVER" "$EC2_EXTRACT_VOLUME_swap" "$VM_SWAP"`
-           [ "${VM_SWAP:0:5}" == "/dev/" ] || cleanup_and_exit 3
-        fi
-
-        # Exctract build resutls from VM
-	if [ "$VM_TYPE" = 'emulator' ]; then
-            # Emulators may not offer to use a second swap space.
-            # So we just mount the filesystem.
-            # WARNING: This is not safe against attacks.
-
-	    mkdir -p $BUILD_ROOT/.build.packages
-	    cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
-            mkdir -p .mount
-            mount $VM_IMAGE -o loop .mount
-            if [ -e .mount/.build.packages ]; then
-              cp -a .mount/.build.packages/* .
-            fi
-            exitcode=`cat .mount/.build/_exitcode`
-            umount .mount
-            rmdir .mount
-
-	    cleanup_and_exit "$exitcode"
-
-	elif test -n "$VM_SWAP" ; then
-	    BUILDSTATUS=`dd if="$VM_SWAP" bs=12 count=1 2>/dev/null`
-	    case $BUILDSTATUS in
-	      BUILDSTATUS[02])
-		mkdir -p $BUILD_ROOT/.build.packages
-		cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
-		echo "build: extracting built packages..."
-		extractbuild --disk "$VM_IMAGE" --input "$VM_SWAP" --skip 512 -v || cleanup_and_exit 3
-		# create same layout as with plain chroot
-		if test "$BUILDTYPE" = spec ; then
-		    mkdir -p SRPMS
-		    for i in *src.rpm *.desktopfiles ; do
-			test -e "$i" || continue
-			mv "$i" SRPMS/
-		    done
-		    for i in *.rpm ; do
-			test -e "$i" || continue
-			arch=${i%.rpm}
-			arch=${i%.delta}
-			arch=${arch##*\.}
-			mkdir -p RPMS/$arch
-			mv "$i" RPMS/$arch/
-		    done
-		elif test "$BUILDTYPE" = dsc ; then
-		    mkdir -p DEBS
-		    find . -type f | while read i; do mv "$i" DEBS/; done
-		elif test "$BUILDTYPE" = arch ; then
-		    mkdir -p ARCHPKGS
-		    find . -type f | while read i; do mv "$i" ARCHPKGS/; done
-		elif test "$BUILDTYPE" = kiwi ; then
-		    mkdir -p KIWI
-		    find . -type f | while read i; do mv "$i" KIWI/; done
-		fi
-		for i in * ; do
-		    test -f "$i" || continue
-		    case $i in
-			_*|.*) ;;
-			*) mkdir -p OTHER ; mv $i OTHER/ ;;
-		    esac
-		done
-                if test "$statistics" = 1; then
-                    mkdir -p OTHER
-                    [ -e _statistics ] && mv _statistics OTHER/
-                    [ -e KIWI/_statistics ] && mv KIWI/_statistics OTHER/
-                    [ -n "$TIME_PREINSTALL" ] && echo "TIME_preinstall: $TIME_PREINSTALL"  >> OTHER/_statistics
-                    TIME_TOTAL=$(( `date +%s` - $TIME_START_TIME ))
-                    echo "TIME_total: $TIME_TOTAL"  >> OTHER/_statistics
-                fi
-		if [ "$VM_TYPE" = 'zvm' ]; then
-		    # free worker devices
-		    zvm_cp volume_detach_local $VM_VOLUME_ROOT ${zvm_worker_nr}
-		    zvm_cp volume_detach_local $VM_VOLUME_SWAP ${zvm_worker_nr}
-		fi
-	        if [ "$VM_TYPE" = 'openstack' ]; then
-                    cloud_volume_detach "$VM_SERVER" "$VM_VOLUME_NAME"
-                    cloud_volume_detach "$VM_SERVER" "$VM_VOLUME_SWAP"
-                fi
-		cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
-		;;
-	      BUILDSTATUS*)
-		if [ "$VM_TYPE" = 'zvm' ]; then
-		    # free worker devices
-		    zvm_cp volume_detach_local $VM_VOLUME_ROOT ${zvm_worker_nr}
-		    zvm_cp volume_detach_local $VM_VOLUME_SWAP ${zvm_worker_nr}
-		fi
-		cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
-		;;
-	      *)
-		if [ "$VM_TYPE" = 'zvm' ]; then
-		    # free worker devices
-		    zvm_cp volume_detach_local $VM_VOLUME_ROOT ${zvm_worker_nr}
-		    zvm_cp volume_detach_local $VM_VOLUME_SWAP ${zvm_worker_nr}
-		fi
-		echo "No buildstatus set, either the base system is broken (glibc/bash/perl)"
-		echo "or the build host has a kernel or hardware problem..."
-		cleanup_and_exit 3
-		;;
-	    esac
-
-	    cleanup_and_exit 1
-	fi
-
+	vm_first_stage
 	cleanup_and_exit 0
     fi
 
@@ -2759,8 +1243,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 
     # appliance builds must run as root
     if test "$BUILDTYPE" = kiwi; then
-      imagetype=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $SPECFILE imagetype)
-      test "$imagetype" = 'product' || BUILD_USER=root
+	imagetype=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $SPECFILE imagetype)
+	test "$imagetype" = 'product' || BUILD_USER=root
     fi
 
     if test $BUILD_USER = abuild ; then
@@ -2798,10 +1282,10 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    sed -i -e '/^abuild:/d' $BUILD_ROOT/etc/passwd
 	    sed -i -e '/^abuild:/d' $BUILD_ROOT/etc/group
 	    if test -f $BUILD_ROOT/etc/shadow ; then
-	      sed -i -e '/^abuild:/d' $BUILD_ROOT/etc/shadow
+		sed -i -e '/^abuild:/d' $BUILD_ROOT/etc/shadow
 	    fi
 	    if test -f $BUILD_ROOT/etc/gshadow ; then
-	      sed -i -e '/^abuild:/d' $BUILD_ROOT/etc/gshadow
+		sed -i -e '/^abuild:/d' $BUILD_ROOT/etc/gshadow
 	    fi
 	fi
     fi
@@ -2866,8 +1350,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	cp -p "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
     fi
     # strip prefix from autogenerated files of source services.
-    for i in $BUILD_ROOT$TOPDIR/SOURCES/_service\:*; do
-      mv "$i" "${i%/*}/${i##*:}"
+    for i in $BUILD_ROOT$TOPDIR/SOURCES/_service\:* ; do
+        mv "$i" "${i%/*}/${i##*:}"
     done
     SPECFILE="${SPECFILE##*:}"
 
@@ -2879,7 +1363,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	# do buildrequires/release substitution
 	args=()
 	if test -n "$RELEASE"; then
-		args=(--release "$RELEASE")
+	    args=(--release "$RELEASE")
 	fi
 	substitutedeps "${args[@]}" --root "$BUILD_ROOT" --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" $CHANGELOGARGS "$BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE" "$BUILD_ROOT/.spec.new" || cleanup_and_exit 1
 	# extract macros from configuration
@@ -2896,8 +1380,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 ' >> $BUILD_ROOT/root/.rpmmacros
 	fi
 
-	if [ -n "$BUILD_JOBS" ]; then
-		cat >> $BUILD_ROOT/root/.rpmmacros <<-EOF
+	if test -n "$BUILD_JOBS" ; then
+	    cat >> $BUILD_ROOT/root/.rpmmacros <<-EOF
 		%jobs $BUILD_JOBS
 		%_smp_mflags -j$BUILD_JOBS
 		EOF
@@ -2965,14 +1449,14 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
     echo -----------------------------------------------------------------
     echo -----------------------------------------------------------------
-    if [ -n "$RUNNING_IN_VM" ]; then
-	if [ -x /sbin/ip ]; then
+    if test -n "$RUNNING_IN_VM" ; then
+	if test -x /sbin/ip ; then
 	    ip addr add 127.0.0.1/8 dev lo
 	    ip link set lo up
 	else
 	    ifconfig lo 127.0.0.1 up
 	fi
-	if [ -n "$MYHOSTNAME" ]; then
+	if test -n "$MYHOSTNAME" ; then
 	    hostname "$MYHOSTNAME"
 	fi
     fi
@@ -3051,7 +1535,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 		> $BUILD_ROOT/.build.command
 	chmod 755 $BUILD_ROOT/.build.command
 	check_exit
-	if test -n "$shell"; then
+	if test -n "$RUN_SHELL"; then
 	    chroot $BUILD_ROOT su -
 	else
 	    chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
@@ -3063,7 +1547,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	# this allows the build environment to be manipulated
 	# and alternate build commands can be used
 # Debian policy requires to build with single CPU by default
-#	if [ -n "$BUILD_JOBS" ]; then
+#	if test -n "$BUILD_JOBS" ; then
 #	    DSC_BUILD_JOBS="-j$BUILD_JOBS"
 #	fi
 	DSC_BUILD_CMD="dpkg-buildpackage -us -uc -rfakeroot-tcp $DSC_BUILD_JOBS"
@@ -3073,7 +1557,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	    chmod +x $BUILD_ROOT/$TOPDIR/SOURCES/build.script
 	fi
 
-	if test -n "$shell"; then
+	if test -n "$RUN_SHELL"; then
 	    chroot $BUILD_ROOT su -
 	else
 	    chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
@@ -3106,7 +1590,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	. $BUILD_DIR/build_kiwi.sh
 	run_kiwi
     fi
-    if test "$statistics" = 1; then
+    if test "$DO_STATISTICS" = 1; then
         mkdir -p $TOPDIR/OTHER
         echo "TIME_main_build: $(( `date +%s` - $start_time ))"  >> $TOPDIR/OTHER/_statistics
     fi
@@ -3116,7 +1600,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     test -d "$SRCDIR" && cd "$SRCDIR"
 done
 
-if test -n "$RUNNING_IN_VM" -a -n "$VM_SWAP"; then
+if test -n "$RUNNING_IN_VM" -a -n "$DO_STATISTICS" ; then
     touch /.build/_statistics.exit
 fi
 
@@ -3213,71 +1697,7 @@ if test -n "$RPMS" \
     fi
 fi
 
-if test -n "$RUNNING_IN_VM"; then
-    if test "$statistics" = 1; then
-         echo "... saving built statistics"
-         [ -n "$TIME_INSTALL" ] && echo "TIME_install: $TIME_INSTALL"  >> $BUILD_ROOT$TOPDIR/OTHER/_statistics
-         if [ -e /.build/_statistics.df ]; then
-           echo -n "MAX_mb_used_on_disk: " >> $TOPDIR/OTHER/_statistics
-           cat /.build/_statistics.df >> $TOPDIR/OTHER/_statistics
-           echo "" >> $TOPDIR/OTHER/_statistics
-           rm /.build/_statistics.df
-         fi
-         if [ -e /.build/_statistics.memory ]; then
-           echo -n "MAX_mb_used_memory: " >> $TOPDIR/OTHER/_statistics
-           cat /.build/_statistics.memory >> $TOPDIR/OTHER/_statistics
-           echo "" >> $TOPDIR/OTHER/_statistics
-           rm /.build/_statistics.memory
-         fi
-         mkdir -p /sys
-         mount -n sys /sys -t sysfs
-         device="hda1"
-         [ -e /dev/sda ] && device="sda"
-         [ -e /dev/vda ] && device="vda"
-         [ -e /dev/dasda ] && device="dasda" # in z/VM
-         [ -e /dev/nfhd0 ] && device="nfhd0" # in aranym
-         if [ -e /sys/block/${device}/stat ]; then
-           disk=(`cat /sys/block/${device}/stat`)
-           [ "0${disk[0]}" -gt 0 ] && echo "IO_requests_read: ${disk[0]}"  >> $TOPDIR/OTHER/_statistics
-           [ "0${disk[2]}" -gt 0 ] && echo "IO_sectors_read: ${disk[2]}"   >> $TOPDIR/OTHER/_statistics
-           [ "0${disk[4]}" -gt 0 ] && echo "IO_requests_write: ${disk[4]}" >> $TOPDIR/OTHER/_statistics
-           [ "0${disk[6]}" -gt 0 ] && echo "IO_sectors_write: ${disk[6]}"  >> $TOPDIR/OTHER/_statistics
-         else
-           echo "ERROR: no root disk device found, yet another new device name?"
-           ls -l /sys/block/
-         fi
-         umount /sys
-    fi
-
-    if test -n "$VM_SWAP"; then
-         echo "... saving built packages"
-         swapoff "$VM_SWAP"
-         args="--padstart 512 --padend 512 -v"
-         case "$BUILDTYPE" in
-             spec)
-                 computeblocklists $args $TOPDIR/RPMS/*/*.{d,}rpm $TOPDIR/SRPMS/* $TOPDIR/OTHER/* > "$VM_SWAP"
-                 ;;
-             dsc)
-                 computeblocklists $args $TOPDIR/DEBS/*.deb $TOPDIR/SOURCES.DEB/* $TOPDIR/OTHER/* > "$VM_SWAP"
-                 ;;
-             kiwi)
-                 computeblocklists $args $TOPDIR/KIWI/* $TOPDIR/OTHER/* > "$VM_SWAP"
-                 ;;
-             arch)
-                 computeblocklists $args $TOPDIR/ARCHPKGS/* $TOPDIR/OTHER/* > "$VM_SWAP"
-                 ;;
-             preinstallimage)
-                 computeblocklists $args $TOPDIR/OTHER/* > "$VM_SWAP"
-                 ;;
-             *)
-                 cleanup_and_exit 1
-                 ;;
-         esac || cleanup_and_exit 1
-    else
-         # quit inside of the emulator
-         cleanup_and_exit "$exitcode"
-    fi
-fi
+test -n "$RUNNING_IN_VM" && vm_wrapup_build
 
 echo
 echo "$HOST finished \"build $SPECFILE\" at `date --utc`."

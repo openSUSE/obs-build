@@ -1,0 +1,777 @@
+#
+# VM specific functions for the build script
+#
+# (C) 2014 SUSE, Inc
+#
+
+# defaults for vm_img_mkfs
+vm_img_mkfs_ext4_options='-O ^has_journal,^huge_file,^resize_inode,sparse_super'
+vm_img_mkfs_ext4_extra='-E lazy_itable_init,discard'
+vm_img_mkfs_ext4="mkfs.ext4 -m 0 -q -F $vm_img_mkfs_ext4_options"
+vm_img_tunefs_ext4='tune2fs -c 0'
+vm_img_mkfs_ext3='mkfs.ext3 -m 0 -q -F'
+vm_img_tunefs_ext3='tune2fs -c 0 -o journal_data_writeback'
+vm_img_mkfs_ext2='mkfs.ext2 -m 0 -q -F'
+vm_img_tunefs_ext2='tune2fs -c 0'
+vm_img_mkfs_reiserfs='mkreiserfs -q -f'
+vm_img_mkfs_btrfs='mkfs.btrfs'
+vm_img_mkfs_xfs='mkfs.xfs -f'
+
+# guest visible swap device
+VM_SWAPDEV=/dev/hda2
+
+VM_TYPE=
+VM_IMAGE=
+VM_SWAP=
+VM_KERNEL=
+VM_INITRD=
+VM_WORKER=
+VM_SERVER=
+VM_MEMSIZE=
+VMDISK_ROOTSIZE=4096
+VMDISK_SWAPSIZE=1024
+VMDISK_FILESYSTEM=
+VMDISK_MOUNT_OPTIONS=__default
+VMDISK_CLEAN=
+
+# zvm specific?
+VM_WORKER_NR=
+
+# kvm specific?
+HUGETLBFSPATH=
+KVM_OPTIONS=
+
+# emulator specific?
+EMULATOR_SCRIPT=
+
+for i in ec2 emulator kvm lxc openstack qemu uml xen zvm ; do
+    . "$BUILD_DIR/build-vm-$i"
+done
+
+# the following functions just call the corresponding vm versions
+vm_kill() {
+    vm_kill_$VM_TYPE "$@"
+}
+
+vm_verify_options() {
+    vm_verify_options_$VM_TYPE "$@"
+}
+
+vm_attach_root() {
+    vm_attach_root_$VM_TYPE "$@"
+}
+
+vm_attach_swap() {
+    vm_attach_swap_$VM_TYPE "$@"
+}
+
+vm_detach_root() {
+    vm_detach_root_$VM_TYPE "$@"
+}
+
+vm_detach_swap() {
+    vm_detach_swap_$VM_TYPE "$@"
+}
+
+vm_fixup() {
+    vm_fixup_$VM_TYPE "$@"
+}
+
+vm_startup() {
+    vm_startup_$VM_TYPE "$@"
+}
+
+vm_kill() {
+    vm_kill_$VM_TYPE "$@"
+}
+
+vm_cleanup() {
+    vm_cleanup_$VM_TYPE "$@"
+}
+
+vm_parse_options() {
+    case ${PARAM/#--/-} in
+      -emulator-script)
+	needarg
+	EMULATOR_SCRIPT="$ARG"
+	shift
+      ;;
+      -xen|-kvm|-uml|-qemu|-emulator)
+	VM_TYPE=${PARAM##*-}
+	test -z "$VM_IMAGE" && VM_IMAGE=1
+	if test -n "$ARG" ; then
+	    VM_IMAGE="$ARG"
+	    shift
+	fi
+      ;;
+      -zvm|-lxc)
+        VM_TYPE=zvm
+	shift
+      ;;
+      -vm-type)
+	needarg
+	VM_TYPE="$ARG"
+	case "$VM_TYPE" in
+            zvm) ;;
+            ec2)
+		test -z "$VM_IMAGE" && VM_IMAGE=1
+                . /etc/profile.d/ec2.sh
+                EC2_INSTANCE_ID=`ec2-instance-id`
+                BUILD_EC2_ZONE=`ec2-meta-data placement/availability-zone`
+                BUILD_EC2_REGION=${BUILD_EC2_ZONE%?}
+	        ;;
+	    xen|kvm|uml|qemu|lxc|emulator|openstack)
+		test -z "$VM_IMAGE" && VM_IMAGE=1
+	        ;;
+	    none|chroot) VM_TYPE= ;;
+	    *)
+		echo "VM '$VM_TYPE' is not supported"
+		cleanup_and_exit
+	    ;;
+	esac
+	shift
+      ;;
+      -vm-worker)
+        needarg
+        VM_WORKER="$ARG"
+        shift
+      ;;
+      -vm-worker-nr|-vm-worker-no)
+        needarg
+        VM_WORKER_NR="$ARG"
+        shift
+      ;;
+      -vm-server|-vm-region)
+	needarg
+	VM_SERVER="$ARG"
+	shift
+      ;;
+      -vm-volumes)
+	needarg
+	VM_VOLUME_NAME="$ARG"
+	shift
+        ARG="$1"
+        test "$ARG" = "${ARG#-}" || ARG=
+	needarg
+	VM_VOLUME_SWAP="$ARG"
+	shift
+      ;;
+      -vm-disk)
+	needarg
+	VM_IMAGE="$ARG"
+	shift
+      ;;
+      -xenswap|-vm-swap|-swap)
+	needarg
+	VM_SWAP="$ARG"
+	shift
+      ;;
+      -xenmemory|-vm-memory|-memory)
+	needarg
+	VM_MEMSIZE="$ARG"
+	shift
+      ;;
+      -vm-kernel)
+	needarg
+	VM_KERNEL="$ARG"
+	shift
+      ;;
+      -vm-initrd)
+	needarg
+	VM_INITRD="$ARG"
+	shift
+      ;;
+      -vmdisk-rootsize|-vm-disk-size)
+	needarg
+	VMDISK_ROOTSIZE="$ARG"
+	shift
+      ;;
+      -vmdisk-swapsize|-vm-swap-size)
+	needarg
+	VMDISK_SWAPSIZE="$ARG"
+	shift
+      ;;
+      -vmdisk-filesystem|-vm-disk-filesystem)
+	needarg
+	VMDISK_FILESYSTEM="$ARG"
+	shift
+      ;;
+      -vmdisk-mount-options|-vm-disk-mount-options)
+       needarg
+       # options needs to be quoted to handle argument which might start with "-o ..."
+       VMDISK_MOUNT_OPTIONS=$(echo $ARG | sed 's/^\"\(.*\)\"$/\1/g')
+       shift
+      ;;
+      -vmdisk-clean)
+	# delete old root/swap to get rid of the old blocks
+        VMDISK_CLEAN=true
+      ;;
+      -rpmlist)
+	needarg
+	RPMLIST="--rpmlist $ARG"
+	BUILD_RPMS=
+	shift
+      ;;
+      -hugetlbfs)
+        HUGETLBFSPATH="$ARG"
+	shift
+      ;;
+      -*)
+	return 1
+    esac
+    nextargs=("$@")
+    return 0
+}
+
+
+#
+# shutdown the system from inside the VM
+#
+vm_shutdown() {
+    cd /
+    test -n "$1" || set 1
+    if test -n "$VM_SWAP" -a -e "$VM_SWAP" ; then
+	swapoff "$VM_SWAP" 2>/dev/null
+	echo -n "BUILDSTATUS$1" >"$VM_SWAP"
+    fi
+    exec >&0 2>&0	# so that the logging tee finishes
+    sleep 1		# wait till tee terminates
+    test "$VM_TYPE" = lxc && exit $1
+    kill -9 -1        # goodbye cruel world
+    if ! test -x /sbin/halt ; then
+	test -e /proc/sysrq-trigger || mount -n -tproc none /proc
+	sync
+	sleep 2	# like halt does
+	if test -e /proc/sysrq-trigger; then
+	    echo o > /proc/sysrq-trigger
+	    sleep 5 # wait for sysrq to take effect
+	else
+	    echo "Warning: VM doesn't support sysrq and /sbin/halt not installed"
+	fi
+    else
+	sync	# halt from systemd is not syncing anymore.
+	halt -f -p
+    fi
+    echo "Warning: clean shut down of the VM didn't work"
+    exit $1	# init died...
+}
+
+vm_img_create() {
+    local img="$1"
+    local size="$2"
+
+    echo "Creating $img (${size}M)"
+    mkdir -p "${img%/*}" || cleanup_and_exit 3
+
+    # prefer fallocate, which avoids fragmentation
+    r=1
+    if type -p fallocate > /dev/null ; then
+        fallocate -l "${size}M" "$img"
+        r=$?
+    fi
+    # fall back to dd method if fallocate is not supported
+    if test "$r" -gt 0 ; then
+        dd if=/dev/zero of="$img" bs=1M count=0 seek="$size" || cleanup_and_exit 3
+    fi
+}
+
+vm_img_mkfs() {
+    local fs="$1"
+    local img="$2"
+    local mkfs tunefs
+    eval "mkfs=\"\$vm_img_mkfs_${fs}\""
+    eval "mkfs_exta_options=\"\$vm_img_mkfs_${fs}_extra\""
+    eval "tunefs=\"\$vm_img_tunefs_${fs}\""
+
+    if test -z "$mkfs"; then
+	echo "filesystem \"$fs\" is not supported"
+	cleanup_and_exit 3
+    fi
+
+    echo "Creating $fs filesystem on $img"
+    if ! $mkfs $mkfs_exta_options "$img"; then
+        if test -z "$mkfs_exta_options"; then
+            cleanup_and_exit 3
+        else
+            echo "Format call failed, trying again without extra options..."
+            $mkfs "$img" || cleanup_and_exit 3
+        fi
+    fi
+    if test -n "$tunefs" ; then
+	$tunefs "$img" || cleanup_and_exit 3
+    fi
+}
+
+background_monitor_process() {
+    max_disk=0
+    max_mem=0
+    while sleep 5; do
+	test -e /.build/_statistics.exit  && exit 0
+
+	# memory usage
+	if test -e /proc/meminfo ; then
+	    memtotal=0
+	    while read key value unit; do
+		case $key in
+		    MemTotal:|SwapTotal:) memtotal=$(( $memtotal + $value )) ;;
+		    MemFree:|SwapFree:|SwapCached:|Cached:|Buffers:) memtotal=$(( $memtotal - $value )) ;;
+		esac
+	    done < /proc/meminfo
+	    if test ${memtotal} -gt $max_mem ; then
+		max_mem="${memtotal}"
+		echo -n $(( $max_mem / 1024 )) > /.build/_statistics.memory.new && mv /.build/_statistics.memory.new /.build/_statistics.memory
+	    fi
+	fi
+
+	# disk storage usage
+	if type -p df >& /dev/null; then
+	    c=(`df -m / 2>/dev/null | tail -n 1`)
+
+	    if test ${c[2]} -gt $max_disk ; then
+		max_disk="${c[2]}"
+		echo -n $max_disk > /.build/_statistics.df.new && mv /.build/_statistics.df.new /.build/_statistics.df
+	    fi
+	fi
+    done
+}
+
+# used before calling kvm or xen
+linux64() {
+    perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' "$@"
+}
+
+vm_detect_2nd_stage() {
+    if test ! -e /.build/build.data -o -n "$BUILD_IGNORE_2ND_STAGE" ; then
+	return 1
+    fi
+    . /.build/build.data
+    if test -z "$VM_TYPE" ; then
+	return 1
+    fi
+    if test $$ -eq 1 || test $$ -eq 2 ; then
+	# ignore special init signals if we're init
+	# we're using ' ' instead of '' so that the signal handlers
+	# are reset in the child processes
+	trap ' ' HUP TERM
+	$0 "$@"
+	cleanup_and_exit $?
+    fi
+
+    echo "2nd stage started in virtual machine"
+    BUILD_ROOT=/
+    BUILD_DIR=/.build
+    echo "machine type: `uname -m`"
+    if test "$PERSONALITY" != 0 -a -z "$PERSONALITY_SET" ; then
+	export PERSONALITY_SET=true
+	echo "switching personality to $PERSONALITY..."
+	# this is 32bit perl/glibc, thus the 32bit syscall number
+	exec perl -e 'syscall(136, '$PERSONALITY') == -1 && warn("personality: $!\n");exec "/.build/build" || die("/.build/build: $!\n")'
+    fi
+    RUNNING_IN_VM=true
+    test -e /proc/version || mount -orw -n -tproc none /proc
+    if test "$VM_TYPE" != lxc; then
+	mount -n ${VMDISK_MOUNT_OPTIONS},remount,rw /
+    fi
+    umount /run >/dev/null 2>&1
+    # mount /sys
+    if ! test -e /sys/block; then
+       mkdir -p /sys
+       mount -orw -n -tsysfs sysfs /sys
+    fi
+# qemu inside of xen does not work, check again with kvm later before enabling this
+#    if test -e /dev/kqemu ; then
+#        # allow abuild user to run qemu
+#        chmod 0666 /dev/kqemu
+#    fi
+
+    if test -n "$VM_SWAP" ; then
+	for i in 1 2 3 4 5 6 7 8 9 10 ; do
+	    test -e "$VM_SWAP" && break
+	    test $i = 1 && echo "waiting for $VM_SWAP to appear"
+	    echo -n .
+	    sleep 1
+	done
+	test $i = 1 || echo
+	# recreate the swap device manually if it didn't exist for some
+	# reason, hardcoded to hda2 atm
+	if ! test -b "$VM_SWAP" ; then
+	    rm -f "$VM_SWAP"
+	    umask 027
+	    mknod "$VM_SWAP" b 3 2
+	    umask 022
+	fi
+	# Usually the external system is writing the swap signature, but EC2 volume
+	# attach is very slow, so let's do it in the VM for now.
+	test "$VM_TYPE" = ec2 && mkswap "$VM_SWAP"
+	swapon -v "$VM_SWAP" || exit 1
+    fi
+    HOST="$MYHOSTNAME"
+
+    # fork a process monitoring max filesystem usage during build
+    if test "$DO_STATISTICS" = 1 ; then
+	rm -f /.build/_statistics.exit
+        ( background_monitor_process & )
+    fi
+
+    if test ! -e /dev/.udev ; then
+        echo "WARNING: udev not running, creating extra device nodes"
+        test -e /dev/fd || ln -sf /proc/self/fd /dev/fd
+        test -e /etc/mtab || ln -sf /proc/mounts /etc/mtab
+    fi
+
+    # set date to build start on broken systems (now < build start)
+    if test $(date '+%s') -lt $(date -r /.build/.date '+%s') ; then
+        echo -n "WARNING: system has a broken clock, setting it to a newer time: "
+        date -s `cat /.build/.date`
+    fi
+
+    return 0
+}
+
+vm_set_mount_options() {
+    if test "$VMDISK_MOUNT_OPTIONS" = __default; then
+	if test "$VMDISK_FILESYSTEM" = reiserfs ; then
+	    VMDISK_MOUNT_OPTIONS='-o data=writeback,commit=150,noatime'
+	elif test "$VMDISK_FILESYSTEM" = btrfs ; then
+	    VMDISK_MOUNT_OPTIONS='-o nobarrier,noatime'
+	elif test "$VMDISK_FILESYSTEM" = "ext4" ; then
+	    VMDISK_MOUNT_OPTIONS='-o noatime'
+	elif test "$VMDISK_FILESYSTEM" = "ext3" ; then
+	    VMDISK_MOUNT_OPTIONS='-o data=writeback,nobarrier,commit=150,noatime'
+	elif test "$VMDISK_FILESYSTEM" = "ext2" ; then
+	    VMDISK_MOUNT_OPTIONS='-o noacl,noatime'
+	elif test "$VMDISK_FILESYSTEM" = "xfs" ; then
+	    VMDISK_MOUNT_OPTIONS='-o noatime'
+	else
+	    VMDISK_MOUNT_OPTIONS='-o noatime'
+	fi
+    fi
+}
+
+#
+# create file system and swap space, mount file system to $BUILD_ROOT
+#
+vm_setup() {
+    vm_set_mount_options
+    if test "$VM_IMAGE" = 1 ; then
+	VM_IMAGE="$BUILD_ROOT.img"
+	if test -z "$VM_SWAP" -a "$VM_TYPE" != emulator; then
+	    VM_SWAP="$BUILD_ROOT.swap"
+	fi
+	echo "VM_IMAGE: $VM_IMAGE, VM_SWAP: $VM_SWAP"
+    else
+	echo "VM_IMAGE: $VM_IMAGE, VM_SWAP: $VM_SWAP"
+        vm_attach_root
+    fi
+    # this should not be needed, but sometimes a xen instance got lost
+    test "$VM_TYPE" = xen && vm_purge_xen
+    if test -n "$VMDISK_CLEAN" ; then
+	# delete old root/swap to get rid of the old blocks
+	if test -f "$VM_IMAGE" ; then
+	    echo "Deleting old $VM_IMAGE"
+	    rm -rf "$VM_IMAGE"
+	fi
+	if test -n "$VM_SWAP" -a -f "$VM_SWAP" ; then
+	    echo "Deleting old $VM_SWAP"
+	    rm -rf "$VM_SWAP"
+	fi
+    fi
+    if test ! -e "$VM_IMAGE" ; then
+	vm_img_create "$VM_IMAGE" "$VMDISK_ROOTSIZE"
+	if test -z "$CLEAN_BUILD" ; then
+	    vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE"
+	fi
+    fi
+    if test -n "$VM_SWAP" -a ! -e "$VM_SWAP" -a ! -b "$VM_SWAP" ; then
+	vm_img_create "$VM_SWAP" "$VMDISK_SWAPSIZE"
+    fi
+    if test ! -e "$VM_IMAGE" ; then
+	echo "you need to create $VM_IMAGE first"
+	cleanup_and_exit 3
+    fi
+    if test -n "$CLEAN_BUILD" ; then
+	vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE" || cleanup_and_exit 3
+    fi
+    # now mount root/swap
+    mkdir_build_root
+    if test -w /root ; then
+	if test -b $VM_IMAGE ; then
+	    # mount device directly
+	    mount $VMDISK_MOUNT_OPTIONS $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 3
+	else
+	    mount ${VMDISK_MOUNT_OPTIONS},loop $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 3
+	fi
+    else
+	if ! mount $BUILD_ROOT; then
+	    echo "mounting the build root failed. An fstab entry is probably missing or incorrect."
+	    echo "/etc/fstab should contain an entry like this:"
+	    echo "$VM_IMAGE $BUILD_ROOT auto noauto,user,loop 0 0"
+	    cleanup_and_exit 3
+	fi
+    fi
+    if test -n "$VM_SWAP" ; then
+	vm_attach_swap
+	dd if=/dev/zero of="$VM_SWAP" bs=1024 count=1 conv=notrunc 2>/dev/null
+	echo "mkswap $VM_SWAP"
+	mkswap "$VM_SWAP"
+	vm_detach_swap
+    fi
+}
+
+#
+# prepare for vm startup
+#
+vm_first_stage() {
+    rm -rf "$BUILD_ROOT/.build"
+    mkdir -p "$BUILD_ROOT/.build"
+    if test "$DO_INIT" = true ; then
+	# do first stage of init_buildsystem
+	rm -f $BUILD_ROOT/.build.success
+	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USE_SYSTEM_QEMU $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
+	echo "$* ..."
+	start_time=`date +%s`
+	"$@" || cleanup_and_exit 1
+	check_exit
+	TIME_PREINSTALL=$(( `date +%s` - $start_time ))
+	unset start_time
+	if test ! -w /root ; then
+	    # remove setuid bit if files belong to user to make e.g. mount work
+	    find $BUILD_ROOT/{bin,sbin,usr/bin,usr/sbin} -type f -uid $UID -perm +4000 -print0 | xargs -0 --no-run-if-empty chmod -s
+	fi
+	copy_oldpackages
+    fi
+
+    # start up VM, rerun ourself
+    cp -a $BUILD_DIR/. $BUILD_ROOT/.build
+    if ! test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
+	rm -rf "$BUILD_ROOT/.build-srcdir"
+	mkdir "$BUILD_ROOT/.build-srcdir"
+	if test "$BUILDTYPE" = kiwi ; then
+	    cp -pRL "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
+	else
+	    cp -p "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
+	fi
+	MYSRCDIR=$BUILD_ROOT/.build-srcdir
+    else
+	# cwd is at $BUILD_ROOT/.build-srcdir which we want to
+	# umount later so step aside
+	cd "$SRCDIR"
+    fi
+    # put our config into .build/build.data
+    Q="'\''"
+    echo "SPECFILE='${SPECFILE//"'"/$Q}'" > $BUILD_ROOT/.build/build.data
+    echo "BUILD_JOBS='${BUILD_JOBS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    echo "BUILD_ARCH='${BUILD_ARCH//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    echo "BUILD_RPMS='${BUILD_RPMS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    case $BUILD_DIST in
+	*/*)
+	    cp $BUILD_DIST $BUILD_ROOT/.build/build.dist
+	    BUILD_DIST=/.build/build.dist
+	    ;;
+    esac
+    echo "BUILD_DIST='${BUILD_DIST//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    echo "RELEASE='${RELEASE//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    echo "BUILD_DEBUG='${BUILD_DEBUG//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    echo "SIGNDUMMY='${SIGNDUMMY//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    echo "DO_LINT='${DO_LINT//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    echo "DO_CHECKS='${DO_CHECKS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    echo "NOROOTFORBUILD='${NOROOTFORBUILD//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    echo "CREATE_BASELIBS='$CREATE_BASELIBS'" >> $BUILD_ROOT/.build/build.data
+    echo "REASON='${REASON//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    echo "CHANGELOG='${CHANGELOG//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    echo "INCARNATION='${INCARNATION//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    echo "DISTURL='${DISTURL//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    echo "DO_INIT='${DO_INIT//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    echo "KIWI_PARAMETERS='${KIWI_PARAMETERS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    test -n "$VM_SWAP" && echo "VM_SWAP='${VM_SWAPDEV//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    test -n "$VMDISK_MOUNT_OPTIONS" && echo "VMDISK_MOUNT_OPTIONS='${VMDISK_MOUNT_OPTIONS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    PERSONALITY=0
+    test -n "$PERSONALITY_SYSCALL" -a "$VM_TYPE" != lxc && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
+    test "$(uname -m)" = ppc && PERSONALITY=8		# ppc kernel never tells us if a 32bit personality is active
+    echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
+    echo "MYHOSTNAME='`hostname`'" >> $BUILD_ROOT/.build/build.data
+    echo -n "definesnstuff=(" >> $BUILD_ROOT/.build/build.data
+    shellquote "${definesnstuff[@]}" >> $BUILD_ROOT/.build/build.data
+    echo ")" >> $BUILD_ROOT/.build/build.data
+    echo -n "repos=(" >> $BUILD_ROOT/.build/build.data
+    shellquote "${repos[@]}" >> $BUILD_ROOT/.build/build.data
+    echo ")" >> $BUILD_ROOT/.build/build.data
+    echo "VM_TYPE='$VM_TYPE'" >> $BUILD_ROOT/.build/build.data
+    echo "RUN_SHELL='$RUN_SHELL'" >> $BUILD_ROOT/.build/build.data
+    echo "DO_STATISTICS='$DO_STATISTICS'" >> $BUILD_ROOT/.build/build.data
+    # fallback time for broken hosts
+    date '+@%s' > $BUILD_ROOT/.build/.date
+    # do vm specific fixups
+    vm_fixup
+    # we're done with the root file system, unmount
+    umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
+    umount -n $BUILD_ROOT/proc 2> /dev/null || true
+    umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
+    umount -n $BUILD_ROOT/dev/shm 2> /dev/null || true
+    umount -n $BUILD_ROOT/mnt 2> /dev/null || true
+
+    vm_init_script="/.build/build"
+    if check_use_emulator ; then
+	vm_init_script="/.build/$INITVM_NAME"
+    fi
+    if test -n "$VM_IMAGE" ; then
+	# copy out kernel & initrd (if they exist) during unmounting VM image
+	KERNEL_TEMP_DIR=
+	if test -e  "$BUILD_ROOT/.build.kernel.$VM_TYPE" ; then
+	    KERNEL_TEMP_DIR=`mktemp -d`
+	    cp "$BUILD_ROOT/.build.kernel.$VM_TYPE" "$KERNEL_TEMP_DIR/kernel"
+	    if test -e  "$BUILD_ROOT/.build.initrd.$VM_TYPE" ; then
+	        cp "$BUILD_ROOT/.build.initrd.$VM_TYPE" "$KERNEL_TEMP_DIR/initrd"
+	    fi
+	fi
+	check_exit
+	# needs to work otherwise we have a corrupted file system
+	if ! umount $BUILD_ROOT; then
+	    rm -rf "$KERNEL_TEMP_DIR"
+	    cleanup_and_exit 3
+	fi
+	# copy back the kernel and set it for VM
+	if test -n "$KERNEL_TEMP_DIR" ; then
+	    mkdir -p "$BUILD_ROOT/boot"
+	    mv "$KERNEL_TEMP_DIR/kernel" "$BUILD_ROOT/boot/kernel"
+	    vm_kernel="$BUILD_ROOT/boot/kernel"
+	    if test -e "$KERNEL_TEMP_DIR/initrd" ; then
+	        mv "$KERNEL_TEMP_DIR/initrd" "$BUILD_ROOT/boot/initrd"
+	        vm_initrd="$BUILD_ROOT/boot/initrd"
+	    fi
+	    rmdir "$KERNEL_TEMP_DIR"
+	fi
+    fi
+    vm_detach_root
+
+    echo "booting $VM_TYPE..."
+    vm_startup
+
+    vm_attach_root
+    if test -n "$VM_SWAP" ; then
+	vm_attach_swap
+	BUILDSTATUS=`dd if="$VM_SWAP" bs=12 count=1 2>/dev/null`
+	case $BUILDSTATUS in
+	  BUILDSTATUS[02])
+	    mkdir -p $BUILD_ROOT/.build.packages
+	    cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
+	    echo "build: extracting built packages..."
+	    extractbuild --disk "$VM_IMAGE" --input "$VM_SWAP" --skip 512 -v || cleanup_and_exit 3
+	    # create same layout as with plain chroot
+	    if test "$BUILDTYPE" = spec ; then
+		mkdir -p SRPMS
+		for i in *src.rpm *.desktopfiles ; do
+		    test -e "$i" || continue
+		    mv "$i" SRPMS/
+		done
+		for i in *.rpm ; do
+		    test -e "$i" || continue
+		    arch=${i%.rpm}
+		    arch=${i%.delta}
+		    arch=${arch##*\.}
+		    mkdir -p RPMS/$arch
+		    mv "$i" RPMS/$arch/
+		done
+	    elif test "$BUILDTYPE" = dsc ; then
+		mkdir -p DEBS
+		find . -type f | while read i; do mv "$i" DEBS/; done
+	    elif test "$BUILDTYPE" = arch ; then
+		mkdir -p ARCHPKGS
+		find . -type f | while read i; do mv "$i" ARCHPKGS/; done
+	    elif test "$BUILDTYPE" = kiwi ; then
+		mkdir -p KIWI
+		find . -type f | while read i; do mv "$i" KIWI/; done
+	    fi
+	    for i in * ; do
+		test -f "$i" || continue
+		case $i in
+		    _*|.*) ;;
+		    *) mkdir -p OTHER ; mv $i OTHER/ ;;
+		esac
+	    done
+	    if test "$DO_STATISTICS" = 1; then
+		mkdir -p OTHER
+		test -e _statistics && mv _statistics OTHER/
+		test -e KIWI/_statistics && mv KIWI/_statistics OTHER/
+		test -n "$TIME_PREINSTALL" && echo "TIME_preinstall: $TIME_PREINSTALL"  >> OTHER/_statistics
+		TIME_TOTAL=$(( `date +%s` - $TIME_START_TIME ))
+		echo "TIME_total: $TIME_TOTAL"  >> OTHER/_statistics
+	    fi
+	    cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
+	    ;;
+	  BUILDSTATUS*)
+	    cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
+	    ;;
+	  *)
+	    echo "No buildstatus set, either the base system is broken (glibc/bash/perl)"
+	    echo "or the build host has a kernel or hardware problem..."
+	    cleanup_and_exit 3
+	    ;;
+	esac
+	cleanup_and_exit 1
+    fi
+}
+
+vm_save_statistics() {
+     echo "... saving built statistics"
+     test -n "$TIME_INSTALL" && echo "TIME_install: $TIME_INSTALL"  >> $BUILD_ROOT$TOPDIR/OTHER/_statistics
+     if test -e /.build/_statistics.df ; then
+	 echo -n "MAX_mb_used_on_disk: " >> $TOPDIR/OTHER/_statistics
+	 cat /.build/_statistics.df >> $TOPDIR/OTHER/_statistics
+	 echo "" >> $TOPDIR/OTHER/_statistics
+	 rm /.build/_statistics.df
+     fi
+     if test -e /.build/_statistics.memory ; then
+	 echo -n "MAX_mb_used_memory: " >> $TOPDIR/OTHER/_statistics
+	 cat /.build/_statistics.memory >> $TOPDIR/OTHER/_statistics
+	 echo "" >> $TOPDIR/OTHER/_statistics
+	 rm /.build/_statistics.memory
+     fi
+     mkdir -p /sys
+     mount -n sys /sys -t sysfs
+     device="hda1"
+     test -e /dev/sda && device="sda"
+     test -e /dev/vda && device="vda"
+     test -e /dev/dasda && device="dasda" # in z/VM
+     test -e /dev/nfhd0 && device="nfhd0" # in aranym
+     if test -e /sys/block/${device}/stat ; then
+	 disk=(`cat /sys/block/${device}/stat`)
+	 test "0${disk[0]}" -gt 0 && echo "IO_requests_read: ${disk[0]}"  >> $TOPDIR/OTHER/_statistics
+	 test "0${disk[2]}" -gt 0 && echo "IO_sectors_read: ${disk[2]}"   >> $TOPDIR/OTHER/_statistics
+	 test "0${disk[4]}" -gt 0 && echo "IO_requests_write: ${disk[4]}" >> $TOPDIR/OTHER/_statistics
+	 test "0${disk[6]}" -gt 0 && echo "IO_sectors_write: ${disk[6]}"  >> $TOPDIR/OTHER/_statistics
+     else
+	 echo "ERROR: no root disk device found, yet another new device name?"
+	 ls -l /sys/block/
+     fi
+     umount /sys
+}
+
+vm_wrapup_build() {
+    test "$DO_STATISTICS" = 1 && vm_save_statistics
+    if test -n "$VM_SWAP"; then
+         echo "... saving built packages"
+         swapoff "$VM_SWAP"
+         args="--padstart 512 --padend 512 -v"
+         case "$BUILDTYPE" in
+             spec)
+                 computeblocklists $args $TOPDIR/RPMS/*/*.{d,}rpm $TOPDIR/SRPMS/* $TOPDIR/OTHER/* > "$VM_SWAP"
+                 ;;
+             dsc)
+                 computeblocklists $args $TOPDIR/DEBS/*.deb $TOPDIR/SOURCES.DEB/* $TOPDIR/OTHER/* > "$VM_SWAP"
+                 ;;
+             kiwi)
+                 computeblocklists $args $TOPDIR/KIWI/* $TOPDIR/OTHER/* > "$VM_SWAP"
+                 ;;
+             arch)
+                 computeblocklists $args $TOPDIR/ARCHPKGS/* $TOPDIR/OTHER/* > "$VM_SWAP"
+                 ;;
+             preinstallimage)
+                 computeblocklists $args $TOPDIR/OTHER/* > "$VM_SWAP"
+                 ;;
+             *)
+                 cleanup_and_exit 1
+                 ;;
+         esac || cleanup_and_exit 1
+    fi
+}

@@ -1,0 +1,59 @@
+#
+# LXC specific functions
+#
+# (C) 2014 SUSE, Inc
+#
+
+vm_verify_options_lxc() {
+    VM_IMAGE=
+    VM_SWAP=
+}
+
+vm_startup_lxc() {
+    LXCCONF="$BUILD_ROOT/.build.lxc.conf"
+    rm -f "$LXCCONF"
+    cat $BUILD_DIR/lxc.conf > "$LXCCONF"
+    cat >> "$LXCCONF" <<-EOF
+	lxc.rootfs = $BUILD_ROOT
+	EOF
+    # XXX: do this always instead of leaking the hosts' one?
+    echo "rootfs / rootfs rw 0 0" > $BUILD_ROOT/etc/mtab
+    LXCID=${BUILD_ROOT##*/}
+    lxc-destroy -n "$LXCID" >/dev/null 2>&1 || true
+    lxc-create -n "$LXCID" -f "$LXCCONF" || cleanup_and_exit 1
+    lxc-start -n "$LXCID" "$vm_init_script"
+    BUILDSTATUS="$?"
+    test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
+    cleanup_and_exit "$BUILDSTATUS"
+}
+
+vm_kill_lxc() {
+    LXCID=${BUILD_ROOT##*/}
+    lxc-stop -n "$LXCID" || true
+    lxc-destroy -n "$LXCID"
+}
+
+vm_fixup_lxc() {
+    :
+}
+
+vm_attach_root_lxc() {
+    :
+}
+
+vm_attach_swap_lxc() {
+    :
+}
+
+vm_detach_root_lxc() {
+    :
+}
+
+vm_detach_swap_lxc() {
+    :
+}
+
+vm_cleanup_lxc() {
+    :
+}
+
