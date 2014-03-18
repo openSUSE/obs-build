@@ -16,22 +16,15 @@ zvm_init_script="/.build/build"
 
 # this once was in zvm_functions
 
-zvm_cleanup_and_exit() {
-    if test -n "$1"; then
-        echo "$1"
-        umount ${BUILD_ROOT}/proc
-        umount ${BUILD_ROOT}/dev/pts
-        cleanup_and_exit 1
-    else
-        exit 0
-        cleanup_and_exit 1
-    fi
+zvm_fatal() {
+    echo "$1"
+    test -n "$ZVM_CLEANUP" && exit 1
+    cleanup_and_exit 1
 }
 
 prevent_detach() {
     if test "$1" = "150" -o "$1" = "0150"; then
-        echo "don't detach local root"
-        zvm_cleanup_and_exit 1
+        zvm_fatal "don't detach local root"
     fi
 }
 
@@ -42,7 +35,7 @@ zvm_memset() {
     # Note, that this is also limited by the worker definition in the user directory
     if test -n "$2"; then
         if ! vmcp send $1 define storage ${2}M ; then
-            zvm_cleanup_and_exit "Could not redefine storage of $1 to ${2}M"
+            zvm_fatal "Could not redefine storage of $1 to ${2}M"
         fi
     fi
 }
@@ -58,7 +51,7 @@ zvm_logon() {
         fi
         if ! $(vmcp q "$1" >& /dev/null) ; then
             if ! $(vmcp xautolog $1 >& /dev/null) ; then
-                zvm_cleanup_and_exit "Could not start machine $1. Is $1 defined in the user directory?"
+                zvm_fatal "Could not start machine $1. Is $1 defined in the user directory?"
             else
                 # give the worker a moment to initialize
                 sleep 2
@@ -73,14 +66,14 @@ zvm_ipl() {
     # IPL worker. Needs user as $1 and ipl device as $2.
     if test -n "$1" -a -n "$2" ; then
         if ! $(vmcp q "$1" >& /dev/null); then
-            zvm_cleanup_and_exit "User $1 not logged on."
+            zvm_fatal "User $1 not logged on."
         else
             if ! $(vmcp send $1 ipl $2); then
-                 zvm_cleanup_and_exit "Could not send command to $1"
+                 zvm_fatal "Could not send command to $1"
             fi
         fi
     else
-        zvm_cleanup_and_exit "Not enough arguments for ipl. Need user and device number."
+        zvm_fatal "Not enough arguments for ipl. Need user and device number."
     fi
 }
 
@@ -90,7 +83,7 @@ zvm_destroy() {
     # needs user as $1
     if test -n "$1"; then
         if ! $(vmcp force $1 ) ; then
-            zvm_cleanup_and_exit "Could not force $1"
+            zvm_fatal "Could not force $1"
         fi
     fi
 }
@@ -100,8 +93,8 @@ zvm_get_local_devnr() {
     # $2 is worker number
     # there is room for up to 100 workers for this controlling guest, however in our setup I expect only up to 10 workers.
     #echo "Debug: zvm_get_local_devnr: arg1: $1 arg2: $2"
-    if test $2 -ge 100 ; then
-        zvm_cleanup_and_exit "Not more than 100 workers supported by one controlling guest."
+    if test "$2" -ge 100 ; then
+        zvm_fatal "Not more than 100 workers supported by one controlling guest."
     fi
     if test "$1" = "0150" -o "$1" = "150" ; then 
         DEVNR=$((300+$2))
@@ -109,7 +102,7 @@ zvm_get_local_devnr() {
         if test "$1" = "0250" -o "$1" = "250" ; then 
             DEVNR=$((400+$2))
         else
-            zvm_cleanup_and_exit "The disk devices for root and swap must be 150 and 250 respectively."
+            zvm_fatal "The disk devices for root and swap must be 150 and 250 respectively."
         fi
     fi
     echo $DEVNR
@@ -128,17 +121,17 @@ zvm_volume_link_local() {
     if test -n "$4"; then
         DEVNR=$(zvm_get_local_devnr $2 $4)
         if ! vmcp link $1 $2 $DEVNR MW pass=THR4ME >& /dev/null ; then
-            zvm_cleanup_and_exit "Could not link disk $2 from user $1 to local device $DEVNR."
+            zvm_fatal "Could not link disk $2 from user $1 to local device $DEVNR."
         fi
         dasd_configure 0.0.0$DEVNR 1 0 >& /dev/null
 	udevadm settle
         DEVICE=$(ls /sys/bus/ccw/devices/0.0.0$DEVNR/block/)
         if ! test -b /dev/${DEVICE}1 ; then
-            zvm_cleanup_and_exit "The device /sys/bus/ccw/devices/0.0.0$DEVNR has not been setup correctly."
+            zvm_fatal "The device /sys/bus/ccw/devices/0.0.0$DEVNR has not been setup correctly."
         fi
         echo "${DEVICE}1"
     else
-        zvm_cleanup_and_exit "Not enough arguments given to volume_link_local."
+        zvm_fatal "Not enough arguments given to volume_link_local."
     fi 
 }
 
@@ -150,7 +143,7 @@ zvm_volume_detach_local() {
     prevent_detach $DEVNR
     dasd_configure 0.0.0$DEVNR 0 0
     if ! vmcp detach $DEVNR >& /dev/null ; then
-        zvm_cleanup_and_exit "Could not locally detach disk number $1 from worker $2"
+        zvm_fatal "Could not locally detach disk number $1 from worker $2"
     fi
 }
 
@@ -160,7 +153,7 @@ zvm_volume_attach() {
     # $2: disk device number
     # send link * nr nr
     if ! vmcp send $1 link \* $2 $2 ; then
-        zvm_cleanup_and_exit "Could not link remote worker disk number $2 from user $1"
+        zvm_fatal "Could not link remote worker disk number $2 from user $1"
     fi 
 }
 
@@ -169,7 +162,7 @@ zvm_volume_detach() {
     # $1: user name
     # $2: disk
     if ! vmcp send $1 detach $2 ; then
-        zvm_cleanup_and_exit "Could not detach disk $2 on worker $1"
+        zvm_fatal "Could not detach disk $2 on worker $1"
     fi
 }
 
@@ -209,7 +202,7 @@ zvm_worker_init() {
 }
 
 zvm_cp() {
-    modprobe vmcp || zvm_cleanup_and_exit "Cannod load vmcp module"
+    modprobe vmcp || zvm_fatal "Cannod load vmcp module"
     if test -n "$1" ; then
         case "$1" in 
             start)                shift ; zvm_logon "$@"         ;;
@@ -348,9 +341,12 @@ vm_detach_swap_zvm() {
 }
 
 vm_cleanup_zvm() {
-    zvm_cp volume_detach $VM_WORKER $VM_VOLUME_ROOT
-    zvm_cp volume_detach $VM_WORKER $VM_VOLUME_SWAP
-    zvm_cp volume_detach_local $VM_VOLUME_ROOT $VM_WORKER_NR
-    zvm_cp volume_detach_local $VM_VOLUME_SWAP $VM_WORKER_NR
+    if test -n "$VM_WORKER" -a -n "$VM_WORKER_NR" -a -n "$VM_VOLUME_ROOT" -a -n "$VM_VOLUME_SWAP" ; then
+	ZVM_CLEANUP=1
+	(zvm_cp volume_detach $VM_WORKER $VM_VOLUME_ROOT >/dev/null 2>&1)
+	(zvm_cp volume_detach $VM_WORKER $VM_VOLUME_SWAP >/dev/null 2>&1)
+	(zvm_cp volume_detach_local $VM_VOLUME_ROOT $VM_WORKER_NR >/dev/null 2>&1)
+	(zvm_cp volume_detach_local $VM_VOLUME_SWAP $VM_WORKER_NR >/dev/null 2>&1)
+    fi
 }
 
