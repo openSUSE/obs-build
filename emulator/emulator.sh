@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "ERROR: the emulator.sh script got not changed to support your emulator!"
+echo "ERROR: the emulator.sh script needs to be changed to support your emulator!"
 exit 1
 
 
