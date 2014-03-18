@@ -335,6 +335,20 @@ background_monitor_process() {
     done
 }
 
+vm_set_personality_syscall() {
+    local archname
+    archname=`perl -V:archname 2>/dev/null`
+    archname="${archname#archname=?}"
+    case "$archname" in
+	x86_64*) PERSONALITY_SYSCALL=135 ;;
+	alpha*) PERSONALITY_SYSCALL=324 ;;
+	sparc*) PERSONALITY_SYSCALL=191 ;;
+	ia64*) PERSONALITY_SYSCALL=1140 ;;
+	i?86*|ppc*|aarch64*|arm*|sh4|cris|m68k*|s390*|unicore32|microblaze)   PERSONALITY_SYSCALL=136 ;;
+	*) echo "Unknown architecture personality: '$archname'"; cleanup_and_exit 1 ;;
+    esac
+}
+
 # used before calling kvm or xen
 linux64() {
     perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' "$@"
@@ -522,6 +536,7 @@ vm_setup() {
 # prepare for vm startup
 #
 vm_first_stage() {
+    vm_set_personality_syscall
     rm -rf "$BUILD_ROOT/.build"
     mkdir -p "$BUILD_ROOT/.build"
     if test "$DO_INIT" = true ; then

@@ -61,7 +61,6 @@ LOGFILE=
 KILL=
 CHANGELOG=
 BUILD_DEBUG=
-PERSONALITY_SYSCALL=
 INCARNATION=
 DISTURL=
 LINKSOURCES=
@@ -639,17 +638,6 @@ mkdir_build_root() {
 
 trap fail_exit EXIT
 
-archname=`perl -V:archname`
-archname="${archname#archname=?}"
-case "$archname" in
-    x86_64*) PERSONALITY_SYSCALL=135 ;;
-    alpha*) PERSONALITY_SYSCALL=324 ;;
-    sparc*) PERSONALITY_SYSCALL=191 ;;
-    ia64*) PERSONALITY_SYSCALL=1140 ;;
-    i?86*|ppc*|aarch64*|arm*|sh4|cris|m68k*|s390*|unicore32|microblaze)   PERSONALITY_SYSCALL=136 ;;
-    *) echo "ARCHITECTURE PERSONALITY IS UNKNOWN"; exit 1;;
-esac
-
 shopt -s nullglob
 
 export PATH=$BUILD_DIR:/sbin:/usr/sbin:$PATH
@@ -987,12 +975,12 @@ if test -w /root ; then
     mount -n -tdevpts -omode=0620,gid=5 none $BUILD_ROOT/dev/pts
 fi
 
-if test -z "$VM_IMAGE" -a -z "$LOGFILE"; then
+if test -z "$VM_IMAGE" -a -z "$LOGFILE" ; then
     LOGFILE="$BUILD_ROOT/.build.log"
 fi
 
 if test -n "$LOGFILE" -a -z "$RUN_SHELL" ; then
-    echo  logging output to $LOGFILE...
+    echo "logging output to $LOGFILE..."
     rm -f $LOGFILE
     touch $LOGFILE
     # set start time, to be substracted for build log timestamps
@@ -1682,7 +1670,7 @@ if test -n "$RPMS" \
 	    chroot $BUILD_ROOT touch /.build/.same_result_marker
 	    # XXX: dirty build service hack. fix bs_worker. Search for
 	    # 'same_result_marker' for traces of a first try to get rid of this
-	    if test -n "$REASON" -a -n "$DISTURL"; then
+	    if test -n "$REASON" -a -n "$DISTURL" ; then
 		exitcode=2
 	    fi
 	fi
