@@ -728,38 +728,42 @@ vm_first_stage() {
 }
 
 vm_save_statistics() {
-     echo "... saving built statistics"
-     test -n "$TIME_INSTALL" && echo "TIME_install: $TIME_INSTALL"  >> $BUILD_ROOT$TOPDIR/OTHER/_statistics
-     if test -e /.build/_statistics.df ; then
-	 echo -n "MAX_mb_used_on_disk: " >> $TOPDIR/OTHER/_statistics
-	 cat /.build/_statistics.df >> $TOPDIR/OTHER/_statistics
-	 echo "" >> $TOPDIR/OTHER/_statistics
-	 rm /.build/_statistics.df
-     fi
-     if test -e /.build/_statistics.memory ; then
-	 echo -n "MAX_mb_used_memory: " >> $TOPDIR/OTHER/_statistics
-	 cat /.build/_statistics.memory >> $TOPDIR/OTHER/_statistics
-	 echo "" >> $TOPDIR/OTHER/_statistics
-	 rm /.build/_statistics.memory
-     fi
-     mkdir -p /sys
-     mount -n sys /sys -t sysfs
-     device="hda1"
-     test -e /dev/sda && device="sda"
-     test -e /dev/vda && device="vda"
-     test -e /dev/dasda && device="dasda" # in z/VM
-     test -e /dev/nfhd0 && device="nfhd0" # in aranym
-     if test -e /sys/block/${device}/stat ; then
-	 disk=(`cat /sys/block/${device}/stat`)
-	 test "0${disk[0]}" -gt 0 && echo "IO_requests_read: ${disk[0]}"  >> $TOPDIR/OTHER/_statistics
-	 test "0${disk[2]}" -gt 0 && echo "IO_sectors_read: ${disk[2]}"   >> $TOPDIR/OTHER/_statistics
-	 test "0${disk[4]}" -gt 0 && echo "IO_requests_write: ${disk[4]}" >> $TOPDIR/OTHER/_statistics
-	 test "0${disk[6]}" -gt 0 && echo "IO_sectors_write: ${disk[6]}"  >> $TOPDIR/OTHER/_statistics
-     else
-	 echo "ERROR: no root disk device found, yet another new device name?"
-	 ls -l /sys/block/
-     fi
-     umount /sys
+    echo "... saving statistics"
+    local sys_mounted
+    test -n "$TIME_INSTALL" && echo "TIME_install: $TIME_INSTALL"  >> $BUILD_ROOT$TOPDIR/OTHER/_statistics
+    if test -e /.build/_statistics.df ; then
+	echo -n "MAX_mb_used_on_disk: " >> $TOPDIR/OTHER/_statistics
+	cat /.build/_statistics.df >> $TOPDIR/OTHER/_statistics
+	echo "" >> $TOPDIR/OTHER/_statistics
+	rm /.build/_statistics.df
+    fi
+    if test -e /.build/_statistics.memory ; then
+	echo -n "MAX_mb_used_memory: " >> $TOPDIR/OTHER/_statistics
+	cat /.build/_statistics.memory >> $TOPDIR/OTHER/_statistics
+	echo "" >> $TOPDIR/OTHER/_statistics
+	rm /.build/_statistics.memory
+    fi
+    if ! test -e /sys/block; then
+	mkdir -p /sys
+	mount -n sys /sys -t sysfs
+	sys_mounted=1
+    fi
+    device="hda1"
+    test -e /dev/sda && device="sda"
+    test -e /dev/vda && device="vda"
+    test -e /dev/dasda && device="dasda" # in z/VM
+    test -e /dev/nfhd0 && device="nfhd0" # in aranym
+    if test -e /sys/b lock/${device}/stat ; then
+	disk=(`cat /sys/block/${device}/stat`)
+	test "0${disk[0]}" -gt 0 && echo "IO_requests_read: ${disk[0]}"  >> $TOPDIR/OTHER/_statistics
+	test "0${disk[2]}" -gt 0 && echo "IO_sectors_read: ${disk[2]}"   >> $TOPDIR/OTHER/_statistics
+	test "0${disk[4]}" -gt 0 && echo "IO_requests_write: ${disk[4]}" >> $TOPDIR/OTHER/_statistics
+	test "0${disk[6]}" -gt 0 && echo "IO_sectors_write: ${disk[6]}"  >> $TOPDIR/OTHER/_statistics
+    else
+	echo "ERROR: no root disk device found, yet another new device name?"
+	ls -l /sys/block/
+    fi
+    test -n "$sys_mounted" && umount /sys
 }
 
 vm_wrapup_build() {
