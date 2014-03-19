@@ -1,0 +1,59 @@
+#
+# preinstall specific functions.
+#
+# (C) 2014 SUSE, Inc
+#
+
+recipe_setup_preinstallimage() {
+    # should never be called
+    cleanup_and_exit 1
+}
+
+recipe_prepare_preinstallimage() {
+    :
+}
+
+recipe_build_preinstallimage() {
+    echo "creating preinstall image..."
+    test -d "$BUILD_ROOT/.preinstall_image" || cleanup_and_exit 1
+    cd $BUILD_ROOT || cleanup_and_exit 1
+    TAR="tar"
+    if test -x /usr/bin/bsdtar; then
+	TAR="/usr/bin/bsdtar --format gnutar --chroot"
+    fi
+    TOPDIRS=
+    for DIR  in .* * ; do
+      case "$DIR" in
+	.|..) continue ;;
+	.build.kernel*) ;; # to be packaged
+	.build.initrd*) ;; # to be packaged
+	.build*) continue ;;
+	.preinstallimage*) continue ;;
+	.srcfiles*) continue ;;
+	.pkgs) continue ;;
+	.rpm-cache) continue ;;
+	installed-pkg) continue ;;
+	proc|sys) continue ;;
+      esac
+      TOPDIRS="$TOPDIRS $DIR"
+    done
+    if ! $TAR -czf .preinstallimage.$$.tar.gz --one-file-system $TOPDIRS ; then
+	cleanup_and_exit 1
+    fi
+    echo "image created."
+    TOPDIR=/usr/src/packages
+    mkdir -p $BUILD_ROOT$TOPDIR/OTHER
+    rm -f $BUILD_ROOT$TOPDIR/OTHER/preinstallimage.info
+    for PKG in $BUILD_ROOT/.preinstall_image/* ; do
+	PKG=${PKG##*/}
+	read PKG_HDRMD5 PKGID < $BUILD_ROOT/.preinstall_image/$PKG
+	test -n "$PKG_HDRMD5" || cleanup_and_exit 1
+	echo "$PKG_HDRMD5  $PKG" >> $BUILD_ROOT$TOPDIR/OTHER/preinstallimage.info
+    done
+    mv $BUILD_ROOT/.preinstallimage.$$.tar.gz $BUILD_ROOT$TOPDIR/OTHER/preinstallimage.tar.gz
+    rm -f $BUILD_ROOT/.build.packages
+    ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
+    test -d "$SRCDIR" && cd "$SRCDIR"
+}
+
+

@@ -542,7 +542,7 @@ vm_first_stage() {
     if test "$DO_INIT" = true ; then
 	# do first stage of init_buildsystem
 	rm -f $BUILD_ROOT/.build.success
-	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USE_SYSTEM_QEMU $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
+	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USE_SYSTEM_QEMU $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
 	start_time=`date +%s`
 	"$@" || cleanup_and_exit 1
@@ -574,7 +574,7 @@ vm_first_stage() {
     fi
     # put our config into .build/build.data
     Q="'\''"
-    echo "SPECFILE='${SPECFILE//"'"/$Q}'" > $BUILD_ROOT/.build/build.data
+    echo "RECIPEFILE='${RECIPEFILE//"'"/$Q}'" > $BUILD_ROOT/.build/build.data
     echo "BUILD_JOBS='${BUILD_JOBS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     echo "BUILD_ARCH='${BUILD_ARCH//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     echo "BUILD_RPMS='${BUILD_RPMS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data

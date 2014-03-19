@@ -1,0 +1,30 @@
+#
+# Arch specific functions.
+#
+# (C) 2014 SUSE, Inc
+#
+
+recipe_setup_arch() {
+    TOPDIR=/usr/src/packages
+    rm -rf "$BUILD_ROOT$TOPDIR"
+    mkdir -p "$BUILD_ROOT$TOPDIR"
+    mkdir -p "$BUILD_ROOT$TOPDIR/OTHER"
+    mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
+    mkdir -p "$BUILD_ROOT/$TOPDIR/ARCHPKGS"
+    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+    cp -p "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+}
+
+recipe_prepare_arch() {
+    echo "Preparing sources..."
+    chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && makepkg -s -o 2>&1 >/dev/null" - $BUILD_USER
+    mv $BUILD_ROOT/$TOPDIR/SOURCES/* -t $BUILD_ROOT/$TOPDIR/BUILD
+}
+
+recipe_build_arch() {
+    chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && makepkg -f" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+    for PKG in $BUILD_ROOT/$TOPDIR/BUILD/*.pkg.tar.?z ; do
+	test -e "$PKG" && mv "$PKG" "$BUILD_ROOT/$TOPDIR/ARCHPKGS"
+    done
+}
+

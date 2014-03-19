@@ -1,0 +1,37 @@
+#
+# recipe specific functions for the build script
+#
+# (C) 2014 SUSE, Inc
+#
+
+
+for i in spec dsc kiwi arch preinstallimage ; do
+    . "$BUILD_DIR/build-recipe-$i"
+done
+
+recipe_setup() {
+    recipe_setup_$BUILDTYPE "$@"
+}
+
+recipe_prepare() {
+    recipe_patch_$BUILDTYPE "$@"
+}
+
+recipe_build() {
+    recipe_build_$BUILDTYPE "$@"
+}
+
+recipe_set_buildtype() {
+    BUILDTYPE=
+    case $RECIPEFILE in
+        *.spec|*.src.rpm) BUILDTYPE=spec ;;
+        *.dsc) BUILDTYPE=dsc ;;
+        *.kiwi) BUILDTYPE=kiwi ;;
+        PKGBUILD) BUILDTYPE=arch ;;
+        _preinstallimage) BUILDTYPE=preinstallimage ;;
+    esac
+    if test -z "$BUILDTYPE" ; then
+       echo "don't know how to build $RECIPEFILE"
+       cleanup_and_exit 1
+    fi
+}

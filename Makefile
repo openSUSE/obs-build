@@ -30,7 +30,6 @@ install:
 	    $(DESTDIR)$(man1dir)
 	install -m755 \
 	    build \
-	    build_kiwi.sh \
 	    vc \
 	    createrpmdeps \
 	    order \
@@ -64,6 +63,7 @@ install:
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build
 	install -m644 qemu-reg $(DESTDIR)$(pkglibdir)
 	install -m644 build-vm build-vm-* $(DESTDIR)$(pkglibdir)
+	install -m644 build-recipe build-recipe-* $(DESTDIR)$(pkglibdir)
 	install -m644 *.pm baselibs_global*.conf lxc.conf $(DESTDIR)$(pkglibdir)
 	install -m644 configs/* $(DESTDIR)$(pkglibdir)/configs
 	install -m644 build.1 $(DESTDIR)$(man1dir)

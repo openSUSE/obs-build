@@ -1,0 +1,82 @@
+#
+# dsc specific functions.
+#
+# (C) 2014 SUSE, Inc
+#
+
+recipe_setup_dsc() {
+    TOPDIR=/usr/src/packages
+    rm -rf "$BUILD_ROOT$TOPDIR"
+    mkdir -p "$BUILD_ROOT$TOPDIR"
+    mkdir -p "$BUILD_ROOT$TOPDIR/OTHER"
+    mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
+    mkdir -p "$BUILD_ROOT/$TOPDIR/DEBS"
+    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+    cp -p "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+    # FIX to work with baselibs_$PROJ etc
+    if test -e "$MYSRCDIR"/baselibs-deb.conf" ; then
+	echo "dsc build and baselibs-deb.conf present: forcing --baselibs to true"
+	CREATE_BASELIBS=true
+    fi
+}
+
+recipe_prepare_dsc() {
+    rm -rf "$BUILD_ROOT$TOPDIR/BUILD"
+    mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES.DEB"
+    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+    DEB_TRANSFORM=
+    DEB_SOURCEDIR="$TOPDIR/SOURCES"
+    DEB_DSCFILE="$RECIPEFILE"
+    for f in $BUILD_ROOT$TOPDIR/SOURCES/debian.* ; do 
+	test -f $f && DEB_TRANSFORM=true
+    done
+    if test -n "$DEB_TRANSFORM" ; then 
+	CHANGELOGARGS=
+	test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" && CHANGELOGARGS="--changelog $BUILD_ROOT/.build-changelog"
+	echo "running debian transformer..."
+	if ! debtransform $CHANGELOGARGS $BUILD_ROOT$TOPDIR/SOURCES $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE $BUILD_ROOT$TOPDIR/SOURCES.DEB ; then 
+	    echo "debian transforming failed."
+	    cleanup_and_exit 1
+	fi
+	DEB_SOURCEDIR=$TOPDIR/SOURCES.DEB
+	for DEB_DSCFILE in $BUILD_ROOT/$DEB_SOURCEDIR/*.dsc ; do : ; done 
+	DEB_DSCFILE="${DEB_DSCFILE##*/}"
+    fi
+    chroot $BUILD_ROOT su -c "dpkg-source -x $DEB_SOURCEDIR/$DEB_DSCFILE $TOPDIR/BUILD" - $BUILD_USER
+}
+
+recipe_build_dsc() {
+    # Checks to see if a build script should be used
+    # this allows the build environment to be manipulated
+    # and alternate build commands can be used
+    # Debian policy requires to build with single CPU by default
+    #       if test -n "$BUILD_JOBS" ; then
+    #           DSC_BUILD_JOBS="-j$BUILD_JOBS"
+    #       fi
+    DSC_BUILD_CMD="dpkg-buildpackage -us -uc -rfakeroot-tcp $DSC_BUILD_JOBS"
+    if test -e $BUILD_ROOT/$TOPDIR/SOURCES/build.script ; then
+	echo "Sourcing build.script to build - it should normally run 'dpkg-buildpackage -us -uc -rfakeroot-tcp'"
+	DSC_BUILD_CMD="source $TOPDIR/SOURCES/build.script"
+	chmod +x $BUILD_ROOT/$TOPDIR/SOURCES/build.script
+    fi
+
+    if test -n "$RUN_SHELL"; then
+	chroot $BUILD_ROOT su -
+    else
+	chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+	if test "$BUILD_SUCCEEDED" = true -a "$DO_CHECKS" != "false"; then
+	   DEB_CHANGESFILE=${RECIPEFILE%.dsc}_"$(chroot $BUILD_ROOT su -c 'dpkg-architecture -qDEB_BUILD_ARCH')".changes
+	   chroot $BUILD_ROOT su -c "which lintian > /dev/null && cd $TOPDIR && echo Running lintian && (set -x && lintian -i $DEB_SOURCEDIR/$DEB_DSCFILE)" - $BUILD_USER < /dev/null
+	fi
+    fi
+
+    for DEB in $BUILD_ROOT/$TOPDIR/*.deb ; do
+	test -e "$DEB" && mv "$DEB" "$BUILD_ROOT/$TOPDIR/DEBS"
+    done
+
+    # link sources over
+    ln $BUILD_ROOT/$DEB_SOURCEDIR/$DEB_DSCFILE $BUILD_ROOT/$TOPDIR/DEBS/
+    while read f ; do
+	ln $BUILD_ROOT/$DEB_SOURCEDIR/$f $BUILD_ROOT/$TOPDIR/DEBS/
+    done < <(sed -ne '/^Files:/,$s/^ ................................ [0-9][0-9]* //p' < $BUILD_ROOT/$DEB_SOURCEDIR/$DEB_DSCFILE)
+}

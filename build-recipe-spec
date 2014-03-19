@@ -1,0 +1,215 @@
+#
+# spec specific functions.
+#
+# (C) 2014 SUSE, Inc
+#
+
+recipe_setup_spec() {
+    TOPDIR=`chroot $BUILD_ROOT su -c "rpm --eval '%_topdir'" - $BUILD_USER`
+    if test -z "$TOPDIR"; then
+	echo "Error: TOPDIR empty"
+	cleanup_and_exit 1
+    fi
+    rm -rf "$BUILD_ROOT$TOPDIR"
+    for i in BUILD RPMS/`uname -m` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS BUILDROOT OTHER ; do
+	mkdir -p $BUILD_ROOT$TOPDIR/$i
+    done
+    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+    mkdir -p $BUILD_ROOT$TOPDIR/SOURCES
+    cp -p "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+}
+
+recipe_prepare_spec() {
+    args=()
+    if test -n "$RELEASE"; then
+	args=(--release "$RELEASE")
+    fi
+
+    # fixup specfile
+    CHANGELOGARGS=
+    test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" && CHANGELOGARGS="--changelog $BUILD_ROOT/.build-changelog"
+    substitutedeps "${args[@]}" --root "$BUILD_ROOT" --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" $CHANGELOGARGS "$BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE" "$BUILD_ROOT/.spec.new" || cleanup_and_exit 1
+
+    # fix rpmrc if we are compiling for i686
+    test -f $BUILD_ROOT/usr/lib/rpm/rpmrc_i586 && mv $BUILD_ROOT/usr/lib/rpm/rpmrc_i586 $BUILD_ROOT/usr/lib/rpm/rpmrc
+    if test -e $BUILD_ROOT/usr/lib/rpm/rpmrc -a "$BUILD_ARCH" != "${BUILD_ARCH#i686}" ; then
+	mv $BUILD_ROOT/usr/lib/rpm/rpmrc $BUILD_ROOT/usr/lib/rpm/rpmrc_i586
+	sed -e 's/^buildarchtranslate: athlon.*/buildarchtranslate: athlon: i686/' -e 's/^buildarchtranslate: i686.*/buildarchtranslate: i686: i686/' < $BUILD_ROOT/usr/lib/rpm/rpmrc_i586 > $BUILD_ROOT/usr/lib/rpm/rpmrc
+    fi
+
+    # extract macros from configuration
+    queryconfig rawmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" > $BUILD_ROOT/root/.rpmmacros
+    if test -n "$BUILD_DEBUG" ; then
+	echo '
+%prep %{?!__debug_package:%{?_build_create_debug:%?_build_insert_debug_package}}%%prep
+%package %{?!__debug_package:%{?_build_create_debug:%?_build_insert_debug_package}}%%package
+%_build_insert_debug_package \
+%global __debug_package 1 \
+%undefine _enable_debug_packages \
+%debug_package
+
+' >> $BUILD_ROOT/root/.rpmmacros
+    fi
+
+    if test -n "$BUILD_JOBS" ; then
+	cat >> $BUILD_ROOT/root/.rpmmacros <<-EOF
+		%jobs $BUILD_JOBS
+		%_smp_mflags -j$BUILD_JOBS
+		EOF
+    fi
+    test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/.rpmmacros $BUILD_ROOT/home/abuild/.rpmmacros
+
+    # extract optflags from configuration
+    getoptflags --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" ${BUILD_DEBUG:+--debug} > $BUILD_ROOT/root/.rpmrc
+    test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/.rpmrc $BUILD_ROOT/home/abuild/.rpmrc
+
+    if test -z "$ABUILD_TARGET"; then
+	ABUILD_TARGET=$(queryconfig target --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" )
+	test -z "$ABUILD_TARGET" || echo "build target is $ABUILD_TARGET"
+    fi
+
+    # report specfile changes
+    if test -f $BUILD_ROOT/.spec.new ; then
+	if ! cmp -s $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE $BUILD_ROOT/.spec.new ; then
+	    echo -----------------------------------------------------------------
+	    echo "I have the following modifications for $RECIPEFILE:"
+	    sed -e "/^%changelog/q" $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE > $BUILD_ROOT/.spec.t1
+	    sed -e "/^%changelog/q" $BUILD_ROOT/.spec.new > $BUILD_ROOT/.spec.t2
+	    diff $BUILD_ROOT/.spec.t1 $BUILD_ROOT/.spec.t2
+	    rm -f $BUILD_ROOT/.spec.t1 $BUILD_ROOT/.spec.t2
+	    mv $BUILD_ROOT/.spec.new $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE
+	else
+	    rm -f $BUILD_ROOT/.spec.new
+	fi
+    fi
+}
+
+recipe_build_spec() {
+    test -z "$BUILD_RPM_BUILD_STAGE" && BUILD_RPM_BUILD_STAGE=-ba
+
+    rpmbuild=rpmbuild
+    test -x $BUILD_ROOT/usr/bin/rpmbuild || rpmbuild=rpm
+
+    # XXX: move _srcdefattr to macro file?
+    rpmbopts=("$BUILD_RPM_BUILD_STAGE" "--define" "_srcdefattr (-,root,root)")
+    if test "$DO_CHECKS" != true ; then
+	rpmbopts[${#rpmbopts[@]}]="--nocheck"
+    fi
+    if test "$rpmbuild" == "rpmbuild" ; then
+	    # use only --nosignature for rpm v4
+	rpmbopts[${#rpmbopts[@]}]="--nosignature"
+    fi
+    if test -n "$ABUILD_TARGET" ; then
+	rpmbopts[${#rpmbopts[@]}]="--target=$ABUILD_TARGET"
+    fi
+    if test -n "$BUILD_DEBUG" ; then
+	rpmbopts[${#rpmbopts[@]}]='--define'
+	rpmbopts[${#rpmbopts[@]}]="_build_create_debug 1"
+    fi
+    if test -n "$DISTURL" ; then
+	rpmbopts[${#rpmbopts[@]}]='--define'
+	rpmbopts[${#rpmbopts[@]}]="disturl $DISTURL"
+    fi
+    if test -n "$RSYNCDONE" ; then
+	rpmbopts[${#rpmbopts[@]}]='--define'
+	rpmbopts[${#rpmbopts[@]}]="RSYNCDONE 1"
+    fi
+
+    # su involves a shell which would require even more
+    # complicated quoting to bypass than this
+    toshellscript $rpmbuild \
+	    "${definesnstuff[@]}" \
+	    "${rpmbopts[@]}" \
+	    "$TOPDIR/SOURCES/$RECIPEFILE" \
+	    > $BUILD_ROOT/.build.command
+    chmod 755 $BUILD_ROOT/.build.command
+    check_exit
+    if test -n "$RUN_SHELL"; then
+	chroot $BUILD_ROOT su -
+    else
+	chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+    fi
+}
+
+recipe_unpack_srcrpm() {
+    echo "processing src rpm $SRCDIR/$RECIPEFILE ..."
+    MYSRCDIR="$BUILD_ROOT/.build-srcdir"
+    rm -rf "$MYSRCDIR"
+    mkdir -p "$MYSRCDIR"
+    cd $MYSRCDIR || cleanup_and_exit 1
+    $BUILD_DIR/unrpm -q $SRCDIR/$RECIPEFILE || {
+	echo "could not unpack $RECIPEFILE."
+	cleanup_and_exit 1
+    }
+    for RECIPEFILE in *.spec ; do : ; done
+}
+
+# post build functions... move somewhere else?
+
+recipe_check_file_owners() {
+    echo "... checking for files with abuild user/group"
+    BADFILE=
+    while read un gn fn ; do
+        if test "$un" = abuild -o "$gn" = abuild -o "$un" = ${ABUILD_UID} -o "$gn" = ${ABUILD_GID} ; then
+            echo "  $un $gn $fn"
+            BADFILE=true
+        fi
+    done < <(rpm -qp --qf '[%{FILEUSERNAME} %{FILEGROUPNAME} %{FILENAMES}\n]' $RPMS)
+    if test -n "$BADFILE" ; then
+        echo "please fix your filelist (e.g. add defattr)"
+        cleanup_and_exit 1
+    fi
+}
+
+recipe_run_rpmlint() {
+    if ! test -x "$BUILD_ROOT/opt/testing/bin/rpmlint" ; then 
+	return
+    fi
+    LINT_RPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/RPMS \
+	\( -name "*-debuginfo-*" -o -name "*-debugsource-*" \
+	-o -name "*-32bit-*" -o -name "*-64bit-*" \
+	-o -name "*-x86-*" -o -name "*-ia32-*" \) -prune \
+	-o -type f -name '*.rpm' -print))
+    SRPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/SRPMS -type f -name "*.rpm"))
+    echo 
+    echo "RPMLINT report:"
+    echo "==============="
+    rpmlint_logfile=$TOPDIR/OTHER/rpmlint.log
+    rm -f "$BUILD_ROOT$rpmlint_logfile"
+    ret=0
+    mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
+    chroot $BUILD_ROOT su -s /opt/testing/bin/rpmlint "$BUILD_USER" -- \
+	    --info ${LINT_RPM_FILE_LIST[*]#$BUILD_ROOT} \
+	    ${SRPM_FILE_LIST[*]#$BUILD_ROOT} > "$BUILD_ROOT$rpmlint_logfile" || ret=1
+    cat "$BUILD_ROOT$rpmlint_logfile"
+    echo
+    umount -n $BUILD_ROOT/proc 2>/dev/null || true 
+    if test "$ret" = 1 ; then 
+	cleanup_and_exit 1
+    fi   
+}
+
+recipe_compare_oldpackages() {
+    if test -x "$BUILD_ROOT/usr/lib/build/same-build-result.sh" ; then 
+	echo "... comparing built packages with the former built"
+	mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
+	if chroot $BUILD_ROOT /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/RPMS" "$TOPDIR/SRPMS"; then 
+	    chroot $BUILD_ROOT touch /.build/.same_result_marker
+	    # XXX: dirty build service hack. fix bs_worker. Search for
+	    # 'same_result_marker' for traces of a first try to get rid of this
+	    if test -n "$REASON" -a -n "$DISTURL" ; then 
+		exitcode=2
+	    fi
+	fi
+	umount -n $BUILD_ROOT/proc 2>/dev/null || true 
+    fi   
+}
+
+recipe_create_deltarpms() {
+    if test -x "$BUILD_ROOT/usr/bin/makedeltarpm" -a -x $BUILD_ROOT/usr/lib/build/mkdrpms ; then
+	echo "... creating delta rpms"
+	ds=("$BUILD_ROOT/$TOPDIR"/RPMS/* "$BUILD_ROOT$TOPDIR/SRPMS")
+	chroot $BUILD_ROOT /usr/lib/build/mkdrpms /.build.oldpackages "${ds[@]#$BUILD_ROOT}"
+    fi
+}
+

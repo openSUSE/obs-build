@@ -1,7 +1,7 @@
 #!/bin/bash
 # Script to build a package.  It uses init_buildsystem to setup a chroot
 # building tree.  This script needs a directory as parameter.  This directory
-# has to include sources and a spec file.
+# has to include sources and a recipe file.
 #
 # BUILD_ROOT        here the packages will be built
 #
@@ -29,6 +29,9 @@ old_packages=()
 # slurp in vm support
 . "$BUILD_DIR/build-vm"
 
+# slurp in recipe support
+. "$BUILD_DIR/build-recipe"
+
 # need to restore build root owner for non-root builds
 browner=
 
@@ -44,7 +47,7 @@ DO_LINT=
 DO_CHECKS=true
 CLEAN_BUILD=
 USE_SYSTEM_QEMU=
-SPECFILES=()
+RECIPEFILES=()
 SRCDIR=
 BUILD_JOBS=
 ABUILD_TARGET=
@@ -87,7 +90,7 @@ echo_help () {
 Some comments for build
 -----------------------
 
-With build you can create rpm packages.  They will be built in a chroot
+With build you can create binary packages.  They will be built in a chroot
 system.  This chroot system will be setup automatically.  Normally you can
 simply call build with a spec file as parameter - nothing else has to be
 set.
@@ -313,7 +316,7 @@ EOT
 }
 
 usage () {
-    echo "Usage: `basename $0` [--no-init|--clean|--rpms path|--verify|--help] [dir-to-build|spec-to-build]"
+    echo "Usage: `basename $0` [--no-init|--clean|--rpms path|--verify|--help] [dir-to-build|recipe-to-build]"
     cleanup_and_exit 1
 }
 
@@ -564,14 +567,14 @@ copy_oldpackages() {
     done
 }
 
-find_spec_files() {
+find_recipe_files() {
     local spec files
-    if test -z "$SPECFILES" ; then
+    if test -z "$RECIPEFILES" ; then
 	set -- "`pwd`"
     else
-	set -- "${SPECFILES[@]}"
+	set -- "${RECIPEFILES[@]}"
     fi
-    SPECFILES=()
+    RECIPEFILES=()
     for spec in "$@" ; do
 	if test "$spec" = "${spec#/}" ; then
 	    spec="`pwd`/$spec"
@@ -580,20 +583,20 @@ find_spec_files() {
 	if test -d "$spec" ; then
 	    specs=("$spec"/*.spec)
 	    if test -n "$specs" ; then
-		SPECFILES=("${SPECFILES[@]}" "${specs[@]}")
+		RECIPEFILES=("${RECIPEFILES[@]}" "${specs[@]}")
 	    else
 		specs=("$spec"/*.spec)
 		if test -n "$specs" ; then
-		    SPECFILES=("${SPECFILES[@]}" "${specs[@]}")
+		    RECIPEFILES=("${RECIPEFILES[@]}" "${specs[@]}")
 		fi
 	    fi
 	else
-	    SPECFILES[${#SPECFILES[@]}]="$spec"
+	    RECIPEFILES[${#RECIPEFILES[@]}]="$spec"
 	fi
     done
 
-    if test -z "$SPECFILES"; then
-	echo no spec files or src rpms found in $@. exit...
+    if test -z "$RECIPEFILES"; then
+	echo no recipe files or src rpms found in $@. exit...
 	cleanup_and_exit 1
     fi
 }
@@ -643,7 +646,7 @@ shopt -s nullglob
 export PATH=$BUILD_DIR:/sbin:/usr/sbin:$PATH
 
 if vm_detect_2nd_stage ; then
-    set "/.build-srcdir/$SPECFILE"
+    set "/.build-srcdir/$RECIPEFILE"
     export PATH=/.build:$PATH
 fi
 
@@ -886,10 +889,14 @@ while test -n "$1"; do
         set -- "${nextargs[@]}"
       ;;
       *)
-	SPECFILES[${#SPECFILES[@]}]="$PARAM"
+	RECIPEFILES[${#RECIPEFILES[@]}]="$PARAM"
       ;;
     esac
 done
+
+if test -n "$CLEAN_BUILD" ; then
+    DO_INIT=true
+fi
 
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
@@ -929,27 +936,23 @@ fi
 
 set_build_arch
 
-if test -n "$CLEAN_BUILD" ; then
-    DO_INIT=true
-fi
-
-find_spec_files
+find_recipe_files
 
 if test -n "$LIST_STATE" ; then
     BUILD_ROOT=`mktemp -d /var/tmp/build-list-state-XXXXXX`
     test -d "$BUILD_ROOT" || cleanup_and_exit 3
-    SPECFILE=$SPECFILES # only one specified anyways
-    if test "$SPECFILE" != "${SPECFILE%.src.rpm}" ; then
+    RECIPEFILE=$RECIPEFILES # only one specified anyways
+    if test "$RECIPEFILE" != "${RECIPEFILE%.src.rpm}" ; then
        rm -rf "$BUILD_ROOT/usr/src/packages"
        mkdir -p $BUILD_ROOT/usr/src/packages/SOURCES $BUILD_ROOT/usr/src/packages/SPECS
-       rpm -i --nodigest --nosignature --root $BUILD_ROOT $SPECFILE || {
-	   echo "could not install $SPECFILE." 2>&1
+       rpm -i --nodigest --nosignature --root $BUILD_ROOT $RECIPEFILE || {
+	   echo "could not install $RECIPEFILE." 2>&1
 	   rm -rf "$BUILD_ROOT"
 	   cleanup_and_exit 3
        }
-       for SPECFILE in $BUILD_ROOT/usr/src/packages/SPECS/*.spec ; do : ; done
+       for RECIPEFILE in $BUILD_ROOT/usr/src/packages/SPECS/*.spec ; do : ; done
     fi
-    init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --list-state "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $SPECFILE $BUILD_EXTRA_PACKS
+    init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --list-state "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $RECIPEFILE $BUILD_EXTRA_PACKS
     ERR=$?
     rm -rf "$BUILD_ROOT"
     cleanup_and_exit $ERR
@@ -1016,29 +1019,16 @@ fi
 test "$BUILD_ARCH" = all && BUILD_ARCH=
 BUILD_USER_ABUILD_USED=
 
-for SPECFILE in "${SPECFILES[@]}" ; do
+for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 
-    SRCDIR="${SPECFILE%/*}"
-    SPECFILE="${SPECFILE##*/}"
+    SRCDIR="${RECIPEFILE%/*}"
+    RECIPEFILE="${RECIPEFILE##*/}"
 
-    BUILDTYPE=
-    case $SPECFILE in
-	*.spec|*.src.rpm) BUILDTYPE=spec ;;
-	*.dsc) BUILDTYPE=dsc ;;
-	*.kiwi) BUILDTYPE=kiwi ;;
-	PKGBUILD) BUILDTYPE=arch ;;
-	_preinstallimage) BUILDTYPE=preinstallimage ;;
-    esac
-    if test -z "$BUILDTYPE" ; then
-       echo "don't know how to build $SPECFILE"
-       cleanup_and_exit 1
-    fi
-
-    cd "$SRCDIR"
+    recipe_set_buildtype
 
     if test -z "$RUNNING_IN_VM" ; then
 	echo
-	echo "$HOST started \"build $SPECFILE\" at `date --utc`."
+	echo "$HOST started \"build $RECIPEFILE\" at `date --utc`."
 	echo
 	test -n "$REASON" && echo "$REASON"
 	echo
@@ -1048,46 +1038,19 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     #
     # first setup building directory...
     #
-    test -s "$SPECFILE" || {
-       echo "$SPECFILE" is empty.  This should not happen...
+    cd "$SRCDIR"
+    if ! test -s "$RECIPEFILE" ; then
+       echo "$RECIPEFILE is empty.  This should not happen..."
        cleanup_and_exit 1
-    }
-
-    if test "$SPECFILE" != "${SPECFILE%.src.rpm}" ; then
-	echo processing src rpm $SRCDIR/$SPECFILE ...
-	MYSRCDIR=$BUILD_ROOT/.build-srcdir
-	rm -rf "$MYSRCDIR"
-	mkdir -p "$MYSRCDIR"
-	cd $MYSRCDIR || cleanup_and_exit 1
-	$BUILD_DIR/unrpm -q $SRCDIR/$SPECFILE || {
-	    echo "could not install $SPECFILE."
-	    cleanup_and_exit 1
-	}
-	for SPECFILE in *.spec ; do : ; done
-    else
-	MYSRCDIR="$SRCDIR"
     fi
+    MYSRCDIR="$SRCDIR"
 
-    # FIX to work with baselibs_$PROJ etc
-    if test "$BUILDTYPE" == "dsc" -a -e ${SRCDIR}/baselibs-deb.conf ; then
-	# Set CREATE_BASELIBS if not set
-	echo "dsc build and baselibs-deb.conf present: forcing --baselibs to true"
-	CREATE_BASELIBS=true
-    fi
+    # special hack to build from a .src.rpm
+    test "$RECIPEFILE" != "${RECIPEFILE%.src.rpm}" && recipe_unpack_srcrpm
 
-# Currently local osc build does not allow extra .deb packages to be
-# specified on the command line. Both init_buildsystem and expanddeps
-# need to handle .deb dependencies first
-#    if test -n "$CREATE_BASELIBS" ; then
-#        case $BUILDTYPE in
-#            spec) ;;
-#            dsc) BUILD_EXTRA_PACKS="$BUILD_EXTRA_PACKS libparse-debcontrol-perl" ;;
-#        esac
-#    fi
+    echo "processing recipe $MYSRCDIR/$RECIPEFILE ..."
 
-    echo processing specfile $MYSRCDIR/$SPECFILE ...
-
-    ADDITIONAL_PACKS=""
+    ADDITIONAL_PACKS=
     test -z "$BUILD_EXTRA_PACKS" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS $BUILD_EXTRA_PACKS"
     test -z "$CREATE_BASELIBS" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS build"
     test "$ccache" = 0 || ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
@@ -1096,14 +1059,15 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     test "$VMDISK_FILESYSTEM" = xfs && ADDITIONAL_PACKS="$ADDITIONAL_PACKS libblkid1"
     test "$VM_TYPE" = zvm && ADDITIONAL_PACKS="$ADDITIONAL_PACKS udev libcap2"
 
+    # we need to do this before the vm is started
     if test -n "$CHANGELOG" -a -z "$RUNNING_IN_VM" ; then
 	rm -f $BUILD_ROOT/.build-changelog
-	case $SPECFILE in
+	case $RECIPEFILE in
 	    *.dsc) CFFORMAT=debian ;;
 	    *) CFFORMAT=rpm ;;
 	esac
-	echo "running changelog2spec --target $CFFORMAT --file $MYSRCDIR/$SPECFILE"
-	if ! $BUILD_DIR/changelog2spec --target $CFFORMAT --file "$MYSRCDIR/$SPECFILE" > $BUILD_ROOT/.build-changelog ; then
+	echo "running changelog2spec --target $CFFORMAT --file $MYSRCDIR/$RECIPEFILE"
+	if ! $BUILD_DIR/changelog2spec --target $CFFORMAT --file "$MYSRCDIR/$RECIPEFILE" > $BUILD_ROOT/.build-changelog ; then
 	    rm -f $BUILD_ROOT/.build-changelog
 	fi
     fi
@@ -1122,8 +1086,8 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	echo "BUILD_INCARNATION=$INCARNATION" > $BUILD_ROOT/.buildenv
 	CREATE_BUILD_BINARIES=
 	test "$BUILDTYPE" = preinstallimage && mkdir -p $BUILD_ROOT/.preinstall_image
-	egrep '^#[       ]*needsbinariesforbuild[       ]*$' >/dev/null <$MYSRCDIR/$SPECFILE && CREATE_BUILD_BINARIES=--create-build-binaries
-	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USE_SYSTEM_QEMU $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$SPECFILE" $ADDITIONAL_PACKS
+	egrep '^#[       ]*needsbinariesforbuild[       ]*$' >/dev/null <$MYSRCDIR/$RECIPEFILE && CREATE_BUILD_BINARIES=--create-build-binaries
+	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USE_SYSTEM_QEMU $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
         start_time=`date +%s`
 	"$@" || cleanup_and_exit 1
@@ -1145,61 +1109,14 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	copy_oldpackages
     fi
 
+    # hack to process preinstallimages early
     if test "$BUILDTYPE" = preinstallimage ; then
-	echo "creating preinstall image..."
-	test -d "$BUILD_ROOT/.preinstall_image" || cleanup_and_exit 1
-	cd $BUILD_ROOT || cleanup_and_exit 1
-	TAR="tar"
-	if test -x /usr/bin/bsdtar; then
-	    TAR="/usr/bin/bsdtar --format gnutar --chroot"
-	fi
-	TOPDIRS=
-	for DIR  in .* * ; do
-	  case "$DIR" in
-	    .|..) continue ;;
-	    .build.kernel*) ;; # to be packaged
-	    .build.initrd*) ;; # to be packaged
-	    .build*) continue ;;
-	    .preinstallimage*) continue ;;
-	    .srcfiles*) continue ;;
-	    .pkgs) continue ;;
-	    .rpm-cache) continue ;;
-	    installed-pkg) continue ;;
-	    proc|sys) continue ;;
-	  esac
-	  TOPDIRS="$TOPDIRS $DIR"
-        done
-	if ! $TAR -czf .preinstallimage.$$.tar.gz --one-file-system $TOPDIRS ; then
-	    cleanup_and_exit 1
-	fi
-	echo "image created."
-	TOPDIR=/usr/src/packages
-	mkdir -p $BUILD_ROOT$TOPDIR/OTHER
-	rm -f $BUILD_ROOT$TOPDIR/OTHER/preinstallimage.info
-	for PKG in $BUILD_ROOT/.preinstall_image/* ; do
-	    PKG=${PKG##*/}
-	    read PKG_HDRMD5 PKGID < $BUILD_ROOT/.preinstall_image/$PKG
-	    test -n "$PKG_HDRMD5" || cleanup_and_exit 1
-	    echo "$PKG_HDRMD5  $PKG" >> $BUILD_ROOT$TOPDIR/OTHER/preinstallimage.info
-	done
-	mv $BUILD_ROOT/.preinstallimage.$$.tar.gz $BUILD_ROOT$TOPDIR/OTHER/preinstallimage.tar.gz
-	rm -f $BUILD_ROOT/.build.packages
-	ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
-	test -d "$SRCDIR" && cd "$SRCDIR"
+	recipe_build
 	continue
     fi
 
     if test -z "$BUILD_DIST" -a -e "$BUILD_ROOT/.guessed_dist" ; then
 	read BUILD_DIST < $BUILD_ROOT/.guessed_dist
-    fi
-
-    #
-    # fix rpmrc if we are compiling for i686
-    #
-    test -f $BUILD_ROOT/usr/lib/rpm/rpmrc_i586 && mv $BUILD_ROOT/usr/lib/rpm/rpmrc_i586 $BUILD_ROOT/usr/lib/rpm/rpmrc
-    if test -e $BUILD_ROOT/usr/lib/rpm/rpmrc -a "$BUILD_ARCH" != "${BUILD_ARCH#i686}" ; then
-	mv $BUILD_ROOT/usr/lib/rpm/rpmrc $BUILD_ROOT/usr/lib/rpm/rpmrc_i586
-	sed -e 's/^buildarchtranslate: athlon.*/buildarchtranslate: athlon: i686/' -e 's/^buildarchtranslate: i686.*/buildarchtranslate: i686: i686/' < $BUILD_ROOT/usr/lib/rpm/rpmrc_i586 > $BUILD_ROOT/usr/lib/rpm/rpmrc
     fi
 
     #
@@ -1218,23 +1135,22 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     BUILD_USER=abuild
     if test -x $BUILD_ROOT/bin/rpm ; then
 	SUSE_VERSION=`chroot $BUILD_ROOT /bin/rpm --eval '%{?suse_version}' 2>/dev/null`
-	if test -n "$SUSE_VERSION" && test "$SUSE_VERSION" -le 1020 ; then
-	    BUILD_USER=root
-	fi
+	test -n "$SUSE_VERSION" -a "$SUSE_VERSION" -le 1020 && BUILD_USER=root
     fi
     if test "$BUILD_USER" = abuild ; then
-	egrep '^#[       ]*needsrootforbuild[       ]*$' >/dev/null <$SPECFILE && BUILD_USER=root
+	egrep '^#[       ]*needsrootforbuild[       ]*$' >/dev/null <$RECIPEFILE && BUILD_USER=root
     else
-	egrep '^#[       ]*norootforbuild[       ]*$' >/dev/null <$SPECFILE && BUILD_USER=abuild
+	egrep '^#[       ]*norootforbuild[       ]*$' >/dev/null <$RECIPEFILE && BUILD_USER=abuild
     fi
     test -n "$NOROOTFORBUILD" && BUILD_USER=abuild
 
     # appliance builds must run as root
-    if test "$BUILDTYPE" = kiwi; then
-	imagetype=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $SPECFILE imagetype)
-	test "$imagetype" = 'product' || BUILD_USER=root
+    if test "$BUILDTYPE" = kiwi ; then
+	imagetype=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $RECIPEFILE imagetype)
+	test "$imagetype" = product || BUILD_USER=root
     fi
 
+    # fixup passwd/group
     if test $BUILD_USER = abuild ; then
 	if ! egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
 	    echo "abuild:x:${ABUILD_UID}:${ABUILD_GID}:Autobuild:/home/abuild:/bin/bash" >>$BUILD_ROOT/etc/passwd
@@ -1278,165 +1194,12 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	fi
     fi
 
-    if test "$BUILDTYPE" = spec ; then
-	TOPDIR=`chroot $BUILD_ROOT su -c "rpm --eval '%_topdir'" - $BUILD_USER`
-	if test -z "$TOPDIR"; then
-	    echo "Error: TOPDIR empty"
-	    cleanup_and_exit 1
-	fi
-    else
-	TOPDIR=/usr/src/packages
-	mkdir -p $BUILD_ROOT$TOPDIR
-    fi
-
-    rm -f $BUILD_ROOT/.build.packages
-    ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
-
     mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
     mount -n -tdevpts -omode=0620,gid=5 none $BUILD_ROOT/dev/pts 2> /dev/null
     # needed for POSIX semaphores
     mkdir -p $BUILD_ROOT/dev/shm
     mount -n -ttmpfs none $BUILD_ROOT/dev/shm 2> /dev/null
 
-    setupicecream
-
-    setupccache
-
-    # nasty hack to prevent rpath on known paths
-    # FIXME: do this only for suse
-    if test -d "$BUILD_ROOT/etc/profile.d" ; then
-	echo "export SUSE_IGNORED_RPATHS=/etc/ld.so.conf" > "$BUILD_ROOT/etc/profile.d/buildsystem.sh"
-    fi
-
-    #
-    # now clean up RPM building directories
-    #
-    rm -rf "$BUILD_ROOT$TOPDIR"
-    for i in BUILD RPMS/`uname -m` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS BUILDROOT OTHER ; do
-	mkdir -p $BUILD_ROOT$TOPDIR/$i
-    done
-    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
-    check_exit
-
-    mkdir -p $BUILD_ROOT$TOPDIR/SOURCES
-    if test "$BUILDTYPE" = kiwi ; then
-	mkdir -p $BUILD_ROOT$TOPDIR/KIWI
-	if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
-	    mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
-	else
-	    if test -z "$LINKSOURCES" ; then
-		cp -dLR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
-	    else
-		cp -lR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
-	    fi
-	    if test "$?" != 0 ; then
-		echo "source copy failed"
-		cleanup_and_exit 1
-	    fi
-	fi
-    else
-	cp -p "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
-    fi
-    # strip prefix from autogenerated files of source services.
-    for i in $BUILD_ROOT$TOPDIR/SOURCES/_service\:* ; do
-        mv "$i" "${i%/*}/${i##*:}"
-    done
-    SPECFILE="${SPECFILE##*:}"
-
-    test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir && rm -rf "$MYSRCDIR"
-    CHANGELOGARGS=
-    test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" && CHANGELOGARGS="--changelog $BUILD_ROOT/.build-changelog"
-
-    if test "$BUILDTYPE" = spec ; then
-	# do buildrequires/release substitution
-	args=()
-	if test -n "$RELEASE"; then
-	    args=(--release "$RELEASE")
-	fi
-	substitutedeps "${args[@]}" --root "$BUILD_ROOT" --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" $CHANGELOGARGS "$BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE" "$BUILD_ROOT/.spec.new" || cleanup_and_exit 1
-	# extract macros from configuration
-	queryconfig rawmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" > $BUILD_ROOT/root/.rpmmacros
-	if test -n "$BUILD_DEBUG" ; then
-	    echo '
-%prep %{?!__debug_package:%{?_build_create_debug:%?_build_insert_debug_package}}%%prep
-%package %{?!__debug_package:%{?_build_create_debug:%?_build_insert_debug_package}}%%package
-%_build_insert_debug_package \
-%global __debug_package 1 \
-%undefine _enable_debug_packages \
-%debug_package
-
-' >> $BUILD_ROOT/root/.rpmmacros
-	fi
-
-	if test -n "$BUILD_JOBS" ; then
-	    cat >> $BUILD_ROOT/root/.rpmmacros <<-EOF
-		%jobs $BUILD_JOBS
-		%_smp_mflags -j$BUILD_JOBS
-		EOF
-	fi
-	test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/.rpmmacros $BUILD_ROOT/home/abuild/.rpmmacros
-	# extract optflags from configuration
-	getoptflags --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" ${BUILD_DEBUG:+--debug} > $BUILD_ROOT/root/.rpmrc
-	test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/.rpmrc $BUILD_ROOT/home/abuild/.rpmrc
-	if test -z "$ABUILD_TARGET"; then
-	    ABUILD_TARGET=$(queryconfig target --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" )
-	    test -z "$ABUILD_TARGET" || echo "build target is $ABUILD_TARGET"
-	fi
-    fi
-    if test -f $BUILD_ROOT/.spec.new ; then
-	if ! cmp -s $BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE $BUILD_ROOT/.spec.new ; then
-	    echo -----------------------------------------------------------------
-	    echo "I have the following modifications for $SPECFILE:"
-	    sed -e "/^%changelog/q" $BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE > $BUILD_ROOT/.spec.t1
-	    sed -e "/^%changelog/q" $BUILD_ROOT/.spec.new > $BUILD_ROOT/.spec.t2
-	    diff $BUILD_ROOT/.spec.t1 $BUILD_ROOT/.spec.t2
-	    rm -f $BUILD_ROOT/.spec.t1 $BUILD_ROOT/.spec.t2
-	    mv $BUILD_ROOT/.spec.new $BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE
-	else
-	    rm -f $BUILD_ROOT/.spec.new
-	fi
-    fi
-
-    if test "$BUILDTYPE" = dsc ; then
-	rm -rf "$BUILD_ROOT$TOPDIR/BUILD"
-	mkdir -p $BUILD_ROOT$TOPDIR/SOURCES.DEB
-	chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
-	DEB_TRANSFORM=
-	DEB_SOURCEDIR=$TOPDIR/SOURCES
-	DEB_DSCFILE=$SPECFILE
-	for f in $BUILD_ROOT$TOPDIR/SOURCES/debian.* ; do
-	    test -f $f && DEB_TRANSFORM=true
-	done
-	if test -n "$DEB_TRANSFORM" ; then
-	    echo "running debian transformer..."
-	    if ! debtransform $CHANGELOGARGS $BUILD_ROOT$TOPDIR/SOURCES $BUILD_ROOT$TOPDIR/SOURCES/$SPECFILE $BUILD_ROOT$TOPDIR/SOURCES.DEB ; then
-		echo "debian transforming failed."
-		cleanup_and_exit 1
-	    fi
-	    DEB_SOURCEDIR=$TOPDIR/SOURCES.DEB
-	    for DEB_DSCFILE in $BUILD_ROOT/$DEB_SOURCEDIR/*.dsc ; do : ; done
-	    DEB_DSCFILE="${DEB_DSCFILE##*/}"
-	fi
-	chroot $BUILD_ROOT su -c "dpkg-source -x $DEB_SOURCEDIR/$DEB_DSCFILE $TOPDIR/BUILD" - $BUILD_USER
-    fi
-
-    if test "$BUILDTYPE" = arch ; then
-	echo "Preparing sources..."
-	chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && makepkg -s -o 2>&1 >/dev/null" - $BUILD_USER
-	mv $BUILD_ROOT/$TOPDIR/SOURCES/* -t $BUILD_ROOT/$TOPDIR/BUILD
-    fi
-
-    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
-    cd $BUILD_ROOT$TOPDIR/SOURCES || cleanup_and_exit 1
-
-    echo -----------------------------------------------------------------
-    if test "$BUILD_USER" = root ; then
-	echo ----- building $SPECFILE
-    else
-	echo ----- building $SPECFILE "(user $BUILD_USER)"
-    fi
-    echo -----------------------------------------------------------------
-    echo -----------------------------------------------------------------
     if test -n "$RUNNING_IN_VM" ; then
 	if test -x /sbin/ip ; then
 	    ip addr add 127.0.0.1/8 dev lo
@@ -1449,6 +1212,47 @@ for SPECFILE in "${SPECFILES[@]}" ; do
 	fi
     fi
 
+    setupicecream
+    setupccache
+
+    # fill build directories with sources. Also sets TOPDIR
+    recipe_setup
+    
+    # strip prefix from autogenerated files of source services.
+    for i in $BUILD_ROOT$TOPDIR/SOURCES/_service\:* ; do
+        mv "$i" "${i%/*}/${i##*:}"
+    done
+    RECIPEFILE="${RECIPEFILE##*:}"
+
+    # create .build.packages link
+    rm -f $BUILD_ROOT/.build.packages
+    ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
+
+    # nasty hack to prevent rpath on known paths
+    # FIXME: do this only for suse
+    if test -d "$BUILD_ROOT/etc/profile.d" ; then
+	echo "export SUSE_IGNORED_RPATHS=/etc/ld.so.conf" > "$BUILD_ROOT/etc/profile.d/buildsystem.sh"
+    fi
+
+    # get rid of old src dir, it is no longer needed and just wastes space
+    test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir && rm -rf "$MYSRCDIR"
+
+    # patch recipes
+    recipe_prepare
+
+    # hmmm
+    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+
+    cd $BUILD_ROOT$TOPDIR/SOURCES || cleanup_and_exit 1
+
+    echo -----------------------------------------------------------------
+    if test "$BUILD_USER" = root ; then
+	echo ----- building $RECIPEFILE
+    else
+	echo ----- building $RECIPEFILE "(user $BUILD_USER)"
+    fi
+    echo -----------------------------------------------------------------
+    echo -----------------------------------------------------------------
     BUILD_SUCCEEDED=false
 
     if test -n "$OVERLAY" ; then
@@ -1483,101 +1287,7 @@ for SPECFILE in "${SPECFILES[@]}" ; do
     fi
 
     start_time=`date +%s`
-    if test "$BUILDTYPE" = spec ; then
-	test -z "$BUILD_RPM_BUILD_STAGE" && BUILD_RPM_BUILD_STAGE=-ba
-
-	rpmbuild=rpmbuild
-	test -x $BUILD_ROOT/usr/bin/rpmbuild || rpmbuild=rpm
-
-	# XXX: move _srcdefattr to macro file?
-	rpmbopts=("$BUILD_RPM_BUILD_STAGE" "--define" "_srcdefattr (-,root,root)")
-	if test "$DO_CHECKS" != true ; then
-	    rpmbopts[${#rpmbopts[@]}]="--nocheck"
-	fi
-	if test "$rpmbuild" == "rpmbuild" ; then
-                # use only --nosignature for rpm v4
-	    rpmbopts[${#rpmbopts[@]}]="--nosignature"
-	fi
-	if test -n "$ABUILD_TARGET" ; then
-	    rpmbopts[${#rpmbopts[@]}]="--target=$ABUILD_TARGET"
-	fi
-	if test -n "$BUILD_DEBUG" ; then
-	    rpmbopts[${#rpmbopts[@]}]='--define'
-	    rpmbopts[${#rpmbopts[@]}]="_build_create_debug 1"
-	fi
-	if test -n "$DISTURL" ; then
-	    rpmbopts[${#rpmbopts[@]}]='--define'
-	    rpmbopts[${#rpmbopts[@]}]="disturl $DISTURL"
-	fi
-	if test -n "$RSYNCDONE" ; then
-	    rpmbopts[${#rpmbopts[@]}]='--define'
-	    rpmbopts[${#rpmbopts[@]}]="RSYNCDONE 1"
-	fi
-
-	# su involves a shell which would require even more
-	# complicated quoting to bypass than this
-	toshellscript $rpmbuild \
-		"${definesnstuff[@]}" \
-		"${rpmbopts[@]}" \
-		"$TOPDIR/SOURCES/$SPECFILE" \
-		> $BUILD_ROOT/.build.command
-	chmod 755 $BUILD_ROOT/.build.command
-	check_exit
-	if test -n "$RUN_SHELL"; then
-	    chroot $BUILD_ROOT su -
-	else
-	    chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
-	fi
-    fi
-
-    if test "$BUILDTYPE" = dsc ; then
-	# Checks to see if a build script should be used
-	# this allows the build environment to be manipulated
-	# and alternate build commands can be used
-# Debian policy requires to build with single CPU by default
-#	if test -n "$BUILD_JOBS" ; then
-#	    DSC_BUILD_JOBS="-j$BUILD_JOBS"
-#	fi
-	DSC_BUILD_CMD="dpkg-buildpackage -us -uc -rfakeroot-tcp $DSC_BUILD_JOBS"
-	if test -e $BUILD_ROOT/$TOPDIR/SOURCES/build.script ; then
-	    echo "Sourcing build.script to build - it should normally run 'dpkg-buildpackage -us -uc -rfakeroot-tcp'"
-	    DSC_BUILD_CMD="source $TOPDIR/SOURCES/build.script"
-	    chmod +x $BUILD_ROOT/$TOPDIR/SOURCES/build.script
-	fi
-
-	if test -n "$RUN_SHELL"; then
-	    chroot $BUILD_ROOT su -
-	else
-	    chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
-	    if test "$BUILD_SUCCEEDED" = true -a "$DO_CHECKS" != "false"; then
-               DEB_CHANGESFILE=${SPECFILE%.dsc}_"$(chroot $BUILD_ROOT su -c 'dpkg-architecture -qDEB_BUILD_ARCH')".changes
-               chroot $BUILD_ROOT su -c "which lintian > /dev/null && cd $TOPDIR && echo Running lintian && (set -x && lintian -i $DEB_SOURCEDIR/$DEB_DSCFILE)" - $BUILD_USER < /dev/null
-	    fi
-	fi
-
-	mkdir -p $BUILD_ROOT/$TOPDIR/DEBS
-	for DEB in $BUILD_ROOT/$TOPDIR/*.deb ; do
-	    test -e "$DEB" && mv "$DEB" "$BUILD_ROOT/$TOPDIR/DEBS"
-	done
-	# link sources over
-	ln $BUILD_ROOT/$DEB_SOURCEDIR/$DEB_DSCFILE $BUILD_ROOT/$TOPDIR/DEBS/
-	while read f ; do
-	    ln $BUILD_ROOT/$DEB_SOURCEDIR/$f $BUILD_ROOT/$TOPDIR/DEBS/
-	done < <(sed -ne '/^Files:/,$s/^ ................................ [0-9][0-9]* //p' < $BUILD_ROOT/$DEB_SOURCEDIR/$DEB_DSCFILE)
-    fi
-
-    if test "$BUILDTYPE" = arch ; then
-	chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && makepkg -f" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
-	mkdir -p $BUILD_ROOT/$TOPDIR/ARCHPKGS
-	for PKG in $BUILD_ROOT/$TOPDIR/BUILD/*.pkg.tar.?z ; do
-	    test -e "$PKG" && mv "$PKG" "$BUILD_ROOT/$TOPDIR/ARCHPKGS"
-	done
-    fi
-
-    if test "$BUILDTYPE" = kiwi ; then
-	. $BUILD_DIR/build_kiwi.sh
-	run_kiwi
-    fi
+    recipe_build
     if test "$DO_STATISTICS" = 1; then
         mkdir -p $TOPDIR/OTHER
         echo "TIME_main_build: $(( `date +%s` - $start_time ))"  >> $TOPDIR/OTHER/_statistics
@@ -1596,60 +1306,30 @@ RPMS=`find $BUILD_ROOT/$TOPDIR/RPMS -type f -name "*.rpm" 2>/dev/null || true`
 DEBS=`find $BUILD_ROOT/$TOPDIR/DEBS -type f -name "*.deb" 2>/dev/null || true`
 
 if test -n "$RPMS" -a -n "$BUILD_USER_ABUILD_USED" ; then
-    echo "... checking for files with abuild user/group"
-    BADFILE=
-    while read un gn fn ; do
-	if test "$un" = abuild -o "$gn" = abuild -o "$un" = ${ABUILD_UID} -o "$gn" = ${ABUILD_GID} ; then
-	    echo "  $un $gn $fn"
-	    BADFILE=true
-	fi
-    done < <(rpm -qp --qf '[%{FILEUSERNAME} %{FILEGROUPNAME} %{FILENAMES}\n]' $RPMS)
-    if test -n "$BADFILE" ; then
-	echo "please fix your filelist (e.g. add defattr)"
-	cleanup_and_exit 1
-    fi
+    recipe_check_file_owners
 fi
 
 if test -n "$RPMS" -a -d "$BUILD_ROOT/usr/lib/build/checks" ; then
-    export PNAME=""
     export DO_RPM_REMOVE=true
+    # find package name
+    export PNAME=
     for SRPM in $BUILD_ROOT/$TOPDIR/SRPMS/*src.rpm ; do
 	test -f "$SRPM" && PNAME=`rpm --nodigest --nosignature -qp --qf "%{NAME}" $SRPM`
     done
     mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
     for CHECKSCRIPT in $BUILD_ROOT/usr/lib/build/checks/* ; do
-	echo "... running `basename $CHECKSCRIPT`"
+	echo "... running ${CHECKSCRIPT##*/}"
 	$CHECKSCRIPT || cleanup_and_exit 1
     done
     umount -n $BUILD_ROOT/proc 2>/dev/null || true
 fi
 
+# checkscripts may have deleted some binaries
 RPMS=`find $BUILD_ROOT/$TOPDIR/RPMS -type f -name "*.rpm" 2>/dev/null || true`
 DEBS=`find $BUILD_ROOT/$TOPDIR/DEBS -type f -name "*.deb" 2>/dev/null || true`
 
-if test -n "$RPMS" -a "$DO_CHECKS" != "false" -a -x "$BUILD_ROOT/opt/testing/bin/rpmlint" ; then
-    LINT_RPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/RPMS \
-	\( -name "*-debuginfo-*" -o -name "*-debugsource-*" \
-	-o -name "*-32bit-*" -o -name "*-64bit-*" \
-	-o -name "*-x86-*" -o -name "*-ia32-*" \) -prune \
-	-o -type f -name '*.rpm' -print))
-    SRPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/SRPMS -type f -name "*.rpm"))
-    echo
-    echo "RPMLINT report:"
-    echo "==============="
-    rpmlint_logfile=$TOPDIR/OTHER/rpmlint.log
-    rm -f "$BUILD_ROOT$rpmlint_logfile"
-    ret=0
-    mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
-    chroot $BUILD_ROOT su -s /opt/testing/bin/rpmlint "$BUILD_USER" -- \
-	    --info ${LINT_RPM_FILE_LIST[*]#$BUILD_ROOT} \
-	    ${SRPM_FILE_LIST[*]#$BUILD_ROOT} > "$BUILD_ROOT$rpmlint_logfile" || ret=1
-	    cat "$BUILD_ROOT$rpmlint_logfile"
-	    echo
-    umount -n $BUILD_ROOT/proc 2>/dev/null || true
-    if test "$ret" = 1; then
-	cleanup_and_exit 1
-    fi
+if test -n "$RPMS" -a "$DO_CHECKS" != false ; then
+    recipe_run_rpmlint
 fi
 
 if test \( -n "$RPMS" -o -n "$DEBS" \) -a -n "$CREATE_BASELIBS"; then
@@ -1657,38 +1337,21 @@ if test \( -n "$RPMS" -o -n "$DEBS" \) -a -n "$CREATE_BASELIBS"; then
 fi
 
 exitcode=0
-# post build scripts
+
+# post build work
 # TODO: don't hardcode. instead run scripts in a directory as it's done for the checks
-if test -n "$RPMS" \
-	-a -d "$BUILD_ROOT/$TOPDIR/RPMS" \
-	-a -d "$BUILD_ROOT/.build.oldpackages" \
-	; then
-    if test -x "$BUILD_ROOT/usr/lib/build/same-build-result.sh" ; then
-	echo "... comparing built packages with the former built"
-	mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
-	if chroot $BUILD_ROOT /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/RPMS" "$TOPDIR/SRPMS"; then
-	    chroot $BUILD_ROOT touch /.build/.same_result_marker
-	    # XXX: dirty build service hack. fix bs_worker. Search for
-	    # 'same_result_marker' for traces of a first try to get rid of this
-	    if test -n "$REASON" -a -n "$DISTURL" ; then
-		exitcode=2
-	    fi
-	fi
-        umount -n $BUILD_ROOT/proc 2>/dev/null || true
-    fi
-    if test ! -e $BUILD_ROOT/.build/.same_result_marker \
-	-a -x "$BUILD_ROOT/usr/bin/makedeltarpm" \
-	-a -x $BUILD_ROOT/usr/lib/build/mkdrpms; then
-	echo "... creating delta rpms"
-	ds=("$BUILD_ROOT/$TOPDIR"/RPMS/* "$BUILD_ROOT$TOPDIR/SRPMS")
-	chroot $BUILD_ROOT /usr/lib/build/mkdrpms /.build.oldpackages "${ds[@]#$BUILD_ROOT}"
+if test -n "$RPMS" -a -d "$BUILD_ROOT/.build.oldpackages" ; then
+    recipe_compare_oldpackages
+    # no need to create deltas if the build is the same
+    if test ! -e $BUILD_ROOT/.build/.same_result_marker ; then
+	recipe_create_deltarpms
     fi
 fi
 
 test -n "$RUNNING_IN_VM" && vm_wrapup_build
 
 echo
-echo "$HOST finished \"build $SPECFILE\" at `date --utc`."
+echo "$HOST finished \"build $RECIPEFILE\" at `date --utc`."
 echo
 
 cleanup_and_exit "$exitcode"
