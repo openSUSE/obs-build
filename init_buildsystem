@@ -13,8 +13,9 @@
 # needed globals variables
 #
 export SRC
-export YAST_IS_RUNNING="instsys"
 export BUILD_DIR=${BUILD_DIR:-/usr/lib/build}
+
+export YAST_IS_RUNNING=instsys
 
 # slurp in package binary support
 . "$BUILD_DIR/build-pkg"
@@ -26,12 +27,11 @@ repos=()
 
 . $BUILD_DIR/common_functions || exit 1
 
-# should RPMs be installed with --force ?
-USE_FORCE=false
-
 BUILD_IS_RUNNING=$BUILD_ROOT/not-ready
 TMPFILE=$BUILD_ROOT/tmpfile
 
+# should RPMs be installed with --force ?
+USE_FORCE=false
 PREPARE_VM=
 USE_SYSTEM_QEMU=
 USEUSEDFORBUILD=
@@ -99,8 +99,7 @@ PKGS=("$@")
 # needed functions
 #
 
-cleanup_and_exit()
-{
+cleanup_and_exit() {
     trap EXIT
     test "$BUILD_ROOT" = / -a -n "$browner" && chown "$browner" "$BUILD_ROOT"
     # umount so init_buildsystem can be used standalone
@@ -112,8 +111,7 @@ cleanup_and_exit()
     exit ${1:-0}
 }
 
-clean_build_root()
-{
+clean_build_root() {
     if test -n "$BUILD_ROOT" ; then
 	umount -n "$BUILD_ROOT/proc/sys/fs/binfmt_misc" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/proc" 2> /dev/null || true
@@ -129,15 +127,14 @@ clean_build_root()
 	rm -rf -- "$BUILD_ROOT"/.preinstallimage*
 	mkdir -p "$BUILD_ROOT/proc"
 	mkdir -p "$BUILD_ROOT/dev/pts"
-	if test "$UID" = '0' ; then
-		mount -n -tproc none "$BUILD_ROOT/proc"
-		mount -n -tdevpts -omode=0620,gid=5 none "$BUILD_ROOT/dev/pts"
+	if test "$UID" = 0 ; then
+	    mount -n -tproc none "$BUILD_ROOT/proc"
+	    mount -n -tdevpts -omode=0620,gid=5 none "$BUILD_ROOT/dev/pts"
 	fi
     fi
 }
 
-unsafe_preinstall_check()
-{
+unsafe_preinstall_check() {
     # cpio isn't safe so we require bsdtar for VMs. chroot is
     # unsafe anyways so it's ok for that.
     if test -n "$PREPARE_VM" ; then
@@ -147,17 +144,14 @@ unsafe_preinstall_check()
     fi
 }
 
-preinstall_image_filter()
-{
+preinstall_image_filter() {
     for PKG in "$@" ; do
 	test -e "$BUILD_ROOT/.preinstall_image/$PKG" && continue
 	echo $PKG
     done
 }
 
-preinstall_image()
-{
-    check_exit
+preinstall_image() { check_exit
     if test -n "$2" ; then
 	echo "unpacking preinstall image $2"
     else
@@ -179,8 +173,7 @@ preinstall_image()
     rm -f "$BUILD_ROOT/.preinstallimage.unpack"
 }
 
-preinstall()
-{
+preinstall() {
     local PKG="$1"
     check_exit
     echo "preinstalling $PKG..."
@@ -196,8 +189,7 @@ preinstall()
     pkg_preinstall
 }
 
-run_pkg_scripts()
-{
+run_pkg_scripts() {
     chroot $BUILD_ROOT /sbin/ldconfig 2>/dev/null
     for PKG in $PACKAGES_TO_RUNSCRIPTS ; do
 	pkg_runscripts
@@ -205,8 +197,7 @@ run_pkg_scripts()
     done
 }
 
-reorder()
-{
+reorder() {
     test -z "$*" && return
     rm -f $BUILD_ROOT/.init_b_cache/order.manifest
     for PKG in "$@" ; do
@@ -216,8 +207,7 @@ reorder()
     rm -f $BUILD_ROOT/.init_b_cache/order.manifest
 }
 
-create_devs()
-{
+create_devs() {
     local com file mode arg
 
     mkdir -m 755 -p $BUILD_ROOT/dev/pts
@@ -251,8 +241,7 @@ DEVLIST
 
 # check whether the repo list contains a plain "zypp://". Add all
 # enabled zypp repos in this case
-maybe_add_all_zypp_repos()
-{
+maybe_add_all_zypp_repos() {
     local i j
     r=()
     for i in "${repos[@]}"; do
@@ -268,9 +257,8 @@ maybe_add_all_zypp_repos()
     repos=("${r[@]}")
 }
 
-validate_cache_file()
-{
-    local findonly=''
+validate_cache_file() {
+    local findonly=
     maybe_add_all_zypp_repos
     if ! test -f $CACHE_FILE || ! test -f $CACHE_FILE.id || \
 	test "${repos[*]} ${BUILD_RPMS//:/ /}" != "$(cat $CACHE_FILE.id 2>/dev/null)"; then
@@ -328,14 +316,12 @@ validate_cache_file()
     fi
 }
 
-fail_exit()
-{
+fail_exit() {
     cleanup_and_exit 1
 }
 
 # modifies $SRC
-downloadpkg()
-{
+downloadpkg() {
     local url="$1"
     local cachedir
 
@@ -375,8 +361,7 @@ downloadpkg()
     mv "$destfile" "$SRC" || cleanup_and_exit 1
 }
 
-getcachedir()
-{
+getcachedir() {
     local url=$1
     case $url in
       zypp://*)
@@ -395,14 +380,14 @@ getcachedir()
     done
 }
 
-get_pkg_filename()
-{
+get_pkg_filename() {
     local url="$1"
     local name=$(basename $url)
     local cachedir=$(getcachedir $url)
     local destfile="$cachedir/$name"
     echo $destfile
 }
+
 
 set_build_arch
 
@@ -419,9 +404,9 @@ fi
 #
 # now test if there was an incomplete run
 #
-if test -e $BUILD_IS_RUNNING ; then
-    echo It seems that there was an incomplete setup of $BUILD_ROOT.
-    echo To be sure, we will build it again completely...
+if test -e "$BUILD_IS_RUNNING" ; then
+    echo "It seems that there was an incomplete setup of $BUILD_ROOT."
+    echo "To be sure, we will build it again completely..."
     umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
     umount -n $BUILD_ROOT/proc 2> /dev/null
     umount -n $BUILD_ROOT/dev/pts 2> /dev/null
