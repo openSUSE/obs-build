@@ -1,0 +1,201 @@
+#
+# RPM specific functions.
+#
+# (C) 2014 SUSE, Inc
+#
+
+#buildhost removed so that id can be generated from repo files
+#RPMIDFMT="%{NAME}-%{VERSION}-%{RELEASE} %{BUILDHOST}-%{BUILDTIME}\n"
+RPMIDFMT="%{NAME}-%{VERSION}-%{RELEASE} %{BUILDTIME}\n"
+
+pkg_initdb_rpm() {
+    echo "initializing rpm db..."
+    mkdir -p $BUILD_ROOT/var/lib/rpm
+    # rpm v5 does not have initdb
+    if ! test -e $BUILD_ROOT/usr/lib/rpm/cpuinfo.yaml ; then
+	if test -x $BUILD_ROOT/usr/bin/rpmdb ; then
+	    chroot $BUILD_ROOT /usr/bin/rpmdb --initdb || cleanup_and_exit 1
+	else
+	    chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
+	fi
+    fi
+    # hack: add nofsync to db config to speed up install
+    mkdir -p $BUILD_ROOT/root
+    DBI_OTHER=`chroot $BUILD_ROOT rpm --eval '%{?__dbi_other}'`
+    echo "%__dbi_other $DBI_OTHER nofsync" > $BUILD_ROOT/.rpmmacros
+    echo "%__dbi_other $DBI_OTHER nofsync" > $BUILD_ROOT/root/.rpmmacros
+}
+
+pkg_get_installed_rpm() {
+    chroot $BUILD_ROOT rpm -qa --qf "%{NAME} $RPMIDFMT" | (
+	while read pp ii; do
+            echo "$ii" > "$BUILD_ROOT/.init_b_cache/alreadyinstalled/$pp"
+        done
+    )
+    # small hack: we misuse get_installed_rpm as initializer function
+    rpm_set_checkopts
+    rpm_init_cumulate
+}
+
+pkg_erase_rpm() {
+    chroot $BUILD_ROOT rpm --nodeps -e $PKG 2>&1 | {
+	local retry
+	while read line; do
+	    case "$line" in
+		r*failed:\ No\ such\ file\ or\ directory) ;;
+		error:\ failed\ to\ stat\ *:\ No\ such\ file\ or\ directory) ;;
+		error:\ *scriptlet\ failed*)
+		    echo "$line"
+		    retry=1
+		;;
+		*) echo "$line" ;;
+	    esac
+	done
+	if test -n "$retry" ; then
+	    echo "re-try deleting $PKG using --noscripts"
+	    chroot $BUILD_ROOT rpm --nodeps --noscripts -e $PKG || true
+	fi
+    }
+}
+
+rpm_set_checkopts() {
+    RPMCHECKOPTS=
+    RPMCHECKOPTS_HOST=
+    # on Fedora 10 rpmbuild is in a separate package so we need something else to
+    # detect rpm4
+    test -x $BUILD_ROOT/usr/bin/rpmquery && RPMCHECKOPTS="--nodigest --nosignature"
+    test -x /usr/bin/rpmquery && RPMCHECKOPTS_HOST="--nodigest --nosignature"
+}
+
+rpm_init_cumulate() {
+    DO_CUMULATE=
+    typeset -ri suse_version=$(chroot $BUILD_ROOT rpm --eval '%{?suse_version}' 2>/dev/null)
+    typeset -g -i num cumulate=-1
+    typeset -g -a CUMULATED_LIST=()
+    typeset -g -a CUMULATED_PIDS=()
+    typeset -g -a CUMULATED_HMD5=()
+    if ((suse_version > 1220)) ; then 
+	DO_CUMULATE=true
+    fi
+}
+
+pkg_set_packageid_rpm() {
+    PKGID=`rpm -qp --qf "$RPMIDFMT" $RPMCHECKOPTS_HOST $BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm`
+}
+
+pkg_verify_installed_rpm() {
+    chroot $BUILD_ROOT rpm --verify $PKG 2>&1 | tee $TMPFILE
+    if grep ^missing $TMPFILE > /dev/null ; then
+	return 1
+    fi
+    return 0
+}
+
+pkg_cumulate_rpm() {
+    test "$DO_CUMULATE" = true || return 1
+    # work around for cross-build installs, we must not overwrite the running rpm
+    if test "$PKG" = rpm ; then
+	for i in $BUILD_ROOT/.init_b_cache/preinstalls/rpm-x86-* ; do
+	    test -e "$i" && return 1
+	done
+    fi
+    let cumulate++
+    CUMULATED_LIST[$cumulate]=".init_b_cache/$PKG.rpm"
+    CUMULATED_PIDS[$cumulate]="$PKGID"
+    CUMULATED_HMD5[$cumulate]="$PKG_HDRMD5"
+    return 0
+}
+
+pkg_install_rpm() {
+    export ADDITIONAL_PARAMS=
+    if test "$USE_FORCE" = true ; then
+	export ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --force"
+    fi
+    # work around for cross-build installs, we must not overwrite the running rpm
+    if test "$PKG" = rpm ; then
+	for i in $BUILD_ROOT/.init_b_cache/preinstalls/rpm-x86-* ; do
+	    test -e "$i" && ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --justdb"
+	done
+    fi
+    ( chroot $BUILD_ROOT rpm --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
+		$ADDITIONAL_PARAMS .init_b_cache/$PKG.rpm 2>&1 || \
+	  touch $BUILD_ROOT/exit ) | \
+	      grep -v "^warning:.*saved as.*rpmorig$"
+}
+
+pkg_finalize_rpm() {
+    if test -n "${CUMULATED_LIST[*]}" ; then
+	echo "now installing cumulated packages"
+	for ((num=0; num<=cumulate; num++)) ; do
+	    echo ${CUMULATED_LIST[$num]}
+	    PKG=${CUMULATED_LIST[$num]##*/}
+	    test "$BUILD_ROOT/.init_b_cache/rpms/$PKG" -ef "$BUILD_ROOT/${CUMULATED_LIST[$num]}" && continue
+	    rm -f $BUILD_ROOT/${CUMULATED_LIST[$num]}
+	    cp $BUILD_ROOT/.init_b_cache/rpms/$PKG $BUILD_ROOT/${CUMULATED_LIST[$num]} || cleanup_and_exit 1
+	done > $BUILD_ROOT/.init_b_cache/manifest
+	chroot $BUILD_ROOT rpm --ignorearch --nodeps -Uh --oldpackage --ignoresize --verbose $RPMCHECKOPTS \
+		$ADDITIONAL_PARAMS .init_b_cache/manifest 2>&1 || touch $BUILD_ROOT/exit
+	for ((num=0; num<=cumulate; num++)) ; do
+	    rm -f $BUILD_ROOT/${CUMULATED_LIST[$num]}
+	done
+	rm -f $BUILD_ROOT/.init_b_cache/manifest
+	check_exit
+	for ((num=0; num<=cumulate; num++)) ; do
+	    PKG=${CUMULATED_LIST[$num]##*/}
+	    echo "${CUMULATED_PIDS[$num]}" > $BUILD_ROOT/installed-pkg/${PKG%.rpm}
+	    test -n "${CUMULATED_HMD5[$num]}" || continue
+	    echo "${CUMULATED_HMD5[$num]} ${CUMULATED_PIDS[$num]}" > $BUILD_ROOT/.preinstall_image/${PKG%.rpm}
+	done
+    fi
+}
+
+pkg_preinstall_rpm() {
+    PAYLOADDECOMPRESS=cat
+    case `rpm -qp --nodigest --nosignature --qf "%{PAYLOADCOMPRESSOR}\n" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm"` in
+	lzma) rpm --showrc | egrep 'PayloadIsLzma|_lzma' > /dev/null || PAYLOADDECOMPRESS="lzma -d" ;;
+	xz) rpm --showrc | egrep 'PayloadIsXz|_xz' > /dev/null || PAYLOADDECOMPRESS="xz -d" ;;
+    esac
+    if test "$PAYLOADDECOMPRESS" = "lzma -d" ; then
+	if ! lzma </dev/null >/dev/null 2>&1 ; then
+	    test -f "$BUILD_DIR/lzmadec.sh" && PAYLOADDECOMPRESS="bash $BUILD_DIR/lzmadec.sh"
+	fi
+    fi
+    if test "$PAYLOADDECOMPRESS" = "xz -d" ; then
+	if ! xz </dev/null >/dev/null 2>&1 ; then
+	    test -f "$BUILD_DIR/xzdec.sh" && PAYLOADDECOMPRESS="bash $BUILD_DIR/xzdec.sh"
+	fi
+    fi
+    if test "$PAYLOADDECOMPRESS" = cat ; then
+	rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" | $CPIO
+    else
+	rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" | $PAYLOADDECOMPRESS | $CPIO
+    fi
+    if test -e ".init_b_cache/scripts/$PKG.run" ; then
+	rpm -qp --nodigest --nosignature --qf "%{PREIN}" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" > ".init_b_cache/scripts/$PKG.pre"
+	rpm -qp --nodigest --nosignature --qf "%{POSTIN}" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" > ".init_b_cache/scripts/$PKG.post"
+	echo -n '(none)' > .init_b_cache/scripts/.none
+	cmp -s ".init_b_cache/scripts/$PKG.pre" .init_b_cache/scripts/.none && rm -f ".init_b_cache/scripts/$PKG.pre"
+	cmp -s ".init_b_cache/scripts/$PKG.post" .init_b_cache/scripts/.none && rm -f ".init_b_cache/scripts/$PKG.post"
+	rm -f .init_b_cache/scripts/.none
+    fi
+    # hack for rpm erasures
+    if test -d "$BUILD_ROOT/installed-pkg" ; then
+	# call for rpm-4.x and not rpm-devel
+        test -z "${PKG##rpm-[0-9]*}" && chroot $BUILD_ROOT rpm --rebuilddb
+        # also exec for exchanged rpm !  naming is rpm-x86-<target>-<ver>
+        test -z "${PKG##rpm-x86-*[0-9]*}" && chroot $BUILD_ROOT rpm --rebuilddb
+    fi
+}
+
+pkg_runscripts_rpm() {
+    if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre" ; then
+	echo "running $PKG preinstall script"
+	chroot $BUILD_ROOT sh ".init_b_cache/scripts/$PKG.pre" 0
+	rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre"
+    fi
+    if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post" ; then
+	echo "running $PKG postinstall script"
+	chroot $BUILD_ROOT sh ".init_b_cache/scripts/$PKG.post" 1
+	rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post"
+    fi
+}

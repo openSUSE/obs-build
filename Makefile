@@ -64,6 +64,7 @@ install:
 	install -m644 qemu-reg $(DESTDIR)$(pkglibdir)
 	install -m644 build-vm build-vm-* $(DESTDIR)$(pkglibdir)
 	install -m644 build-recipe build-recipe-* $(DESTDIR)$(pkglibdir)
+	install -m644 build-pkg build-pkg-* $(DESTDIR)$(pkglibdir)
 	install -m644 *.pm baselibs_global*.conf lxc.conf $(DESTDIR)$(pkglibdir)
 	install -m644 configs/* $(DESTDIR)$(pkglibdir)/configs
 	install -m644 build.1 $(DESTDIR)$(man1dir)

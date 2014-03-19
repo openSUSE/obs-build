@@ -1,0 +1,56 @@
+#
+# binary package specific functions for the build script
+#
+# (C) 2014 SUSE, Inc
+#
+
+for i in rpm deb arch ; do
+    . "$BUILD_DIR/build-pkg-$i"
+done
+
+pkg_initdb() {
+    pkg_initdb_$PSUF "$@"
+}
+
+pkg_get_installed() {
+    pkg_get_installed_$PSUF "$@"
+}
+
+pkg_set_packageid() {
+    pkg_set_packageid_$PSUF "$@"
+}
+
+pkg_install() {
+    pkg_install_$PSUF "$@"
+}
+
+pkg_verify_installed() {
+    pkg_verify_installed_$PSUF "$@"
+}
+
+pkg_erase() {
+    pkg_erase_$PSUF "$@"
+}
+
+pkg_cumulate() {
+    pkg_cumulate_$PSUF "$@"
+}
+
+pkg_finalize() {
+    pkg_finalize_$PSUF "$@"
+}
+
+pkg_preinstall() {
+    pkg_preinstall_$PSUF "$@"
+}
+
+pkg_runscripts() {
+    pkg_runscripts_$PSUF "$@"
+}
+
+pkg_autodetect_type() {
+    PSUF=
+    test -e $BUILD_ROOT/.init_b_cache/rpms/rpm.rpm && PSUF=rpm
+    test -e $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb && PSUF=deb
+    test -e $BUILD_ROOT/.init_b_cache/rpms/pacman.arch && PSUF=arch
+}

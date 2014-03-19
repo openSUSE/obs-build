@@ -1,0 +1,111 @@
+#
+# Debian dpkg specific functions.
+#
+# (C) 2014 SUSE, Inc
+#
+
+deb_setup() {
+    mkdir -p $BUILD_ROOT/var/lib/dpkg
+    mkdir -p $BUILD_ROOT/var/log
+    mkdir -p $BUILD_ROOT/etc/default
+    :> $BUILD_ROOT/var/lib/dpkg/status
+    :> $BUILD_ROOT/var/lib/dpkg/available
+    :> $BUILD_ROOT/var/log/dpkg.log
+    :> $BUILD_ROOT/etc/ld.so.conf
+    :> $BUILD_ROOT/etc/default/rcS
+}
+
+pkg_initdb_deb() {
+    deb_setup
+    # force dpkg into database to make epoch test work
+    if ! test "$BUILD_ROOT/.init_b_cache/rpms/dpkg.deb" -ef "$BUILD_ROOT/.init_b_cache/dpkg.deb" ; then
+	rm -f $BUILD_ROOT/.init_b_cache/dpkg.deb
+	cp $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb $BUILD_ROOT/.init_b_cache/dpkg.deb || cleanup_and_exit 1
+    fi
+    chroot $BUILD_ROOT dpkg -i --force all .init_b_cache/dpkg.deb >/dev/null 2>&1
+}
+
+pkg_get_installed_deb() {
+    :
+}
+
+pkg_set_packageid_deb() {
+    PKGID=`readlink $BUILD_ROOT/.init_b_cache/rpms/$PKG.deb`
+    PKGID="${PKGID##*/}"
+    PKGID="${PKGID%.deb} debian"
+}
+
+pkg_install_deb() {
+    export DEBIAN_FRONTEND=noninteractive
+    export DEBIAN_PRIORITY=critical
+    ( chroot $BUILD_ROOT dpkg --install --force all .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
+	perl -ne '$|=1;/^(Configuration file|Installing new config file|Selecting previously deselected|Selecting previously unselected|\(Reading database|Unpacking |Setting up|Creating config file|Preparing to replace dpkg)/||/^$/||print'
+    check_exit
+    # ugly workaround for upstart system. some packages (procps) try
+    # to start a service in their configure phase. As we don't have
+    # a running upstart, we just link the start binary to /bin/true
+    if test -e "$BUILD_ROOT/sbin/start"; then
+	if test "$BUILD_ROOT/sbin/start" -ef "$BUILD_ROOT/sbin/initctl" ; then
+	    echo "linking /sbin/start to /bin/true"
+	    mv "$BUILD_ROOT/sbin/start" "$BUILD_ROOT/sbin/start.disabled"
+	    ln -s "/bin/true" "$BUILD_ROOT/sbin/start"
+	fi
+    fi
+    # another workaround, see bug bnc#733699
+    rm -f "$BUILD_ROOT/var/run/init.upgraded"
+}
+
+pkg_erase_deb() {
+    cleanup_and_exit 1
+}
+
+pkg_cumulate_deb() {
+    return 1
+}
+
+pkg_verify_installed_deb() {
+    return 1
+}
+
+pkg_finalize_deb() {
+    echo "configuring all installed packages..."
+    # configure all packages after complete installation, not for each package like rpm does
+    # We need to run this twice, because of cyclic dependencies as it does not succeed on most
+    # debian based distros in the first attempt.
+    if ! chroot $BUILD_ROOT dpkg --configure --pending  2>&1; then
+         echo "first configure attempt failed, trying again..."
+         chroot $BUILD_ROOT dpkg --configure --pending  2>&1 || cleanup_and_exit 1
+    fi
+}
+
+pkg_preinstall_deb() {
+    ar x "$BUILD_ROOT/.init_b_cache/rpms/$PKG.deb"
+    mkdir -p .init_b_cache/scripts/control
+    $TAR -C .init_b_cache/scripts/control -z -f control.tar.gz
+    if test -f "data.tar.gz" ; then
+	$TAR -z -f data.tar.gz
+    elif test -f "data.tar.xz" ; then
+	$TAR -J -f data.tar.xz
+    fi
+    if test -e ".init_b_cache/scripts/$PKG.run" ; then
+	test -e .init_b_cache/scripts/control/preinst && mv .init_b_cache/scripts/control/preinst ".init_b_cache/scripts/$PKG.pre"
+	test -e .init_b_cache/scripts/control/postinst && mv .init_b_cache/scripts/control/postinst ".init_b_cache/scripts/$PKG.post"
+    fi
+    rm -rf .init_b_cache/scripts/control control.tar.gz data.tar.{g,x}z
+}
+
+pkg_runscripts_deb() {
+    if ! test -e $BUILD_ROOT/var/lib/dpkg/status ; then
+	deb_setup
+    fi
+    if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre" ; then
+	echo "running $PKG preinstall script"
+	chroot $BUILD_ROOT ".init_b_cache/scripts/$PKG.pre" install < /dev/null
+	rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre"
+    fi
+    if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post" ; then
+	echo "running $PKG postinstall script"
+	chroot $BUILD_ROOT ".init_b_cache/scripts/$PKG.post" configure '' < /dev/null
+	rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post"
+    fi
+}
