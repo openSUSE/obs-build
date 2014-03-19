@@ -14,7 +14,7 @@ recipe_setup() {
 }
 
 recipe_prepare() {
-    recipe_patch_$BUILDTYPE "$@"
+    recipe_prepare_$BUILDTYPE "$@"
 }
 
 recipe_build() {
