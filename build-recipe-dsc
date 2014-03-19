@@ -14,7 +14,7 @@ recipe_setup_dsc() {
     chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
     cp -p "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
     # FIX to work with baselibs_$PROJ etc
-    if test -e "$MYSRCDIR"/baselibs-deb.conf" ; then
+    if test -e "$MYSRCDIR/baselibs-deb.conf" ; then
 	echo "dsc build and baselibs-deb.conf present: forcing --baselibs to true"
 	CREATE_BASELIBS=true
     fi
