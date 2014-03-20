@@ -6,7 +6,11 @@ BEGIN {
 
 use Build;
 use Build::Susetags;
+use Getopt::Long;
+
 use strict;
+
+Getopt::Long::Configure("no_ignore_case");
 
 sub print_pkg($)
 {
@@ -60,43 +64,30 @@ sub callback
   return 0;
 }
 
+### main
+
+my $opt_zypp;
+my $cachedir = "/var/cache/build";
+
+GetOptions (
+    "zypp"   => \$opt_zypp,
+    "cachedir=s"  => \$cachedir,
+    ) or exit(1);
+
 for my $url (@ARGV) {
   my $dir;
-  if ($url =~ /^zypp:\/\/([^\/]*)\/?/) {
-    use Build::Zypp;
-    my $repo = Build::Zypp::parsecfg($1);
-    die "can't parse $1\n" unless $repo;
-    die "only yast2 repos supported\n" unless $repo->{'type'} eq 'yast2';
-    my $name = $repo->{'name'};
-    $dir = "/var/cache/zypp/raw/$name/";
+  if ($opt_zypp) {
+    $dir = $cachedir;
   } else {
     $dir = $url;
   }
 
-# a really fucked up system
-#  if (-e $url."/yast/order") {
-#    if(open(F, '<', $url."/yast/order")) {
-#      my $found_products;
-#      while(<F>) {
-#        chomp;
-#        my ($a, $b) = split(/ /);
-#        $a =~ s/^\///;
-#        if(-e $url.$a)
-#        {
-#          push @ARGV, $url.$a;
-#          $found_products = 1;
-#          print STDERR "$url -> $url$a\n";
-#        }
-#      }
-#      close(F);
-#      next if $found_products;
-#    }
-#  }
-  # XXX: location is actually defined in content file
-  my $packages = $dir.'/suse/setup/descr/packages';
-  
+  $dir .= '/' unless $dir =~ /\/$/;
   $url .= '/' unless $url =~ /\/$/;
 
+  # XXX: use descrdir from content file
+  my $packages = $dir.'suse/setup/descr/packages';
+  
   my @order = ();
   my $pkgs = Build::Susetags::parse($packages,
     { 'Loc' => 'location', 'Prv' => 'provides', 'Req' => 'requires', 'Tim' => 'buildtime' },

@@ -241,7 +241,7 @@ DEVLIST
 
 # check whether the repo list contains a plain "zypp://". Add all
 # enabled zypp repos in this case
-maybe_add_all_zypp_repos() {
+expand_plain_zypp_repo() {
     local i j
     r=()
     for i in "${repos[@]}"; do
@@ -257,9 +257,9 @@ maybe_add_all_zypp_repos() {
     repos=("${r[@]}")
 }
 
-validate_cache_file() {
+create_cache_file() {
     local findonly=
-    maybe_add_all_zypp_repos
+    expand_plain_zypp_repo
     if ! test -f $CACHE_FILE || ! test -f $CACHE_FILE.id || \
 	test "${repos[*]} ${BUILD_RPMS//:/ /}" != "$(cat $CACHE_FILE.id 2>/dev/null)"; then
 	rm -f $CACHE_FILE.id
@@ -282,20 +282,28 @@ validate_cache_file() {
     fi
     if ! test -f $CACHE_FILE.id ; then
 	test -z "$LIST_STATE" && echo initializing $CACHE_FILE ...
+	BINTYPE=
+	if test -n "$BUILD_DIST" ; then
+	    BINTYPE=`queryconfig binarytype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
+	    test "$BINTYPE" = UNKNOWN && BINTYPE=
+	fi
 	for SRC in "${repos[@]}" -- ${BUILD_RPMS//:/ /}; do
 	    if test "$SRC" = '--' ; then
 		findonly=1
 		continue
 	    fi
 	    test -z "$SRC" && SRC=`pwd`
-	    if test "${SRC#zypp://}" != "$SRC" ; then
-		set -- $BUILD_DIR/createrepomddeps "$SRC"
-	    elif test "${SRC#http://}" != "$SRC" -o "${SRC#https://}" != "$SRC" -o "${SRC#ftp://}" != "$SRC" -o "${SRC#ftps://}" != "$SRC" ; then
+	    if test "${SRC#http://}" != "$SRC" -o "${SRC#https://}" != "$SRC" -o "${SRC#ftp://}" != "$SRC" -o "${SRC#ftps://}" != "$SRC" ; then
+		# remote repo, cache binary packages
 		mkdir -p "$(getcachedir "$SRC")"
-		set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
-	    elif test "${SRC#arch@http://}" != "$SRC" -o "${SRC#arch@https://}" != "$SRC" -o "${SRC#arch@ftp://}" != "$SRC" -o "${SRC#arch@ftps://}" != "$SRC" ; then
-		mkdir -p "$(getcachedir "$SRC")"
-		set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
+		if test "$BINTYPE" = arch ; then
+		    set -- $BUILD_DIR/createarchdeps --cachedir="$CACHE_DIR" "$SRC"
+		else
+		    set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
+		fi
+	    elif test "${SRC#zypp://}" != "$SRC" ; then
+		# special zypp repo, re-use zypp cache
+		set -- $BUILD_DIR/createzyppdeps "$SRC"
 	    elif test ! -e "$SRC" ; then
 		echo "*** $SRC does not exist" >&2
 		cleanup_and_exit 1
@@ -367,9 +375,8 @@ getcachedir() {
       zypp://*)
 	url=${url#zypp:/}
 	echo "/var/cache/zypp/packages/${url%/*}"
-	return 0;
+	return 0
 	;;
-      *.pkg.tar.?z) url="arch@$url" ;;
     esac
     for repo in "${repos[@]}" ; do
 	if test "${url:0:${#repo}}" == "$repo" -o "${url:0:${#repo}}" == "$repo" ; then
@@ -459,7 +466,7 @@ else
 	# create rpmdeps file
 	#
 	CACHE_FILE=$BUILD_ROOT/.srcfiles.cache
-	validate_cache_file
+	create_cache_file
 
 	#
 	# select and expand packages

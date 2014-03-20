@@ -46,9 +46,9 @@ GetOptions("cachedir=s"  => \$cachedir) or exit(1);
 
 
 for my $url (@ARGV) {
-  die("Not an Archlinux repo") unless $url =~ /^(ht|f)tp:\/\/([^\/]*)\/?/;
+  die("Not an Archlinux repo") unless $url =~ /^(:?ftp|https?):\/\/([^\/]*)\/?/;
   my $reponame = getreponame($url);
-  my $repoid = Digest::MD5::md5_hex("arch\@$url");
+  my $repoid = Digest::MD5::md5_hex($url);
   my $dir = "$cachedir/$repoid";
   $url .= '/' unless $url =~ /\/$/;
   getrepodb($url, $reponame, $dir);

@@ -48,6 +48,7 @@ install:
 	    debtransformzip \
 	    mkbaselibs \
 	    mkdrpms \
+	    createzyppdeps \
 	    createarchdeps \
 	    createrepomddeps \
 	    createyastdeps \

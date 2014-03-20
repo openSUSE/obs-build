@@ -26,6 +26,7 @@ my $opt_dump;
 my $opt_old;
 my $opt_nosrc;
 my $opt_bc;
+my $opt_zypp;
 my $cachedir = "/var/cache/build";
 
 my $old_seen = ();
@@ -205,31 +206,30 @@ sub primary_handle_package_end
   my $el = shift;
 
   if($opt_bc) {
-      printasbuildcachefile(@packages);
-      shift @packages;
+    printasbuildcachefile(@packages);
+    shift @packages;
   } elsif ($opt_old) {
-      foreach my $pkg (@packages) {
-    my $arch = $pkg->{'arch'};
-    $arch = 'src' if $pkg->{'arch'} eq 'nosrc';
-    next if ($arch eq 'src' && $opt_nosrc);
-    if(exists($old_seen->{$pkg->{'name'}}->{$arch})) {
+    foreach my $pkg (@packages) {
+      my $arch = $pkg->{'arch'};
+      $arch = 'src' if $pkg->{'arch'} eq 'nosrc';
+      next if ($arch eq 'src' && $opt_nosrc);
+      if (exists($old_seen->{$pkg->{'name'}}->{$arch})) {
 	my $pv = $old_seen->{$pkg->{'name'}}->{$arch}->{'ver'};
 	my $rv = $pkg->{'ver'}.'-'.$pkg->{'rel'};
 	my $vv = Build::Rpm::verscmp($pv, $rv, 0);
-	if($vv < 0)
-	{
-      print $old_seen->{$pkg->{'name'}}->{$arch}->{'loc'}."\n";
-      $old_seen->{$pkg->{'name'}}->{$arch}->{'ver'} = $pkg->{'ver'}.'-'.$pkg->{'rel'};
-      $old_seen->{$pkg->{'name'}}->{$arch}->{'loc'} = $pkg->{'baseurl'} . $pkg->{'location'};
+	if ($vv < 0) {
+	  print $old_seen->{$pkg->{'name'}}->{$arch}->{'loc'}."\n";
+	  $old_seen->{$pkg->{'name'}}->{$arch}->{'ver'} = $pkg->{'ver'}.'-'.$pkg->{'rel'};
+	  $old_seen->{$pkg->{'name'}}->{$arch}->{'loc'} = $pkg->{'baseurl'} . $pkg->{'location'};
 	} else {
-      print $pkg->{'baseurl'} . $pkg->{'location'}."\n";
+	  print $pkg->{'baseurl'} . $pkg->{'location'}."\n";
 	}
-    } else {
+      } else {
 	$old_seen->{$pkg->{'name'}}->{$arch}->{'ver'} = $pkg->{'ver'}.'-'.$pkg->{'rel'};
 	$old_seen->{$pkg->{'name'}}->{$arch}->{'loc'} = $pkg->{'baseurl'} . $pkg->{'location'};
-    }
       }
-      shift @packages;
+    }
+    shift @packages;
   }
 }
 
@@ -385,6 +385,7 @@ GetOptions (
     "nosrc"   => \$opt_nosrc,
     "dump"   => \$opt_dump,
     "old"   => \$opt_old,
+    "zypp"   => \$opt_zypp,
     "cachedir=s"  => \$cachedir,
     ) or exit(1);
 
@@ -400,30 +401,17 @@ my $p = new XML::Parser(
 #my $url = '/mounts/mirror/SuSE/ftp.suse.com/pub/suse/update/10.1/';
 for my $url (@ARGV) {
   my $dir;
-  if ($url =~ /^zypp:\/\/([^\/]*)\/?/) {
-    use Build::Zypp;
-    my $repo = Build::Zypp::parsecfg($1);
-    die "can't parse $1\n" unless $repo;
-    my $type = $repo->{'type'};
-    if($type eq 'rpm-md') {
-      my $name = $repo->{'name'};
-      $dir = "/var/cache/zypp/raw/$name/";
-      $baseurl = $url;
-      $baseurl .= '/' unless $baseurl =~ /\/$/;
-    } elsif ($type eq 'yast2') {
-      # XXX
-      exec ($INC[0].'/createyastdeps', $url);
-    } else {
-      die "unsupported repo type: $type\n";
-    }
-  } elsif ($url =~ /^http[s]?:\/\/([^\/]*)\/?/) {
+  if ($opt_zypp) {
+    $dir = $cachedir;
+    $dir .= '/' unless $dir =~ /\/$/;
+    $baseurl = $url;
+    $baseurl .= '/' unless $baseurl =~ /\/$/;
+  } elsif ($url =~ /^(?:ftp|https?):\/\/([^\/]*)\/?/) {
     my $repoid = md5_hex($url);
     $dir = "$cachedir/$repoid/";
     $baseurl = $url;
     $baseurl .= '/' unless $baseurl =~ /\/$/;
     getmetadata($baseurl, $dir);
-  } elsif ($url =~ /^arch\@/) {
-    exec ("$INC[0]/createarchdeps", "--cachedir=$cachedir", substr($url, 5));
   } else {
     $dir = $url;
     $dir .= '/' unless $dir =~ /\/$/;
@@ -437,7 +425,7 @@ for my $url (@ARGV) {
 
 #  print Dumper(\@primaryfiles);
 
-  foreach my $f (@primaryfiles) {
+  for my $f (@primaryfiles) {
     @cursor = ([undef, $primaryparser]);
 
     my $u = $dir . $f->{'location'};
@@ -451,7 +439,7 @@ for my $url (@ARGV) {
       $cached = 0 if exists($f->{'size'}) && $f->{'size'} != (-s _);
       $cached = 0 if !exists($f->{'size'}) && $u !~ /[0-9a-f]{32}-primary/;
     }
-    if ($url =~ /^http[s]?:\/\/([^\/]*)\/?/ and !$cached) {
+    if ($url =~ /^(?:ftp|https?):\/\/([^\/]*)\/?/ and !$cached) {
         if (system($INC[0].'/download', $dir . "repodata/", $baseurl . "repodata/" . basename($u))) {
 	  die("download failed\n");
 	}

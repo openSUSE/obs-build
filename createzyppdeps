@@ -1,0 +1,34 @@
+#!/usr/bin/perl -w
+
+BEGIN {
+  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+}
+
+use strict;
+
+use Build::Zypp;
+use Getopt::Long;
+
+use strict;
+
+Getopt::Long::Configure("no_ignore_case");
+
+GetOptions() or exit(1);
+
+die("createzyppdeps needs exactly one argument\n") if @ARGV != 1;
+my $url = $ARGV[0];
+
+die("createzyppdeps argument must start with 'zypp://'\n") unless $url =~ /^zypp:\/\/([^\/]*)/;
+my $repo = Build::Zypp::parsecfg($1);
+die("can't parse $1\n") unless $repo;
+
+my $type = $repo->{'type'};
+my $cachedir = "/var/cache/zypp/raw/$repo->{'name'}";
+
+if($type eq 'rpm-md') {
+  exec ($INC[0].'/createrepomddeps', '--cachedir', $cachedir, '--zypp', $url);
+} elsif ($type eq 'yast2') {
+  exec ($INC[0].'/createyastdeps', '--cachedir', $cachedir, '--zypp', $url);
+} else {
+  die "unsupported repo type: $type\n";
+}
