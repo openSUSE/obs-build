@@ -33,7 +33,6 @@ TMPFILE=$BUILD_ROOT/tmpfile
 # should RPMs be installed with --force ?
 USE_FORCE=false
 PREPARE_VM=
-USE_SYSTEM_QEMU=
 USEUSEDFORBUILD=
 LIST_STATE=
 RPMLIST=
@@ -46,10 +45,6 @@ while test -n "$1" ; do
 	--prepare)
 	    shift
 	    PREPARE_VM=true
-	    ;;
-	--use-system-qemu)
-	    shift
-	    USE_SYSTEM_QEMU=true
 	    ;;
 	--create-build-binaries)
 	    shift
