@@ -406,7 +406,7 @@ for my $url (@ARGV) {
     $dir .= '/' unless $dir =~ /\/$/;
     $baseurl = $url;
     $baseurl .= '/' unless $baseurl =~ /\/$/;
-  } elsif ($url =~ /^(?:ftp|https?):\/\/([^\/]*)\/?/) {
+  } elsif ($url =~ /^(?:ftps?|https?):\/\/([^\/]*)\/?/) {
     my $repoid = md5_hex($url);
     $dir = "$cachedir/$repoid/";
     $baseurl = $url;
@@ -439,7 +439,7 @@ for my $url (@ARGV) {
       $cached = 0 if exists($f->{'size'}) && $f->{'size'} != (-s _);
       $cached = 0 if !exists($f->{'size'}) && $u !~ /[0-9a-f]{32}-primary/;
     }
-    if ($url =~ /^(?:ftp|https?):\/\/([^\/]*)\/?/ and !$cached) {
+    if ($url =~ /^(?:ftps?|https?):\/\/([^\/]*)\/?/ and !$cached) {
         if (system($INC[0].'/download', $dir . "repodata/", $baseurl . "repodata/" . basename($u))) {
 	  die("download failed\n");
 	}
