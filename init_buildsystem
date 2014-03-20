@@ -117,6 +117,7 @@ clean_build_root() {
 	umount -n "$BUILD_ROOT/proc/sys/fs/binfmt_misc" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/proc" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/dev/pts" 2> /dev/null || true
+	umount -n "$BUILD_ROOT/dev/shm" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/mnt" 2> /dev/null || true
 	rm -rf -- "$BUILD_ROOT"/*
 	rm -rf -- "$BUILD_ROOT/.build"
