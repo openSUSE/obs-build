@@ -77,6 +77,7 @@ RSYNCDONE=
 SIGNDUMMY=
 DO_STATISTICS=
 RUN_SHELL=
+CACHE_DIR=/var/cache/build
 
 
 # This is for insserv
@@ -1200,7 +1201,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
     mount -n -tdevpts -omode=0620,gid=5 none $BUILD_ROOT/dev/pts 2> /dev/null
     # needed for POSIX semaphores
-    test -d $BUILD_ROOT/dev/shm || rm -f $BUILD_ROOT/dev/shm
+    test -d $BUILD_ROOT/dev/shm || rm -f $BUILD_ROOT/dev/shm 2>/dev/null
     mkdir -p $BUILD_ROOT/dev/shm
     mount -n -ttmpfs none $BUILD_ROOT/dev/shm 2> /dev/null
 
