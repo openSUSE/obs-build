@@ -299,8 +299,8 @@ create_cache_file() {
 		    set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
 		fi
 	    elif test "${SRC#zypp://}" != "$SRC" ; then
-		# special zypp repo, re-use zypp cache
-		set -- $BUILD_DIR/createzyppdeps "$SRC"
+		# special zypp repo
+		set -- $BUILD_DIR/createzyppdeps --cachedir="$CACHE_DIR" "$SRC"
 	    elif test ! -e "$SRC" ; then
 		echo "*** $SRC does not exist" >&2
 		cleanup_and_exit 1
@@ -376,22 +376,13 @@ getcachedir() {
 	;;
     esac
     for repo in "${repos[@]}" ; do
-	if test "${url:0:${#repo}}" == "$repo" -o "${url:0:${#repo}}" == "$repo" ; then
+	if test "${url:0:${#repo}}" == "$repo" ; then
 	    read repoid dummy < <(echo -n "$repo" | md5sum)
 	    echo "$CACHE_DIR/$repoid"
 	    break
 	fi
     done
 }
-
-get_pkg_filename() {
-    local url="$1"
-    local name=$(basename $url)
-    local cachedir=$(getcachedir $url)
-    local destfile="$cachedir/$name"
-    echo $destfile
-}
-
 
 set_build_arch
 

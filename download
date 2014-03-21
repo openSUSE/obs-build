@@ -28,7 +28,7 @@ for my $url (@ARGV) {
     die "can't parse $1\n" unless $repo;
     die "missing url in repo ".$repo->{'name'}."\n" unless exists $repo->{'baseurl'};
     my $u = $repo->{'baseurl'};
-    $u .= '/' unless substr($u, -1, 1) eq '/';
+    $u .= '/' unless $u =~ /\/$/;
     $url =~ s/^zypp:\/\/[^\/]*\/*//;
     $url = URI->new($u.$url);
     if ($url->scheme eq 'dir') {

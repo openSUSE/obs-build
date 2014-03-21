@@ -70,14 +70,14 @@ my $opt_zypp;
 my $cachedir = "/var/cache/build";
 
 GetOptions (
-    "zypp"   => \$opt_zypp,
+    "zypp=s"   => \$opt_zypp,
     "cachedir=s"  => \$cachedir,
     ) or exit(1);
 
 for my $url (@ARGV) {
   my $dir;
   if ($opt_zypp) {
-    $dir = $cachedir;
+    $dir = $opt_zypp;
   } else {
     $dir = $url;
   }

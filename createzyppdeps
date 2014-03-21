@@ -13,7 +13,11 @@ use strict;
 
 Getopt::Long::Configure("no_ignore_case");
 
-GetOptions() or exit(1);
+my $cachedir = "/var/cache/build";
+
+GetOptions(
+    "cachedir=s"  => \$cachedir,
+    ) or exit(1);
 
 die("createzyppdeps needs exactly one argument\n") if @ARGV != 1;
 my $url = $ARGV[0];
@@ -23,12 +27,12 @@ my $repo = Build::Zypp::parsecfg($1);
 die("can't parse $1\n") unless $repo;
 
 my $type = $repo->{'type'};
-my $cachedir = "/var/cache/zypp/raw/$repo->{'name'}";
+my $zyppcachedir = "/var/cache/zypp/raw/$repo->{'name'}";
 
 if($type eq 'rpm-md') {
-  exec ($INC[0].'/createrepomddeps', '--cachedir', $cachedir, '--zypp', $url);
+  exec ($INC[0].'/createrepomddeps', '--cachedir', $cachedir, '--zypp', $zyppcachedir, $url);
 } elsif ($type eq 'yast2') {
-  exec ($INC[0].'/createyastdeps', '--cachedir', $cachedir, '--zypp', $url);
+  exec ($INC[0].'/createyastdeps', '--cachedir', $cachedir, '--zypp', $zyppcachedir, $url);
 } else {
   die "unsupported repo type: $type\n";
 }

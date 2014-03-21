@@ -385,7 +385,7 @@ GetOptions (
     "nosrc"   => \$opt_nosrc,
     "dump"   => \$opt_dump,
     "old"   => \$opt_old,
-    "zypp"   => \$opt_zypp,
+    "zypp=s"   => \$opt_zypp,
     "cachedir=s"  => \$cachedir,
     ) or exit(1);
 
@@ -402,7 +402,7 @@ my $p = new XML::Parser(
 for my $url (@ARGV) {
   my $dir;
   if ($opt_zypp) {
-    $dir = $cachedir;
+    $dir = $opt_zypp;
     $dir .= '/' unless $dir =~ /\/$/;
     $baseurl = $url;
     $baseurl .= '/' unless $baseurl =~ /\/$/;
