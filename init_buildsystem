@@ -330,11 +330,7 @@ downloadpkg() {
     local url="$1"
     local cachedir
 
-    if test "${url:0:7}" == "zypp://"  ; then
-	cachedir="/var/cache/zypp/packages/"
-	SRC="$cachedir${url#zypp://}"
-	mkdir -p "${SRC%/*}" || cleanup_and_exit 1
-    elif test "${url:0:7}" == "http://" -o "${url:0:8}" == "https://" -o "${url:0:6}" == "ftp://" -o "${url:0:7}" == "ftps://" ; then
+    if test "${url:0:7}" == "zypp://" -o "${url:0:7}" == "http://" -o "${url:0:8}" == "https://" -o "${url:0:6}" == "ftp://" -o "${url:0:7}" == "ftps://" ; then
 	cachedir="$(getcachedir "$url")"
 	local name="$(basename "$url")"
 	name=${name/%.pkg.tar.?z/.arch}
@@ -368,13 +364,6 @@ downloadpkg() {
 
 getcachedir() {
     local url=$1
-    case $url in
-      zypp://*)
-	url=${url#zypp:/}
-	echo "/var/cache/zypp/packages/${url%/*}"
-	return 0
-	;;
-    esac
     for repo in "${repos[@]}" ; do
 	if test "${url:0:${#repo}}" == "$repo" ; then
 	    read repoid dummy < <(echo -n "$repo" | md5sum)
@@ -382,6 +371,18 @@ getcachedir() {
 	    break
 	fi
     done
+}
+
+can_reuse_cached_package() {
+    local cachepkgid pkgid
+    test -s "$1" || return 1
+    # XXX verify for non-rpm types as well
+    if test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.id" -a "${1%.rpm}" != "$1" ; then
+	pkgid=`rpm -qp --qf "$RPMIDFMT" $RPMCHECKOPTS_HOST "$1"`
+	read cachepkgid < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
+	test "$cachepkgid" = "$pkgid" || return 1
+    fi
+    return 0
 }
 
 set_build_arch
@@ -576,27 +577,25 @@ else
         while read PKG SRC ; do
 	    cachepkg="${SRC##*/}"
 	    cachepkg="${cachepkg/%.pkg.tar.?z/.arch}"
-	    cachedir="$(getcachedir "$SRC")"
-	    if test -s "$cachedir/$cachepkg" ; then
-		# XXX verify for non-rpm types as well
-		if test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.id" -a "${SRC%.rpm}" != "$SRC" ; then
-		    PKGID=`rpm -qp --qf "$RPMIDFMT" $RPMCHECKOPTS_HOST "$cachedir/$cachepkg"`
-		    read cachepkgid < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
-		    if test "$cachepkgid" = "$PKGID" ; then
-			SRC="$cachedir/$cachepkg"
-		    else
-			rm -f "$cachedir/$cachepkg"
-		    fi
-		else
-		    SRC="${cachedir}/$cachepkg"
+	    if test "$SRC" != "$SRC#zypp://" ; then
+		# for zypp packages also look in the zypp cache
+		cachedir="/var/cache/zypp/packages/${SRC#zypp://}"
+		cachedir="${cachedir%/*}"
+		if can_reuse_cached_package "$cachedir/$cachepkg" ; then
+		    SRCSUF=${SRC/%.pkg.tar.?z/.arch}
+		    ln -s "$cachedir/$cachepkg" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
+		    continue
 		fi
 	    fi
-	    if test "${SRC#/}" = "$SRC" ; then
-		echo "$PKG $SRC" >>$BUILD_ROOT/.init_b_cache/rpmlist.download2
-	    else
+	    cachedir="$(getcachedir "$SRC")"
+	    if can_reuse_cached_package "$cachedir/$cachepkg" ; then
 		SRCSUF=${SRC/%.pkg.tar.?z/.arch}
-		ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
+		ln -s "$cachedir/$cachepkg" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
+		continue
 	    fi
+	    # not found in cache or cache has different package
+	    rm -f "$cachedir/$cachepkg"
+	    echo "$PKG $SRC" >>$BUILD_ROOT/.init_b_cache/rpmlist.download2
 	done < $BUILD_ROOT/.init_b_cache/rpmlist.download
 	rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download
 	test -s $BUILD_ROOT/.init_b_cache/rpmlist.download2 && mv $BUILD_ROOT/.init_b_cache/rpmlist.download2 $BUILD_ROOT/.init_b_cache/rpmlist.download
