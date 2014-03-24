@@ -52,7 +52,7 @@ die("createzyppdeps needs exactly one argument\n") if @ARGV != 1;
 my $url = $ARGV[0];
 
 die("createzyppdeps argument must start with 'zypp://'\n") unless $url =~ /^zypp:\/\/([^\/]*)/;
-my $repo = Build::Zypp::parsecfg($1);
+my $repo = Build::Zypp::parserepo($1);
 die("can't parse $1\n") unless $repo;
 
 my $type = $repo->{'type'};

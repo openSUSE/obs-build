@@ -263,14 +263,14 @@ create_cache_file() {
 	for SRC in "${repos[@]}" ${BUILD_RPMS//:/ /}; do
 	    test -n "$SRC" || SRC=.
 	    if test "${SRC#zypp://}" != "$SRC" ; then
-		SRC="/var/cache/zypp/raw" # XXX can't use name here as we'd need to parse the file
+		SRC="/var/cache/zypp/raw/${SRC#zypp://}"
 	    fi
 	    if test "$SRC" -nt $CACHE_FILE; then
 		rm -f $CACHE_FILE.id
 		break
 	    fi
 	    # always rebuild if we have remote repositories and --clean is given
-	    if test -n "$CLEAN_BUILD" -a "$SRC" != "${SRC#*://}" ; then
+	    if test -n "$CLEAN_BUILD" -a "$SRC" != "${SRC#*://}" -a "${SRC#zypp://}" = "$SRC" ; then
 		rm -f $CACHE_FILE.id
 		break
 	    fi

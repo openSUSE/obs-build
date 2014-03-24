@@ -24,7 +24,7 @@ my $ua = LWP::UserAgent->new(
 for my $url (@ARGV) {
   if ($url =~ /^zypp:\/\/([^\/]*)\/?/) {
     use Build::Zypp;
-    my $repo = Build::Zypp::parsecfg($1);
+    my $repo = Build::Zypp::parserepo($1);
     die "can't parse $1\n" unless $repo;
     die "missing url in repo ".$repo->{'name'}."\n" unless exists $repo->{'baseurl'};
     my $u = $repo->{'baseurl'};
