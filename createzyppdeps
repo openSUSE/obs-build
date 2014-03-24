@@ -14,11 +14,40 @@ use strict;
 Getopt::Long::Configure("no_ignore_case");
 
 my $cachedir = "/var/cache/build";
+my $opt_listrepos;
 
 GetOptions(
     "cachedir=s"  => \$cachedir,
+    "listrepos" => \$opt_listrepos,
     ) or exit(1);
 
+if ($opt_listrepos) {
+  die("createzyppdeps --listrepos does not take an argument\n") if @ARGV;
+  opendir(D, "/etc/zypp/repos.d") || exit(0);
+  my @r = grep {!/^\./ && /.repo$/} readdir(D);
+  closedir D;
+  @r = sort @r;
+  for my $r (@r) {
+    open(F, '<', "/etc/zypp/repos.d/$r") || next;
+    my $reponame;
+    my $enabled;
+    while(<F>) {
+      chomp;
+      next if /^\s*#/;
+      s/\s+$//;
+      if (/^\[(.*)\]$/) {
+        print "$reponame\n" if defined($reponame) && $enabled;
+	$reponame = $1;
+	$enabled = undef;
+      } elsif (/enabled=\s*(\S+)/) {
+	$enabled = $1;
+      }
+    }
+    print "$reponame\n" if defined($reponame) && $enabled;
+    close F;
+  }
+  exit(0);
+}
 die("createzyppdeps needs exactly one argument\n") if @ARGV != 1;
 my $url = $ARGV[0];
 
