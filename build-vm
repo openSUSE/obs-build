@@ -722,7 +722,7 @@ vm_save_statistics() {
     test -e /dev/vda && device="vda"
     test -e /dev/dasda && device="dasda" # in z/VM
     test -e /dev/nfhd0 && device="nfhd0" # in aranym
-    if test -e /sys/b lock/${device}/stat ; then
+    if test -e /sys/block/${device}/stat ; then
 	disk=(`cat /sys/block/${device}/stat`)
 	test "0${disk[0]}" -gt 0 && echo "IO_requests_read: ${disk[0]}"  >> $otherdir/_statistics
 	test "0${disk[2]}" -gt 0 && echo "IO_sectors_read: ${disk[2]}"   >> $otherdir/_statistics
