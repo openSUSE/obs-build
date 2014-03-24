@@ -15,7 +15,8 @@
 
 use strict;
 
-my ($opt_padstart, $opt_padend, $opt_verbose);
+my ($opt_padstart, $opt_padend, $opt_verbose, $opt_manifest, $opt_mani0);
+$opt_verbose = 0;
 
 while (@ARGV)  {
   if ($ARGV[0] eq '--padstart') {
@@ -30,71 +31,125 @@ while (@ARGV)  {
   }
   if ($ARGV[0] eq '--verbose' || $ARGV[0] eq '-v') {
     shift @ARGV;
-    $opt_verbose = 1;
+    $opt_verbose++;
+    next;
+  }
+  if ($ARGV[0] eq '-0') {
+    shift @ARGV;
+    $opt_mani0 = 1;
+    next;
+  }
+  if ($ARGV[0] eq '--manifest') {
+    shift @ARGV;
+    $opt_manifest = shift @ARGV;
     next;
   }
   last;
 }
 
-if($opt_padstart) {
-  print "\n"x$opt_padstart;
+print "\n"x$opt_padstart if $opt_padstart;
+
+if ($opt_manifest) {
+  if ($opt_manifest eq '-') {
+    open(MANIFEST, '<&STDIN') || die("STDIN dup: $!\n");
+  } else {
+    open(MANIFEST, '<', $opt_manifest) || die("$opt_manifest: $!\n");
+  }
 }
 
-for my $file (@ARGV) {
-  next unless -f $file;
-  print STDERR "$file\n" if $opt_verbose;
+while (1) {
+  my $file;
+  if (@ARGV) {
+    $file = shift @ARGV;
+  } elsif ($opt_manifest) {
+    if ($opt_mani0) {
+      local $/ = "\0";
+      $file = <MANIFEST>;
+      last unless defined $file;
+      $file =~ s/\0$//s;
+    } else {
+      $file = <MANIFEST>;
+      last unless defined $file;
+      chomp $file;
+    }
+  }
   my $n = $file;
-  $n =~ s/.*\///;
+  $n =~ s/([\000-\037 %])/sprintf("%%%02X", ord($1))/ges;
+  if (-l $file) {
+    print STDERR "$file\n" if $opt_verbose && !($opt_verbose == 1 && $file =~ /^KIWI\/.*\//);
+    my $c = readlink($file);
+    die("$file: readlink: $!\n") unless defined $c;
+    if ("/$c/" =~ /\/\.?\//s) {
+      print STDERR "$file: bad symlink ($c) ignored\n";
+      next;
+    }
+    if ("/$c/" =~ /^(\/\.\.)+\/(.*?)$/s) {
+      my ($head, $tail) = ($1, $2);
+      if (("/$tail/" =~ /\/\.\.\//s) || (($head =~ y!/!!) > ($file =~ y!/!!))) {
+        print STDERR "$file: bad symlink ($c) ignored\n";
+        next;
+      }
+    } else {
+      if ("/$c/" =~ /\/\.\.\//s) {
+        print STDERR "$file: bad symlink ($c) ignored\n";
+        next;
+      }
+    }
+    $c =~ s/([\000-\037 %])/sprintf("%%%02X", ord($1))/ges;
+    print "l $n $c\n";
+    next;
+  } elsif (-d _) {
+    print STDERR "$file\n" if $opt_verbose && !($opt_verbose == 1 && $file =~ /^KIWI\/.*\//);
+    my @stat = stat(_);
+    print "d $n\n";
+    next;
+  } elsif (!-f _) {
+    next;
+  }
+  print STDERR "$file\n" if $opt_verbose && !($opt_verbose == 1 && $file =~ /^KIWI\/.*\//);
 
-  if(!open(F, '<', $file)) {
+  if (!open(F, '<', $file)) {
     print STDERR "$file: $!";
+    next;
+  }
+
+  my @stat = stat(F);
+  die unless @stat;
+  my $st_size = $stat[7];
+  if ($st_size == 0) {
+    print "f $n 0\n";
+    close F;
     next;
   }
 
   my $bsize = 'xxxx';
   ioctl(F, 2, $bsize) || ioctl(F, 536870914, $bsize) || die("FIGETBSZ: $!\n");
   $bsize = unpack("L", $bsize);
+  die unless $bsize != 0;
 
-  my @stat = stat(F);
-  my ($st_size, $st_blocks) = ($stat[7], $stat[11], $stat[12]);
-
+  print "f $n $st_size $bsize";
   my $blocks = int(($st_size+$bsize-1)/$bsize);
-
-  print "$n $st_size $bsize ";
-
   my ($firstblock, $lastblock);
   for ($b = 0; $b < $blocks; ++$b) {
     my $block = pack('I', $b);
-    if(not defined ioctl(F, 1, $block)) {
-	if(not defined ioctl(F, 536870913, $block)) {
-	    die "$file: $!";
-	}
+    if (not defined ioctl(F, 1, $block)) {
+      if (not defined ioctl(F, 536870913, $block)) {
+	die "$file: $!\n";
+      }
     }
     $block = unpack('I', $block);
-    if($b == 0) {
-      print "$block";
+    if (!$firstblock || $lastblock + 1 != $block) {
+      # start of a new run
+      printf "-$lastblock" if defined($firstblock) && $firstblock != $lastblock;
+      print " $block";
       $firstblock = $block;
-    } else {
-      # blocks are non-contiguous
-      if($lastblock+1 != $block) {
-	# check if we skipped some that form a range
-	if($firstblock != $lastblock) {
-	  printf "-$lastblock";
-	}
-	print " $block";
-	$firstblock = $block;
-      }
-      # last block, check if contiguous
-      if($b+1==$blocks && $lastblock+1 == $block) {
-	print "-$block";
-      }
     }
     $lastblock = $block;
   }
+  # finish last run
+  printf "-$lastblock" if defined($firstblock) && $firstblock != $lastblock;
   close F;
   print "\n";
 }
 
-if($opt_padend) {
-  print "\n"x$opt_padend;
-}
+print "\n"x$opt_padend if $opt_padend;

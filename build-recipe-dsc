@@ -80,3 +80,8 @@ recipe_build_dsc() {
 	ln $BUILD_ROOT/$DEB_SOURCEDIR/$f $BUILD_ROOT/$TOPDIR/DEBS/
     done < <(sed -ne '/^Files:/,$s/^ ................................ [0-9][0-9]* //p' < $BUILD_ROOT/$DEB_SOURCEDIR/$DEB_DSCFILE)
 }
+
+recipe_resultdirs_dsc() {
+    echo DEBS
+    echo SOURCES.DEB
+}

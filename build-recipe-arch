@@ -29,3 +29,6 @@ recipe_build_arch() {
     done
 }
 
+recipe_resultdirs_arch() {
+    echo ARCHPKGS
+}

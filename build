@@ -1349,7 +1349,9 @@ if test -n "$RPMS" -a -d "$BUILD_ROOT/.build.oldpackages" ; then
     fi
 fi
 
-test -n "$RUNNING_IN_VM" && vm_wrapup_build
+if test -n "$RUNNING_IN_VM" ; then
+    vm_wrapup_build $(recipe_resultdirs) OTHER
+fi
 
 echo
 echo "$HOST finished \"build $RECIPEFILE\" at `date --utc`."

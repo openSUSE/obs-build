@@ -131,6 +131,10 @@ recipe_build_spec() {
     fi
 }
 
+recipe_resultdirs_spec() {
+    echo RPMS SRPMS
+}
+
 recipe_unpack_srcrpm() {
     echo "processing src rpm $SRCDIR/$RECIPEFILE ..."
     MYSRCDIR="$BUILD_ROOT/.build-srcdir"
@@ -212,4 +216,3 @@ recipe_create_deltarpms() {
 	chroot $BUILD_ROOT /usr/lib/build/mkdrpms /.build.oldpackages "${ds[@]#$BUILD_ROOT}"
     fi
 }
-

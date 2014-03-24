@@ -442,3 +442,6 @@ recipe_build_kiwi() {
     fi
 }
 
+recipe_resultdirs_kiwi() {
+    echo KIWI
+}

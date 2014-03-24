@@ -21,6 +21,10 @@ recipe_build() {
     recipe_build_$BUILDTYPE "$@"
 }
 
+recipe_resultdirs () {
+    recipe_resultdirs_$BUILDTYPE "$@"
+}
+
 recipe_set_buildtype() {
     BUILDTYPE=
     case $RECIPEFILE in

@@ -539,6 +539,7 @@ vm_first_stage() {
     vm_set_personality_syscall
     rm -rf "$BUILD_ROOT/.build"
     mkdir -p "$BUILD_ROOT/.build"
+    TIME_PREINSTALL=
     if test "$DO_INIT" = true ; then
 	# do first stage of init_buildsystem
 	rm -f $BUILD_ROOT/.build.success
@@ -614,6 +615,7 @@ vm_first_stage() {
     echo "VM_TYPE='$VM_TYPE'" >> $BUILD_ROOT/.build/build.data
     echo "RUN_SHELL='$RUN_SHELL'" >> $BUILD_ROOT/.build/build.data
     echo "DO_STATISTICS='$DO_STATISTICS'" >> $BUILD_ROOT/.build/build.data
+    echo "TIME_PREINSTALL='$TIME_PREINSTALL'" >> $BUILD_ROOT/.build/build.data
     # fallback time for broken hosts
     date '+@%s' > $BUILD_ROOT/.build/.date
     # do vm specific fixups
@@ -672,43 +674,8 @@ vm_first_stage() {
 	    cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
 	    echo "build: extracting built packages..."
 	    extractbuild --disk "$VM_IMAGE" --input "$VM_SWAP" --skip 512 -v || cleanup_and_exit 3
-	    # create same layout as with plain chroot
-	    if test "$BUILDTYPE" = spec ; then
-		mkdir -p SRPMS
-		for i in *src.rpm *.desktopfiles ; do
-		    test -e "$i" || continue
-		    mv "$i" SRPMS/
-		done
-		for i in *.rpm ; do
-		    test -e "$i" || continue
-		    arch=${i%.rpm}
-		    arch=${arch%.delta}
-		    arch=${arch##*\.}
-		    mkdir -p RPMS/$arch
-		    mv "$i" RPMS/$arch/
-		done
-	    elif test "$BUILDTYPE" = dsc ; then
-		mkdir -p DEBS
-		find . -type f | while read i; do mv "$i" DEBS/; done
-	    elif test "$BUILDTYPE" = arch ; then
-		mkdir -p ARCHPKGS
-		find . -type f | while read i; do mv "$i" ARCHPKGS/; done
-	    elif test "$BUILDTYPE" = kiwi ; then
-		mkdir -p KIWI
-		find . -type f | while read i; do mv "$i" KIWI/; done
-	    fi
-	    for i in * ; do
-		test -f "$i" || continue
-		case $i in
-		    _*|.*) ;;
-		    *) mkdir -p OTHER ; mv $i OTHER/ ;;
-		esac
-	    done
-	    if test "$DO_STATISTICS" = 1; then
+	    if test "$DO_STATISTICS" = 1 ; then
 		mkdir -p OTHER
-		test -e _statistics && mv _statistics OTHER/
-		test -e KIWI/_statistics && mv KIWI/_statistics OTHER/
-		test -n "$TIME_PREINSTALL" && echo "TIME_preinstall: $TIME_PREINSTALL"  >> OTHER/_statistics
 		TIME_TOTAL=$(( `date +%s` - $TIME_START_TIME ))
 		echo "TIME_total: $TIME_TOTAL"  >> OTHER/_statistics
 	    fi
@@ -729,18 +696,20 @@ vm_first_stage() {
 
 vm_save_statistics() {
     echo "... saving statistics"
-    local sys_mounted
-    test -n "$TIME_INSTALL" && echo "TIME_install: $TIME_INSTALL"  >> $BUILD_ROOT$TOPDIR/OTHER/_statistics
+    local sys_mounted otherdir
+    otherdir="$BUILD_ROOT$TOPDIR/OTHER"
+    test -n "$TIME_PREINSTALL" && echo "TIME_preinstall: $TIME_PREINSTALL"  >> $otherdir/_statistics
+    test -n "$TIME_INSTALL" && echo "TIME_install: $TIME_INSTALL"  >> $otherdir/_statistics
     if test -e /.build/_statistics.df ; then
-	echo -n "MAX_mb_used_on_disk: " >> $TOPDIR/OTHER/_statistics
-	cat /.build/_statistics.df >> $TOPDIR/OTHER/_statistics
-	echo "" >> $TOPDIR/OTHER/_statistics
+	echo -n "MAX_mb_used_on_disk: " >> $otherdir/_statistics
+	cat /.build/_statistics.df >> $otherdir/_statistics
+	echo "" >> $otherdir/_statistics
 	rm /.build/_statistics.df
     fi
     if test -e /.build/_statistics.memory ; then
-	echo -n "MAX_mb_used_memory: " >> $TOPDIR/OTHER/_statistics
-	cat /.build/_statistics.memory >> $TOPDIR/OTHER/_statistics
-	echo "" >> $TOPDIR/OTHER/_statistics
+	echo -n "MAX_mb_used_memory: " >> $otherdir/_statistics
+	cat /.build/_statistics.memory >> $otherdir/_statistics
+	echo "" >> $otherdir/_statistics
 	rm /.build/_statistics.memory
     fi
     if ! test -e /sys/block; then
@@ -755,10 +724,10 @@ vm_save_statistics() {
     test -e /dev/nfhd0 && device="nfhd0" # in aranym
     if test -e /sys/b lock/${device}/stat ; then
 	disk=(`cat /sys/block/${device}/stat`)
-	test "0${disk[0]}" -gt 0 && echo "IO_requests_read: ${disk[0]}"  >> $TOPDIR/OTHER/_statistics
-	test "0${disk[2]}" -gt 0 && echo "IO_sectors_read: ${disk[2]}"   >> $TOPDIR/OTHER/_statistics
-	test "0${disk[4]}" -gt 0 && echo "IO_requests_write: ${disk[4]}" >> $TOPDIR/OTHER/_statistics
-	test "0${disk[6]}" -gt 0 && echo "IO_sectors_write: ${disk[6]}"  >> $TOPDIR/OTHER/_statistics
+	test "0${disk[0]}" -gt 0 && echo "IO_requests_read: ${disk[0]}"  >> $otherdir/_statistics
+	test "0${disk[2]}" -gt 0 && echo "IO_sectors_read: ${disk[2]}"   >> $otherdir/_statistics
+	test "0${disk[4]}" -gt 0 && echo "IO_requests_write: ${disk[4]}" >> $otherdir/_statistics
+	test "0${disk[6]}" -gt 0 && echo "IO_sectors_write: ${disk[6]}"  >> $otherdir/_statistics
     else
 	echo "ERROR: no root disk device found, yet another new device name?"
 	ls -l /sys/block/
@@ -766,31 +735,14 @@ vm_save_statistics() {
     test -n "$sys_mounted" && umount /sys
 }
 
+# args: resultdirs
 vm_wrapup_build() {
     test "$DO_STATISTICS" = 1 && vm_save_statistics
     if test -n "$VM_SWAP"; then
-         echo "... saving built packages"
-         swapoff "$VM_SWAP"
-         args="--padstart 512 --padend 512 -v"
-         case "$BUILDTYPE" in
-             spec)
-                 computeblocklists $args $TOPDIR/RPMS/*/*.{d,}rpm $TOPDIR/SRPMS/* $TOPDIR/OTHER/* > "$VM_SWAP"
-                 ;;
-             dsc)
-                 computeblocklists $args $TOPDIR/DEBS/*.deb $TOPDIR/SOURCES.DEB/* $TOPDIR/OTHER/* > "$VM_SWAP"
-                 ;;
-             kiwi)
-                 computeblocklists $args $TOPDIR/KIWI/* $TOPDIR/OTHER/* > "$VM_SWAP"
-                 ;;
-             arch)
-                 computeblocklists $args $TOPDIR/ARCHPKGS/* $TOPDIR/OTHER/* > "$VM_SWAP"
-                 ;;
-             preinstallimage)
-                 computeblocklists $args $TOPDIR/OTHER/* > "$VM_SWAP"
-                 ;;
-             *)
-                 cleanup_and_exit 1
-                 ;;
-         esac || cleanup_and_exit 1
+        echo "... saving built packages"
+        swapoff "$VM_SWAP"
+	pushd "$BUILD_ROOT$TOPDIR" >/dev/null
+	find "$@" -print0 | computeblocklists --padstart 512 --padend 512 -v --manifest - -0 > "$VM_SWAP"
+	popd >/dev/null
     fi
 }

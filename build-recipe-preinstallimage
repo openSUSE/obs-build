@@ -56,4 +56,7 @@ recipe_build_preinstallimage() {
     test -d "$SRCDIR" && cd "$SRCDIR"
 }
 
+recipe_resultdirs_preinstallimage() {
+    :
+}
 
