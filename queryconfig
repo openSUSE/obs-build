@@ -35,12 +35,19 @@ die("Unable to read config\n") unless $cf;
 
 if ($type eq 'buildflags') {
   die("Specify which buildflag to query\n") unless $argument;
-
   my $result = $cf->{"buildflags:$argument"};
   print "$result\n" if defined $result;
 } elsif ($type eq 'target' || $type eq 'binarytype' || $type eq 'rawmacros') {
-  my $cf = Build::read_config_dist($dist, $archs, $configdir);
   print "$cf->{$type}\n" if $cf->{$type};
+} elsif ($type eq 'optflags') {
+  exit(0) unless $cf->{'optflags'};
+  my $all = $cf->{'optflags'}->{'*'};
+  $all = defined($all) && $all ne '' ? " $all" : '';
+  $all .= " -g" if $argument && $argument eq 'debug';
+  for (sort keys %{$cf->{'optflags'}}) {
+    next if $_ eq '*';
+    print "optflags: $_ $cf->{'optflags'}->{$_}$all\n";
+  }
 } else {
   die("unsupported query type: $type\n");
 }

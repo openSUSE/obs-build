@@ -39,7 +39,6 @@ install:
 	    getbinaryid \
 	    killchroot \
 	    queryconfig \
-	    getoptflags \
 	    common_functions \
 	    init_buildsystem \
 	    substitutedeps \

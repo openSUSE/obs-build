@@ -60,7 +60,7 @@ recipe_prepare_spec() {
     test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/.rpmmacros $BUILD_ROOT/home/abuild/.rpmmacros
 
     # extract optflags from configuration
-    getoptflags --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" ${BUILD_DEBUG:+--debug} > $BUILD_ROOT/root/.rpmrc
+    queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" optflags ${BUILD_DEBUG:+debug} > $BUILD_ROOT/root/.rpmrc
     test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/.rpmrc $BUILD_ROOT/home/abuild/.rpmrc
 
     if test -z "$ABUILD_TARGET"; then
