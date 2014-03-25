@@ -10,6 +10,8 @@ use Build;
 
 my ($dist, $rpmdeps, $archs, $configdir, $useusedforbuild);
 
+$configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
+
 while (@ARGV)  {
   if ($ARGV[0] eq '--dist') {
     shift @ARGV;
@@ -56,7 +58,7 @@ while (@ARGV)  {
   }
   last;
 }
-$configdir = '.' unless defined $configdir;
+
 $archs = '' unless defined $archs;
 die("you must specfiy a depfile!\n") unless defined $rpmdeps;
 

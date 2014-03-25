@@ -9,6 +9,7 @@ use strict;
 
 my ($dist, $archs, $configdir, $manifest);
 
+$configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
 
 while (@ARGV)  {
   if ($ARGV[0] eq '--dist') {

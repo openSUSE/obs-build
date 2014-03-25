@@ -10,6 +10,8 @@ use Build;
 
 my ($dist, $archs, $configdir, $debug, $type, $argument);
 
+$configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
+
 while (@ARGV)  {
   if ($ARGV[0] eq '--dist') {
     shift @ARGV;
@@ -30,6 +32,8 @@ while (@ARGV)  {
   }
 }
 
+die("Please specify what to query\n") unless defined $type;
+
 my $cf = Build::read_config_dist($dist, $archs, $configdir);
 die("Unable to read config\n") unless $cf;
 
@@ -37,7 +41,7 @@ if ($type eq 'buildflags') {
   die("Specify which buildflag to query\n") unless $argument;
   my $result = $cf->{"buildflags:$argument"};
   print "$result\n" if defined $result;
-} elsif ($type eq 'target' || $type eq 'binarytype' || $type eq 'rawmacros') {
+} elsif ($type eq 'target' || $type eq 'type' || $type eq 'binarytype' || $type eq 'rawmacros') {
   print "$cf->{$type}\n" if $cf->{$type};
 } elsif ($type eq 'optflags') {
   exit(0) unless $cf->{'optflags'};

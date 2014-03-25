@@ -19,6 +19,8 @@ sub expand {
 
 my ($dist, $buildroot, $rpmdeps, $archs, $configdir, $release, $changelog);
 
+$configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
+
 while (@ARGV)  {
   if ($ARGV[0] eq '--root') {
     shift @ARGV;
