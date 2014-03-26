@@ -43,6 +43,7 @@ vm_verify_options_ec2() {
         echo "ERROR: No amazon EC2 environment set. Set AWS_ACCESS_KEY and AWS_SECRET_KEY."
         cleanup_and_exit 3
     fi
+    . /etc/profile.d/ec2.sh
     EC2_INSTANCE_ID=`ec2-instance-id`
     BUILD_EC2_AKI=
     BUILD_EC2_ZONE=`ec2-meta-data placement/availability-zone`
