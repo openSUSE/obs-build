@@ -39,7 +39,6 @@ VM_WORKER_NR=
 
 # kvm specific?
 HUGETLBFSPATH=
-KVM_OPTIONS=
 
 # emulator specific?
 EMULATOR_SCRIPT=
@@ -47,6 +46,9 @@ EMULATOR_SCRIPT=
 for i in ec2 emulator kvm lxc openstack qemu uml xen zvm ; do
     . "$BUILD_DIR/build-vm-$i"
 done
+
+VM_WATCHDOG=
+VM_WATCHDOG_PID=
 
 # the following functions just call the corresponding vm versions
 vm_kill() {
@@ -86,6 +88,7 @@ vm_kill() {
 }
 
 vm_cleanup() {
+    kill_watchdog
     vm_cleanup_$VM_TYPE "$@"
 }
 
@@ -112,17 +115,10 @@ vm_parse_options() {
 	needarg
 	VM_TYPE="$ARG"
 	case "$VM_TYPE" in
-            zvm|lxc) ;;
-            ec2)
+	    lxc) ;;
+	    ec2|xen|kvm|uml|qemu|emulator|openstack|zvm)
 		test -z "$VM_IMAGE" && VM_IMAGE=1
-                . /etc/profile.d/ec2.sh
-                EC2_INSTANCE_ID=`ec2-instance-id`
-                BUILD_EC2_ZONE=`ec2-meta-data placement/availability-zone`
-                BUILD_EC2_REGION=${BUILD_EC2_ZONE%?}
-	        ;;
-	    xen|kvm|uml|qemu|emulator|openstack)
-		test -z "$VM_IMAGE" && VM_IMAGE=1
-	        ;;
+	    ;;
 	    none|chroot) VM_TYPE= ;;
 	    *)
 		echo "VM '$VM_TYPE' is not supported"
@@ -213,8 +209,12 @@ vm_parse_options() {
 	shift
       ;;
       -hugetlbfs)
-        HUGETLBFSPATH="$ARG"
+	needarg
+	HUGETLBFSPATH="$ARG"
 	shift
+      ;;
+      -vm-watchdog)
+	VM_WATCHDOG=true
       ;;
       -*)
 	return 1
@@ -228,6 +228,7 @@ vm_parse_options() {
 # shutdown the system from inside the VM
 #
 vm_shutdown() {
+    test -n "$VM_WATCHDOG" && echo "### WATCHDOG MARKER START ###"
     cd /
     test -n "$1" || set 1
     if test -n "$VM_SWAP" -a -e "$VM_SWAP" ; then
@@ -335,6 +336,40 @@ background_monitor_process() {
     done
 }
 
+background_watchdog() {
+    WATCHDOG_START=
+    WATCHDOG_TIMEOUT=300
+    while sleep 5 ; do
+	WATCH=`grep "### WATCHDOG MARKER" "$LOGFILE" | tail -n 1`
+	case $WATCH in
+	    *WATCHDOG\ MARKER\ START*) test -n "$WATCHDOG_START" || WATCHDOG_START=`date +%s` ;;
+	    *WATCHDOG\ MARKER\ END*) WATCHDOG_START= ;;
+	esac
+	if test -n "$WATCHDOG_START" ; then
+	    NOW=`date +%s`
+	    ELAPSED=$((NOW-WATCHDOG_START))
+	    if test $ELAPSED -gt $WATCHDOG_TIMEOUT ; then
+		# kill the VM
+		 echo "### WATCHDOG TRIGGERED, KILLING VM ###"
+	    fuser -k -TERM "$VM_IMAGE"
+	    exit 0
+       fi
+    fi
+    done
+}
+
+start_watchdog() {
+    local wf=$(mktemp)
+    ( background_watchdog & echo $! > "$wf" )
+    read VM_WATCHDOG_PID < "$wf"
+    rm -f "$wf"
+}
+
+kill_watchdog() {
+    test -n "$VM_WATCHDOG_PID" && kill "$VM_WATCHDOG_PID"
+    VM_WATCHDOG_PID=
+}
+
 vm_set_personality_syscall() {
     local archname
     archname=`perl -V:archname 2>/dev/null`
@@ -371,6 +406,7 @@ vm_detect_2nd_stage() {
 	cleanup_and_exit $?
     fi
 
+    test -n "$VM_WATCHDOG" && echo "### WATCHDOG MARKER END ###"
     echo "2nd stage started in virtual machine"
     BUILD_ROOT=/
     BUILD_DIR=/.build
@@ -573,6 +609,8 @@ vm_first_stage() {
 	# umount later so step aside
 	cd "$SRCDIR"
     fi
+    # the watchdog needs a log file
+    test -n "$LOGFILE" || VM_WATCHDOG=
     # put our config into .build/build.data
     Q="'\''"
     echo "RECIPEFILE='${RECIPEFILE//"'"/$Q}'" > $BUILD_ROOT/.build/build.data
@@ -603,7 +641,9 @@ vm_first_stage() {
     test -n "$VMDISK_MOUNT_OPTIONS" && echo "VMDISK_MOUNT_OPTIONS='${VMDISK_MOUNT_OPTIONS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     PERSONALITY=0
     test -n "$PERSONALITY_SYSCALL" -a "$VM_TYPE" != lxc && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
-    test "$(uname -m)" = ppc && PERSONALITY=8		# ppc kernel never tells us if a 32bit personality is active
+    case $(uname -n) in
+	ppc|s390) PERSONALITY=8		# ppc/s390 kernel never tells us if a 32bit personality is active, assume we run on 64bit
+    esac
     echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
     echo "MYHOSTNAME='`hostname`'" >> $BUILD_ROOT/.build/build.data
     echo -n "definesnstuff=(" >> $BUILD_ROOT/.build/build.data
@@ -616,6 +656,7 @@ vm_first_stage() {
     echo "RUN_SHELL='$RUN_SHELL'" >> $BUILD_ROOT/.build/build.data
     echo "DO_STATISTICS='$DO_STATISTICS'" >> $BUILD_ROOT/.build/build.data
     echo "TIME_PREINSTALL='$TIME_PREINSTALL'" >> $BUILD_ROOT/.build/build.data
+    echo "VM_WATCHDOG='$VM_WATCHDOG'" >> $BUILD_ROOT/.build/build.data
     # fallback time for broken hosts
     date '+@%s' > $BUILD_ROOT/.build/.date
     # do vm specific fixups
@@ -661,8 +702,20 @@ vm_first_stage() {
     fi
     vm_detach_root
 
+    # start watchdog if requested
+    if test -n "$VM_WATCHDOG" ; then
+	start_watchdog
+	echo "### WATCHDOG MARKER START ###"
+    fi
+
     echo "booting $VM_TYPE..."
     vm_startup
+
+    # kill watchdog again
+    if test -n "$VM_WATCHDOG" ; then
+	echo "### WATCHDOG MARKER END ###"
+	kill_watchdog
+    fi
 
     vm_attach_root
     if test -n "$VM_SWAP" ; then
