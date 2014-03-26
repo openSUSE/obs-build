@@ -973,6 +973,7 @@ rm -f $BUILD_ROOT/exit
 
 if test -w /root ; then
     mkdir -p $BUILD_ROOT/proc
+    mkdir -p $BUILD_ROOT/sys
     mkdir -p $BUILD_ROOT/dev/pts
     mount -n -tproc none $BUILD_ROOT/proc || true
     mount -n -tdevpts -omode=0620,gid=5 none $BUILD_ROOT/dev/pts
