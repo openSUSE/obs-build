@@ -7,12 +7,7 @@ build_host_arch() {
     test i686 != "$BUILD_INITVM_ARCH" || BUILD_INITVM_ARCH=i586
 }
 
-set_build_arch() {
-    build_host_arch
-
-    if test -z "$BUILD_ARCH" ; then
-	BUILD_ARCH="$BUILD_HOST_ARCH"
-    fi
+extend_build_arch() {
     case $BUILD_ARCH in
       armv7hl) BUILD_ARCH="armv7hl:armv7l:armv6hl:armv6l:armv5tel" ;;
       armv7l) BUILD_ARCH="armv7l:armv6l:armv5tel" ;;
@@ -33,6 +28,14 @@ set_build_arch() {
       sparc) BUILD_ARCH="sparc" ;;
       x86_64) BUILD_ARCH="x86_64:i686:i586:i486:i386" ;;
     esac
+}
+
+set_build_arch() {
+    build_host_arch
+    if test -z "$BUILD_ARCH" ; then
+	BUILD_ARCH="$BUILD_HOST_ARCH"
+    fi
+    extend_build_arch
     if test "$BUILD_ARCH" != "${BUILD_ARCH#i686}" ; then
 	cpuflags=`grep ^flags /proc/cpuinfo`
 	cpuflags="$cpuflags "
@@ -52,11 +55,19 @@ check_exit() {
 
 check_use_emulator() {
     INITVM_NAME=
-    arch=":$BUILD_ARCH:"
-    if test "$arch" != "${arch/:$BUILD_HOST_ARCH:/}"; then
-        # native supported arch, no emulator
-        return 1
+    # check if the extended host arch contains the build arch
+    local old_build_arch="$BUILD_ARCH"
+    local arch="${BUILD_ARCH%%:*}"
+    BUILD_ARCH="$BUILD_HOST_ARCH"
+    extend_build_arch
+    BUILD_ARCH=":$BUILD_ARCH:"
+    if test "$BUILD_ARCH" != "$BUILD_ARCH/:$arch:/" ; then
+	# native supported arch, no emulator
+	BUILD_ARCH="$old_build_arch"
+	return 1
     fi
+    BUILD_ARCH="$old_build_arch"
+
     # to run the qemu initialization in the vm, we need to
     # register it with a static program or shell script
     INITVM_NAME="initvm.$BUILD_INITVM_ARCH"
