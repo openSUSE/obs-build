@@ -609,6 +609,10 @@ vm_first_stage() {
 	# umount later so step aside
 	cd "$SRCDIR"
     fi
+
+    # do vm specific fixups
+    vm_fixup
+
     # the watchdog needs a log file
     test -n "$LOGFILE" || VM_WATCHDOG=
     # put our config into .build/build.data
@@ -659,8 +663,6 @@ vm_first_stage() {
     echo "VM_WATCHDOG='$VM_WATCHDOG'" >> $BUILD_ROOT/.build/build.data
     # fallback time for broken hosts
     date '+@%s' > $BUILD_ROOT/.build/.date
-    # do vm specific fixups
-    vm_fixup
     # we're done with the root file system, unmount
     umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
     umount -n $BUILD_ROOT/proc 2> /dev/null || true
@@ -675,7 +677,7 @@ vm_first_stage() {
     if test -n "$VM_IMAGE" ; then
 	# copy out kernel & initrd (if they exist) during unmounting VM image
 	KERNEL_TEMP_DIR=
-	if test -e  "$BUILD_ROOT/.build.kernel.$VM_TYPE" ; then
+	if test -z "$VM_KERNEL" -a -e "$BUILD_ROOT/.build.kernel.$VM_TYPE" ; then
 	    KERNEL_TEMP_DIR=`mktemp -d`
 	    cp "$BUILD_ROOT/.build.kernel.$VM_TYPE" "$KERNEL_TEMP_DIR/kernel"
 	    if test -e  "$BUILD_ROOT/.build.initrd.$VM_TYPE" ; then
@@ -695,7 +697,7 @@ vm_first_stage() {
 	    vm_kernel="$BUILD_ROOT/boot/kernel"
 	    if test -e "$KERNEL_TEMP_DIR/initrd" ; then
 	        mv "$KERNEL_TEMP_DIR/initrd" "$BUILD_ROOT/boot/initrd"
-	        vm_initrd="$BUILD_ROOT/boot/initrd"
+	        test -n "$VM_INITRD" && vm_initrd="$BUILD_ROOT/boot/initrd"
 	    fi
 	    rmdir "$KERNEL_TEMP_DIR"
 	fi
