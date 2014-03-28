@@ -21,17 +21,19 @@ kvm_check_ppc970() {
 vm_verify_options_kvm() {
     HUGETLBPAGES=
     HUGETLBDIV=
+    vm_kernel=
+    vm_initrd=
 
     # overwrite some options on armv7l
     if test `uname -m` = armv7l ; then
 	kvm_bin="/usr/bin/qemu-system-arm"
 	kvm_console=ttyAMA0
 	kvm_options="-enable-kvm -M vexpress-a15 -dtb /boot/a15-guest.dtb -cpu cortex-a15"
-        VM_KERNEL=/boot/zImage
-        VM_INITRD=/boot/initrd
+        vm_kernel=/boot/zImage
+        vm_initrd=/boot/initrd
 	# prefer the guest kernel/initrd
-        test -e /boot/zImage.guest && VM_KERNEL=/boot/zImage.guest
-	test -e /boot/initrd.guest && VM_INITRD=/boot/initrd.guest
+        test -e /boot/zImage.guest && vm_kernel=/boot/zImage.guest
+	test -e /boot/initrd.guest && vm_initrd=/boot/initrd.guest
 	HUGETLBPAGES=hugepages-2048kB
 	HUGETLBDIV=2
 	kvm_device=virtio-blk-device
@@ -43,11 +45,11 @@ vm_verify_options_kvm() {
 	kvm_console=hvc0
 	kvm_options="-enable-kvm -M pseries"
 	grep -q PPC970MP /proc/cpuinfo && kvm_check_ppc970
-	VM_KERNEL=/boot/vmlinux
-	VM_INITRD=/boot/initrd
+	vm_kernel=/boot/vmlinux
+	vm_initrd=/boot/initrd
 	if test "$BUILD_ARCH" = ppc64le ; then
-	    VM_KERNEL=/boot/vmlinuxle
-	    VM_INITRD=/boot/initrdle
+	    vm_kernel=/boot/vmlinuxle
+	    vm_initrd=/boot/initrdle
 	fi
 	HUGETLBPAGES=hugepages-16384kB
 	HUGETLBDIV=16
@@ -57,8 +59,9 @@ vm_verify_options_kvm() {
     # overwrite some options for z series
     if test `uname -m` = s390 -o `uname -m` = s390x ; then
 	kvm_console=hvc0
-	VM_KERNEL=/boot/image
-	VM_INITRD=/boot/initrd
+	vm_kernel=/boot/image
+	vm_initrd=/boot/initrd
+	kvm_device=virtio-blk-pci
     fi
 
     # check if we can run kvm
@@ -86,22 +89,23 @@ vm_verify_options_kvm() {
     qemu_bin="$kvm_bin"
 
     # set kernel
-    vm_kernel=/boot/vmlinuz
     test -n "$VM_KERNEL" && vm_kernel="$VM_KERNEL"
+    test -z "$vm_kernel" && vm_kernel=/boot/vmlinuz
 
     # set initrd
-    if test -n "$VM_INITRD" ; then
-	vm_initrd="$VM_INITRD"
-    elif test -e "/boot/initrd-build" ; then
-	vm_initrd="/boot/initrd-build"
-    elif test -e "/boot/initrd-virtio" ; then
-	vm_initrd="/boot/initrd-virtio"
-    else
-	vm_initrd="/boot/initrd"
-	kvm_device=ide-hd
+    test -n "$VM_INITRD" && vm_initrd="$VM_INITRD"
+    if test -z "$vm_initrd" ; then
+	# find a nice default
+	if test -e "/boot/initrd-build" ; then
+	    vm_initrd="/boot/initrd-build"
+	elif test -e "/boot/initrd-virtio" ; then
+	    vm_initrd="/boot/initrd-virtio"
+	else
+	    vm_initrd="/boot/initrd"
+	    kvm_device=ide-hd
+	fi
     fi
 
-    # set devices
     case $kvm_device in
 	virtio*)
 	    qemu_rootdev=/dev/disk/by-id/virtio-0
@@ -153,7 +157,16 @@ vm_kill_kvm() {
 }
 
 vm_fixup_kvm() {
-    :
+    # check if we will use a kernel from the build root, in this case
+    # we assume the kernel does virtio
+    if test -z "$VM_KERNEL" -a -e "$BUILD_ROOT/.build.kernel.$VM_TYPE" ; then
+	# ide-hd is the non-virtio default
+	if test "$kvm_device" = ide-hd ; then
+	    kvm_device=virtio-blk-pci
+	    qemu_rootdev=/dev/disk/by-id/virtio-0
+	    VM_SWAPDEV=/dev/disk/by-id/virtio-1
+	fi
+    fi
 }
 
 vm_attach_root_kvm() {
