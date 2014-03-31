@@ -106,7 +106,7 @@ vm_verify_options_kvm() {
 	    # use /etc/sysconfig/kernel as indication if we have virtio
 	    if test -e /etc/sysconfig/kernel ; then
 		local im=$(INITRD_MODULES=; . /etc/sysconfig/kernel; echo "$INITRD_MODULES")
-		if "$im" != "${im/virtio/}" ; then
+		if test "$im" != "${im/virtio/}" ; then
 		    kvm_device=virtio-blk-pci
 		fi
 	    fi
