@@ -99,7 +99,7 @@ while (1) {
     print "l $n $c\n";
     next;
   } elsif (-d _) {
-    print STDERR "$file\n" if $opt_verbose && !($opt_verbose == 1 && $file =~ /^KIWI\/.*\//);
+    print STDERR "$file\n" if $opt_verbose && $opt_verbose > 1;
     my @stat = stat(_);
     print "d $n\n";
     next;
@@ -125,7 +125,7 @@ while (1) {
   my $bsize = 'xxxx';
   ioctl(F, 2, $bsize) || ioctl(F, 536870914, $bsize) || die("FIGETBSZ: $!\n");
   $bsize = unpack("L", $bsize);
-  die unless $bsize != 0;
+  die("$file: empty blocksize\n") unless $bsize != 0;
 
   print "f $n $st_size $bsize";
   my $blocks = int(($st_size+$bsize-1)/$bsize);

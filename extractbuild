@@ -59,7 +59,7 @@ while (<S>) {
     die("file without directory: $file\n") unless $done{$1} && $done{$1} eq 'd';
   }
   if ($filetype eq 'd') {	# dir
-    print "$file\n" if $opt_verbose && !($opt_verbose == 1 && $file =~ /^KIWI\/.*\//);
+    print "$file\n" if $opt_verbose && $opt_verbose > 1;
     mkdir($file) || die("mkdir $file: $!\n");
     $done{$file} = 'd';
     next;
@@ -87,7 +87,7 @@ while (<S>) {
   $filesize = int($filesize);
   if ($filesize == 0) {
     print "$file\n" if $opt_verbose && !($opt_verbose == 1 && $file =~ /^KIWI\/.*\//);
-    open (O, '>', $file) or die "$file: $!";
+    open (O, '>', $file) or die "$file: $!\n";
     close O;
     next;
   }
@@ -95,7 +95,7 @@ while (<S>) {
   die "$file: invalid block size $blksize\n" unless $blksize > 0 && $blksize <= $bufsize;
   my $maxblocks = int($bufsize/$blksize);
   print "$file\n" if $opt_verbose && !($opt_verbose == 1 && $file =~ /^KIWI\/.*\//);
-  open (O, '>', $file) or die "$file: $!";
+  open (O, '>', $file) or die "$file: $!\n";
   for my $block (@blocks) {
     my $end;
     ($block, $end) = split(/-/, $block);
