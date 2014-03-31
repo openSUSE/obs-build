@@ -103,6 +103,13 @@ vm_verify_options_kvm() {
 	else
 	    vm_initrd="/boot/initrd"
 	    kvm_device=ide-hd
+	    # use /etc/sysconfig/kernel as indication if we have virtio
+	    if test -e /etc/sysconfig/kernel ; then
+		local im=$(INITRD_MODULES=; . /etc/sysconfig/kernel; echo "$INITRD_MODULES")
+		if "$im" != "${im/virtio/}" ; then
+		    kvm_device=virtio-blk-pci
+		fi
+	    fi
 	fi
     fi
 
