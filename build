@@ -943,14 +943,9 @@ if test -n "$LIST_STATE" ; then
     test -d "$BUILD_ROOT" || cleanup_and_exit 3
     RECIPEFILE=$RECIPEFILES # only one specified anyways
     if test "$RECIPEFILE" != "${RECIPEFILE%.src.rpm}" ; then
-       rm -rf "$BUILD_ROOT/usr/src/packages"
-       mkdir -p $BUILD_ROOT/usr/src/packages/SOURCES $BUILD_ROOT/usr/src/packages/SPECS
-       rpm -i --nodigest --nosignature --root $BUILD_ROOT $RECIPEFILE || {
-	   echo "could not install $RECIPEFILE." 2>&1
-	   rm -rf "$BUILD_ROOT"
-	   cleanup_and_exit 3
-       }
-       for RECIPEFILE in $BUILD_ROOT/usr/src/packages/SPECS/*.spec ; do : ; done
+	MYSRCDIR="$BUILD_ROOT/usr/src/packages/SOURCES"
+	recipe_unpack_srcrpm
+	RECIPEFILE="$MYSRCDIR/$RECIPEFILE"
     fi
     init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --list-state "${definesnstuff[@]}" "${repos[@]}" $USEUSEDFORBUILD $RECIPEFILE $BUILD_EXTRA_PACKS
     ERR=$?

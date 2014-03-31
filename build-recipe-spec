@@ -136,7 +136,7 @@ recipe_resultdirs_spec() {
 }
 
 recipe_unpack_srcrpm() {
-    echo "processing src rpm $SRCDIR/$RECIPEFILE ..."
+    test -n "$LIST_STATE" || echo "processing src rpm $SRCDIR/$RECIPEFILE ..."
     MYSRCDIR="$BUILD_ROOT/.build-srcdir"
     rm -rf "$MYSRCDIR"
     mkdir -p "$MYSRCDIR"
