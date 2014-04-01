@@ -150,12 +150,9 @@ preinstall_image_filter() {
     done
 }
 
-preinstall_image() { check_exit
-    if test -n "$2" ; then
-	echo "unpacking preinstall image $2"
-    else
-	echo "unpacking preinstall image"
-    fi
+preinstall_image() {
+    check_exit
+    echo "unpacking preinstall image${2:+ $2}"
     cd $BUILD_ROOT || cleanup_and_exit 1
     if test -x /usr/bin/bsdtar ; then
 	TAR="/usr/bin/bsdtar -P --chroot --numeric-owner -x"
