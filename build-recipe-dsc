@@ -74,7 +74,7 @@ recipe_build_dsc() {
 	test -e "$DEB" && mv "$DEB" "$BUILD_ROOT/$TOPDIR/DEBS"
     done
 
-    # link sources over
+    # link used sources over to DEB directory
     ln $BUILD_ROOT/$DEB_SOURCEDIR/$DEB_DSCFILE $BUILD_ROOT/$TOPDIR/DEBS/
     while read f ; do
 	ln $BUILD_ROOT/$DEB_SOURCEDIR/$f $BUILD_ROOT/$TOPDIR/DEBS/
@@ -83,5 +83,4 @@ recipe_build_dsc() {
 
 recipe_resultdirs_dsc() {
     echo DEBS
-    echo SOURCES.DEB
 }
