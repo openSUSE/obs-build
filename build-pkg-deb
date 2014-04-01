@@ -8,11 +8,11 @@ deb_setup() {
     mkdir -p $BUILD_ROOT/var/lib/dpkg
     mkdir -p $BUILD_ROOT/var/log
     mkdir -p $BUILD_ROOT/etc/default
-    :> $BUILD_ROOT/var/lib/dpkg/status
-    :> $BUILD_ROOT/var/lib/dpkg/available
-    :> $BUILD_ROOT/var/log/dpkg.log
-    :> $BUILD_ROOT/etc/ld.so.conf
-    :> $BUILD_ROOT/etc/default/rcS
+    :>> $BUILD_ROOT/var/lib/dpkg/status
+    :>> $BUILD_ROOT/var/lib/dpkg/available
+    :>> $BUILD_ROOT/var/log/dpkg.log
+    :>> $BUILD_ROOT/etc/ld.so.conf
+    :>> $BUILD_ROOT/etc/default/rcS
 }
 
 pkg_initdb_deb() {
