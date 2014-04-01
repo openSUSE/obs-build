@@ -18,9 +18,27 @@ kvm_check_ppc970() {
     fi
 }
 
+kvm_check_hugetbl() {
+    if ! grep -q "$HUGETLBFSPATH" /proc/mounts ; then
+	echo "hugetlbfs is not mounted to $HUGETLBFSPATH"
+	cleanup_and_exit 3
+    fi
+    local HUGETLBBLKSIZE=$(stat -f -c "%S" "$HUGETLBFSPATH")
+    HUGETLBBLKSIZE=$(( ${HUGETLBBLKSIZE:-0} / 1024 ))
+    if test "$HUGETLBBLKSIZE" -lt 1 -o ! -e  "/sys/kernel/mm/hugepages/hugepages-${HUGETLBBLKSIZE}kB" ; then
+	echo "could not determine hugetlbfs block size"
+	cleanup_and_exit 3
+    fi
+    local PAGES_FREE=$(cat /sys/kernel/mm/hugepages/hugepages-${HUGETLBBLKSIZE}kB/free_hugepages)
+    local PAGES_REQ=$(( ${VM_MEMSIZE:-64} * 1024 / $HUGETLBBLKSIZE ))
+    if test "$PAGES_FREE" -lt "$PAGES_REQ" ; then
+	echo "expected $PAGES_REQ to be available (have $PAGES_FREE)"
+	echo "please adjust nr_hugepages"
+	cleanup_and_exit 3
+    fi
+}
+
 vm_verify_options_kvm() {
-    HUGETLBPAGES=
-    HUGETLBDIV=
     vm_kernel=
     vm_initrd=
 
@@ -34,8 +52,6 @@ vm_verify_options_kvm() {
 	# prefer the guest kernel/initrd
         test -e /boot/zImage.guest && vm_kernel=/boot/zImage.guest
 	test -e /boot/initrd.guest && vm_initrd=/boot/initrd.guest
-	HUGETLBPAGES=hugepages-2048kB
-	HUGETLBDIV=2
 	kvm_device=virtio-blk-device
     fi
 
@@ -47,13 +63,11 @@ vm_verify_options_kvm() {
 	grep -q PPC970MP /proc/cpuinfo && kvm_check_ppc970
 	vm_kernel=/boot/vmlinux
 	vm_initrd=/boot/initrd
-	if test "$BUILD_ARCH" = ppc64le ; then
+	if test "$BUILD_ARCH" = ppc64le -a -e /boot/vmlinuxle ; then
 	    vm_kernel=/boot/vmlinuxle
 	    vm_initrd=/boot/initrdle
 	fi
-	HUGETLBPAGES=hugepages-16384kB
-	HUGETLBDIV=16
-	grep -q "PowerNV" /proc/cpuinfo || kvm_device=scsi-hd	# no virtio on !power7 yet
+	grep -q "PowerNV" /proc/cpuinfo || kvm_device=scsi-hd	# no virtio on ppc != power7 yet
     fi
 
     # overwrite some options for z series
@@ -72,21 +86,7 @@ vm_verify_options_kvm() {
     fi
 
     # check hugepages
-    if test -n "$HUGETLBFSPATH" -a -n "$HUGETLBPAGES" -a "$VM_TYPE" = kvm ; then
-	if ! grep -q "$HUGETLBFSPATH" /proc/mounts ; then
-	    echo "hugetlbfs is not mounted to $HUGETLBFSPATH"
-	    cleanup_and_exit 3
-	fi
-	PAGES_FREE=$(cat /sys/kernel/mm/hugepages/$HUGETLBPAGES/free_hugepages)
-	PAGES_REQ=$(( ${VM_MEMSIZE:-64} / $HUGETLBDIV ))
-	if test "$PAGES_FREE" -lt "$PAGES_REQ" ; then
-	    echo "expected $PAGES_REQ to be available (have $PAGES_FREE)"
-	    echo "please adjust nr_hugepages"
-	    cleanup_and_exit 3
-	fi
-    fi
-
-    qemu_bin="$kvm_bin"
+    test -n "$HUGETLBFSPATH" -a "$VM_TYPE" = kvm && kvm_check_hugetbl
 
     # set kernel
     test -n "$VM_KERNEL" && vm_kernel="$VM_KERNEL"
@@ -126,6 +126,7 @@ vm_verify_options_kvm() {
 }
 
 vm_startup_kvm() {
+    qemu_bin="$kvm_bin"
     qemu_args=(-drive file="$VM_IMAGE",if=none,id=disk,serial=0,cache=unsafe -device "$kvm_device",drive=disk)
     if test -n "$VM_SWAP" ; then
 	qemu_args=("${qemu_args[@]}" -drive file="$VM_SWAP",if=none,id=swap,serial=1,cache=unsafe -device "$kvm_device",drive=swap)
@@ -138,7 +139,7 @@ vm_startup_kvm() {
     fi
     if test "$VM_TYPE" = kvm ; then
 	test "$kvm_console" != ttyAMA0 && kvm_options="$kvm_options -cpu host"
-	test -n "$HUGETLBFSPATH" -a -n "$HUGETLBPAGES" && kvm_options="$kvm_options -mem-path $HUGETLBFSPATH"
+	test -n "$HUGETLBFSPATH" && kvm_options="$kvm_options -mem-path $HUGETLBFSPATH"
     fi
     set -- $qemu_bin -no-reboot -nographic -vga none -net none $kvm_options \
 	-kernel $vm_kernel \
