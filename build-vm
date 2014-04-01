@@ -645,7 +645,7 @@ vm_first_stage() {
     test -n "$VMDISK_MOUNT_OPTIONS" && echo "VMDISK_MOUNT_OPTIONS='${VMDISK_MOUNT_OPTIONS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     PERSONALITY=0
     test -n "$PERSONALITY_SYSCALL" -a "$VM_TYPE" != lxc && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
-    case $(uname -n) in
+    case $(uname -m) in
 	ppc|s390) PERSONALITY=8		# ppc/s390 kernel never tells us if a 32bit personality is active, assume we run on 64bit
     esac
     echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
