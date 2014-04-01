@@ -40,7 +40,7 @@ vm_verify_options_kvm() {
     fi
 
     # overwrite some options on ppc
-    if test "$BUILD_ARCH" = ppc -o "$BUILD_ARCH" = ppc64 -a "$BUILD_ARCH" = ppc64le ; then
+    if test "$BUILD_ARCH" = ppc -o "$BUILD_ARCH" = ppc64 -o "$BUILD_ARCH" = ppc64le ; then
 	kvm_bin="/usr/bin/qemu-system-ppc64"
 	kvm_console=hvc0
 	kvm_options="-enable-kvm -M pseries"
@@ -53,7 +53,7 @@ vm_verify_options_kvm() {
 	fi
 	HUGETLBPAGES=hugepages-16384kB
 	HUGETLBDIV=16
-	kvm_device=scsi-hd	# no virtio on power yet
+	grep -q "PowerNV" /proc/cpuinfo || kvm_device=scsi-hd	# no virtio on !power7 yet
     fi
 
     # overwrite some options for z series
@@ -138,7 +138,7 @@ vm_startup_kvm() {
     fi
     if test "$VM_TYPE" = kvm ; then
 	test "$kvm_console" != ttyAMA0 && kvm_options="$kvm_options -cpu host"
-	test -n "$HUGETLBFSPATH" && kvm_options="$kvm_options -mem-path $HUGETLBFSPATH"
+	test -n "$HUGETLBFSPATH" -a -n "$HUGETLBPAGES" && kvm_options="$kvm_options -mem-path $HUGETLBFSPATH"
     fi
     set -- $qemu_bin -no-reboot -nographic -vga none -net none $kvm_options \
 	-kernel $vm_kernel \
