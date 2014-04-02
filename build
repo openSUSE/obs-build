@@ -570,40 +570,6 @@ copy_oldpackages() {
     done
 }
 
-find_recipe_files() {
-    local spec files
-    if test -z "$RECIPEFILES" ; then
-	set -- "`pwd`"
-    else
-	set -- "${RECIPEFILES[@]}"
-    fi
-    RECIPEFILES=()
-    for spec in "$@" ; do
-	if test "$spec" = "${spec#/}" ; then
-	    spec="`pwd`/$spec"
-	fi
-
-	if test -d "$spec" ; then
-	    specs=("$spec"/*.spec)
-	    if test -n "$specs" ; then
-		RECIPEFILES=("${RECIPEFILES[@]}" "${specs[@]}")
-	    else
-		specs=("$spec"/*.spec)
-		if test -n "$specs" ; then
-		    RECIPEFILES=("${RECIPEFILES[@]}" "${specs[@]}")
-		fi
-	    fi
-	else
-	    RECIPEFILES[${#RECIPEFILES[@]}]="$spec"
-	fi
-    done
-
-    if test -z "$RECIPEFILES"; then
-	echo no recipe files or src rpms found in $@. exit...
-	cleanup_and_exit 1
-    fi
-}
-
 become_root_or_fail() {
     if test ! -w /root ; then
 	echo "You have to be root to use $0" >&2
@@ -936,7 +902,7 @@ fi
 
 set_build_arch
 
-find_recipe_files
+expand_recipe_directories
 
 if test -n "$LIST_STATE" ; then
     BUILD_ROOT=`mktemp -d /var/tmp/build-list-state-XXXXXX`

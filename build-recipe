@@ -35,7 +35,40 @@ recipe_set_buildtype() {
         _preinstallimage) BUILDTYPE=preinstallimage ;;
     esac
     if test -z "$BUILDTYPE" ; then
-       echo "don't know how to build $RECIPEFILE"
+       echo "I don't know how to build $RECIPEFILE"
        cleanup_and_exit 1
+    fi
+}
+
+# expands al directories into files
+expand_recipe_directories() {
+    local f t ff found
+    if test -z "$RECIPEFILES" ; then
+	set -- "`pwd`"
+    else
+	set -- "${RECIPEFILES[@]}"
+    fi
+    RECIPEFILES=()
+    for f in "$@" ; do
+	if test "$f" = "${f#/}" ; then
+	    f="`pwd`/$f"
+	fi
+	if test -d "$f" ; then
+	    for t in .spec .dsc PKGBUILD .kiwi .src.rpm .nosrc.rpm ; do
+		found=
+		for ff in "$f"/*$t ; do
+		    test -f "$ff" || continue
+		    RECIPEFILES=("${RECIPEFILES[@]}" "$ff")
+		    found=true
+		done
+		test -n "$found" && break
+	    done
+	else
+	    RECIPEFILES[${#RECIPEFILES[@]}]="$f"
+	fi
+    done
+    if test -z "$RECIPEFILES" ; then
+	echo "no recipe files found in $@. exit..."
+	cleanup_and_exit 1
     fi
 }
