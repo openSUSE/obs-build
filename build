@@ -646,7 +646,7 @@ trap fail_exit EXIT
 
 shopt -s nullglob
 
-export PATH=$BUILD_DIR:/sbin:/usr/sbin:$PATH
+export PATH=$BUILD_DIR:/sbin:/usr/sbin:/bin:/usr/bin:$PATH
 
 if vm_detect_2nd_stage ; then
     set "/.build-srcdir/$RECIPEFILE"
