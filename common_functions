@@ -61,7 +61,7 @@ check_use_emulator() {
     BUILD_ARCH="$BUILD_HOST_ARCH"
     extend_build_arch
     BUILD_ARCH=":$BUILD_ARCH:"
-    if test "$BUILD_ARCH" != "$BUILD_ARCH/:$arch:/" ; then
+    if test "$BUILD_ARCH" != "${BUILD_ARCH/:$arch:/}" ; then
 	# native supported arch, no emulator
 	BUILD_ARCH="$old_build_arch"
 	return 1
