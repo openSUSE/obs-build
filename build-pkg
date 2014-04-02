@@ -65,7 +65,7 @@ pkg_autodetect_type() {
 
 pkg_set_type() {
     PSUF=`queryconfig binarytype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
-    test "$PSUF" = UNKNOWN && PSUF=
+    test "$PSUF" = UNDEFINED && PSUF=
     case "$PSUF" in
 	rpm|deb|arch)
 	    ;;

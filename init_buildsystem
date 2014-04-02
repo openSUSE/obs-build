@@ -280,7 +280,7 @@ create_cache_file() {
 	BINTYPE=
 	if test -n "$BUILD_DIST" ; then
 	    BINTYPE=`queryconfig binarytype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
-	    test "$BINTYPE" = UNKNOWN && BINTYPE=
+	    test "$BINTYPE" = UNDEFINED && BINTYPE=
 	fi
 	for SRC in "${repos[@]}" -- ${BUILD_RPMS//:/ /}; do
 	    if test "$SRC" = '--' ; then
