@@ -49,8 +49,32 @@ pkg_runscripts() {
 }
 
 pkg_autodetect_type() {
+    if test -n "$PREINSTALL_IMAGE" ; then
+	echo "cannot autodetect build type when using a preinstall image" >&2
+	cleanup_and_exit 1
+    fi
     PSUF=
     test -e $BUILD_ROOT/.init_b_cache/rpms/rpm.rpm && PSUF=rpm
     test -e $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb && PSUF=deb
     test -e $BUILD_ROOT/.init_b_cache/rpms/pacman.arch && PSUF=arch
+    if test -z "$PSUF" ; then
+	echo "could not autodetect package type" >&2
+	cleanup_and_exit 1
+    fi
+}
+
+pkg_set_type() {
+    PSUF=`queryconfig binarytype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
+    test "$PSUF" = UNKNOWN && PSUF=
+    case "$PSUF" in
+	rpm|deb|arch)
+	    ;;
+	'')
+	    pkg_autodetect_type
+	    ;;
+	*)
+            echo "unknown package type '$PSUF'" >&2
+            cleanup_and_exit 1
+	    ;;
+    esac
 }

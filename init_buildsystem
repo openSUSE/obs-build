@@ -620,20 +620,7 @@ else
     echo "$GUESSED_DIST" > $BUILD_ROOT/.guessed_dist
     test -n "$BUILD_DIST" || BUILD_DIST="$GUESSED_DIST"
 
-    PSUF=`queryconfig binarytype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
-    test "$PSUF" = UNKNOWN && PSUF=
-    if test -z "$PSUF" ; then
-	# auto detect from packages
-	if test -n "$PREINSTALL_IMAGE" ; then
-	    echo "cannot autodetect build type when using a preinstall image" >&2
-	    cleanup_and_exit 1
-	fi
-	pkg_autodetect_type
-	if test -z "$PSUF" ; then
-	    echo "could not autodetect package type" >&2
-	    cleanup_and_exit 1
-	fi
-    fi
+    pkg_set_type
 
     if test -n "$PREINSTALL_IMAGE" ; then
 	for PKG in $PACKAGES_FROM_PREINSTALLIMAGE ; do
