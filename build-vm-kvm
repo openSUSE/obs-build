@@ -41,43 +41,41 @@ kvm_check_hugetbl() {
 vm_verify_options_kvm() {
     vm_kernel=
     vm_initrd=
-
-    # overwrite some options on armv7l
-    if test `uname -m` = armv7l ; then
-	kvm_bin="/usr/bin/qemu-system-arm"
-	kvm_console=ttyAMA0
-	kvm_options="-enable-kvm -M vexpress-a15 -dtb /boot/a15-guest.dtb -cpu cortex-a15"
-        vm_kernel=/boot/zImage
-        vm_initrd=/boot/initrd
-	# prefer the guest kernel/initrd
-        test -e /boot/zImage.guest && vm_kernel=/boot/zImage.guest
-	test -e /boot/initrd.guest && vm_initrd=/boot/initrd.guest
-	kvm_device=virtio-blk-device
-    fi
-
-    # overwrite some options on ppc
-    if test "$BUILD_ARCH" = ppc -o "$BUILD_ARCH" = ppc64 -o "$BUILD_ARCH" = ppc64le ; then
-	kvm_bin="/usr/bin/qemu-system-ppc64"
-	kvm_console=hvc0
-	kvm_options="-enable-kvm -M pseries"
-	grep -q PPC970MP /proc/cpuinfo && kvm_check_ppc970
-	vm_kernel=/boot/vmlinux
-	vm_initrd=/boot/initrd
-	if test "$BUILD_ARCH" = ppc64le -a -e /boot/vmlinuxle ; then
-	    vm_kernel=/boot/vmlinuxle
-	    vm_initrd=/boot/initrdle
-	fi
-	grep -q "PowerNV" /proc/cpuinfo || kvm_device=scsi-hd	# no virtio on ppc != power7 yet
-	test "$BUILD_ARCH" != ppc64le || kvm_device=scsi-hd	# also no virtio for ppc64le yet
-    fi
-
-    # overwrite some options for z series
-    if test `uname -m` = s390 -o `uname -m` = s390x ; then
-	kvm_console=hvc0
-	vm_kernel=/boot/image
-	vm_initrd=/boot/initrd
-	kvm_device=virtio-blk-pci
-    fi
+    
+    # overwrite some options for specific host architectures
+    case `uname -m` in
+	armv7l)
+	    kvm_bin="/usr/bin/qemu-system-arm"
+	    kvm_console=ttyAMA0
+	    kvm_options="-enable-kvm -M vexpress-a15 -dtb /boot/a15-guest.dtb -cpu cortex-a15"
+	    vm_kernel=/boot/zImage
+	    vm_initrd=/boot/initrd
+	    # prefer the guest kernel/initrd
+	    test -e /boot/zImage.guest && vm_kernel=/boot/zImage.guest
+	    test -e /boot/initrd.guest && vm_initrd=/boot/initrd.guest
+	    kvm_device=virtio-blk-device
+	    ;;
+	ppc|ppc64|ppc64le)
+	    kvm_bin="/usr/bin/qemu-system-ppc64"
+	    kvm_console=hvc0
+	    kvm_options="-enable-kvm -M pseries"
+	    grep -q PPC970MP /proc/cpuinfo && kvm_check_ppc970
+	    vm_kernel=/boot/vmlinux
+	    vm_initrd=/boot/initrd
+	    if test "$BUILD_ARCH" = ppc64le -a -e /boot/vmlinuxle ; then
+		vm_kernel=/boot/vmlinuxle
+		vm_initrd=/boot/initrdle
+	    fi
+	    grep -q "PowerNV" /proc/cpuinfo || kvm_device=scsi-hd	# no virtio on ppc != power7 yet
+	    test "$BUILD_ARCH" != ppc64le || kvm_device=scsi-hd		# also no virtio for ppc64le yet
+	    ;;
+	s390|s390x)
+	    kvm_console=hvc0
+	    vm_kernel=/boot/image
+	    vm_initrd=/boot/initrd
+	    kvm_device=virtio-blk-pci
+	    ;;
+    esac
 
     # check if we can run kvm
     if ! test -r /dev/kvm -a -x "$kvm_bin" ; then
