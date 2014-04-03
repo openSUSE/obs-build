@@ -68,12 +68,12 @@ rpm_set_checkopts() {
 }
 
 rpm_init_cumulate() {
+    cumulate=-1
+    CUMULATED_LIST=()
+    CUMULATED_PIDS=()
+    CUMULATED_HMD5=()
     DO_CUMULATE=
     typeset -ri suse_version=$(chroot $BUILD_ROOT rpm --eval '%{?suse_version}' 2>/dev/null)
-    typeset -g -i num cumulate=-1
-    typeset -g -a CUMULATED_LIST=()
-    typeset -g -a CUMULATED_PIDS=()
-    typeset -g -a CUMULATED_HMD5=()
     if ((suse_version > 1220)) ; then 
 	DO_CUMULATE=true
     fi
