@@ -300,7 +300,7 @@ build_kiwi_product() {
 	case $f in
 	    *.iso) mv $i $BUILD_ROOT/$TOPDIR/KIWI/. ;;
 	    *.packages) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
-	    *.channel) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
+	    *.report) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
 	    scripts) ;;
 	    *0) ;;
 	    *) test -d $i -a "$drop_repo" != true  && mv $i $BUILD_ROOT/$TOPDIR/KIWI/. ;;
