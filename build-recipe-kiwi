@@ -280,8 +280,8 @@ build_kiwi_product() {
     # XXX: again?
     chroot "$BUILD_ROOT" chown -R abuild.abuild "$TOPDIR"
     chroot "$BUILD_ROOT" rm -rf "$TOPDIR/KIWIROOT"
-    ver=`chroot "$BUILD_ROOT" su -c "/usr/sbin/kiwi --version | sed -n 's,.*kiwi version v\(.*\),\1,p'"
-    [ -n "$ver" ] || ver=`chroot "$BUILD_ROOT" su -c "/usr/sbin/kiwi --version | sed -n 's,.* vnr: \(.*\),\1,p'"`
+    ver=`chroot "$BUILD_ROOT" su -c "/usr/sbin/kiwi --version | sed -n 's,.*kiwi version v\(.*\),\1,p'"`
+    test -n "$ver" || ver=`chroot "$BUILD_ROOT" su -c "/usr/sbin/kiwi --version | sed -n 's,.* vnr: \(.*\),\1,p'"`
     if test "${ver:0:1}" == "3" ; then
         # old style kiwi 3 builds
 	chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX /usr/sbin/kiwi --root $TOPDIR/KIWIROOT -v --logfile terminal -p $TOPDIR/SOURCES --instsource-local --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
