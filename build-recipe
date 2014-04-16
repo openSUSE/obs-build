@@ -4,6 +4,7 @@
 # (C) 2014 SUSE, Inc
 #
 
+KIWI_PARAMETERS=
 
 for i in spec dsc kiwi arch preinstallimage ; do
     . "$BUILD_DIR/build-recipe-$i"
@@ -28,9 +29,15 @@ recipe_resultdirs () {
 recipe_parse_options() {
     case ${PARAM/#--/-} in
       -stage)
-        needarg
-        BUILD_RPM_BUILD_STAGE="$ARG"
-        shift
+	needarg
+	BUILD_RPM_BUILD_STAGE="$ARG"
+	shift
+	;;
+      -kiwi-parameter)
+	test -z "$ARG" && ARG="$1"
+	needarg
+	KIWI_PARAMETERS="$KIWI_PARAMETERS $ARG"
+	shift
 	;;
       -*)
 	return 1

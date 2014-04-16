@@ -38,9 +38,6 @@ old_packages=()
 # need to restore build root owner for non-root builds
 browner=
 
-# additional kiwi parameters, used for appliance builds with obsrepositories:/ directive
-KIWI_PARAMETERS=
-
 # Default uid:gid for the build user
 ABUILD_UID=399
 ABUILD_GID=399
@@ -632,7 +629,6 @@ needarg() {
 
 while test -n "$1"; do
     PARAM="$1"
-    UNSTRIPPED_ARG="$2"
     ARG="$2"
     test "$ARG" = "${ARG#-}" || ARG=
     shift
@@ -698,10 +694,6 @@ while test -n "$1"; do
 	;;
       -baselibs)
 	CREATE_BASELIBS=true
-	;;
-      -kiwi-parameter)
-	KIWI_PARAMETERS="$KIWI_PARAMETERS $UNSTRIPPED_ARG"
-	shift
 	;;
       -baselibs-internal)
 	CREATE_BASELIBS=internal
@@ -817,7 +809,7 @@ while test -n "$1"; do
       -uid)
 	needarg
 	ABUILD_ID="$ARG"
-	if test -n "${ABUILD_ID//[0-9:]/}"; then
+	if test -n "${ABUILD_ID//[0-9:]/}" ; then
 	    echo "--uid argument must be uid:gid"
 	    cleanup_and_exit
 	fi
@@ -858,10 +850,6 @@ while test -n "$1"; do
     esac
 done
 
-if test -n "$CLEAN_BUILD" ; then
-    DO_INIT=true
-fi
-
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
     if test -n "$VM_IMAGE" -a -n "$VM_SWAP" -a -n "$VM_TYPE"; then
@@ -880,6 +868,10 @@ if test -n "$KILL" ; then
 	fi
     fi
     cleanup_and_exit 0
+fi
+
+if test -n "$CLEAN_BUILD" ; then
+    DO_INIT=true
 fi
 
 if test -n "$VM_TYPE" -a -z "$RUNNING_IN_VM" ; then
@@ -1228,10 +1220,10 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     fi
 
     if test -n "$RSYNCSRC" ; then
-	if test -n "$RSYNCDEST"; then
-	    if test -d "$RSYNCSRC"; then
-		if ! test -d "$BUILD_ROOT/$RSYNCDEST"; then
-		    echo "ATTENTION! Creating target directory ($BUILD_ROOT/$RSYNCDEST) as its not there."
+	if test -n "$RSYNCDEST" ; then
+	    if test -d "$RSYNCSRC" ; then
+		if ! test -d "$BUILD_ROOT/$RSYNCDEST" ; then
+		    echo "ATTENTION! Creating missing target directory ($BUILD_ROOT/$RSYNCDEST)."
 		    mkdir -p $BUILD_ROOT/$RSYNCDEST
 		fi
 		echo "Running rsync ..."
@@ -1240,7 +1232,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 		RSYNCDONE=true
 		echo "... done"
 	    else
-		echo "RSYNCSRC is no directory - skipping"
+		echo "RSYNCSRC is not a directory - skipping"
 	    fi
 	else
 	    echo "RSYNCSRC given, but not RSYNCDEST - skipping"
