@@ -74,7 +74,7 @@ vm_verify_options_kvm() {
 	    kvm_console=hvc0
 	    vm_kernel=/boot/image
 	    vm_initrd=/boot/initrd
-	    kvm_device=virtio-blk-pci
+	    kvm_device=virtio-blk-ccw
 	    ;;
     esac
 
