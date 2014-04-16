@@ -218,6 +218,7 @@ vm_parse_options() {
       ;;
       -*)
 	return 1
+      ;;
     esac
     nextargs=("$@")
     return 0

@@ -744,11 +744,6 @@ while test -n "$1"; do
       -norootforbuild)
 	NOROOTFORBUILD=true
       ;;
-      -stage)
-	needarg
-	BUILD_RPM_BUILD_STAGE="$ARG"
-	shift
-      ;;
       -useusedforbuild)
 	USEUSEDFORBUILD="--useusedforbuild"
       ;;
@@ -848,11 +843,14 @@ while test -n "$1"; do
 	cleanup_and_exit
       ;;
       -*)
-	if ! vm_parse_options "$@"; then
+	if vm_parse_options "$@" ; then
+	    set -- "${nextargs[@]}"
+	elif recipe_parse_options "$@" ; then
+	    set -- "${nextargs[@]}"
+	else
 	    echo "Unknown option '$PARAM'. Exit."
 	    cleanup_and_exit 1
 	fi
-        set -- "${nextargs[@]}"
       ;;
       *)
 	RECIPEFILES[${#RECIPEFILES[@]}]="$PARAM"

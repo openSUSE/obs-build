@@ -25,6 +25,21 @@ recipe_resultdirs () {
     recipe_resultdirs_$BUILDTYPE "$@"
 }
 
+recipe_parse_options() {
+    case ${PARAM/#--/-} in
+      -stage)
+        needarg
+        BUILD_RPM_BUILD_STAGE="$ARG"
+        shift
+	;;
+      -*)
+	return 1
+	;;
+    esac
+    nextargs=("$@")
+    return 0
+}
+
 recipe_set_buildtype() {
     BUILDTYPE=
     case $RECIPEFILE in
