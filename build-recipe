@@ -62,7 +62,7 @@ recipe_set_buildtype() {
     fi
 }
 
-# expands al directories into files
+# expands all directories into files
 expand_recipe_directories() {
     local f t ff found
     if test -z "$RECIPEFILES" ; then
