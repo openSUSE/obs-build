@@ -282,6 +282,14 @@ create_cache_file() {
 	    BINTYPE=`queryconfig binarytype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
 	    test "$BINTYPE" = UNDEFINED && BINTYPE=
 	fi
+	if test -z "$BINTYPE" ; then
+	    # check the first init_buildsystem arg, maybe it is a recipe
+	    case ${PKGS[0]} in
+		*.spec) BINTYPE=rpm ;;
+		*.dsc) BINTYPE=deb ;;
+		*/PKGBUILD|PKGBUILD) BINTYPE=arch ;;
+	    esac
+	fi
 	for SRC in "${repos[@]}" -- ${BUILD_RPMS//:/ /}; do
 	    if test "$SRC" = '--' ; then
 		findonly=1
