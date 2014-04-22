@@ -68,6 +68,7 @@ sub parse {
   $ret->{'name'} = $vars{'pkgname'}->[0] if $vars{'pkgname'};
   $ret->{'version'} = $vars{'pkgver'}->[0] if $vars{'pkgver'};
   $ret->{'deps'} = $vars{'makedepends'} || [];
+  push @{$ret->{'deps'}}, @{$vars{'checkdepends'} || []};
   push @{$ret->{'deps'}}, @{$vars{'depends'} || []};
   $ret->{'source'} = $vars{'source'} if $vars{'source'};
   return $ret;
