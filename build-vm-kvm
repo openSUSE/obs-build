@@ -68,7 +68,6 @@ vm_verify_options_kvm() {
 	    fi
 	    grep -q "pSeries" /proc/cpuinfo && kvm_device=scsi-hd	# no virtio on pSeries
 	    grep -q "PowerNV" /proc/cpuinfo || kvm_device=scsi-hd	# no virtio on ppc != power7 yet
-	    test "$BUILD_ARCH" != ppc64le || kvm_device=scsi-hd		# also no virtio for ppc64le yet
 	    ;;
 	s390|s390x)
 	    kvm_console=hvc0
