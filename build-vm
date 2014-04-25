@@ -662,6 +662,7 @@ vm_first_stage() {
     echo "DO_STATISTICS='$DO_STATISTICS'" >> $BUILD_ROOT/.build/build.data
     echo "TIME_PREINSTALL='$TIME_PREINSTALL'" >> $BUILD_ROOT/.build/build.data
     echo "VM_WATCHDOG='$VM_WATCHDOG'" >> $BUILD_ROOT/.build/build.data
+    echo "BUILDENGINE='$BUILDENGINE'" >> $BUILD_ROOT/.build/build.data
     # fallback time for broken hosts
     date '+@%s' > $BUILD_ROOT/.build/.date
     # we're done with the root file system, unmount

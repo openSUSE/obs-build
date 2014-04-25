@@ -272,13 +272,15 @@ sub read_config {
 	  $config->{'order'}->{$l} = 1;
 	}
       }
-    } elsif ($l0 eq 'repotype:') { #type of generated repository data
+    } elsif ($l0 eq 'repotype:') { # type of generated repository data
       $config->{'repotype'} = [ @l ];
-    } elsif ($l0 eq 'type:') { #kind of packaging system (spec,dsc,arch,kiwi,...)
+    } elsif ($l0 eq 'type:') { # kind of recipe system (spec,dsc,arch,kiwi,...)
       $config->{'type'} = $l[0];
-    } elsif ($l0 eq 'binarytype:') { #rpm,deb,arch,...
+    } elsif ($l0 eq 'buildengine:') { # build engine (build,mock)
+      $config->{'buildengine'} = $l[0];
+    } elsif ($l0 eq 'binarytype:') { # kind of binary packages (rpm,deb,arch,...)
       $config->{'binarytype'} = $l[0];
-    } elsif ($l0 eq 'patterntype:') { #kind of generated patterns in repository
+    } elsif ($l0 eq 'patterntype:') { # kind of generated patterns in repository
       $config->{'patterntype'} = [ @l ];
     } elsif ($l0 eq 'release:') {
       $config->{'release'} = $l[0];

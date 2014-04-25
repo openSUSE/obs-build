@@ -1,0 +1,78 @@
+
+recipe_setup_mock() {
+    recipe_setup_spec "$@"
+}
+
+recipe_prepare_mock() {
+    recipe_prepare_spec "$@"
+}
+
+recipe_build_mock() {
+    test -d $BUILD_ROOT/.build.binaries || cleanup_and_exit 1
+    if test "$DO_INIT" = true -o ! -d "$BUILD_ROOT/.build.binaries/repodata" ; then
+	echo "creating repository for mock..."
+	chroot $BUILD_ROOT createrepo --no-database --basedir /.build.binaries -o /.build.binaries /.build.binaries
+    fi
+    MOCK_CHROOT_SETUP_CMD="$(queryconfig --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" substitute mock:chroot_setup_cmd)"
+    test -z "$MOCK_CHROOT_SETUP_CMD" && MOCK_CHROOT_SETUP_CMD="groupinstall buildsys-build"
+    echo "config_opts['root'] = 'build'" > $BUILD_ROOT/etc/mock/build.cfg
+    echo "config_opts['target_arch'] = '${BUILD_ARCH%%:*}'" >> $BUILD_ROOT/etc/mock/build.cfg
+    echo "config_opts['plugin_conf']['ccache_enable'] = False" >> $BUILD_ROOT/etc/mock/build.cfg
+    echo "config_opts['chroot_setup_cmd'] = '$MOCK_CHROOT_SETUP_CMD'" >> $BUILD_ROOT/etc/mock/build.cfg
+    cat >> $BUILD_ROOT/etc/mock/build.cfg <<-'EOF'
+	config_opts['yum.conf'] = """
+	[main]
+	cachedir=/var/cache/yum
+	debuglevel=1
+	reposdir=/dev/null
+	logfile=/var/log/yum.log
+	obsoletes=1
+	gpgcheck=0
+	assumeyes=1
+	syslog_ident=mock
+	syslog_device=
+
+	[build]
+	name=build
+	baseurl=file:///.build.binaries
+	"""
+	EOF
+    touch $BUILD_ROOT/etc/resolv.conf
+    BUILD_SUCCEEDED=false
+    echo "building src rpm..."
+    MOCK_INIT_ARG=
+    test "$DO_INIT" = true || MOCK_INIT_ARG=--no-clean
+    if chroot $BUILD_ROOT /usr/bin/mock -r build $MOCK_INIT_ARG --buildsrpm --spec "$TOPDIR/SOURCES/$RECIPEFILE" --sources "$TOPDIR/SOURCES" ; then
+	BUILT_SRPM=
+	for i in "$BUILD_ROOT/var/lib/mock/build/result/"*src.rpm ; do
+	    test -s "$i" && BUILT_SRPM="${i##*/}"
+	done
+	if test -n "$BUILT_SRPM" ; then
+	    mkdir -p "$BUILD_ROOT/$TOPDIR/SRPMS"
+	    mv "$BUILD_ROOT/var/lib/mock/build/result/$BUILT_SRPM" "$BUILD_ROOT/$TOPDIR/SRPMS/$BUILT_SRPM"
+	    echo "building binary rpms..."
+	    if chroot $BUILD_ROOT /usr/bin/mock -v -r build --rebuild --no-clean "$TOPDIR/SRPMS/$BUILT_SRPM" ; then
+		BUILD_SUCCEEDED=true
+		# move result over to TOPDIR
+		rm -f "$TOPDIR/SRPMS/$BUILT_SRPM"
+		for i in "$BUILD_ROOT/var/lib/mock/build/result/"*.rpm ; do
+		    a="${i%.rpm}"
+		    a="${a##*/}"
+		    a="${a##*.}"
+		    if test "$a" = src -o "$a" = nosrc ; then
+			mkdir -p "$BUILD_ROOT/$TOPDIR/SRPMS"
+			mv $i "$BUILD_ROOT/$TOPDIR/SRPMS/."
+		    else
+			mkdir -p "$BUILD_ROOT/$TOPDIR/RPMS/$a"
+			mv $i "$BUILD_ROOT/$TOPDIR/RPMS/$a/."
+		    fi
+		done
+	    fi
+	fi
+    fi
+}
+
+recipe_resultdirs_mock() {
+    echo RPMS SRPMS
+}
+

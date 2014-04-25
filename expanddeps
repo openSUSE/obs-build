@@ -8,7 +8,7 @@ use strict;
 
 use Build;
 
-my ($dist, $rpmdeps, $archs, $configdir, $useusedforbuild);
+my ($dist, $rpmdeps, $archs, $configdir, $useusedforbuild, $installonly, $noinstall);
 
 $configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
 
@@ -63,12 +63,12 @@ $archs = '' unless defined $archs;
 die("you must specfiy a depfile!\n") unless defined $rpmdeps;
 
 my @extradeps = grep {!/(^|\/)(?:PKGBUILD|_preinstallimage)$/ && !/\.(?:spec|dsc|kiwi)$/} @ARGV;
-my @specs = grep {/(^|\/)(?:PKGBUILD|_preinstallimage)$/ || /\.(?:spec|dsc|kiwi)$/} @ARGV;
-die("can only work with at most one spec\n") if @specs > 1;
-my $spec = $specs[0];
+my @recipes = grep {/(^|\/)(?:PKGBUILD|_preinstallimage)$/ || /\.(?:spec|dsc|kiwi)$/} @ARGV;
+die("can only work with at most one recipe file\n") if @recipes > 1;
+my $recipe = $recipes[0];
 
 my @archs = split(':', $archs);
-if ($spec =~ /(^|\/)PKGBUILD$/) {
+if ($recipe =~ /(^|\/)PKGBUILD$/) {
   push @archs, 'any' unless grep {$_ eq 'any'} @archs;
 } else {
   push @archs, 'noarch' unless grep {$_ eq 'noarch'} @archs;
@@ -195,8 +195,7 @@ for my $pack (keys %packs) {
 
 #######################################################################
 
-sub print_rpmlist
-{
+sub print_rpmlist {
   for (@_) {
     print "$_ $fn{$packs{$_}}\n";
     print "rpmid: $_:$ids{$packs{$_}}\n" if exists $ids{$packs{$_}};
@@ -205,12 +204,14 @@ sub print_rpmlist
   print "vminstall: @{$cf->{'vminstall'} || []}\n";
   print "runscripts: @{$cf->{'runscripts'} || []}\n";
   print "dist: $dist\n" if defined $dist;
+  print "installonly: $installonly\n" if defined $installonly;
+  print "noinstall: $noinstall\n" if defined $noinstall;
 }
 
 if ($useusedforbuild) {
-  die("Need a specfile/dscfile for --usedforbuild\n") unless defined $spec;
+  die("Need a recipe file for --usedforbuild\n") unless defined $recipe;
   local *F;
-  open(F, '<', $spec) || die("$spec: $!\n");
+  open(F, '<', $recipe) || die("$recipe: $!\n");
   my @usedforbuild;
   my @buildrequires;
   while(<F>) {
@@ -243,11 +244,11 @@ if ($useusedforbuild) {
 my ($packname, $packvers, $subpacks, @packdeps);
 $subpacks = [];
 
-if ($spec) {
+if ($recipe) {
   my $d;
-  if ($spec =~ /\.kiwi$/) {
+  if ($recipe =~ /\.kiwi$/) {
     # lets see if this is a product or image build
-    $d = Build::parse($cf, $spec) || {};
+    $d = Build::parse($cf, $recipe) || {};
     my $type = $d->{'imagetype'} && $d->{'imagetype'}->[0] eq 'product' ? 'product' : 'image';
     my @kdeps;
     if ($type eq 'image') {
@@ -260,7 +261,7 @@ if ($spec) {
     push @kdeps, grep {/^kiwi-.*:/} @{$d->{'deps'} || []};
     $d = { 'deps' => \@kdeps, 'subpacks' => [] };
   } else {
-    $d = Build::parse($cf, $spec);
+    $d = Build::parse($cf, $recipe);
   }
   $packname = $d->{'name'};
   $packvers = $d->{'version'};
@@ -282,6 +283,24 @@ if (!shift @bdeps) {
   print STDERR "expansion error\n";
   print STDERR "  $_\n" for @bdeps;
   exit(1);
+}
+
+my $engine = $cf->{'buildengine'} || '';
+if ($engine eq 'mock') {
+  my @sysdeps = @{$cf->{'substitute'}->{'engine-packages:mock'} || []};
+  @sysdeps = ('mock', 'createrepo') unless @sysdeps;   # default
+  @sysdeps = Build::get_build($cf, [], @sysdeps);
+  if (!shift @sysdeps) {
+    print STDERR "expansion error\n";
+    print STDERR "  $_\n" for @bdeps;
+    exit(1);
+  }
+  @sysdeps = Build::unify(@sysdeps, Build::get_preinstalls($cf));
+  my %sysdeps = map {$_ => 1} @sysdeps;
+  my %bdeps = map {$_ => 1} @bdeps;
+  $installonly = join(' ', grep {!$bdeps{$_}} @sysdeps);
+  $noinstall = join(' ', grep {!$sysdeps{$_}} @bdeps);
+  @bdeps = Build::unify(@sysdeps, @bdeps);
 }
 
 # make sure all preinstalls are in bdeps;

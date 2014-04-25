@@ -6,7 +6,7 @@
 
 KIWI_PARAMETERS=
 
-for i in spec dsc kiwi arch preinstallimage ; do
+for i in spec dsc kiwi arch preinstallimage mock ; do
     . "$BUILD_DIR/build-recipe-$i"
 done
 
@@ -59,6 +59,17 @@ recipe_set_buildtype() {
     if test -z "$BUILDTYPE" ; then
        echo "I don't know how to build $RECIPEFILE"
        cleanup_and_exit 1
+    fi
+    # we can't query right after vm startup, so we put the BUILDENGINE in the build.data
+    if test -z "$RUNNING_IN_VM" ; then
+	BUILDENGINE=
+	if test -n "$BUILD_DIST" ; then
+	    BUILDENGINE=`queryconfig buildengine --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
+	    test "$BUILDENGINE" = UNDEFINED && BUILDENGINE=
+	fi
+    fi
+    if test "$BUILDENGINE" = mock -a "$BUILDTYPE" = spec ; then
+	BUILDTYPE=mock
     fi
 }
 

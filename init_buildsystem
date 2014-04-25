@@ -512,6 +512,8 @@ else
     PACKAGES_TO_PREINSTALL=
     PACKAGES_TO_RUNSCRIPTS=
     PACKAGES_TO_VMINSTALL=
+    PACKAGES_TO_INSTALLONLY=
+    PACKAGES_TO_NOINSTALL=
     PREINSTALL_IMAGE=
     PREINSTALL_IMAGE_SOURCE=
     RUNSCRIPTS_SEEN=
@@ -526,6 +528,14 @@ else
 	fi
 	if test "$PKG" = "vminstall:" ; then
 	    PACKAGES_TO_VMINSTALL=$SRC
+	    continue
+	fi
+	if test "$PKG" = "installonly:" ; then
+	    PACKAGES_TO_INSTALLONLY=$SRC
+	    continue
+	fi
+	if test "$PKG" = "noinstall:" ; then
+	    PACKAGES_TO_NOINSTALL=$SRC
 	    continue
 	fi
 	if test "$PKG" = "preinstallimage:" ; then
@@ -575,6 +585,26 @@ else
 	SRCSUF=${SRC/%.pkg.tar.?z/.arch}
 	ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
     done < $RPMLIST
+
+    PACKAGES_TO_ALL="$PACKAGES_TO_INSTALL"
+    PACKAGES_TO_AVAILABLE="$PACKAGES_TO_INSTALL"
+
+    # subtract noinstall packages from PACKAGES_TO_INSTALL
+    if test -n "$PACKAGES_TO_NOINSTALL" ; then
+        settest=" $PACKAGES_TO_NOINSTALL "
+	PACKAGES_TO_INSTALL=
+	for PKG in $PACKAGES_TO_ALL ; do
+	    test "$settest" = "${settest/ $PKG /}" && PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $PKG"
+	done
+    fi
+    # subtract installonly packages from PACKAGES_TO_AVAILABLE
+    if test -n "$PACKAGES_TO_INSTALLONLY" ; then
+        settest=" $PACKAGES_TO_INSTALLONLY "
+	PACKAGES_TO_AVAILABLE=
+	for PKG in $PACKAGES_TO_ALL ; do
+	    test "$settest" = "${settest/ $PKG /}" && PACKAGES_TO_AVAILABLE="$PACKAGES_TO_INSTALL $PKG"
+	done
+    fi
 
     # check if we really can use cached versions for packages on the download list
     if test -s $BUILD_ROOT/.init_b_cache/rpmlist.download ; then
@@ -691,7 +721,7 @@ fi
 
 if test -n "$PREPARE_VM" ; then
     echo "copying packages..."
-    for PKG in $PACKAGES_TO_INSTALL ; do
+    for PKG in $PACKAGES_TO_ALL ; do
 	rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
 	cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
 	ln -s -f ../$PKG.$PSUF $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF
@@ -707,6 +737,7 @@ if test -n "$PREPARE_VM" ; then
     echo "PACKAGES_TO_RUNSCRIPTS='${PACKAGES_TO_RUNSCRIPTS//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
     # needed for continuation in xen/kvm with rpm-x86
     echo "PACKAGES_TO_PREINSTALL='${PACKAGES_TO_PREINSTALL//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
+    echo "PACKAGES_TO_AVAILABLE='${PACKAGES_TO_AVAILABLE//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
     echo "PSUF='$PSUF'" >> $BUILD_ROOT/.build/init_buildsystem.data
     rm -f $BUILD_IS_RUNNING
     cleanup_and_exit 0
@@ -725,7 +756,7 @@ rm -rf "$BUILD_ROOT/.build.binaries"
 if test -n "$CREATE_BUILD_BINARIES" ; then
     echo "creating .build.binaries directory..."
     mkdir -p "$BUILD_ROOT/.build.binaries"
-    for PKG in $PACKAGES_TO_INSTALL ; do
+    for PKG in $PACKAGES_TO_AVAILABLE ; do
 	test -L "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" || continue
 	LPKG=`readlink -f "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF"`
 	ln "$LPKG" "$BUILD_ROOT/.build.binaries/$PKG.$PSUF" 2>/dev/null

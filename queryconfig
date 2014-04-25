@@ -41,7 +41,7 @@ if ($type eq 'buildflags') {
   die("Specify which buildflag to query\n") unless $argument;
   my $result = $cf->{"buildflags:$argument"};
   print "$result\n" if defined $result;
-} elsif ($type eq 'target' || $type eq 'type' || $type eq 'binarytype' || $type eq 'rawmacros') {
+} elsif ($type eq 'target' || $type eq 'type' || $type eq 'binarytype' || $type eq 'buildengine' || $type eq 'rawmacros') {
   print "$cf->{$type}\n" if $cf->{$type};
 } elsif ($type eq 'optflags') {
   exit(0) unless $cf->{'optflags'};
@@ -52,6 +52,10 @@ if ($type eq 'buildflags') {
     next if $_ eq '*';
     print "optflags: $_ $cf->{'optflags'}->{$_}$all\n";
   }
+} elsif ($type eq 'substitute') {
+  die("Specify which substitute to query\n") unless $argument;
+  my @res =  @{$cf->{'substitute'}->{$argument} || []};
+  print join(' ', @res)."\n" if @res;
 } else {
   die("unsupported query type: $type\n");
 }

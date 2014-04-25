@@ -1039,6 +1039,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	CREATE_BUILD_BINARIES=
 	test "$BUILDTYPE" = preinstallimage && mkdir -p $BUILD_ROOT/.preinstall_image
 	egrep '^#[       ]*needsbinariesforbuild[       ]*$' >/dev/null <$MYSRCDIR/$RECIPEFILE && CREATE_BUILD_BINARIES=--create-build-binaries
+	test "$BUILDTYPE" = mock && CREATE_BUILD_BINARIES=--create-build-binaries
 	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
         start_time=`date +%s`
@@ -1087,7 +1088,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     BUILD_USER=abuild
     if test -x $BUILD_ROOT/bin/rpm ; then
 	SUSE_VERSION=`chroot $BUILD_ROOT /bin/rpm --eval '%{?suse_version}' 2>/dev/null`
-	test -n "$SUSE_VERSION" -a "$SUSE_VERSION" -le 1020 && BUILD_USER=root
+	test -n "$SUSE_VERSION" -a "${SUSE_VERSION:-0}" -le 1020 && BUILD_USER=root
     fi
     if test "$BUILD_USER" = abuild ; then
 	egrep '^#[       ]*needsrootforbuild[       ]*$' >/dev/null <$RECIPEFILE && BUILD_USER=root
