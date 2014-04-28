@@ -20,7 +20,6 @@ test -z "$CONFIG_DIR" && CONFIG_DIR="$BUILD_DIR/configs"
 export BUILD_ARCH BUILD_HOST_ARCH BUILD_ROOT BUILD_RPMS BUILD_DIR BUILD_DEBUG
 export BUILD_DIST
 
-ccache=0
 icecream=0
 definesnstuff=()
 repos=()
@@ -73,6 +72,7 @@ RSYNCDONE=
 SIGNDUMMY=
 DO_STATISTICS=
 RUN_SHELL=
+CCACHE=
 CACHE_DIR=/var/cache/build
 
 
@@ -377,7 +377,7 @@ toshellscript() {
 }
 
 setupccache() {
-    if test "$ccache" = 1 ; then
+    if test -n "$CCACHE" ; then
 	if mkdir -p $BUILD_ROOT/var/lib/build/ccache/bin; then
 	    for i in $(ls $BUILD_ROOT/usr/bin | grep -E '^(cc|gcc|[cg][+][+])([-]?[234][.]?[0-9])*$'); do
 #                ln -sf /usr/bin/ccache $BUILD_ROOT/var/lib/build/ccache/bin/$i
@@ -414,7 +414,7 @@ setupicecream() {
 
     echo "using icecream with $icecream jobs"
 
-    if test "$ccache" -ne 1 ; then
+    if test -z "$CCACHE" ; then
 	echo 'export PATH=/usr/lib/icecc/bin:/opt/icecream/bin:$PATH' > "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
     else
 	echo 'export CCACHE_PATH=/usr/lib/icecc/bin:/opt/icecream/bin' > "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
@@ -767,7 +767,7 @@ while test -n "$1"; do
 	shift
       ;;
       -ccache)
-	ccache=1
+	CCACHE=true
       ;;
       -statistics)
 	DO_STATISTICS=1
@@ -1005,7 +1005,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     ADDITIONAL_PACKS=
     test -z "$BUILD_EXTRA_PACKS" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS $BUILD_EXTRA_PACKS"
     test -z "$CREATE_BASELIBS" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS build"
-    test "$ccache" = 0 || ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
+    test -z "$CCACHE" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
     test "$icecream" = 0 || ADDITIONAL_PACKS="$ADDITIONAL_PACKS icecream gcc-c++"
     test -z "$DO_LINT" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS rpmlint-Factory"
     test "$VMDISK_FILESYSTEM" = xfs && ADDITIONAL_PACKS="$ADDITIONAL_PACKS libblkid1"
