@@ -23,7 +23,7 @@ recipe_prepare_arch() {
 }
 
 recipe_build_arch() {
-    chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && makepkg -f" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+    chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && makepkg -e -f" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
     for PKG in $BUILD_ROOT/$TOPDIR/BUILD/*.pkg.tar.?z ; do
 	test -e "$PKG" && mv "$PKG" "$BUILD_ROOT/$TOPDIR/ARCHPKGS"
     done
