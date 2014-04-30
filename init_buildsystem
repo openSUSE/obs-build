@@ -602,7 +602,7 @@ else
         settest=" $PACKAGES_TO_INSTALLONLY "
 	PACKAGES_TO_AVAILABLE=
 	for PKG in $PACKAGES_TO_ALL ; do
-	    test "$settest" = "${settest/ $PKG /}" && PACKAGES_TO_AVAILABLE="$PACKAGES_TO_INSTALL $PKG"
+	    test "$settest" = "${settest/ $PKG /}" && PACKAGES_TO_AVAILABLE="$PACKAGES_TO_AVAILABLE $PKG"
 	done
     fi
 
