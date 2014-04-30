@@ -70,6 +70,8 @@ vm_verify_options_kvm() {
 	    grep -q "PowerNV" /proc/cpuinfo || kvm_device=scsi-hd	# no virtio on ppc != power7 yet
 	    ;;
 	s390|s390x)
+	    kvm_bin="/usr/bin/qemu-system-s390x"
+	    kvm_options="-enable-kvm"
 	    kvm_console=hvc0
 	    vm_kernel=/boot/image
 	    vm_initrd=/boot/initrd
