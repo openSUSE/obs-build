@@ -18,12 +18,11 @@ recipe_setup_arch() {
 
 recipe_prepare_arch() {
     echo "Preparing sources..."
-    chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && makepkg -s -o 2>&1 >/dev/null" - $BUILD_USER
-    mv $BUILD_ROOT/$TOPDIR/SOURCES/* -t $BUILD_ROOT/$TOPDIR/BUILD
+    _arch_recipe_makepkg -so "2>&1" ">/dev/null"
 }
 
 recipe_build_arch() {
-    chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && makepkg -e -f" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+    _arch_recipe_makepkg -ef < /dev/null && BUILD_SUCCEEDED=true
     for PKG in $BUILD_ROOT/$TOPDIR/BUILD/*.pkg.tar.?z ; do
 	test -e "$PKG" && mv "$PKG" "$BUILD_ROOT/$TOPDIR/ARCHPKGS"
     done
@@ -31,4 +30,8 @@ recipe_build_arch() {
 
 recipe_resultdirs_arch() {
     echo ARCHPKGS
+}
+
+_arch_recipe_makepkg() {
+    chroot $BUILD_ROOT su -lc "cd $TOPDIR/BUILD && SRCDEST=$TOPDIR/SOURCES makepkg -p ../SOURCES/PKGBUILD $*" $BUILD_USER
 }
