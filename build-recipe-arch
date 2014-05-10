@@ -33,5 +33,5 @@ recipe_resultdirs_arch() {
 }
 
 _arch_recipe_makepkg() {
-    chroot $BUILD_ROOT su -lc "cd $TOPDIR/BUILD && SRCDEST=$TOPDIR/SOURCES makepkg -p ../SOURCES/PKGBUILD $*" $BUILD_USER
+    chroot $BUILD_ROOT su -lc "cd $TOPDIR/SOURCES && BUILDDIR=$TOPDIR/BUILD makepkg $*" $BUILD_USER
 }
