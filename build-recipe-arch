@@ -23,9 +23,6 @@ recipe_prepare_arch() {
 
 recipe_build_arch() {
     _arch_recipe_makepkg -ef < /dev/null && BUILD_SUCCEEDED=true
-    for PKG in $BUILD_ROOT/$TOPDIR/BUILD/*.pkg.tar.?z ; do
-	test -e "$PKG" && mv "$PKG" "$BUILD_ROOT/$TOPDIR/ARCHPKGS"
-    done
 }
 
 recipe_resultdirs_arch() {
@@ -33,5 +30,5 @@ recipe_resultdirs_arch() {
 }
 
 _arch_recipe_makepkg() {
-    chroot $BUILD_ROOT su -lc "cd $TOPDIR/SOURCES && BUILDDIR=$TOPDIR/BUILD makepkg $*" $BUILD_USER
+    chroot $BUILD_ROOT su -lc "cd $TOPDIR/SOURCES && BUILDDIR=$TOPDIR/BUILD PKGDEST=$TOPDIR/ARCHPKGS makepkg $*" $BUILD_USER
 }
