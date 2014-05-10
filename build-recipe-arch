@@ -14,6 +14,12 @@ recipe_setup_arch() {
     mkdir -p "$BUILD_ROOT/$TOPDIR/BUILD"
     chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
     cp -p "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+    {
+	echo 'source /etc/makepkg.conf'
+	printf '%s=%s\n' \
+	    BUILDDIR $TOPDIR/BUILD \
+	    PKGDEST $TOPDIR/ARCHPKGS
+    } > $BUILD_ROOT$TOPDIR/makepkg.conf
 }
 
 recipe_prepare_arch() {
@@ -30,5 +36,5 @@ recipe_resultdirs_arch() {
 }
 
 _arch_recipe_makepkg() {
-    chroot $BUILD_ROOT su -lc "cd $TOPDIR/SOURCES && BUILDDIR=$TOPDIR/BUILD PKGDEST=$TOPDIR/ARCHPKGS makepkg $*" $BUILD_USER
+    chroot $BUILD_ROOT su -lc "cd $TOPDIR/SOURCES && makepkg --config ../makepkg.conf $*" $BUILD_USER
 }
