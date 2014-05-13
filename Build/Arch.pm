@@ -55,7 +55,7 @@ sub parse {
     my $var = $1;
     my $val = $3;
     if ($2) {
-      while ($val !~ s/\)\s*$//s) {
+      while ($val !~ s/\)\s*(?:#.*)?$//s) {
 	my $nextline = <PKG>;
 	last unless defined $nextline;
 	chomp $nextline;
