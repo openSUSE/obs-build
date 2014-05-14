@@ -1000,3 +1000,5 @@ rm -f $BUILD_IS_RUNNING
 rm -f $TMPFILE
 
 cleanup_and_exit 0
+
+# vim: set tabstop=8 softtabstop=4 shiftwidth=4 noexpandtab:
