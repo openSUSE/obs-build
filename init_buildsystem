@@ -75,7 +75,7 @@ while test -n "$1" ; do
 	--clean)
 	    CLEAN_BUILD="$1"
 	    shift
-	;;
+	    ;;
 	--cachedir)
 	    CACHE_DIR="$2"
 	    shift 2
@@ -285,9 +285,12 @@ create_cache_file() {
 	if test -z "$BINTYPE" ; then
 	    # check the first init_buildsystem arg, maybe it is a recipe
 	    case ${PKGS[0]} in
-		*.spec) BINTYPE=rpm ;;
-		*.dsc) BINTYPE=deb ;;
-		*/PKGBUILD|PKGBUILD) BINTYPE=arch ;;
+		*.spec)
+		    BINTYPE=rpm ;;
+		*.dsc)
+		    BINTYPE=deb ;;
+		*/PKGBUILD|PKGBUILD)
+		    BINTYPE=arch ;;
 	    esac
 	fi
 	for SRC in "${repos[@]}" -- ${BUILD_RPMS//:/ /}; do
@@ -423,9 +426,12 @@ if test -e "$BUILD_IS_RUNNING" ; then
     echo -n "[y/N/c] "
     read ANSWER
     case "$ANSWER" in
-	c|C) rm -f $BUILD_IS_RUNNING ;;
-	y|Y) clean_build_root ;;
-	*) cleanup_and_exit 1 ;;
+	c|C)
+	    rm -f $BUILD_IS_RUNNING ;;
+	y|Y)
+	    clean_build_root ;;
+	*)
+	    cleanup_and_exit 1 ;;
     esac
 fi
 
@@ -935,16 +941,16 @@ if test -x $BUILD_ROOT/sbin/ldconfig ; then
 	CHROOT_RETURN="`chroot $BUILD_ROOT /sbin/ldconfig 2>&1`"
 	case "$CHROOT_RETURN" in
 	    *warning:*)
-	      chroot $BUILD_ROOT /sbin/ldconfig
-	      echo
-	      echo chroot $BUILD_ROOT /sbin/ldconfig
-	      echo
-	      echo "$CHROOT_RETURN"
-	      echo
-	      echo "Problem with ldconfig.  It's better to reinit the build system..."
-	      echo
-	      cleanup_and_exit 1
-	    ;;
+		chroot $BUILD_ROOT /sbin/ldconfig
+		echo
+		echo chroot $BUILD_ROOT /sbin/ldconfig
+		echo
+		echo "$CHROOT_RETURN"
+		echo
+		echo "Problem with ldconfig.  It's better to reinit the build system..."
+		echo
+		cleanup_and_exit 1
+		;;
 	esac
 fi
 
@@ -1000,3 +1006,5 @@ rm -f $BUILD_IS_RUNNING
 rm -f $TMPFILE
 
 cleanup_and_exit 0
+
+# vim: set tabstop=8 softtabstop=4 shiftwidth=4 noexpandtab:
