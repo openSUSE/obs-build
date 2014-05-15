@@ -128,6 +128,10 @@ kiwi_post_vmx() {
 	    SHAFILES="\$SHAFILES $imageout$buildnum-vmx.raw.\${compress_suffix}"
 	    popd
 	fi
+	if [ -e "$imageout.box" ]; then
+	    tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx-box.tar.bz2" $imageout.box $imageout.json
+	    SHAFILES="\$SHAFILES $imageout$buildnum-vmx-box.tar.bz2"
+	fi
 	if [ -e "$imageout.xenconfig" ]; then
 	    tar cvjfS "/$TOPDIR/KIWI/$imageout$buildnum-vmx.tar.bz2" $imageout.xenconfig $imageout.raw initrd-*
 	    SHAFILES="\$SHAFILES $imageout$buildnum-vmx.tar.bz2"
