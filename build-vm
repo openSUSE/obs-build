@@ -743,7 +743,7 @@ vm_first_stage() {
 	    cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
 	    ;;
 	  *)
-	    echo "No buildstatus set, either the base system is broken (glibc/bash/perl)"
+	    echo "No buildstatus set, either the base system is broken (kernel/initrd/udev/glibc/bash/perl)"
 	    echo "or the build host has a kernel or hardware problem..."
 	    cleanup_and_exit 3
 	    ;;

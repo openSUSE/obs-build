@@ -318,6 +318,7 @@ build_kiwi_appliance() {
 	echo "starting device mapper for kiwi..."
 	test -x /etc/init.d/boot.device-mapper && /etc/init.d/boot.device-mapper start
     fi
+    RUN_BUNDLE="true"
     for imgtype in $imagetype ; do
 	echo "running kiwi --prepare for $imgtype..."
 	# Do not use $BUILD_USER here, since we always need root permissions
@@ -325,8 +326,23 @@ build_kiwi_appliance() {
 	echo "running kiwi --create for $imgtype..."
 	mkdir -p $BUILD_ROOT/$TOPDIR/KIWI-$imgtype
 	chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --create $TOPDIR/KIWIROOT-$imgtype --logfile terminal --type $imgtype -d $TOPDIR/KIWI-$imgtype $KIWI_PARAMETERS" - root < /dev/null || cleanup_and_exit 1
+        rm -rf "/$TOPDIR/KIWI.bundle"
+        if chroot $BUILD_ROOT su -c "kiwi --bundle-build $TOPDIR/KIWI-$imgtype -d /$TOPDIR/KIWI.bundle/ --bundle-id Build$RELEASE" - root < /dev/null; then
+            mv "/$TOPDIR/KIWI.bundle/*" "/$TOPDIR/KIWI/"
+            rmdir "/$TOPDIR/KIWI.bundle"
+            unset RUN_BUNDLE
+        fi
     done
     BUILD_SUCCEEDED=true
+
+    if test -z "$RUN_BUNDLE"; then
+       # new kiwi has bundled our result already :)
+       return
+    fi
+
+    #
+    # Legacy bundling code for kiwi version below 5.06.106
+    #
 
     # create tar.gz of images, in case it makes sense
     buildnum=
