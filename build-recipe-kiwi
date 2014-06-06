@@ -328,8 +328,8 @@ build_kiwi_appliance() {
 	chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --create $TOPDIR/KIWIROOT-$imgtype --logfile terminal --type $imgtype -d $TOPDIR/KIWI-$imgtype $KIWI_PARAMETERS" - root < /dev/null || cleanup_and_exit 1
         rm -rf "/$TOPDIR/KIWI.bundle"
         if chroot $BUILD_ROOT su -c "kiwi --bundle-build $TOPDIR/KIWI-$imgtype -d /$TOPDIR/KIWI.bundle/ --bundle-id Build$RELEASE" - root < /dev/null; then
-            mv "/$TOPDIR/KIWI.bundle/*" "/$TOPDIR/KIWI/"
-            rmdir "/$TOPDIR/KIWI.bundle"
+            mv "$BUILD_ROOT/$TOPDIR/KIWI.bundle/"* "$BUILD_ROOT/$TOPDIR/KIWI/" || cleanup_and_exit 1
+            rmdir "$BUILD_ROOT/$TOPDIR/KIWI.bundle"
             unset RUN_BUNDLE
         fi
     done
