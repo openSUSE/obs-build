@@ -174,6 +174,7 @@ sub query {
   # arch packages don't seem to have a source :(
   # fake it so that the package isn't confused with a src package
   $ret->{'source'} = $ret->{'name'} if defined $ret->{'name'};
+  $ret->{'buildtime'} = $vars->{'builddate'}->[0] if $opts{'buildtime'} && $vars->{'builddate'};
   return $ret;
 }
 

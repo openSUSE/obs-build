@@ -565,6 +565,7 @@ my %rpmstag = (
   "EPOCH"          => 1003,
   "SUMMARY"        => 1004,
   "DESCRIPTION"    => 1005,
+  "BUILDTIME"      => 1006,
   "ARCH"           => 1022,
   "OLDFILENAMES"   => 1027,
   "SOURCERPM"      => 1044,
@@ -580,6 +581,7 @@ my %rpmstag = (
   "DIRINDEXES"     => 1116,
   "BASENAMES"      => 1117,
   "DIRNAMES"       => 1118,
+  "DISTURL"        => 1123,
 );
 
 sub rpmq {
@@ -842,6 +844,8 @@ sub query {
   push @tags, qw{EPOCH VERSION RELEASE ARCH};
   push @tags, qw{FILENAMES} if $opts{'filelist'};
   push @tags, qw{SUMMARY DESCRIPTION} if $opts{'description'};
+  push @tags, qw{DISTURL} if $opts{'disturl'};
+  push @tags, qw{BUILDTIME} if $opts{'buildtime'};
   my %res = rpmq($handle, @tags);
   return undef unless %res;
   my $src = $res{'SOURCERPM'}->[0];
@@ -894,6 +898,8 @@ sub query {
     $data->{'summary'} = $res{'SUMMARY'}->[0];
     $data->{'description'} = $res{'DESCRIPTION'}->[0];
   }
+  $data->{'buildtime'} = $res{'BUILDTIME'}->[0] if $opts{'buildtime'};
+  $data->{'disturl'} = $res{'DISTURL'}->[0] if $opts{'disturl'} && $res{'DISTURL'};
   return $data;
 }
 
