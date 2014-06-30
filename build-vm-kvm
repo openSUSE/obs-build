@@ -18,7 +18,7 @@ kvm_check_ppc970() {
     fi
 }
 
-kvm_check_hugetbl() {
+kvm_check_hugetlb() {
     if ! grep -q "$HUGETLBFSPATH" /proc/mounts ; then
 	echo "hugetlbfs is not mounted to $HUGETLBFSPATH"
 	cleanup_and_exit 3
@@ -87,7 +87,7 @@ vm_verify_options_kvm() {
     fi
 
     # check hugepages
-    test -n "$HUGETLBFSPATH" -a "$VM_TYPE" = kvm && kvm_check_hugetbl
+    test -n "$HUGETLBFSPATH" -a "$VM_TYPE" = kvm && kvm_check_hugetlb
 
     # set kernel
     test -n "$VM_KERNEL" && vm_kernel="$VM_KERNEL"
