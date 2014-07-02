@@ -529,8 +529,8 @@ sub handle_rpms {
   $arch = $res{'ARCH'}->[0];
   my @targets = get_targets($arch, $config);
   if (!@targets) {
-    print "no targets for arch $arch, nothing to do\n";
-    exit(0);
+    print "no targets for arch $arch, skipping $rname\n";
+    next;
   }
   for my $target (@targets) {
 
@@ -966,8 +966,8 @@ sub handle_debs {
     # line and get a list of target_arch-es
     my @targets = get_targets($arch, $config);
     if (!@targets) {
-      print "no targets for arch $arch, nothing to do\n";
-      return; # there may be more debs to handle
+      print "no targets for arch $arch, skipping $d_name\n";
+      next; # there may be more debs to handle
     }
 
     for my $target (@targets) {
