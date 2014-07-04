@@ -1,0 +1,42 @@
+#!/usr/bin/perl -w -I ..
+
+use strict;
+use Test::More tests => 3;
+use Build::LiveBuild;
+
+use Data::Dumper;
+use Digest::MD5 qw(md5_hex);
+
+my $VAR = '
+
+
+a
+
+b
+#comment
+
+! whatever
+';
+
+is(Build::LiveBuild::filter($VAR), 'a
+b
+');
+
+
+my $DEB_ARCHIVE = '
+# comment
+deb obs://openSUSE.org:Debian:7.0/standard wheezy main contrib
+deb-src obs://openSUSE.org:Debian:7.0/standard wheezy main contrib
+
+';
+my $DEB_ARCHIVE_RESULT = "\$VAR1 = 'openSUSE.org:Debian:7.0/standard';
+";
+
+is(Dumper(Build::LiveBuild::parse_archive($DEB_ARCHIVE)), $DEB_ARCHIVE_RESULT);
+
+my $config = {};
+$Data::Dumper::Sortkeys = 1;
+is(md5_hex(Dumper(Build::LiveBuild::parse( $config, 'standard.livebuild'))),
+   '0e68b6473bc8dbf00e0c6f1b53af3efd');
+
+#print Dumper(Build::LiveBuild::parse( $config, 'standard.livebuild'));
