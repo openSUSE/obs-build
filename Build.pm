@@ -11,6 +11,7 @@ our $do_rpm;
 our $do_deb;
 our $do_kiwi;
 our $do_arch;
+our $do_livebuild;
 
 sub import {
   for (@_) {
@@ -18,8 +19,9 @@ sub import {
     $do_deb = 1 if $_ eq ':deb';
     $do_kiwi = 1 if $_ eq ':kiwi';
     $do_arch = 1 if $_ eq ':arch';
+    $do_livebuild = 1 if $_ eq ':livebuild';
   }
-  $do_rpm = $do_deb = $do_kiwi = $do_arch = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch;
+  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_livebuild = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch;
   if ($do_deb) {
     require Build::Deb;
   }
@@ -28,6 +30,9 @@ sub import {
   }
   if ($do_arch) {
     require Build::Arch;
+  }
+  if ($do_livebuild) {
+    require Build::LiveBuild;
   }
 }
 
@@ -918,6 +923,7 @@ sub parse {
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /\.kiwi$/;
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $fn =~ /(^|\/|-)PKGBUILD$/;
   return parse_preinstallimage($cf, $fn, @args) if $fn =~ /(^|\/|-)_preinstallimage$/;
+  return Build::LiveBuild::parse($cf, $fn, @args) if $do_livebuild && $fn =~ /\.livebuild$/;
   return undef;
 }
 

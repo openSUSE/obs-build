@@ -55,6 +55,7 @@ recipe_set_buildtype() {
         *.kiwi) BUILDTYPE=kiwi ;;
         PKGBUILD) BUILDTYPE=arch ;;
         _preinstallimage) BUILDTYPE=preinstallimage ;;
+        *.livebuild) BUILDTYPE=livebuild ;;
     esac
     if test -z "$BUILDTYPE" ; then
        echo "I don't know how to build $RECIPEFILE"
