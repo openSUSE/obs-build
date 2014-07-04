@@ -23,7 +23,7 @@ use strict;
 use Archive::Tar;
 
 sub filter {
-  my ( $content ) = @_;
+  my ($content) = @_;
 
   return '' unless defined $content;
 
@@ -34,19 +34,19 @@ sub filter {
 }
 
 sub parse_package_list {
-  my ( $content ) = @_;
+  my ($content) = @_;
   my @packages = split /\n/, filter($content);
 
   return @packages;
 };
 
 sub parse_archive {
-  my ( $content ) = @_;
-  my @repos = ( );
+  my ($content) = @_;
+  my @repos;
 
   my @lines = split /\n/, filter($content);
   for (@lines) {
-    next if $_ =~ /^deb-src /;
+    next if /^deb-src /;
 
     die("bad path using not obs:/ URL: $_\n") unless $_ =~ /^deb\s+obs:\/\/\/?([^\s\/]+)\/([^\s\/]+)\/?\s+.*$/;
     push @repos, "$1/$2";
@@ -67,7 +67,7 @@ sub parse {
 
   # check that filename is a tar
   my $tar = Archive::Tar->new;
-  $tar->read($filename) || die "Read failed: $filename";
+  $tar->read($filename) || die "Read failed: $filename\n";
 
   # check that directory layout matches live-build directory structure
 
@@ -82,24 +82,24 @@ sub parse {
 
   push @packages, @lb4_requirements;
 
-  for my $file( $tar->list_files('') ) {
+  for my $file ($tar->list_files('')) {
     next unless $file =~ /^config\/package-lists\/.*/;
     push @packages, parse_package_list($tar->get_content($file));
   }
 
   my @repos;
-  for my $file( $tar->list_files('') ) {
+  for my $file ($tar->list_files('')) {
     next unless $file =~ /^config\/archives\/.*\.list.*/;
     push @repos, parse_archive($tar->get_content($file));
   }
 
   my $ret = {};
-  ( $ret->{'name'} = $filename ) =~ s/\.[^.]+$//;
+  ($ret->{'name'} = $filename) =~ s/\.[^.]+$//;
   $ret->{'deps'} = [ unify(@packages) ];
   $ret->{'path'} = [ unify(@repos) ];
   for (@{$ret->{'path'}}) {
     my @s = split('/', $_, 2);
-    $_ = {'project' => $s[0], 'repository' => $s[1]};
+    $_ = { 'project' => $s[0], 'repository' => $s[1] };
   }
 
   return $ret;
