@@ -332,7 +332,7 @@ sub read_config {
   }
   if (!$config->{'binarytype'}) {
     $config->{'binarytype'} = 'rpm' if $config->{'type'} eq 'spec' || $config->{'type'} eq 'kiwi';
-    $config->{'binarytype'} = 'deb' if $config->{'type'} eq 'dsc';
+    $config->{'binarytype'} = 'deb' if $config->{'type'} eq 'dsc' || $config->{'type'} eq 'livebuild';
     $config->{'binarytype'} = 'arch' if $config->{'type'} eq 'arch';
     $config->{'binarytype'} ||= 'UNDEFINED';
   }
