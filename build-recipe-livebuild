@@ -1,0 +1,123 @@
+#
+# Debian live-build specific functions.
+#
+# Author: Jan Blunck <jblunck@infradead.org>
+#
+# This file is part of build.
+#
+# build is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#
+# build is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with build.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+recipe_setup_livebuild() {
+
+    TOPDIR=/usr/src/packages
+    rm -rf "$BUILD_ROOT$TOPDIR"
+    for i in OTHER SOURCES LIVEBUILD_ROOT ; do
+	mkdir -p "$BUILD_ROOT$TOPDIR/$i"
+    done
+    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+    if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
+	mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+    else
+	if test -z "$LINKSOURCES" ; then
+	    cp -dLR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+	else
+	    cp -lR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+	fi
+	if test "$?" != 0 ; then
+	    echo "source copy failed"
+	    cleanup_and_exit 1
+	fi
+    fi
+}
+
+recipe_prepare_livebuild() {
+    :
+}
+
+# This script expects that the $BUILD_ROOT is a Debian installation with
+# live-build already installed!
+#
+# Variables:
+# $BUILD_ROOT the Debian chroot
+# $TOPDIR/SOURCES includes the live-build config tarball
+# $TOPDIR/LIVEBUILD_ROOT where live-build will be called
+# $RECIPEFILE the name of the live-build config tarball
+
+recipe_build_livebuild() {
+
+    echo "Creating repository metadata"
+    cat > $BUILD_ROOT/.build.run_livebuild.tmp.sh <<EOF
+cd $TOPDIR/SOURCES/repos || exit 1
+apt-ftparchive packages . > Packages
+gzip -c9 Packages > Packages.gz
+apt-ftparchive sources . > Sources
+gzip -c9 Sources > Sources.gz
+apt-ftparchive release . > Release
+EOF
+    chroot $BUILD_ROOT su -c "sh /.build.run_livebuild.tmp.sh" - root
+    local RESULT=$?
+    rm -f $BUILD_ROOT/.build.run_livebuild.tmp.sh
+    [ "${RESULT}" != 0 ] && cleanup_and_exit 1
+
+    # Expand live-build configuration to $TOPDIR/LIVEBUILD_ROOT
+    echo "Expanding live-build configuration"
+    tar -xvf $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE \
+	-C $BUILD_ROOT/$TOPDIR/LIVEBUILD_ROOT || cleanup_and_exit 1
+
+    if [ -f $BUILD_ROOT/$TOPDIR/SOURCES/livebuild_pre_run ] ; then
+	cp $BUILD_ROOT/$TOPDIR/SOURCES/livebuild_pre_run \
+	    $BUILD_ROOT/.build.livebuild_pre_run
+	chmod +x $BUILD_ROOT/.build.livebuild_pre_run
+	echo "Running package livebuild_pre_run hook"
+	chroot $BUILD_ROOT su -c "/.build.livebuild_pre_run" - root \
+	    < /dev/null || cleanup_and_exit 1
+    elif [ -x $BUILD_ROOT/usr/lib/build/livebuild_pre_run ] ; then
+	echo "Running OBS build livebuild_pre_run hook"
+	chroot $BUILD_ROOT su -c "/usr/lib/build/livebuild_pre_run" - root \
+	    < /dev/null || cleanup_and_exit 1
+    fi
+
+    chroot $BUILD_ROOT su -c "cd $TOPDIR/LIVEBUILD_ROOT && lb build" - root \
+	< /dev/null || cleanup_and_exit 1
+
+    # Move created product to destination
+    for i in $BUILD_ROOT/$TOPDIR/LIVEBUILD_ROOT/* ; do
+	test -f "$i" || continue
+	case "${i##*/}" in
+	    *.iso)
+		# all created files share the same name without suffix
+		mv ${i%%.iso}.* $BUILD_ROOT/$TOPDIR/OTHER/.
+		BUILD_SUCCEEDED=true
+		;;
+	    *)
+		;;
+	esac
+    done
+
+    # Fail the build if no ISO was created
+    if [ -z "$(ls $BUILD_ROOT/$TOPDIR/OTHER/*.iso)" ] ; then
+	echo "No ISO image found"
+	cleanup_and_exit 1
+    fi
+}
+
+recipe_resultdirs_livebuild() {
+    # our results are already in OTHERS
+    echo ""
+}
+
+# Local Variables:
+# mode: Shell-script
+# End:

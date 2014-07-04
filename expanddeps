@@ -62,8 +62,8 @@ while (@ARGV)  {
 $archs = '' unless defined $archs;
 die("you must specfiy a depfile!\n") unless defined $rpmdeps;
 
-my @extradeps = grep {!/(^|\/)(?:PKGBUILD|_preinstallimage)$/ && !/\.(?:spec|dsc|kiwi)$/} @ARGV;
-my @recipes = grep {/(^|\/)(?:PKGBUILD|_preinstallimage)$/ || /\.(?:spec|dsc|kiwi)$/} @ARGV;
+my @extradeps = grep {!/(^|\/)(?:PKGBUILD|_preinstallimage)$/ && !/\.(?:spec|dsc|kiwi|livebuild)$/} @ARGV;
+my @recipes = grep {/(^|\/)(?:PKGBUILD|_preinstallimage)$/ || /\.(?:spec|dsc|kiwi|livebuild)$/} @ARGV;
 die("can only work with at most one recipe file\n") if @recipes > 1;
 my $recipe = $recipes[0];
 
@@ -260,6 +260,12 @@ if ($recipe) {
     }
     push @kdeps, grep {/^kiwi-.*:/} @{$d->{'deps'} || []};
     $d = { 'deps' => \@kdeps, 'subpacks' => [] };
+  } elsif ($recipe =~ /\.livebuild$/) {
+    # just set up live-build root for now
+    $d = {
+      'deps' => [ 'live-build' ],
+      'subpacks' => [],
+    };
   } else {
     $d = Build::parse($cf, $recipe);
   }
