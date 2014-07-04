@@ -6,7 +6,7 @@
 
 KIWI_PARAMETERS=
 
-for i in spec dsc kiwi arch preinstallimage mock ; do
+for i in spec dsc kiwi arch preinstallimage mock livebuild; do
     . "$BUILD_DIR/build-recipe-$i"
 done
 

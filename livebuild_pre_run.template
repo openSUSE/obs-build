@@ -1,0 +1,49 @@
+#!/bin/bash
+#
+# This is a template for a livebuild_pre_run script. These scripts are
+# executed by build_livebuild.sh in the chroot environment.
+#
+
+fix_debootstrap()
+{
+    # debootstrap in Debian 7.0 does not like dash
+
+    if [ -x /usr/sbin/debootstrap ] ; then
+	sed -i 's|^#!/bin/sh|#!/bin/bash|' /usr/sbin/debootstrap
+    fi
+}
+
+fix_lb_bootstrap_archive-keys()
+{
+    if [ -e /usr/lib/live/build/bootstrap_archive-keys ] ; then
+	sed -i '/apt-get update/{ s/^/#/ }' \
+	    /usr/lib/live/build/bootstrap_archive-keys
+    fi
+}
+
+#
+# main
+#
+
+: ${TOPDIR:=/usr/src/packages}
+
+# Distribution and live-build specific hooks
+fix_debootstrap
+fix_lb_bootstrap_archive-keys
+
+# Expand configuration based on defaults
+cd $TOPDIR/LIVEBUILD_ROOT && lb config || exit 1
+
+# Replace all occurances of LB_MIRROR with local repository
+sed -i "s|^\(LB_MIRROR_[^=]\+=\).*|\1\"file:$TOPDIR/SOURCES/repos/\"|" \
+    $TOPDIR/LIVEBUILD_ROOT/config/bootstrap
+sed -i "s|^\(LB_PARENT_MIRROR_[^=]\+=\).*|\1\"file:$TOPDIR/SOURCES/repos/\"|" \
+    $TOPDIR/LIVEBUILD_ROOT/config/bootstrap
+
+# Prevent debootstrap from cleaning our cache
+sed -i 's|^\(LB_CACHE_PACKAGES=\).*|\1"false"|' \
+    $TOPDIR/LIVEBUILD_ROOT/config/common
+
+# Disable GPG checking
+sed -i 's|^\(LB_APT_SECURE=\).*|\1"false"|' \
+    $TOPDIR/LIVEBUILD_ROOT/config/common
