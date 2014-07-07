@@ -76,6 +76,10 @@ EOF
     tar -xvf $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE \
 	-C $BUILD_ROOT/$TOPDIR/LIVEBUILD_ROOT || cleanup_and_exit 1
 
+    # Sanity check to not configure archives inside configuration
+    local files=($BUILD_ROOT/$TOPDIR/LIVEBUILD_ROOT/config/archives/*)
+    [ ${#files[@]} -gt 0 ] && cleanup_and_exit 1
+
     if [ -f $BUILD_ROOT/$TOPDIR/SOURCES/livebuild_pre_run ] ; then
 	cp $BUILD_ROOT/$TOPDIR/SOURCES/livebuild_pre_run \
 	    $BUILD_ROOT/.build.livebuild_pre_run
