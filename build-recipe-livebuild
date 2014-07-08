@@ -168,6 +168,12 @@ EOF
     # TODO: Add the repository public key
     # cp ... $BUILD_ROOT/$TOPDIR/LIVEBUILD_ROOT/config/archives/debian.key
 
+    if [ -x $BUILD_ROOT/usr/lib/build/livebuild_pre_run ] ; then
+	echo "Running OBS build livebuild_pre_run hook"
+	chroot $BUILD_ROOT su -c "/usr/lib/build/livebuild_pre_run" - root \
+	    < /dev/null || cleanup_and_exit 1
+    fi
+
     # TODO: this might move to lb auto/config file
     if [ -f $BUILD_ROOT/$TOPDIR/SOURCES/livebuild_pre_run ] ; then
 	cp $BUILD_ROOT/$TOPDIR/SOURCES/livebuild_pre_run \
@@ -175,10 +181,6 @@ EOF
 	chmod +x $BUILD_ROOT/.build.livebuild_pre_run
 	echo "Running package livebuild_pre_run hook"
 	chroot $BUILD_ROOT su -c "/.build.livebuild_pre_run" - root \
-	    < /dev/null || cleanup_and_exit 1
-    elif [ -x $BUILD_ROOT/usr/lib/build/livebuild_pre_run ] ; then
-	echo "Running OBS build livebuild_pre_run hook"
-	chroot $BUILD_ROOT su -c "/usr/lib/build/livebuild_pre_run" - root \
 	    < /dev/null || cleanup_and_exit 1
     fi
 
