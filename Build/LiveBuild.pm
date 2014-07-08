@@ -20,7 +20,9 @@
 package Build::LiveBuild;
 
 use strict;
-use Archive::Tar;
+
+eval { require Archive::Tar; };
+*Archive::Tar::new = sub {die("Archive::Tar is not available\n")} unless defined &Archive::Tar::new;
 
 sub filter {
   my ($content) = @_;
