@@ -134,6 +134,28 @@ recipe_build_livebuild() {
         createrepo_debian $BUILD_ROOT/.build.binaries ${ARCH} ${DIST}
     fi
 
+    # Write our default configuration variables
+    mkdir -p $BUILD_ROOT/etc/live
+    cat > $BUILD_ROOT/etc/live/build.conf <<EOF
+LB_DEBIAN_INSTALLER_DISTRIBUTION="${DIST}"
+LB_DISTRIBUTION="${DIST}"
+LB_PARENT_DISTRIBUTION="${DIST}"
+LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION="${DIST}"
+LB_PARENT_MIRROR_BOOTSTRAP="file:/.build.binaries/"
+LB_PARENT_MIRROR_CHROOT="file:/.build.binaries/"
+LB_PARENT_MIRROR_CHROOT_SECURITY="file:/.build.binaries/"
+LB_PARENT_MIRROR_BINARY="file:/.build.binaries/"
+LB_PARENT_MIRROR_BINARY_SECURITY="file:/.build.binaries/"
+LB_PARENT_MIRROR_DEBIAN_INSTALLER="file:/.build.binaries/"
+LB_MIRROR_BOOTSTRAP="file:/.build.binaries/"
+LB_MIRROR_CHROOT="file:/.build.binaries/"
+LB_MIRROR_CHROOT_SECURITY="file:/.build.binaries/"
+LB_MIRROR_BINARY="file:/.build.binaries/"
+LB_MIRROR_BINARY_SECURITY="file:/.build.binaries/"
+LB_MIRROR_DEBIAN_INSTALLER="file:/.build.binaries/"
+LB_APT_SECURE="false"
+EOF
+
     # Expand live-build configuration to $TOPDIR/LIVEBUILD_ROOT
     echo "Expanding live-build configuration"
     tar -xvf $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE \
