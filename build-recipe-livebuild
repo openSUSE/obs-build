@@ -46,6 +46,73 @@ recipe_prepare_livebuild() {
     :
 }
 
+createrepo_debian()
+{
+    local DIR=${1}
+    local ARCH=${2}
+    local DIST=${3}
+
+    if [ -z "${DIR}" -o ! -d ${DIR} -o ${DIR} = ${DIR##${BUILD_ROOT}} ] ; then
+        return
+    fi
+
+    pushd ${DIR} >/dev/null
+
+    # cleanup existing repository files
+    rm -f Packages Packages.gz Release
+    rm -fr dists
+
+    mkdir -p dists/${DIST}
+    # Suite is symlinked to Codename
+    ln -s ${DIST} dists/stable
+
+    # create Packages and Sources files
+    mkdir -p dists/${DIST}/main/binary-${ARCH}
+    mkdir -p dists/${DIST}/main/source
+    cat > ${BUILD_ROOT}/.createrepo_debian.tmp.sh <<EOF
+cd /.build.binaries || exit 1
+dpkg-scanpackages -m . > dists/${DIST}/main/binary-${ARCH}/Packages
+gzip -c9 < dists/${DIST}/main/binary-${ARCH}/Packages \
+    > dists/${DIST}/main/binary-${ARCH}/Packages.gz
+dpkg-scansources . > dists/${DIST}/main/source/Sources
+gzip -c9 dists/${DIST}/main/source/Sources \
+    > dists/${DIST}/main/source/Sources.gz
+EOF
+    chroot $BUILD_ROOT su -c "sh /.createrepo_debian.tmp.sh" - root
+    local RESULT=$?
+    rm -f $BUILD_ROOT/.createrepo_debian.tmp.sh
+    [ "${RESULT}" != 0 ] && return
+
+    # create Release file
+    pushd dists/${DIST} >/dev/null
+    cat > Release <<EOF
+Origin: Debian
+Label: Debian
+Suite: stable
+Version: 7.1
+Codename: ${DIST}
+Date: Sat, 15 Jun 2013 10:55:26 UTC
+Description: Debian repository created by build-recipe-livebuild
+Components: main
+EOF
+    echo "SHA256:" >> Release
+    for file in main/binary-${ARCH}/Packages* ; do
+        local SUM=( $(sha256sum ${file}) )
+        local SIZE=$(stat -c '%s' ${file})
+        echo " ${SUM} ${SIZE} ${file}" >> Release
+    done
+    for file in main/source/Sources* ; do
+        local SUM=( $(sha256sum ${file}) )
+        local SIZE=$(stat -c '%s' ${file})
+        echo " ${SUM} ${SIZE} ${file}" >> Release
+    done
+    popd >/dev/null
+
+    # TODO: this is missing the signature with the private key
+
+    popd >/dev/null
+}
+
 # This script expects that the $BUILD_ROOT is a Debian installation with
 # live-build already installed!
 #
@@ -56,20 +123,16 @@ recipe_prepare_livebuild() {
 # $RECIPEFILE the name of the live-build config tarball
 
 recipe_build_livebuild() {
+    local ARCH=$(chroot $BUILD_ROOT su -c "dpkg-architecture -qDEB_BUILD_ARCH")
+    local DIST=$(chroot $BUILD_ROOT su -c "lsb_release --codename" | awk '{ print $2 }')
 
-    echo "Creating repository metadata"
-    cat > $BUILD_ROOT/.build.run_livebuild.tmp.sh <<EOF
-cd $TOPDIR/SOURCES/repos || exit 1
-apt-ftparchive packages . > Packages
-gzip -c9 Packages > Packages.gz
-apt-ftparchive sources . > Sources
-gzip -c9 Sources > Sources.gz
-apt-ftparchive release . > Release
-EOF
-    chroot $BUILD_ROOT su -c "sh /.build.run_livebuild.tmp.sh" - root
-    local RESULT=$?
-    rm -f $BUILD_ROOT/.build.run_livebuild.tmp.sh
-    [ "${RESULT}" != 0 ] && cleanup_and_exit 1
+    [ -z "${ARCH}" -o -z "${DIST}" ] && cleanup_and_exit 1
+
+    test -d $BUILD_ROOT/.build.binaries || cleanup_and_exit 1
+    if test "$DO_INIT" = true -o ! -d "$BUILD_ROOT/.build.binaries/dists" ; then
+	echo "creating repository metadata..."
+        createrepo_debian $BUILD_ROOT/.build.binaries ${ARCH} ${DIST}
+    fi
 
     # Expand live-build configuration to $TOPDIR/LIVEBUILD_ROOT
     echo "Expanding live-build configuration"
@@ -80,6 +143,10 @@ EOF
     local files=($BUILD_ROOT/$TOPDIR/LIVEBUILD_ROOT/config/archives/*)
     [ ${#files[@]} -gt 0 ] && cleanup_and_exit 1
 
+    # TODO: Add the repository public key
+    # cp ... $BUILD_ROOT/$TOPDIR/LIVEBUILD_ROOT/config/archives/debian.key
+
+    # TODO: this might move to lb auto/config file
     if [ -f $BUILD_ROOT/$TOPDIR/SOURCES/livebuild_pre_run ] ; then
 	cp $BUILD_ROOT/$TOPDIR/SOURCES/livebuild_pre_run \
 	    $BUILD_ROOT/.build.livebuild_pre_run
