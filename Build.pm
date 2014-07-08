@@ -413,25 +413,36 @@ sub do_subst_vers {
 sub get_build {
   my ($config, $subpacks, @deps) = @_;
   my @ndeps = grep {/^-/} @deps;
+  my %ndeps = map {$_ => 1} @ndeps;
+  my @directdepsend;
+  if ($ndeps{'--directdepsend--'}) {
+    @directdepsend = @deps;
+    for (splice @deps) {
+      last if $_ eq '--directdepsend--';
+      push @deps, $_;
+    }
+    @directdepsend = grep {!/^-/} splice(@directdepsend, @deps + 1);
+  }
   my @extra = (@{$config->{'required'}}, @{$config->{'support'}});
   if (@{$config->{'keep'} || []}) {
     my %keep = map {$_ => 1} (@deps, @{$config->{'keep'} || []}, @{$config->{'preinstall'}});
     for (@{$subpacks || []}) {
-      push @ndeps, "-$_" unless $keep{$_};
+      next if $keep{$_};
+      push @ndeps, "-$_";
+      $ndeps{"-$_"} = 1;
     }
   } else {
     # new "empty keep" mode, filter subpacks from required/support
     my %subpacks = map {$_ => 1} @{$subpacks || []};
     @extra = grep {!$subpacks{$_}} @extra;
   }
-  my %ndeps = map {$_ => 1} @ndeps;
   @deps = grep {!$ndeps{$_}} @deps;
   push @deps, @{$config->{'preinstall'}};
   push @deps, @extra;
   @deps = grep {!$ndeps{"-$_"}} @deps;
   @deps = do_subst($config, @deps);
   @deps = grep {!$ndeps{"-$_"}} @deps;
-  @deps = expand($config, @deps, @ndeps);
+  @deps = expand($config, @deps, @ndeps, @directdepsend);
   return @deps;
 }
 
@@ -673,13 +684,23 @@ sub expand {
   my $requires = $config->{'requiresh'};
 
   my %xignore = map {substr($_, 1) => 1} grep {/^-/} @p;
+  my @directdepsend;
+  if ($xignore{'-directdepsend--'}) {
+    delete $xignore{'-directdepsend--'};
+    my @directdepsend = @p;
+    for my $p (splice @p) {
+      last if $p eq '--directdepsend--';
+      push @p, $p;
+    }
+    @directdepsend = grep {!/^-/} splice(@directdepsend, @p + 1);
+  }
   @p = grep {!/^-/} @p;
 
   my %p;		# expanded packages
   my %aconflicts;	# packages we are conflicting with
 
   # add direct dependency packages. this is different from below,
-  # because we add packages even if to dep is already provided and
+  # because we add packages even if the dep is already provided and
   # we break ambiguities if the name is an exact match.
   for my $p (splice @p) {
     my @q = @{$whatprovides->{$p} || addproviders($config, $p)};
@@ -697,6 +718,7 @@ sub expand {
     $p{$q[0]} = 1;
     $aconflicts{$_} = 1 for @{$conflicts->{$q[0]} || []};
   }
+  push @p, @directdepsend;
 
   my @pamb = ();
   my $doamb = 0;
