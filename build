@@ -603,6 +603,37 @@ mkdir_build_root() {
     fi
 }
 
+copy_overlay() {
+    if test -d "$OVERLAY"; then
+	pushd $OVERLAY
+	echo "Copying overlay to BUILD_ROOT"
+	tar -cpf - . | (cd $BUILD_ROOT ; tar -xvf -)
+	popd
+    else
+	echo "OVERLAY ($OVERLAY) is no directory - skipping"
+    fi
+}
+
+run_rsync() {
+    if test -n "$RSYNCDEST" ; then
+	if test -d "$RSYNCSRC" ; then
+	    if ! test -d "$BUILD_ROOT/$RSYNCDEST" ; then
+		echo "ATTENTION! Creating missing target directory ($BUILD_ROOT/$RSYNCDEST)."
+		mkdir -p $BUILD_ROOT/$RSYNCDEST
+	    fi
+	    echo "Running rsync ..."
+	    rsync -av $RSYNCSRC/* $BUILD_ROOT/$RSYNCDEST/
+	    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/$RSYNCDEST"
+	    RSYNCDONE=true
+	    echo "... done"
+	else
+	    echo "RSYNCSRC is not a directory - skipping"
+	fi
+    else
+	echo "RSYNCSRC given, but not RSYNCDEST - skipping"
+    fi
+}
+
 #### main ####
 
 trap fail_exit EXIT
@@ -992,8 +1023,8 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     #
     cd "$SRCDIR"
     if ! test -s "$RECIPEFILE" ; then
-       echo "$RECIPEFILE is empty.  This should not happen..."
-       cleanup_and_exit 1
+	 echo "$RECIPEFILE is empty.  This should not happen..."
+	 cleanup_and_exit 1
     fi
     MYSRCDIR="$SRCDIR"
 
@@ -1210,34 +1241,11 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     BUILD_SUCCEEDED=false
 
     if test -n "$OVERLAY" ; then
-	if test -d "$OVERLAY"; then
-	    pushd $OVERLAY
-	    echo "Copying overlay to BUILD_ROOT"
-	    tar -cpf - . | (cd $BUILD_ROOT ; tar -xvf -)
-	    popd
-	else
-	    echo "OVERLAY ($OVERLAY) is no directory - skipping"
-	fi
+	copy_overlay
     fi
 
     if test -n "$RSYNCSRC" ; then
-	if test -n "$RSYNCDEST" ; then
-	    if test -d "$RSYNCSRC" ; then
-		if ! test -d "$BUILD_ROOT/$RSYNCDEST" ; then
-		    echo "ATTENTION! Creating missing target directory ($BUILD_ROOT/$RSYNCDEST)."
-		    mkdir -p $BUILD_ROOT/$RSYNCDEST
-		fi
-		echo "Running rsync ..."
-		rsync -av $RSYNCSRC/* $BUILD_ROOT/$RSYNCDEST/
-		chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/$RSYNCDEST"
-		RSYNCDONE=true
-		echo "... done"
-	    else
-		echo "RSYNCSRC is not a directory - skipping"
-	    fi
-	else
-	    echo "RSYNCSRC given, but not RSYNCDEST - skipping"
-	fi
+	run_rsync
     fi
 
     start_time=`date +%s`
