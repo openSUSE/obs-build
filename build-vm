@@ -451,9 +451,8 @@ vm_detect_2nd_stage() {
 	    mknod "$VM_SWAP" b 3 2
 	    umask 022
 	fi
-	# Usually the external system is writing the swap signature, but EC2 volume
-	# attach is very slow, so let's do it in the VM for now.
-	test "$VM_TYPE" = ec2 && mkswap "$VM_SWAP"
+	# Do not rely on external system writing the signature, it might differ...
+	mkswap "$VM_SWAP"
 	swapon -v "$VM_SWAP" || exit 1
     fi
     HOST="$MYHOSTNAME"
@@ -563,9 +562,8 @@ vm_setup() {
     if test -n "$VM_SWAP" ; then
 	vm_attach_swap
 	dd if=/dev/zero of="$VM_SWAP" bs=1024 count=1 conv=notrunc 2>/dev/null
-	echo "mkswap $VM_SWAP"
-	mkswap "$VM_SWAP"
 	vm_detach_swap
+        # mkswap happens inside of the vm
     fi
 }
 
