@@ -37,6 +37,6 @@ is(Dumper(Build::LiveBuild::parse_archive($DEB_ARCHIVE)), $DEB_ARCHIVE_RESULT);
 my $config = {};
 $Data::Dumper::Sortkeys = 1;
 is(md5_hex(Dumper(Build::LiveBuild::parse( $config, 'standard.livebuild'))),
-   '0e68b6473bc8dbf00e0c6f1b53af3efd');
+   'b0427b05beccb16fccf7e9d0851f452b');
 
 #print Dumper(Build::LiveBuild::parse( $config, 'standard.livebuild'));

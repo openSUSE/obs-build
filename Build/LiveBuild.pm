@@ -83,7 +83,7 @@ sub parse {
   push @packages, @lb4_requirements;
 
   for my $file ($tar->list_files('')) {
-    next unless $file =~ /^config\/package-lists\/.*/;
+    next unless $file =~ /^config\/package-lists\/.*\.list.*/;
     push @packages, parse_package_list($tar->get_content($file));
   }
 
