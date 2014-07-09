@@ -601,8 +601,6 @@ vm_first_stage() {
 	mkdir "$BUILD_ROOT/.build-srcdir"
 	if test "$BUILDTYPE" = kiwi ; then
 	    cp -pRL "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
-        elif test "$BUILDTYPE" = livebuild ; then
-            cp -pRL "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
 	else
 	    cp -p "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
 	fi
