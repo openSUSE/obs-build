@@ -37,13 +37,11 @@ is(Dumper(Build::LiveBuild::parse_archive($DEB_ARCHIVE)), $DEB_ARCHIVE_RESULT);
 my $config = {};
 $Data::Dumper::Sortkeys = 1;
 is(md5_hex(Dumper(Build::LiveBuild::parse( $config, 'standard.livebuild'))),
-   'dc387355614be68eaee570929ec5b14b');
+   '9cfb69e8f0581293f207342edacd19e7');
 
 #print Dumper(Build::LiveBuild::parse( $config, 'standard.livebuild'));
 
-$config->{'substitute'}->{'build-packages:livebuild'} = [ 'test-test' ];
-$Data::Dumper::Sortkeys = 1;
-is(md5_hex(Dumper(Build::LiveBuild::parse( $config, 'standard.livebuild'))),
-   'bec5a5bb552eaef5ef8f4caa55f0a4cc');
+is(md5_hex(Dumper(Build::LiveBuild::parse( $config, 'bad.livebuild'))),
+   '1e596160978007d1014e9c5e38574700');
 
-#print Dumper(Build::LiveBuild::parse( $config, 'standard.livebuild'));
+#print Dumper(Build::LiveBuild::parse( $config, 'bad.livebuild'));
