@@ -36,5 +36,5 @@ recipe_resultdirs_arch() {
 }
 
 _arch_recipe_makepkg() {
-    chroot $BUILD_ROOT su -lc "cd $TOPDIR/SOURCES && makepkg --config ../makepkg.conf $*" $BUILD_USER
+    chroot $BUILD_ROOT su -lc "source /etc/profile; cd $TOPDIR/SOURCES && makepkg --config ../makepkg.conf $*" $BUILD_USER
 }
