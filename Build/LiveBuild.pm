@@ -73,19 +73,24 @@ sub parse {
 
   # check that directory layout matches live-build directory structure
 
-  # TODO: add dependency injection package based on $LB_DISTRIBUTION
-  my @packages = ( 'live-build-desc-wheezy' );
-
+  # defaults live-build package dependencies base on 4.0~a26 gathered with:
+  # $ grep Check_package -r /usr/lib/live/build
   my @lb4_requirements = (
-    'live-boot', 'live-config', 'e2fsprogs', 'squashfs-tools', 'mtd-tools',
-    'dosfstools', 'parted', 'grub', 'syslinux', 'syslinux-common',
-    'librsvg2-bin', 'xorriso', 'zsync', 'apt-utils', 'dctrl-tools',
-    'debconf', 'wget' );
+    'apt-utils', 'dctrl-tools', 'debconf', 'dosfstools', 'e2fsprogs', 'grub',
+    'librsvg2-bin', 'live-boot', 'live-config', 'mtd-tools', 'parted',
+    'squashfs-tools', 'syslinux', 'syslinux-common', 'wget', 'xorriso',
+    'zsync' );
 
-  push @packages, @lb4_requirements;
+  # dependency injection based on live-build version
+  my @packages = @{$config->{'substitute'}->{'build-packages:livebuild'} || []};
+  push @packages, @lb4_requirements unless @packages;
+
+  # always require the list of packages required by live-boot for
+  # bootstrapping the target distribution image (e.g. with debootstrap)
+  push @packages, ( 'live-build-desc' );
 
   for my $file ($tar->list_files('')) {
-    next unless $file =~ /^config\/package-lists\/.*/;
+    next unless $file =~ /^config\/package-lists\/.*\.list.*/;
     push @packages, parse_package_list($tar->get_content($file));
   }
 
