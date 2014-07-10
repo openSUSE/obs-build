@@ -64,39 +64,35 @@ sub unify {
 
 sub parse {
   my ($config, $filename, @args) = @_;
-
-  # TODO: check that filename exists
+  my $ret = {};
 
   # check that filename is a tar
   my $tar = Archive::Tar->new;
-  $tar->read($filename) || die "Read failed: $filename\n";
+  unless($tar->read($filename)) {
+    warn("$filename: " . $tar->error . "\n");
+    $ret->{'error'} = "$filename: " . $tar->error;
+    return $ret;
+  }
 
   # check that directory layout matches live-build directory structure
+  for my $file ($tar->list_files('')) {
+    next unless $file =~ /^config\/archives\/.*\.list.*/;
+    warn("$filename: config/archives/*.list* files not allowed!\n");
+    $ret->{'error'} = "$filename: config/archives/*.list* files not allowed!";
+    return $ret;
+  }
 
   # always require the list of packages required by live-boot for
   # bootstrapping the target distribution image (e.g. with debootstrap)
-  push @packages, ( 'live-build-desc' );
+  my @packages = ( 'live-build-desc' );
 
   for my $file ($tar->list_files('')) {
     next unless $file =~ /^config\/package-lists\/.*\.list.*/;
     push @packages, parse_package_list($tar->get_content($file));
   }
 
-  my @repos;
-  for my $file ($tar->list_files('')) {
-    next unless $file =~ /^config\/archives\/.*\.list.*/;
-    push @repos, parse_archive($tar->get_content($file));
-  }
-
-  my $ret = {};
   ($ret->{'name'} = $filename) =~ s/\.[^.]+$//;
   $ret->{'deps'} = [ unify(@packages) ];
-  $ret->{'path'} = [ unify(@repos) ];
-  for (@{$ret->{'path'}}) {
-    my @s = split('/', $_, 2);
-    $_ = { 'project' => $s[0], 'repository' => $s[1] };
-  }
-
   return $ret;
 }
 
