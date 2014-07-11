@@ -348,10 +348,20 @@ reexpand:
 	  }
 	  $macalt = $macros{$macname} unless defined $macalt;
 	  $macalt = '' if $mactest == -1;
-	  $line = "$macalt$line";
+	  if ($macalt =~ /%/) {
+	    push @expandstack, ('', $line, 1) if $line ne '';
+	    $line = $macalt;
+	  } else {
+	    $expandedline .= $macalt;
+	  }
 	} elsif ($mactest) {
 	  $macalt = '' if !defined($macalt) || $mactest == 1;
-	  $line = "$macalt$line";
+	  if ($macalt =~ /%/) {
+	    push @expandstack, ('', $line, 1) if $line ne '';
+	    $line = $macalt;
+	  } else {
+	    $expandedline .= $macalt;
+	  }
 	} else {
 	  $expandedline .= "%$macorig" unless $macname =~ /^-/;
 	}
@@ -360,12 +370,15 @@ reexpand:
       if (@expandstack) {
 	my $m = pop(@expandstack);
 	if ($m) {
-	  $optmacros = adaptmacros(\%macros, $optmacros, $m);
+	  $optmacros = adaptmacros(\%macros, $optmacros, $m) if ref $m;
 	  $expandstack[-2] .= $line;
-	  $line = '';
+	  $line = pop(@expandstack);
+	  $expandedline = pop(@expandstack);
+	} else {
+	  my $todo = pop(@expandstack);
+	  $expandedline = pop(@expandstack);
+	  push @expandstack, ('', $todo, 1) if $todo ne '';
 	}
-	$line = $line . pop(@expandstack);
-	$expandedline = pop(@expandstack);
 	goto reexpand;
       }
     }
