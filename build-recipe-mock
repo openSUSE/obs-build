@@ -1,3 +1,8 @@
+#
+# mock specific functions.
+#
+# (C) 2014 SUSE, Inc
+#
 
 recipe_setup_mock() {
     recipe_setup_spec "$@"

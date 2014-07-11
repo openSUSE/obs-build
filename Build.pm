@@ -409,9 +409,28 @@ sub do_subst_vers {
   return @res;
 }
 
+sub add_livebuild_packages {
+  my ($config, @deps) = @_;
+
+  if ($config->{'substitute'}->{'build-packages:livebuild'}) {
+    push @deps, @{$config->{'substitute'}->{'build-packages:livebuild'}};
+  } else {
+    # defaults live-build package dependencies base on 4.0~a26 gathered with:
+    # grep Check_package -r /usr/lib/live/build
+    push @deps, (
+      'apt-utils', 'dctrl-tools', 'debconf', 'dosfstools', 'e2fsprogs', 'grub',
+      'librsvg2-bin', 'live-boot', 'live-config', 'mtd-tools', 'parted',
+      'squashfs-tools', 'syslinux', 'syslinux-common', 'wget', 'xorriso',
+      'zsync' );
+  }
+  return @deps;
+}
+
 # Delivers all packages which get used for building
 sub get_build {
   my ($config, $subpacks, @deps) = @_;
+
+  @deps = add_livebuild_packages($config, @deps) if $config->{'type'} eq 'livebuild';
   my @ndeps = grep {/^-/} @deps;
   my %ndeps = map {$_ => 1} @ndeps;
   my @directdepsend;
@@ -444,6 +463,30 @@ sub get_build {
   @deps = grep {!$ndeps{"-$_"}} @deps;
   @deps = expand($config, @deps, @ndeps, @directdepsend);
   return @deps;
+}
+
+# return the package needed for setting up the build environment.
+# an empty result means that the packages from get_build should
+# be used instead.
+sub get_sysbuild {
+  my ($config, $packtype) = @_;
+  my $engine = $config->{'buildengine'} || '';
+  $packtype ||= $config->{'type'} || '';
+  my @sysdeps;
+  if ($engine eq 'mock' && $packtype ne 'kiwi') {
+    @sysdeps = @{$config->{'substitute'}->{'system-packages:mock'} || []};
+    @sysdeps = ('mock', 'createrepo') unless @sysdeps;
+  } elsif ($packtype eq 'livebuild') {
+    # packages used for build environment setup (build-recipe-livebuild deps)
+    @sysdeps = @{$config->{'substitute'}->{'system-packages:livebuild'} || []};
+    @sysdeps = ('apt-utils', 'cpio', 'dpkg-dev', 'live-build', 'lsb-release', 'tar') unless @sysdeps;
+  }
+  return () unless @sysdeps;
+  @sysdeps = Build::get_build($config, [], @sysdeps);
+  return @sysdeps unless $sysdeps[0];
+  shift @sysdeps;
+  @sysdeps = unify(@sysdeps, get_preinstalls($config));
+  return (1, @sysdeps);
 }
 
 # Delivers all packages which shall have an influence to other package builds (get_build reduced by support packages)

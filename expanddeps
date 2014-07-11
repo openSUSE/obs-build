@@ -291,17 +291,13 @@ if (!shift @bdeps) {
   exit(1);
 }
 
-my $engine = $cf->{'buildengine'} || '';
-if ($engine eq 'mock') {
-  my @sysdeps = @{$cf->{'substitute'}->{'engine-packages:mock'} || []};
-  @sysdeps = ('mock', 'createrepo') unless @sysdeps;   # default
-  @sysdeps = Build::get_build($cf, [], @sysdeps);
+my @sysdeps = Build::get_sysbuild($cf);
+if (@sysdeps) {
   if (!shift @sysdeps) {
     print STDERR "expansion error\n";
-    print STDERR "  $_\n" for @bdeps;
+    print STDERR "  $_\n" for @sysdeps;
     exit(1);
   }
-  @sysdeps = Build::unify(@sysdeps, Build::get_preinstalls($cf));
   my %sysdeps = map {$_ => 1} @sysdeps;
   my %bdeps = map {$_ => 1} @bdeps;
   $installonly = join(' ', grep {!$bdeps{$_}} @sysdeps);
