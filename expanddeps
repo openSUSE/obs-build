@@ -245,10 +245,9 @@ my ($packname, $packvers, $subpacks, @packdeps);
 $subpacks = [];
 
 if ($recipe) {
-  my $d;
+  my $d = Build::parse($cf, $recipe) || {};
   if ($recipe =~ /\.kiwi$/) {
     # lets see if this is a product or image build
-    $d = Build::parse($cf, $recipe) || {};
     my $type = $d->{'imagetype'} && $d->{'imagetype'}->[0] eq 'product' ? 'product' : 'image';
     my @kdeps;
     if ($type eq 'image') {
@@ -260,14 +259,6 @@ if ($recipe) {
     }
     push @kdeps, grep {/^kiwi-.*:/} @{$d->{'deps'} || []};
     $d = { 'deps' => \@kdeps, 'subpacks' => [] };
-  } elsif ($recipe =~ /\.livebuild$/) {
-    # just set up live-build root for now
-    $d = {
-      'deps' => [ 'live-build' ],
-      'subpacks' => [],
-    };
-  } else {
-    $d = Build::parse($cf, $recipe);
   }
   $packname = $d->{'name'};
   $packvers = $d->{'version'};
