@@ -62,11 +62,18 @@ while (@ARGV)  {
 $archs = '' unless defined $archs;
 die("you must specfiy a depfile!\n") unless defined $rpmdeps;
 
-my @extradeps = grep {!/(^|\/)(?:PKGBUILD|_preinstallimage)$/ && !/\.(?:spec|dsc|kiwi|livebuild)$/} @ARGV;
-my @recipes = grep {/(^|\/)(?:PKGBUILD|_preinstallimage)$/ || /\.(?:spec|dsc|kiwi|livebuild)$/} @ARGV;
-die("can only work with at most one recipe file\n") if @recipes > 1;
-my $recipe = $recipes[0];
-
+# split args in recipe and pkgnames
+my $recipe;
+my @extradeps;
+for my $arg (@ARGV) {
+  my $buildtype = Build::recipe2buildtype($arg);
+  if ($buildtype) {
+    die("can only work with at most one recipe file\n") if defined $recipe;
+    $recipe = $arg;
+  } else {
+    push @extradeps, $arg;
+  }
+}
 my @archs = split(':', $archs);
 if ($recipe =~ /(^|\/)PKGBUILD$/) {
   push @archs, 'any' unless grep {$_ eq 'any'} @archs;
@@ -246,7 +253,9 @@ $subpacks = [];
 
 if ($recipe) {
   my $d = Build::parse($cf, $recipe) || {};
-  if ($recipe =~ /\.kiwi$/) {
+  my $buildtype = Build::recipe2buildtype($recipe) || '';
+  $cf->{'type'} = $buildtype if $buildtype;
+  if ($buildtype eq 'kiwi') {
     # lets see if this is a product or image build
     my $type = $d->{'imagetype'} && $d->{'imagetype'}->[0] eq 'product' ? 'product' : 'image';
     my @kdeps;
