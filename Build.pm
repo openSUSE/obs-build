@@ -474,14 +474,14 @@ sub get_build {
 # an empty result means that the packages from get_build should
 # be used instead.
 sub get_sysbuild {
-  my ($config, $packtype) = @_;
+  my ($config, $buildtype) = @_;
   my $engine = $config->{'buildengine'} || '';
-  $packtype ||= $config->{'type'} || '';
+  $buildtype ||= $config->{'type'} || '';
   my @sysdeps;
-  if ($engine eq 'mock' && $packtype ne 'kiwi') {
+  if ($engine eq 'mock' && $buildtype ne 'kiwi') {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:mock'} || []};
     @sysdeps = ('mock', 'createrepo') unless @sysdeps;
-  } elsif ($packtype eq 'livebuild') {
+  } elsif ($buildtype eq 'livebuild') {
     # packages used for build environment setup (build-recipe-livebuild deps)
     @sysdeps = @{$config->{'substitute'}->{'system-packages:livebuild'} || []};
     @sysdeps = ('apt-utils', 'cpio', 'dpkg-dev', 'live-build', 'lsb-release', 'tar') unless @sysdeps;
