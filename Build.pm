@@ -21,7 +21,7 @@ sub import {
     $do_arch = 1 if $_ eq ':arch';
     $do_livebuild = 1 if $_ eq ':livebuild';
   }
-  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_livebuild = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch;
+  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_livebuild = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_livebuild;
   if ($do_deb) {
     require Build::Deb;
   }
