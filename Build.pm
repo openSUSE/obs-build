@@ -461,6 +461,11 @@ sub get_build {
   @deps = grep {!$ndeps{"-$_"}} @deps;
   @deps = do_subst($config, @deps);
   @deps = grep {!$ndeps{"-$_"}} @deps;
+  if (@directdepsend) {
+    @directdepsend = do_subst($config, @directdepsend);
+    @directdepsend = grep {!$ndeps{"-$_"}} @directdepsend;
+    unshift @directdepsend, '--directdepsend--' if @directdepsend;
+  }
   @deps = expand($config, @deps, @ndeps, @directdepsend);
   return @deps;
 }
