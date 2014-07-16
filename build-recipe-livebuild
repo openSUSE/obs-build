@@ -154,8 +154,20 @@ EOF
     tar -xvf $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE \
 	-C $BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT || cleanup_and_exit 1
 
+    # Skip top-level directory if it matches recipe name, ...
+    local files=($BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT/*)
+    # ... but ignore some well known names
+    files=(${files[@]%%*/auto})
+    files=(${files[@]%%*/config})
+    files=(${files[@]%%*/local})
+    if [ ${#files[@]} -eq 1 ] && \
+	[ -d $BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT/${RECIPEFILE%.livebuild} ]
+    then
+	LIVEBUILD_ROOT="LIVEBUILD_ROOT/${RECIPEFILE%.livebuild}"
+    fi
+
     # Sanity check to not configure archives inside configuration
-    local files=($BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT/config/archives/*)
+    files=($BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT/config/archives/*)
     [ ${#files[@]} -gt 0 ] && cleanup_and_exit 1
 
     # TODO: Add the repository public key
