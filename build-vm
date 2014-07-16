@@ -407,7 +407,7 @@ vm_detect_2nd_stage() {
 	cleanup_and_exit $?
     fi
 
-    test -n "$VM_WATCHDOG" && echo "### WATCHDOG MARKER END ###"
+    test -n "$VM_WATCHDOG" -a -z "$PERSONALITY_SET" && echo "### WATCHDOG MARKER END ###"
     echo "2nd stage started in virtual machine"
     BUILD_ROOT=/
     BUILD_DIR=/.build
