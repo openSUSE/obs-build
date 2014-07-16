@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w -I ..
 
 use strict;
-use Test::More tests => 4;
+use Test::More tests => 5;
 use Build::LiveBuild;
 
 use Data::Dumper;
@@ -40,6 +40,11 @@ is(md5_hex(Dumper(Build::LiveBuild::parse( $config, 'standard.livebuild'))),
    '9cfb69e8f0581293f207342edacd19e7');
 
 #print Dumper(Build::LiveBuild::parse( $config, 'standard.livebuild'));
+
+is(md5_hex(Dumper(Build::LiveBuild::parse( $config, 'directory.livebuild'))),
+   'bc803d2b4a375d9a02b3242117f6c93a');
+
+#print Dumper(Build::LiveBuild::parse( $config, 'directory.livebuild'));
 
 is(md5_hex(Dumper(Build::LiveBuild::parse( $config, 'bad.livebuild'))),
    '1e596160978007d1014e9c5e38574700');
