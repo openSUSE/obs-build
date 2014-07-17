@@ -49,7 +49,7 @@ recipe_parse_options() {
 
 recipe_set_buildtype() {
     BUILDTYPE=
-    case $RECIPEFILE in
+    case ${RECIPEFILE##_service:*:} in
         *.spec|*.src.rpm) BUILDTYPE=spec ;;
         *.dsc) BUILDTYPE=dsc ;;
         *.kiwi) BUILDTYPE=kiwi ;;
