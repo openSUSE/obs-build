@@ -1011,6 +1011,18 @@ sub parse {
   return undef;
 }
 
+sub parse_typed {
+  my ($cf, $fn, $buildtype, @args) = @_;
+  $buildtype ||= '';
+  return Build::Rpm::parse($cf, $fn, @args) if $do_rpm && $buildtype eq 'spec';
+  return Build::Deb::parse($cf, $fn, @args) if $do_deb && $buildtype eq 'dsc';
+  return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $buildtype eq 'kiwi';
+  return Build::LiveBuild::parse($cf, $fn, @args) if $do_livebuild && $buildtype eq 'livebuild';
+  return Build::Arch::parse($cf, $fn, @args) if $do_arch && $buildtype eq 'arch';
+  return parse_preinstallimage($cf, $fn, @args) if $buildtype eq 'preinstallimage';
+  return undef;
+}
+
 sub query {
   my ($binname, %opts) = @_;
   my $handle = $binname;
