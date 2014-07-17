@@ -1001,9 +1001,13 @@ sub parse {
   return Build::Deb::parse($cf, $fn, @args) if $do_deb && $fn =~ /\.dsc$/;
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /config\.xml$/;
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /\.kiwi$/;
-  return Build::Arch::parse($cf, $fn, @args) if $do_arch && $fn =~ /(^|\/|-)PKGBUILD$/;
-  return parse_preinstallimage($cf, $fn, @args) if $fn =~ /(^|\/|-)_preinstallimage$/;
   return Build::LiveBuild::parse($cf, $fn, @args) if $do_livebuild && $fn =~ /\.livebuild$/;
+  my $fnx = $fn;
+  $fnx =~ s/.*\///;
+  $fnx =~ s/^[0-9a-f]{32,}-//;	# hack for OBS srcrep implementation
+  $fnx =~ s/^_service:.*://;
+  return Build::Arch::parse($cf, $fn, @args) if $do_arch && $fnx eq 'PKGBUILD';
+  return parse_preinstallimage($cf, $fn, @args) if $fnx eq '_preinstallimage';
   return undef;
 }
 
