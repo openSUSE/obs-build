@@ -76,7 +76,7 @@ sub parse {
 
   # check that directory layout matches live-build directory structure
   for my $file ($tar->list_files('')) {
-    next unless $file =~ /^config\/archives\/.*\.list.*/;
+    next unless $file =~ /^(.*\/)?config\/archives\/.*\.list.*/;
     warn("$filename: config/archives/*.list* files not allowed!\n");
     $ret->{'error'} = "$filename: config/archives/*.list* files not allowed!";
     return $ret;
@@ -87,7 +87,7 @@ sub parse {
   my @packages = ( 'live-build-desc' );
 
   for my $file ($tar->list_files('')) {
-    next unless $file =~ /^config\/package-lists\/.*\.list.*/;
+    next unless $file =~ /^(.*\/)?config\/package-lists\/.*\.list.*/;
     push @packages, parse_package_list($tar->get_content($file));
   }
 

@@ -111,12 +111,13 @@ EOF
 # Variables:
 # $BUILD_ROOT the Debian chroot
 # $TOPDIR/SOURCES includes the live-build config tarball
-# $TOPDIR/LIVEBUILD_ROOT where live-build will be called
+# $TOPDIR/$LIVEBUILD_ROOT where live-build will be called
 # $RECIPEFILE the name of the live-build config tarball
 
 recipe_build_livebuild() {
     local ARCH=$(chroot $BUILD_ROOT su -c "dpkg-architecture -qDEB_BUILD_ARCH")
     local DIST=$(chroot $BUILD_ROOT su -c "lsb_release --codename" | awk '{ print $2 }')
+    local LIVEBUILD_ROOT="LIVEBUILD_ROOT"
 
     [ -z "${ARCH}" -o -z "${DIST}" ] && cleanup_and_exit 1
 
@@ -148,17 +149,29 @@ LB_MIRROR_DEBIAN_INSTALLER="file:/.build.binaries/"
 LB_APT_SECURE="false"
 EOF
 
-    # Expand live-build configuration to $TOPDIR/LIVEBUILD_ROOT
+    # Expand live-build configuration to $TOPDIR/$LIVEBUILD_ROOT
     echo "Expanding live-build configuration"
     tar -xvf $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE \
-	-C $BUILD_ROOT/$TOPDIR/LIVEBUILD_ROOT || cleanup_and_exit 1
+	-C $BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT || cleanup_and_exit 1
+
+    # Skip top-level directory if it matches recipe name, ...
+    local files=($BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT/*)
+    # ... but ignore some well known names
+    files=(${files[@]%%*/auto})
+    files=(${files[@]%%*/config})
+    files=(${files[@]%%*/local})
+    if [ ${#files[@]} -eq 1 ] && \
+	[ -d $BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT/${RECIPEFILE%.livebuild} ]
+    then
+	LIVEBUILD_ROOT="LIVEBUILD_ROOT/${RECIPEFILE%.livebuild}"
+    fi
 
     # Sanity check to not configure archives inside configuration
-    local files=($BUILD_ROOT/$TOPDIR/LIVEBUILD_ROOT/config/archives/*)
+    files=($BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT/config/archives/*)
     [ ${#files[@]} -gt 0 ] && cleanup_and_exit 1
 
     # TODO: Add the repository public key
-    # cp ... $BUILD_ROOT/$TOPDIR/LIVEBUILD_ROOT/config/archives/debian.key
+    # cp ... $BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT/config/archives/debian.key
 
     if [ -x $BUILD_ROOT/usr/lib/build/livebuild_pre_run ] ; then
 	echo "Running OBS build livebuild_pre_run hook"
@@ -176,11 +189,11 @@ EOF
 	    < /dev/null || cleanup_and_exit 1
     fi
 
-    chroot $BUILD_ROOT su -c "cd $TOPDIR/LIVEBUILD_ROOT && lb build" - root \
+    chroot $BUILD_ROOT su -c "cd $TOPDIR/$LIVEBUILD_ROOT && lb build" - root \
 	< /dev/null || cleanup_and_exit 1
 
     # Move created product to destination
-    for i in $BUILD_ROOT/$TOPDIR/LIVEBUILD_ROOT/* ; do
+    for i in $BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT/* ; do
 	test -f "$i" || continue
 	case "${i##*/}" in
 	    *.iso)
