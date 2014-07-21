@@ -645,7 +645,9 @@ vm_first_stage() {
     PERSONALITY=0
     test -n "$PERSONALITY_SYSCALL" && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
     case $(uname -m) in
-	ppc|ppcle|s390) PERSONALITY=8		# ppc/s390 kernel never tells us if a 32bit personality is active, assume we run on 64bit
+	# ppc/aarch64/s390 kernel never tells us if a 32bit personality is
+	# active, assume we run on 64bit
+	ppc|ppcle|s390|aarch64) PERSONALITY=8
     esac
     test "$VM_TYPE" = lxc && PERSONALITY=0
     echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
