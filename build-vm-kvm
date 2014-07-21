@@ -66,7 +66,7 @@ vm_verify_options_kvm() {
 	    test -e /boot/initrd.guest && vm_initrd=/boot/initrd.guest
 	    kvm_device=virtio-blk-device
 	    ;;
-	ppc|ppc64|ppc64le)
+	ppc|ppcle|ppc64|ppc64le)
 	    kvm_bin="/usr/bin/qemu-system-ppc64"
 	    kvm_console=hvc0
 	    kvm_options="-enable-kvm -M pseries"
