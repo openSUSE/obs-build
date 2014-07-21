@@ -420,7 +420,7 @@ vm_detect_2nd_stage() {
     fi
     RUNNING_IN_VM=true
     test -e /proc/version || mount -orw -n -tproc none /proc
-    if test "$VM_TYPE" != lxc; then
+    if test "$VM_TYPE" != lxc ; then
 	mount -n ${VMDISK_MOUNT_OPTIONS},remount,rw /
     fi
     umount /run >/dev/null 2>&1
@@ -643,10 +643,11 @@ vm_first_stage() {
     test -n "$VM_SWAP" && echo "VM_SWAP='${VM_SWAPDEV//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     test -n "$VMDISK_MOUNT_OPTIONS" && echo "VMDISK_MOUNT_OPTIONS='${VMDISK_MOUNT_OPTIONS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     PERSONALITY=0
-    test -n "$PERSONALITY_SYSCALL" -a "$VM_TYPE" != lxc && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
+    test -n "$PERSONALITY_SYSCALL" && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
     case $(uname -m) in
 	ppc|ppcle|s390) PERSONALITY=8		# ppc/s390 kernel never tells us if a 32bit personality is active, assume we run on 64bit
     esac
+    test "$VM_TYPE" = lxc && PERSONALITY=0
     echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
     echo "MYHOSTNAME='`hostname`'" >> $BUILD_ROOT/.build/build.data
     echo -n "definesnstuff=(" >> $BUILD_ROOT/.build/build.data
