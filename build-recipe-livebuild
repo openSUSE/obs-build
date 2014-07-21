@@ -38,8 +38,7 @@ recipe_prepare_livebuild() {
     :
 }
 
-createrepo_debian()
-{
+createrepo_debian() {
     local DIR=${1}
     local ARCH=${2}
     local DIST=${3}
@@ -61,15 +60,15 @@ createrepo_debian()
     # create Packages and Sources files
     mkdir -p dists/${DIST}/main/binary-${ARCH}
     mkdir -p dists/${DIST}/main/source
-    cat > ${BUILD_ROOT}/.createrepo_debian.tmp.sh <<EOF
-cd /.build.binaries || exit 1
-dpkg-scanpackages -m . > dists/${DIST}/main/binary-${ARCH}/Packages
-gzip -c9 < dists/${DIST}/main/binary-${ARCH}/Packages \
-    > dists/${DIST}/main/binary-${ARCH}/Packages.gz
-dpkg-scansources . > dists/${DIST}/main/source/Sources
-gzip -c9 dists/${DIST}/main/source/Sources \
-    > dists/${DIST}/main/source/Sources.gz
-EOF
+    cat > ${BUILD_ROOT}/.createrepo_debian.tmp.sh <<-EOF
+	cd /.build.binaries || exit 1
+	dpkg-scanpackages -m . > dists/${DIST}/main/binary-${ARCH}/Packages
+	gzip -c9 < dists/${DIST}/main/binary-${ARCH}/Packages \
+	    > dists/${DIST}/main/binary-${ARCH}/Packages.gz
+	dpkg-scansources . > dists/${DIST}/main/source/Sources
+	gzip -c9 dists/${DIST}/main/source/Sources \
+	    > dists/${DIST}/main/source/Sources.gz
+	EOF
     chroot $BUILD_ROOT su -c "sh /.createrepo_debian.tmp.sh" - root
     local RESULT=$?
     rm -f $BUILD_ROOT/.createrepo_debian.tmp.sh
@@ -77,16 +76,16 @@ EOF
 
     # create Release file
     pushd dists/${DIST} >/dev/null
-    cat > Release <<EOF
-Origin: Debian
-Label: Debian
-Suite: stable
-Version: 7.1
-Codename: ${DIST}
-Date: Sat, 15 Jun 2013 10:55:26 UTC
-Description: Debian repository created by build-recipe-livebuild
-Components: main
-EOF
+    cat > Release <<-EOF
+	Origin: Debian
+	Label: Debian
+	Suite: stable
+	Version: 7.1
+	Codename: ${DIST}
+	Date: Sat, 15 Jun 2013 10:55:26 UTC
+	Description: Debian repository created by build-recipe-livebuild
+	Components: main
+	EOF
     echo "SHA256:" >> Release
     for file in main/binary-${ARCH}/Packages* ; do
         local SUM=( $(sha256sum ${file}) )
@@ -129,25 +128,25 @@ recipe_build_livebuild() {
 
     # Write our default configuration variables
     mkdir -p $BUILD_ROOT/etc/live
-    cat > $BUILD_ROOT/etc/live/build.conf <<EOF
-LB_DEBIAN_INSTALLER_DISTRIBUTION="${DIST}"
-LB_DISTRIBUTION="${DIST}"
-LB_PARENT_DISTRIBUTION="${DIST}"
-LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION="${DIST}"
-LB_PARENT_MIRROR_BOOTSTRAP="file:/.build.binaries/"
-LB_PARENT_MIRROR_CHROOT="file:/.build.binaries/"
-LB_PARENT_MIRROR_CHROOT_SECURITY="file:/.build.binaries/"
-LB_PARENT_MIRROR_BINARY="file:/.build.binaries/"
-LB_PARENT_MIRROR_BINARY_SECURITY="file:/.build.binaries/"
-LB_PARENT_MIRROR_DEBIAN_INSTALLER="file:/.build.binaries/"
-LB_MIRROR_BOOTSTRAP="file:/.build.binaries/"
-LB_MIRROR_CHROOT="file:/.build.binaries/"
-LB_MIRROR_CHROOT_SECURITY="file:/.build.binaries/"
-LB_MIRROR_BINARY="file:/.build.binaries/"
-LB_MIRROR_BINARY_SECURITY="file:/.build.binaries/"
-LB_MIRROR_DEBIAN_INSTALLER="file:/.build.binaries/"
-LB_APT_SECURE="false"
-EOF
+    cat > $BUILD_ROOT/etc/live/build.conf <<-EOF
+	LB_DEBIAN_INSTALLER_DISTRIBUTION="${DIST}"
+	LB_DISTRIBUTION="${DIST}"
+	LB_PARENT_DISTRIBUTION="${DIST}"
+	LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION="${DIST}"
+	LB_PARENT_MIRROR_BOOTSTRAP="file:/.build.binaries/"
+	LB_PARENT_MIRROR_CHROOT="file:/.build.binaries/"
+	LB_PARENT_MIRROR_CHROOT_SECURITY="file:/.build.binaries/"
+	LB_PARENT_MIRROR_BINARY="file:/.build.binaries/"
+	LB_PARENT_MIRROR_BINARY_SECURITY="file:/.build.binaries/"
+	LB_PARENT_MIRROR_DEBIAN_INSTALLER="file:/.build.binaries/"
+	LB_MIRROR_BOOTSTRAP="file:/.build.binaries/"
+	LB_MIRROR_CHROOT="file:/.build.binaries/"
+	LB_MIRROR_CHROOT_SECURITY="file:/.build.binaries/"
+	LB_MIRROR_BINARY="file:/.build.binaries/"
+	LB_MIRROR_BINARY_SECURITY="file:/.build.binaries/"
+	LB_MIRROR_DEBIAN_INSTALLER="file:/.build.binaries/"
+	LB_APT_SECURE="false"
+	EOF
 
     # Expand live-build configuration to $TOPDIR/$LIVEBUILD_ROOT
     echo "Expanding live-build configuration"
@@ -214,8 +213,8 @@ EOF
 }
 
 recipe_resultdirs_livebuild() {
-    # our results are already in OTHERS
-    echo ""
+    # our results are already in OTHER
+    :
 }
 
 # Local Variables:
