@@ -644,8 +644,10 @@ vm_first_stage() {
     test -n "$VMDISK_MOUNT_OPTIONS" && echo "VMDISK_MOUNT_OPTIONS='${VMDISK_MOUNT_OPTIONS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     PERSONALITY=0
     test -n "$PERSONALITY_SYSCALL" && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
+    test "$PERSONALITY" = -1 && PERSONALITY=0	# syscall failed?
     case $(uname -m) in
-	ppc|ppcle|s390) PERSONALITY=8		# ppc/s390 kernel never tells us if a 32bit personality is active, assume we run on 64bit
+	ppc|ppcle|s390) PERSONALITY=8 ;;	# ppc/s390 kernel never tells us if a 32bit personality is active, assume we run on 64bit
+	aarch64) test "$BUILD_ARCH" != "${BUILD_ARCH#armv}" && PERSONALITY=8 ;; # workaround, to be removed
     esac
     test "$VM_TYPE" = lxc && PERSONALITY=0
     echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
@@ -663,6 +665,7 @@ vm_first_stage() {
     echo "VM_WATCHDOG='$VM_WATCHDOG'" >> $BUILD_ROOT/.build/build.data
     echo "BUILDENGINE='$BUILDENGINE'" >> $BUILD_ROOT/.build/build.data
     echo "CCACHE='$CCACHE'" >> $BUILD_ROOT/.build/build.data
+    echo "ABUILD_TARGET='$ABUILD_TARGET'" >> $BUILD_ROOT/.build/build.data
     # fallback time for broken hosts
     date '+@%s' > $BUILD_ROOT/.build/.date
     # we're done with the root file system, unmount
