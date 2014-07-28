@@ -118,7 +118,7 @@ pkg_install_rpm() {
 	done
     fi
     ( chroot $BUILD_ROOT rpm --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
-		$ADDITIONAL_PARAMS .init_b_cache/$PKG.rpm 2>&1 || \
+		$ADDITIONAL_PARAMS /.init_b_cache/$PKG.rpm 2>&1 || \
 	  touch $BUILD_ROOT/exit ) | \
 	      grep -v "^warning:.*saved as.*rpmorig$"
 }
@@ -134,7 +134,7 @@ pkg_finalize_rpm() {
 	    cp $BUILD_ROOT/.init_b_cache/rpms/$PKG $BUILD_ROOT/${CUMULATED_LIST[$num]} || cleanup_and_exit 1
 	done > $BUILD_ROOT/.init_b_cache/manifest
 	chroot $BUILD_ROOT rpm --ignorearch --nodeps -Uh --oldpackage --ignoresize --verbose $RPMCHECKOPTS \
-		$ADDITIONAL_PARAMS .init_b_cache/manifest 2>&1 || touch $BUILD_ROOT/exit
+		$ADDITIONAL_PARAMS /.init_b_cache/manifest 2>&1 || touch $BUILD_ROOT/exit
 	for ((num=0; num<=cumulate; num++)) ; do
 	    rm -f $BUILD_ROOT/${CUMULATED_LIST[$num]}
 	done
@@ -190,12 +190,12 @@ pkg_preinstall_rpm() {
 pkg_runscripts_rpm() {
     if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre" ; then
 	echo "running $PKG preinstall script"
-	chroot $BUILD_ROOT sh ".init_b_cache/scripts/$PKG.pre" 0
+	chroot $BUILD_ROOT sh "/.init_b_cache/scripts/$PKG.pre" 0
 	rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre"
     fi
     if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post" ; then
 	echo "running $PKG postinstall script"
-	chroot $BUILD_ROOT sh ".init_b_cache/scripts/$PKG.post" 1
+	chroot $BUILD_ROOT sh "/.init_b_cache/scripts/$PKG.post" 1
 	rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post"
     fi
 }
