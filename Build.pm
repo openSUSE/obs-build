@@ -970,7 +970,7 @@ sub recipe2buildtype {
   my ($recipe) = @_;
   return $1 if $recipe =~ /\.(spec|dsc|kiwi|livebuild)$/;
   $recipe =~ s/.*\///;
-  $recipe =~ s/^service:.*://;
+  $recipe =~ s/^_service:.*://;
   return 'arch' if $recipe eq 'PKGBUILD';
   return 'preinstallimage' if $recipe eq '_preinstallimage';
   return undef;
