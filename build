@@ -1189,9 +1189,11 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     if test -n "$RUNNING_IN_VM" ; then
 	if test -x /sbin/ip ; then
 	    ip addr add 127.0.0.1/8 dev lo
+	    ip addr add ::1/128 dev lo
 	    ip link set lo up
 	else
 	    ifconfig lo 127.0.0.1 up
+	    ifconfig lo add ::1/128
 	fi
 	if test -n "$MYHOSTNAME" ; then
 	    hostname "$MYHOSTNAME"
