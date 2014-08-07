@@ -341,7 +341,7 @@ background_watchdog() {
     WATCHDOG_START=
     WATCHDOG_TIMEOUT=300
     while sleep 5 ; do
-	WATCH=`grep "### WATCHDOG MARKER" "$LOGFILE" | tail -n 1`
+	WATCH=`grep -a "### WATCHDOG MARKER" "$LOGFILE" | tail -n 1`
 	case $WATCH in
 	    *WATCHDOG\ MARKER\ START*) test -n "$WATCHDOG_START" || WATCHDOG_START=`date +%s` ;;
 	    *WATCHDOG\ MARKER\ END*) WATCHDOG_START= ;;
