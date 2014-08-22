@@ -63,7 +63,7 @@ sub parse {
     } elsif ($tag eq 'SOURCE') {
       $name = $data;
     } elsif ($tag eq 'BUILD-DEPENDS' || $tag eq 'BUILD-CONFLICTS' || $tag eq 'BUILD-IGNORE' || $tag eq 'BUILD-DEPENDS-INDEP') {
-      my @d = split(/,\s*/, $data);
+      my @d = split(/\s*,\s*/, $data);
       for my $d (@d) {
         my @alts = split('\s*\|\s*', $d);
         my @needed;
