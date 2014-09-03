@@ -341,7 +341,7 @@ reexpand:
 	      $line = $2;
 	    }
 	    push @expandstack, ($expandedline, $line, $optmacros);
-	    $optmacros = adaptmacros(\%macros, $optmacros, grabargs($macname, $macros_args{$macname}, split(/ /, $macdata)));
+	    $optmacros = adaptmacros(\%macros, $optmacros, grabargs($macname, $macros_args{$macname}, split(' ', $macdata)));
 	    $line = $macros{$macname};
 	    $expandedline = '';
 	    next;
