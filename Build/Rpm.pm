@@ -130,7 +130,8 @@ sub grabargs {
   my %m;
   $m{'0'} = $macname;
   $m{'**'} = join(' ', @args);
-  my %go = (split(/(:?)/, $getopt, -1), undef);
+  my %go;
+  %go = ($getopt =~ /(.)(:*)/sg) if defined $getopt;
   while (@args && $args[0] =~ s/^-//) {
     my $o = shift @args;
     last if $o eq '-';
