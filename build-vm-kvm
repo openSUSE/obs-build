@@ -151,7 +151,7 @@ vm_startup_kvm() {
     fi
     if test "$VM_TYPE" = kvm ; then
 	test "$kvm_console" != ttyAMA0 && kvm_options="$kvm_options -cpu host"
-	test -n "$HUGETLBFSPATH" && kvm_options="$kvm_options -mem-path $HUGETLBFSPATH"
+	test -n "$HUGETLBFSPATH" && kvm_options="$kvm_options -mem-prealloc -mem-path $HUGETLBFSPATH"
     fi
     set -- $qemu_bin -no-reboot -nographic -vga none -net none $kvm_options \
 	-kernel $vm_kernel \
