@@ -108,6 +108,9 @@ sub expr {
       ($v2, $expr) = expr(substr($expr, 1), 4);
       return undef unless defined $v2 && 0 + $v2;
       $v /= $v2;
+    } elsif ($expr =~ /^([=&|])/) {
+      warn("syntax error while parsing $1$1\n");
+      return ($v, $expr);
     } else {
       return ($v, $expr);
     }
