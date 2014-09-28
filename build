@@ -259,7 +259,6 @@ Known Parameters:
   --emulator 
               Use any generic emulator to isolate the build process. You need to write
               an emulator/emulator.sh script and put it next to the build script sources.
-              You must NOT use any vm swap file for this.
 
   --emulator-script SCRIPT
               specify another emulator instead of emulator.sh

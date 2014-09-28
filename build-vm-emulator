@@ -5,7 +5,11 @@
 #
 
 vm_verify_options_emulator() {
-    VM_SWAP=
+    if test -f "$BUILD_DIR/emulator/verify-options.sh"; then
+      . "$BUILD_DIR/emulator/verify-options.sh"
+    else
+      VM_SWAP=
+    fi
 }
 
 vm_startup_emulator() {
@@ -15,7 +19,7 @@ vm_startup_emulator() {
     elif test "${EMULATOR_SCRIPT:0:1}" != / ; then
        EMULATOR_SCRIPT="./$EMULATOR_SCRIPT"
     fi
-    set -- "$EMULATOR_SCRIPT" "$VM_IMAGE"
+    set -- "$EMULATOR_SCRIPT" "$VM_IMAGE" "$VM_SWAP"
     echo "$@"
     if ! "$@"; then
 	 popd
@@ -23,6 +27,8 @@ vm_startup_emulator() {
 	 cleanup_and_exit 3
     fi
     popd
+
+    test -n "$VM_SWAP" && return
 
     # Emulators may not offer to use a second swap space.
     # So we just mount the filesystem.
