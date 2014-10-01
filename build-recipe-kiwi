@@ -302,7 +302,11 @@ build_kiwi_product() {
 	test -e "$i" || continue
 	f=${i##*/}
 	case $f in
-	    *.iso) mv $i $BUILD_ROOT/$TOPDIR/KIWI/. ;;
+	    *.iso) if [ -x /usr/bin/sha256sum ]; then
+                       /usr/bin/sha256sum "$i" > "$i.sha256"
+                       mv "$i.sha256" $BUILD_ROOT/$TOPDIR/KIWI/.
+                   fi
+                   mv "$i" $BUILD_ROOT/$TOPDIR/KIWI/. ;;
 	    *.packages) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
 	    *.report) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
 	    scripts) ;;
