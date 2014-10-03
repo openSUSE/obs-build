@@ -8,7 +8,7 @@ sub parsecfg {
   my ($repocfg, $reponame) = @_;
 
   local *REPO;
-  open(REPO, '<', "$root/etc/zypp/repos.d/$repocfg.repo") or return undef;
+  open(REPO, '<', "$root/etc/zypp/repos.d/$repocfg") or return undef;
   my $name;
   my $repo = {};
   while (<REPO>) {
