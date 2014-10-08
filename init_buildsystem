@@ -38,6 +38,7 @@ LIST_STATE=
 RPMLIST=
 CLEAN_BUILD=
 CREATE_BUILD_BINARIES=
+DLNOSIGNATURE=
 CACHE_DIR=/var/cache/build
 
 while test -n "$1" ; do
@@ -83,6 +84,10 @@ while test -n "$1" ; do
 	--configdir)
 	    CONFIG_DIR=$2
 	    shift 2
+	    ;;
+	--nosignature)
+	    shift
+	    DLNOSIGNATURE="--nosignature"
 	    ;;
 	*)
 	    break
@@ -360,7 +365,7 @@ downloadpkg() {
     fi
     case $destfile in
       *.rpm)
-	rpm -K "$destfile" > $destfile.v || { echo "rpm verify failed" >&2; rm -rf "$destdir"; cleanup_and_exit 1; }
+	rpm -K $DLNOSIGNATURE "$destfile" > $destfile.v || { echo "rpm verify failed" >&2; rm -rf "$destdir"; cleanup_and_exit 1; }
 	if grep "NOT OK" $destfile.v; then
 	    rm -rf "$destdir"
 	    cleanup_and_exit 1
