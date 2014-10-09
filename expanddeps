@@ -94,11 +94,25 @@ for my $arg (@ARGV) {
     push @extradeps, $arg;
   }
 }
+
+my $binarytype;
 my @archs = split(':', $archs);
 if ($recipe =~ /(^|\/)PKGBUILD$/) {
   push @archs, 'any' unless grep {$_ eq 'any'} @archs;
+  $binarytype = 'arch';
+} elsif ($recipe =~ /\.dsc$/) {
+  push @archs, 'all' unless grep {$_ eq 'noarch'} @archs;
+  $binarytype = 'deb';
 } else {
   push @archs, 'noarch' unless grep {$_ eq 'noarch'} @archs;
+  $binarytype = 'rpm';
+}
+
+# read dist if we can
+my $cf;
+if (defined($dist) && $dist ne '') {
+  $cf = Build::read_config_dist($dist, $archs[0], $configdir);
+  $binarytype = $cf->{'binarytype'} if $cf->{'binarytype'} && $cf->{'binarytype'} ne 'UNDEFINED';
 }
 
 my (%fn, %prov, %req);
@@ -112,6 +126,16 @@ my %packs_done;
 open(F, '<', $rpmdeps) || die("$rpmdeps: $!\n");
 # WARNING: the following code assumes that the 'I' tag comes last
 my ($pkgF, $pkgP, $pkgR);
+
+my $verscmp = \&Build::Rpm::verscmp;
+
+if ($binarytype && $binarytype eq 'deb') {
+  $verscmp = \&Build::Deb::verscmp;
+  for my $arch (@archs) {
+    $arch = Build::Deb::basearch($arch) unless $arch =~ /^i[456]86$/;
+  }
+}
+
 while(<F>) {
   chomp;
   if (/^F:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
@@ -123,18 +147,16 @@ while(<F>) {
     push @{$packs_arch{$2}}, $1;
   } elsif (/^P:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
     $pkgP = $2;
-    next if $prov{$1};
-    $prov{$1} = $2;
+    $prov{$1} ||= $2;
   } elsif (/^R:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
     $pkgR = $2;
-    next if $req{$1};
-    $req{$1} = $2;
+    $req{$1} ||= $2;
   } elsif (/^I:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
     if ($ids{$1} && !$packs_done{$1} && defined($pkgF) && defined($pkgP) && defined($pkgR)) {
       my $i = $1;
       my $oldid = $ids{$1};
       my $newid = $2;
-      if (Build::Rpm::verscmp($oldid, $newid) < 0) {
+      if ($verscmp->($oldid, $newid) < 0) {
         $ids{$i}  = $newid;
         $fn{$i}   = $pkgF;
         $prov{$i} = $pkgP;
@@ -184,10 +206,11 @@ if (!defined($dist) || $dist eq '') {
   print STDERR "Warning: distribution not specified, assuming '$dist' (see $configdir).\n";
 }
 
-my $cf = Build::read_config_dist($dist, $archs[0], $configdir);
+$cf ||= Build::read_config_dist($dist, $archs[0], $configdir);
 $cf->{'warnings'} = 1;
 
 my $dofileprovides = %{$cf->{'fileprovides'}};
+$dofileprovides = 1 if ($binarytype || 'rpm') ne 'rpm';
 
 for my $pack (keys %packs) {
   my $r = {};
@@ -201,7 +224,12 @@ for my $pack (keys %packs) {
       next;
     }
     push @pr, $s;
-    splice(@s, 0, 2) if @s && $s[0] =~ /^[<=>]/;
+    while (@s && $s[0] =~ /^[\(<=>|]/) {
+      $pr[-1] .= " $s[0] $s[1]";
+      $pr[-1] =~ s/ \((.*)\)/ $1/;
+      $pr[-1] =~ s/(<|>){2}/$1/;
+      splice(@s, 0, 2);
+    }
   }
   @s = split(' ', $req{$packs{$pack}} || '');
   while (@s) {
@@ -212,7 +240,12 @@ for my $pack (keys %packs) {
       next;
     }
     push @re, $s;
-    splice(@s, 0, 2) if @s && $s[0] =~ /^[<=>]/;
+    while (@s && $s[0] =~ /^[\(<=>|]/) {
+      $re[-1] .= " $s[0] $s[1]";
+      $re[-1] =~ s/ \((.*)\)/ $1/;
+      $re[-1] =~ s/(<|>){2}/$1/;
+      splice(@s, 0, 2);
+    }
   }
   $r->{'provides'} = \@pr;
   $r->{'requires'} = \@re;

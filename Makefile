@@ -49,6 +49,7 @@ install:
 	    mkdrpms \
 	    createzyppdeps \
 	    createarchdeps \
+	    createdebdeps \
 	    createrepomddeps \
 	    createyastdeps \
 	    changelog2spec \

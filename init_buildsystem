@@ -327,6 +327,8 @@ create_cache_file() {
 		mkdir -p "$(getcachedir "$SRC")"
 		if test "$BINTYPE" = arch ; then
 		    set -- $BUILD_DIR/createarchdeps --cachedir="$CACHE_DIR" "$SRC"
+		elif test "$BINTYPE" = deb ; then
+		    set -- $BUILD_DIR/createdebdeps --cachedir="$CACHE_DIR" --archpath "$BUILD_ARCH" "$SRC"
 		else
 		    set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
 		fi

@@ -29,6 +29,18 @@ eval {
   $have_zlib = 1;
 };
 
+sub basearch {
+  my ($arch) = @_;
+  $arch = 'all' if !defined($arch) || $arch eq 'noarch';
+  $arch = 'i386' if $arch =~ /^i[456]86$/;
+  $arch = 'powerpc' if $arch eq 'ppc';
+  $arch = 'ppc64el' if $arch eq 'ppc64le';
+  $arch = 'amd64' if $arch eq 'x86_64';
+  $arch = 'armel' if $arch =~ /^armv[4567]l$/;
+  $arch = 'armhf' if $arch eq 'armv7hl';
+  return $arch;
+}
+
 sub parse {
   my ($bconf, $fn) = @_;
   my $ret;
@@ -42,13 +54,7 @@ sub parse {
   }
   # map to debian names
   $os = 'linux' if !defined($os);
-  $arch = 'all' if !defined($arch) || $arch eq 'noarch';
-  $arch = 'i386' if $arch =~ /^i[456]86$/;
-  $arch = 'powerpc' if $arch eq 'ppc';
-  $arch = 'ppc64el' if $arch eq 'ppc64le';
-  $arch = 'amd64' if $arch eq 'x86_64';
-  $arch = 'armel' if $arch =~ /^armv[4567]l$/;
-  $arch = 'armhf' if $arch eq 'armv7hl';
+  $arch = basearch($arch);
 
   if (ref($fn) eq 'ARRAY') {
     @control = @$fn;

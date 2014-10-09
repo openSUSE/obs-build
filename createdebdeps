@@ -1,0 +1,118 @@
+#!/usr/bin/perl -w
+
+BEGIN {
+  unshift @INC, ($::ENV{"BUILD_DIR"} || "/usr/lib/build");
+}
+
+use strict;
+use Digest::MD5;
+use File::Path;
+use Getopt::Long;
+use Build::Deb;
+
+Getopt::Long::Configure("no_ignore_case");
+
+my $cachedir = "/var/cache/build";
+my $archpath;
+
+sub getreponame {
+  my ($url) = @_;
+  return $1 if "/$url/" =~ /.*\/([^\/]+)\/os\//;
+  return undef;
+}
+
+my $pkgnum = 0;
+
+sub printpkginfo {
+  my ($d, $repourl)  = @_;
+
+  for (qw{package version filename architecture}) {
+    return unless defined $d->{$_};
+  }
+  $pkgnum++;
+  my $id = "$d->{'package'}.$d->{'architecture'}-$pkgnum/0/0";
+  print "F:$id: $repourl$d->{'filename'}\n";
+  if (defined $d->{'provides'}) {
+    $d->{'provides'} =~ s/,\s+/ /g;
+    print "P:$id: $d->{'provides'} $d->{'package'} (= $d->{'version'})\n";
+  } else {
+    print "P:$id: $d->{'package'} (= $d->{'version'})\n";
+  }
+  if (defined $d->{'depends'}) {
+    $d->{'depends'} =~ s/,\s+/ /g;
+    print "R:$id: $d->{'depends'}\n";
+  }
+  print "I:$id: $d->{package}-$d->{'version'} 0\n";
+}
+
+GetOptions('cachedir=s'  => \$cachedir, 'archpath=s' => \$archpath) or exit(1);
+
+if (!$archpath) {
+  $archpath = `uname -p` || 'unknown';
+  chomp $archpath;
+}
+my $basearch = $archpath;
+$basearch =~ s/:.*//;
+$basearch = Build::Deb::basearch($basearch);
+
+for my $url (@ARGV) {
+  die("Not an remote debian repo") unless $url =~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/;
+  my $reponame = getreponame($url);
+  my $repoid = Digest::MD5::md5_hex($url);
+  my $dir = "$cachedir/$repoid";
+
+  my @components;
+  my $baseurl = $url;
+
+  if ($url =~ /^(.*\/)\.(\/.*)?$/) {
+    # flat repo
+    $baseurl = $1;
+    @components = ('.');
+    $url = defined($2) ? "$1$2" : $1;
+    $url .= '/' unless $url =~ /\/$/;
+  } else {
+    if ($url =~ /([^\/]+)$/) {
+      @components = split(/[,+]/, $1);
+      $url =~ s/([^\/]+)$//;
+    }
+    push @components, 'main' unless @components;
+    $url .= '/' unless $url =~ /\/$/;
+    $url =~ s/([^\/]+\/)$/dists\/$1/;
+  }
+
+  File::Path::mkpath($dir);
+  for my $component (@components) {
+    unlink("$dir/Packages.gz");
+    if ($component eq '.') {
+      system($INC[0]."/download", $dir, "${url}Packages.gz");
+      die("Packages.gz missing\n") unless -s "$dir/Packages.gz";
+    } else {
+      system($INC[0]."/download", $dir, "$url$component/binary-$basearch/Packages.gz");
+      die("Packages.gz missing for basearch $basearch, component $component\n") unless -s "$dir/Packages.gz";
+    }
+    open(F, "-|", 'gunzip', '-dc', "$dir/Packages.gz") || die("$dir/Packages.gz: $!\n");
+    my $pkg = {};
+    my $tag;
+    while (<F>) {
+      chomp;
+      if ($_ eq '') {
+        printpkginfo($pkg, $baseurl);
+	$pkg = {};
+	next;
+      }
+      if (/^\s/) {
+	next unless $tag;
+        $pkg->{$tag} .= "\n".substr($_, 1);
+	next;
+      }
+      my $data;
+      ($tag, $data) = split(':', $_, 2);
+      next unless defined $data;
+      $tag = lc($tag);
+      $data =~ s/^\s*//;
+      $pkg->{$tag} = $data;
+    }
+    close(F) || die("gunzip: $!\n");
+    printpkginfo($pkg, $baseurl);
+  }
+}
