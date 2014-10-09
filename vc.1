@@ -1,0 +1,25 @@
+.TH vc 1 "(c) 1997-2014 SuSE Linux AG Nuernberg, Germany"
+.SH NAME
+vs \- create a SUSE stype changes entry
+.SH SYNOPSIS
+.B vc
+.RB [ -m
+.IR message ]
+.RB [ -e ]
+.RI [ changesfile_or_dir
+.RI [ commentfile ]]
+
+.SH DESCRIPTION
+The \fBvc\fP tool adds a new changes entry to a SUSE \fB.changes\fP file.
+The \fB-m\fP option can be used to directly specify the entry, if it is
+not given an editor is started to interactively enter the new changes
+entry. If a \fIcommentfile\fP is given, its content is used as template
+for the new entry instead of an empty entry, whereas the \fB-e\fP option
+suppresses the creation of an empty entry.
+
+If no \fIchangesfile\fP is specified, \fBvc\fP will search the current
+directory for a file ending with \fB.changes\fP. If a directory is
+specified instead of a changes will, it will be searched instead.
+
+.SH SEE ALSO
+.BR build (1),
