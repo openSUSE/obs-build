@@ -35,6 +35,7 @@ my %tag;
 
 my %oldp;
 my %oldr;
+my %oldc;
 if (defined($rpmdepfile) && open(F, '<', $rpmdepfile)) {
   while (<F>) {
     chomp;
@@ -42,6 +43,8 @@ if (defined($rpmdepfile) && open(F, '<', $rpmdepfile)) {
       $oldp{$1} = $_;
     } elsif (/^R:([^ ]): /) {
       $oldr{$1} = $_;
+    } elsif (/^C:([^ ]): /) {
+      $oldc{$1} = $_;
     }
   }
   close F;
@@ -94,9 +97,11 @@ foreach my $dir (@ARGV) {
 
   my %newp;
   my %newr;
+  my %newc;
   for (@known) {
     $newp{$_} = $oldp{$_} if $oldp{$_};
     $newr{$_} = $oldr{$_} if $oldr{$_};
+    $newc{$_} = $oldc{$_} if $oldc{$_};
   }
 
   my @todo = grep {!($newp{$_} && $newr{$_})} @known;
@@ -104,10 +109,11 @@ foreach my $dir (@ARGV) {
     for my $known (@todo) {
       my $path = $known2path{$known};
       if ($path =~ /\.rpm$/) {
-	my %res = Build::Rpm::rpmq($path, 1000, 1001, 1002, 1006, 1022, 1047, 1049, 1048, 1050, 1112, 1113);
+	my %res = Build::Rpm::rpmq($path, 1000, 1001, 1002, 1006, 1022, 1047, 1049, 1048, 1050, 1053, 1054, 1055, 1112, 1113);
 	next unless %res;
 	Build::Rpm::add_flagsvers(\%res, 1047, 1112, 1113);
 	Build::Rpm::add_flagsvers(\%res, 1049, 1048, 1050);
+	Build::Rpm::add_flagsvers(\%res, 1054, 1053, 1055);
 	my $id = $known;
 	$id =~ s/.*-//;
 	if ($known ne "$res{1000}->[0].$res{1022}->[0]-$id") {
@@ -127,6 +133,7 @@ foreach my $dir (@ARGV) {
 
 	$newp{$known} = "P:$known: ".join(' ', @{$res{1047} || []});
 	$newr{$known} = "R:$known: ".join(' ', @{$res{1049} || []});
+	$newc{$known} = "C:$known: ".join(' ', @{$res{1054} || []}) if @{$res{1054} || []};
 	#$tag{$known} = $res{1000}->[0]."-".$res{1001}->[0]."-".$res{1002}->[0]." ".$res{1007}->[0]."-".$res{1006}->[0];
 	$tag{$known} = $res{1000}->[0]."-".$res{1001}->[0]."-".$res{1002}->[0]." ".$res{1006}->[0];
       } else {
@@ -161,6 +168,7 @@ foreach my $dir (@ARGV) {
     print "F:$_: $known2path{$_}\n";
     print "$newp{$_}\n";
     print "$newr{$_}\n";
+    print "$newc{$_}\n" if $newc{$_};
     print "I:$_: $tag{$_}\n" if exists $tag{$_};
   }
 }

@@ -37,18 +37,11 @@ sub print_pkg($)
   my $pkg = shift;
 
   return if $pkg->{'arch'} eq 'src' || $pkg->{'arch'} eq 'nosrc';
-  my $id = sprintf("%s.%s-%d/%d/%d: ",
-    $pkg->{'name'},
-    $pkg->{'arch'},
-    $pkg->{'buildtime'},
-    0,
-    0);
-  print sprintf('F:%s%ssuse/%s/%s',$id,$pkg->{'baseurl'},
-    $pkg->{'arch'}, $pkg->{'location'}), "\n";
-
-  print "P:$id".$pkg->{'provides'}."\n";
-  print "R:$id".$pkg->{'requires'}."\n";
-
+  my $id = sprintf("%s.%s-%d/%d/%d: ", $pkg->{'name'}, $pkg->{'arch'}, $pkg->{'buildtime'}, 0, 0);
+  print "F:$id$pkg->{'baseurl'}suse/$pkg->{'arch'}/$pkg->{'location'}\n";
+  print "P:$id$pkg->{'provides'}\n";
+  print "R:$id$pkg->{'requires'}\n";
+  print "C:$id$pkg->{'conflicts'}\n" if $pkg->{'conflicts'};
   my $tag = sprintf("%s-%s-%s %s",
     $pkg->{'name'},
     $pkg->{'version'},
@@ -64,23 +57,21 @@ sub callback
   $pkg->{'provides'} = [] unless exists $pkg->{'provides'};
   # add self provides (rpm3 misses that)
   my $n = $pkg->{'name'};
-  if(substr($pkg->{'arch'}, -3) ne 'src' && !scalar grep(/^\Q$n\E( =.*)?$/,@{$pkg->{'provides'}}))
-  {
+  if(substr($pkg->{'arch'}, -3) ne 'src' && !grep(/^\Q$n\E( =.*)?$/,@{$pkg->{'provides'}})) {
     push @{$pkg->{'provides'}}, sprintf("%s = %s-%s", $pkg->{'name'}, $pkg->{'version'}, $pkg->{'release'});
   }
   $pkg->{'provides'} = join(' ', @{$pkg->{'provides'}});
   $pkg->{'requires'} = join(' ', @{$pkg->{'requires'}}) if $pkg->{'requires'};
+  $pkg->{'conflicts'} = join(' ', @{$pkg->{'conflicts'}}) if $pkg->{'conflicts'};
   $pkg->{'baseurl'} = $url;
   my @data = split(' ', $pkg->{'location'});
   # multi cd support hack
   my $num = $data[0];
-  if($pkg->{'baseurl'} =~ /1\/$/ && $num ne 0) {
+  if($pkg->{'baseurl'} =~ /1\/$/ && $num ne '0') {
     $pkg->{'baseurl'} =~ s/1\/$/$num\//;
   }
   $pkg->{'location'} = $data[1];
-
   print_pkg($pkg);
-
   return 0;
 }
 
@@ -89,19 +80,10 @@ sub callback
 my $opt_zypp;
 my $cachedir = "/var/cache/build";
 
-GetOptions (
-    "zypp=s"   => \$opt_zypp,
-    "cachedir=s"  => \$cachedir,
-    ) or exit(1);
+GetOptions ("zypp=s" => \$opt_zypp, "cachedir=s" => \$cachedir) or exit(1);
 
 for my $url (@ARGV) {
-  my $dir;
-  if ($opt_zypp) {
-    $dir = $opt_zypp;
-  } else {
-    $dir = $url;
-  }
-
+  my $dir = $opt_zypp ? $opt_zypp : $url;
   $dir .= '/' unless $dir =~ /\/$/;
   $url .= '/' unless $url =~ /\/$/;
 
@@ -110,6 +92,6 @@ for my $url (@ARGV) {
   
   my @order = ();
   my $pkgs = Build::Susetags::parse($packages,
-    { 'Loc' => 'location', 'Prv' => 'provides', 'Req' => 'requires', 'Tim' => 'buildtime' },
+    { 'Loc' => 'location', 'Prv' => 'provides', 'Req' => 'requires', 'Con' => 'conflicts', 'Tim' => 'buildtime' },
     { cb => \&callback, data => $url });
 }

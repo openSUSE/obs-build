@@ -115,7 +115,7 @@ if (defined($dist) && $dist ne '') {
   $binarytype = $cf->{'binarytype'} if $cf->{'binarytype'} && $cf->{'binarytype'} ne 'UNDEFINED';
 }
 
-my (%fn, %prov, %req);
+my (%fn, %prov, %req, %con);
 
 my %packs;
 my %repo;
@@ -125,7 +125,7 @@ my %packs_arch;
 my %packs_done;
 open(F, '<', $rpmdeps) || die("$rpmdeps: $!\n");
 # WARNING: the following code assumes that the 'I' tag comes last
-my ($pkgF, $pkgP, $pkgR);
+my ($pkgF, $pkgP, $pkgR, $pkgC);
 
 my $verscmp = \&Build::Rpm::verscmp;
 
@@ -140,35 +140,32 @@ while(<F>) {
   chomp;
   if (/^F:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
     $pkgF = $2;
-    next if $fn{$1};
-    $fn{$1} = $2;
-    my $pack = $1;
-    $pack =~ /^(.*)\.([^\.]+)$/ or die;
-    push @{$packs_arch{$2}}, $1;
   } elsif (/^P:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
     $pkgP = $2;
-    $prov{$1} ||= $2;
   } elsif (/^R:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
     $pkgR = $2;
-    $req{$1} ||= $2;
+  } elsif (/^C:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
+    $pkgC = $2;
   } elsif (/^I:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
-    if ($ids{$1} && !$packs_done{$1} && defined($pkgF) && defined($pkgP) && defined($pkgR)) {
-      my $i = $1;
-      my $oldid = $ids{$1};
-      my $newid = $2;
-      if ($verscmp->($oldid, $newid) < 0) {
-        $ids{$i}  = $newid;
-        $fn{$i}   = $pkgF;
-        $prov{$i} = $pkgP;
-        $req{$i}  = $pkgR;
-      }
-    } else {
-      next if $ids{$1};
-      $ids{$1} = $2;
+    next if $packs_done{$1};
+    my ($i, $newid) = ($1, $2);
+    undef $i unless !$ids{$i} || $verscmp->($ids{$i}, $newid) < 0;
+    undef $i unless defined($pkgF) && defined($pkgP);
+    if (defined $i) {
+      $i =~ /^(.*)\.([^\.]+)$/ or die;
+      push @{$packs_arch{$2}}, $1;
+      $ids{$i}  = $newid;
+      $fn{$i}   = $pkgF;
+      $prov{$i} = $pkgP;
+      delete $req{$i};
+      delete $con{$i};
+      $req{$i}  = $pkgR;
+      $con{$i}  = $pkgC;
     }
     undef $pkgF;
     undef $pkgP;
     undef $pkgR;
+    undef $pkgC;
   } elsif ($_ eq 'D:') {
     %packs_done = %ids;
   }
@@ -214,7 +211,7 @@ $dofileprovides = 1 if ($binarytype || 'rpm') ne 'rpm';
 
 for my $pack (keys %packs) {
   my $r = {};
-  my (@s, $s, @pr, @re);
+  my (@s, $s, @pr, @re, @co);
   @s = split(' ', $prov{$packs{$pack}} || '');
   while (@s) {
     $s = shift @s;
@@ -247,8 +244,21 @@ for my $pack (keys %packs) {
       splice(@s, 0, 2);
     }
   }
+  @s = split(' ', $con{$packs{$pack}} || '');
+  while (@s) {
+    $s = shift @s;
+    next if !$dofileprovides && $s =~ /^\//;
+    push @co, $s;
+    while (@s && $s[0] =~ /^[\(<=>|]/) {
+      $co[-1] .= " $s[0] $s[1]";
+      $co[-1] =~ s/ \((.*)\)/ $1/;
+      $co[-1] =~ s/(<|>){2}/$1/;
+      splice(@s, 0, 2);
+    }
+  }
   $r->{'provides'} = \@pr;
   $r->{'requires'} = \@re;
+  $r->{'conflicts'} = \@co;
   $repo{$pack} = $r;
 }
 
