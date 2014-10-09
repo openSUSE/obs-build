@@ -277,6 +277,10 @@ recipe_setup_kiwi() {
 	    cleanup_and_exit 1
 	fi
     fi
+
+    # extract macros from configuration
+    # some post scripts might call rpm-build and rely on the macros
+    queryconfig rawmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" > $BUILD_ROOT/root/.rpmmacros
 }
 
 recipe_prepare_kiwi() {
