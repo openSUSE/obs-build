@@ -383,6 +383,10 @@ sub printasbuildcachefile(@)
       $deps = deps2string(@{$pkg->{'conflicts'}});
       print "C:$id$deps\n";
     }
+    if (@{$pkg->{'obsoletes'} || []}) {
+      $deps = deps2string(@{$pkg->{'obsoletes'}});
+      print "O:$id$deps\n";
+    }
 
     my $tag = sprintf("%s-%s-%s %s",
       $pkg->{'name'},

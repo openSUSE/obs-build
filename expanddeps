@@ -115,7 +115,7 @@ if (defined($dist) && $dist ne '') {
   $binarytype = $cf->{'binarytype'} if $cf->{'binarytype'} && $cf->{'binarytype'} ne 'UNDEFINED';
 }
 
-my (%fn, %prov, %req, %con);
+my (%fn, %prov, %req, %con, %obs);
 
 my %packs;
 my %repo;
@@ -125,7 +125,7 @@ my %packs_arch;
 my %packs_done;
 open(F, '<', $rpmdeps) || die("$rpmdeps: $!\n");
 # WARNING: the following code assumes that the 'I' tag comes last
-my ($pkgF, $pkgP, $pkgR, $pkgC);
+my ($pkgF, $pkgP, $pkgR, $pkgC, $pkgO);
 
 my $verscmp = \&Build::Rpm::verscmp;
 
@@ -146,6 +146,8 @@ while(<F>) {
     $pkgR = $2;
   } elsif (/^C:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
     $pkgC = $2;
+  } elsif (/^O:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
+    $pkgO = $2;
   } elsif (/^I:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
     next if $packs_done{$1};
     my ($i, $newid) = ($1, $2);
@@ -159,13 +161,16 @@ while(<F>) {
       $prov{$i} = $pkgP;
       delete $req{$i};
       delete $con{$i};
+      delete $obs{$i};
       $req{$i}  = $pkgR;
-      $con{$i}  = $pkgC;
+      $con{$i}  = $pkgC if defined $pkgC;
+      $obs{$i}  = $pkgO if defined $pkgO;
     }
     undef $pkgF;
     undef $pkgP;
     undef $pkgR;
     undef $pkgC;
+    undef $pkgO;
   } elsif ($_ eq 'D:') {
     %packs_done = %ids;
   }
@@ -211,7 +216,7 @@ $dofileprovides = 1 if ($binarytype || 'rpm') ne 'rpm';
 
 for my $pack (keys %packs) {
   my $r = {};
-  my (@s, $s, @pr, @re, @co);
+  my (@s, $s, @pr, @re, @co, @ob);
   @s = split(' ', $prov{$packs{$pack}} || '');
   while (@s) {
     $s = shift @s;
@@ -256,9 +261,22 @@ for my $pack (keys %packs) {
       splice(@s, 0, 2);
     }
   }
+  @s = split(' ', $obs{$packs{$pack}} || '');
+  while (@s) {
+    $s = shift @s;
+    next if !$dofileprovides && $s =~ /^\//;
+    push @ob, $s;
+    while (@s && $s[0] =~ /^[\(<=>|]/) {
+      $ob[-1] .= " $s[0] $s[1]";
+      $ob[-1] =~ s/ \((.*)\)/ $1/;
+      $ob[-1] =~ s/(<|>){2}/$1/;
+      splice(@s, 0, 2);
+    }
+  }
   $r->{'provides'} = \@pr;
   $r->{'requires'} = \@re;
   $r->{'conflicts'} = \@co;
+  $r->{'obsoletes'} = \@ob;
   $repo{$pack} = $r;
 }
 

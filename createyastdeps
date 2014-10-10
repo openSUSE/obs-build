@@ -42,6 +42,7 @@ sub print_pkg($)
   print "P:$id$pkg->{'provides'}\n";
   print "R:$id$pkg->{'requires'}\n";
   print "C:$id$pkg->{'conflicts'}\n" if $pkg->{'conflicts'};
+  print "O:$id$pkg->{'obsoletes'}\n" if $pkg->{'obsoletes'};
   my $tag = sprintf("%s-%s-%s %s",
     $pkg->{'name'},
     $pkg->{'version'},
@@ -63,6 +64,7 @@ sub callback
   $pkg->{'provides'} = join(' ', @{$pkg->{'provides'}});
   $pkg->{'requires'} = join(' ', @{$pkg->{'requires'}}) if $pkg->{'requires'};
   $pkg->{'conflicts'} = join(' ', @{$pkg->{'conflicts'}}) if $pkg->{'conflicts'};
+  $pkg->{'obsoletes'} = join(' ', @{$pkg->{'obsoletes'}}) if $pkg->{'obsoletes'};
   $pkg->{'baseurl'} = $url;
   my @data = split(' ', $pkg->{'location'});
   # multi cd support hack
@@ -92,6 +94,6 @@ for my $url (@ARGV) {
   
   my @order = ();
   my $pkgs = Build::Susetags::parse($packages,
-    { 'Loc' => 'location', 'Prv' => 'provides', 'Req' => 'requires', 'Con' => 'conflicts', 'Tim' => 'buildtime' },
+    { 'Loc' => 'location', 'Prv' => 'provides', 'Req' => 'requires', 'Con' => 'conflicts', 'Obs' => 'obsoletes', 'Tim' => 'buildtime' },
     { cb => \&callback, data => $url });
 }

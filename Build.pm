@@ -570,15 +570,19 @@ sub get_cbinstalls { return @{[]}; }
 sub readdeps {
   my ($config, $pkginfo, @depfiles) = @_;
 
-  my %requires = ();
+  my %requires;
   local *F;
   my %provides;
+  my %pkgconflicts;
+  my %pkgobsoletes;
   my $dofileprovides = %{$config->{'fileprovides'}};
   for my $depfile (@depfiles) {
     if (ref($depfile) eq 'HASH') {
       for my $rr (keys %$depfile) {
 	$provides{$rr} = $depfile->{$rr}->{'provides'};
 	$requires{$rr} = $depfile->{$rr}->{'requires'};
+	$pkgconflicts{$rr} = $depfile->{$rr}->{'conflicts'};
+	$pkgobsoletes{$rr} = $depfile->{$rr}->{'obsoletes'};
       }
       next;
     }
@@ -607,12 +611,22 @@ sub readdeps {
       }
       my %ss;
       @ss = grep {!$ss{$_}++} @ss;
-      if ($s =~ /^(P|R):(.*)\.(.*)-\d+\/\d+\/\d+:$/) {
+      if ($s =~ /^(P|R|C|O):(.*)\.(.*)-\d+\/\d+\/\d+:$/) {
 	my $pkgid = $2;
 	my $arch = $3;
 	if ($1 eq "R") {
 	  $requires{$pkgid} = \@ss;
 	  $pkginfo->{$pkgid}->{'requires'} = \@ss if $pkginfo;
+	  next;
+	}
+	if ($1 eq "C") {
+	  $pkgconflicts{$pkgid} = \@ss;
+	  $pkginfo->{$pkgid}->{'conflicts'} = \@ss if $pkginfo;
+	  next;
+	}
+	if ($1 eq "O") {
+	  $pkgobsoletes{$pkgid} = \@ss;
+	  $pkginfo->{$pkgid}->{'obsoletes'} = \@ss if $pkginfo;
 	  next;
 	}
 	# handle provides
@@ -633,6 +647,8 @@ sub readdeps {
   }
   $config->{'providesh'} = \%provides;
   $config->{'requiresh'} = \%requires;
+  $config->{'pkgconflictsh'} = \%pkgconflicts;
+  $config->{'pkgobsoletesh'} = \%pkgobsoletes;
   makewhatprovidesh($config);
 }
 
@@ -666,6 +682,8 @@ sub forgetdeps {
   delete $config->{'providesh'};
   delete $config->{'whatprovidesh'};
   delete $config->{'requiresh'};
+  delete $config->{'pkgconflictsh'};
+  delete $config->{'pkgobsoletesh'};
 }
 
 my %addproviders_fm = (
@@ -737,12 +755,47 @@ sub addproviders {
   return \@p;
 }
 
+# XXX: should also check the package EVR
+sub nevrmatch {
+  my ($config, $r, @p) = @_;
+  my $rn = $r;
+  $rn =~ s/\s*([<=>]{1,2}).*$//;
+  return grep {$_ eq $rn} @p;
+}
+
+sub checkconflicts {
+  my ($config, $ins, $q, $eq, @r) = @_;
+  my $whatprovides = $config->{'whatprovidesh'};
+  for my $r (@r) {
+    my @eq = grep {$ins->{$_}} @{$whatprovides->{$r} || addproviders($config, $r)};
+    next unless @eq;
+    push @$eq, map {"provider $q conflicts with installed $_"} @eq;
+    return 1;
+  }
+  return 0;
+}
+
+sub checkobsoletes {
+  my ($config, $ins, $q, $eq, @r) = @_;
+  my $whatprovides = $config->{'whatprovidesh'};
+  for my $r (@r) {
+    my @eq = grep {$ins->{$_}} nevrmatch($config, $r, @{$whatprovides->{$r} || addproviders($config, $r)});
+    next unless @eq;
+    push @$eq, map {"provider $q is obsoleted by installed $_"} @eq;
+    return 1;
+  }
+  return 0;
+}
+
 sub expand {
   my ($config, @p) = @_;
 
   my $conflicts = $config->{'conflicth'};
+  my $pkgconflicts = $config->{'pkgconflictsh'} || {};
+  my $pkgobsoletes = $config->{'pkgobsoletesh'} || {};
   my $prefer = $config->{'preferh'};
   my $ignore = $config->{'ignoreh'};
+  my $ignoreconflicts = $config->{'expandflags:ignoreconflicts'};
 
   my $whatprovides = $config->{'whatprovidesh'};
   my $requires = $config->{'requiresh'};
@@ -777,10 +830,19 @@ sub expand {
       push @p, $p;
       next;
     }
+    return (undef, "$q[0] $aconflicts{$q[0]}") if $aconflicts{$q[0]};
     print "added $q[0] because of $p (direct dep)\n" if $expand_dbg;
     push @p, $q[0];
     $p{$q[0]} = 1;
-    $aconflicts{$_} = 1 for @{$conflicts->{$q[0]} || []};
+    $aconflicts{$_} = "conflict from project config with $q[0]" for @{$conflicts->{$q[0]} || []};
+    if (!$ignoreconflicts) {
+      for my $r (@{$pkgconflicts->{$q[0]}}) {
+	$aconflicts{$_} = "conflicts with installed $q[0]" for @{$whatprovides->{$r} || addproviders($config, $r)};
+      }
+      for my $r (@{$pkgobsoletes->{$q[0]}}) {
+	$aconflicts{$_} = "is obsoleted by installed $q[0]" for nevrmatch($config, $r, @{$whatprovides->{$r} || addproviders($config, $r)});
+      }
+    }
   }
   push @p, @directdepsend;
 
@@ -798,13 +860,24 @@ sub expand {
 	next if grep {$p{$_}} @q;
 	next if grep {$xignore{$_}} @q;
 	next if grep {$ignore->{"$p:$_"} || $xignore{"$p:$_"}} @q;
+	my @eq = map {"provider $_ $aconflicts{$_}"} grep {$aconflicts{$_}} @q;
 	@q = grep {!$aconflicts{$_}} @q;
+	if (!$ignoreconflicts) {
+	  for my $q (splice @q) {
+	    push @q, $q unless @{$pkgconflicts->{$q} || []} && checkconflicts($config, \%p, $q, \@eq, @{$pkgconflicts->{$q}});
+	  }
+	  for my $q (splice @q) {
+	    push @q, $q unless @{$pkgobsoletes->{$q} || []} && checkobsoletes($config, \%p, $q, \@eq, @{$pkgobsoletes->{$q}});
+	  }
+	}
 	if (!@q) {
+	  my $eq = @eq ? " (".join(', ', @eq).")" : '';
+	  my $msg = @eq ? 'conflict for providers of' : 'nothing provides';
 	  if ($r eq $p) {
-	    push @rerror, "nothing provides $r";
+	    push @rerror, "$msg $r$eq";
 	  } else {
-	    next if $r =~ /^\//;
-	    push @rerror, "nothing provides $r needed by $p";
+	    next if $r =~ /^\// && !@eq;
+	    push @rerror, "$msg $r needed by $p$eq";
 	  }
 	  next;
 	}
@@ -847,7 +920,15 @@ sub expand {
 	push @p, $q[0];
 	print "added $q[0] because of $p:$r\n" if $expand_dbg;
 	$p{$q[0]} = 1;
-	$aconflicts{$_} = 1 for @{$conflicts->{$q[0]} || []};
+	$aconflicts{$_} = "conflict from project config with $q[0]" for @{$conflicts->{$q[0]} || []};
+	if (!$ignoreconflicts) {
+	  for my $r (@{$pkgconflicts->{$q[0]}}) {
+	    $aconflicts{$_} = "conflicts with installed $q[0]" for @{$whatprovides->{$r} || addproviders($config, $r)};
+	  }
+	  for my $r (@{$pkgobsoletes->{$q[0]}}) {
+	    $aconflicts{$_} = "is obsoleted by installed $q[0]" for nevrmatch($config, $r, @{$whatprovides->{$r} || addproviders($config, $r)});
+	  }
+        }
 	@error = ();
 	$doamb = 0;
       }
