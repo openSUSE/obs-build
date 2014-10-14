@@ -594,6 +594,8 @@ become_root_or_fail() {
 }
 
 mkdir_build_root() {
+    # strip trailing slash
+    test "$BUILD_ROOT" != / && BUILD_ROOT="${BUILD_ROOT%/}"
     if test -d "$BUILD_ROOT" ; then
 	# check if it is owned by root
 	if test -z "$RUNNING_IN_VM" -a \! -O "$BUILD_ROOT" -a "`stat -c %u $BUILD_ROOT`" -ne 0 ; then
