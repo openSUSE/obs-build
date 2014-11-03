@@ -347,7 +347,7 @@ build_kiwi_appliance() {
     for imgtype in $imagetype ; do
 	echo "running kiwi --prepare for $imgtype..."
 	# Do not use $BUILD_USER here, since we always need root permissions
-	$CHROOT su -c "cd $TOPDIR/SOURCES && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT-$imgtype $KIWI_PARAMETERS" - root < /dev/null || cleanup_and_exit 1
+	$CHROOT su -c "cd $TOPDIR/SOURCES && rm -rf $TOPDIR/KIWIROOT-$imgtype && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT-$imgtype $KIWI_PARAMETERS" - root < /dev/null || cleanup_and_exit 1
 	echo "running kiwi --create for $imgtype..."
 	mkdir -p $BUILD_ROOT/$TOPDIR/KIWI-$imgtype
 	$CHROOT su -c "cd $TOPDIR/SOURCES && kiwi --create $TOPDIR/KIWIROOT-$imgtype --logfile terminal --type $imgtype -d $TOPDIR/KIWI-$imgtype $KIWI_PARAMETERS" - root < /dev/null || cleanup_and_exit 1
