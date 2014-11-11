@@ -29,16 +29,35 @@ eval {
   $have_zlib = 1;
 };
 
+my %obs2debian = (
+  "i486" => "i386",
+  "i586" => "i386",
+  "i686" => "i386",
+  "ppc" => "powerpc",
+  "ppc64el" => "ppc64el",
+  "x86_64" => "amd64",
+  "armv4l" => "armel",
+  "armv5l" => "armel",
+  "armv6l" => "armel",
+  "armv7l" => "armel",
+  "armv7hl" => "armhf"
+);
+
 sub basearch {
-  my ($arch) = @_;
-  $arch = 'all' if !defined($arch) || $arch eq 'noarch';
-  $arch = 'i386' if $arch =~ /^i[456]86$/;
-  $arch = 'powerpc' if $arch eq 'ppc';
-  $arch = 'ppc64el' if $arch eq 'ppc64le';
-  $arch = 'amd64' if $arch eq 'x86_64';
-  $arch = 'armel' if $arch =~ /^armv[4567]l$/;
-  $arch = 'armhf' if $arch eq 'armv7hl';
-  return $arch;
+  my ($arch, ) = @_;
+  return 'all' if !defined($arch) || $arch eq 'noarch';
+  return $obs2debian{$arch};
+}
+
+sub obsarch {
+ my ($arch, ) = @_;
+ my @ret = [];
+
+ while (my ($key, $value) = each(%obs2debian) ) {
+    push (@ret, $key) if $value eq $arch;
+ }
+
+ return @ret;
 }
 
 sub parse {
@@ -72,6 +91,7 @@ sub parse {
   my $name;
   my $version;
   my @deps;
+  my @exclarch;
   while (@control) {
     my $c = shift @control;
     last if $c eq '';   # new paragraph
@@ -86,6 +106,11 @@ sub parse {
     if ($tag eq 'VERSION') {
       $version = $data;
       $version =~ s/-[^-]+$//;
+    } elsif ($tag eq 'ARCHITECTURE') {
+      my @archs = split('\s+', $data);
+      map { s/$os-//; s/any-// } @archs;
+      next if grep { $_ eq "any" || $_ eq "all" } @archs;
+      @exclarch = map { obsarch($_) } @archs;
     } elsif ($tag eq 'SOURCE') {
       $name = $data;
     } elsif ($tag eq 'BUILD-DEPENDS' || $tag eq 'BUILD-CONFLICTS' || $tag eq 'BUILD-IGNORE' || $tag eq 'BUILD-DEPENDS-INDEP') {
@@ -131,6 +156,7 @@ sub parse {
   $ret->{'name'} = $name;
   $ret->{'version'} = $version;
   $ret->{'deps'} = \@deps;
+  $ret->{'exclarch'} = \@exclarch if (@exclarch);
   return $ret;
 }
 
