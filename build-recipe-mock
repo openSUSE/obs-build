@@ -33,7 +33,7 @@ recipe_build_mock() {
     test -d $BUILD_ROOT/.build.binaries || cleanup_and_exit 1
     if test "$DO_INIT" = true -o ! -d "$BUILD_ROOT/.build.binaries/repodata" ; then
 	echo "creating repository for mock..."
-	$CHROOT createrepo --no-database --basedir /.build.binaries -o /.build.binaries /.build.binaries
+	chroot $BUILD_ROOT createrepo --no-database --basedir /.build.binaries -o /.build.binaries /.build.binaries
     fi
     MOCK_CHROOT_SETUP_CMD="$(queryconfig --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" substitute mock:chroot_setup_cmd)"
     test -z "$MOCK_CHROOT_SETUP_CMD" && MOCK_CHROOT_SETUP_CMD="groupinstall buildsys-build"
@@ -64,7 +64,7 @@ recipe_build_mock() {
     echo "building src rpm..."
     MOCK_INIT_ARG=
     test "$DO_INIT" = true || MOCK_INIT_ARG=--no-clean
-    if $CHROOT /usr/bin/mock -r build $MOCK_INIT_ARG --buildsrpm --spec "$TOPDIR/SOURCES/$RECIPEFILE" --sources "$TOPDIR/SOURCES" ; then
+    if chroot $BUILD_ROOT /usr/bin/mock -r build $MOCK_INIT_ARG --buildsrpm --spec "$TOPDIR/SOURCES/$RECIPEFILE" --sources "$TOPDIR/SOURCES" ; then
 	BUILT_SRPM=
 	for i in "$BUILD_ROOT/var/lib/mock/build/result/"*src.rpm ; do
 	    test -s "$i" && BUILT_SRPM="${i##*/}"
@@ -73,7 +73,7 @@ recipe_build_mock() {
 	    mkdir -p "$BUILD_ROOT/$TOPDIR/SRPMS"
 	    mv "$BUILD_ROOT/var/lib/mock/build/result/$BUILT_SRPM" "$BUILD_ROOT/$TOPDIR/SRPMS/$BUILT_SRPM"
 	    echo "building binary rpms..."
-	    if $CHROOT /usr/bin/mock -v -r build --rebuild --no-clean "$TOPDIR/SRPMS/$BUILT_SRPM" ; then
+	    if chroot $BUILD_ROOT /usr/bin/mock -v -r build --rebuild --no-clean "$TOPDIR/SRPMS/$BUILT_SRPM" ; then
 		BUILD_SUCCEEDED=true
 		# move result over to TOPDIR
 		rm -f "$TOPDIR/SRPMS/$BUILT_SRPM"

@@ -37,6 +37,7 @@ export YAST_IS_RUNNING=instsys
 
 # slurp in package binary support
 . "$BUILD_DIR/build-pkg"
+
 # need to restore build root owner for non-root builds
 browner=0
 definesnstuff=()
@@ -208,7 +209,7 @@ preinstall() {
 }
 
 run_pkg_scripts() {
-    $CHROOT /sbin/ldconfig 2>/dev/null
+    chroot $BUILD_ROOT /sbin/ldconfig 2>/dev/null
     for PKG in $PACKAGES_TO_RUNSCRIPTS ; do
 	pkg_runscripts
 	check_exit
@@ -842,7 +843,7 @@ done
 rm -rf "$BUILD_ROOT/installed-pkg"
 mkdir -p "$BUILD_ROOT/installed-pkg"
 
-test -x $BUILD_ROOT/sbin/ldconfig && $CHROOT /sbin/ldconfig 2>&1
+test -x $BUILD_ROOT/sbin/ldconfig && chroot $BUILD_ROOT /sbin/ldconfig 2>&1
 
 MAIN_LIST="$PACKAGES_TO_INSTALL"
 progress_setup MAIN_LIST
@@ -962,12 +963,12 @@ done
 
 echo now finalizing build dir...
 if test -x $BUILD_ROOT/sbin/ldconfig ; then
-	CHROOT_RETURN="`$CHROOT /sbin/ldconfig 2>&1`"
+	CHROOT_RETURN="`chroot $BUILD_ROOT /sbin/ldconfig 2>&1`"
 	case "$CHROOT_RETURN" in
 	    *warning:*)
-		$CHROOT /sbin/ldconfig
+		chroot $BUILD_ROOT /sbin/ldconfig
 		echo
-		echo $CHROOT /sbin/ldconfig
+		echo chroot $BUILD_ROOT /sbin/ldconfig
 		echo
 		echo "$CHROOT_RETURN"
 		echo
@@ -979,7 +980,7 @@ if test -x $BUILD_ROOT/sbin/ldconfig ; then
 fi
 
 if test -x $BUILD_ROOT/usr/sbin/Check && ! grep -q "/usr/sbin/Check is obsolete" $BUILD_ROOT/usr/sbin/Check ; then
-    $CHROOT /usr/sbin/Check
+    chroot $BUILD_ROOT /usr/sbin/Check
 fi
 
 mkdir -p $BUILD_ROOT/var/adm/packages
@@ -987,24 +988,24 @@ touch $BUILD_ROOT/var/adm/packages
 
 if test -x $BUILD_ROOT/sbin/SuSEconfig ; then
     if grep norestarts $BUILD_ROOT/sbin/SuSEconfig > /dev/null ; then
-	$CHROOT /sbin/SuSEconfig --norestarts --force
+	chroot $BUILD_ROOT /sbin/SuSEconfig --norestarts --force
     else
-	$CHROOT /sbin/SuSEconfig --force
+	chroot $BUILD_ROOT /sbin/SuSEconfig --force
     fi
 fi
 
 if test -x $BUILD_ROOT/usr/X11R6/bin/switch2mesasoft ; then
-    $CHROOT /usr/X11R6/bin/switch2mesasoft
+    chroot $BUILD_ROOT /usr/X11R6/bin/switch2mesasoft
 fi
 
 for PROG in /usr/bin/TeX/texhash /usr/bin/texhash ; do
     test -x $BUILD_ROOT/$PROG && \
-	$CHROOT bash -c ". /etc/profile ; $PROG"
+	chroot $BUILD_ROOT bash -c ". /etc/profile ; $PROG"
 done
 
 if test -e $BUILD_ROOT/usr/share/zoneinfo/UTC ; then
     for PROG in /usr/sbin/zic /usr/bin/zic /bin/zic /sbin/zic ; do
-        test -x $BUILD_ROOT/$PROG  && $CHROOT bash -c "$PROG -l $(readlink -f /usr/share/zoneinfo/UTC)"
+        test -x $BUILD_ROOT/$PROG  && chroot $BUILD_ROOT bash -c "$PROG -l $(readlink -f /usr/share/zoneinfo/UTC)"
     done
 fi
 
@@ -1021,7 +1022,7 @@ fi
 # XXX: still needed?
 if test -x $BUILD_ROOT/bin/rpm -a ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a ! -f $BUILD_ROOT/var/lib/rpm/Packages ; then
     pkg_initdb_rpm
-    $CHROOT rpm -q --whatprovides rpm >/dev/null 2>&1	# create provides index
+    chroot $BUILD_ROOT rpm -q --whatprovides rpm >/dev/null 2>&1	# create provides index
 fi
 
 rm -f $BUILD_ROOT/.rpmmacros $BUILD_ROOT/root/.rpmmacros

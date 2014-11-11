@@ -294,7 +294,7 @@ run_suse_isolinux() {
 	i="${i##*/}"
 	test "$i" = scripts && continue
 	test "$i" != "${i%0}" && continue
-	$CHROOT su -c "suse-isolinux $TOPDIR/KIWIROOT/main/$i $TOPDIR/KIWI/$i.iso" - $BUILD_USER
+	chroot $BUILD_ROOT su -c "suse-isolinux $TOPDIR/KIWIROOT/main/$i $TOPDIR/KIWI/$i.iso" - $BUILD_USER
     done
 }
 
@@ -347,12 +347,12 @@ build_kiwi_appliance() {
     for imgtype in $imagetype ; do
 	echo "running kiwi --prepare for $imgtype..."
 	# Do not use $BUILD_USER here, since we always need root permissions
-	$CHROOT su -c "cd $TOPDIR/SOURCES && rm -rf $TOPDIR/KIWIROOT-$imgtype && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT-$imgtype $KIWI_PARAMETERS" - root < /dev/null || cleanup_and_exit 1
+	chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && rm -rf $TOPDIR/KIWIROOT-$imgtype && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT-$imgtype $KIWI_PARAMETERS" - root < /dev/null || cleanup_and_exit 1
 	echo "running kiwi --create for $imgtype..."
 	mkdir -p $BUILD_ROOT/$TOPDIR/KIWI-$imgtype
-	$CHROOT su -c "cd $TOPDIR/SOURCES && kiwi --create $TOPDIR/KIWIROOT-$imgtype --logfile terminal --type $imgtype -d $TOPDIR/KIWI-$imgtype $KIWI_PARAMETERS" - root < /dev/null || cleanup_and_exit 1
+	chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --create $TOPDIR/KIWIROOT-$imgtype --logfile terminal --type $imgtype -d $TOPDIR/KIWI-$imgtype $KIWI_PARAMETERS" - root < /dev/null || cleanup_and_exit 1
         rm -rf "/$TOPDIR/KIWI.bundle"
-        if $CHROOT su -c "kiwi --bundle-build $TOPDIR/KIWI-$imgtype -d /$TOPDIR/KIWI.bundle/ --bundle-id Build$RELEASE" - root < /dev/null; then
+        if chroot $BUILD_ROOT su -c "kiwi --bundle-build $TOPDIR/KIWI-$imgtype -d /$TOPDIR/KIWI.bundle/ --bundle-id Build$RELEASE" - root < /dev/null; then
             mv "$BUILD_ROOT/$TOPDIR/KIWI.bundle/"* "$BUILD_ROOT/$TOPDIR/KIWI/" || cleanup_and_exit 1
             rmdir "$BUILD_ROOT/$TOPDIR/KIWI.bundle"
             unset RUN_BUNDLE
@@ -401,7 +401,7 @@ build_kiwi_appliance() {
 		    cp "$imageout.verified" "/$TOPDIR/OTHER/$imageout$buildnum-$imgtype.verified"
 		fi
 		EOF
-	$CHROOT su -c "sh -e /kiwi_post.sh" || cleanup_and_exit 1
+	chroot $BUILD_ROOT su -c "sh -e /kiwi_post.sh" || cleanup_and_exit 1
 	rm -f $BUILD_ROOT/kiwi_post.sh
     done
 }
@@ -430,10 +430,10 @@ recipe_build_kiwi() {
         fi
         if test "$imagetype" != product -a "$DO_INIT" != "false" ; then
 	    echo "creating repodata for $repo"
-	    if $CHROOT createrepo --no-database --simple-md-filenames --help >/dev/null 2>&1 ; then
-		$CHROOT createrepo --no-database --simple-md-filenames "$repo"
+	    if chroot $BUILD_ROOT createrepo --no-database --simple-md-filenames --help >/dev/null 2>&1 ; then
+		chroot $BUILD_ROOT createrepo --no-database --simple-md-filenames "$repo"
 	    else
-		$CHROOT createrepo "$repo"
+		chroot $BUILD_ROOT createrepo "$repo"
 	    fi
         fi
     done
@@ -442,7 +442,7 @@ recipe_build_kiwi() {
     for t in $BUILD_ROOT/$TOPDIR/SOURCES/root.tar* ; do
 	test -f $t || continue
 	mkdir -p $BUILD_ROOT/$TOPDIR/SOURCES/root
-	$CHROOT tar -C $TOPDIR/SOURCES/root -xf "$TOPDIR/SOURCES/${t##*/}"
+	chroot $BUILD_ROOT tar -C $TOPDIR/SOURCES/root -xf "$TOPDIR/SOURCES/${t##*/}"
     done
 
     # fix script permissions
@@ -458,7 +458,7 @@ recipe_build_kiwi() {
 	    for t in $r/root.tar* ; do
 		test -f $t || continue
 		mkdir -p $r/root
-		$CHROOT tar -C $TOPDIR/SOURCES/images/$r/root -xf "$TOPDIR/SOURCES/images/$r/${t##*/}"
+		chroot $BUILD_ROOT tar -C $TOPDIR/SOURCES/images/$r/root -xf "$TOPDIR/SOURCES/images/$r/${t##*/}"
 	    done
 	    # fix script permissions
 	    chmod a+x $BUILD_ROOT/$TOPDIR/SOURCES/images/$r/*.sh 2>/dev/null
@@ -485,7 +485,7 @@ recipe_build_kiwi() {
 
     # Hook for running post kiwi build scripts like QA scripts if installed
     if test -x $BUILD_ROOT/usr/lib/build/kiwi_post_run ; then
-	$CHROOT su -c /usr/lib/build/kiwi_post_run || cleanup_and_exit 1
+	chroot $BUILD_ROOT su -c /usr/lib/build/kiwi_post_run || cleanup_and_exit 1
     fi
 }
 

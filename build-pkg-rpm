@@ -32,20 +32,20 @@ pkg_initdb_rpm() {
     # rpm v5 does not have initdb
     if ! test -e $BUILD_ROOT/usr/lib/rpm/cpuinfo.yaml ; then
 	if test -x $BUILD_ROOT/usr/bin/rpmdb ; then
-	    $CHROOT /usr/bin/rpmdb --initdb || cleanup_and_exit 1
+	    chroot $BUILD_ROOT /usr/bin/rpmdb --initdb || cleanup_and_exit 1
 	else
-	    $CHROOT rpm --initdb || cleanup_and_exit 1
+	    chroot $BUILD_ROOT rpm --initdb || cleanup_and_exit 1
 	fi
     fi
     # hack: add nofsync to db config to speed up install
     mkdir -p $BUILD_ROOT/root
-    DBI_OTHER=`$CHROOT rpm --eval '%{?__dbi_other}'`
+    DBI_OTHER=`chroot $BUILD_ROOT rpm --eval '%{?__dbi_other}'`
     echo "%__dbi_other $DBI_OTHER nofsync" > $BUILD_ROOT/.rpmmacros
     echo "%__dbi_other $DBI_OTHER nofsync" > $BUILD_ROOT/root/.rpmmacros
 }
 
 pkg_get_installed_rpm() {
-    $CHROOT rpm -qa --qf "%{NAME} $RPMIDFMT" | (
+    chroot $BUILD_ROOT rpm -qa --qf "%{NAME} $RPMIDFMT" | (
 	while read pp ii; do
             echo "$ii" > "$BUILD_ROOT/.init_b_cache/alreadyinstalled/$pp"
         done
@@ -56,7 +56,7 @@ pkg_get_installed_rpm() {
 }
 
 pkg_erase_rpm() {
-    $CHROOT rpm --nodeps -e $PKG 2>&1 | {
+    chroot $BUILD_ROOT rpm --nodeps -e $PKG 2>&1 | {
 	local retry
 	while read line; do
 	    case "$line" in
@@ -71,7 +71,7 @@ pkg_erase_rpm() {
 	done
 	if test -n "$retry" ; then
 	    echo "re-try deleting $PKG using --noscripts"
-	    $CHROOT rpm --nodeps --noscripts -e $PKG || true
+	    chroot $BUILD_ROOT rpm --nodeps --noscripts -e $PKG || true
 	fi
     }
 }
@@ -91,7 +91,7 @@ rpm_init_cumulate() {
     CUMULATED_PIDS=()
     CUMULATED_HMD5=()
     DO_CUMULATE=
-    typeset -ri suse_version=$($CHROOT rpm --eval '%{?suse_version}' 2>/dev/null)
+    typeset -ri suse_version=$(chroot $BUILD_ROOT rpm --eval '%{?suse_version}' 2>/dev/null)
     if ((suse_version > 1220)) ; then 
 	DO_CUMULATE=true
     fi
@@ -102,7 +102,7 @@ pkg_set_packageid_rpm() {
 }
 
 pkg_verify_installed_rpm() {
-    $CHROOT rpm --verify $PKG 2>&1 | tee $TMPFILE
+    chroot $BUILD_ROOT rpm --verify $PKG 2>&1 | tee $TMPFILE
     if grep ^missing $TMPFILE > /dev/null ; then
 	return 1
     fi
@@ -118,7 +118,7 @@ pkg_cumulate_rpm() {
 	done
     fi
     let cumulate++
-    CUMULATED_LIST[$cumulate]="/.init_b_cache/$PKG.rpm"
+    CUMULATED_LIST[$cumulate]=".init_b_cache/$PKG.rpm"
     CUMULATED_PIDS[$cumulate]="$PKGID"
     CUMULATED_HMD5[$cumulate]="$PKG_HDRMD5"
     return 0
@@ -135,8 +135,8 @@ pkg_install_rpm() {
 	    test -e "$i" && ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --justdb"
 	done
     fi
-    ( $CHROOT rpm --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
-		$ADDITIONAL_PARAMS /.init_b_cache/$PKG.rpm 2>&1 || \
+    ( chroot $BUILD_ROOT rpm --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
+		$ADDITIONAL_PARAMS .init_b_cache/$PKG.rpm 2>&1 || \
 	  touch $BUILD_ROOT/exit ) | \
 	      grep -v "^warning:.*saved as.*rpmorig$"
 }
@@ -151,8 +151,8 @@ pkg_finalize_rpm() {
 	    rm -f $BUILD_ROOT/${CUMULATED_LIST[$num]}
 	    cp $BUILD_ROOT/.init_b_cache/rpms/$PKG $BUILD_ROOT/${CUMULATED_LIST[$num]} || cleanup_and_exit 1
 	done > $BUILD_ROOT/.init_b_cache/manifest
-	$CHROOT rpm --ignorearch --nodeps -Uh --oldpackage --ignoresize --verbose $RPMCHECKOPTS \
-		$ADDITIONAL_PARAMS /.init_b_cache/manifest 2>&1 || touch $BUILD_ROOT/exit
+	chroot $BUILD_ROOT rpm --ignorearch --nodeps -Uh --oldpackage --ignoresize --verbose $RPMCHECKOPTS \
+		$ADDITIONAL_PARAMS .init_b_cache/manifest 2>&1 || touch $BUILD_ROOT/exit
 	for ((num=0; num<=cumulate; num++)) ; do
 	    rm -f $BUILD_ROOT/${CUMULATED_LIST[$num]}
 	done
@@ -199,21 +199,21 @@ pkg_preinstall_rpm() {
     # hack for rpm erasures
     if test -d "$BUILD_ROOT/installed-pkg" ; then
 	# call for rpm-4.x and not rpm-devel
-        test -z "${PKG##rpm-[0-9]*}" && $CHROOT rpm --rebuilddb
+        test -z "${PKG##rpm-[0-9]*}" && chroot $BUILD_ROOT rpm --rebuilddb
         # also exec for exchanged rpm !  naming is rpm-x86-<target>-<ver>
-        test -z "${PKG##rpm-x86-*[0-9]*}" && $CHROOT rpm --rebuilddb
+        test -z "${PKG##rpm-x86-*[0-9]*}" && chroot $BUILD_ROOT rpm --rebuilddb
     fi
 }
 
 pkg_runscripts_rpm() {
     if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre" ; then
 	echo "running $PKG preinstall script"
-	$CHROOT sh "/.init_b_cache/scripts/$PKG.pre" 0
+	chroot $BUILD_ROOT sh ".init_b_cache/scripts/$PKG.pre" 0
 	rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre"
     fi
     if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post" ; then
 	echo "running $PKG postinstall script"
-	$CHROOT sh "/.init_b_cache/scripts/$PKG.post" 1
+	chroot $BUILD_ROOT sh ".init_b_cache/scripts/$PKG.post" 1
 	rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post"
     fi
 }

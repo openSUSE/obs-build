@@ -72,7 +72,7 @@ createrepo_debian() {
 	gzip -c9 dists/${DIST}/main/source/Sources \
 	    > dists/${DIST}/main/source/Sources.gz
 	EOF
-    $CHROOT su -c "sh /.createrepo_debian.tmp.sh" - root
+    chroot $BUILD_ROOT su -c "sh /.createrepo_debian.tmp.sh" - root
     local RESULT=$?
     rm -f $BUILD_ROOT/.createrepo_debian.tmp.sh
     [ "${RESULT}" != 0 ] && return
@@ -117,8 +117,8 @@ createrepo_debian() {
 # $RECIPEFILE the name of the live-build config tarball
 
 recipe_build_livebuild() {
-    local ARCH=$($CHROOT su -c "dpkg-architecture -qDEB_BUILD_ARCH")
-    local DIST=$($CHROOT su -c "lsb_release --codename" | awk '{ print $2 }')
+    local ARCH=$(chroot $BUILD_ROOT su -c "dpkg-architecture -qDEB_BUILD_ARCH")
+    local DIST=$(chroot $BUILD_ROOT su -c "lsb_release --codename" | awk '{ print $2 }')
     local LIVEBUILD_ROOT="LIVEBUILD_ROOT"
 
     [ -z "${ARCH}" -o -z "${DIST}" ] && cleanup_and_exit 1
@@ -177,7 +177,7 @@ recipe_build_livebuild() {
 
     if [ -x $BUILD_ROOT/usr/lib/build/livebuild_pre_run ] ; then
 	echo "Running OBS build livebuild_pre_run hook"
-	$CHROOT su -c "/usr/lib/build/livebuild_pre_run" - root \
+	chroot $BUILD_ROOT su -c "/usr/lib/build/livebuild_pre_run" - root \
 	    < /dev/null || cleanup_and_exit 1
     fi
 
@@ -187,11 +187,11 @@ recipe_build_livebuild() {
 	    $BUILD_ROOT/.build.livebuild_pre_run
 	chmod +x $BUILD_ROOT/.build.livebuild_pre_run
 	echo "Running package livebuild_pre_run hook"
-	$CHROOT su -c "/.build.livebuild_pre_run" - root \
+	chroot $BUILD_ROOT su -c "/.build.livebuild_pre_run" - root \
 	    < /dev/null || cleanup_and_exit 1
     fi
 
-    $CHROOT su -c "cd $TOPDIR/$LIVEBUILD_ROOT && lb build" - root \
+    chroot $BUILD_ROOT su -c "cd $TOPDIR/$LIVEBUILD_ROOT && lb build" - root \
 	< /dev/null || cleanup_and_exit 1
 
     # Move created product to destination

@@ -35,8 +35,6 @@ test -z "$BUILD_DIR" && BUILD_DIR=/usr/lib/build
 test -z "$BUILD_ROOT" && BUILD_ROOT=/var/tmp/build-root
 test -z "$CONFIG_DIR" && CONFIG_DIR="$BUILD_DIR/configs"
 
-export CHROOT="chroot $BUILD_ROOT"
-
 export BUILD_ARCH BUILD_HOST_ARCH BUILD_ROOT BUILD_RPMS BUILD_DIR BUILD_DEBUG
 export BUILD_DIST
 
@@ -464,7 +462,7 @@ setupicecream() {
 	    echo "create-env not found"
 	    return 1
 	fi
-	$CHROOT bash -c "cd /var/run/icecream; $createenv" || cleanup_and_exit 1
+	chroot $BUILD_ROOT bash -c "cd /var/run/icecream; $createenv" || cleanup_and_exit 1
 	icecc_vers=(`shopt -s nullglob; echo $BUILD_ROOT/var/run/icecream/*.tar.{bz2,gz}`)
 	icecc_vers=${icecc_vers//$BUILD_ROOT/}
     else
@@ -561,7 +559,7 @@ create_baselibs() {
     echo "... creating baselibs$whichone"
     while read line
     do
-	$CHROOT su -c "$mkbaselibs $BASELIBS_GLOBAL $BASELIBS_CFG $line" - $BUILD_USER || cleanup_and_exit 1
+	chroot $BUILD_ROOT su -c "$mkbaselibs $BASELIBS_GLOBAL $BASELIBS_CFG $line" - $BUILD_USER || cleanup_and_exit 1
     done < <(IFS=$'\n'; echo "${pkgs[*]#$BUILD_ROOT}" | xargs -n 1024)
     rm -rf "$BUILD_ROOT/.mkbaselibs"
 }
@@ -597,10 +595,7 @@ become_root_or_fail() {
 
 mkdir_build_root() {
     # strip trailing slash
-    if test "$BUILD_ROOT" != /; then
-      BUILD_ROOT="${BUILD_ROOT%/}"
-      export CHROOT="chroot $BUILD_ROOT"
-    fi
+    test "$BUILD_ROOT" != / && BUILD_ROOT="${BUILD_ROOT%/}"
     if test -d "$BUILD_ROOT" ; then
 	# check if it is owned by root
 	if test -z "$RUNNING_IN_VM" -a \! -O "$BUILD_ROOT" -a "`stat -c %u $BUILD_ROOT`" -ne 0 ; then
@@ -757,7 +752,6 @@ while test -n "$1"; do
       -root)
 	needarg
 	BUILD_ROOT="$ARG"
-        export CHROOT="chroot $BUILD_ROOT"
 	shift
       ;;
       -cachedir)
@@ -956,7 +950,6 @@ expand_recipe_directories
 
 if test -n "$LIST_STATE" ; then
     BUILD_ROOT=`mktemp -d /var/tmp/build-list-state-XXXXXX`
-    export CHROOT="chroot $BUILD_ROOT"
     test -d "$BUILD_ROOT" || cleanup_and_exit 3
     RECIPEFILE=$RECIPEFILES # only one specified anyways
     if test "$RECIPEFILE" != "${RECIPEFILE%.src.rpm}" ; then
@@ -1149,7 +1142,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     #
     BUILD_USER=abuild
     if test -x $BUILD_ROOT/bin/rpm ; then
-	SUSE_VERSION=`$CHROOT /bin/rpm --eval '%{?suse_version}' 2>/dev/null`
+	SUSE_VERSION=`chroot $BUILD_ROOT /bin/rpm --eval '%{?suse_version}' 2>/dev/null`
 	test -n "$SUSE_VERSION" -a "${SUSE_VERSION:-0}" -le 1020 && BUILD_USER=root
     fi
     if test "$BUILD_USER" = abuild ; then

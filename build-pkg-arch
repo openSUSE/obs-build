@@ -53,7 +53,7 @@ pkg_cumulate_arch() {
 
 pkg_install_arch() {
     # -d -d disables deps checking
-    ( $CHROOT pacman -U --force -d -d --noconfirm /.init_b_cache/$PKG.$PSUF 2>&1 || touch $BUILD_ROOT/exit ) | \
+    ( cd $BUILD_ROOT && chroot $BUILD_ROOT pacman -U --force -d -d --noconfirm .init_b_cache/$PKG.$PSUF 2>&1 || touch $BUILD_ROOT/exit ) | \
 	perl -ne '$|=1;/^(warning: could not get filesystem information for |loading packages|looking for inter-conflicts|Targets |Total Installed Size: |Net Upgrade Size: |Proceed with installation|checking package integrity|loading package files|checking for file conflicts|checking keyring|Packages \(\d+\):|:: Proceed with installation|checking available disk space|installing |upgrading |warning:.*is up to date -- reinstalling|Optional dependencies for|    )/||/^$/||print'
 }
 
@@ -73,7 +73,7 @@ pkg_preinstall_arch() {
 pkg_runscripts_arch() {
     if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post" ; then
 	echo "running $PKG postinstall script"
-	( $CHROOT "/.init_b_cache/scripts/$PKG.post" < /dev/null )
+	( cd $BUILD_ROOT && chroot $BUILD_ROOT ".init_b_cache/scripts/$PKG.post" < /dev/null )
 	rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post"
     fi
 }

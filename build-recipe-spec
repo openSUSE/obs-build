@@ -22,7 +22,7 @@
 ################################################################
 
 recipe_setup_spec() {
-    TOPDIR=`$CHROOT su -c "rpm --eval '%_topdir'" - $BUILD_USER`
+    TOPDIR=`chroot $BUILD_ROOT su -c "rpm --eval '%_topdir'" - $BUILD_USER`
     if test -z "$TOPDIR"; then
 	echo "Error: TOPDIR empty"
 	cleanup_and_exit 1
@@ -142,9 +142,9 @@ recipe_build_spec() {
     chmod 755 $BUILD_ROOT/.build.command
     check_exit
     if test -n "$RUN_SHELL"; then
-	$CHROOT su -
+	chroot $BUILD_ROOT su -
     else
-	$CHROOT su -c /.build.command - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+	chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
     fi
 }
 
@@ -199,7 +199,7 @@ recipe_run_rpmlint() {
     rm -f "$BUILD_ROOT$rpmlint_logfile"
     ret=0
     mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
-    $CHROOT su -s /opt/testing/bin/rpmlint "$BUILD_USER" -- \
+    chroot $BUILD_ROOT su -s /opt/testing/bin/rpmlint "$BUILD_USER" -- \
 	    --info ${LINT_RPM_FILE_LIST[*]#$BUILD_ROOT} \
 	    ${SRPM_FILE_LIST[*]#$BUILD_ROOT} > "$BUILD_ROOT$rpmlint_logfile" || ret=1
     cat "$BUILD_ROOT$rpmlint_logfile"
@@ -214,8 +214,8 @@ recipe_compare_oldpackages() {
     if test -x "$BUILD_ROOT/usr/lib/build/same-build-result.sh" ; then 
 	echo "... comparing built packages with the former built"
 	mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
-	if $CHROOT /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/RPMS" "$TOPDIR/SRPMS"; then 
-	    $CHROOT touch /.build/.same_result_marker
+	if chroot $BUILD_ROOT /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/RPMS" "$TOPDIR/SRPMS"; then 
+	    chroot $BUILD_ROOT touch /.build/.same_result_marker
 	    # XXX: dirty build service hack. fix bs_worker. Search for
 	    # 'same_result_marker' for traces of a first try to get rid of this
 	    if test -n "$REASON" -a -n "$DISTURL" ; then 
@@ -230,6 +230,6 @@ recipe_create_deltarpms() {
     if test -x "$BUILD_ROOT/usr/bin/makedeltarpm" -a -x $BUILD_ROOT/usr/lib/build/mkdrpms ; then
 	echo "... creating delta rpms"
 	ds=("$BUILD_ROOT/$TOPDIR"/RPMS/* "$BUILD_ROOT$TOPDIR/SRPMS")
-	$CHROOT /usr/lib/build/mkdrpms /.build.oldpackages "${ds[@]#$BUILD_ROOT}"
+	chroot $BUILD_ROOT /usr/lib/build/mkdrpms /.build.oldpackages "${ds[@]#$BUILD_ROOT}"
     fi
 }
