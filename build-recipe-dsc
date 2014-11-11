@@ -66,10 +66,10 @@ recipe_build_dsc() {
     # Checks to see if a build script should be used
     # this allows the build environment to be manipulated
     # and alternate build commands can be used
-    # Debian policy requires to build with single CPU by default
-    #       if test -n "$BUILD_JOBS" ; then
-    #           DSC_BUILD_JOBS="-j$BUILD_JOBS"
-    #       fi
+    DSC_BUILD_ENVIRONMENT=""
+    if [ -n "$BUILD_JOBS" ]; then
+        DSC_BUILD_ENVIRONMENT="parallel=${BUILD_JOBS}"
+    fi
     DSC_BUILD_CMD="$(queryconfig --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" substitute dsc:build_cmd)"
     test -z "$DSC_BUILD_CMD" && DSC_BUILD_CMD="dpkg-buildpackage -us -uc $DSC_BUILD_JOBS"
     if test -e $BUILD_ROOT/$TOPDIR/SOURCES/build.script ; then
@@ -81,7 +81,7 @@ recipe_build_dsc() {
     if test -n "$RUN_SHELL"; then
 	$CHROOT su -
     else
-	$CHROOT su -c "cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+	$CHROOT su -c "export DEB_BUILD_OPTIONS=${DSC_BUILD_ENVIRONMENT} ; cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
 	if test "$BUILD_SUCCEEDED" = true -a "$DO_CHECKS" != "false"; then
 	   DEB_CHANGESFILE=${RECIPEFILE%.dsc}_"$($CHROOT su -c 'dpkg-architecture -qDEB_BUILD_ARCH')".changes
 	   $CHROOT su -c "which lintian > /dev/null && cd $TOPDIR && echo Running lintian && (set -x && lintian -i $DEB_SOURCEDIR/$DEB_DSCFILE)" - $BUILD_USER < /dev/null
