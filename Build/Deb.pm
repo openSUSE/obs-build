@@ -44,20 +44,14 @@ my %obs2debian = (
 );
 
 sub basearch {
-  my ($arch, ) = @_;
+  my ($arch) = @_;
   return 'all' if !defined($arch) || $arch eq 'noarch';
-  return $obs2debian{$arch};
+  return $obs2debian{$arch} || $arch;
 }
 
 sub obsarch {
- my ($arch, ) = @_;
- my @ret = [];
-
- while (my ($key, $value) = each(%obs2debian) ) {
-    push (@ret, $key) if $value eq $arch;
- }
-
- return @ret;
+  my ($arch) = @_;
+  return grep {$obs2debian{$_} eq $arch} sort keys %obs2debian;
 }
 
 sub parse {
@@ -111,6 +105,9 @@ sub parse {
       map { s/$os-//; s/any-// } @archs;
       next if grep { $_ eq "any" || $_ eq "all" } @archs;
       @exclarch = map { obsarch($_) } @archs;
+      # unify
+      my %exclarch = map {$_ => 1} @exclarch;
+      @exclarch = sort keys %exclarch;
     } elsif ($tag eq 'SOURCE') {
       $name = $data;
     } elsif ($tag eq 'BUILD-DEPENDS' || $tag eq 'BUILD-CONFLICTS' || $tag eq 'BUILD-IGNORE' || $tag eq 'BUILD-DEPENDS-INDEP') {
@@ -156,7 +153,7 @@ sub parse {
   $ret->{'name'} = $name;
   $ret->{'version'} = $version;
   $ret->{'deps'} = \@deps;
-  $ret->{'exclarch'} = \@exclarch if (@exclarch);
+  $ret->{'exclarch'} = \@exclarch if @exclarch;
   return $ret;
 }
 
