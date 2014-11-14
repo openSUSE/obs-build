@@ -51,7 +51,7 @@ sub parserepo($) {
   my ($reponame) = @_;
   # first try matching .repo file
   if (-e "$root/etc/zypp/repos.d/$reponame.repo") {
-    my $repo = parsecfg($reponame, $reponame);
+    my $repo = parsecfg("$reponame.repo", $reponame);
     return $repo if $repo;
   }
   # then try all repo files
