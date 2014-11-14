@@ -51,7 +51,14 @@ recipe_prepare_dsc() {
 	CHANGELOGARGS=
 	test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" && CHANGELOGARGS="--changelog $BUILD_ROOT/.build-changelog"
 	echo "running debian transformer..."
-	if ! debtransform $CHANGELOGARGS $BUILD_ROOT$TOPDIR/SOURCES $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE $BUILD_ROOT$TOPDIR/SOURCES.DEB ; then 
+        if [ "$RELEASE" ]; then
+          # remove rpm macros (everything after "%")
+          # they are not evaluated by the Debian build process
+          DEB_RELEASE=`sed 's/%.*$//' <<< $RELEASE`
+          echo "release: ($RELEASE), release (DEB) ($DEB_RELEASE)"
+                 RELEASEARGS="--release $DEB_RELEASE"
+        fi
+        if ! debtransform $CHANGELOGARGS $RELEASEARGS $BUILD_ROOT$TOPDIR/SOURCES $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE $BUILD_ROOT$TOPDIR/SOURCES.DEB ; then
 	    echo "debian transforming failed."
 	    cleanup_and_exit 1
 	fi

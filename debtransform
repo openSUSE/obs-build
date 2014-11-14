@@ -23,6 +23,11 @@
 use strict;
 use Digest::MD5;
 
+sub usage
+{
+  die("usage: debtransform [--debug] [--changelog <changelog>] [--release <release number>] <srcdir> <dscfile> <outdir>\n");
+}
+
 sub parsedsc {
   my ($fn) = @_;
   my @control;
@@ -231,13 +236,30 @@ sub addfile {
   return "$md5 $size $base";
 }
 
-my $changelog;
+print "debtransform: ", join( " ", @ARGV ), "\n";
 
-if (@ARGV > 1 && $ARGV[0] eq '--changelog') {
-  shift @ARGV;
-  $changelog = shift @ARGV;
+my $debug = 0;
+my $changelog;
+my $release;
+
+while (@ARGV > 3) {
+  if ($ARGV[0] eq '--debug') {
+    shift @ARGV;
+    $debug = 1;
+  } elsif ($ARGV[0] eq '--changelog') {
+    shift @ARGV;
+    $changelog = shift @ARGV;
+  } elsif ($ARGV[0] eq '--release') {
+    shift @ARGV;
+    $release = shift @ARGV;
+  } else {
+    usage();
+  }
 }
-die("usage: debtransform [--changelog <changelog>] <srcdir> <dscfile> <outdir>\n") unless @ARGV == 3;
+
+if( @ARGV != 3 ) {
+  usage();
+}
 
 my $dir = $ARGV[0];
 my $dsc = $ARGV[1];
@@ -283,6 +305,7 @@ my $version = $tags->{'VERSION'};
 die("dsc file contains no version\n") unless defined($version);
 $version =~ s/^\d+://;	# no epoch in version, please
 
+
 # transform 
 my $tmptar;
 if ($tarfile =~ /\.tar\.bz2/) {
@@ -319,6 +342,18 @@ if( $tmptar ) {
   link("$dir/$tarfile", "$out/$ntarfile") || die("link $dir/$tarfile $out/$ntarfile: $!\n");
 }
 push @files, addfile("$out/$ntarfile");
+
+if ( $tags->{'DEBTRANSFORM-RELEASE'} && $release ) {
+    # if dsc file contains the tag DEBTRANSFORM-RELEASE
+    # and "release" is given as a commad line parameter,
+    # replace "version" from dsc file by "version-release".
+    # From "version" the current release is stripped before
+    # (last "-" and the part after the last "-").
+    # On OBS, release is incremented automatically
+    # (same as for RPMs)
+    $version = $v . "-" . $release;
+    $tags->{'VERSION'} = $version;
+}
 
 my $tarpath = "$out/$ntarfile";
 my $tardir = $tarfile;
@@ -388,5 +423,13 @@ delete $tags->{'DEBTRANSFORM-SERIES'};
 delete $tags->{'DEBTRANSFORM-TAR'};
 delete $tags->{'DEBTRANSFORM-FILES-TAR'};
 delete $tags->{'DEBTRANSFORM-FILES'};
+delete $tags->{'DEBTRANSFORM-RELEASE'};
 writedsc("$out/${name}_$version.dsc", $tags);
+
+if( $debug ) {
+  print `ls -la $out`;
+  print `cat $out/${name}_$version.dsc`;
+  print `zcat $out/${name}_$version.diff.gz`;
+}
+
 exit(0);
