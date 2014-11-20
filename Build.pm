@@ -313,6 +313,8 @@ sub read_config {
       $config->{'cicntstart'} = $l[0];
     } elsif ($l0 eq 'releaseprg:') {
       $config->{'releaseprg'} = $l[0];
+    } elsif ($l0 eq 'releasesuffix:') {
+      $config->{'releasesuffix'} = join(' ', @l);
     } elsif ($l0 eq 'changetarget:' || $l0 eq 'target:') {
       $config->{'target'} = join(' ', @l);
       push @macros, "%define _target_cpu ".(split('-', $config->{'target'}))[0] if $config->{'target'};
