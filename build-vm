@@ -308,6 +308,7 @@ vm_img_mkfs() {
     fi
 
     echo "Creating $fs filesystem on $img"
+    export MKE2FS_SYNC=0
     if ! $mkfs $mkfs_exta_options "$img"; then
         if test -z "$mkfs_exta_options"; then
             cleanup_and_exit 3
