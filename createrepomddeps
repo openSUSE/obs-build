@@ -29,11 +29,9 @@ use Data::Dumper;
 use Getopt::Long;
 use Build::Rpm;
 use Build::Rpmmd;
-use Digest::MD5 qw(md5 md5_hex md5_base64);
+use Digest::MD5 ();
 use File::Path qw(mkpath rmtree);
 use File::Basename;
-use LWP::UserAgent;
-use URI;
 
 Getopt::Long::Configure("no_ignore_case");
 
@@ -85,29 +83,17 @@ sub package_parsed {
   }
 }
 
-sub printasbuildcachefile(@) {
-}
-
-sub getmetadata {
-  my ($url, $dir) = @_;
-  my $dest = "${dir}repodata";
-  mkpath($dest);
-  system($INC[0].'/download', $dest, "${url}repodata/repomd.xml");
-}
-
 ### main
 
 GetOptions (
-    "nosrc"   => \$opt_nosrc,
-    "dump"   => \$opt_dump,
-    "old"   => \$opt_old,
-    "zypp=s"   => \$opt_zypp,
-    "cachedir=s"  => \$cachedir,
-    ) or exit(1);
+  "nosrc"   => \$opt_nosrc,
+  "dump"   => \$opt_dump,
+  "old"   => \$opt_old,
+  "zypp=s"   => \$opt_zypp,
+  "cachedir=s"  => \$cachedir,
+  ) or exit(1);
 
 $opt_bc = 1 unless $opt_dump || $opt_old;
-
-#my $url = '/mounts/mirror/SuSE/ftp.suse.com/pub/suse/update/10.1/';
 
 for my $url (@ARGV) {
   my $dir;
@@ -115,32 +101,34 @@ for my $url (@ARGV) {
     $dir = $opt_zypp;
     $dir .= '/' unless $dir =~ /\/$/;
     $baseurl = $url;
-    $baseurl .= '/' unless $baseurl =~ /\/$/;
   } elsif ($url =~ /^(?:ftps?|https?):\/\/([^\/]*)\/?/) {
-    my $repoid = md5_hex($url);
+    my $repoid = Digest::MD5::md5_hex($url);
     $dir = "$cachedir/$repoid/";
     $baseurl = $url;
     $baseurl .= '/' unless $baseurl =~ /\/$/;
-    getmetadata($baseurl, $dir);
+    mkpath("${dir}repodata");
+    system($INC[0].'/download', "${dir}repodata", "${baseurl}repodata/repomd.xml");
   } else {
     $dir = $url;
     $dir .= '/' unless $dir =~ /\/$/;
     $baseurl = $dir;
   }
 
-  die("zypp repo $url is not up to date, please refresh first\n") unless -s "${dir}repodata/repomd.xml";
+  if (! -s "${dir}repodata/repomd.xml") {
+    die("zypp repo $url is not up to date, please refresh first\n") if $opt_zypp;
+    die("repo $url does not contain a repomd.xml file\n");
+  }
 
   my @primaryfiles;
   Build::Rpmmd::parse_repomd("${dir}repodata/repomd.xml", \@primaryfiles);
   @primaryfiles = grep {$_->{'type'} eq 'primary' && defined($_->{'location'})} @primaryfiles;
-
 #  print Dumper(\@primaryfiles);
 
   for my $f (@primaryfiles) {
     my $u = "$dir$f->{'location'}";
     if ($] > 5.007) {
-	require Encode;
-	utf8::downgrade($u);
+      require Encode;
+      utf8::downgrade($u);
     }
     my $cached;
     if (-e $u) {
@@ -149,20 +137,20 @@ for my $url (@ARGV) {
       $cached = 0 if !exists($f->{'size'}) && $u !~ /[0-9a-f]{32}-primary/;
     }
     if (!$cached) {
-	die("zypp repo $url is not up to date, please refresh first\n") if $opt_zypp;
-	if ($url =~ /^(?:ftps?|https?):\/\/([^\/]*)\/?/) {
-	    if (system($INC[0].'/download', $dir . "repodata/", $baseurl . "repodata/" . basename($u))) {
-	      die("download failed\n");
-	    }
-	} else {
-	    die("inconsistent repodata in $url\n");
+      die("zypp repo $url is not up to date, please refresh first\n") if $opt_zypp;
+      if ($url =~ /^(?:ftps?|https?):\/\/([^\/]*)\/?/) {
+	if (system("$INC[0]/download", "${dir}repodata/", "${baseurl}repodata/" . basename($u))) {
+	  die("download failed\n");
 	}
+      } else {
+	die("inconsistent repodata in $url\n");
+      }
     }
     my $fh;
     open($fh, '<', $u) or die "Error opening $u: $!\n";
     if ($u =~ /\.gz$/) {
-	use IO::Uncompress::Gunzip qw($GunzipError);
-	$fh = new IO::Uncompress::Gunzip $fh or die "Error opening $u: $GunzipError\n";
+      use IO::Uncompress::Gunzip qw($GunzipError);
+      $fh = new IO::Uncompress::Gunzip $fh or die "Error opening $u: $GunzipError\n";
     }
     Build::Rpmmd::parse_primary($fh, \&package_parsed);
     close($fh);
@@ -170,6 +158,6 @@ for my $url (@ARGV) {
 }
 
 if ($opt_dump) {
-    print Data::Dumper->Dump([\@packages], ['packages']); # caution: excessive memory consumption!
+  print Data::Dumper->Dump([\@packages], ['packages']); # caution: excessive memory consumption!
 }
 
