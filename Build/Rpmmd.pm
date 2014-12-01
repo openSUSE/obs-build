@@ -186,3 +186,4 @@ sub parse_primary {
   return generic_parse($primaryparser, @_);
 }
 
+1;

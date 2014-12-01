@@ -21,66 +21,98 @@
 package Build::Susetags;
 
 use strict;
-use warnings;
-use Data::Dumper;
+
+# compatibility to old OBS code
+sub parse_obs_compat {
+  my ($file, undef, undef, @arches) = @_;
+  $file = "$file.gz" if ! -e $file && -e "$file.gz";
+  my $pkgs = {};
+  parse($file, sub {
+    my ($data) = @_;
+    my $medium = delete($data->{'medium'});
+    my $loc = delete($data->{'location'});
+    if (defined($medium) && defined($loc)) {
+      $loc =~ s/^\Q$data->{'arch'}\E\///;
+      $data->{'path'} = "$medium $loc";
+    }
+    return unless !@arches || grep { /$data->{'arch'}/ } @arches;
+    $pkgs->{"$data->{'name'}-$data->{'version'}-$data->{'release'}-$data->{'arch'}"} = $data;
+  });
+  return $pkgs;
+}
+
+my %tmap = (
+  'Pkg' => '',
+  'Loc' => 'location',
+  'Src' => 'source',
+  'Prv' => 'provides',
+  'Req' => 'requires',
+  'Con' => 'conflicts',
+  'Obs' => 'obsoletes',
+  'Rec' => 'recommends',
+  'Sug' => 'suggests',
+  'Sup' => 'supplements',
+  'Enh' => 'enhances',
+  'Tim' => 'buildtime',
+);
 
 sub addpkg {
-  my ($pkgs, $cur, $order, $cb, $cbdata, @arches) = @_;
-  if (defined($cur) && (!@arches || grep { /$cur->{'arch'}/ } @arches)) {
-    if(!$cb || &$cb($cur, $cbdata)) {
-      my $k = "$cur->{'name'}-$cur->{'version'}-$cur->{'release'}-$cur->{'arch'}";
-      $pkgs->{$k} = $cur;
-      # keep order (or should we use Tie::IxHash?)
-      push @{$order}, $k if defined $order;
-    }
+  my ($res, $data) = @_;
+  if (ref($res) eq 'CODE') {
+    $res->($data);
+  } else {
+    push @$res, $data;
   }
 }
 
 sub parse {
-  # if @arches is empty take all arches
-  my ($file, $tmap, $order, @arches) = @_;
-  my $cb;
-  my $cbdata;
-  if (ref $order eq 'HASH') {
-    my $d = $order;
-    $order = undef;
-    $cb = $d->{'cb'} if (exists $d->{'cb'});
-    $cbdata = $d->{'data'} if (exists $d->{'data'});
-  }
-
-  # if @arches is empty take all arches
-  my @needed = keys %$tmap;
-  my $r = '(' . join('|', @needed) . '|Pkg):\s*(.*)';
-
-  if (!open(F, '<', $file)) {
-    if (!open(F, '-|', "gzip", "-dc", $file.'.gz')) {
-      die "$file: $!";
+  return parse_obs_compat(@_) if @_ > 2 && !defined $_[2];
+  my ($in, $res, %options) = @_;
+  $res ||= [];
+  my $fd;
+  if (ref($in)) {
+    $fd = $in;
+  } else {
+    if ($in =~ /\.gz$/) {
+      open($fd, '-|', "gzip", "-dc", $in) || die("$in: $!\n");
+    } else {
+      open($fd, '<', $in) || die("$in: $!\n");
     }
   }
-
   my $cur;
-  my $pkgs = {};
-  while (<F>) {
+  my $r = join('|', sort keys %tmap);
+  $r = qr/^([\+=])($r):\s*(.*)/;
+  while (<$fd>) {
     chomp;
-    next unless $_ =~ /([\+=])$r/;
+    next unless /$r/;
     my ($multi, $tag, $data) = ($1, $2, $3);
     if ($multi eq '+') {
-      while (<F>) {
+      while (<$fd>) {
 	chomp;
-	last if $_ =~ /-$tag/;
-	push @{$cur->{$tmap->{$tag}}}, $_;
+	last if /^-\Q$tag\E/;
+	next if $tag eq 'Req' && /^rpmlib\(/;
+	push @{$cur->{$tmap{$tag}}}, $_;
       }
     } elsif ($tag eq 'Pkg') {
-      addpkg($pkgs, $cur, $order, $cb, $cbdata, @arches);
+      addpkg($res, $cur) if $cur;
       $cur = {};
       ($cur->{'name'}, $cur->{'version'}, $cur->{'release'}, $cur->{'arch'}) = split(' ', $data);
+      $cur->{'epoch'} = $1 if $cur->{'version'} =~ s/^(\d+)://;
+      next;
+    } elsif ($tag eq 'Loc') {
+      my ($medium, $dir, $loc) = split(' ', $data, 3);
+      $cur->{'medium'} = $medium;
+      $cur->{'location'} = defined($loc) ? "$dir/$loc" : "$cur->{'arch'}/$dir";
     } else {
-      $cur->{$tmap->{$tag}} = $data;
+      $data =~ s/\s.*// if $tag eq 'Src';
+      $cur->{$tmap{$tag}} = $data;
     }
   }
-  addpkg($pkgs, $cur, $order, $cb, $cbdata, @arches);
-  close(F);
-  return $pkgs;
+  addpkg($res, $cur) if $cur;
+  if (!ref($in)) {
+    close($fd) || die("close $in: $!\n");
+  }
+  return $res;
 }
-
+  
 1;
