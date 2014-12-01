@@ -131,10 +131,7 @@ for my $url (@ARGV) {
   die("zypp repo $url is not up to date, please refresh first\n") unless -s "${dir}repodata/repomd.xml";
 
   my @primaryfiles;
-  my $repomdfh;
-  open($repomdfh, '<', "${dir}repodata/repomd.xml") || die("${dir}repodata/repomd.xml: $!\n");
-  Build::Rpmmd::parse_repomd($repomdfh, \@primaryfiles);
-  close($repomdfh);
+  Build::Rpmmd::parse_repomd("${dir}repodata/repomd.xml", \@primaryfiles);
   @primaryfiles = grep {$_->{'type'} eq 'primary' && defined($_->{'location'})} @primaryfiles;
 
 #  print Dumper(\@primaryfiles);
