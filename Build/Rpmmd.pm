@@ -198,7 +198,7 @@ sub parse_repomd {
   return generic_parse($repomdparser, @_);
 }
 
-sub parse_primary {
+sub parse {
   return generic_parse($primaryparser, @_);
 }
 
