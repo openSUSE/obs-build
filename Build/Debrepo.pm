@@ -25,6 +25,8 @@ use strict;
 sub addpkg {
   my ($res, $data, $options) = @_;
   return unless defined $data->{'version'};
+  my $selfprovides;
+  $selfprovides = "= $data->{'version'}" if $options->{'addselfprovides'};
   # split version into evr
   $data->{'epoch'} = $1 if $data->{'version'} =~ s/^(\d+)://s;
   $data->{'release'} = $1 if $data->{'version'} =~ s/-([^-]*)$//s;
@@ -36,6 +38,11 @@ sub addpkg {
       $data->{$d} =~ s/>>/>/g;
     }
     $data->{$d} = [ split(/\s*,\s*/, $data->{$d}) ];
+  }
+  if (defined($selfprovides)) {
+    $selfprovides = "($selfprovides)" unless $options->{'normalizedeps'};
+    $selfprovides = "$data->{'name'} $selfprovides";
+    push @{$data->{'provides'}}, $selfprovides  unless @{$data->{'provides'} || []} && $data->{'provides'}->[-1] eq $selfprovides;
   }
   if (ref($res) eq 'CODE') {
     $res->($data);

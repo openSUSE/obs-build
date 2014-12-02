@@ -37,7 +37,7 @@ sub parse_obs_compat {
     }
     return unless !@arches || grep { /$data->{'arch'}/ } @arches;
     $pkgs->{"$data->{'name'}-$data->{'version'}-$data->{'release'}-$data->{'arch'}"} = $data;
-  });
+  }, 'addselfprovides' => 1);
   return $pkgs;
 }
 
@@ -57,7 +57,16 @@ my %tmap = (
 );
 
 sub addpkg {
-  my ($res, $data) = @_;
+  my ($res, $data, $options) = @_;
+  if ($options->{'addselfprovides'} && defined($data->{'name'}) && defined($data->{'version'})) {
+    if (($data->{'arch'} || '') ne 'src' && ($data->{'arch'} || '') ne 'nosrc') {
+      my $evr = $data->{'version'};
+      $evr = "$data->{'epoch'}:$evr" if $data->{'epoch'};
+      $evr = "$evr-$data->{'release'}" if defined $data->{'release'};
+      my $s = "$data->{'name'} = $evr";
+      push @{$data->{'provides'}}, $s unless grep {$_ eq $s} @{$data->{'provides'} || []};
+    }
+  }
   if (ref($res) eq 'CODE') {
     $res->($data);
   } else {
@@ -94,7 +103,7 @@ sub parse {
 	push @{$cur->{$tmap{$tag}}}, $_;
       }
     } elsif ($tag eq 'Pkg') {
-      addpkg($res, $cur) if $cur;
+      addpkg($res, $cur, \%options) if $cur;
       $cur = {};
       ($cur->{'name'}, $cur->{'version'}, $cur->{'release'}, $cur->{'arch'}) = split(' ', $data);
       $cur->{'epoch'} = $1 if $cur->{'version'} =~ s/^(\d+)://;
@@ -108,7 +117,7 @@ sub parse {
       $cur->{$tmap{$tag}} = $data;
     }
   }
-  addpkg($res, $cur) if $cur;
+  addpkg($res, $cur, \%options) if $cur;
   if (!ref($in)) {
     close($fd) || die("close $in: $!\n");
   }

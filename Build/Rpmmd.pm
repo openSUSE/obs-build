@@ -109,7 +109,7 @@ my $primaryparser = {
       _start => \&generic_new_data,
       _attr => 'type',
       _tag => 'type',
-      _end => \&generic_add_result,
+      _end => \&primary_add_result,
       name => { _text => 1, _end => \&generic_store_text, _tag => 'name' },
       arch => { _text => 1, _end => \&generic_store_text, _tag => 'arch' },
       version => { _start => \&primary_handle_version },
@@ -176,6 +176,22 @@ sub primary_handle_dep {
   }
   my $data = $c->[0]->[4];
   push @{$data->{$h->{'_tag'}}}, $dep;
+}
+
+sub primary_add_result {
+  my ($h, $c, $p, $el) = @_;
+  my $options = $c->[0]->[5] || {};
+  my $data = $c->[0]->[4];
+  if ($options->{'addselfprovides'} && defined($data->{'name'}) && defined($data->{'version'})) {
+    if (($data->{'arch'} || '') ne 'src' && ($data->{'arch'} || '') ne 'nosrc') {
+      my $evr = $data->{'version'};
+      $evr = "$data->{'epoch'}:$evr" if $data->{'epoch'};
+      $evr = "$evr-$data->{'release'}" if defined $data->{'release'};
+      my $s = "$data->{'name'} = $evr";
+      push @{$data->{'provides'}}, $s unless grep {$_ eq $s} @{$data->{'provides'} || []};
+    }
+  }
+  return generic_add_result(@_);
 }
 
 sub parse_repomd {

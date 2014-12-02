@@ -152,7 +152,7 @@ for my $url (@ARGV) {
       use IO::Uncompress::Gunzip qw($GunzipError);
       $fh = new IO::Uncompress::Gunzip $fh or die "Error opening $u: $GunzipError\n";
     }
-    Build::Rpmmd::parse_primary($fh, \&package_parsed);
+    Build::Rpmmd::parse_primary($fh, \&package_parsed, 'addselfprovides' => 1);
     close($fh);
   }
 }

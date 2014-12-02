@@ -33,16 +33,12 @@ sub printpkginfo {
   $pkgnum++;
   my $id = "$d->{'name'}.$d->{'arch'}-$pkgnum/0/0";
   print "F:$id: $repourl$d->{'location'}\n";
+  print "P:$id: ".join(' ', @{$d->{'provides'} || []})."\n";
+  print "R:$id: ".join(' ', @{$d->{'requires'}})."\n" if $d->{'requires'};
+  print "C:$id: ".join(' ', @{$d->{'conflicts'}})."\n" if $d->{'conflicts'};
   my $evr = $d->{'version'};
   $evr = "$d->{'epoch'}:$evr" if $d->{'epoch'};
   $evr = "$evr-$d->{'release'}" if defined $d->{'release'};
-  if (defined $d->{'provides'}) {
-    print "P:$id: ".join(' ', @{$d->{'provides'}})." $d->{'name'} (= $evr)\n";
-  } else {
-    print "P:$id: $d->{'name'} (= $evr)\n";
-  }
-  print "R:$id: ".join(' ', @{$d->{'requires'}})."\n" if $d->{'requires'};
-  print "C:$id: ".join(' ', @{$d->{'conflicts'}})."\n" if $d->{'conflicts'};
   print "I:$id: $d->{'name'}-$evr 0\n";
 }
 
@@ -91,6 +87,6 @@ for my $url (@ARGV) {
       system($INC[0]."/download", $dir, "$url$component/binary-$basearch/Packages.gz");
       die("Packages.gz missing for basearch $basearch, component $component\n") unless -s "$dir/Packages.gz";
     }
-    Build::Debrepo::parse("$dir/Packages.gz", sub { printpkginfo($_[0], $baseurl) });
+    Build::Debrepo::parse("$dir/Packages.gz", sub { printpkginfo($_[0], $baseurl) }, 'addselfprovides' => 1);
   }
 }

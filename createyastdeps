@@ -35,18 +35,10 @@ Getopt::Long::Configure("no_ignore_case");
 sub callback {
   my ($pkg, $url, $datadir) = @_;
   return if $pkg->{'arch'} eq 'src' || $pkg->{'arch'} eq 'nosrc';
-  # add self provides (rpm3 misses that)
-  $pkg->{'provides'} ||= [];
-  my $n = $pkg->{'name'};
-  if (!grep(/^\Q$n\E( =.*)?$/, @{$pkg->{'provides'}})) {
-    my $evr = "$pkg->{'version'}-$pkg->{'release'}";
-    $evr = "$pkg->{'epoch'}:$evr" if $pkg->{'epoch'};
-    push @{$pkg->{'provides'}}, "$n = $evr";
-  }
   $url =~ s/1\/$/$pkg->{'medium'}/ if $pkg->{'medium'}; # multi cd support hack
   my $id = sprintf("%s.%s-%d/%d/%d: ", $pkg->{'name'}, $pkg->{'arch'}, $pkg->{'buildtime'}, 0, 0);
   print "F:$id${url}$datadir/$pkg->{'location'}\n";
-  print "P:$id".join(' ', @{$pkg->{'provides'}})."\n";
+  print "P:$id".join(' ', @{$pkg->{'provides'} || []})."\n";
   print "R:$id".join(' ', @{$pkg->{'requires'}})."\n" if $pkg->{'requires'};
   print "C:$id".join(' ', @{$pkg->{'conflicts'}})."\n" if $pkg->{'conflicts'};
   print "O:$id".join(' ', @{$pkg->{'obsoletes'}})."\n" if $pkg->{'obsoletes'};
@@ -69,6 +61,6 @@ for my $url (@ARGV) {
   my $datadir = 'suse';
   my $packages = "$dir$descrdir/packages";
   $packages = "$packages.gz" if ! -e $packages && -e "$packages.gz";
-  Build::Susetags::parse($packages, sub { callback($_[0], $url, $datadir) });
+  Build::Susetags::parse($packages, sub { callback($_[0], $url, $datadir) }, 'addselfprovides' => 1);
 }
 
