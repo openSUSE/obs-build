@@ -9,6 +9,7 @@ use Digest::MD5;
 use File::Path;
 use Getopt::Long;
 use Build::Deb;
+use Build::Debrepo;
 
 Getopt::Long::Configure("no_ignore_case");
 
@@ -26,23 +27,23 @@ my $pkgnum = 0;
 sub printpkginfo {
   my ($d, $repourl)  = @_;
 
-  for (qw{package version filename architecture}) {
+  for (qw{name version location arch}) {
     return unless defined $d->{$_};
   }
   $pkgnum++;
-  my $id = "$d->{'package'}.$d->{'architecture'}-$pkgnum/0/0";
-  print "F:$id: $repourl$d->{'filename'}\n";
+  my $id = "$d->{'name'}.$d->{'arch'}-$pkgnum/0/0";
+  print "F:$id: $repourl$d->{'location'}\n";
+  my $evr = $d->{'version'};
+  $evr = "$d->{'epoch'}:$evr" if $d->{'epoch'};
+  $evr = "$evr-$d->{'release'}" if defined $d->{'release'};
   if (defined $d->{'provides'}) {
-    $d->{'provides'} =~ s/,\s+/ /g;
-    print "P:$id: $d->{'provides'} $d->{'package'} (= $d->{'version'})\n";
+    print "P:$id: ".join(' ', @{$d->{'provides'}})." $d->{'name'} (= $evr)\n";
   } else {
-    print "P:$id: $d->{'package'} (= $d->{'version'})\n";
+    print "P:$id: $d->{'name'} (= $evr)\n";
   }
-  if (defined $d->{'depends'}) {
-    $d->{'depends'} =~ s/,\s+/ /g;
-    print "R:$id: $d->{'depends'}\n";
-  }
-  print "I:$id: $d->{package}-$d->{'version'} 0\n";
+  print "R:$id: ".join(' ', @{$d->{'requires'}})."\n" if $d->{'requires'};
+  print "C:$id: ".join(' ', @{$d->{'conflicts'}})."\n" if $d->{'conflicts'};
+  print "I:$id: $d->{'name'}-$evr 0\n";
 }
 
 GetOptions('cachedir=s'  => \$cachedir, 'archpath=s' => \$archpath) or exit(1);
@@ -56,7 +57,7 @@ $basearch =~ s/:.*//;
 $basearch = Build::Deb::basearch($basearch);
 
 for my $url (@ARGV) {
-  die("Not an remote debian repo") unless $url =~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/;
+  die("$url: not an remote debian repo\n") unless $url =~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/;
   my $reponame = getreponame($url);
   my $repoid = Digest::MD5::md5_hex($url);
   my $dir = "$cachedir/$repoid";
@@ -90,29 +91,6 @@ for my $url (@ARGV) {
       system($INC[0]."/download", $dir, "$url$component/binary-$basearch/Packages.gz");
       die("Packages.gz missing for basearch $basearch, component $component\n") unless -s "$dir/Packages.gz";
     }
-    open(F, "-|", 'gunzip', '-dc', "$dir/Packages.gz") || die("$dir/Packages.gz: $!\n");
-    my $pkg = {};
-    my $tag;
-    while (<F>) {
-      chomp;
-      if ($_ eq '') {
-        printpkginfo($pkg, $baseurl);
-	$pkg = {};
-	next;
-      }
-      if (/^\s/) {
-	next unless $tag;
-        $pkg->{$tag} .= "\n".substr($_, 1);
-	next;
-      }
-      my $data;
-      ($tag, $data) = split(':', $_, 2);
-      next unless defined $data;
-      $tag = lc($tag);
-      $data =~ s/^\s*//;
-      $pkg->{$tag} = $data;
-    }
-    close(F) || die("gunzip: $!\n");
-    printpkginfo($pkg, $baseurl);
+    Build::Debrepo::parse("$dir/Packages.gz", sub { printpkginfo($_[0], $baseurl) });
   }
 }
