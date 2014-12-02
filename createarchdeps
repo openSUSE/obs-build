@@ -27,21 +27,14 @@ BEGIN {
 }
 
 use strict;
-use Archive::Tar;
-use Build::Arch;
-use Digest::MD5;
+use Build::Archrepo;
+use Digest::MD5 ();
 use File::Path;
 use Getopt::Long;
 
 Getopt::Long::Configure("no_ignore_case");
 
 my $cachedir = "/var/cache/build";
-
-sub getrepodb {
-  my ($url, $reponame, $dir) = @_;
-  File::Path::mkpath($dir);
-  system($INC[0]."/download", $dir, "$url$reponame.db");
-}
 
 sub getreponame {
   my ($url) = @_;
@@ -51,42 +44,26 @@ sub getreponame {
 
 sub printpkginfo {
   my ($d, $repourl)  = @_;
-  my $id = $d->{'name'} . "." . $d->{'arch'} . "-" . $d->{'buildtime'} . "/0/0";
-  my $pkgurl = $repourl . $d->{'filename'};
-  my $selfprovides = $d->{'name'};
-  $selfprovides .= "=$d->{'version'}" if defined $d->{'version'};
-  push @{$d->{'provides'}}, $selfprovides unless @{$d->{'provides'} || []} && $d->{'provides'}->[-1] eq $selfprovides;
+  my $id = "$d->{'name'}.$d->{'arch'}-$d->{'buildtime'}/0/0";
+  my $pkgurl = $repourl . $d->{'location'};
   print "F:$id: $pkgurl\n";
   print "P:$id: " . join(' ', @{$d->{'provides'}}) . "\n" if $d->{'provides'};
   print "R:$id: " . join(' ', @{$d->{'requires'}}) . "\n" if $d->{'requires'};
-  print "I:$id: $d->{name}-$d->{'version'} $d->{'buildtime'}\n";
+  my $evr = $d->{'version'};
+  $evr = "$d->{'epoch'}:$evr" if $d->{'epoch'};
+  $evr = "$evr-$d->{'release'}" if defined $d->{'release'};
+  print "I:$id: $d->{name}-$evr $d->{'buildtime'}\n";
 }
 
 GetOptions("cachedir=s"  => \$cachedir) or exit(1);
 
-
 for my $url (@ARGV) {
-  die("Not an Archlinux repo") unless $url =~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/;
+  die("$url: not an remote Archlinux repo") unless $url =~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/;
   my $reponame = getreponame($url);
   my $repoid = Digest::MD5::md5_hex($url);
   my $dir = "$cachedir/$repoid";
   $url .= '/' unless $url =~ /\/$/;
-  getrepodb($url, $reponame, $dir);
-
-  my $repodb = Archive::Tar->iter("$dir/$reponame.db", 1);
-  my $e;
-  my $lastfn = '';
-  my $d;
-  while ($e = $repodb->()) {
-    next unless $e->type() == Archive::Tar::Constant::FILE;
-    my $fn = $e->name();
-    next unless $fn =~ s/\/(?:depends|desc|files)$//s;
-    if ($lastfn ne $fn) {
-      printpkginfo($d, $url) if $d->{'name'};
-      $d = {};
-      $lastfn = $fn;
-    }
-    Build::Arch::parserepodata($d, $e->get_content());
-  }
-  printpkginfo($d, $url) if $d->{'name'};
+  File::Path::mkpath($dir);
+  system("$INC[0]/download", $dir, "$url$reponame.db");
+  Build::Archrepo::parse("$dir/$reponame.db", sub { printpkginfo($_[0], $url) }, 'addselfprovides' => 1);
 }
