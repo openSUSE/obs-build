@@ -55,7 +55,7 @@ sub parse {
   return Build::Susetags::parse(@args) if $do_susetags && $type eq 'susetags';
   return Build::Debrepo::parse(@args) if $do_deb && $type eq 'deb';
   return Build::Archrepo::parse(@args) if $do_arch && $type eq 'arch';
-  return undef;
+  die("parse repo: unknown type '$type'\n");
 }
 
 1;
