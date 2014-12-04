@@ -25,13 +25,18 @@ BEGIN {
 }
 
 use Build;
+use Getopt::Long;
+
 use strict;
 
+Getopt::Long::Configure("no_ignore_case");
+
+my $rpmdepfile;
+
+GetOptions ("oldfile=s" => \$rpmdepfile) or exit(1);
+
+
 ######################################################################
-
-my $rpmdepfile = $ARGV[0];
-
-my %tag;
 
 my %oldp;
 my %oldr;
@@ -40,22 +45,22 @@ my %oldo;
 if (defined($rpmdepfile) && open(F, '<', $rpmdepfile)) {
   while (<F>) {
     chomp;
-    if (/^P:([^ ]): /) {
+    if (/^P:([^ ]+): /) {
       $oldp{$1} = $_;
-    } elsif (/^R:([^ ]): /) {
+    } elsif (/^R:([^ ]+): /) {
       $oldr{$1} = $_;
-    } elsif (/^C:([^ ]): /) {
+    } elsif (/^C:([^ ]+): /) {
       $oldc{$1} = $_;
-    } elsif (/^O:([^ ]): /) {
+    } elsif (/^O:([^ ]+): /) {
       $oldo{$1} = $_;
     }
   }
   close F;
 }
 
-my $redo = 1;
+my %tag;
+
 foreach my $dir (@ARGV) {
-  $redo = 0;
   my @known;
   my %known2fn;
   my %known2path;
@@ -176,6 +181,7 @@ foreach my $dir (@ARGV) {
     print "$newp{$_}\n";
     print "$newr{$_}\n";
     print "$newc{$_}\n" if $newc{$_};
+    print "$newo{$_}\n" if $newo{$_};
     print "I:$_: $tag{$_}\n" if exists $tag{$_};
   }
 }
