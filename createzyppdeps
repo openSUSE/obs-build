@@ -29,8 +29,6 @@ use strict;
 use Build::Zypp;
 use Getopt::Long;
 
-use strict;
-
 Getopt::Long::Configure("no_ignore_case");
 
 my $cachedir = "/var/cache/build";
@@ -43,45 +41,24 @@ GetOptions(
 
 if ($opt_listrepos) {
   die("createzyppdeps --listrepos does not take an argument\n") if @ARGV;
-  opendir(D, "/etc/zypp/repos.d") || exit(0);
-  my @r = grep {!/^\./ && /.repo$/} readdir(D);
-  closedir D;
-  @r = sort @r;
-  for my $r (@r) {
-    open(F, '<', "/etc/zypp/repos.d/$r") || next;
-    my $reponame;
-    my $enabled;
-    while(<F>) {
-      chomp;
-      next if /^\s*#/;
-      s/\s+$//;
-      if (/^\[(.*)\]$/) {
-        print "$reponame\n" if defined($reponame) && $enabled;
-	$reponame = $1;
-	$enabled = undef;
-      } elsif (/enabled=\s*(\S+)/) {
-	$enabled = $1;
-      }
-    }
-    print "$reponame\n" if defined($reponame) && $enabled;
-    close F;
+  for my $r (Build::Zypp::parseallrepos()) {
+    print "$r->{'name'}\n" if $r->{'enabled'};
   }
-  exit(0);
+  exit 0;
 }
 die("createzyppdeps needs exactly one argument\n") if @ARGV != 1;
 my $url = $ARGV[0];
 
 die("createzyppdeps argument must start with 'zypp://'\n") unless $url =~ /^zypp:\/\/([^\/]*)/;
 my $repo = Build::Zypp::parserepo($1);
-die("can't parse $1\n") unless $repo;
 
 my $type = $repo->{'type'};
 my $zyppcachedir = "/var/cache/zypp/raw/$repo->{'name'}";
 
 if($type eq 'rpm-md') {
-  exec ($INC[0].'/createrepomddeps', '--cachedir', $cachedir, '--zypp', $zyppcachedir, $url);
+  exec ("$INC[0]/createrepomddeps", '--cachedir', $cachedir, '--zypp', $zyppcachedir, $url);
 } elsif ($type eq 'yast2') {
-  exec ($INC[0].'/createyastdeps', '--cachedir', $cachedir, '--zypp', $zyppcachedir, $url);
+  exec ("$INC[0]/createyastdeps", '--cachedir', $cachedir, '--zypp', $zyppcachedir, $url);
 } else {
   die "unsupported repo type: $type\n";
 }

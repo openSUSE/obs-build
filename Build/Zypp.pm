@@ -25,7 +25,7 @@ use strict;
 our $root = '';
 
 sub parsecfg {
-  my ($repocfg, $reponame) = @_;
+  my ($repocfg, $reponame, $allrepos) = @_;
 
   local *REPO;
   open(REPO, '<', "$root/etc/zypp/repos.d/$repocfg") or return undef;
@@ -33,7 +33,17 @@ sub parsecfg {
   my $repo = {};
   while (<REPO>) {
     chomp;
+    next if /^\s*#/;
+    s/\s+$//;
     if (/^\[(.+)\]/) {
+      if ($allrepos && defined($name)) {
+	$repo->{'description'} = $repo->{'name'} if defined $repo->{'name'};
+	$repo->{'name'} = $name;
+	push @$allrepos, $repo;
+	undef $name;
+	$repo = {};
+      }
+      last if defined $name;
       $name = $1 if !defined($reponame) || $reponame eq $1;
     } elsif (defined($name)) {
       my ($key, $value) = split(/=/, $_, 2);
@@ -42,9 +52,26 @@ sub parsecfg {
   }
   close(REPO);
   return undef unless defined $name;
-  $repo->{'description'} = $repo->{'name'} if exists $repo->{'name'};
+  $repo->{'description'} = $repo->{'name'} if defined $repo->{'name'};
   $repo->{'name'} = $name;
+  push @$allrepos, $repo if $allrepos;
   return $repo;
+}
+
+sub repofiles {
+  local *D;
+  return () unless opendir(D, "/etc/zypp/repos.d");
+  my @r = grep {!/^\./ && /.repo$/} readdir(D);
+  closedir D;
+  return sort(@r);
+}
+
+sub parseallrepos {
+  my @r;
+  for my $r (repofiles()) {
+    parsecfg($r, undef, \@r);
+  }
+  return @r;
 }
 
 sub parserepo($) {
@@ -55,12 +82,7 @@ sub parserepo($) {
     return $repo if $repo;
   }
   # then try all repo files
-  my @r;
-  if (opendir(D, "$root/etc/zypp/repos.d")) {
-    @r = grep {!/^\./ && /.repo$/} readdir(D);
-    closedir D;
-  }
-  for my $r (sort @r) {
+  for my $r (repofiles()) {
     my $repo = parsecfg($r, $reponame);
     return $repo if $repo;
   }
