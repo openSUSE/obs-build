@@ -65,7 +65,7 @@ foreach my $dir (@ARGV) {
   my %known2fn;
   my %known2path;
   my %fnsize2id;
-  my $cmd = "find $dir -follow -type f \\( -name \"*.rpm\" -o -name \"*.deb\" \\) -a ! -name \"*src.rpm\" -printf '\%T@/\%s/\%i \%p\\n'";
+  my $cmd = "find $dir -follow -type f \\( -name \"*.rpm\" -o -name \"*.deb\" -o -name \"*.pkg.tar.gz\" -o -name \"*.pkg.tar.xz\" \\) -a ! -name \"*src.rpm\" -printf '\%T@/\%s/\%i \%p\\n'";
   open(F, '-|', $cmd) or next;
   while (<F>) {
     chomp;
@@ -74,7 +74,7 @@ foreach my $dir (@ARGV) {
     my $path = $2;
     # new find added a fraction part to %T@, ignore it
     $id =~ s/^(\d+)\.\d+/$1/;
-    next unless $path =~ /\.(?:rpm|deb)$/;
+    next unless $path =~ /\.(?:rpm|deb|pkg\.tar\.gz|pkg\.tar\.xz)$/;
     my $fn = $path;
     $fn =~ s/.*\///;
     next if $fn =~ /\.(?:patch|delta)\.rpm$/;
@@ -89,7 +89,9 @@ foreach my $dir (@ARGV) {
     } elsif ($fn =~ /^([^_]*)_(?:[^_]*)_([^_]*)\.deb$/) {
       $r = $1;
       $arch = $2;
-      $arch = 'noarch' if $arch eq 'all';
+    } elsif ($fn =~ /^(.*)-[^-]+-[^-]+-([^-]+)\.pkg\.tar\.[gx]z$/) {
+      $r = $1;
+      $arch = $2;
     } else {
       next;
     }
@@ -148,11 +150,10 @@ foreach my $dir (@ARGV) {
 	$newo{$known} = "O:$known: ".join(' ', @{$res{1090} || []}) if @{$res{1090} || []};
 	#$tag{$known} = $res{1000}->[0]."-".$res{1001}->[0]."-".$res{1002}->[0]." ".$res{1007}->[0]."-".$res{1006}->[0];
 	$tag{$known} = $res{1000}->[0]."-".$res{1001}->[0]."-".$res{1002}->[0]." ".$res{1006}->[0];
-      } else {
+      } elsif ($path =~ /\.deb$/) {
 	my %res = Build::Deb::debq($path);
 	next unless %res;
 	my ($dn, $da) = ($res{'PACKAGE'}, $res{'ARCHITECTURE'});
-	$da = 'noarch' if $da eq 'all';
 	my $id = $known;
 	$id =~ s/.*-//;
 	if ($known ne "$dn.$da-$id") {
@@ -165,13 +166,27 @@ foreach my $dir (@ARGV) {
 	my @provides = split(',\s*', $res{'PROVIDES'} || '');
 	my @depends = split(',\s*', $res{'DEPENDS'} || '');
 	my @predepends = split(',\s*', $res{'PRE-DEPENDS'} || '');
-	s/\s.*// for @provides;   #for now
-	s/\s.*// for @depends;    #for now
-	s/\s.*// for @predepends; #for now
 	push @depends, @predepends;
-	push @provides, $res{'PACKAGE'};
+	push @provides, "$res{'PACKAGE'} (= $res{'VERSION'})";
+	my @conflicts = split(',\s*', $res{'CONFLICTS'} || '');
+	my @breaks = split(',\s*', $res{'BREAKS'} || '');
+	push @conflicts, @breaks;
 	$newp{$known} = "P:$known: ".join(' ', @provides);
 	$newr{$known} = "R:$known: ".join(' ', @depends);
+	$newo{$known} = "C:$known: ".join(' ', @conflicts) if @conflicts;
+	$tag{$known} = "$dn-$res{'VERSION'} 0";
+      } elsif ($path =~ /\.tar\.[gx]z$/) {
+	my $res = Build::Arch::queryvars($path);
+	next unless $res;
+	my $name = ($res->{'pkgname'} || [])->[0];
+	my $pkgver = ($res->{'pkgver'} || [])->[0];
+	my $pkgarch = ($res->{'pkgarch'} || [])->[0];
+	my $provides = $res->{'provides'} || [];
+	push @$provides, "$name=$pkgver";
+	$newp{$known} = "P:$known: ".join(' ', @$provides);
+	$newr{$known} = "R:$known: ".join(' ', @{$res->{'depend'} || []});
+	$newc{$known} = "C:$known: ".join(' ', @{$res->{'conflict'}}) if $res->{'conflict'};
+	$newo{$known} = "O:$known: ".join(' ', @{$res->{'replaces'}}) if $res->{'replaces'};
       }
     }
   }
