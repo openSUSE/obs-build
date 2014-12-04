@@ -30,16 +30,16 @@ eval {
 };
 
 my %obs2debian = (
-  "i486" => "i386",
-  "i586" => "i386",
-  "i686" => "i386",
-  "ppc" => "powerpc",
-  "ppc64el" => "ppc64el",
-  "x86_64" => "amd64",
-  "armv4l" => "armel",
-  "armv5l" => "armel",
-  "armv6l" => "armel",
-  "armv7l" => "armel",
+  "i486"    => "i386",
+  "i586"    => "i386",
+  "i686"    => "i386",
+  "ppc"     => "powerpc",
+  "ppc64le" => "ppc64el",
+  "x86_64"  => "amd64",
+  "armv4l"  => "armel",
+  "armv5l"  => "armel",
+  "armv6l"  => "armel",
+  "armv7l"  => "armel",
   "armv7hl" => "armhf"
 );
 
