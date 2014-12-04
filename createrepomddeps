@@ -42,45 +42,38 @@ my $opt_bc;
 my $opt_zypp;
 my $cachedir = "/var/cache/build";
 
-my $baseurl; # current url
-my $old_seen;
-my @packages;
+sub printpkginfo {
+  my ($pkg, $baseurl) = @_;
+  return if $pkg->{'arch'} eq 'src' || $pkg->{'arch'} eq 'nosrc';
+  my $id = sprintf("%s.%s-%d/%d/%d: ", $pkg->{'name'}, $pkg->{'arch'}, $pkg->{'buildtime'}, $pkg->{'filetime'}, 0);
+  print "F:$id$baseurl$pkg->{'location'}\n";
+  print "P:$id@{$pkg->{'provides'} || []}\n";
+  print "R:$id@{$pkg->{'requires'} || []}\n";
+  print "C:$id@{$pkg->{'conflicts'} || []}\n" if @{$pkg->{'conflicts'} || []};
+  print "O:$id@{$pkg->{'obsoletes'} || []}\n" if @{$pkg->{'obsoletes'} || []};
+  my $tag = sprintf("%s-%s-%s %s", $pkg->{'name'}, $pkg->{'version'}, $pkg->{'release'}, $pkg->{'buildtime'});
+  print "I:$id$tag\n";
+}
 
-sub package_parsed {
-  my ($pkg) = @_;
+sub printold {
+  my ($pkg, $baseurl, $old_seen) = @_;
 
-  $pkg->{'baseurl'} = $baseurl;
-  push @packages, $pkg if $opt_dump;
-  if($opt_bc) {
-    return if $pkg->{'arch'} eq 'src' || $pkg->{'arch'} eq 'nosrc';
-    my $id = sprintf("%s.%s-%d/%d/%d: ", $pkg->{'name'}, $pkg->{'arch'}, $pkg->{'buildtime'}, $pkg->{'filetime'}, 0);
-    print "F:".$id. $pkg->{'baseurl'} . $pkg->{'location'} . "\n";
-    print "P:$id@{$pkg->{'provides'} || []}\n";
-    print "R:$id@{$pkg->{'requires'} || []}\n";
-    print "C:$id@{$pkg->{'conflicts'} || []}\n" if @{$pkg->{'conflicts'} || []};
-    print "O:$id@{$pkg->{'obsoletes'} || []}\n" if @{$pkg->{'obsoletes'} || []};
-    my $tag = sprintf("%s-%s-%s %s", $pkg->{'name'}, $pkg->{'version'}, $pkg->{'release'}, $pkg->{'buildtime'});
-    print "I:$id$tag\n";
-  } elsif ($opt_old) {
-    my $arch = $pkg->{'arch'};
-    $arch = 'src' if $pkg->{'arch'} eq 'nosrc';
-    return if $arch eq 'src' && $opt_nosrc;
-    my $evr = $pkg->{'version'}.'-'.$pkg->{'release'};
-    $evr = "$pkg->{'epoch'}:$evr" if $pkg->{'epoch'};
-    if (exists($old_seen->{$pkg->{'name'}}->{$arch})) {
-      my $vv = Build::Rpm::verscmp($old_seen->{$pkg->{'name'}}->{$arch}->{'evr'}, $evr, 0);
-      if ($vv < 0) {
-	print $old_seen->{$pkg->{'name'}}->{$arch}->{'loc'}."\n";
-	$old_seen->{$pkg->{'name'}}->{$arch}->{'evr'} = $evr;
-	$old_seen->{$pkg->{'name'}}->{$arch}->{'loc'} = $pkg->{'baseurl'} . $pkg->{'location'};
-      } else {
-	print $pkg->{'baseurl'} . $pkg->{'location'}."\n";
-      }
-    } else {
-      $old_seen->{$pkg->{'name'}}->{$arch}->{'evr'} = $evr;
-      $old_seen->{$pkg->{'name'}}->{$arch}->{'loc'} = $pkg->{'baseurl'} . $pkg->{'location'};
+  my $arch = $pkg->{'arch'};
+  $arch = 'src' if $pkg->{'arch'} eq 'nosrc';
+  return if $arch eq 'src' && $opt_nosrc;
+  my $evr = $pkg->{'version'}.'-'.$pkg->{'release'};
+  $evr = "$pkg->{'epoch'}:$evr" if $pkg->{'epoch'};
+  my $loc = $baseurl . $pkg->{'location'};
+  if ($old_seen->{$pkg->{'name'}}->{$arch}) {
+    my $vv = Build::Rpm::verscmp($old_seen->{$pkg->{'name'}}->{$arch}->{'evr'}, $evr, 0);
+    if ($vv >= 0) {
+      print "$loc\n";
+      return;
     }
+    print $old_seen->{$pkg->{'name'}}->{$arch}->{'loc'}."\n";
   }
+  $old_seen->{$pkg->{'name'}}->{$arch}->{'evr'} = $evr;
+  $old_seen->{$pkg->{'name'}}->{$arch}->{'loc'} = $loc;
 }
 
 ### main
@@ -95,8 +88,12 @@ GetOptions (
 
 $opt_bc = 1 unless $opt_dump || $opt_old;
 
+my $old_seen = {};	# for opt_old
+my @packages;		# for opt_dump
+
 for my $url (@ARGV) {
   my $dir;
+  my $baseurl;
   if ($opt_zypp) {
     $dir = $opt_zypp;
     $dir .= '/' unless $dir =~ /\/$/;
@@ -152,7 +149,17 @@ for my $url (@ARGV) {
       use IO::Uncompress::Gunzip qw($GunzipError);
       $fh = new IO::Uncompress::Gunzip $fh or die "Error opening $u: $GunzipError\n";
     }
-    Build::Rpmmd::parse($fh, \&package_parsed, 'addselfprovides' => 1);
+    Build::Rpmmd::parse($fh, sub {
+      if ($opt_dump) {
+        $_[0]->{'baseurl'} = $baseurl;
+        push @packages, $_[0] if $opt_dump;
+      }
+      if ($opt_bc) {
+	printpkginfo($_[0], $baseurl);
+      } elsif ($opt_old) {
+	printold($_[0], $baseurl, $old_seen);
+      }
+    }, 'addselfprovides' => 1);
     close($fh);
   }
 }
