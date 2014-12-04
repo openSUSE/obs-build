@@ -236,6 +236,10 @@ sub parserepodata {
       push @{$d->{'provides'}}, @p;
     } elsif ($p eq '%DEPENDS%') {
       push @{$d->{'requires'}}, @p;
+    } elsif ($p eq '%CONFLICTS%') {
+      push @{$d->{'conflicts'}}, @p;
+    } elsif ($p eq '%REPLACES%') {
+      push @{$d->{'obsoletes'}}, @p;
     }
   }
   return $d;

@@ -49,6 +49,8 @@ sub printpkginfo {
   print "F:$id: $pkgurl\n";
   print "P:$id: " . join(' ', @{$d->{'provides'}}) . "\n" if $d->{'provides'};
   print "R:$id: " . join(' ', @{$d->{'requires'}}) . "\n" if $d->{'requires'};
+  print "C:$id: " . join(' ', @{$d->{'conflicts'}}) . "\n" if $d->{'conflicts'};
+  print "O:$id: " . join(' ', @{$d->{'obsoletes'}}) . "\n" if $d->{'obsoletes'};
   my $evr = $d->{'version'};
   $evr = "$d->{'epoch'}:$evr" if $d->{'epoch'};
   $evr = "$evr-$d->{'release'}" if defined $d->{'release'};
@@ -60,6 +62,7 @@ GetOptions("cachedir=s"  => \$cachedir) or exit(1);
 for my $url (@ARGV) {
   die("$url: not an remote Archlinux repo") unless $url =~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/;
   my $reponame = getreponame($url);
+  die("could not determine reponame from url $url\n") unless defined $reponame;
   my $repoid = Digest::MD5::md5_hex($url);
   my $dir = "$cachedir/$repoid";
   $url .= '/' unless $url =~ /\/$/;
