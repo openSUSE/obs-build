@@ -35,36 +35,30 @@ my $rpmdepfile;
 
 GetOptions ("oldfile=s" => \$rpmdepfile) or exit(1);
 
+sub queryfromfilename {
+  my ($fn) = @_;
+  $fn =~ s/.*\///;
+  return {'name' => $1, 'arch' => $2} if $fn =~ /^(.*)-[^-]+-[^-]+\.([^\. ]+)\.rpm$/;
+  return {'name' => $1, 'arch' => $2} if $fn =~ /^([^_]*)_(?:[^_]*)_([^_]*)\.deb$/;
+  return {'name' => $1, 'arch' => $2} if $fn =~ /^(.*)-[^-]+-[^-]+-([^-]+)\.pkg\.tar\.[gx]z$/;
+  return undef;
+}
+
 
 ######################################################################
 
-my %oldp;
-my %oldr;
-my %oldc;
-my %oldo;
+my %old;
 if (defined($rpmdepfile) && open(F, '<', $rpmdepfile)) {
   while (<F>) {
     chomp;
-    if (/^P:([^ ]+): /) {
-      $oldp{$1} = $_;
-    } elsif (/^R:([^ ]+): /) {
-      $oldr{$1} = $_;
-    } elsif (/^C:([^ ]+): /) {
-      $oldc{$1} = $_;
-    } elsif (/^O:([^ ]+): /) {
-      $oldo{$1} = $_;
-    }
+    $old{$1} = $_ if /^([PRCOI]:[^ ]+): /;
   }
   close F;
 }
 
-my %tag;
+my %seen;
 
-foreach my $dir (@ARGV) {
-  my @known;
-  my %known2fn;
-  my %known2path;
-  my %fnsize2id;
+for my $dir (@ARGV) {
   my $cmd = "find $dir -follow -type f \\( -name \"*.rpm\" -o -name \"*.deb\" -o -name \"*.pkg.tar.gz\" -o -name \"*.pkg.tar.xz\" \\) -a ! -name \"*src.rpm\" -printf '\%T@/\%s/\%i \%p\\n'";
   open(F, '-|', $cmd) or next;
   while (<F>) {
@@ -72,131 +66,34 @@ foreach my $dir (@ARGV) {
     next unless /^([\d\.]+\/\d+\/\d+) (.*)$/;
     my $id = $1;
     my $path = $2;
-    # new find added a fraction part to %T@, ignore it
+    # newer find version add a fraction part to %T@, strip it
     $id =~ s/^(\d+)\.\d+/$1/;
-    next unless $path =~ /\.(?:rpm|deb|pkg\.tar\.gz|pkg\.tar\.xz)$/;
-    my $fn = $path;
-    $fn =~ s/.*\///;
-    next if $fn =~ /\.(?:patch|delta)\.rpm$/;
-    my ($r, $arch);
-    if ($fn =~ /^(.*)-[^-]+-[^-]+\.([^\. ]+)\.rpm$/) {
-      $r = $1;
-      $arch = $2;
-    } elsif ($path =~ /^(?:.*\/)?([^\/ ]+)\/([^\/ ]+)\.rpm$/) {
-      #next if $1 eq '.';
-      $r = $2;
-      $arch = $1;
-    } elsif ($fn =~ /^([^_]*)_(?:[^_]*)_([^_]*)\.deb$/) {
-      $r = $1;
-      $arch = $2;
-    } elsif ($fn =~ /^(.*)-[^-]+-[^-]+-([^-]+)\.pkg\.tar\.[gx]z$/) {
-      $r = $1;
-      $arch = $2;
-    } else {
-      next;
-    }
-    next if $arch eq 'src' || $arch eq 'nosrc';
-    push @known, "$r.$arch-$id";
-    $known2fn{"$r.$arch-$id"} = $fn;
-    $known2path{"$r.$arch-$id"} = $path;
-    my $size = (split('/', $id))[1];
-    $fnsize2id{"$fn-$size"} = $id;
-  }
-
-  close F;
-
-  my %newp;
-  my %newr;
-  my %newc;
-  my %newo;
-  for (@known) {
-    $newp{$_} = $oldp{$_} if $oldp{$_};
-    $newr{$_} = $oldr{$_} if $oldr{$_};
-    $newc{$_} = $oldc{$_} if $oldc{$_};
-    $newo{$_} = $oldo{$_} if $oldo{$_};
-  }
-
-  my @todo = grep {!($newp{$_} && $newr{$_})} @known;
-  if (@todo) {
-    for my $known (@todo) {
-      my $path = $known2path{$known};
-      if ($path =~ /\.rpm$/) {
-	my %res = Build::Rpm::rpmq($path, 1000, 1001, 1002, 1006, 1022, 1047, 1049, 1048, 1050, 1053, 1054, 1055, 1090, 1112, 1113, 1114, 1115);
-	next unless %res;
-	Build::Rpm::add_flagsvers(\%res, 1047, 1112, 1113);
-	Build::Rpm::add_flagsvers(\%res, 1049, 1048, 1050);
-	Build::Rpm::add_flagsvers(\%res, 1054, 1053, 1055);
-	Build::Rpm::add_flagsvers(\%res, 1090, 1114, 1115);
-	my $id = $known;
-	$id =~ s/.*-//;
-	if ($known ne "$res{1000}->[0].$res{1022}->[0]-$id") {
-	  $known = "$res{1000}->[0].$res{1022}->[0]-$id";
-	  if (!$known2path{$known}) {
-	    push @known, $known;
-	    $known2path{$known} = $path;
+    next if $path =~ /\.(?:patch|delta)\.rpm$/;	# not good for building...
+    if (%old) {
+      my $q = queryfromfilename($path);
+      if ($q && defined($q->{'name'}) && defined($q->{'arch'})) {
+        my $idx = "$q->{'name'}.$q->{'arch'}-$id";
+	if ($old{"I:$idx"} && $old{"P:$idx"}) {
+	  # reuse old data
+	  next if $seen{$idx};
+	  $seen{$idx} = 1;
+	  print "F:$idx: $path\n";
+	  for (qw{P R C O I}) {
+	    print $old{"$_:$idx"}."\n" if $old{"$_:$idx"};
 	  }
+	  next;
 	}
-	# rpm3 compatibility: retrofit missing self provides
-	my $name = $res{1000}->[0];
-	if (!@{$res{1047} || []} || $res{1047}->[-1] !~ /^\Q$name\E =/) {
-	  my $evr = "$res{1001}->[0]-$res{1002}->[0]";
-	  $evr = "$res{1003}->[0]:$evr" if $res{1003} && $res{1003}->[0];
-	  push @{$res{1047}}, "$name = $evr";
-	}
-
-	$newp{$known} = "P:$known: ".join(' ', @{$res{1047} || []});
-	$newr{$known} = "R:$known: ".join(' ', @{$res{1049} || []});
-	$newc{$known} = "C:$known: ".join(' ', @{$res{1054} || []}) if @{$res{1054} || []};
-	$newo{$known} = "O:$known: ".join(' ', @{$res{1090} || []}) if @{$res{1090} || []};
-	#$tag{$known} = $res{1000}->[0]."-".$res{1001}->[0]."-".$res{1002}->[0]." ".$res{1007}->[0]."-".$res{1006}->[0];
-	$tag{$known} = $res{1000}->[0]."-".$res{1001}->[0]."-".$res{1002}->[0]." ".$res{1006}->[0];
-      } elsif ($path =~ /\.deb$/) {
-	my %res = Build::Deb::debq($path);
-	next unless %res;
-	my ($dn, $da) = ($res{'PACKAGE'}, $res{'ARCHITECTURE'});
-	my $id = $known;
-	$id =~ s/.*-//;
-	if ($known ne "$dn.$da-$id") {
-	  $known = "$dn.$da-$id";
-	  if (!$known2path{$known}) {
-	    push @known, $known;
-	    $known2path{$known} = $path;
-	  }
-	}
-	my @provides = split(',\s*', $res{'PROVIDES'} || '');
-	my @depends = split(',\s*', $res{'DEPENDS'} || '');
-	my @predepends = split(',\s*', $res{'PRE-DEPENDS'} || '');
-	push @depends, @predepends;
-	push @provides, "$res{'PACKAGE'} (= $res{'VERSION'})";
-	my @conflicts = split(',\s*', $res{'CONFLICTS'} || '');
-	my @breaks = split(',\s*', $res{'BREAKS'} || '');
-	push @conflicts, @breaks;
-	$newp{$known} = "P:$known: ".join(' ', @provides);
-	$newr{$known} = "R:$known: ".join(' ', @depends);
-	$newo{$known} = "C:$known: ".join(' ', @conflicts) if @conflicts;
-	$tag{$known} = "$dn-$res{'VERSION'} 0";
-      } elsif ($path =~ /\.tar\.[gx]z$/) {
-	my $res = Build::Arch::queryvars($path);
-	next unless $res;
-	my $name = ($res->{'pkgname'} || [])->[0];
-	my $pkgver = ($res->{'pkgver'} || [])->[0];
-	my $pkgarch = ($res->{'pkgarch'} || [])->[0];
-	my $provides = $res->{'provides'} || [];
-	push @$provides, "$name=$pkgver";
-	$newp{$known} = "P:$known: ".join(' ', @$provides);
-	$newr{$known} = "R:$known: ".join(' ', @{$res->{'depend'} || []});
-	$newc{$known} = "C:$known: ".join(' ', @{$res->{'conflict'}}) if $res->{'conflict'};
-	$newo{$known} = "O:$known: ".join(' ', @{$res->{'replaces'}}) if $res->{'replaces'};
       }
     }
+    my $q = Build::query($path, 'addselfprovides' => 1, 'conflicts' => 1, 'evra' => 1, 'buildtime' => 1);
+    next unless $q && defined($q->{'name'}) && defined($q->{'arch'}) && defined($q->{'version'});
+    my $idx = "$q->{'name'}.$q->{'arch'}-$id";
+    next if $seen{$idx};
+    $seen{$idx} = 1;
+    $q->{'id'} = $id;
+    $q->{'location'} = $path;
+    Build::writedeps(\*STDOUT, $q);
   }
-  @known = grep {$newp{$_} && $newr{$_}} @known;
-  for (@known) {
-    print "F:$_: $known2path{$_}\n";
-    print "$newp{$_}\n";
-    print "$newr{$_}\n";
-    print "$newc{$_}\n" if $newc{$_};
-    print "$newo{$_}\n" if $newo{$_};
-    print "I:$_: $tag{$_}\n" if exists $tag{$_};
-  }
+  close F;
 }
+

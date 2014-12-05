@@ -27,6 +27,7 @@ BEGIN {
 use strict;
 use Data::Dumper;
 use Getopt::Long;
+use Build ':rpm';
 use Build::Rpm;
 use Build::Rpmmd;
 use Digest::MD5 ();
@@ -41,19 +42,6 @@ my $opt_nosrc;
 my $opt_bc;
 my $opt_zypp;
 my $cachedir = "/var/cache/build";
-
-sub printpkginfo {
-  my ($pkg, $baseurl) = @_;
-  return if $pkg->{'arch'} eq 'src' || $pkg->{'arch'} eq 'nosrc';
-  my $id = sprintf("%s.%s-%d/%d/%d: ", $pkg->{'name'}, $pkg->{'arch'}, $pkg->{'buildtime'}, $pkg->{'filetime'}, 0);
-  print "F:$id$baseurl$pkg->{'location'}\n";
-  print "P:$id@{$pkg->{'provides'} || []}\n";
-  print "R:$id@{$pkg->{'requires'} || []}\n";
-  print "C:$id@{$pkg->{'conflicts'} || []}\n" if @{$pkg->{'conflicts'} || []};
-  print "O:$id@{$pkg->{'obsoletes'} || []}\n" if @{$pkg->{'obsoletes'} || []};
-  my $tag = sprintf("%s-%s-%s %s", $pkg->{'name'}, $pkg->{'version'}, $pkg->{'release'}, $pkg->{'buildtime'});
-  print "I:$id$tag\n";
-}
 
 sub printold {
   my ($pkg, $baseurl, $old_seen) = @_;
@@ -75,8 +63,6 @@ sub printold {
   $old_seen->{$pkg->{'name'}}->{$arch}->{'evr'} = $evr;
   $old_seen->{$pkg->{'name'}}->{$arch}->{'loc'} = $loc;
 }
-
-### main
 
 GetOptions (
   "nosrc"   => \$opt_nosrc,
@@ -155,7 +141,7 @@ for my $url (@ARGV) {
         push @packages, $_[0] if $opt_dump;
       }
       if ($opt_bc) {
-	printpkginfo($_[0], $baseurl);
+	Build::writedeps(\*STDOUT, $_[0], $baseurl);
       } elsif ($opt_old) {
 	printold($_[0], $baseurl, $old_seen);
       }

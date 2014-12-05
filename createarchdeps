@@ -27,6 +27,7 @@ BEGIN {
 }
 
 use strict;
+use Build ':arch';
 use Build::Archrepo;
 use Digest::MD5 ();
 use File::Path;
@@ -42,21 +43,6 @@ sub getreponame {
   return undef;
 }
 
-sub printpkginfo {
-  my ($d, $repourl)  = @_;
-  my $id = "$d->{'name'}.$d->{'arch'}-$d->{'buildtime'}/0/0";
-  my $pkgurl = $repourl . $d->{'location'};
-  print "F:$id: $pkgurl\n";
-  print "P:$id: " . join(' ', @{$d->{'provides'}}) . "\n" if $d->{'provides'};
-  print "R:$id: " . join(' ', @{$d->{'requires'}}) . "\n" if $d->{'requires'};
-  print "C:$id: " . join(' ', @{$d->{'conflicts'}}) . "\n" if $d->{'conflicts'};
-  print "O:$id: " . join(' ', @{$d->{'obsoletes'}}) . "\n" if $d->{'obsoletes'};
-  my $evr = $d->{'version'};
-  $evr = "$d->{'epoch'}:$evr" if $d->{'epoch'};
-  $evr = "$evr-$d->{'release'}" if defined $d->{'release'};
-  print "I:$id: $d->{name}-$evr $d->{'buildtime'}\n";
-}
-
 GetOptions("cachedir=s"  => \$cachedir) or exit(1);
 
 for my $url (@ARGV) {
@@ -68,5 +54,5 @@ for my $url (@ARGV) {
   $url .= '/' unless $url =~ /\/$/;
   File::Path::mkpath($dir);
   system("$INC[0]/download", $dir, "$url$reponame.db");
-  Build::Archrepo::parse("$dir/$reponame.db", sub { printpkginfo($_[0], $url) }, 'addselfprovides' => 1);
+  Build::Archrepo::parse("$dir/$reponame.db", sub { Build::writedeps(\*STDOUT, $_[0], $url) }, 'addselfprovides' => 1);
 }

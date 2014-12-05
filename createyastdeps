@@ -24,27 +24,13 @@ BEGIN {
   unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
 }
 
-use Build;
+use Build ':rpm';
 use Build::Susetags;
 use Getopt::Long;
 
 use strict;
 
 Getopt::Long::Configure("no_ignore_case");
-
-sub callback {
-  my ($pkg, $url, $datadir) = @_;
-  return if $pkg->{'arch'} eq 'src' || $pkg->{'arch'} eq 'nosrc';
-  $url =~ s/1\/$/$pkg->{'medium'}/ if $pkg->{'medium'}; # multi cd support hack
-  my $id = sprintf("%s.%s-%d/%d/%d: ", $pkg->{'name'}, $pkg->{'arch'}, $pkg->{'buildtime'}, 0, 0);
-  print "F:$id${url}$datadir/$pkg->{'location'}\n";
-  print "P:$id".join(' ', @{$pkg->{'provides'} || []})."\n";
-  print "R:$id".join(' ', @{$pkg->{'requires'}})."\n" if $pkg->{'requires'};
-  print "C:$id".join(' ', @{$pkg->{'conflicts'}})."\n" if $pkg->{'conflicts'};
-  print "O:$id".join(' ', @{$pkg->{'obsoletes'}})."\n" if $pkg->{'obsoletes'};
-  my $tag = sprintf("%s-%s-%s %s", $pkg->{'name'}, $pkg->{'version'}, $pkg->{'release'}, $pkg->{'buildtime'});
-  print "I:$id$tag\n";
-}
 
 my $opt_zypp;
 my $cachedir = "/var/cache/build";
@@ -61,6 +47,12 @@ for my $url (@ARGV) {
   my $datadir = 'suse';
   my $packages = "$dir$descrdir/packages";
   $packages = "$packages.gz" if ! -e $packages && -e "$packages.gz";
-  Build::Susetags::parse($packages, sub { callback($_[0], $url, $datadir) }, 'addselfprovides' => 1);
+  Build::Susetags::parse($packages, sub {
+    my $xurl = $url;
+    # multi cd support hack
+    $xurl =~ s/1\/$/$_[0]->{'medium'}/ if $_[0]->{'medium'};
+    $xurl .= "$datadir/" if $datadir;
+    Build::writedeps(\*STDOUT, $_[0], $xurl);
+  }, 'addselfprovides' => 1);
 }
 

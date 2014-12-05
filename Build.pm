@@ -577,7 +577,7 @@ sub readdeps {
   my %provides;
   my %pkgconflicts;
   my %pkgobsoletes;
-  my $dofileprovides = %{$config->{'fileprovides'}};
+  my $dofileprovides = %{$config->{'fileprovides'} || {}};
   for my $depfile (@depfiles) {
     if (ref($depfile) eq 'HASH') {
       for my $rr (keys %$depfile) {
@@ -589,10 +589,22 @@ sub readdeps {
       next;
     }
     # XXX: we don't support different architectures per file
-    open(F, "<$depfile") || die("$depfile: $!\n");
+    open(F, '<', $depfile) || die("$depfile: $!\n");
     while(<F>) {
       my @s = split(' ', $_);
       my $s = shift @s;
+      if ($pkginfo && ($s =~ /^I:(.*)\.(.*)-\d+\/\d+\/\d+:$/)) {
+	my $pkgid = $1;
+	my $arch = $2; 
+	my $evr = $s[0];
+	$pkginfo->{$pkgid}->{'buildtime'} = $s[1] if $s[1];
+	if ($evr =~ s/^\Q$pkgid-//) {
+	  $pkginfo->{$pkgid}->{'epoch'} = $1 if $evr =~ s/^(\d+)://;
+	  $pkginfo->{$pkgid}->{'release'} = $1 if $evr =~ s/-([^-]*)$//;
+	  $pkginfo->{$pkgid}->{'version'} = $evr;
+	}
+	next;
+      }
       my @ss;
       while (@s) {
 	if (!$dofileprovides && $s[0] =~ /^\//) {
@@ -616,6 +628,14 @@ sub readdeps {
       if ($s =~ /^(P|R|C|O):(.*)\.(.*)-\d+\/\d+\/\d+:$/) {
 	my $pkgid = $2;
 	my $arch = $3;
+	if ($1 eq "P") {
+	  $provides{$pkgid} = \@ss;
+	  if ($pkginfo) {
+	    $pkginfo->{$pkgid}->{'name'} = $pkgid;
+	    $pkginfo->{$pkgid}->{'arch'} = $arch;
+	    $pkginfo->{$pkgid}->{'provides'} = \@ss;
+	  }
+	}
 	if ($1 eq "R") {
 	  $requires{$pkgid} = \@ss;
 	  $pkginfo->{$pkgid}->{'requires'} = \@ss if $pkginfo;
@@ -631,27 +651,59 @@ sub readdeps {
 	  $pkginfo->{$pkgid}->{'obsoletes'} = \@ss if $pkginfo;
 	  next;
 	}
-	# handle provides
-	$provides{$pkgid} = \@ss;
-	if ($pkginfo) {
-	  # extract ver and rel from self provides
-	  my ($v, $r) = map { /\Q$pkgid\E = ([^-]+)(?:-(.+))?$/ } @ss;
-	  die("$pkgid: no self provides\n") unless defined($v) && $v ne '';
-	  $pkginfo->{$pkgid}->{'name'} = $pkgid;
-	  $pkginfo->{$pkgid}->{'version'} = $v;
-	  $pkginfo->{$pkgid}->{'release'} = $r if defined($r);
-	  $pkginfo->{$pkgid}->{'arch'} = $arch;
-	  $pkginfo->{$pkgid}->{'provides'} = \@ss;
-	}
       }
     }
     close F;
+  }
+  if ($pkginfo) {
+    # extract evr from self provides
+    for my $pkg (values %$pkginfo) {
+      next if $pkg->{'epoch'};	# oh well
+      next unless defined($pkg->{'name'}) && $pkg->{'provides'};
+      my @sp;
+      my $n = $pkg->{'name'};
+      if (defined($pkg->{'version'})) {
+	# try to get epoch from self-provides
+	my $vr = $pkg->{'version'};
+	$vr .= "-$pkg->{'release'}" if defined $pkg->{'release'};
+	@sp = grep {/^\Q$n\E = \d+:\Q$vr\E/} $pkg->{'provides'};
+      } else {
+	@sp = grep {/^\Q$n\E = /} $pkg->{'provides'};
+      }
+      if (@sp) {
+	my $evr = $sp[-1];
+	$evr =~ s/^\Q$n\E =\s*//;
+	$pkg->{'epoch'} = $1 if $evr =~ s/^(\d+)://;
+	$pkg->{'release'} = $1 if $evr =~ s/-([^-]*)$//;
+	$pkg->{'version'} = $evr;
+      }
+    }
   }
   $config->{'providesh'} = \%provides;
   $config->{'requiresh'} = \%requires;
   $config->{'pkgconflictsh'} = \%pkgconflicts;
   $config->{'pkgobsoletesh'} = \%pkgobsoletes;
   makewhatprovidesh($config);
+}
+
+sub writedeps {
+  my ($fh, $pkg, $url) = @_;
+  $url = '' unless defined $url;
+  return unless defined($pkg->{'name'}) && defined($pkg->{'arch'});
+  return if $pkg->{'arch'} eq 'src' || $pkg->{'arch'} eq 'nosrc';
+  my $id = $pkg->{'id'};
+  $id = ($pkg->{'buildtime'} || 0)."/".($pkg->{'filetime'} || 0)."/0" unless $id;
+  $id = "$pkg->{'name'}.$pkg->{'arch'}-$id: ";
+  print $fh "F:$id$url$pkg->{'location'}\n";
+  print $fh "P:$id".join(' ', @{$pkg->{'provides'} || []})."\n";
+  print $fh "R:$id".join(' ', @{$pkg->{'requires'}})."\n" if $pkg->{'requires'};
+  print $fh "C:$id".join(' ', @{$pkg->{'conflicts'}})."\n" if $pkg->{'conflicts'};
+  print $fh "O:$id".join(' ', @{$pkg->{'obsoletes'}})."\n" if $pkg->{'obsoletes'};
+  my $evr = $pkg->{'version'};
+  $evr = "$pkg->{'epoch'}:$evr" if $pkg->{'epoch'} && $pkg->{'location'} !~ /\.rpm$/;
+  $evr .= "-$pkg->{'release'}" if defined $pkg->{'release'};
+  my $buildtime = $pkg->{'buildtime'} || 0;
+  print $fh "I:$id$pkg->{'name'}-$evr $buildtime\n";
 }
 
 sub makewhatprovidesh {
