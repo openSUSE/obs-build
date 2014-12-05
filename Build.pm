@@ -666,13 +666,13 @@ sub readdeps {
 	# try to get epoch from self-provides
 	my $vr = $pkg->{'version'};
 	$vr .= "-$pkg->{'release'}" if defined $pkg->{'release'};
-	@sp = grep {/^\Q$n\E = \d+:\Q$vr\E/} $pkg->{'provides'};
+	@sp = grep {/^\Q$n\E\s*=\s*\d+:\Q$vr\E/} @{$pkg->{'provides'}};
       } else {
-	@sp = grep {/^\Q$n\E = /} $pkg->{'provides'};
+	@sp = grep {/^\Q$n\E\s*=\s*/} @{$pkg->{'provides'}};
       }
       if (@sp) {
 	my $evr = $sp[-1];
-	$evr =~ s/^\Q$n\E =\s*//;
+	$evr =~ s/^\Q$n\E\s*=\s*//;
 	$pkg->{'epoch'} = $1 if $evr =~ s/^(\d+)://;
 	$pkg->{'release'} = $1 if $evr =~ s/-([^-]*)$//;
 	$pkg->{'version'} = $evr;
