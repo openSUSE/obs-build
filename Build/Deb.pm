@@ -283,22 +283,27 @@ sub query {
     $src =~ s/\s.*$//;
   }
   my @provides = split(',\s*', $res{'PROVIDES'} || '');
-  push @provides, "$name = $res{'VERSION'}";
+  if ($opts{'addselfprovides'}) {
+    push @provides, "$name (= $res{'VERSION'})";
+  }
   my @depends = split(',\s*', $res{'DEPENDS'} || '');
-  my @predepends = split(',\s*', $res{'PRE-DEPENDS'} || '');
-  push @depends, @predepends;
-  s/ \(([^\)]*)\)/ $1/g for @provides;
-  s/ \(([^\)]*)\)/ $1/g for @depends;
-  s/>>/>/g for @provides;
-  s/<</</g for @provides;
-  s/>>/>/g for @depends;
-  s/<</</g for @depends;
+  push @depends, split(',\s*', $res{'PRE-DEPENDS'} || '');
   my $data = {
     name => $name,
     hdrmd5 => $res{'CONTROL_MD5'},
     provides => \@provides,
     requires => \@depends,
   };
+  if ($opts{'conflicts'}) {
+    my @conflicts = split(',\s*', $res{'CONFLICTS'} || '');
+    push @conflicts, split(',\s*', $res{'BREAKS'} || '');
+    $data->{'conflicts'} = \@conflicts if @conflicts;
+  }
+  if ($opts{'weakdeps'}) {
+    for my $dep ('SUGGESTS', 'RECOMMENDS', 'ENHANCES') {
+      $data->{lc($dep)} = [ split(',\s*', $res{$dep} || '') ] if defined $res{$dep};
+    }
+  }
   $data->{'source'} = $src if $src ne '';
   if ($opts{'evra'}) {
     $res{'VERSION'} =~ /^(?:(\d+):)?(.*?)(?:-([^-]*))?$/s;
@@ -309,6 +314,16 @@ sub query {
   }
   if ($opts{'description'}) {
     $data->{'description'} = $res{'DESCRIPTION'};
+  }
+  if ($opts{'normalizedeps'}) {
+    for my $dep (qw{provides requires conflicts suggests enhances recommends}) {
+      next unless $data->{$dep};
+      for (@{$data->{$dep}}) {
+        s/ \(([^\)]*)\)/ $1/g;
+        s/<</</g;
+        s/>>/>/g;
+      }
+    }
   }
   return $data;
 }

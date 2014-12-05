@@ -168,7 +168,7 @@ sub query {
   $ret->{'hdrmd5'} = Digest::MD5::md5_hex($vars->{'_pkginfo'});
   $ret->{'provides'} = $vars->{'provides'} || [];
   $ret->{'requires'} = $vars->{'depend'} || [];
-  if ($vars->{'pkgname'}) {
+  if ($vars->{'pkgname'} && $opts{'addselfprovides'}) {
     my $selfprovides = $vars->{'pkgname'}->[0];
     $selfprovides .= "=$vars->{'pkgver'}->[0]" if $vars->{'pkgver'};
     push @{$ret->{'provides'}}, $selfprovides unless @{$ret->{'provides'} || []} && $ret->{'provides'}->[-1] eq $selfprovides;
@@ -190,6 +190,15 @@ sub query {
   }
   if ($opts{'description'}) {
     $ret->{'description'} = $vars->{'pkgdesc'}->[0] if $vars->{'pkgdesc'};
+  }
+  if ($opts{'conflicts'}) {
+    $ret->{'conflicts'} = $vars->{'conflict'} if $vars->{'conflict'};
+    $ret->{'obsoletes'} = $vars->{'replaces'} if $vars->{'replaces'};
+  }
+  if ($opts{'weakdeps'}) {
+    my @suggests = @{$vars->{'optdepend'} || []};
+    s/:.*// for @suggests;
+    $ret->{'suggests'} = \@suggests if @suggests;
   }
   # arch packages don't seem to have a source :(
   # fake it so that the package isn't confused with a src package

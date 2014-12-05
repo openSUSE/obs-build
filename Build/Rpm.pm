@@ -619,6 +619,30 @@ my %rpmstag = (
   "BASENAMES"      => 1117,
   "DIRNAMES"       => 1118,
   "DISTURL"        => 1123,
+  "CONFLICTFLAGS"  => 1053,
+  "CONFLICTNAME"   => 1054,
+  "CONFLICTVERSION" => 1055,
+  "OBSOLETENAME"   => 1090,
+  "OBSOLETEFLAGS"  => 1114,
+  "OBSOLETEVERSION" => 1115,
+  "OLDSUGGESTSNAME" => 1156,
+  "OLDSUGGESTSVERSION" => 1157,
+  "OLDSUGGESTSFLAGS" => 1158,
+  "OLDENHANCESNAME" => 1159,
+  "OLDENHANCESVERSION" => 1160,
+  "OLDENHANCESFLAGS" => 1161,
+  "RECOMMENDNAME" => 5046,
+  "RECOMMENDVERSION" => 5047,
+  "RECOMMENDFLAGS" => 5048,
+  "SUGGESTNAME"    => 5049,
+  "SUGGESTVERSION" => 5050,
+  "SUGGESTFLAGS"   => 5051,
+  "SUPPLEMENTNAME" => 5052,
+  "SUPPLEMENTVERSION" => 5053,
+  "SUPPLEMENTFLAGS" => 5054,
+  "ENHANCENAME"    => 5055,
+  "ENHANCEVERSION" => 5056,
+  "ENHANCEFLAGS"   => 5057,
 );
 
 sub rpmq {
@@ -783,12 +807,9 @@ sub rpmq {
 }
 
 sub add_flagsvers {
-  my $res = shift;
-  my $name = shift;
-  my $flags = shift;
-  my $vers = shift;
+  my ($res, $name, $flags, $vers) = @_;
 
-  return unless $res;
+  return unless $res && $res->{$name};
   my @flags = @{$res->{$flags} || []};
   my @vers = @{$res->{$vers} || []};
   for (@{$res->{$name}}) {
@@ -802,6 +823,25 @@ sub add_flagsvers {
     shift @flags;
     shift @vers;
   }
+}
+
+sub filteroldweak {
+  my ($res, $name, $flags, $data, $strong, $weak) = @_;
+
+  return unless $res && $res->{$name};
+  my @flags = @{$res->{$flags} || []};
+  my @strong;
+  my @weak;
+  for (@{$res->{$name}}) {
+    if (@flags && ($flags[0] & 0x8000000)) {
+      push @strong, $_;
+    } else {
+      push @weak, $_;
+    }
+    shift @flags;
+  }
+  $data->{$strong} = \@strong if @strong;
+  $data->{$weak} = \@weak if @weak;
 }
 
 sub verscmp_part {
@@ -883,6 +923,9 @@ sub query {
   push @tags, qw{SUMMARY DESCRIPTION} if $opts{'description'};
   push @tags, qw{DISTURL} if $opts{'disturl'};
   push @tags, qw{BUILDTIME} if $opts{'buildtime'};
+  push @tags, qw{CONFLICTNAME CONFLICTVERSION CONFLICTFLAGS OBSOLETENAME OBSOLETEVERSION OBSOLETEFLAGS} if $opts{'conflicts'};
+  push @tags, qw{RECOMMENDNAME RECOMMENDVERSION RECOMMENDFLAGS SUGGESTNAME SUGGESTVERSION SUGGESTFLAGS SUPPLEMENTNAME SUPPLEMENTVERSION SUPPLEMENTFLAGS ENHANCENAME ENHANCEVERSION ENHANCEFLAGS OLDSUGGESTSNAME OLDSUGGESTSVERSION OLDSUGGESTSFLAGS OLDENHANCESNAME OLDENHANCESVERSION OLDENHANCESFLAGS} if $opts{'weakdeps'};
+
   my %res = rpmq($handle, @tags);
   return undef unless %res;
   my $src = $res{'SOURCERPM'}->[0];
@@ -900,6 +943,27 @@ sub query {
   } else {
     $data->{'provides'} = [ grep {!/^rpmlib\(/ && !/^\//} @{$res{'PROVIDENAME'} || []} ];
     $data->{'requires'} = [ grep {!/^rpmlib\(/ && !/^\//} @{$res{'REQUIRENAME'} || []} ];
+  }
+  if ($opts{'conflicts'}) {
+    add_flagsvers(\%res, 'CONFLICTNAME', 'CONFLICTFLAGS', 'CONFLICTVERSION');
+    add_flagsvers(\%res, 'OBSOLETENAME', 'OBSOLETEFLAGS', 'OBSOLETEVERSION');
+    $data->{'conflicts'} = [ @{$res{'CONFLICTNAME'}} ] if $res{'CONFLICTNAME'};
+    $data->{'obsoletes'} = [ @{$res{'OBSOLETENAME'}} ] if $res{'OBSOLETENAME'};
+  }
+  if ($opts{'weakdeps'}) {
+    for (qw{RECOMMEND SUGGEST SUPPLEMENT ENHANCE}) {
+      next unless $res{"${_}NAME"};
+      add_flagsvers(\%res, "${_}NAME", "${_}FLAGS", "${_}VERSION");
+      $data->{lc($_)."s"} = [ @{$res{"${_}NAME"}} ];
+    }
+    if ($res{'OLDSUGGESTSNAME'}) {
+      add_flagsvers(\%res, 'OLDSUGGESTSNAME', 'OLDSUGGESTSFLAGS', 'OLDSUGGESTSVERSION');
+      filteroldweak(\%res, 'OLDSUGGESTSNAME', 'OLDSUGGESTSFLAGS', $data, 'recommends', 'suggests');
+    }
+    if ($res{'OLDENHANCESNAME'}) {
+      add_flagsvers(\%res, 'OLDENHANCESNAME', 'OLDENHANCESFLAGS', 'OLDENHANCESVERSION');
+      filteroldweak(\%res, 'OLDENHANCESNAME', 'OLDENHANCESFLAGS', $data, 'supplements', 'enhances');
+    }
   }
 
   # rpm3 compatibility: retrofit missing self provides
