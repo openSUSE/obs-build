@@ -343,7 +343,7 @@ create_cache_file() {
 	    elif test -z "$findonly" -a -e "$SRC"/repodata/repomd.xml ; then
 		set -- $BUILD_DIR/createrepomddeps "$SRC"
 	    else
-		set -- $BUILD_DIR/createrpmdeps --oldfile "$CACHE_FILE" "$SRC"
+		set -- $BUILD_DIR/createdirdeps --oldfile "$CACHE_FILE" "$SRC"
 	    fi
 	    echo "$@" >&2
 	    "$@" || cleanup_and_exit 1

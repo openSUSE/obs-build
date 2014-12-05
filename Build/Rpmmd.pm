@@ -125,7 +125,7 @@ my $primaryparser = {
         'rpm:obsoletes' =>   { 'rpm:entry' => { _start => \&primary_handle_dep , _tag => 'obsoletes' }, },
         'rpm:buildhost' => { _text => 1, _end => \&generic_store_text, _tag => 'buildhost' },
         'rpm:sourcerpm' => { _text => 1, _end => \&primary_handle_sourcerpm , _tag => 'source' },
-### currently commented out, as we ignore file provides in createrpmdeps
+### currently commented out, as we ignore file provides in expanddeps
 #       file => { _text => 1, _end => \&primary_handle_file_end, _tag => 'provides' },
       },
       location => { _start => \&generic_store_attr, _attr => 'href', _tag => 'location'},

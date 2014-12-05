@@ -31,9 +31,9 @@ use strict;
 
 Getopt::Long::Configure("no_ignore_case");
 
-my $rpmdepfile;
+my $oldfile;
 
-GetOptions ("oldfile=s" => \$rpmdepfile) or exit(1);
+GetOptions ("oldfile=s" => \$oldfile) or exit(1);
 
 sub queryfromfilename {
   my ($fn) = @_;
@@ -48,7 +48,7 @@ sub queryfromfilename {
 ######################################################################
 
 my %old;
-if (defined($rpmdepfile) && open(F, '<', $rpmdepfile)) {
+if (defined($oldfile) && open(F, '<', $oldfile)) {
   while (<F>) {
     chomp;
     $old{$1} = $_ if /^([PRCOI]:[^ ]+): /;

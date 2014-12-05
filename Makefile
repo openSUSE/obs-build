@@ -31,7 +31,7 @@ install:
 	install -m755 \
 	    build \
 	    vc \
-	    createrpmdeps \
+	    createdirdeps \
 	    order \
 	    expanddeps \
 	    computeblocklists \
