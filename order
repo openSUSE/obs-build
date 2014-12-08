@@ -86,7 +86,7 @@ for my $p (@p) {
       $q = {'provides' => [], 'requires' => []}; # package from preinstallimage, no need to order
       last;
     }
-    $q = Build::query("$cachedir/$p.$suf", 'filelist' => 1, 'alldeps' => 1);
+    $q = Build::query("$cachedir/$p.$suf", 'filelist' => 1, 'alldeps' => 1, 'addselfprovides' => 1, 'normalizedeps' => 1);
     die("bad binary: $p.$suf\n") unless $q;
     push @{$q->{'provides'}}, @{$q->{'filelist'}} if $suf eq 'rpm' && $q->{'filelist'};
     delete $q->{'filelist'};
