@@ -28,7 +28,7 @@ use strict;
 
 use Build;
 
-my ($dist, $archs, $configdir, $debug, $type, $argument);
+my ($dist, $archs, $configdir, $type, $argument);
 
 $configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
 

@@ -28,19 +28,13 @@ pkg_initdb_arch() {
     touch $BUILD_ROOT/var/lib/pacman/sync/community.db
 }
 
-pkg_get_installed_arch() {
+pkg_prepare_arch() {
     :
 }
 
-pkg_set_packageid_arch() {
-    PKGID=`readlink $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF`
-    PKGID="${PKGID##*/}"
-    PKGID="${PKGID/%.pkg.tar.?z/.arch}"
-    PKGID="${PKGID%.arch} arch"
-}
-
 pkg_erase_arch() {
-    cleanup_and_exit 1
+    ( cd $BUILD_ROOT && chroot $BUILD_ROOT pacman -R -n -d -d --noconfirm $PKG 2>&1 || touch $BUILD_ROOT/exit ) | \
+	perl -ne '$|=1;/^(Total Removed Size: |Packages \(\d+\):|:: Do you want to remove these packages|deleting |removing |    )/||/^$/||print'
 }
 
 pkg_verify_installed_arch() {

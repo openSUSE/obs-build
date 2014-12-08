@@ -177,6 +177,26 @@ sub ungzip {
   return $data;
 }
 
+sub control2res {
+  my ($control) = @_;
+  my %res;
+  my @control = split("\n", $control);
+  while (@control) {
+    my $c = shift @control;
+    last if $c eq '';   # new paragraph
+    my ($tag, $data) = split(':', $c, 2);
+    next unless defined $data;
+    $tag = uc($tag);
+    while (@control && $control[0] =~ /^\s/) {
+      $data .= "\n".substr(shift @control, 1);
+    }
+    $data =~ s/^\s+//s;
+    $data =~ s/\s+$//s;
+    $res{$tag} = $data;
+  }
+  return %res;
+}
+
 sub debq {
   my ($fn) = @_;
 
@@ -252,21 +272,7 @@ sub debq {
     }
     $data = substr($data, $blen);
   }
-  my %res;
-  my @control = split("\n", $control);
-  while (@control) {
-    my $c = shift @control;
-    last if $c eq '';   # new paragraph
-    my ($tag, $data) = split(':', $c, 2);
-    next unless defined $data;
-    $tag = uc($tag);
-    while (@control && $control[0] =~ /^\s/) {
-      $data .= "\n".substr(shift @control, 1);
-    }
-    $data =~ s/^\s+//s;
-    $data =~ s/\s+$//s;
-    $res{$tag} = $data;
-  }
+  my %res = control2res($control);
   $res{'CONTROL_MD5'} = $controlmd5;
   return %res;
 }
@@ -403,6 +409,39 @@ sub verscmp {
   $r1 = '' unless defined $r1;
   $r2 = '' unless defined $r2;
   return verscmp_part($r1, $r2);
+}
+
+sub queryinstalled {
+  my ($root, %opts) = @_;
+
+  $root = '' if !defined($root) || $root eq '/';
+  my @pkgs;
+  local *F;
+  if (open(F, '<', "$root/var/lib/dpkg/status")) {
+    my $ctrl = '';
+    my $nl;
+    while(<F>) {
+      if ($_ eq "\n" && $nl) {
+	my %res = control2res($ctrl);
+	if (defined($res{'PACKAGE'})) {
+	  my $data = {'name' => $res{'PACKAGE'}};
+	  $res{'VERSION'} =~ /^(?:(\d+):)?(.*?)(?:-([^-]*))?$/s;
+	  $data->{'epoch'} = $1 if defined $1;
+	  $data->{'version'} = $2;
+	  $data->{'release'} = $3 if defined $3;
+	  $data->{'arch'} = $res{'ARCHITECTURE'};
+	  push @pkgs, $data;
+	}
+        $ctrl = '';
+        undef $nl;
+	next;
+      }
+      $ctrl .= $_;
+      $nl = 1 if $_ eq "\n";
+    }
+    close F;
+  }
+  return \@pkgs;
 }
 
 1;

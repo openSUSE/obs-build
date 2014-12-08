@@ -254,4 +254,33 @@ sub parserepodata {
   return $d;
 }
 
+sub queryinstalled {
+  my ($root, %opts) = @_; 
+
+  $root = '' if !defined($root) || $root eq '/';
+  local *D;
+  local *F;
+  opendir(D, "$root/var/lib/pacman/local") || return [];
+  my @pn = sort(grep {!/^\./} readdir(D));
+  closedir(D);
+  my @pkgs;
+  for my $pn (@pn) {
+    next unless open(F, '<', "$root/var/lib/pacman/local/$pn/desc");
+    my $data = '';
+    1 while sysread(F, $data, 8192, length($data));
+    close F;
+    my $d = parserepodata(undef, $data);
+    next unless defined $d->{'name'};
+    my $q = {};
+    for (qw{name arch buildtime version}) {
+      $q->{$_} = $d->{$_} if defined $d->{$_};
+    }
+    $q->{'epoch'} = $1 if $q->{'version'} =~ s/^(\d+)://s;
+    $q->{'release'} = $1 if $q->{'version'} =~ s/-([^-]*)$//s;
+    push @pkgs, $q;
+  }
+  return \@pkgs;
+}
+
+
 1;

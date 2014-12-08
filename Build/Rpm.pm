@@ -1057,4 +1057,48 @@ sub queryhdrmd5 {
   return unpack("\@${md5off}H32", $buf);
 }
 
+sub queryinstalled {
+  my ($root, %opts) = @_;
+
+  $root = '' if !defined($root) || $root eq '/';
+  local *F;
+  my $dochroot = $root ne '' && !$opts{'nochroot'} && !$< && (-x "$root/usr/bin/rpm" || -x "$root/bin/rpm") ? 1 : 0;
+  my $pid = open(F, '-|');
+  die("fork: $!\n") unless defined $pid;
+  if (!$pid) {
+    if ($dochroot && chroot($root)) {
+      chdir('/') || die("chdir: $!\n");
+      $root = '';
+    }
+    my @args;
+    unshift @args, '--nodigest', '--nosignature' if -e "$root/usr/bin/rpmquery ";
+    unshift @args, '--dbpath', "$root/var/lib/rpm" if $root ne '';
+    push @args, '--qf', '%{NAME}/%{ARCH}/%|EPOCH?{%{EPOCH}}:{0}|/%{VERSION}/%{RELEASE}/%{BUILDTIME}\n';
+    if (-x "$root/usr/bin/rpm") {
+      exec("$root/usr/bin/rpm", '-qa', @args);
+      die("$root/usr/bin/rpm: $!\n");
+    }
+    if (-x "$root/bin/rpm") {
+      exec("$root/bin/rpm", '-qa', @args);
+      die("$root/bin/rpm: $!\n");
+    }
+    die("rpm: command not found\n");
+  }
+  my @pkgs;
+  while (<F>) {
+    chomp;
+    my @s = split('/', $_);
+    next unless @s >= 5;
+    my $q = {'name' => $s[0], 'arch' => $s[1], 'version' => $s[3], 'release' => $s[4]};
+    $q->{'epoch'} = $s[2] if $s[2];
+    $q->{'buildtime'} = $s[5] if $s[5];
+    push @pkgs, $q;
+  }
+  if (!close(F)) {
+    return queryinstalled($root, %opts, 'nochroot' => 1) if !@pkgs && $dochroot;
+    die("rpm: $?\n");
+  }
+  return \@pkgs;
+}
+
 1;

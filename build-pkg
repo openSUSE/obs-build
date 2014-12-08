@@ -29,12 +29,8 @@ pkg_initdb() {
     pkg_initdb_$PSUF "$@"
 }
 
-pkg_get_installed() {
-    pkg_get_installed_$PSUF "$@"
-}
-
-pkg_set_packageid() {
-    pkg_set_packageid_$PSUF "$@"
+pkg_prepare() {
+    pkg_prepare_$PSUF "$@"
 }
 
 pkg_install() {

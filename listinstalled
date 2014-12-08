@@ -1,0 +1,59 @@
+#!/usr/bin/perl -w
+
+################################################################
+#
+# Copyright (c) 1995-2014 SUSE Linux Products GmbH
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+BEGIN {
+  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+}
+
+use Getopt::Long;
+use Build;
+
+use strict;
+
+Getopt::Long::Configure("no_ignore_case");
+
+my $opt_root;
+my $opt_type;
+my $opt_extraname;
+
+GetOptions ("root=s" => \$opt_root, "type=s" => \$opt_type, "extraname" => \$opt_extraname) or exit(1);
+
+$opt_type ||= 'rpm';
+
+my $ql = Build::queryinstalled($opt_type, $opt_root);
+die("cannot get list of installed packages for type $opt_type\n") unless $ql;
+
+for my $q (@$ql) {
+  next unless defined($q->{'name'}) && defined($q->{'arch'});
+  next if $q->{'arch'} eq 'src' || $q->{'arch'} eq 'nosrc';
+  my $id = "$q->{'name'}.$q->{'arch'}-0/0/0: ";
+  my $evr = $q->{'version'};
+  $evr = "$q->{'epoch'}:$evr" if $q->{'epoch'};
+  $evr .= "-$q->{'release'}" if defined $q->{'release'};
+  my $buildtime = $q->{'buildtime'} || 0;
+  if ($opt_extraname) {
+    print "I:$id$q->{'name'} $q->{'name'}-$evr $buildtime-$q->{'arch'}\n";
+  } else {
+    print "I:$id$q->{'name'}-$evr $buildtime-$q->{'arch'}\n";
+  }
+}
+

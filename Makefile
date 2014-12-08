@@ -47,6 +47,7 @@ install:
 	    debtransformzip \
 	    mkbaselibs \
 	    mkdrpms \
+	    listinstalled \
 	    createzyppdeps \
 	    createarchdeps \
 	    createdebdeps \

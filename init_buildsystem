@@ -383,6 +383,7 @@ downloadpkg() {
 	echo "expected $destfile after download but it's missing" >&2
 	cleanup_and_exit 1
     fi
+    # for rpm check integrity and the signature
     case $destfile in
       *.rpm)
 	rpm -K $DLNOSIGNATURE "$destfile" > $destfile.v || { echo "rpm verify failed" >&2; rm -rf "$destdir"; cleanup_and_exit 1; }
@@ -410,9 +411,8 @@ getcachedir() {
 can_reuse_cached_package() {
     local cachepkgid pkgid
     test -s "$1" || return 1
-    # XXX verify for non-rpm types as well
-    if test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.id" -a "${1%.rpm}" != "$1" ; then
-	pkgid=`rpm -qp --qf "$RPMIDFMT" $RPMCHECKOPTS_HOST "$1"`
+    if test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.id" ; then
+        pkgid=$(perl -I$BUILD_DIR -MBuild -e Build::showquery "$1" buildid)
 	read cachepkgid < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
 	test "$cachepkgid" = "$pkgid" || return 1
     fi
@@ -644,7 +644,7 @@ else
         while read PKG SRC ; do
 	    cachepkg="${SRC##*/}"
 	    cachepkg="${cachepkg/%.pkg.tar.?z/.arch}"
-	    if test "$SRC" != "$SRC#zypp://" ; then
+	    if test "$SRC" != "${SRC#zypp://}" ; then
 		# for zypp packages also look in the zypp cache
 		cachedir="/var/cache/zypp/packages/${SRC#zypp://}"
 		cachedir="${cachedir%/*}"
@@ -798,12 +798,6 @@ if test -n "$CREATE_BUILD_BINARIES" ; then
 fi
 
 #
-# get list and ids of already installed rpms
-#
-mkdir -p $BUILD_ROOT/.init_b_cache/alreadyinstalled
-pkg_get_installed
-
-#
 # reorder packages (already done in vm continuation)
 #
 if ! test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
@@ -812,6 +806,19 @@ if ! test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
     check_exit
     echo 'done'
 fi
+
+#
+# get list and ids of already installed packages
+#
+mkdir -p $BUILD_ROOT/.init_b_cache/alreadyinstalled
+listinstalled --root "$BUILD_ROOT" --type "$PSUF" --extraname | (
+    while read id name buildid; do
+	echo "$buildid" > "$BUILD_ROOT/.init_b_cache/alreadyinstalled/$name"
+    done
+)
+
+# do pre-installation work
+pkg_prepare
 
 #
 # delete all packages we don't want
@@ -863,29 +870,29 @@ for PKG in $MAIN_LIST ; do
 	continue
     fi
 
+    # get the hdrmd5 if we want to create a preinstall image
     PKG_HDRMD5=
-    if test -d $BUILD_ROOT/.preinstall_image ; then
-	if ! test -e $BUILD_ROOT/.preinstall_image/$PKG ; then
-	    PKG_HDRMD5=`perl -I$BUILD_DIR -MBuild -e 'print Build::queryhdrmd5($ARGV[0])' $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF`
-	    test -n "$PKG_HDRMD5" || cleanup_and_exit 1
-	fi
+    if test -d $BUILD_ROOT/.preinstall_image -a ! -e $BUILD_ROOT/.preinstall_image/$PKG ; then
+	PKG_HDRMD5=`perl -I$BUILD_DIR -MBuild -e 'print Build::queryhdrmd5($ARGV[0])' $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF`
+	test -n "$PKG_HDRMD5" || cleanup_and_exit 1
     fi
 
     test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF || continue
 
-    # XXX?
+    # check if we can keep an already installed package
     if test "$VERIFY_BUILD_SYSTEM" != true -a -f $BUILD_ROOT/.init_b_cache/rpms/$PKG.id -a -f $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG ; then
 	read PKGID < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
 	read OLDPKGID < $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG
 	if test "$PKGID" = "$OLDPKGID" ; then
 	    #echo "keeping ${PKGID%% *}"
+	    rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
 	    echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
 	    test -n "$PKG_HDRMD5" && echo "$PKG_HDRMD5 $PKGID" > $BUILD_ROOT/.preinstall_image/$PKG
 	    continue
 	fi
     fi
 
-    pkg_set_packageid
+    PKGID=$(perl -I$BUILD_DIR -MBuild -e Build::showquery "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" buildid)
 
     if test -f $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG ; then
 	read OLDPKGID < $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG
@@ -912,6 +919,7 @@ for PKG in $MAIN_LIST ; do
 	continue
     fi
     
+    # install the package
     echo "installing ${PKGID%% *}"
     if ! test "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" -ef "$BUILD_ROOT/.init_b_cache/$PKG.$PSUF" ; then
 	rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
@@ -919,12 +927,12 @@ for PKG in $MAIN_LIST ; do
     fi
     pkg_install
     rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
-
     echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
     test -n "$PKG_HDRMD5" && echo "$PKG_HDRMD5 $PKGID" > $BUILD_ROOT/.preinstall_image/$PKG
 
 done
 
+# do post-installation work
 pkg_finalize
 
 # devices can vanish if devs got uninstalled

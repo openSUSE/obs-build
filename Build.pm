@@ -597,6 +597,7 @@ sub readdeps {
 	my $pkgid = $1;
 	my $arch = $2; 
 	my $evr = $s[0];
+	$pkginfo->{$pkgid}->{'arch'} = $1 if $s[1] && $s[1] =~ s/-(.*)$//;
 	$pkginfo->{$pkgid}->{'buildtime'} = $s[1] if $s[1];
 	if ($evr =~ s/^\Q$pkgid-//) {
 	  $pkginfo->{$pkgid}->{'epoch'} = $1 if $evr =~ s/^(\d+)://;
@@ -656,27 +657,18 @@ sub readdeps {
     close F;
   }
   if ($pkginfo) {
-    # extract evr from self provides
+    # extract evr from self provides if there is no 'I' line
     for my $pkg (values %$pkginfo) {
-      next if $pkg->{'epoch'};	# oh well
-      next unless defined($pkg->{'name'}) && $pkg->{'provides'};
-      my @sp;
+      next if defined $pkg->{'version'};
       my $n = $pkg->{'name'};
-      if (defined($pkg->{'version'})) {
-	# try to get epoch from self-provides
-	my $vr = $pkg->{'version'};
-	$vr .= "-$pkg->{'release'}" if defined $pkg->{'release'};
-	@sp = grep {/^\Q$n\E\s*=\s*\d+:\Q$vr\E/} @{$pkg->{'provides'}};
-      } else {
-	@sp = grep {/^\Q$n\E\s*=\s*/} @{$pkg->{'provides'}};
-      }
-      if (@sp) {
-	my $evr = $sp[-1];
-	$evr =~ s/^\Q$n\E\s*=\s*//;
-	$pkg->{'epoch'} = $1 if $evr =~ s/^(\d+)://;
-	$pkg->{'release'} = $1 if $evr =~ s/-([^-]*)$//;
-	$pkg->{'version'} = $evr;
-      }
+      next unless defined $n;
+      my @sp = grep {/^\Q$n\E\s*=\s*/} @{$pkg->{'provides'} || []};
+      next unless @sp;
+      my $evr = $sp[-1];
+      $evr =~ s/^\Q$n\E\s*=\s*//;
+      $pkg->{'epoch'} = $1 if $evr =~ s/^(\d+)://;
+      $pkg->{'release'} = $1 if $evr =~ s/-([^-]*)$//;
+      $pkg->{'version'} = $evr;
     }
   }
   $config->{'providesh'} = \%provides;
@@ -684,6 +676,17 @@ sub readdeps {
   $config->{'pkgconflictsh'} = \%pkgconflicts;
   $config->{'pkgobsoletesh'} = \%pkgobsoletes;
   makewhatprovidesh($config);
+}
+
+sub getbuildid {
+  my ($q) = @_;
+  my $evr = $q->{'version'};
+  $evr = "$q->{'epoch'}:$evr" if $q->{'epoch'};
+  $evr .= "-$q->{'release'}" if defined $q->{'release'};;
+  my $buildtime = $q->{'buildtime'} || 0;
+  $evr .= " $buildtime";
+  $evr .= "-$q->{'arch'}" if defined $q->{'arch'};
+  return "$q->{'name'}-$evr";
 }
 
 sub writedeps {
@@ -699,11 +702,7 @@ sub writedeps {
   print $fh "R:$id".join(' ', @{$pkg->{'requires'}})."\n" if $pkg->{'requires'};
   print $fh "C:$id".join(' ', @{$pkg->{'conflicts'}})."\n" if $pkg->{'conflicts'};
   print $fh "O:$id".join(' ', @{$pkg->{'obsoletes'}})."\n" if $pkg->{'obsoletes'};
-  my $evr = $pkg->{'version'};
-  $evr = "$pkg->{'epoch'}:$evr" if $pkg->{'epoch'} && $pkg->{'location'} !~ /\.rpm$/;
-  $evr .= "-$pkg->{'release'}" if defined $pkg->{'release'};
-  my $buildtime = $pkg->{'buildtime'} || 0;
-  print $fh "I:$id$pkg->{'name'}-$evr $buildtime\n";
+  print $fh "I:$id".getbuildid($pkg)."\n";
 }
 
 sub makewhatprovidesh {
@@ -1189,6 +1188,24 @@ sub query {
   return undef;
 }
 
+sub showquery {
+  my ($fn, $field) = @ARGV;
+  my %opts;
+  $opts{'evra'} = 1 if grep {$_ eq $field} qw{epoch version release arch buildid};
+  $opts{'weakdeps'} = 1 if grep {$_ eq $field} qw{suggests enhances recommends supplements};
+  $opts{'conflicts'} = 1 if grep {$_ eq $field} qw{conflicts obsoletes};
+  $opts{'description'} = 1 if grep {$_ eq $field} qw{summary description};
+  $opts{'filelist'} = 1 if $field eq 'filelist';
+  $opts{'buildtime'} = 1 if grep {$_ eq $field} qw{buildtime buildid};
+  my $d = Build::query($fn, %opts);
+  die("cannot query $fn\n") unless $d;
+  $d->{'buildid'} = getbuildid($d);
+  my $x = $d->{$field};
+  $x = [] unless defined $x;
+  $x = [ $x ] unless ref $x;
+  print "$_\n" for @$x;
+}
+
 sub queryhdrmd5 {
   my ($binname) = @_;
   return Build::Rpm::queryhdrmd5(@_) if $do_rpm && $binname =~ /\.rpm$/;
@@ -1198,6 +1215,14 @@ sub queryhdrmd5 {
   return Build::Kiwi::queryhdrmd5(@_) if $do_kiwi && $binname =~ /\.raw.install$/;
   return Build::Arch::queryhdrmd5(@_) if $do_arch && $binname =~ /\.pkg\.tar(?:\.gz|\.xz)?$/;
   return Build::Arch::queryhdrmd5(@_) if $do_arch && $binname =~ /\.arch$/;
+  return undef;
+}
+
+sub queryinstalled {
+  my ($binarytype, @args) = @_;
+  return Build::Rpm::queryinstalled(@args) if $binarytype eq 'rpm';
+  return Build::Deb::queryinstalled(@args) if $binarytype eq 'deb';
+  return Build::Arch::queryinstalled(@args) if $binarytype eq 'arch';
   return undef;
 }
 
