@@ -14,6 +14,12 @@ use Build::Debrepo;
 
 Getopt::Long::Configure("no_ignore_case");
 
+#
+# supported urls
+#
+# distribution:   <baseurl>/<dist>/[components]
+# flat repo:      <baseurl>/.
+
 my $cachedir = "/var/cache/build";
 my $archpath;
 
@@ -56,7 +62,9 @@ for my $url (@ARGV) {
     }
     push @components, 'main' unless @components;
     $url .= '/' unless $url =~ /\/$/;
+    $baseurl = $url;
     $url =~ s/([^\/]+\/)$/dists\/$1/;
+    $baseurl =~ s/([^\/]+\/)$//;
   }
 
   File::Path::mkpath($dir);

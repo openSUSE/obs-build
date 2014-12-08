@@ -1096,7 +1096,7 @@ sub queryinstalled {
   }
   if (!close(F)) {
     return queryinstalled($root, %opts, 'nochroot' => 1) if !@pkgs && $dochroot;
-    die("rpm: $?\n");
+    die("rpm: exit status $?\n");
   }
   return \@pkgs;
 }
