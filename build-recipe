@@ -94,7 +94,7 @@ recipe_set_buildtype() {
 
 # expands all directories into files
 expand_recipe_directories() {
-    local f t ff found
+    local f t ff found types
     if test -z "$RECIPEFILES" ; then
 	set -- "`pwd`"
     else
@@ -106,7 +106,18 @@ expand_recipe_directories() {
 	    f="`pwd`/$f"
 	fi
 	if test -d "$f" ; then
-	    for t in .spec .dsc PKGBUILD .kiwi .src.rpm .nosrc.rpm ; do
+	    if test -z "$types" ; then
+		if test -n "$BUILD_DIST" ; then
+		    case $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" type) in
+			dsc) types=".dsc" ;;
+			kiwi) types=".kiwi" ;;
+			arch) types="PKGBUILD" ;;
+			livebuild) types=".livebuild" ;;
+		    esac
+		fi
+		types="$types .spec .dsc PKGBUILD .kiwi .src.rpm .nosrc.rpm"
+	    fi
+	    for t in $types ; do
 		found=
 		for ff in "$f"/*$t ; do
 		    test -f "$ff" || continue
