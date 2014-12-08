@@ -419,9 +419,8 @@ sub queryinstalled {
   local *F;
   if (open(F, '<', "$root/var/lib/dpkg/status")) {
     my $ctrl = '';
-    my $nl;
     while(<F>) {
-      if ($_ eq "\n" && $nl) {
+      if ($_ eq "\n") {
 	my %res = control2res($ctrl);
 	if (defined($res{'PACKAGE'})) {
 	  my $data = {'name' => $res{'PACKAGE'}};
@@ -433,11 +432,9 @@ sub queryinstalled {
 	  push @pkgs, $data;
 	}
         $ctrl = '';
-        undef $nl;
 	next;
       }
       $ctrl .= $_;
-      $nl = 1 if $_ eq "\n";
     }
     close F;
   }
