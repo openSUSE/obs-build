@@ -912,6 +912,7 @@ for PKG in $MAIN_LIST ; do
 	if test -e "$BUILD_ROOT/.init_b_cache/preinstalls/$PKG" ; then
 	    preinstall "$PKG"
 	fi
+	check_exit
     fi
     
     if pkg_cumulate ; then
@@ -926,6 +927,7 @@ for PKG in $MAIN_LIST ; do
 	cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
     fi
     pkg_install
+    check_exit
     rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
     echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
     test -n "$PKG_HDRMD5" && echo "$PKG_HDRMD5 $PKGID" > $BUILD_ROOT/.preinstall_image/$PKG
