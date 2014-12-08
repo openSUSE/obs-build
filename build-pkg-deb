@@ -67,8 +67,11 @@ pkg_install_deb() {
 }
 
 pkg_erase_deb() {
-    echo "Package erasing not implemented yet, please use --clean"
-    cleanup_and_exit 1
+    export DEBIAN_FRONTEND=noninteractive
+    export DEBIAN_PRIORITY=critical
+    ( cd $BUILD_ROOT && chroot $BUILD_ROOT dpkg --purge --force all $PKG 2>&1 || touch $BUILD_ROOT/exit ) | \
+	perl -ne '$|=1;/^(\(Reading database|Removing |Purging configuration files for )/||/^$/||print'
+    check_exit
 }
 
 pkg_cumulate_deb() {
