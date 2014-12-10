@@ -10,13 +10,12 @@ build \- build SuSE Linux RPMs in a chroot environment
 .SH SYNOPSIS
 .B build
 .RB [ --clean | --no-init]
-.RB [ --rpms
-.IR path1 : path2 : ... ]
-.RB [ --arch
-.IR arch1 : arch2 : ... ]
+.RB [ --repo
+.IR dir_or_url ]
+.RB [ --repo ...]
 .RB [ --root
 .IR buildroot ]
-.RB [ specfile | srcrpm ]
+.RB [ recipefile ]
 .br
 .B build
 .B --help
@@ -24,67 +23,91 @@ build \- build SuSE Linux RPMs in a chroot environment
 .B build
 .B --verify
 .SH DESCRIPTION
-\fBbuild\fR is a tool to build SuSE Linux RPMs in a safe and clean way.
-.B build
-will install a minimal SuSE Linux as build system into some directory
-and will chroot to this system to compile the package.
-This way you don't risk to corrupt your working system (due to a broken spec
-file for example), even if the package does not use BuildRoot.
-
-.B build
-searches the spec file for a
-.I BuildRequires:
-line; if such a line is found, all the specified rpms are installed.
-Otherwise a selection of default packages are used. Note that
-.B build
-doesn't automatically resolve missing dependencies, so the specified
-rpms have to be sufficient for the build.
+\fBbuild\fR is a tool to build binary packages in a safe and reproducible
+way.
+The default is to build in a chroot sandbox, but \fBbuild\fP also supports
+building in a virtual machine for better security.
 .P
-If a spec file is specified on the command line,
+If a recipe file is specified on the command line,
 .B build
 will use this file and all other files in the directory for building
-the package. If a srcrpm is specified,
+the package. If no recipe argument is provided, build will search the
+current directory for a file.
+.P
+The
 .B build
-automatically unpacks it for the build.
-If neither is given,
-.B build
-will use all the specfiles in the current directory.
+tool understands the following recipe file types:
+.TP
+.B spec
+A specfile used to generate rpms.
+.TP
+.B src.rpm
+A source rpm, which will be unpacked for the build.
+.TP
+.B kiwi
+A kiwi config file used to generate a kiwi image.
+.TP
+.B dsc
+A dsc file used to generate Debian binary packages.
+.TP
+.B PKGBUILD
+A file used to generate Arch Linux binary packages.
 .P
 .SH OPTIONS
 .TP
 .B --clean
-remove the build system and reinitialize it from scratch.
+Remove the build system and reinitialize it from scratch.
 .TP
 .B --no-init
-skip the build system initialization and start with build immediately.
+Skip the build system initialization and start with build immediately.
+.TP
+.BI "\-\-repo " dir_or_url
+Either a directory containing binary packages (optionally with repository
+metadata), or a url pointing to some remote repository. Multiple
+\fB--repo\fP options can be used so create a specific repository
+layering. Note that packages are searched in the specified repository
+order, i.e. the first repository containing a package with a specific
+name wins regardless of the version.
+As a special form, 'zypp://reponame' can be used to specify
+a system repository. 'zypp://' selects all enabled system
+repositories. This is also the default if BUILD_RPMS is not
+set and no \fB--rpms\fP or \fB--repo\fP option is used.
+.TP
+.BI "\-\-dist " distribution
+Set the distribution. If this option is not given, build tries to
+guess the distribution by looking at the available packages.
+The specified distribution can either be a string
+like "11.2" or "sles9", "debian7", or the pathname of the build
+configuration to use.
+.TP
+.BI "\-\-root " buildroot
+Specifies where the build system is set up. Overrides the
+BUILD_ROOT enviroment variable.
+.TP
+.B --help
+Print a short help text.
+.TP
+.B --norootforbuild
+Force building with user \fRabuild\fP. Otherwise, \fBbuild\fP searches
+the recipe file for a "needsrootforbuild" hint to decide what user
+to use.
 .TP
 .B --list-state
-list rpms that would be used to create a fresh build root.
+list packages that would be used to create a fresh build root.
 Does not create the build root or perform a build.
 .TP
 .BI "\-\-rpms " path1 : path2 : path3\fR...\fP
-Where build can find the SuSE Linux RPMs needed to create the
+Where build can find the packages needed to create the
 build system. This option overrides the BUILD_RPMS environment
-variable.
+variable. This option is deprecated, use \fB--repo\fP instead.
 .TP
 .BI "\-\-arch " arch1 : arch2 : arch3\fR...\fP
 What architectures to select from the RPMs.
 .B build
 automatically sets this to a sensible value for your host if you
-don't specify this option.
-.TP
-.BI "\-\-repo " url_or_dir
-Also use the specified repository to create the build system.
-The repositories may be either of type rpmmd, yast2 (susetags),
-or a simple directory. Multiple --repo options may be given.
-As a special form, 'zypp://reponame' can be used to specify
-a system repository. 'zypp://' selects all enabled system
-repositories. This is also the default if BUILD_RPMS is not
-set and no --rpms or --repo option is used.
-.TP
-.BI "\-\-root " buildroot
-Specifies where the build system is set up. Overrides the
-BUILD_ROOT enviroment variable.
+do not specify this option so you should almost never need it.
+
+.SH RPM BUILD SPECIFIC OPTIONS
 .TP
 .B --useusedforbuild
 Tell build not to do dependency expansion, but to extract the
@@ -93,27 +116,57 @@ are found, from all "BuildRequires" lines.  This option is useful
 if you want to re-build a package from a srcrpm with exactly the
 same packages used for the srcrpm build.
 .TP
-.B --norootforbuild
-
+.B --stage
+Pass a stage option to rpmbuild. The default is \fB-ba\fP.
 .TP
-.B --help
-Print a short help text.
+.B --target
+Call rpmbuild with a target option. This can be used for cross building.
 .TP
 .B --verify
-verify the files in an existing build system.
-.TP
-.BI "\-\--dist " distribution
-Set the distribution. If this option is not given, build tries to
-calculate the distribution by looking at the rpm package used in the
-build.
-The specified distribution can either be a string
-like "11.2" or "sles9", or the pathname of the build configuration to
-use.
+Verify the files in an existing build system.
 
-.SH .spec FILE OPTIONS
+.SH VIRTUAL MACHINE SPECIFIC OPTIONS
+.TP
+.B "--xen --kvm --uml --qemu --emulator --zvm --lxc"
+Sets a specific vm type.
+.TP
+.BI "--vm-type " type
+As above.
+.TP
+.BI "--vm-disk " file
+Specifies the location of the disk image to use. If this option is not
+given, \fIbuildroot\fP\fB.img\fP is used (e.g. /var/tmp/build-root.img).
+.TP
+.BI "--vm-disk-size " size_in_mb
+Specify the size of the disk image to create.
+.TP
+.BI "--vm-disk-filesystem " type
+Sets the filesystem type to use when creating the disk image. The default
+is to use the ext3 filesystem.
+.TP
+.BI "--vm-swap " file
+Specifies the location of the swap file to use. If this option is not
+given, \fIbuildroot\fP\fB.swap\fP is used (e.g. /var/tmp/build-root.swap).
+.TP
+.BI "--vm-swap-size " size_in_mb
+Specify the size of the swap file to create.
+.TP
+.BI "--vm-memory " size_in_mb
+Sets the desired memory size of the virtual machine.
+.TP
+.BI "--vm-kernel " kernel_file
+Set a specific kernel to boot in the virtual machine.
+.TP
+.BI "--vm-initrd " initrd_file
+Set a specific kernel to boot in the virtual machine.
+.TP
+.B --vm-disk-clean
+Force the recreation of the disk image.
+
+.SH RECIPE FILE OPTIONS
 The
 .B build
-command interprets some special control comments in the specfile:
+command interprets some special control comments in the recipe file:
 .TP
 .B # norootforbuild
 .TQ
@@ -144,20 +197,19 @@ within the build root.
 .TP
 .B BUILD_ROOT
 The directory where build should install the chrooted build system.
-"/var/tmp/build-root" is used by default.
+"/var/tmp/build-root" is used by default. See the \fB--root\fP option.
 .TP
 .B BUILD_RPMS
-Where build can find the SuSE Linux RPMs.  build needs them to create the
-build system.
+This can be used instead of the \fB--rpms\fP option. Deprecated.
 .TP
 .B BUILD_RPM_BUILD_STAGE
 The rpm build stage (-ba, -bb, ...).  This is just passed through to
 rpm, check the rpm manpage for a complete list and descriptions.
-"-ba" is the default.
-You can use this to add more options to RPM.
+"-ba" is the default. You should probably use the \fB--stage\fP
+option instead.
 
 .SH SEE ALSO
-.BR rpm (8),
+.BR rpm (8), dpkg (8), pacman (8), kiwi (8)
 .TP
 .BR "Maximum RPM":
 .I http://www.rpm.org/max-rpm/

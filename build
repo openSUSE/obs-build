@@ -157,14 +157,13 @@ Known Parameters:
               Capture build output to logfile. Defaults to
               .build.log in the build root for non-VM builds.
 
-  --repository PATH
-	      Use package repository at PATH. Supported formats are
-	      rpm-md and yast2.
+  --repo PATH_OR_URL
+	      Use package repository at PATH_OR_URL. Supported formats
+              are rpm-md, yast2, debian, and arch linux.
 	      Alternatively zypp://NAME specifies the zypp
 	      repository NAME. The repo must be refreshed with zypp
 	      so package meta data is available locally. With emtpy
 	      NAME all enabled repositories are used.
-              a url can specify a remote repo.
 
   --rpms path1:path2:...
               Specify path where to find the RPMs for the build system
@@ -182,9 +181,9 @@ Known Parameters:
               Use 'rootdir' to setup chroot environment
 
   --cachedir cachedir
-              Use 'cachedir' to cache remote repo's packages, the
+              Use 'cachedir' to cache remote repo's packages. The
               default cache dir is /var/cache/build, every repo
-              given by --repository corresponds to a subdir named
+              given by --repo corresponds to a subdir named
               as md5sum of its repo url, for example:
                  /var/cache/build/3e8ea9b47808629414a0cebc33ea285e
 
