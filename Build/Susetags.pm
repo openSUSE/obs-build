@@ -58,6 +58,13 @@ my %tmap = (
 
 sub addpkg {
   my ($res, $data, $options) = @_;
+  # fixup location and source
+  if (exists($data->{'location'})) {
+    my ($medium, $dir, $loc) = split(' ', $data->{'location'}, 3);
+    $data->{'medium'} = $medium;
+    $data->{'location'} = defined($loc) ? "$dir/$loc" : "$data->{'arch'}/$dir";
+  }
+  $data->{'source'} =~ s/\s.*// if exists $data->{'source'};
   if ($options->{'addselfprovides'} && defined($data->{'name'}) && defined($data->{'version'})) {
     if (($data->{'arch'} || '') ne 'src' && ($data->{'arch'} || '') ne 'nosrc') {
       my $evr = $data->{'version'};
@@ -108,12 +115,7 @@ sub parse {
       ($cur->{'name'}, $cur->{'version'}, $cur->{'release'}, $cur->{'arch'}) = split(' ', $data);
       $cur->{'epoch'} = $1 if $cur->{'version'} =~ s/^(\d+)://;
       next;
-    } elsif ($tag eq 'Loc') {
-      my ($medium, $dir, $loc) = split(' ', $data, 3);
-      $cur->{'medium'} = $medium;
-      $cur->{'location'} = defined($loc) ? "$dir/$loc" : "$cur->{'arch'}/$dir";
     } else {
-      $data =~ s/\s.*// if $tag eq 'Src';
       $cur->{$tmap{$tag}} = $data;
     }
   }
