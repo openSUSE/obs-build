@@ -114,7 +114,6 @@ sub parse {
       $cur = {};
       ($cur->{'name'}, $cur->{'version'}, $cur->{'release'}, $cur->{'arch'}) = split(' ', $data);
       $cur->{'epoch'} = $1 if $cur->{'version'} =~ s/^(\d+)://;
-      next;
     } else {
       $cur->{$tmap{$tag}} = $data;
     }
