@@ -23,12 +23,6 @@ Getopt::Long::Configure("no_ignore_case");
 my $cachedir = "/var/cache/build";
 my $archpath;
 
-sub getreponame {
-  my ($url) = @_;
-  return $1 if "/$url/" =~ /.*\/([^\/]+)\/os\//;
-  return undef;
-}
-
 GetOptions('cachedir=s'  => \$cachedir, 'archpath=s' => \$archpath) or exit(1);
 
 if (!$archpath) {
@@ -42,7 +36,6 @@ my $pkgnum = 0;
 
 for my $url (@ARGV) {
   die("$url: not an remote debian repo\n") unless $url =~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/;
-  my $reponame = getreponame($url);
   my $repoid = Digest::MD5::md5_hex($url);
   my $dir = "$cachedir/$repoid";
 
