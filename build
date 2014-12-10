@@ -317,7 +317,7 @@ Known Parameters:
   --vm-memory SIZEINMB
               Set amount of RAM for VMs
 
-  --hugetlbfs HUGETLBFSPATH
+  --vm-hugetlbfs HUGETLBFSPATH
               Use hugetlb for memory management, path to mounted hugetlbfs.
 
   --vm-kernel FILE
@@ -929,10 +929,6 @@ if test -n "$CLEAN_BUILD" ; then
 fi
 
 if test -n "$VM_TYPE" -a -z "$RUNNING_IN_VM" ; then
-    if test -z "$VMDISK_FILESYSTEM" -a -n "$BUILD_DIST" ; then
-	VMDISK_FILESYSTEM=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags vmfstype`
-    fi
-    test -n "$VMDISK_FILESYSTEM" || VMDISK_FILESYSTEM=ext3
     vm_verify_options
 fi
 

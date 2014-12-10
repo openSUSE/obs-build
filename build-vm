@@ -111,7 +111,7 @@ vm_cleanup() {
 
 vm_parse_options() {
     case ${PARAM/#--/-} in
-      -emulator-script)
+      -vm-emulator-script|-emulator-script)
 	needarg
 	EMULATOR_SCRIPT="$ARG"
 	shift
@@ -174,12 +174,12 @@ vm_parse_options() {
 	VM_IMAGE="$ARG"
 	shift
       ;;
-      -xenswap|-vm-swap|-swap)
+      -vm-swap|-xenswap|-swap)
 	needarg
 	VM_SWAP="$ARG"
 	shift
       ;;
-      -xenmemory|-vm-memory|-memory)
+      -vm-memory|-xenmemory|-memory)
 	needarg
 	VM_MEMSIZE="$ARG"
 	shift
@@ -194,38 +194,32 @@ vm_parse_options() {
 	VM_INITRD="$ARG"
 	shift
       ;;
-      -vmdisk-rootsize|-vm-disk-size)
+      -vm-disk-size|-vmdisk-rootsize)
 	needarg
 	VMDISK_ROOTSIZE="$ARG"
 	shift
       ;;
-      -vmdisk-swapsize|-vm-swap-size)
+      -vm-swap-size|-vmdisk-swapsize)
 	needarg
 	VMDISK_SWAPSIZE="$ARG"
 	shift
       ;;
-      -vmdisk-filesystem|-vm-disk-filesystem)
+      -vm-disk-filesystem|-vmdisk-filesystem)
 	needarg
 	VMDISK_FILESYSTEM="$ARG"
 	shift
       ;;
-      -vmdisk-mount-options|-vm-disk-mount-options)
+      -vm-disk-mount-options|-vmdisk-mount-options)
        needarg
        # options needs to be quoted to handle argument which might start with "-o ..."
        VMDISK_MOUNT_OPTIONS=$(echo $ARG | sed 's/^\"\(.*\)\"$/\1/g')
        shift
       ;;
-      -vmdisk-clean)
+      -vm-disk-clean|-vmdisk-clean)
 	# delete old root/swap to get rid of the old blocks
         VMDISK_CLEAN=true
       ;;
-      -rpmlist)
-	needarg
-	RPMLIST="--rpmlist $ARG"
-	BUILD_RPMS=
-	shift
-      ;;
-      -hugetlbfs)
+      -vm-hugetlbfs|-hugetlbfs)
 	needarg
 	HUGETLBFSPATH="$ARG"
 	shift
@@ -496,6 +490,13 @@ vm_detect_2nd_stage() {
     return 0
 }
 
+vm_set_filesystem_type() {
+    if test -z "$VMDISK_FILESYSTEM" -a -n "$BUILD_DIST" ; then 
+	VMDISK_FILESYSTEM=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags vmfstype`
+    fi   
+    test -n "$VMDISK_FILESYSTEM" || VMDISK_FILESYSTEM=ext3
+}
+
 vm_set_mount_options() {
     if test "$VMDISK_MOUNT_OPTIONS" = __default; then
 	if test "$VMDISK_FILESYSTEM" = reiserfs ; then
@@ -520,6 +521,7 @@ vm_set_mount_options() {
 # create file system and swap space, mount file system to $BUILD_ROOT
 #
 vm_setup() {
+    vm_set_filesystem_type
     vm_set_mount_options
     if test "$VM_IMAGE" = 1 ; then
 	VM_IMAGE="$BUILD_ROOT.img"
