@@ -27,6 +27,7 @@ BEGIN {
 use Build ':rpm';
 use Build::Susetags;
 use Getopt::Long;
+use File::Path qw(mkpath);
 
 use strict;
 
@@ -38,17 +39,31 @@ my $cachedir = "/var/cache/build";
 GetOptions ("zypp=s" => \$opt_zypp, "cachedir=s" => \$cachedir) or exit(1);
 
 for my $url (@ARGV) {
-  my $dir = $opt_zypp ? $opt_zypp : $url;
-  $dir .= '/' unless $dir =~ /\/$/;
-  $url .= '/' unless $url =~ /\/$/;
-
   # XXX: use descrdir/datadir from content file
   my $descrdir = 'suse/setup/descr';
   my $datadir = 'suse';
+
+  my $dir;
+  my $baseurl = $url;
+  if ($opt_zypp) {
+    $dir =  $opt_zypp;
+  } elsif ($url =~ /^(?:ftps?|https?):\/\/([^\/]*)\/?/) {
+    my $repoid = Digest::MD5::md5_hex($url);
+    $dir = "$cachedir/$repoid/";
+    $baseurl .= '/' unless $baseurl =~ /\/$/;
+    mkpath($dir);
+    system("$INC[0]/download", "$dir/", "${baseurl}$descrdir/packages.gz");
+    $descrdir = '.';
+  } else {
+    $dir = $url;
+  }
+  $dir .= '/' unless $dir =~ /\/$/;
+  $baseurl .= '/' unless $baseurl =~ /\/$/;
+
   my $packages = "$dir$descrdir/packages";
   $packages = "$packages.gz" if ! -e $packages && -e "$packages.gz";
   Build::Susetags::parse($packages, sub {
-    my $xurl = $url;
+    my $xurl = $baseurl;
     # multi cd support hack
     $xurl =~ s/1\/$/$_[0]->{'medium'}/ if $_[0]->{'medium'};
     $xurl .= "$datadir/" if $datadir;

@@ -79,23 +79,20 @@ my @packages;		# for opt_dump
 
 for my $url (@ARGV) {
   my $dir;
-  my $baseurl;
+  my $baseurl = $url;
   if ($opt_zypp) {
     $dir = $opt_zypp;
-    $dir .= '/' unless $dir =~ /\/$/;
-    $baseurl = $url;
   } elsif ($url =~ /^(?:ftps?|https?):\/\/([^\/]*)\/?/) {
     my $repoid = Digest::MD5::md5_hex($url);
     $dir = "$cachedir/$repoid/";
-    $baseurl = $url;
     $baseurl .= '/' unless $baseurl =~ /\/$/;
     mkpath("${dir}repodata");
     system($INC[0].'/download', "${dir}repodata", "${baseurl}repodata/repomd.xml");
   } else {
     $dir = $url;
-    $dir .= '/' unless $dir =~ /\/$/;
-    $baseurl = $dir;
   }
+  $dir .= '/' unless $dir =~ /\/$/;
+  $baseurl .= '/' unless $baseurl =~ /\/$/;
 
   if (! -s "${dir}repodata/repomd.xml") {
     die("zypp repo $url is not up to date, please refresh first\n") if $opt_zypp;
