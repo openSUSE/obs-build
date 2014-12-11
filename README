@@ -1,21 +1,11 @@
 
-This script is used for building SUSE Linux RPMs in
-a clean and safe chroot'ed build environment.
+This is a tool to build binary packages in a safe and reproducible
+way. The default is to build in a chroot sandbox, but it also
+supports building in a virtual machine for better security.
 
-At first you need to copy your SUSE Linux CDs into a
-path reachable by the build script, for example /home/suse-8.2-i386.
+The build tool can work with multiple package and recipe formats.
+The currently supported package formats are deb, rpm, and arch.
+The supported recipe formats are spec, dsc, kiwi, and PKGBUILD.
 
-If you have a DVD Drive and the SUSE Linux DVD, you can mount it
-and use this as the source for the RPMs.
+See the man page for more information.
 
-To build an RPM, change into the directory with the sources
-and the SPEC file. Then start the build script:
-env BUILD_RPMS=/home/suse-8.2-i386/suse build
-
-If this was successful you can find the binary and source RPMs below
-/var/tmp/build-root/usr/src/packages/
-
-Note: Depending on which package you want to build, you'll need
-a few hundred megabytes for the build in /var/tmp/build-root.
-
-For more information on using build, see 'man build'.
