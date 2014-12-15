@@ -45,15 +45,6 @@ pkg_prepare_rpm() {
     rpm_init_cumulate
 }
 
-pkg_get_installed_rpm() {
-    listinstalled --root "$BUILD_ROOT" --type rpm --extraname | (
-	while read id name buildid; do
-            echo "$buildid" > "$BUILD_ROOT/.init_b_cache/alreadyinstalled/$name"
-        done
-    )
-    # small hack: we misuse get_installed_rpm as initializer function
-}
-
 pkg_erase_rpm() {
     chroot $BUILD_ROOT rpm --nodeps -e $PKG 2>&1 | {
 	local retry
