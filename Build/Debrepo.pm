@@ -30,7 +30,7 @@ sub addpkg {
   # split version into evr
   $data->{'epoch'} = $1 if $data->{'version'} =~ s/^(\d+)://s;
   $data->{'release'} = $1 if $data->{'version'} =~ s/-([^-]*)$//s;
-  for my $d (qw{provides requires conflicts recommends suggests enhances}) {
+  for my $d (qw{provides requires conflicts recommends suggests enhances breaks prerequires}) {
     next unless $data->{$d};
     if ($options->{'normalizedeps'}) {
       $data->{$d} =~ s/\(([^\)]*)\)/$1/g;
@@ -39,6 +39,10 @@ sub addpkg {
     }
     $data->{$d} = [ split(/\s*,\s*/, $data->{$d}) ];
   }
+  push @{$data->{'requires'}}, @{$data->{'prerequires'}} if $data->{'prerequires'};
+  delete $data->{'prerequires'};
+  push @{$data->{'conflicts'}}, @{$data->{'breaks'}} if $data->{'breaks'};
+  delete $data->{'breaks'};
   if (defined($selfprovides)) {
     $selfprovides = "($selfprovides)" unless $options->{'normalizedeps'};
     $selfprovides = "$data->{'name'} $selfprovides";
@@ -57,9 +61,9 @@ my %tmap = (
   'architecture' => 'arch',
   'provides' => 'provides',
   'depends' => 'requires',
-  'pre-depends' => 'requires',
+  'pre-depends' => 'prerequires',
   'conflicts' => 'conflicts',
-  'breaks' => 'conflicts',
+  'breaks' => 'breaks',
   'recommends' => 'recommends',
   'suggests' => 'suggests',
   'enhances' => 'enhances',
