@@ -640,7 +640,6 @@ else
     # check if we really can use cached versions for packages on the download list
     if test -s $BUILD_ROOT/.init_b_cache/rpmlist.download ; then
 	rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download2
-	rpm_set_checkopts
         while read PKG SRC ; do
 	    cachepkg="${SRC##*/}"
 	    cachepkg="${cachepkg/%.pkg.tar.?z/.arch}"
