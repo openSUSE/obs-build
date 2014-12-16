@@ -503,6 +503,9 @@ sub get_sysbuild {
   if ($engine eq 'mock' && $buildtype ne 'kiwi') {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:mock'} || []};
     @sysdeps = ('mock', 'createrepo') unless @sysdeps;
+  } elsif ($engine eq 'debootstrap' && $buildtype ne 'kiwi') {
+    @sysdeps = @{$config->{'substitute'}->{'system-packages:debootstrap'} || []};
+    @sysdeps = ('debootstrap', 'lsb-release') unless @sysdeps;
   } elsif ($buildtype eq 'livebuild') {
     # packages used for build environment setup (build-recipe-livebuild deps)
     @sysdeps = @{$config->{'substitute'}->{'system-packages:livebuild'} || []};

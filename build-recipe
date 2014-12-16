@@ -24,7 +24,7 @@
 
 KIWI_PARAMETERS=
 
-for i in spec dsc kiwi arch preinstallimage mock livebuild; do
+for i in spec dsc kiwi arch preinstallimage mock livebuild debootstrap; do
     . "$BUILD_DIR/build-recipe-$i"
 done
 
@@ -89,6 +89,9 @@ recipe_set_buildtype() {
     fi
     if test "$BUILDENGINE" = mock -a "$BUILDTYPE" = spec ; then
 	BUILDTYPE=mock
+    fi
+    if test "$BUILDENGINE" = debootstrap -a "$BUILDTYPE" = dsc ; then
+	BUILDTYPE=debootstrap
     fi
 }
 
