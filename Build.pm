@@ -867,10 +867,14 @@ sub expand {
     }
     @directdepsend = grep {!/^-/} splice(@directdepsend, @p + 1);
   }
-  @p = grep {!/^-/} @p;
 
-  my %p;		# expanded packages
   my %aconflicts;	# packages we are conflicting with
+  for (grep {/^!/} @p) {
+    $aconflicts{substr($_, 1)} = "is in BuildConflicts";
+  }
+
+  @p = grep {!/^[-!]/} @p;
+  my %p;		# expanded packages
 
   # add direct dependency packages. this is different from below,
   # because we add packages even if the dep is already provided and

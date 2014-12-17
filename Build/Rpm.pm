@@ -21,6 +21,7 @@
 package Build::Rpm;
 
 our $unfilteredprereqs = 0;
+our $conflictdeps = 0;
 
 use strict;
 
@@ -257,7 +258,7 @@ sub parse {
       next;
     }
     if ($line =~ /^\s*#/) {
-      next unless $line =~ /^#!BuildIgnore/;
+      next unless $line =~ /^#!Build(?:Ignore|Conflicts)\s*:/i;
     }
     my $expandedline = '';
     if (!$skip && ($line =~ /%/)) {
@@ -418,7 +419,7 @@ reexpand:
 
     if ($skip) {
       $xspec->[-1] = [ $xspec->[-1], undef ] if $xspec;
-      $ifdeps = 1 if $line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore)\s*:\s*(\S.*)$/i;
+      $ifdeps = 1 if $line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts)\s*:\s*(\S.*)$/i;
       next;
     }
 
@@ -488,7 +489,7 @@ reexpand:
       }
       next;
     }
-    if ($preamble && ($line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore)\s*:\s*(\S.*)$/i)) {
+    if ($preamble && ($line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts)\s*:\s*(\S.*)$/i)) {
       my $what = $1;
       my $deps = $2;
       $ifdeps = 1 if $hasif;
@@ -530,6 +531,10 @@ reexpand:
 
       $replace = 1 if grep {/^-/} @ndeps;
       if (lc($what) ne 'buildrequires' && lc($what) ne 'buildprereq') {
+        if ($conflictdeps && $what =~ /conflict/i) {
+	  push @packdeps, map {"!$_"} @ndeps;
+	  next;
+	}
 	push @packdeps, map {"-$_"} @ndeps;
 	next;
       }
