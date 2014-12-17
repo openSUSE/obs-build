@@ -69,7 +69,9 @@ recipe_prepare_dsc() {
     chroot $BUILD_ROOT su -c "dpkg-source -x $DEB_SOURCEDIR/$DEB_DSCFILE $TOPDIR/BUILD" - $BUILD_USER
 }
 
-recipe_build_dsc() {
+dsc_build() {
+    local buildroot=$1
+
     DSC_BUILD_OPTIONS=
     if test -n "$BUILD_JOBS" ; then
 	DSC_BUILD_OPTIONS="parallel=${BUILD_JOBS}"
@@ -79,22 +81,24 @@ recipe_build_dsc() {
     # and alternate build commands can be used
     DSC_BUILD_CMD="$(queryconfig --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" substitute dsc:build_cmd)"
     test -z "$DSC_BUILD_CMD" && DSC_BUILD_CMD="dpkg-buildpackage -us -uc"
-    if test -e $BUILD_ROOT/$TOPDIR/SOURCES/build.script ; then
+    if test -e $buildroot/$TOPDIR/SOURCES/build.script ; then
 	echo "Sourcing build.script to build - it should normally run 'dpkg-buildpackage -us -uc'"
 	DSC_BUILD_CMD="source $TOPDIR/SOURCES/build.script"
-	chmod +x $BUILD_ROOT/$TOPDIR/SOURCES/build.script
+	chmod +x $buildroot/$TOPDIR/SOURCES/build.script
     fi
 
     if test -n "$RUN_SHELL"; then
-	chroot $BUILD_ROOT su -
+	chroot $buildroot su -
     else
-	chroot $BUILD_ROOT su -c "export DEB_BUILD_OPTIONS=${DSC_BUILD_OPTIONS} ; cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+	chroot $buildroot su -c "export DEB_BUILD_OPTIONS=${DSC_BUILD_OPTIONS} ; cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
 	if test "$BUILD_SUCCEEDED" = true -a "$DO_CHECKS" != "false"; then
-	   DEB_CHANGESFILE=${RECIPEFILE%.dsc}_"$(chroot $BUILD_ROOT su -c 'dpkg-architecture -qDEB_BUILD_ARCH')".changes
-	   chroot $BUILD_ROOT su -c "which lintian > /dev/null && cd $TOPDIR && echo Running lintian && (set -x && lintian -i $DEB_SOURCEDIR/$DEB_DSCFILE)" - $BUILD_USER < /dev/null
+	   DEB_CHANGESFILE=${RECIPEFILE%.dsc}_"$(chroot $buildroot su -c 'dpkg-architecture -qDEB_BUILD_ARCH')".changes
+	   chroot $buildroot su -c "which lintian > /dev/null && cd $TOPDIR && echo Running lintian && (set -x && lintian -i $DEB_SOURCEDIR/$DEB_DSCFILE)" - $BUILD_USER < /dev/null
 	fi
     fi
+}
 
+dsc_move_build_result() {
     for DEB in $BUILD_ROOT/$TOPDIR/*.deb ; do
 	test -e "$DEB" && mv "$DEB" "$BUILD_ROOT/$TOPDIR/DEBS"
     done
@@ -104,6 +108,12 @@ recipe_build_dsc() {
     while read f ; do
 	ln $BUILD_ROOT/$DEB_SOURCEDIR/$f $BUILD_ROOT/$TOPDIR/DEBS/
     done < <(sed -ne '/^Files:/,$s/^ ................................ [0-9][0-9]* //p' < $BUILD_ROOT/$DEB_SOURCEDIR/$DEB_DSCFILE)
+}
+
+
+recipe_build_dsc() {
+    dsc_build "$BUILD_ROOT"
+    dsc_move_build_result
 }
 
 recipe_resultdirs_dsc() {
