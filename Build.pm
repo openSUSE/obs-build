@@ -870,7 +870,10 @@ sub expand {
 
   my %aconflicts;	# packages we are conflicting with
   for (grep {/^!/} @p) {
-    $aconflicts{substr($_, 1)} = "is in BuildConflicts";
+    my $r = /^!!/ ? substr($_, 2) : substr($_, 1);
+    my @q = @{$whatprovides->{$r} || addproviders($config, $r)};
+    @q = nevrmatch($config, $r, @q) if /^!!/;
+    $aconflicts{$_} = "is in BuildConflicts" for @q;
   }
 
   @p = grep {!/^[-!]/} @p;
