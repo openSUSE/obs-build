@@ -500,10 +500,10 @@ sub get_sysbuild {
   my $engine = $config->{'buildengine'} || '';
   $buildtype ||= $config->{'type'} || '';
   my @sysdeps;
-  if ($engine eq 'mock' && $buildtype ne 'kiwi') {
+  if ($engine eq 'mock' && $buildtype eq 'spec') {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:mock'} || []};
     @sysdeps = ('mock', 'createrepo') unless @sysdeps;
-  } elsif ($engine eq 'debootstrap' && $buildtype ne 'kiwi') {
+  } elsif ($engine eq 'debootstrap' && $buildtype eq 'dsc') {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:debootstrap'} || []};
     @sysdeps = ('debootstrap', 'lsb-release') unless @sysdeps;
   } elsif ($buildtype eq 'livebuild') {
