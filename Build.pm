@@ -512,7 +512,13 @@ sub get_sysbuild {
     @sysdeps = ('apt-utils', 'cpio', 'dpkg-dev', 'live-build', 'lsb-release', 'tar') unless @sysdeps;
   }
   return () unless @sysdeps;
-  @sysdeps = Build::get_build($config, [], @sysdeps);
+  my @ndeps = grep {/^-/} @sysdeps;
+  my %ndeps = map {$_ => 1} @ndeps;
+  @sysdeps = grep {!$ndeps{$_}} @sysdeps;
+  push @sysdeps, @{$config->{'preinstall'}}, @{$config->{'required'}};
+  @sysdeps = do_subst($config, @sysdeps);
+  @sysdeps = grep {!$ndeps{$_}} @sysdeps;
+  @sysdeps = expand($config, @sysdeps, @ndeps);
   return @sysdeps unless $sysdeps[0];
   shift @sysdeps;
   @sysdeps = unify(@sysdeps, get_preinstalls($config));
