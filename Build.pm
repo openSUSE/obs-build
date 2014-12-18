@@ -858,11 +858,13 @@ sub expand {
   my $prefer = $config->{'preferh'};
   my $ignore = $config->{'ignoreh'};
   my $ignoreconflicts = $config->{'expandflags:ignoreconflicts'};
+  my $ignoreignore;
 
   my $whatprovides = $config->{'whatprovidesh'};
   my $requires = $config->{'requiresh'};
 
   my %xignore = map {substr($_, 1) => 1} grep {/^-/} @p;
+  $ignoreignore = 1 if $xignore{'-ignoreignore--'};
   my @directdepsend;
   if ($xignore{'-directdepsend--'}) {
     delete $xignore{'-directdepsend--'};
@@ -923,12 +925,16 @@ sub expand {
     for my $p (splice @p) {
       for my $r (@{$requires->{$p} || [$p]}) {
 	my $ri = (split(/[ <=>]/, $r, 2))[0];
-	next if $ignore->{"$p:$ri"} || $xignore{"$p:$ri"};
-	next if $ignore->{$ri} || $xignore{$ri};
+	if (!$ignoreignore) {
+	  next if $ignore->{"$p:$ri"} || $xignore{"$p:$ri"};
+	  next if $ignore->{$ri} || $xignore{$ri};
+	}
 	my @q = @{$whatprovides->{$r} || addproviders($config, $r)};
 	next if grep {$p{$_}} @q;
-	next if grep {$xignore{$_}} @q;
-	next if grep {$ignore->{"$p:$_"} || $xignore{"$p:$_"}} @q;
+	if (!$ignoreignore) {
+	  next if grep {$xignore{$_}} @q;
+	  next if grep {$ignore->{"$p:$_"} || $xignore{"$p:$_"}} @q;
+	}
 	my @eq = map {"provider $_ $aconflicts{$_}"} grep {$aconflicts{$_}} @q;
 	@q = grep {!$aconflicts{$_}} @q;
 	if (!$ignoreconflicts) {
