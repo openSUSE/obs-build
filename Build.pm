@@ -529,7 +529,8 @@ sub get_sysbuild {
   push @sysdeps, @{$config->{'support'}} if $buildtype eq 'kiwi-image' || $buildtype eq 'kiwi-product';	# compat to old versions
   @sysdeps = do_subst($config, @sysdeps);
   @sysdeps = grep {!$ndeps{$_}} @sysdeps;
-  @sysdeps = expand($config, @sysdeps, @ndeps);
+  my $configtmp = $config;
+  @sysdeps = expand($configtmp, @sysdeps, @ndeps);
   return @sysdeps unless $sysdeps[0];
   shift @sysdeps;
   @sysdeps = unify(@sysdeps, get_preinstalls($config));
