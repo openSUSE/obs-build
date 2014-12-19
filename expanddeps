@@ -332,23 +332,17 @@ if ($useusedforbuild) {
 my ($packname, $packvers, $subpacks, @packdeps);
 $subpacks = [];
 
+my $buildtype = '';
+my $extrasysdeps;
+
 if ($recipe) {
   my $d = Build::parse($cf, $recipe) || {};
-  my $buildtype = Build::recipe2buildtype($recipe) || '';
+  $buildtype = Build::recipe2buildtype($recipe) || '';
   $cf->{'type'} = $buildtype if $buildtype;
   if ($buildtype eq 'kiwi') {
     # lets see if this is a product or image build
-    my $type = $d->{'imagetype'} && $d->{'imagetype'}->[0] eq 'product' ? 'product' : 'image';
-    my @kdeps;
-    if ($type eq 'image') {
-      @kdeps = @{$cf->{'substitute'}->{'kiwi-setup:image'} || []};
-      @kdeps = ('kiwi', 'createrepo', 'tar') unless @kdeps;
-    } else {
-      @kdeps = @{$cf->{'substitute'}->{'kiwi-setup:product'} || []};
-      @kdeps = ('kiwi') unless @kdeps;
-    }
-    push @kdeps, grep {/^kiwi-.*:/} @{$d->{'deps'} || []};
-    $d = { 'deps' => \@kdeps, 'subpacks' => [] };
+    $buildtype = $d->{'imagetype'} && $d->{'imagetype'}->[0] eq 'product' ? 'kiwi-product' : 'kiwi-image';
+    $extrasysdeps = [ grep {/^kiwi-.*:/} @{$d->{'deps'} || []} ];
   }
   $packname = $d->{'name'};
   $packvers = $d->{'version'};
@@ -364,6 +358,15 @@ Build::readdeps($cf, undef, \%repo);
 
 #######################################################################
 
+my @sysdeps = Build::get_sysbuild($cf, $buildtype, $extrasysdeps);
+
+if ($buildtype eq 'kiwi-image' || $buildtype eq 'kiwi-product') {
+  # just use the sysdeps for now, ignore real deps
+  print_rpmlist(@sysdeps);
+  exit(0);
+}
+
+push @extradeps, '--ignoreignore--' if @sysdeps;
 my @bdeps = Build::get_build($cf, $subpacks, @packdeps, @extradeps);
 
 if (!shift @bdeps) {
@@ -372,7 +375,6 @@ if (!shift @bdeps) {
   exit(1);
 }
 
-my @sysdeps = Build::get_sysbuild($cf);
 if (@sysdeps) {
   if (!shift @sysdeps) {
     print STDERR "expansion error\n";

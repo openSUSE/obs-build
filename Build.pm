@@ -496,7 +496,7 @@ sub get_build {
 # an empty result means that the packages from get_build should
 # be used instead.
 sub get_sysbuild {
-  my ($config, $buildtype) = @_;
+  my ($config, $buildtype, $extradeps) = @_;
   my $engine = $config->{'buildengine'} || '';
   $buildtype ||= $config->{'type'} || '';
   my @sysdeps;
@@ -510,12 +510,23 @@ sub get_sysbuild {
     # packages used for build environment setup (build-recipe-livebuild deps)
     @sysdeps = @{$config->{'substitute'}->{'system-packages:livebuild'} || []};
     @sysdeps = ('apt-utils', 'cpio', 'dpkg-dev', 'live-build', 'lsb-release', 'tar') unless @sysdeps;
+  } elsif ($buildtype eq 'kiwi-image') {
+    @sysdeps = @{$config->{'substitute'}->{'system-packages:kiwi-image'} || []};
+    @sysdeps = @{$config->{'substitute'}->{'kiwi-setup:image'} || []} unless @sysdeps;
+    @sysdeps = ('kiwi', 'createrepo', 'tar') unless @sysdeps;
+    push @sysdeps, @$extradeps if $extradeps;
+  } elsif ($buildtype eq 'kiwi-product') {
+    @sysdeps = @{$config->{'substitute'}->{'system-packages:kiwi-product'} || []};
+    @sysdeps = @{$config->{'substitute'}->{'kiwi-setup:product'} || []} unless @sysdeps;
+    @sysdeps = ('kiwi') unless @sysdeps;
+    push @sysdeps, @$extradeps if $extradeps;
   }
   return () unless @sysdeps;
   my @ndeps = grep {/^-/} @sysdeps;
   my %ndeps = map {$_ => 1} @ndeps;
   @sysdeps = grep {!$ndeps{$_}} @sysdeps;
   push @sysdeps, @{$config->{'preinstall'}}, @{$config->{'required'}};
+  push @sysdeps, @{$config->{'support'}} if $buildtype eq 'kiwi-image' || $buildtype eq 'kiwi-product';	# compat to old versions
   @sysdeps = do_subst($config, @sysdeps);
   @sysdeps = grep {!$ndeps{$_}} @sysdeps;
   @sysdeps = expand($config, @sysdeps, @ndeps);
