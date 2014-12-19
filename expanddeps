@@ -329,7 +329,7 @@ if ($useusedforbuild) {
 
 #######################################################################
 
-my ($packname, $packvers, $subpacks, @packdeps);
+my ($packname, $packvers, $subpacks);
 $subpacks = [];
 
 my $buildtype = '';
@@ -347,10 +347,10 @@ if ($recipe) {
   $packname = $d->{'name'};
   $packvers = $d->{'version'};
   $subpacks = $d->{'subpacks'};
-  @packdeps = @{$d->{'deps'} || []};
+  unshift @extradeps, @{$d->{'deps'} || []};
   if ($d->{'prereqs'}) {
-    my %deps = map {$_ => 1} (@packdeps, @{$d->{'subpacks'} || []});
-    push @packdeps, '--directdepsend--', grep {!$deps{$_} && !/^%/} @{$d->{'prereqs'}};
+    my %deps = map {$_ => 1} (@extradeps, @{$d->{'subpacks'} || []});
+    push @extradeps, '--directdepsend--', grep {!$deps{$_} && !/^%/} @{$d->{'prereqs'}};
   }
 }
 
@@ -367,7 +367,7 @@ if ($buildtype eq 'kiwi-image' || $buildtype eq 'kiwi-product') {
 }
 
 push @extradeps, '--ignoreignore--' if @sysdeps;
-my @bdeps = Build::get_build($cf, $subpacks, @packdeps, @extradeps);
+my @bdeps = Build::get_build($cf, $subpacks, @extradeps);
 
 if (!shift @bdeps) {
   print STDERR "expansion error\n";
