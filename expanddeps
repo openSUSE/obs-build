@@ -329,8 +329,7 @@ if ($useusedforbuild) {
 
 #######################################################################
 
-my ($packname, $packvers, $subpacks);
-$subpacks = [];
+my $subpacks = [];
 
 my $buildtype = '';
 my $extrasysdeps;
@@ -344,8 +343,6 @@ if ($recipe) {
     $buildtype = $d->{'imagetype'} && $d->{'imagetype'}->[0] eq 'product' ? 'kiwi-product' : 'kiwi-image';
     $extrasysdeps = [ grep {/^kiwi-.*:/} @{$d->{'deps'} || []} ];
   }
-  $packname = $d->{'name'};
-  $packvers = $d->{'version'};
   $subpacks = $d->{'subpacks'};
   unshift @extradeps, @{$d->{'deps'} || []};
   if ($d->{'prereqs'}) {
