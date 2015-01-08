@@ -431,28 +431,39 @@ sub do_subst_vers {
   return @res;
 }
 
-sub add_livebuild_packages {
-  my ($config, @deps) = @_;
-
-  if ($config->{'substitute'}->{'build-packages:livebuild'}) {
-    push @deps, @{$config->{'substitute'}->{'build-packages:livebuild'}};
-  } else {
-    # defaults live-build package dependencies base on 4.0~a26 gathered with:
-    # grep Check_package -r /usr/lib/live/build
-    push @deps, (
-      'apt-utils', 'dctrl-tools', 'debconf', 'dosfstools', 'e2fsprogs', 'grub',
-      'librsvg2-bin', 'live-boot', 'live-config', 'mtd-tools', 'parted',
-      'squashfs-tools', 'syslinux', 'syslinux-common', 'wget', 'xorriso',
-      'zsync' );
-  }
-  return @deps;
-}
+my %subst_defaults = (
+  # defaults live-build package dependencies base on 4.0~a26 gathered with:
+  # grep Check_package -r /usr/lib/live/build
+  'build-packages:livebuild' => [
+    'apt-utils', 'dctrl-tools', 'debconf', 'dosfstools', 'e2fsprogs', 'grub',
+    'librsvg2-bin', 'live-boot', 'live-config', 'mtd-tools', 'parted',
+    'squashfs-tools', 'syslinux', 'syslinux-common', 'wget', 'xorriso', 'zsync',
+  ],
+  'system-packages:livebuild' => [
+    'apt-utils', 'cpio', 'dpkg-dev', 'live-build', 'lsb-release', 'tar',
+  ],
+  'system-packages:mock' => [
+    'mock', 'createrepo',
+  ],
+  'system-packages:debootstrap' => [
+    'debootstrap', 'lsb-release',
+  ],
+  'system-packages:kiwi-image' => [
+    'kiwi', 'createrepo', 'tar',
+  ],
+  'system-packages:kiwi-product' => [
+    'kiwi',
+  ],
+);
 
 # Delivers all packages which get used for building
 sub get_build {
   my ($config, $subpacks, @deps) = @_;
 
-  @deps = add_livebuild_packages($config, @deps) if $config->{'type'} eq 'livebuild';
+  if ($config->{'type'} eq 'livebuild') {
+    push @deps, @{$config->{'substitute'}->{'build-packages:livebuild'}
+		  || $subst_defaults{'build-packages:livebuild'} || []};
+  }
   my @ndeps = grep {/^-/} @deps;
   my %ndeps = map {$_ => 1} @ndeps;
   my @directdepsend;
@@ -502,23 +513,23 @@ sub get_sysbuild {
   my @sysdeps;
   if ($engine eq 'mock' && $buildtype eq 'spec') {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:mock'} || []};
-    @sysdeps = ('mock', 'createrepo') unless @sysdeps;
+    @sysdeps = @{$subst_defaults{'system-packages:mock'} || []} unless @sysdeps;
   } elsif ($engine eq 'debootstrap' && $buildtype eq 'dsc') {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:debootstrap'} || []};
-    @sysdeps = ('debootstrap', 'lsb-release') unless @sysdeps;
+    @sysdeps = @{$subst_defaults{'system-packages:debootstrap'} || []} unless @sysdeps;
   } elsif ($buildtype eq 'livebuild') {
     # packages used for build environment setup (build-recipe-livebuild deps)
     @sysdeps = @{$config->{'substitute'}->{'system-packages:livebuild'} || []};
-    @sysdeps = ('apt-utils', 'cpio', 'dpkg-dev', 'live-build', 'lsb-release', 'tar') unless @sysdeps;
+    @sysdeps = @{$subst_defaults{'system-packages:livebuild'} || []} unless @sysdeps;
   } elsif ($buildtype eq 'kiwi-image') {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:kiwi-image'} || []};
     @sysdeps = @{$config->{'substitute'}->{'kiwi-setup:image'} || []} unless @sysdeps;
-    @sysdeps = ('kiwi', 'createrepo', 'tar') unless @sysdeps;
+    @sysdeps = @{$subst_defaults{'system-packages:kiwi-image'} || []} unless @sysdeps;
     push @sysdeps, @$extradeps if $extradeps;
   } elsif ($buildtype eq 'kiwi-product') {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:kiwi-product'} || []};
     @sysdeps = @{$config->{'substitute'}->{'kiwi-setup:product'} || []} unless @sysdeps;
-    @sysdeps = ('kiwi') unless @sysdeps;
+    @sysdeps = @{$subst_defaults{'system-packages:kiwi-product'} || []} unless @sysdeps;
     push @sysdeps, @$extradeps if $extradeps;
   }
   return () unless @sysdeps;
