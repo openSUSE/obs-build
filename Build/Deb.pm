@@ -39,8 +39,9 @@ my %obs2debian = (
   "armv4l"  => "armel",
   "armv5l"  => "armel",
   "armv6l"  => "armel",
-  "armv7l"  => "armel",
-  "armv7hl" => "armhf"
+  "armv7el" => "armel",
+  "armv7l"  => "armhf",
+  "armv7hl" => "armhf",
 );
 
 sub basearch {
