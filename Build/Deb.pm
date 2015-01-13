@@ -102,7 +102,7 @@ sub parse {
       $version =~ s/-[^-]+$//;
     } elsif ($tag eq 'ARCHITECTURE') {
       my @archs = split('\s+', $data);
-      map { s/$os-//; s/any-// } @archs;
+      map { s/\Q$os\E-//; s/any-// } @archs;
       next if grep { $_ eq "any" || $_ eq "all" } @archs;
       @exclarch = map { obsarch($_) } @archs;
       # unify
