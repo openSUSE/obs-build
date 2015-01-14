@@ -64,7 +64,7 @@ vm_verify_options_kvm() {
 	armv7l)
 	    kvm_bin="/usr/bin/qemu-system-arm"
 	    kvm_console=ttyAMA0
-	    kvm_options="-enable-kvm -M vexpress-a15 -dtb /boot/a15-guest.dtb -cpu cortex-a15"
+	    kvm_options="-enable-kvm -M virt -cpu host"
 	    vm_kernel=/boot/zImage
 	    vm_initrd=/boot/initrd
 	    # prefer the guest kernel/initrd
