@@ -39,7 +39,7 @@ extend_build_arch() {
       i486) BUILD_ARCH="i486:i386" ;;
       i386) BUILD_ARCH="i386" ;;
       ppc64) BUILD_ARCH="ppc64:ppc" ;;
-      ppc64le) BUILD_ARCH="ppc64le" ;;
+      ppc64le) BUILD_ARCH="ppc64le:ppc64" ;;
       sparc64v) BUILD_ARCH="sparc64v:sparc64:sparcv9v:sparcv9:sparcv8:sparc" ;;
       sparc64) BUILD_ARCH="sparc64:sparcv9:sparcv8:sparc" ;;
       sparcv9v) BUILD_ARCH="sparcv9v:sparcv9:sparcv8:sparc" ;;
