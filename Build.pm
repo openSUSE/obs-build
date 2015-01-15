@@ -454,6 +454,9 @@ my %subst_defaults = (
   'system-packages:kiwi-product' => [
     'kiwi',
   ],
+  'system-packages:deltarpm' => [
+    'deltarpm',
+  ],
 );
 
 # Delivers all packages which get used for building
@@ -531,6 +534,9 @@ sub get_sysbuild {
     @sysdeps = @{$config->{'substitute'}->{'kiwi-setup:product'} || []} unless @sysdeps;
     @sysdeps = @{$subst_defaults{'system-packages:kiwi-product'} || []} unless @sysdeps;
     push @sysdeps, @$extradeps if $extradeps;
+  } elsif ($buildtype eq 'deltarpm') {
+    @sysdeps = @{$config->{'substitute'}->{'system-packages:deltarpm'} || []};
+    @sysdeps = @{$subst_defaults{'system-packages:deltarpm'} || []} unless @sysdeps;
   }
   return () unless @sysdeps;
   my @ndeps = grep {/^-/} @sysdeps;
