@@ -1014,7 +1014,7 @@ done
 
 if test -e $BUILD_ROOT/usr/share/zoneinfo/UTC ; then
     for PROG in /usr/sbin/zic /usr/bin/zic /bin/zic /sbin/zic ; do
-        test -x $BUILD_ROOT/$PROG  && chroot $BUILD_ROOT bash -c "$PROG -l $(readlink -f /usr/share/zoneinfo/UTC)"
+        test -x $BUILD_ROOT/$PROG  && chroot $BUILD_ROOT bash -c "$PROG -l \$(readlink -f /usr/share/zoneinfo/UTC)"
     done
 fi
 
