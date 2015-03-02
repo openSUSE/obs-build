@@ -27,7 +27,9 @@ recipe_setup_spec() {
 	echo "Error: TOPDIR empty"
 	cleanup_and_exit 1
     fi
-    rm -rf "$BUILD_ROOT$TOPDIR"
+    if test "$DO_INIT" = true ; then
+	rm -rf "$BUILD_ROOT$TOPDIR"
+    fi
     for i in BUILD RPMS/`uname -m` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS BUILDROOT OTHER ; do
 	mkdir -p $BUILD_ROOT$TOPDIR/$i
     done

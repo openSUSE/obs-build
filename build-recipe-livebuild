@@ -25,7 +25,9 @@
 recipe_setup_livebuild() {
 
     TOPDIR=/usr/src/packages
-    rm -rf "$BUILD_ROOT$TOPDIR"
+    if test "$DO_INIT" = true ; then
+	rm -rf "$BUILD_ROOT$TOPDIR"
+    fi
     for i in OTHER SOURCES LIVEBUILD_ROOT ; do
 	mkdir -p "$BUILD_ROOT$TOPDIR/$i"
     done
