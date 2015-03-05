@@ -21,22 +21,36 @@
 #
 ################################################################
 
+lxc_get_id() {
+    LXCID="obsbuild:${BUILD_ROOT##*/}"
+}
+
 vm_verify_options_lxc() {
     VM_IMAGE=
     VM_SWAP=
 }
 
 vm_startup_lxc() {
+    lxc_get_id
+    LXCDIR="`lxc-config lxc.lxcpath`/$LXCID"
+    LXCROOTFS="$LXCDIR/rootfs"
+    LXCHOOK="$LXCDIR/pre-mount.hook"
     LXCCONF="$BUILD_ROOT/.build.lxc.conf"
     rm -f "$LXCCONF"
     cat $BUILD_DIR/lxc.conf > "$LXCCONF"
     cat >> "$LXCCONF" <<-EOF
-	lxc.rootfs = $BUILD_ROOT
+	lxc.rootfs = $LXCROOTFS
+	lxc.hook.pre-mount = $LXCHOOK
 	EOF
     # XXX: do this always instead of leaking the hosts' one?
     echo "rootfs / rootfs rw 0 0" > $BUILD_ROOT/etc/mtab
-    LXCID=${BUILD_ROOT##*/}
     lxc-destroy -n "$LXCID" >/dev/null 2>&1 || true
+    mkdir -p "$LXCROOTFS"
+    cat > "$LXCHOOK" <<-EOF
+	#!/bin/sh
+	mount --bind "$BUILD_ROOT" "$LXCROOTFS"
+	EOF
+    chmod a+x "$LXCHOOK"
     lxc-create -n "$LXCID" -f "$LXCCONF" || cleanup_and_exit 1
     lxc-start -n "$LXCID" "$vm_init_script"
     BUILDSTATUS="$?"
@@ -45,9 +59,8 @@ vm_startup_lxc() {
 }
 
 vm_kill_lxc() {
-    LXCID=${BUILD_ROOT##*/}
+    lxc_get_id
     lxc-stop -n "$LXCID" || true
-    lxc-destroy -n "$LXCID"
 }
 
 vm_fixup_lxc() {
@@ -71,6 +84,9 @@ vm_detach_swap_lxc() {
 }
 
 vm_cleanup_lxc() {
-    :
+    if test $$ -ne 1 && test $$ -ne 2 ; then
+        lxc_get_id
+        lxc-destroy -n "$LXCID"
+    fi
 }
 

@@ -980,7 +980,10 @@ if test -w /root ; then
 fi
 
 if test -z "$VM_IMAGE" -a -z "$LOGFILE" ; then
-    LOGFILE="$BUILD_ROOT/.build.log"
+    # lxc is special case: virtual machine shares logfile with host
+    if test -z "$RUNNING_IN_VM" -o "$VM_TYPE" != lxc; then
+        LOGFILE="$BUILD_ROOT/.build.log"
+    fi
 fi
 
 if test -n "$LOGFILE" -a -z "$RUN_SHELL" ; then
