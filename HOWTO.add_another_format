@@ -7,40 +7,71 @@ script and Open Build Service you need to follow these steps:
 
 Let's call the new format "XYZ" here.
 
+General notes about the implementations. There are two areas:
+
+SAFE implementations:
+ Some code runs outside of protected environments like KVM. Therefore
+this code must be implemented with security in mind. Special crafted
+build descriptions or binary files must not be able to exploit this code.
+What makes it even more interessting is that this code can also run
+on all kind of old or obscure systems. So any external dependency should
+be avoided as well. 
+This means in short:
+ - code must be as simple as possible.
+ - code must not allow to execute random commands or to access random files.
+ - avoid external dependencies. When you look for a simple XML parser
+   check the kiwi support for this.
+ - code must stay compatible for all versions
+
+Build code running inside of environment.
+ - using any tool is fine here. However, the tool must be installed
+   somehow into the build system. In best case via some dependency.
+ - Incompatible changes can be implemented inside of these packages
+   pulled into the build environment.
+ - network is not possible here.
+
+
 1) Implement the parse() function into Build/XYZ.pm
 
-    parse() extracts the build dependecies from the build specification.
-    For RPM this would be the <package>.spec file for example.
-    What makes the task interesting is that this must be a "safe" operation,
-    as later on it is done on the build service's source server. Thus nothing
-    must allow to execute random tasks and you should try to avoid to
-    call external apps.
+   parse() extracts the build dependecies from the build specification.
+   For RPM this would be the <package>.spec file for example.
+
+   Must be a SAFE implementation.
 
 2) Add a query() function to Build/XYZ.pm
 
-    query() extracts information from built packages. In the rpm world
-    these are the .rpm files.
-    query returns a hash containing:
-        name, epoch, version, release, arch, description,
-        provides, requires, hdrmd5
+   query() extracts information from built packages. In the rpm world
+   these are the .rpm files.
+   query returns a hash containing:
+       name, epoch, version, release, arch, description,
+       provides, requires, hdrmd5
 
-    hdrmd5 is some unique identifier of the package built, it might be 
-    just a md5 over the entire file.
+   hdrmd5 is some unique identifier of the package built, it might be 
+   just a md5 over the entire file.
+
+   Must be a SAFE implementation.
 
 3) Add a queryhdrmd5() function
 
    this functions is a specialized version of query(), it just returns
    the hdrmd5
 
+   Must be a SAFE implementation.
+
 4) Add a verscmp() function
 
    verscmp() compares two package version strings. For rpms, a version has
    the form [epoch:]version-release
 
+   Must be a SAFE implementation.
+
 5) Implement build-pkg-xyz functions
 
    Those functions are used to setup the build environment. I.e. they
    need to install/unpack the packages
+
+   Must be a SAFE implementation for the pre-installation part. Afterwards
+   it is fine to use any tool to install the packages (like rpm itself).
 
 6) Implement build-recipe-xyz functions
 
