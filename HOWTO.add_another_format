@@ -1,0 +1,68 @@
+
+How to add another build format
+===============================
+
+To support yet another package format to be used with standalone build
+script and Open Build Service you need to follow these steps:
+
+Let's call the new format "XYZ" here.
+
+1) Implement the parse() function into Build/XYZ.pm
+
+    parse() extracts the build dependecies from the build specification.
+    For RPM this would be the <package>.spec file for example.
+    What makes the task interesting is that this must be a "safe" operation,
+    as later on it is done on the build service's source server. Thus nothing
+    must allow to execute random tasks and you should try to avoid to
+    call external apps.
+
+2) Add a query() function to Build/XYZ.pm
+
+    query() extracts information from built packages. In the rpm world
+    these are the .rpm files.
+    query returns a hash containing:
+        name, epoch, version, release, arch, description,
+        provides, requires, hdrmd5
+
+    hdrmd5 is some unique identifier of the package built, it might be 
+    just a md5 over the entire file.
+
+3) Add a queryhdrmd5() function
+
+   this functions is a specialized version of query(), it just returns
+   the hdrmd5
+
+4) Add a verscmp() function
+
+   verscmp() compares two package version strings. For rpms, a version has
+   the form [epoch:]version-release
+
+5) Implement build-pkg-xyz functions
+
+   Those functions are used to setup the build environment. I.e. they
+   need to install/unpack the packages
+
+6) Implement build-recipe-xyz functions
+
+   This functions are called to create the build result
+
+7) For standalone build support (actually not needed for OBS integration, but
+   it makes development easier) we need a "createxyzdeps" helper script.
+   For xyz://<...> repos it needs to download the repository metadata
+   and convert it to build's representation. See createyastdeps and createrepomddeps.
+
+
+Special notes for non-OSS systems
+=================================
+
+Systems like MS-Windows, MacOSX or SunOS could be support as well. However, these
+systems can not be installed by packages from scratch. So using preinstallimages
+would be mandatory here. Support for that exists in general already inside of 
+the code.
+
+Special notes for image formats
+===============================
+
+Image formats can usually skip 2) 3) and 4) from the items above. At least as long
+as they do not want to build new images based on former created ones.
+
