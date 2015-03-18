@@ -1,0 +1,69 @@
+#
+# Docker specific functions
+#
+################################################################
+#
+# Copyright (c) 2015 Oleg Girko
+# Copyright (c) 2015 SUSE Linux Products GmbH
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+vm_verify_options_docker() {
+    VM_IMAGE=
+    VM_SWAP=
+}
+
+vm_startup_docker() {
+    local name="obsbuild.${BUILD_ROOT##*/}"
+    docker rm "$name" >/dev/null 2>&1 || true
+    docker run \
+        --rm --name "$name" --cap-add=sys_admin --net=none \
+        -v "$BUILD_ROOT:/mnt" busybox /usr/sbin/chroot /mnt "$vm_init_script"
+    BUILDSTATUS="$?"
+    test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
+    cleanup_and_exit "$BUILDSTATUS"
+}
+
+vm_kill_docker() {
+    local name="obsbuild.${BUILD_ROOT##*/}"
+    docker stop -t 2 "$name" || true
+}
+
+vm_fixup_docker() {
+    :
+}
+
+vm_attach_root_docker() {
+    :
+}
+
+vm_attach_swap_docker() {
+    :
+}
+
+vm_detach_root_docker() {
+    :
+}
+
+vm_detach_swap_docker() {
+    :
+}
+
+vm_cleanup_docker() {
+    :
+}
+
