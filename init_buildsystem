@@ -851,18 +851,6 @@ mkdir -p "$BUILD_ROOT/installed-pkg"
 
 test -x $BUILD_ROOT/sbin/ldconfig && chroot $BUILD_ROOT /sbin/ldconfig 2>&1
 
-# hack around a initrd incompability
-# initrd's prepared by dracut for systemd remove this directory
-# hopefully fixed via bsc#922676 
-if test -L $BUILD_ROOT/var/run -a ! -e $BUILD_ROOT/var/run; then
-   rm $BUILD_ROOT/var/run
-   mkdir $BUILD_ROOT/var/run
-fi
-if test -L $BUILD_ROOT/var/lock -a ! -e $BUILD_ROOT/var/lock; then
-   rm $BUILD_ROOT/var/lock
-   mkdir $BUILD_ROOT/var/lock
-fi
-
 MAIN_LIST="$PACKAGES_TO_INSTALL"
 progress_setup MAIN_LIST
 for PKG in $MAIN_LIST ; do
