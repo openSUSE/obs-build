@@ -29,18 +29,28 @@ build_host_arch() {
 
 extend_build_arch() {
     case $BUILD_ARCH in
-      aarch64) BUILD_ARCH="aarch64:armv7hl:armv7l:armv6hl:armv6l:armv5tel" ;;
+      aarch64) BUILD_ARCH="aarch64:armv8l" ;;
+      armv8l) BUILD_ARCH="armv8l" ;; # armv8l is aarch64 in 32bit mode. not a superset of armv7
       armv7hl) BUILD_ARCH="armv7hl:armv7l:armv6hl:armv6l:armv5tel" ;;
       armv7l) BUILD_ARCH="armv7l:armv6l:armv5tel" ;;
       armv6hl) BUILD_ARCH="armv6hl:armv6l:armv5tel" ;;
       armv6l) BUILD_ARCH="armv6l:armv5tel" ;;
       armv5tel) BUILD_ARCH="armv5tel" ;;
+      m68k) BUILD_ARCH="m68k" ;;
+      mips64) BUILD_ARCH="mips64:mips" ;;
+      mips) BUILD_ARCH="mips" ;;
       i686) BUILD_ARCH="i686:i586:i486:i386" ;;
       i586) BUILD_ARCH="i586:i486:i386" ;;
       i486) BUILD_ARCH="i486:i386" ;;
       i386) BUILD_ARCH="i386" ;;
+      ia64) BUILD_ARCH="ia64" ;;
+      parisc64) BUILD_ARCH="hppa64:hppa" ;;
+      parisc) BUILD_ARCH="hppa" ;;
+      ppc) BUILD_ARCH="ppc" ;;
       ppc64) BUILD_ARCH="ppc64:ppc" ;;
       ppc64le) BUILD_ARCH="ppc64le:ppc64" ;;
+      s390x) BUILD_ARCH="s390x:s390" ;;
+      s390) BUILD_ARCH="s390" ;;
       sparc64v) BUILD_ARCH="sparc64v:sparc64:sparcv9v:sparcv9:sparcv8:sparc" ;;
       sparc64) BUILD_ARCH="sparc64:sparcv9:sparcv8:sparc" ;;
       sparcv9v) BUILD_ARCH="sparcv9v:sparcv9:sparcv8:sparc" ;;
