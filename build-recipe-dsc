@@ -23,7 +23,7 @@
 
 recipe_setup_dsc() {
     TOPDIR=/usr/src/packages
-    rm -rf "$BUILD_ROOT$TOPDIR"
+    test "$DO_INIT_TOPDIR" = false || rm -rf "$BUILD_ROOT$TOPDIR"
     mkdir -p "$BUILD_ROOT$TOPDIR"
     mkdir -p "$BUILD_ROOT$TOPDIR/OTHER"
     mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"

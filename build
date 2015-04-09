@@ -60,6 +60,7 @@ ABUILD_UID=399
 ABUILD_GID=399
 
 DO_INIT=true
+DO_INIT_TOPDIR=true
 DO_LINT=
 DO_CHECKS=true
 CLEAN_BUILD=
@@ -695,6 +696,7 @@ while test -n "$1"; do
 	cleanup_and_exit
       ;;
       -noinit|-no-init)
+	test "$DO_INIT" = false && DO_INIT_TOPDIR=false
 	DO_INIT=false
       ;;
       -nochecks|-no-checks)
@@ -925,6 +927,7 @@ fi
 
 if test -n "$CLEAN_BUILD" ; then
     DO_INIT=true
+    DO_INIT_TOPDIR=true
 fi
 
 if test -n "$VM_TYPE" -a -z "$RUNNING_IN_VM" ; then
