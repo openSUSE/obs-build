@@ -23,7 +23,9 @@
 
 recipe_setup_dsc() {
     TOPDIR=/usr/src/packages
-    rm -rf "$BUILD_ROOT$TOPDIR"
+    if test "$DO_INIT" = true ; then
+	rm -rf "$BUILD_ROOT$TOPDIR"
+    fi
     mkdir -p "$BUILD_ROOT$TOPDIR"
     mkdir -p "$BUILD_ROOT$TOPDIR/OTHER"
     mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
@@ -38,7 +40,9 @@ recipe_setup_dsc() {
 }
 
 recipe_prepare_dsc() {
-    rm -rf "$BUILD_ROOT$TOPDIR/BUILD"
+    if test "$DO_INIT" = true ; then
+	rm -rf "$BUILD_ROOT$TOPDIR/BUILD"
+    fi
     mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES.DEB"
     chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
     DEB_TRANSFORM=
