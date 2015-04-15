@@ -39,6 +39,7 @@
 
 #include <sys/mount.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -174,6 +175,8 @@ enum okfail binfmt_register(char *datafile, char *regfile)
 	char buf[BUFSIZ];
 	FILE *fp;
 	int line;
+	struct utsname myuname;
+	uname(&myuname);
 
 	fp = fopen(datafile, "r");
 	if (fp == NULL)
@@ -186,6 +189,7 @@ enum okfail binfmt_register(char *datafile, char *regfile)
 	{
 		char tokens[BUFSIZ];
 		char *s = tokens;
+		char *blacklist;
 		char *f[n_fields];	/* field content pointers */
 		int n;			/* current field */
 		char path[BUFSIZ];
@@ -193,6 +197,32 @@ enum okfail binfmt_register(char *datafile, char *regfile)
 		if (buf[0] != ':')	/* non-data input line */
 		{
 			continue;
+		}
+		blacklist = strchr(buf, ' ');
+		if (blacklist) {
+			int skip = 0;
+			char *eol;
+
+			*blacklist = '\0';
+			blacklist++;
+
+			eol = strchr(blacklist, '\n');
+			if (eol)
+				*eol = '\0';
+
+			for (n = 0; blacklist != NULL; n++)
+			{
+				char *bp = strsep(&blacklist, " ");
+				if (!strcmp(bp, myuname.machine)) {
+#ifdef DEBUG
+					fprintf(stderr, " skipping on hostarch %s line %s\n", bp, buf);
+#endif /* DEBUG */
+					skip = 1;
+					break;
+				}
+			}
+			if (skip)
+				continue;
 		}
 
 		/* copy buf and tokenize :-seperated fields into f[] */
@@ -229,11 +259,6 @@ enum okfail binfmt_register(char *datafile, char *regfile)
                 /* Is an interpreter for this arch already registered? */
 		snprintf(path, sizeof(path), SYSFS_BINFMT_MISC "/%s", f[name]);
 		ret=access(path, X_OK);
-#ifdef DEBUG
-		fprintf(stderr, 
-			"interpreter for '%s' is %d\n",
-			f[name], ret);
-#endif /* DEBUG */
 		if (ret == 0) {
 #ifdef DEBUG
 			fprintf(stderr, 
@@ -242,6 +267,11 @@ enum okfail binfmt_register(char *datafile, char *regfile)
 #endif /* DEBUG */
 			continue;
 		}
+#ifdef DEBUG
+		fprintf(stderr, 
+			"registering interpreter for '%s'...\n",
+			f[name]);
+#endif /* DEBUG */
 
                 /* Does the interpreter exists? */
 		ret=access(f[interpreter], X_OK);
