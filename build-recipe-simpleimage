@@ -1,0 +1,88 @@
+recipe_setup_simpleimage() {
+    TOPDIR=/usr/src/packages
+    rm -rf "$BUILD_ROOT$TOPDIR"
+    for i in OTHER SOURCES LIVEBUILD_ROOT ; do
+        mkdir -p "$BUILD_ROOT$TOPDIR/$i"
+    done
+    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+    if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
+        mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+    else
+        cp -p "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+    fi
+}
+
+recipe_prepare_simpleimage() {
+    BUILD_USER="root"
+}
+
+recipe_build_simpleimage() {
+    TOPDIR=/usr/src/packages
+
+    echo "creating simple image..."
+    cd $BUILD_ROOT || cleanup_and_exit 1
+    export SRCDIR="$TOPDIR/SOURCES"
+
+    NAME="`sed -n 's|Name:[[:blank:]]*||p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage`"
+    [ -n "$NAME" ] || NAME="simpleimage"
+    VERSION="`sed -n 's|Version:[[:blank:]]*||p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage`"
+    [ -n "$VERSION" ] || VERSION="`date -u +%y.%m.%d-%H.%M.%S`"
+
+    SHELL="/bin/sh"
+    [ -x $BUILD_ROOT/bin/bash ] && SHELL="/bin/bash"
+    if [ "`grep '^%build$' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage`" ]; then
+      echo "Running integration script..."
+      sed -n '/%build/,$ p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage | tail -n +2 | chroot $BUILD_ROOT $SHELL -x
+      echo "Integration script finished."
+    fi
+
+    echo "Compresing the final image, this can take a while..."
+    echo
+    TAR="tar"
+    if test -x /usr/bin/bsdtar; then
+	TAR="/usr/bin/bsdtar --format gnutar --chroot"
+    fi
+    TOPDIRS=
+    for DIR  in .* * ; do
+      case "$DIR" in
+	.|..) continue ;;
+	.build*) continue ;;
+	.simpleimage*) continue ;;
+	.srcfiles*) continue ;;
+	.pkgs) continue ;;
+	.rpm-cache) continue ;;
+	.tmp) continue ;;
+	installed-pkg) continue ;;
+	proc|sys) continue ;;
+      esac
+      TOPDIRS="$TOPDIRS $DIR"
+    done
+	rm -rf "$BUILD_ROOT$TOPDIR"
+    mkdir -p .tmp/{proc,sys}
+    if ! $TAR -cvzf .simpleimage.tar.gz --one-file-system $TOPDIRS -C .tmp proc sys; then
+      cleanup_and_exit 1
+    fi
+    if [ -x "`which mksquashfs 2> /dev/null`" ]; then
+      echo
+      echo "Tarball done, creating squashfs image as well"
+      echo
+      mksquashfs $TOPDIRS .tmp/proc .tmp/sys .simpleimage.squashfs -info -keep-as-directory -no-progress || cleanup_and_exit 1
+    fi
+    echo "simple image created."
+
+    DEST="$BUILD_ROOT$TOPDIR/OTHER"
+    mkdir -p "$DEST"
+    mv $BUILD_ROOT/.simpleimage.tar.gz $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz
+    if [ -r .simpleimage.squashfs ]; then
+      mv $BUILD_ROOT/.simpleimage.squashfs $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs
+    fi
+    rm -f $BUILD_ROOT/.build.packages
+    ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
+    test -d "$SRCDIR" && cd "$SRCDIR"
+    cleanup_and_exit 0
+}
+
+recipe_resultdirs_simpleimage() {
+    :
+}
+
