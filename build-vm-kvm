@@ -203,6 +203,15 @@ vm_fixup_kvm() {
 	    qemu_rootdev=/dev/disk/by-id/virtio-0
 	    VM_SWAPDEV=/dev/disk/by-id/virtio-1
 	fi
+	if test -e "$BUILD_ROOT/.build.hostarch.$VM_TYPE" ; then
+	    BUILD_HOST_ARCH=`cat "$BUILD_ROOT/.build.hostarch.$VM_TYPE"`
+	else
+	    # do autodetection for ppc/ppc64le switching, legacy
+	    case `uname -m`-`file "$BUILD_ROOT/.build.kernel.$VM_TYPE` in
+		ppc*ELF 64-bit MSB*) BUILD_HOST_ARCH=ppc64 ;;
+		ppc*ELF 64-bit LSB*) BUILD_HOST_ARCH=ppc64le ;;
+	    esac
+	fi
     fi
 }
 

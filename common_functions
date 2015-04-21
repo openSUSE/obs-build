@@ -22,9 +22,6 @@
 
 build_host_arch() {
     : ${BUILD_HOST_ARCH:=`uname -m`}
-    # hostarch may be overwritten in config
-    config_hostarch=`queryconfig hostarch --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
-    test -n "$config_hostarch" && BUILD_HOST_ARCH="$config_hostarch"
     BUILD_INITVM_ARCH="$BUILD_HOST_ARCH"
     # avoid multiple initvm.* helpers for i586 and i686
     test i686 != "$BUILD_INITVM_ARCH" || BUILD_INITVM_ARCH=i586
