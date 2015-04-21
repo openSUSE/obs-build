@@ -207,9 +207,9 @@ vm_fixup_kvm() {
 	    BUILD_HOST_ARCH=`cat "$BUILD_ROOT/.build.hostarch.$VM_TYPE"`
 	else
 	    # do autodetection for ppc/ppc64le switching, legacy
-	    case `uname -m`-`file "$BUILD_ROOT/.build.kernel.$VM_TYPE` in
-		ppc*ELF 64-bit MSB*) BUILD_HOST_ARCH=ppc64 ;;
-		ppc*ELF 64-bit LSB*) BUILD_HOST_ARCH=ppc64le ;;
+	    case `objdump -f "$BUILD_ROOT/.build.kernel.$VM_TYPE" | sed -ne 's/.*file format //p'` in
+		elf64-powerpcle) BUILD_HOST_ARCH=ppc64le ;;
+		elf64-powerpc)   BUILD_HOST_ARCH=ppc64 ;;
 	    esac
 	fi
     fi
