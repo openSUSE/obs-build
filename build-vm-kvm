@@ -212,6 +212,8 @@ vm_fixup_kvm() {
 		elf64-powerpc)   BUILD_HOST_ARCH=ppc64 ;;
 	    esac
 	fi
+        # set BUILD_INITVM_ARCH
+        build_host_arch
     fi
 }
 
