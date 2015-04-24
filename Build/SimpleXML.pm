@@ -1,4 +1,4 @@
-package Build::simplexml;
+package Build::SimpleXML;
 
 use strict;
 

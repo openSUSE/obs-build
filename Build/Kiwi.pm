@@ -21,7 +21,7 @@
 package Build::Kiwi;
 
 use strict;
-use Build::simplexml;
+use Build::SimpleXML;
 
 our $bootcallback;
 
@@ -70,7 +70,7 @@ sub kiwiparse {
   my @requiredarch;
   my $schemaversion = 0;
   my $schemaversion56 = versionstring("5.6");
-  my $kiwi = Build::simplexml::parse($xml);
+  my $kiwi = Build::SimpleXML::parse($xml);
   die("not a kiwi config\n") unless $kiwi && $kiwi->{'image'};
   $kiwi = $kiwi->{'image'}->[0];
   $schemaversion = versionstring($kiwi->{'schemaversion'}) if $kiwi->{'schemaversion'}; 

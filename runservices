@@ -5,10 +5,12 @@ BEGIN {
 }
 
 use POSIX;
+use File::Temp ();
+use File::Copy ();
+
 use strict;
 
-use Build::simplexml;
-use Data::Dumper;
+use Build::SimpleXML;
 
 sub ls {
   local *D;
@@ -22,25 +24,24 @@ sub run_services {
   my ($xml, $count) = @_;
   $count ||= 0;
   die("_service inclusion depth limit reached\n") if $count++ > 10;
-  my $tempdir    = "/tmp/TEST";
-  my $servicedir = "/usr/lib/obs/service/";
-  mkdir($tempdir, 0777);
+  my $servicedir = "/usr/lib/obs/service";
 
-  my $ret = {};
   my @servicxml;
-  my $servicexml = Build::simplexml::parse($xml);
+  my $servicexml = Build::SimpleXML::parse($xml);
   die("not a _service file\n") unless $servicexml && $servicexml->{'services'};
   $servicexml = $servicexml->{'services'}->[0];
+
+  my $tempdir = File::Temp::tempdir('CLEANUP' => 1);
 
   # take default version setting
   my $services = ($servicexml->{'service'} || []);
   for my $s (@{$services || []}) {
     # buildtime only is default
-    next unless $s->{'mode'} && $s->{'mode'} eq "buildtime";
+    next unless $s->{'mode'} && $s->{'mode'} eq 'buildtime';
+    die("missing name in service\n") unless $s->{'name'};
 
     if (!-x "$servicedir/$s->{'name'}") {
-      print "service $s->{'name'} configured to run, but is not available\n";
-      exit(1);
+      die("service '$s->{'name'}' configured to run, but is not available\n");
     }
 
     my @run;
@@ -54,15 +55,11 @@ sub run_services {
     push @run, "--outdir";
     push @run, $tempdir;
     if (system(@run) != 0) {
-      print "service run failed for $s->{'name'}\n";
-      exit(1);
+      die("service run failed for $s->{'name'}\n")
     }
     # copy back
     for my $file (grep {!/^[:\.]/} ls($tempdir)) {
-      my $mode = (stat($tempdir."/".$file))[2];
-      if (!S_ISDIR($mode)) {
-        rename("$tempdir/".$file, $file);
-      }
+      File::Copy::move("$tempdir/$file", $file) if -f "$tempdir/$file";
     }
   }
 }
