@@ -1202,7 +1202,10 @@ sub parse_simpleimage {
   return undef unless $do_rpm;
   my $d = Build::Rpm::parse(@_);
   $d->{'name'} ||= 'simpleimage';
-  $d->{'version'} ||= strftime "%Y.%m.%d-%H.%M.%S", gmtime;
+  if (!defined($d->{'version'})) {
+    my @s = stat($_[1]);
+    $d->{'version'} = strftime "%Y.%m.%d-%H.%M.%S", gmtime($s[9] || time);
+  }
   return $d;
 }
 
