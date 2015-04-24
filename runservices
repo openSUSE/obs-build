@@ -1,0 +1,83 @@
+#!/usr/bin/perl -w
+
+BEGIN {
+  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+}
+
+use POSIX;
+use strict;
+
+use Build::simplexml;
+use Data::Dumper;
+
+sub ls {
+  local *D;
+  opendir(D, $_[0]) || return ();
+  my @r = grep {$_ ne '.' && $_ ne '..'} readdir(D);
+  closedir D;
+  return @r;
+}
+
+sub run_services {
+  my ($xml, $count) = @_;
+  $count ||= 0;
+  die("_service inclusion depth limit reached\n") if $count++ > 10;
+  my $tempdir    = "/tmp/TEST";
+  my $servicedir = "/usr/lib/obs/service/";
+  mkdir($tempdir, 0777);
+
+  my $ret = {};
+  my @servicxml;
+  my $servicexml = Build::simplexml::parse($xml);
+  die("not a _service file\n") unless $servicexml && $servicexml->{'services'};
+  $servicexml = $servicexml->{'services'}->[0];
+
+  # take default version setting
+  my $services = ($servicexml->{'service'} || []);
+  for my $s (@{$services || []}) {
+    # buildtime only is default
+    next unless $s->{'mode'} && $s->{'mode'} eq "buildtime";
+
+    if (!-x "$servicedir/$s->{'name'}") {
+      print "service $s->{'name'} configured to run, but is not available\n";
+      exit(1);
+    }
+
+    my @run;
+    push @run, "$servicedir/$s->{'name'}";
+    for my $param (@{$s->{'param'}}) {
+      next if $param->{'name'} eq 'outdir';
+      next unless $param->{'_content'};
+      push @run, "--$param->{'name'}";
+      push @run, $param->{'_content'};
+    }
+    push @run, "--outdir";
+    push @run, $tempdir;
+    if (system(@run) != 0) {
+      print "service run failed for $s->{'name'}\n";
+      exit(1);
+    }
+    # copy back
+    for my $file (grep {!/^[:\.]/} ls($tempdir)) {
+      my $mode = (stat($tempdir."/".$file))[2];
+      if (!S_ISDIR($mode)) {
+        rename("$tempdir/".$file, $file);
+      }
+    }
+  }
+}
+
+local *F;
+open(F, '<', "_service") || die("_service: $!\n");
+my $xml = '';
+1 while sysread(F, $xml, 4096, length($xml)) > 0;
+close F;
+my $d;
+eval {
+  $d = run_services($xml);
+};
+if ($@) {
+  print $@;
+  exit(1);
+}
+exit(0);
