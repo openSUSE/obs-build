@@ -24,6 +24,7 @@ use strict;
 use Digest::MD5;
 use Build::Rpm;
 use Data::Dumper;
+use POSIX qw(strftime);
 
 our $expand_dbg;
 
@@ -1174,6 +1175,7 @@ sub recipe2buildtype {
   $recipe =~ s/^_service:.*://;
   return 'arch' if $recipe eq 'PKGBUILD';
   return 'preinstallimage' if $recipe eq '_preinstallimage';
+  return 'simpleimage' if $recipe eq 'simpleimage';
   return undef;
 }
 
@@ -1196,6 +1198,14 @@ sub parse_preinstallimage {
   return $d;
 }
 
+sub parse_simpleimage {
+  return undef unless $do_rpm;
+  my $d = Build::Rpm::parse(@_);
+  $d->{'name'} ||= 'simpleimage';
+  $d->{'version'} ||= strftime "%Y.%m.%d-%H.%M.%S", gmtime;
+  return $d;
+}
+
 sub parse {
   my ($cf, $fn, @args) = @_;
   return Build::Rpm::parse($cf, $fn, @args) if $do_rpm && $fn =~ /\.spec$/;
@@ -1203,6 +1213,7 @@ sub parse {
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /config\.xml$/;
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /\.kiwi$/;
   return Build::LiveBuild::parse($cf, $fn, @args) if $do_livebuild && $fn =~ /\.livebuild$/;
+  return parse_simpleimage($cf, $fn, @args) if $fn eq 'simpleimage';
   my $fnx = $fn;
   $fnx =~ s/.*\///;
   $fnx =~ s/^[0-9a-f]{32,}-//;	# hack for OBS srcrep implementation
@@ -1219,6 +1230,7 @@ sub parse_typed {
   return Build::Deb::parse($cf, $fn, @args) if $do_deb && $buildtype eq 'dsc';
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $buildtype eq 'kiwi';
   return Build::LiveBuild::parse($cf, $fn, @args) if $do_livebuild && $buildtype eq 'livebuild';
+  return parse_simpleimage($cf, $fn, @args) if $buildtype eq 'simpleimage';
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $buildtype eq 'arch';
   return parse_preinstallimage($cf, $fn, @args) if $buildtype eq 'preinstallimage';
   return undef;
