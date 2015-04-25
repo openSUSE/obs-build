@@ -56,6 +56,7 @@ install:
 	    changelog2spec \
 	    spec2changelog \
 	    download \
+	    runservices \
 	    spec_add_patch \
 	    spectool \
 	    signdummy \
