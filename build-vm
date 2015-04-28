@@ -594,6 +594,30 @@ vm_setup() {
     fi
 }
 
+vm_update_hostarch() {
+    local kernel="$vm_kernel"
+    local hostarchfile
+    local newhostarch
+    if test -z "$VM_KERNEL" -a -e "$BUILD_ROOT/.build.kernel.$VM_TYPE" ; then
+	kernel="$BUILD_ROOT/.build.kernel.$VM_TYPE"
+	hostarchfile="$BUILD_ROOT/.build.hostarch.$VM_TYPE"
+    fi
+    if test -n "$hostarchfile" -a -e "$hostarchfile"; then
+	newhostarch=`cat "$hostarchfile"`
+    elif test -n "$kernel" -a -e "$kernel" ; then
+	case `objdump -f "$kernel" | sed -ne 's/.*file format //p'` in
+	    elf64-powerpcle) newhostarch=ppc64le ;;
+	    elf64-powerpc) newhostarch=ppc64 ;;
+	esac
+    fi
+    if test -n "$newhostarch" -a "$newhostarch" != "$BUILD_HOST_ARCH" ; then
+	echo "setting hostarch to $newhostarch"
+	BUILD_HOST_ARCH="$newhostarch"
+	# update BUILD_INITVM_ARCH
+	build_host_arch
+    fi
+}
+
 #
 # prepare for vm startup
 #
@@ -638,6 +662,11 @@ vm_first_stage() {
 
     # do vm specific fixups
     vm_fixup
+
+    # update the hostarch
+    if test -n "$VM_IMAGE" ; then
+	vm_update_hostarch
+    fi
 
     # the watchdog needs a log file
     test -n "$LOGFILE" || VM_WATCHDOG=

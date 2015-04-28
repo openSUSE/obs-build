@@ -203,17 +203,6 @@ vm_fixup_kvm() {
 	    qemu_rootdev=/dev/disk/by-id/virtio-0
 	    VM_SWAPDEV=/dev/disk/by-id/virtio-1
 	fi
-	if test -e "$BUILD_ROOT/.build.hostarch.$VM_TYPE" ; then
-	    BUILD_HOST_ARCH=`cat "$BUILD_ROOT/.build.hostarch.$VM_TYPE"`
-	else
-	    # do autodetection for ppc/ppc64le switching, legacy
-	    case `objdump -f "$BUILD_ROOT/.build.kernel.$VM_TYPE" | sed -ne 's/.*file format //p'` in
-		elf64-powerpcle) BUILD_HOST_ARCH=ppc64le ;;
-		elf64-powerpc)   BUILD_HOST_ARCH=ppc64 ;;
-	    esac
-	fi
-        # set BUILD_INITVM_ARCH
-        build_host_arch
     fi
 }
 
