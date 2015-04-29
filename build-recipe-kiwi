@@ -419,6 +419,9 @@ recipe_build_kiwi() {
         test -L $r && continue
         test -d $r || continue
         repo="$TOPDIR/SOURCES/repos/$r/"
+        # skip if already done in previous run
+        rr=`dirname $r`
+        test "$rr" = "${rr%:}" || continue
         # create compatibility link for old kiwi versions
         rc="${r//:/:/}"
         if test "$rc" != "$r" ; then
