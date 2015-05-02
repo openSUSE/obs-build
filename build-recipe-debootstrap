@@ -45,7 +45,7 @@ recipe_build_debootstrap() {
     done
     FULL_PKG_LIST="${FULL_PKG_LIST#,}"
     rm -rf "$BUILD_ROOT/$myroot"
-    set -- chroot $BUILD_ROOT debootstrap --no-check-gpg --variant=buildd --arch="${arch}" --include="$FULL_PKG_LIST" "$dist" "$myroot" file:///.build.binaries
+    set -- chroot $BUILD_ROOT debootstrap --keep-debootstrap-dir --no-check-gpg --variant=buildd --arch="${arch}" --include="$FULL_PKG_LIST" "$dist" "$myroot" file:///.build.binaries
     echo "running debootstrap..."
     if ! "$@" || ! chroot $BUILD_ROOT dpkg --configure -a; then
         cat $BUILD_ROOT/debootstrap/debootstrap.log
