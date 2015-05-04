@@ -106,6 +106,7 @@ recipe_build_spec() {
 
     rpmbuild=rpmbuild
     test -x $BUILD_ROOT/usr/bin/rpmbuild || rpmbuild=rpm
+    test "$BUILDTYPE" = debbuild && rpmbuild=debbuild
 
     # XXX: move _srcdefattr to macro file?
     rpmbopts=("$BUILD_RPM_BUILD_STAGE" "--define" "_srcdefattr (-,root,root)")

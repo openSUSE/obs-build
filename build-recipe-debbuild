@@ -1,0 +1,49 @@
+#
+# debbuild specific functions.
+#
+################################################################
+#
+# Copyright (c) 2015 SUSE Linux GmbH
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+recipe_setup_debbuild() {
+    TOPDIR=/usr/src/debian
+    test "$DO_INIT_TOPDIR" = false || rm -rf "$BUILD_ROOT$TOPDIR"
+    mkdir -p "$BUILD_ROOT$TOPDIR"
+    mkdir -p "$BUILD_ROOT$TOPDIR/OTHER"
+    mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
+    mkdir -p "$BUILD_ROOT$TOPDIR/DEBS"
+    mkdir -p "$BUILD_ROOT$TOPDIR/SDEBS"
+    mkdir -p "$BUILD_ROOT$TOPDIR/BUILD"
+    test -e "$BUILD_ROOT$TOPDIR/SPECS" || ln -s SOURCES "$BUILD_ROOT$TOPDIR/SPECS"
+    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+    cp -p "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+}
+
+recipe_prepare_debbuild() {
+    recipe_prepare_spec "$@"
+}
+
+recipe_build_debbuild() {
+    recipe_build_spec "$@"
+}
+
+recipe_resultdirs_debbuild() {
+    echo DEBS SDEBS
+}
+
