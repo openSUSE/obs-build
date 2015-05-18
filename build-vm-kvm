@@ -26,6 +26,7 @@ kvm_console=ttyS0
 
 # assume virtio support by default
 kvm_device=virtio-blk-pci
+kvm_serial_device=
 kvm_options=
 
 kvm_check_ppc970() {
@@ -104,6 +105,7 @@ vm_verify_options_kvm() {
 	    vm_kernel=/boot/image
 	    vm_initrd=/boot/initrd
 	    kvm_device=virtio-blk-ccw
+	    kvm_serial_device=virtio-serial-ccw
 	    ;;
     esac
 
@@ -160,6 +162,11 @@ vm_startup_kvm() {
     if test -n "$VM_SWAP" ; then
 	qemu_args=("${qemu_args[@]}" -drive file="$VM_SWAP",if=none,id=swap,serial=1,cache=unsafe -device "$kvm_device",drive=swap)
     fi
+    if test -n "$kvm_serial_device" ; then
+	qemu_args=("${qemu_args[@]}" -device "$kvm_serial_device" -device virtconsole,chardev=virtiocon0 -chardev stdio,id=virtiocon0)
+    else
+	qemu_args=("${qemu_args[@]}" -serial stdio)
+    fi
 
     if test -n "$BUILD_JOBS" -a "$icecream" = 0 -a -z "$BUILD_THREADS" ; then
 	qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS")
@@ -178,7 +185,7 @@ vm_startup_kvm() {
     if test -n "$VMDISK_MOUNT_OPTIONS" ; then
         qemu_rootflags="rootflags=${VMDISK_MOUNT_OPTIONS#-o }"
     fi
-    set -- $qemu_bin -nodefaults -serial stdio -no-reboot -nographic -vga none -net none $kvm_options \
+    set -- $qemu_bin -nodefaults -no-reboot -nographic -vga none -net none $kvm_options \
 	-kernel $vm_kernel \
 	-initrd $vm_initrd \
 	-append "root=$qemu_rootdev $qemu_rootfstype $qemu_rootflags panic=1 quiet no-kvmclock nmi_watchdog=0 rw rd.driver.pre=binfmt_misc elevator=noop console=$kvm_console init=$vm_init_script" \
