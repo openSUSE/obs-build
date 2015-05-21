@@ -202,7 +202,7 @@ preinstall() {
 	TAR="/usr/bin/bsdtar -P --chroot -o --numeric-owner -x"
     else
 	unsafe_preinstall_check
-	CPIO="cpio --extract --unconditional --preserve-modification-time --make-directories --no-absolute-filenames --quiet"
+	CPIO="cpio --extract --unconditional --preserve-modification-time --make-directories --no-absolute-filenames --quiet --extract-over-symlinks"
 	TAR="tar -x"
     fi
     pkg_preinstall
