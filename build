@@ -324,6 +324,12 @@ Known Parameters:
   --vm-initrd FILE
               Kernel and initrd to use for VM (kvm and qemu only)
 
+  --vm-net OPTION
+  --vm-netdev OPTION
+  --vm-device OPTION
+              KVM only: Attach kvm option
+              Available options are -net, -netdev, -device
+	      (This options in kvm can not guarantee reproducible builds)
   --debug
               Enable creation of a debuginfo package
 

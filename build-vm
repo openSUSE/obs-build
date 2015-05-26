@@ -45,6 +45,9 @@ VM_INITRD=
 VM_WORKER=
 VM_SERVER=
 VM_MEMSIZE=
+VM_NETOPT=()
+VM_NETDEVOPT=()
+VM_DEVICEOPT=()
 VMDISK_ROOTSIZE=4096
 VMDISK_SWAPSIZE=1024
 VMDISK_FILESYSTEM=
@@ -226,6 +229,21 @@ vm_parse_options() {
       ;;
       -vm-watchdog)
 	VM_WATCHDOG=true
+      ;;
+      -vm-net)
+        needarg
+        VM_NETOPT+=("$ARG")
+        shift
+      ;;
+      -vm-netdev)
+        needarg
+        VM_NETDEVOPT+=("$ARG")
+        shift
+      ;;
+      -vm-device)
+        needarg
+        VM_DEVICEOPT+=("$ARG")
+        shift
       ;;
       -*)
 	return 1
