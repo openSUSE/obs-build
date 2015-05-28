@@ -54,7 +54,7 @@ recipe_prepare_dsc() {
     if test -n "$DEB_TRANSFORM" ; then 
 	CHANGELOGARGS=
 	test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" && CHANGELOGARGS="--changelog $BUILD_ROOT/.build-changelog"
-	echo "running debian transformer..."
+	echo "Found files matching debian.*, running debian transformer..."
         if [ "$RELEASE" ]; then
           echo "release: ($RELEASE), release (DEB) ($DEB_RELEASE)"
                  RELEASEARGS="--release $DEB_RELEASE"
