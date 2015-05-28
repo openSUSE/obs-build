@@ -32,7 +32,7 @@ sub parsedsc {
   my ($fn) = @_;
   my @control;
   local *F;
-  open(F, '<', $fn) || die("$fn: $!\n");
+  open(F, '<', $fn) || die("Error in reading $fn: $!\n");
   @control = <F>;
   close F;
   chomp @control;
@@ -59,7 +59,8 @@ sub parsedsc {
 
 sub writedsc {
   my ($fn, $tags) = @_;
-  open(F, '>', $fn) || die("$fn: $!\n");
+  print "Writing $fn\n";
+  open(F, '>', $fn) || die("open $fn: $!\n");
   my @seq = @{$tags->{'__seq'} || []};
   my %seq = map {uc($_) => 1} @seq;
   for (sort keys %$tags) {
@@ -78,44 +79,48 @@ sub writedsc {
 
 sub listtar {
   my ($tar, $skipdebiandir) = @_;
+  print "Scanning $tar...\n";
   local *F;
   my @c;
   unless(defined($skipdebiandir)) {
     $skipdebiandir = 1;
   }
-  open(F, '-|', 'tar', '--numeric-owner', '-tvf', $tar) || die("tar: $!\n");
+  open(F, '-|', 'tar', '--numeric-owner', '-tvf', $tar) ||
+    die("Execution of tar subprocess failed: $!\n");
   while(<F>) {
     next unless /^([-dlbcp])(.........)\s+\d+\/\d+\s+(\S+) \d\d\d\d-\d\d-\d\d \d\d:\d\d(?::\d\d)? (.*)$/;
     my ($type, $mode, $size, $name) = ($1, $2, $3, $4);
     next if $type eq 'd';
     if ($type eq 'l') {
       next if $skipdebiandir eq 0;
-      die("debian tar contains link: $name\n");
+      die("Archive contains a link: $name\n");
     }
     if ($type ne '-') {
       next if $skipdebiandir eq 0;
-      die("debian tar contains unexpected file type: $name\n");
+      die("Archive contains an unexpected type for file \"$name\"\n");
     }
     $name =~ s/^\.\///;
     $name =~ s/^debian\/// if $skipdebiandir eq 1;
     push @c, {'name' => $name, 'size' => $size};
   }
-  close(F) || die("tar: $!\n");
+  close(F) || die("tar exited with non-zero status: $!\n");
   return @c;
 }
 
 sub extracttar {
   my ($tar, $filename, $s) = @_;
   local *F;
-  open(F, '-|', 'tar', '-xOf', $tar, $filename) || die("tar: $!\n");
+  print "Extracting $tar...\n";
+  open(F, '-|', 'tar', '-xOf', $tar, $filename) ||
+    die("Execution of tar subprocess failed: $!\n");
   my $file = '';
   while ($s > 0) {
     my $l = sysread(F, $file, $s, length($file));
-    die("tar read error\n") unless $l;
+    die("Error while reading from tar subprocess: $!\n") unless $l;
     $s -= $l;
   }
   my @file = split("\n", $file);
-  close(F);
+  close(F) || warn("tar exited with non-zero status: $!\n");
   return @file;
 }
 
@@ -174,7 +179,8 @@ sub dotar {
 sub dofile {
   my ($file, $tardir, $dfile, $origtarfile) = @_;
   local *F;
-  open(F, '<', $file) || die("$file: $!\n");
+  print "Processing file \"$file\"...\n";
+  open(F, '<', $file) || die("Error in reading $file: $!\n");
   my @file = <F>;
   close F;
   chomp(@file);
@@ -192,13 +198,15 @@ sub doseries {
   my @series = <F>;
   close F;
   chomp(@series);
+  print "Processing series file \"$series\"...\n";
   for my $patch (@series) {
     $patch =~ s/(^|\s+)#.*//;
     next if $patch =~ /^\s*$/;
     my $level = 1;
     $level = $1 if $patch =~ /\s.*-p\s*(\d+)/;
     $patch =~ s/\s.*//;
-    open(F, '<', "$dir/$patch") || die("$dir/$patch: $!\n");
+    print "Processing patch $dir/$patch...\n";
+    open(F, '<', "$dir/$patch") || die("Error in reading $dir/$patch: $!\n");
     while(<F>) {
       chomp;
       if ((/^--- ./ || /^\+\+\+ ./) && !/^... \/dev\/null/) {
@@ -227,7 +235,7 @@ sub addfile {
   my $base = $file;
   $base =~ s/.*\///;
   local *F;
-  open(F, '<', $file) || die("$file: $!\n");
+  open(F, '<', $file) || die("Error in reading $file: $!\n");
   my $size = -s F;
   my $ctx = Digest::MD5->new;
   $ctx->addfile(*F);
@@ -236,7 +244,7 @@ sub addfile {
   return "$md5 $size $base";
 }
 
-print "debtransform: ", join( " ", @ARGV ), "\n";
+print "** Started: debtransform @ARGV\n";
 
 my $debug = 0;
 my $changelog;
@@ -265,11 +273,11 @@ my $dir = $ARGV[0];
 my $dsc = $ARGV[1];
 my $out = $ARGV[2];
 
-die("$out: $!\n") unless -d $out;
+die("$out is not a directory\n") unless -d $out;
 
 my $tags = parsedsc($dsc);
 
-opendir(D, $dir) || die("$dir: $!\n");
+opendir(D, $dir) || die("Could not open $dir: $!\n");
 my @dir = grep {$_ ne '.' && $_ ne '..'} readdir(D);
 closedir(D);
 my %dir = map {$_ => 1} @dir;
@@ -284,29 +292,41 @@ if (!$tarfile || !@debtarfiles) {
   my @tars = grep {/\.tgz$|\.tar(?:\.gz|\.bz2|\.xz)?$/} @dir;
   my @debtars = grep {/^debian\.tar(?:\.gz|\.bz2|\.xz)?$/} @tars;
   if (!$tarfile) {
+    print "No DEBTRANSFORM-TAR line in the .dsc file.\n";
+    print "Attempting automatic discovery of a suitable source archive.\n";
     @tars = grep {!/^debian\.tar(?:\.gz|\.bz2|\.xz)?$/} @tars;
     if (@debtarfiles) {
       my %debtarfiles = map {$_ => 1} @debtarfiles;
       @tars = grep {!$debtarfiles{$_}} @tars;
     }
-    die("package contains no tar file\n") unless @tars;
-    die("package contains more than one tar file: @tars\n") if @tars > 1;
+    die("None of the files looks like a usable source tarball.\n") unless @tars;
+    die("Too many files looking like a usable source tarball (would not know which to pick): @tars\n") if @tars > 1;
     $tarfile = $tars[0];
+    print "Source archive chosen for transformation: $tarfile\n";
+  }
+  if (!exists($tags->{'DEBTRANSFORM-FILES-TAR'})) {
+    print "No DEBTRANSFORM-FILES-TAR line in the .dsc file.\n";
+    print "Attempting automatic discovery of a debian archive.\n";
   }
   if (@debtars && !exists($tags->{'DEBTRANSFORM-FILES-TAR'})) {
-    die("package contains more than one debian tar file\n") if @debtars > 1;
+    die("package contains more than one debian archive\n") if @debtars > 1;
     @debtarfiles = ($debtars[0]);
+    print "Debian archive chosen for transformation: $debtars[0]\n";
   }
 }
 
 my $name = $tags->{'SOURCE'};
-die("dsc file contains no source\n") unless defined($name);
+die("dsc file contains no Source: line\n") unless defined($name);
 my $version = $tags->{'VERSION'};
-die("dsc file contains no version\n") unless defined($version);
-$version =~ s/^\d+://;	# no epoch in version, please
+die("dsc file contains no Version: line\n") unless defined($version);
+# no epoch in version, please
+if ($version =~ s/^\d+://) {
+	print "Stripped epoch from Version field, which is now \"$version\".\n";
+}
 
 
-# transform 
+# debtransform will always generate a 1.0 format type,
+# so it has to transform all source archives into weak gzip files.
 my $tmptar;
 if ($tarfile =~ /\.tar\.bz2/) {
     my $old = $tarfile;
@@ -343,12 +363,15 @@ $v =~ s/-[^-]*$//;
 $tarfile =~ /.*(\.tar.*?)$/;
 my $ntarfile = "${name}_$v.orig$1";
 if( $tmptar ) {
-  link("$tmptar", "$out/$ntarfile") || die("link $dir/$tarfile $out/$ntarfile: $!\n");
+  print "Moving $dir/$tarfile to $out/$ntarfile\n";
+  link("$tmptar", "$out/$ntarfile") || die("link: $!\n");
   unlink("$tmptar");
 } else {
-  link("$dir/$tarfile", "$out/$ntarfile") || die("link $dir/$tarfile $out/$ntarfile: $!\n");
+  print "Hardlinking $dir/$tarfile to $out/$ntarfile\n";
+  link("$dir/$tarfile", "$out/$ntarfile") || die("link: $!\n");
 }
 push @files, addfile("$out/$ntarfile");
+print "files @files\n";
 
 if ( $tags->{'DEBTRANSFORM-RELEASE'} && $release ) {
     # if dsc file contains the tag DEBTRANSFORM-RELEASE
@@ -360,6 +383,7 @@ if ( $tags->{'DEBTRANSFORM-RELEASE'} && $release ) {
     # (same as for RPMs)
     $version = $v . "-" . $release;
     $tags->{'VERSION'} = $version;
+    print "Modifying dsc Version field to \"$tags->{VERSION}\"\n";
 }
 
 my $tarpath = "$out/$ntarfile";
@@ -367,9 +391,12 @@ my $tardir = $tarfile;
 $tardir =~ s/\.orig\.tar/\.tar/;
 $tardir =~ s/\.tar.*?$//;
 my @tarfilecontent = listtar($tarpath, 0);
-my $origtarfile = { 'name', $tarpath, 'content', \@tarfilecontent, 'version', $tags->{'VERSION'}, 'tardir', $tardir};
+my $origtarfile = {'name' => $tarpath, 'content' => \@tarfilecontent, 'version' => $tags->{'VERSION'}, 'tardir' => $tardir};
 
-open(DIFF, '>', "$out/${name}_$version.diff") || die("$out/${name}_$version.diff: $!\n");
+print "Generating $out/${name}_$version.diff\n";
+# Since we are generating a unitary diff, we must re-set Format:.
+$tags->{"FORMAT"} = "1.0";
+open(DIFF, '>', "$out/${name}_$version.diff") || die("Cannot open $out/${name}_$version.diff for write: $!\n");
 
 undef $changelog if $dir{'debian.changelog'};
 
@@ -379,7 +406,7 @@ for my $debtarfile (@debtarfiles) {
   my @c = listtar("$dir/$debtarfile");
   $debtarcontent{$debtarfile} = \@c;
   for (@c) {
-    die("debian tar and directory both contain '$_->{'name'}'\n") if $dir{"debian.$_->{'name'}"};
+    die("\"$_->{'name'}\" exists in both the debian archive as well as the package source directory.\n") if $dir{"debian.$_->{'name'}"};
     undef $changelog if $_->{'name'} eq 'changelog';
     $debtarorigin{$_->{'name'}} = "$dir/$debtarfile";
   }
