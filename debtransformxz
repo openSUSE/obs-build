@@ -1,0 +1,6 @@
+#!/bin/sh
+if test $# -ne 2; then
+	exit 1
+fi
+xz -cd "$1" | gzip -f - >"$2" || exit 1
+exit 0
