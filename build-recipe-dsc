@@ -91,9 +91,9 @@ dsc_build() {
 	chroot $buildroot su -
     else
 	chroot $buildroot su -c "export DEB_BUILD_OPTIONS=${DSC_BUILD_OPTIONS} ; cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
-	if test "$BUILD_SUCCEEDED" = true -a "$DO_CHECKS" != "false"; then
+	if test "$BUILD_SUCCEEDED" = true -a "$DO_CHECKS" != "false" && ( chroot $buildroot su -c "which lintian > /dev/null" - $BUILD_USER < /dev/null ); then
 	   DEB_CHANGESFILE=${RECIPEFILE%.dsc}_"$(chroot $buildroot su -c 'dpkg-architecture -qDEB_BUILD_ARCH')".changes
-	   chroot $buildroot su -c "which lintian > /dev/null && cd $TOPDIR && echo Running lintian && (set -x && lintian -i $DEB_SOURCEDIR/$DEB_DSCFILE)" - $BUILD_USER < /dev/null
+	   chroot $buildroot su -c "cd $TOPDIR && echo Running lintian && (set -x && lintian -i $DEB_SOURCEDIR/$DEB_DSCFILE)" - $BUILD_USER < /dev/null || BUILD_SUCCEEDED=false
 	fi
     fi
 }
