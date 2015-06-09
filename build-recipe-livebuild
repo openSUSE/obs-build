@@ -148,6 +148,7 @@ recipe_build_livebuild() {
 	LB_MIRROR_BINARY_SECURITY="file:/.build.binaries/"
 	LB_MIRROR_DEBIAN_INSTALLER="file:/.build.binaries/"
 	LB_APT_SECURE="false"
+	LIVE_IMAGE_NAME="${RECIPEFILE%.livebuild}"
 	EOF
 
     # Expand live-build configuration to $TOPDIR/$LIVEBUILD_ROOT
