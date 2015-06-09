@@ -193,25 +193,46 @@ recipe_build_livebuild() {
     chroot $BUILD_ROOT su -c "cd $TOPDIR/$LIVEBUILD_ROOT && lb build" - root \
 	< /dev/null || cleanup_and_exit 1
 
-    # Move created product to destination
+    # extract build result basenames
+    local build_results=""
     for i in $BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT/* ; do
 	test -f "$i" || continue
 	case "${i##*/}" in
+	    *.hybrid.iso)
+		build_results="${build_results}\n${i%%.hybrid.iso}"
+		;;
 	    *.iso)
-		# all created files share the same name without suffix
-		mv ${i%%.iso}.* $BUILD_ROOT/$TOPDIR/OTHER/.
-		BUILD_SUCCEEDED=true
+		build_results="${build_results}\n${i%%.iso}"
+		;;
+	    *.img)
+		build_results="${build_results}\n${i%%.img}"
+		;;
+	    *.netboot.tar*)
+		build_results="${build_results}\n${i%%.netboot.tar*}"
+		;;
+	    *.tar*)
+		build_results="${build_results}\n${i%%.tar*}"
 		;;
 	    *)
 		;;
 	esac
     done
 
-    # Fail the build if no ISO was created
-    if [ -z "$(ls $BUILD_ROOT/$TOPDIR/OTHER/*.iso)" ] ; then
-	echo "No ISO image found"
+    # Fail the build if no build results are found
+    if [ -z "${build_results}" ] ; then
+	echo "No live-build result found"
 	cleanup_and_exit 1
     fi
+
+    # move created products (and their metadata files) to destination
+    local buildnum="${RELEASE:+-Build${RELEASE}}"
+    for prefix in $(echo -e ${build_results} | sort | uniq) ; do
+	for f in ${prefix}.* ; do
+	    mv ${f} \
+		$BUILD_ROOT/$TOPDIR/OTHER/${prefix##*/}${buildnum}${f#${prefix}}
+	    BUILD_SUCCEEDED=true
+	done
+    done
 }
 
 recipe_resultdirs_livebuild() {
