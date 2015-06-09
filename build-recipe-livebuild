@@ -225,9 +225,13 @@ recipe_build_livebuild() {
     fi
 
     # move created products (and their metadata files) to destination
-    for i in $(echo -e ${build_results} | sort | uniq) ; do
-	mv ${i}.* $BUILD_ROOT/$TOPDIR/OTHER/.
-	BUILD_SUCCEEDED=true
+    local buildnum="${RELEASE:+-Build${RELEASE}}"
+    for prefix in $(echo -e ${build_results} | sort | uniq) ; do
+	for f in ${prefix}.* ; do
+	    mv ${f} \
+		$BUILD_ROOT/$TOPDIR/OTHER/${prefix##*/}${buildnum}${f#${prefix}}
+	    BUILD_SUCCEEDED=true
+	done
     done
 }
 
