@@ -154,6 +154,25 @@ vm_verify_options_kvm() {
 	    VM_SWAPDEV=/dev/sdb
 	    ;;
     esac
+
+    if test -n "$VM_NETOPT" -o -n "$VM_NETDEVOPT" ; then
+        if test -n "$VM_NETOPT" ; then
+           for item in "${VM_NETOPT[@]}" ; do
+              kvm_options="$kvm_options -net $item"
+           done
+        fi
+        if test -n "$VM_NETDEVOPT" ; then
+           for item in "${VM_NETDEVOPT[@]}" ; do
+              kvm_options="$kvm_options -netdev $item"
+           done
+        fi
+    fi
+
+    if test -n "$VM_DEVICEOPT" ; then
+        for item in "${VM_DEVICEOPT[@]}" ; do
+            kvm_options="$kvm_options -device $item"
+        done
+    fi
 }
 
 vm_startup_kvm() {
@@ -187,7 +206,10 @@ vm_startup_kvm() {
     if test -n "$VMDISK_MOUNT_OPTIONS" ; then
         qemu_rootflags="rootflags=${VMDISK_MOUNT_OPTIONS#-o }"
     fi
-    set -- $qemu_bin -nodefaults -no-reboot -nographic -vga none -net none $kvm_options \
+    if test -z "$VM_NETOPT" -a -z "$VM_NETDEVOPT"; then
+        kvm_options="$kvm_options -net none"
+    fi
+    set -- $qemu_bin -nodefaults -no-reboot -nographic -vga none $kvm_options \
 	-kernel $vm_kernel \
 	-initrd $vm_initrd \
 	-append "root=$qemu_rootdev $qemu_rootfstype $qemu_rootflags panic=1 quiet no-kvmclock nmi_watchdog=0 rw rd.driver.pre=binfmt_misc elevator=noop console=$kvm_console init=$vm_init_script" \
