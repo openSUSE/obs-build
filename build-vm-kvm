@@ -158,9 +158,9 @@ vm_verify_options_kvm() {
 
 vm_startup_kvm() {
     qemu_bin="$kvm_bin"
-    qemu_args=(-drive file="$VM_IMAGE",if=none,id=disk,serial=0,cache=unsafe -device "$kvm_device",drive=disk)
+    qemu_args=(-drive file="$VM_IMAGE",format=raw,if=none,id=disk,serial=0,cache=unsafe -device "$kvm_device",drive=disk)
     if test -n "$VM_SWAP" ; then
-	qemu_args=("${qemu_args[@]}" -drive file="$VM_SWAP",if=none,id=swap,serial=1,cache=unsafe -device "$kvm_device",drive=swap)
+	qemu_args=("${qemu_args[@]}" -drive file="$VM_SWAP",format=raw,if=none,id=swap,serial=1,cache=unsafe -device "$kvm_device",drive=swap)
     fi
     # the serial console device needs to be compiled into the target kernel
     # which is why we can not use virtio-serial on other platforms
