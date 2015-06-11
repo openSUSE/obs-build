@@ -30,6 +30,7 @@ use Build;
 
 my ($dist, $archs, $configdir, $type, $argument);
 
+my $print_array_as_lines = 0;
 $configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
 
 while (@ARGV)  {
@@ -44,6 +45,10 @@ while (@ARGV)  {
   } elsif ($ARGV[0] eq '--configdir') {
     shift @ARGV;
     $configdir = shift @ARGV;
+    next;
+  } elsif ($ARGV[0] eq '--lines') {
+    shift @ARGV;
+    $print_array_as_lines = 1;
     next;
   } elsif (defined($type)) {
     $argument = shift @ARGV; 
@@ -77,12 +82,18 @@ if ($type eq 'buildflags') {
     next if $_ eq '*';
     print "optflags: $_ $cf->{'optflags'}->{$_}$all\n";
   }
-} elsif ($type eq 'substitute') {
-  die("Specify which substitute to query\n") unless $argument;
-  my @res =  @{$cf->{'substitute'}->{$argument} || []};
-  print join(' ', @res)."\n" if @res;
 } else {
-  die("unsupported query type: $type\n");
+  my $res =  $cf->{$type};
+  if (ref $res eq 'HASH') {
+	  die("Specify which $type to query\n") unless $argument;
+	  $res =  $cf->{$type}->{$argument};
+  }
+  if (ref $res eq 'ARRAY') {
+	  $res = join($print_array_as_lines?"\n":' ', @$res);
+  }
+  if (defined $res && length $res) {
+	  print "$res\n";
+  }
 }
 
 exit(0);
