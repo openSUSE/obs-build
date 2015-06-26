@@ -40,13 +40,13 @@ sub expr {
     return undef unless defined $v;
     return undef unless $expr =~ s/^\)//;
   } elsif ($t eq '!') {
-    ($v, $expr) = expr(substr($expr, 1), 0);
+    ($v, $expr) = expr(substr($expr, 1), 5);
     return undef unless defined $v;
     $v = 0 if $v && $v eq '\"\"';
     $v =~ s/^0+/0/ if $v;
     $v = !$v;
   } elsif ($t eq '-') {
-    ($v, $expr) = expr(substr($expr, 1), 0);
+    ($v, $expr) = expr(substr($expr, 1), 5);
     return undef unless defined $v;
     $v = -$v;
   } elsif ($expr =~ /^([0-9]+)(.*?)$/) {
@@ -61,6 +61,7 @@ sub expr {
   } else {
     return;
   }
+  return ($v, $expr) if $lev >= 5;
   while (1) {
     $expr =~ s/^\s+//;
     if ($expr =~ /^&&/) {
