@@ -231,6 +231,7 @@ sub read_config {
   $config->{'constraint'} = [];
   $config->{'expandflags'} = [];
   $config->{'buildflags'} = [];
+  $config->{'singleexport'} = '';
   for my $l (@spec) {
     $l = $l->[1] if ref $l;
     next unless defined $l;
@@ -328,6 +329,8 @@ sub read_config {
       } else {
 	push @{$config->{'constraint'}}, $l;
       }
+    } elsif ($l0 eq 'singleexport:') {
+      $config->{'singleexport'} = $l[0]; # avoid to export multiple package container in maintenance_release projects
     } elsif ($l0 !~ /^[#%]/) {
       warn("unknown keyword in config: $l0\n");
     }
