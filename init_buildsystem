@@ -247,6 +247,7 @@ create_devs() {
 	mknod urandom 644 c 1 9
 	mknod tty     666 c 5 0
 	mknod ptmx    666 c 5 2
+	mknod loop-control 600 c 10 237
 	mknod loop0   640 b 7 0
 	mknod loop1   640 b 7 1
 	mknod loop2   640 b 7 2
