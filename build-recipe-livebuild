@@ -170,7 +170,10 @@ recipe_build_livebuild() {
 
     # Sanity check to not configure archives inside configuration
     files=($BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT/config/archives/*)
-    [ ${#files[@]} -gt 0 ] && cleanup_and_exit 1
+    if [ ${#files[@]} -gt 0 ]; then
+        echo "E: No configuration in config/archives/* allowed"
+        cleanup_and_exit 1
+    fi
 
     # TODO: Add the repository public key
     # cp ... $BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT/config/archives/debian.key
