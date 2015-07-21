@@ -232,17 +232,17 @@ vm_parse_options() {
       ;;
       -vm-net)
         needarg
-        VM_NETOPT=($VM_NETOPT "$ARG")
+        VM_NETOPT=("${VM_NETOPT[@]}" "$ARG")
         shift
       ;;
       -vm-netdev)
         needarg
-        VM_NETDEVOPT=($VM_NETDEVOPT "$ARG")
+        VM_NETDEVOPT=("${VM_NETDEVOPT[@]}" "$ARG")
         shift
       ;;
       -vm-device)
         needarg
-        VM_DEVICEOPT=($VM_DEVICEOPT "$ARG")
+        VM_DEVICEOPT=("${VM_DEVICEOPT[@]}" "$ARG")
         shift
       ;;
       -*)
