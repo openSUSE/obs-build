@@ -99,7 +99,7 @@ dsc_build() {
 }
 
 dsc_move_build_result() {
-    for DEB in $BUILD_ROOT/$TOPDIR/*.deb ; do
+    for DEB in $BUILD_ROOT/$TOPDIR/*.{deb,changes} ; do
 	test -e "$DEB" && mv "$DEB" "$BUILD_ROOT/$TOPDIR/DEBS"
     done
 
