@@ -425,8 +425,12 @@ setupccache() {
 }
 
 setupicecream() {
+    local icecreamdir="/var/run/icecream"
+    if test `readlink "$BUILD_ROOT/var/run"` = '/run' ; then
+	icecreamdir="/run/icecream"
+    fi
     if test "$icecream" -eq 0 ; then
-	rm -rf "$BUILD_ROOT/var/run/icecream"
+	rm -rf "$BUILD_ROOT$icecreamdir"
 	rm -f "$BUILD_ROOT/etc/profile.d/build_icecream.sh"
 	return 0
     fi
@@ -444,7 +448,7 @@ setupicecream() {
 	echo 'export CCACHE_PATH=/usr/lib/icecc/bin:/opt/icecream/bin' > "$BUILD_ROOT"/etc/profile.d/build_icecream.sh
     fi
 
-    local icecc_vers=(`shopt -s nullglob; echo $BUILD_ROOT/var/run/icecream/*.tar.{bz2,gz}`)
+    local icecc_vers=(`shopt -s nullglob; echo $BUILD_ROOT$icecreamdir/*.tar.{bz2,gz}`)
     icecc_vers=${icecc_vers//$BUILD_ROOT/}
 
     # XXX use changelog like autobuild does instead?
@@ -456,8 +460,8 @@ setupicecream() {
 	-o "$BUILD_ROOT/usr/bin/as" -nt "$BUILD_ROOT/$icecc_vers" \
 	-o "$BUILD_ROOT/lib/libc.so.6" -nt "$BUILD_ROOT/$icecc_vers"
     then
-	rm -rf "$BUILD_ROOT/var/run/icecream"
-	mkdir -p "$BUILD_ROOT/var/run/icecream"
+	rm -rf "$BUILD_ROOT$icecreamdir"
+	mkdir -p "$BUILD_ROOT$icecreamdir"
 	if test -e "$BUILD_ROOT"/usr/bin/create-env ; then
 	    createenv=/usr/bin/create-env
 	elif test -e "$BUILD_ROOT"/usr/lib/icecc/icecc-create-env ; then
@@ -468,9 +472,11 @@ setupicecream() {
 	    echo "create-env not found"
 	    return 1
 	fi
-	chroot $BUILD_ROOT bash -c "cd /var/run/icecream; $createenv" || cleanup_and_exit 1
-	icecc_vers=(`shopt -s nullglob; echo $BUILD_ROOT/var/run/icecream/*.tar.{bz2,gz}`)
+        echo "creating new env in '$icecreamdir'"
+	chroot $BUILD_ROOT bash -c "cd $icecreamdir; $createenv" || cleanup_and_exit 1
+	icecc_vers=(`shopt -s nullglob; echo $BUILD_ROOT/$icecreamdir/*.tar.{bz2,gz}`)
 	icecc_vers=${icecc_vers//$BUILD_ROOT/}
+	echo "created icecream environment $icecc_vers"
     else
 	echo "reusing existing icecream environment $icecc_vers"
     fi
