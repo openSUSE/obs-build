@@ -249,6 +249,10 @@ sub parserepodata {
       push @{$d->{'conflicts'}}, @p;
     } elsif ($p eq '%REPLACES%') {
       push @{$d->{'obsoletes'}}, @p;
+    } elsif ($p eq '%MD5SUM%') {
+      $d->{'checksum_md5'} = $p[0];
+    } elsif ($p eq '%SHA256SUM%') {
+      $d->{'checksum_sha256'} = $p[0];
     }
   }
   return $d;

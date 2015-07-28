@@ -40,6 +40,14 @@ sub addpkg {
     $data->{'release'} = $1 if $data->{'version'} =~ s/-([^-]*)$//s;
   }
   $data->{'location'} = delete($data->{'filename'}) if exists $data->{'filename'};
+  if ($options->{'withchecksum'}) {
+    for (qw {md5 sha1 sha256}) {
+      my $c = delete($data->{"checksum_$_"});
+      $data->{'checksum'} = "$_:$c" if $c;
+    }     
+  } else {
+    delete $data->{"checksum_$_"} for qw {md5 sha1 sha256};
+  }
   if (ref($res) eq 'CODE') {
     $res->($data);
   } else {

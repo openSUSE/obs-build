@@ -54,6 +54,7 @@ my %tmap = (
   'Sup' => 'supplements',
   'Enh' => 'enhances',
   'Tim' => 'buildtime',
+  'Cks' => 'checksum',
 );
 
 sub addpkg {
@@ -73,6 +74,11 @@ sub addpkg {
       my $s = "$data->{'name'} = $evr";
       push @{$data->{'provides'}}, $s unless grep {$_ eq $s} @{$data->{'provides'} || []};
     }
+  }
+  if ($options->{'withchecksum'} && $data->{'checksum'}) {
+    my ($ctype, $csum) = split(' ', delete($data->{'checksum'}));
+    $ctype = lc($ctype || '');
+    $data->{'checksum'} = "$ctype:$csum" if $csum && ($ctype eq 'md5' || $ctype eq 'sha1' || $ctype eq 'sha256' || $ctype eq 'sha512');
   }
   if (ref($res) eq 'CODE') {
     $res->($data);
@@ -96,7 +102,9 @@ sub parse {
     }
   }
   my $cur;
-  my $r = join('|', sort keys %tmap);
+  my @tmap = sort keys %tmap;
+  @tmap = grep {$_ ne 'Cks'} @tmap unless $options{'withchecksum'};
+  my $r = join('|', @tmap);
   $r = qr/^([\+=])($r):\s*(.*)/;
   while (<$fd>) {
     chomp;

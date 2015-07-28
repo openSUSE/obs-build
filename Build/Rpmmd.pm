@@ -113,6 +113,7 @@ my $primaryparser = {
       name => { _text => 1, _end => \&generic_store_text, _tag => 'name' },
       arch => { _text => 1, _end => \&generic_store_text, _tag => 'arch' },
       version => { _start => \&primary_handle_version },
+      checksum => { _start => \&generic_store_attr, _attr => 'type', _tag => 'checksum', _text => 1, _end => \&primary_handle_checksum },
       'time' => { _start => \&primary_handle_time },
       format => {
         'rpm:provides' =>    { 'rpm:entry' => { _start => \&primary_handle_dep , _tag => 'provides' }, },
@@ -156,6 +157,16 @@ sub primary_handle_time {
   $data->{'buildtime'} = $attr{'build'} if $attr{'build'};
 }
 
+sub primary_handle_checksum {
+  my ($h, $c, $p, $el) = @_;
+  my $data = $c->[0]->[4];
+  my $type = lc(delete($data->{$h->{'_tag'}}) || '');
+  $type = 'sha1' if $type eq 'sha';
+  if ($type eq 'md5' || $type eq 'sha1' || $type eq 'sha256' || $type eq 'sha512') {
+    $data->{$h->{'_tag'}} = "$type:$c->[-1]->[2]" if defined $c->[-1]->[2];
+  }
+}
+
 sub primary_handle_file_end {
   my ($h, $c, $p, $el) = @_;
   primary_handle_dep($h, $c, $p, $el, 'name', $c->[-1]->[2]);
@@ -191,6 +202,7 @@ sub primary_add_result {
       push @{$data->{'provides'}}, $s unless grep {$_ eq $s} @{$data->{'provides'} || []};
     }
   }
+  delete $data->{'checksum'} unless $options->{'withchecksum'};
   return generic_add_result(@_);
 }
 

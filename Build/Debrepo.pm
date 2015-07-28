@@ -48,6 +48,12 @@ sub addpkg {
     $selfprovides = "$data->{'name'} $selfprovides";
     push @{$data->{'provides'}}, $selfprovides  unless @{$data->{'provides'} || []} && $data->{'provides'}->[-1] eq $selfprovides;
   }
+  if ($options{'withchecksum'}) {
+    for (qw {md5 sha1 sha256}) {
+      my $c = delete($data->{"checksum_$_"});
+      $data->{'checksum'} = "$_:$c" if $c;
+    }
+  }
   if (ref($res) eq 'CODE') {
     $res->($data);
   } else {
@@ -71,6 +77,12 @@ my %tmap = (
   'source' => 'source',
 );
 
+my %tmap_checksums = (
+  'md5sum' => 'checksum_md5',
+  'sha1'   => 'checksum_sha1',
+  'sha256' => 'checksum_sha256',
+);
+
 sub parse {
   my ($in, $res, %options) = @_;
   $res ||= [];
@@ -86,6 +98,8 @@ sub parse {
   }
   my $pkg = {};
   my $tag;
+  my %ltmap = %tmap;
+  %ltmap = (%ltmap, %tmap_checksums) if $options{'withchecksum'};
   while (<$fd>) {
     chomp;
     if ($_ eq '') {
