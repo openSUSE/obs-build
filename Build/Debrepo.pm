@@ -48,7 +48,7 @@ sub addpkg {
     $selfprovides = "$data->{'name'} $selfprovides";
     push @{$data->{'provides'}}, $selfprovides  unless @{$data->{'provides'} || []} && $data->{'provides'}->[-1] eq $selfprovides;
   }
-  if ($options{'withchecksum'}) {
+  if ($options->{'withchecksum'}) {
     for (qw {md5 sha1 sha256}) {
       my $c = delete($data->{"checksum_$_"});
       $data->{'checksum'} = "$_:$c" if $c;
