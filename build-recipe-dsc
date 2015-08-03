@@ -47,14 +47,15 @@ recipe_prepare_dsc() {
     for f in $BUILD_ROOT$TOPDIR/SOURCES/debian.* ; do 
 	test -f $f && DEB_TRANSFORM=true
     done
+    # remove rpm macros (everything after "%")
+    # they are not evaluated by the Debian build process
+    DEB_RELEASE=`sed 's/%.*$//' <<< $RELEASE`
+
     if test -n "$DEB_TRANSFORM" ; then 
 	CHANGELOGARGS=
 	test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" && CHANGELOGARGS="--changelog $BUILD_ROOT/.build-changelog"
 	echo "running debian transformer..."
         if [ "$RELEASE" ]; then
-          # remove rpm macros (everything after "%")
-          # they are not evaluated by the Debian build process
-          DEB_RELEASE=`sed 's/%.*$//' <<< $RELEASE`
           echo "release: ($RELEASE), release (DEB) ($DEB_RELEASE)"
                  RELEASEARGS="--release $DEB_RELEASE"
         fi
@@ -67,6 +68,19 @@ recipe_prepare_dsc() {
 	DEB_DSCFILE="${DEB_DSCFILE##*/}"
     fi
     chroot $BUILD_ROOT su -c "dpkg-source -x $DEB_SOURCEDIR/$DEB_DSCFILE $TOPDIR/BUILD" - $BUILD_USER
+
+    # Alternative to debtransform: apply OBS release number if tag OBS-DCH-RELEASE is set.
+    if test -z "$DEB_TRANSFORM" && grep -Eq '^OBS-DCH-RELEASE: 1' $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE; then
+        chroot $BUILD_ROOT su -c /bin/sh <<EOF
+cd $TOPDIR/BUILD
+[ ! -f debian/changelog ] && exit 0
+# avoid devscripts dependency and mimic dch
+PACKAGE=\$(dpkg-parsechangelog 2> /dev/null | grep -E '^Source:'  | awk '{ print \$NF }')
+VERSION=\$(dpkg-parsechangelog 2> /dev/null | grep -E '^Version:' | awk '{ print \$NF }')
+sed -i "s/\${PACKAGE} (\${VERSION})/\${PACKAGE} (\${VERSION}+$DEB_RELEASE)/" debian/changelog
+EOF
+    fi
+
 }
 
 dsc_build() {
