@@ -98,6 +98,7 @@ my $repomdparser = {
       _tag => 'type',
       _end => \&generic_add_result,
       location => { _start => \&generic_store_attr, _attr => 'href', _tag => 'location'},
+      checksum => { _start => \&generic_store_attr, _attr => 'type', _tag => 'checksum', _text => 1, _end => \&primary_handle_checksum },
       size => { _text => 1, _end => \&generic_store_text, _tag => 'size'},
     },
   },
