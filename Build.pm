@@ -813,7 +813,6 @@ sub addproviders {
     for my $pp (@{$provides->{$rp} || []}) {
       if ($pp eq $rn) {
 	# debian: unversioned provides do not match
-	# kiwi: supports only rpm, so we need to hand it like it
 	next if $config->{'binarytype'} eq 'deb';
 	push @p, $rp;
 	last;
