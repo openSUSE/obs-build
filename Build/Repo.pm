@@ -26,6 +26,7 @@ our $do_rpmmd;
 our $do_deb;
 our $do_arch;
 our $do_susetags;
+our $do_mdk;
 
 sub import {
   for (@_) {
@@ -33,8 +34,9 @@ sub import {
     $do_deb = 1 if $_ eq ':deb';
     $do_arch = 1 if $_ eq ':arch';
     $do_susetags = 1 if $_ eq ':susetags';
+    $do_mdk = 1 if $_ eq ':mdk';
   }
-  $do_rpmmd = $do_deb = $do_arch = $do_susetags = 1 unless $do_rpmmd || $do_deb || $do_arch || $do_susetags;
+  $do_rpmmd = $do_deb = $do_arch = $do_susetags = $do_mdk = 1 unless $do_rpmmd || $do_deb || $do_arch || $do_susetags || $do_mdk;
   if ($do_rpmmd) {
     require Build::Rpmmd;
   }
@@ -47,6 +49,9 @@ sub import {
   if ($do_arch) {
     require Build::Archrepo;
   }
+  if ($do_mdk) {
+    require Build::Mdkrepo;
+  }
 }
 
 sub parse {
@@ -55,6 +60,7 @@ sub parse {
   return Build::Susetags::parse(@args) if $do_susetags && $type eq 'susetags';
   return Build::Debrepo::parse(@args) if $do_deb && $type eq 'deb';
   return Build::Archrepo::parse(@args) if $do_arch && $type eq 'arch';
+  return Build::Mdkrepo::parse(@args) if $do_arch && $type eq 'mdk';
   die("parse repo: unknown type '$type'\n");
 }
 

@@ -301,20 +301,31 @@ create_cache_file() {
     fi
     if ! test -f $CACHE_FILE.id ; then
 	test -z "$LIST_STATE" && echo initializing $CACHE_FILE ...
-	BINTYPE=
+	REPOTYPE=
 	if test -n "$BUILD_DIST" ; then
-	    BINTYPE=`queryconfig binarytype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
-	    test "$BINTYPE" = UNDEFINED && BINTYPE=
+	    for i in `queryconfig repotype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"` ; do
+		case $i in
+		    arch|debian|hdlist2|rpm-md) REPOTYPE=$i
+		esac
+		test -n "$REPOTYPE" && break
+	    done
+	    if test -z "$REPOTYPE"; then
+		BINTYPE=`queryconfig binarytype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
+		case "$BINTYPE" in
+		    arch) REPOTYPE=arch ;;
+		    deb)  REPOTYPE=debian ;;
+		esac
+	    fi
 	fi
-	if test -z "$BINTYPE" ; then
+	if test -z "$REPOTYPE" ; then
 	    # check the first init_buildsystem arg, maybe it is a recipe
 	    case ${PKGS[0]} in
 		*.spec)
-		    BINTYPE=rpm ;;
+		    REPOTYPE=rpm-md ;;
 		*.dsc)
-		    BINTYPE=deb ;;
+		    REPOTYPE=debian ;;
 		*/PKGBUILD|PKGBUILD)
-		    BINTYPE=arch ;;
+		    REPOTYPE=arch ;;
 	    esac
 	fi
 	for SRC in "${repos[@]}" -- ${BUILD_RPMS//:/ /}; do
@@ -326,10 +337,12 @@ create_cache_file() {
 	    if test "${SRC#http://}" != "$SRC" -o "${SRC#https://}" != "$SRC" -o "${SRC#ftp://}" != "$SRC" -o "${SRC#ftps://}" != "$SRC" ; then
 		# remote repo, cache binary packages
 		mkdir -p "$(getcachedir "$SRC")"
-		if test "$BINTYPE" = arch ; then
+		if test "$REPOTYPE" = arch ; then
 		    set -- $BUILD_DIR/createarchdeps --cachedir="$CACHE_DIR" "$SRC"
-		elif test "$BINTYPE" = deb ; then
+		elif test "$REPOTYPE" = debian ; then
 		    set -- $BUILD_DIR/createdebdeps --cachedir="$CACHE_DIR" --archpath "$BUILD_ARCH" "$SRC"
+		elif test "$REPOTYPE" = hdlist2 ; then
+		    set -- $BUILD_DIR/createmdkdeps --cachedir="$CACHE_DIR" "$SRC"
 		else
 		    set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
 		fi
@@ -410,11 +423,15 @@ getcachedir() {
 }
 
 can_reuse_cached_package() {
-    local cachepkgid pkgid
+    local cachepkgid pkgid xpkgid
     test -s "$1" || return 1
     if test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.id" ; then
         pkgid=$(perl -I$BUILD_DIR -MBuild -e Build::showquery "$1" buildid)
 	read cachepkgid < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
+	# check if the build time is zero
+	case $cachepkgid in
+	    *" 0-"*) xpkgid="${pkgid##* }"; pkgid="${pkgid% *} 0-${xpkgid#*-}" ;;
+	esac
 	test "$cachepkgid" = "$pkgid" || return 1
     fi
     return 0
@@ -640,6 +657,7 @@ else
 
     # check if we really can use cached versions for packages on the download list
     if test -s $BUILD_ROOT/.init_b_cache/rpmlist.download ; then
+	echo "calculating packages to download..."
 	rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download2
         while read PKG SRC ; do
 	    cachepkg="${SRC##*/}"

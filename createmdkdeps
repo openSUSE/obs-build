@@ -1,0 +1,50 @@
+#!/usr/bin/perl -w
+
+################################################################
+#
+# Copyright (c) 2015 SUSE Linux GmbH
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+# Mandriva/Mageia support
+
+BEGIN {
+  unshift @INC, ($::ENV{"BUILD_DIR"} || "/usr/lib/build");
+}
+
+use strict;
+use Build ':mdk';
+use Build::Mdkrepo;
+use Digest::MD5 ();
+use File::Path;
+use Getopt::Long;
+
+Getopt::Long::Configure("no_ignore_case");
+
+my $cachedir = "/var/cache/build";
+
+GetOptions("cachedir=s"  => \$cachedir) or exit(1);
+
+for my $url (@ARGV) {
+  die("$url: not an remote mandriva/mageia repo") unless $url =~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/;
+  my $repoid = Digest::MD5::md5_hex($url);
+  my $dir = "$cachedir/$repoid";
+  $url .= '/' unless $url =~ /\/$/;
+  File::Path::mkpath($dir);
+  system("$INC[0]/download", $dir, "${url}media_info/synthesis.hdlist.cz");
+  Build::Mdkrepo::parse("$dir/synthesis.hdlist.cz", sub { Build::writedeps(\*STDOUT, $_[0], $url) }, 'addselfprovides' => 1);
+}
