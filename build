@@ -425,9 +425,9 @@ setupccache() {
 }
 
 setupicecream() {
-    local icecreamdir="/var/run/icecream"
-    if test `readlink "$BUILD_ROOT/var/run"` = '/run' ; then
-	icecreamdir="/run/icecream"
+    local icecreamdir=/var/run/icecream
+    if test "$(readlink "$BUILD_ROOT/var/run")" = /run ; then
+	icecreamdir=/run/icecream
     fi
     if test "$icecream" -eq 0 ; then
 	rm -rf "$BUILD_ROOT$icecreamdir"
