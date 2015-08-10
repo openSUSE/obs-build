@@ -97,10 +97,10 @@ for my $arg (@ARGV) {
 
 my $binarytype;
 my @archs = split(':', $archs);
-if ($recipe =~ /(^|\/)PKGBUILD$/) {
+if ($recipe && $recipe =~ /(^|\/)PKGBUILD$/) {
   push @archs, 'any' unless grep {$_ eq 'any'} @archs;
   $binarytype = 'arch';
-} elsif ($recipe =~ /\.dsc$/) {
+} elsif ($recipe && $recipe =~ /\.dsc$/) {
   push @archs, 'all' unless grep {$_ eq 'noarch'} @archs;
   $binarytype = 'deb';
 } else {
