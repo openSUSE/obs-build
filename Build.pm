@@ -463,10 +463,40 @@ my %subst_defaults = (
   ],
 );
 
+# expand the preinstalls/vminstalls
+sub expandpreinstalls {
+  my ($config) = @_;
+  return if !$config->{'expandflags:preinstallexpand'} || $config->{'preinstallisexpanded'};
+  my (@pre, @vm);
+  if (@{$config->{'preinstall'} || []}) {
+    @pre = expand($config, @{$config->{'preinstall'} || []});
+    return "preinstalls: $pre[0]" unless shift @pre;
+    @pre = sort(@pre);
+  }
+  if (@{$config->{'vminstall'} || []}) {
+    my %pre = map {$_ => 1} @pre;
+    my %vmx = map {+"-$_" => 1} @{$config->{'vminstall'} || []};
+    my @pren = grep {/^-/ && !$vmx{$_}} @{$config->{'preinstall'} || []};
+    @vm = expand($config, @pre, @pren, @{$config->{'vminstall'} || []});
+    return "vminstalls: $vm[0]" unless shift @vm;
+    @vm = sort(grep {!$pre{$_}} @vm);
+  }
+  $config->{'preinstall'} = \@pre;
+  $config->{'vminstall'} = \@vm;
+  #print STDERR "pre: @pre\n";
+  #print STDERR "vm: @vm\n";
+  $config->{'preinstallisexpanded'} = 1;
+  return '';
+}
+
 # Delivers all packages which get used for building
 sub get_build {
   my ($config, $subpacks, @deps) = @_;
 
+  if ($config->{'expandflags:preinstallexpand'} && !$config->{'preinstallisexpanded'}) {
+    my $err = expandpreinstalls($config);
+    return (undef, $err) if $err;
+  }
   if ($config->{'type'} eq 'livebuild') {
     push @deps, @{$config->{'substitute'}->{'build-packages:livebuild'}
 		  || $subst_defaults{'build-packages:livebuild'} || []};
@@ -543,6 +573,10 @@ sub get_sysbuild {
     @sysdeps = @{$subst_defaults{'system-packages:deltarpm'} || []} unless @sysdeps;
   }
   return () unless @sysdeps;
+  if ($config->{'expandflags:preinstallexpand'} && !$config->{'preinstallisexpanded'}) {
+    my $err = expandpreinstalls($config);
+    return (undef, $err) if $err;
+  }
   my @ndeps = grep {/^-/} @sysdeps;
   my %ndeps = map {$_ => 1} @ndeps;
   @sysdeps = grep {!$ndeps{$_}} @sysdeps;
@@ -561,6 +595,10 @@ sub get_sysbuild {
 # Delivers all packages which shall have an influence to other package builds (get_build reduced by support packages)
 sub get_deps {
   my ($config, $subpacks, @deps) = @_;
+  if ($config->{'expandflags:preinstallexpand'} && !$config->{'preinstallisexpanded'}) {
+    my $err = expandpreinstalls($config);
+    return (undef, $err) if $err;
+  }
   my @ndeps = grep {/^-/} @deps;
   my @extra = @{$config->{'required'}};
   if (@{$config->{'keep'} || []}) {
@@ -592,11 +630,19 @@ sub get_deps {
 
 sub get_preinstalls {
   my ($config) = @_;
+  if ($config->{'expandflags:preinstallexpand'} && !$config->{'preinstallisexpanded'}) {
+    my $err = expandpreinstalls($config);
+    return ('expandpreinstalls_error') if $err;
+  }
   return @{$config->{'preinstall'}};
 }
 
 sub get_vminstalls {
   my ($config) = @_;
+  if ($config->{'expandflags:preinstallexpand'} && !$config->{'preinstallisexpanded'}) {
+    my $err = expandpreinstalls($config);
+    return ('expandpreinstalls_error') if $err;
+  }
   return @{$config->{'vminstall'}};
 }
 
