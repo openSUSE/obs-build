@@ -24,7 +24,21 @@ use strict;
 use Build::Arch;
 
 eval { require Archive::Tar; };
-*Archive::Tar::new = sub {die("Archive::Tar is not available\n")} unless defined &Archive::Tar::new;
+if (!defined &Archive::Tar::iter) {
+  die("Archive::Tar is not available\n") unless defined &Archive::Tar::new;
+  *Archive::Tar::iter = sub {
+    my ($class, $filename) = @_;
+    my $handle = $class->_get_handle($filename, 1, 'rb') or return undef;
+    my @data;
+    return sub {
+      return shift(@data) if !$handle || @data; 
+      my $files = $class->_read_tar($handle, { limit => 1 });
+      @data = @$files if (ref($files) || '') eq 'ARRAY';
+      undef $handle unless @data;
+      return shift @data;
+    };
+  };
+}
 
 sub addpkg {
   my ($res, $data, $options) = @_;
