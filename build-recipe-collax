@@ -1,0 +1,45 @@
+#!/bin/sh
+
+recipe_setup_collax()
+{
+	TOPDIR=/usr/src/packages
+	test "$DO_INIT_TOPDIR" = false || rm -Rf "$BUILD_ROOT$TOPDIR"
+	mkdir -p "$BUILD_ROOT$TOPDIR"/{SOURCES,DEBS}
+	chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+	cp -p "$MYSRCDIR"/* "$BUILD_ROOT$TOPDIR/SOURCES/"
+}
+
+recipe_prepare_collax()
+{
+	chmod -v +x "$BUILD_ROOT$TOPDIR/SOURCES/build.collax"
+	ln -fsv build.collax "$BUILD_ROOT$TOPDIR/SOURCES/build"
+}
+
+collax_build()
+{
+	local buildroot="$1"
+
+	if test -n "$RUN_SHELL"; then
+		chroot "$buildroot" su -
+	else
+		chroot "$buildroot" su - abuild -c 'cd /usr/src/packages/SOURCES && ./build packages'
+	fi
+}
+
+collax_move_build_result()
+{
+	for d in "$BUILD_ROOT$TOPDIR"/*.{deb,changes}; do
+		test -e "$d" && mv "$d" "$BUILD_ROOT$TOPDIR/DEBS"
+	done
+}
+
+recipe_build_collax()
+{
+	collax_build "$BUILD_ROOT"
+	collax_move_build_result
+}
+
+recipe_resultdirs_collax()
+{
+	echo DEBS
+}
