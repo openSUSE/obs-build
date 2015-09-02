@@ -24,7 +24,7 @@
 
 KIWI_PARAMETERS=
 
-for i in spec dsc kiwi arch preinstallimage simpleimage mock livebuild debootstrap debbuild; do
+for i in spec dsc kiwi arch collax preinstallimage simpleimage mock livebuild debootstrap debbuild; do
     . "$BUILD_DIR/build-recipe-$i"
 done
 
@@ -72,6 +72,7 @@ recipe_set_buildtype() {
         *.dsc) BUILDTYPE=dsc ;;
         *.kiwi) BUILDTYPE=kiwi ;;
         PKGBUILD) BUILDTYPE=arch ;;
+        build.collax) BUILDTYPE=collax ;;
         _preinstallimage) BUILDTYPE=preinstallimage ;;
         simpleimage) BUILDTYPE=simpleimage ;;
         *.livebuild) BUILDTYPE=livebuild ;;
@@ -119,10 +120,11 @@ expand_recipe_directories() {
 			dsc) types=".dsc" ;;
 			kiwi) types=".kiwi" ;;
 			arch) types="PKGBUILD" ;;
+			collax) types="build.collax" ;;
 			livebuild) types=".livebuild" ;;
 		    esac
 		fi
-		types="$types .spec .dsc PKGBUILD .kiwi .src.rpm .nosrc.rpm simpleimage"
+		types="$types .spec .dsc PKGBUILD build.collax .kiwi .src.rpm .nosrc.rpm simpleimage"
 	    fi
 	    for t in $types ; do
 		found=
