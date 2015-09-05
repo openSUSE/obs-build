@@ -138,8 +138,16 @@ for my $diffname (keys %diffs) {
     my $striplevel = "";
     open(P, '<', $diffname) or die "$diffname: $!\n";
     while(<P>) {
-	$striplevel = " -p1" if (m/^--- a/ or m/^--- [^\/]+-\d+\./);
-	last if (/^--- /);
+        # Check if either the --- filename starts with 'a/' or the +++
+        # filename starts with 'b/', or either starts with a package
+        # name/version prefix.  We have to check for either, because either
+        # of them could be /dev/null if a file is being added or
+        # deleted.
+        $striplevel = " -p1"
+	    if m,^--- a/, or
+               m,^\+\+\+ b/, or
+               m,^(---|\+\+\+) [^/]+-\d+\.,;
+	last if (/^@@ -\d/);
 
     }
     close(P);
