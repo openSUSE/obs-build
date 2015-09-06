@@ -32,6 +32,7 @@ our $do_rpm;
 our $do_deb;
 our $do_kiwi;
 our $do_arch;
+our $do_collax;
 our $do_livebuild;
 
 sub import {
@@ -40,6 +41,7 @@ sub import {
     $do_deb = 1 if $_ eq ':deb';
     $do_kiwi = 1 if $_ eq ':kiwi';
     $do_arch = 1 if $_ eq ':arch';
+    $do_collax = 1 if $_ eq ':collax';
     $do_livebuild = 1 if $_ eq ':livebuild';
   }
   $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_livebuild = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_livebuild;
@@ -51,6 +53,9 @@ sub import {
   }
   if ($do_arch) {
     require Build::Arch;
+  }
+  if ($do_collax) {
+    require Build::Collax;
   }
   if ($do_livebuild) {
     require Build::LiveBuild;
@@ -1222,6 +1227,7 @@ sub recipe2buildtype {
   $recipe =~ s/.*\///;
   $recipe =~ s/^_service:.*://;
   return 'arch' if $recipe eq 'PKGBUILD';
+  return 'collax' if $recipe eq 'collax';
   return 'preinstallimage' if $recipe eq '_preinstallimage';
   return 'simpleimage' if $recipe eq 'simpleimage';
   return undef;
@@ -1265,6 +1271,7 @@ sub parse {
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /\.kiwi$/;
   return Build::LiveBuild::parse($cf, $fn, @args) if $do_livebuild && $fn =~ /\.livebuild$/;
   return parse_simpleimage($cf, $fn, @args) if $fn eq 'simpleimage';
+  return Build::Collax::parse($cf, $fn, @args) if $do_arch && $fn eq 'build.collax';
   my $fnx = $fn;
   $fnx =~ s/.*\///;
   $fnx =~ s/^[0-9a-f]{32,}-//;	# hack for OBS srcrep implementation
@@ -1283,6 +1290,7 @@ sub parse_typed {
   return Build::LiveBuild::parse($cf, $fn, @args) if $do_livebuild && $buildtype eq 'livebuild';
   return parse_simpleimage($cf, $fn, @args) if $buildtype eq 'simpleimage';
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $buildtype eq 'arch';
+  return Build::Collax::parse($cf, $fn, @args) if $do_arch && $buildtype eq 'collax';
   return parse_preinstallimage($cf, $fn, @args) if $buildtype eq 'preinstallimage';
   return undef;
 }
