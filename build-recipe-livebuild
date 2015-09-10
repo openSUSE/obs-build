@@ -180,8 +180,9 @@ recipe_build_livebuild() {
 
     if [ -x $BUILD_ROOT/usr/lib/build/livebuild_pre_run ] ; then
 	echo "Running OBS build livebuild_pre_run hook"
-	chroot $BUILD_ROOT su -c "/usr/lib/build/livebuild_pre_run" - root \
-	    < /dev/null || cleanup_and_exit 1
+	chroot $BUILD_ROOT su -c \
+        "export RECIPEFILE=${RECIPEFILE}; /usr/lib/build/livebuild_pre_run" \
+        - root < /dev/null || cleanup_and_exit 1
     fi
 
     # TODO: this might move to lb auto/config file
@@ -190,8 +191,9 @@ recipe_build_livebuild() {
 	    $BUILD_ROOT/.build.livebuild_pre_run
 	chmod +x $BUILD_ROOT/.build.livebuild_pre_run
 	echo "Running package livebuild_pre_run hook"
-	chroot $BUILD_ROOT su -c "/.build.livebuild_pre_run" - root \
-	    < /dev/null || cleanup_and_exit 1
+	chroot $BUILD_ROOT su -c \
+        "export RECIPEFILE=${RECIPEFILE}; /.build.livebuild_pre_run" \
+        - root < /dev/null || cleanup_and_exit 1
     fi
 
     chroot $BUILD_ROOT su -c "cd $TOPDIR/$LIVEBUILD_ROOT && lb build" - root \
