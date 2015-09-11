@@ -211,11 +211,12 @@ sub debq {
   my $data = '';
   sysread(DEBF, $data, 4096);
   if (length($data) < 8+60) {
-    warn("$fn: not a debian package\n");
+    warn("$fn: not a debian package - header too short\n");
     close DEBF unless ref $fn;
     return ();
   }
-  if (substr($data, 0, 8+16) ne "!<arch>\ndebian-binary   ") {
+  if (substr($data, 0, 8+16) ne "!<arch>\ndebian-binary   " &&
+      substr($data, 0, 8+16) ne "!<arch>\ndebian-binary/  ") {
     close DEBF unless ref $fn;
     return ();
   }
@@ -231,7 +232,8 @@ sub debq {
     }
   }
   $data = substr($data, 8 + 60 + $len);
-  if (substr($data, 0, 16) ne 'control.tar.gz  ') {
+  if (substr($data, 0, 16) ne 'control.tar.gz  ' &&
+      substr($data, 0, 16) ne 'control.tar.gz/ ') {
     warn("$fn: control.tar.gz is not second ar entry\n");
     close DEBF unless ref $fn;
     return ();
@@ -267,7 +269,7 @@ sub debq {
       warn("$fn: corrupt control.tar.gz file\n");
       return ();
     }
-    if ($n eq './control') {
+    if ($n eq './control' || $n eq "control") {
       $control = substr($data, 512, $len);
       last;
     }
@@ -343,12 +345,13 @@ sub queryhdrmd5 {
   my $data = '';
   sysread(F, $data, 4096);
   if (length($data) < 8+60) {
-    warn("$bin: not a debian package\n");
+    warn("$bin: not a debian package - header too short\n");
     close F;
     return undef;
   }
-  if (substr($data, 0, 8+16) ne "!<arch>\ndebian-binary   ") {
-    warn("$bin: not a debian package\n");
+  if (substr($data, 0, 8+16) ne "!<arch>\ndebian-binary   " &&
+      substr($data, 0, 8+16) ne "!<arch>\ndebian-binary/  ") {
+    warn("$bin: not a debian package - no \"debian-binary\" entry\n");
     close F;
     return undef;
   }
@@ -364,7 +367,8 @@ sub queryhdrmd5 {
     }
   }
   $data = substr($data, 8 + 60 + $len);
-  if (substr($data, 0, 16) ne 'control.tar.gz  ') {
+  if (substr($data, 0, 16) ne 'control.tar.gz  ' &&
+      substr($data, 0, 16) ne 'control.tar.gz/ ') {
     warn("$bin: control.tar.gz is not second ar entry\n");
     close F;
     return undef;

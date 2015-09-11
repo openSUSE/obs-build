@@ -1,0 +1,53 @@
+#!/bin/sh
+
+recipe_setup_collax()
+{
+	TOPDIR="/usr/src/packages"
+	test "$DO_INIT_TOPDIR" != false && rm -Rf "$BUILD_ROOT/$TOPDIR"
+	mkdir -p "$BUILD_ROOT/$TOPDIR"/{SOURCES,SOURCES.DEB,DEBS,OTHER}
+	cp -p "$MYSRCDIR"/* "$BUILD_ROOT/$TOPDIR/SOURCES/"
+	chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/$TOPDIR"
+}
+
+recipe_prepare_collax()
+{
+	DEB_SOURCEDIR="$TOPDIR/SOURCES"
+	DEB_DSCFILE="$RECIPEFILE"
+	chmod -v +x "$BUILD_ROOT/$DEB_SOURCEDIR/build.collax"
+	ln -fsv build.collax "$BUILD_ROOT/$DEB_SOURCEDIR/build"
+}
+
+collax_build()
+{
+	local buildroot="$1"
+
+	if test -n "$RUN_SHELL"; then
+		chroot "$buildroot" su -
+		ret=$?
+	else
+		chroot "$buildroot" su - $BUILD_USER -c \
+			"cd $TOPDIR/SOURCES && ./build"
+		ret=$?
+	fi
+	if test "$ret" = 0; then
+		BUILD_SUCCEEDED=true
+	fi
+}
+
+collax_move_build_result()
+{
+	for f in "$BUILD_ROOT/$DEB_SOURCEDIR"/*.{deb,changes}; do
+		test -f "$f" && mv -v "$f" "$BUILD_ROOT/$TOPDIR/DEBS/"
+	done
+}
+
+recipe_build_collax()
+{
+	collax_build "$BUILD_ROOT"
+	collax_move_build_result
+}
+
+recipe_resultdirs_collax()
+{
+	echo DEBS
+}

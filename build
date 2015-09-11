@@ -514,7 +514,7 @@ create_baselibs() {
 
     BASELIBS_CFG=
 
-    if test "$BUILDTYPE" == arch ; then
+    if test "$BUILDTYPE" == arch || test "$BUILDTYPE" = collax ; then
 	return
     fi
     if test "$BUILDTYPE" == dsc ; then
