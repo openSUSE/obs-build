@@ -11,12 +11,10 @@
 # details.
 #
 package Build::Collax;
-use strict;
-use warnings;
-use parent "Build::Deb";
 
-sub parse
-{
+use strict;
+
+sub parse {
 	my($buildconf, $fn) = @_;
 	my @bscript;
 
