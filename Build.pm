@@ -1276,7 +1276,7 @@ sub parse {
   $fnx =~ s/^[0-9a-f]{32,}-//;	# hack for OBS srcrep implementation
   $fnx =~ s/^_service:.*://;
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $fnx eq 'PKGBUILD';
-  return Build::Collax::parse($cf, $fn, @args) if $do_arch && $fnx eq 'build.collax';
+  return Build::Collax::parse($cf, $fn, @args) if $do_collax && $fnx eq 'build.collax';
   return parse_preinstallimage($cf, $fn, @args) if $fnx eq '_preinstallimage';
   return undef;
 }
@@ -1290,7 +1290,7 @@ sub parse_typed {
   return Build::LiveBuild::parse($cf, $fn, @args) if $do_livebuild && $buildtype eq 'livebuild';
   return parse_simpleimage($cf, $fn, @args) if $buildtype eq 'simpleimage';
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $buildtype eq 'arch';
-  return Build::Collax::parse($cf, $fn, @args) if $do_arch && $buildtype eq 'collax';
+  return Build::Collax::parse($cf, $fn, @args) if $do_collax && $buildtype eq 'collax';
   return parse_preinstallimage($cf, $fn, @args) if $buildtype eq 'preinstallimage';
   return undef;
 }
