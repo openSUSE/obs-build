@@ -25,9 +25,9 @@ use Build::Arch;
 
 eval { require Archive::Tar; };
 if (!defined &Archive::Tar::iter) {
-  die("Archive::Tar is not available\n") unless defined &Archive::Tar::new;
   *Archive::Tar::iter = sub {
     my ($class, $filename) = @_;
+    die("Archive::Tar is not available\n") unless defined &Archive::Tar::new;
     my $handle = $class->_get_handle($filename, 1, 'rb') or return undef;
     my @data;
     return sub {
