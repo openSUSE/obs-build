@@ -86,6 +86,8 @@ sub parse {
       $s->{'requires'} = parsedeps(substr($_, 10));
     } elsif (/^\@suggests\@/) {
       $s->{'suggests'} = parsedeps(substr($_, 10));
+    } elsif (/^\@recommends\@/) {
+      $s->{'recommends'} = parsedeps(substr($_, 12));
     } elsif (/^\@obsoletes\@/) {
       $s->{'obsoletes'} = parsedeps(substr($_, 11));
     } elsif (/^\@conflicts\@/) {
