@@ -657,8 +657,8 @@ sub get_runscripts {
 }
 
 ### just for API compability
-sub get_cbpreinstalls { return @{[]}; }
-sub get_cbinstalls { return @{[]}; }
+sub get_cbpreinstalls { return (); }
+sub get_cbinstalls { return (); }
 
 ###########################################################################
 
