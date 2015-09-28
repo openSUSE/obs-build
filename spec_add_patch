@@ -64,6 +64,7 @@ my $in_prep = 0;
 my $in_global = 1;
 my $last_patch_in_prep_index = 0;
 my $last_patch_in_global_index = 0;
+my $last_source_in_global_index = 0;
 my @c = ();
 my $index = 0;
 
@@ -109,7 +110,7 @@ while(<S>)
     }
 
     if ($in_global && $ifdef_level == 0 && /^Source(?:\d+)?:/) {
-        $last_patch_in_global_index = $index;
+        $last_source_in_global_index = $index;
     }
 
     if ($in_prep && $ifdef_level == 0 && /^\%patch/) {
@@ -119,6 +120,11 @@ while(<S>)
     $index++;
 }
 close(S);
+
+# append after last Source if this spec doesn't have any Patches
+if ($last_patch_in_global_index == 0) {
+    $last_patch_in_global_index = $last_source_in_global_index;
+}
 
 die if ($ifdef_level > 0);
 die if ($in_global || $in_prep);
