@@ -1280,7 +1280,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 
     if  test -e _service; then
       echo "Running build time source services..."
-      $BUILD_DIR/runservices || cleanup_and_exit 1
+      $BUILD_DIR/runservices --buildroot "$BUILD_ROOT" || cleanup_and_exit 1
     fi
 
     echo -----------------------------------------------------------------
