@@ -600,8 +600,10 @@ reexpand:
 ###########################################################################
 
 my %rpmstag = (
-  "SIGTAG_SIZE"    => 1000,     # /*!< internal Header+Payload size in bytes. */
-  "SIGTAG_MD5"     => 1004,     # /*!< internal MD5 signature. */
+  "SIGTAG_SIZE"    => 1000,     # Header+Payload size in bytes. */
+  "SIGTAG_PGP"     => 1002,     # RSA signature over Header+Payload
+  "SIGTAG_MD5"     => 1004,     # MD5 hash over Header+Payload
+  "SIGTAG_GPG"     => 1005,     # DSA signature over Header+Payload
   "NAME"           => 1000,
   "VERSION"        => 1001,
   "RELEASE"        => 1002,
@@ -1105,6 +1107,47 @@ sub queryinstalled {
     die("rpm: exit status $?\n");
   }
   return \@pkgs;
+}
+
+# return (lead, sighdr, hdr [, hdrmd5]) of a rpm
+sub getrpmheaders {
+  my ($path, $withhdrmd5) = @_;
+
+  my $hdrmd5;
+  local *F;
+  open(F, '<', $path) || die("$path: $!\n");
+  my $buf = '';
+  my $l;
+  while (length($buf) < 96 + 16) {
+    $l = sysread(F, $buf, 4096, length($buf));
+    die("$path: read error\n") unless $l;
+  }
+  die("$path: not a rpm\n") unless unpack('N', $buf) == 0xedabeedb && unpack('@78n', $buf) == 5;
+  my ($headmagic, $cnt, $cntdata) = unpack('@96N@104NN', $buf);
+  die("$path: not a rpm (bad sig header)\n") unless $headmagic == 0x8eade801 && $cnt < 16384 && $cntdata < 1048576;
+  my $hlen = 96 + 16 + $cnt * 16 + $cntdata;
+  $hlen = ($hlen + 7) & ~7;
+  while (length($buf) < $hlen + 16) {
+    $l = sysread(F, $buf, 4096, length($buf));
+    die("$path: read error\n") unless $l;
+  }
+  if ($withhdrmd5) {
+    my $idxarea = substr($buf, 96 + 16, $cnt * 16);
+    die("$path: no md5 signature header\n") unless $idxarea =~ /\A(?:.{16})*\000\000\003\354\000\000\000\007(....)\000\000\000\020/s;
+    my $md5off = unpack('N', $1);
+    die("$path: bad md5 offset\n") unless $md5off;
+    $md5off += 96 + 16 + $cnt * 16; 
+    $hdrmd5 = unpack("\@${md5off}H32", $buf);
+  }
+  ($headmagic, $cnt, $cntdata) = unpack('N@8NN', substr($buf, $hlen));
+  die("$path: not a rpm (bad header)\n") unless $headmagic == 0x8eade801 && $cnt < 1048576 && $cntdata < 33554432;
+  my $hlen2 = $hlen + 16 + $cnt * 16 + $cntdata;
+  while (length($buf) < $hlen2) {
+    $l = sysread(F, $buf, 4096, length($buf));
+    die("$path: read error\n") unless $l;
+  }
+  close F;
+  return (substr($buf, 0, 96), substr($buf, 96, $hlen - 96), substr($buf, $hlen, $hlen2 - $hlen), $hdrmd5);
 }
 
 1;
