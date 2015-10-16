@@ -1117,6 +1117,11 @@ for my $rpm (@pkgs) {
     warn ("$rpm does not exist, skipping\n");
     next;
   }
+  my @rpmfiles = `rpm -qp --queryformat "[%{FILENAMES}\n]" $rpm`;
+  if (!@rpmfiles) {
+    warn ("$rpm is empty, skipping\n");
+    next;
+  }
   next if $rpm =~ /\.(no)?src\.rpm$/;  # ignore source rpms
   next if $rpm =~ /\.spm$/;
   $rpmn =~ s/.*\///;   # Remove leading path info
@@ -1136,6 +1141,11 @@ my @debs;
 for my $deb (@pkgs) {
   my $debn = $deb;
   next unless $debn =~ /\.deb$/;
+  my @debfiles = `dpkg --contents $deb`;
+  if (!@debfiles) {
+    warn ("$deb is empty, skipping\n");
+    next;
+  }
   $debn =~ s/.*\///;   # Remove leading path info
   $debn =~ s/_[^_]+_[^_]+\.deb$//; # remove all version info and extension
   push @debs, $deb if $debs_to_process{$debn};
