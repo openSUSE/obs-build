@@ -173,6 +173,13 @@ vm_verify_options_kvm() {
             kvm_options="$kvm_options -device $item"
         done
     fi
+
+    if test -c /dev/hwrng ; then
+        rng_dev="/dev/hwrng"
+    else
+        rng_dev="/dev/random"
+    fi
+    kvm_options="$kvm_options -object rng-random,filename=$rng_dev,id=rng0 -device virtio-rng-pci,rng=rng0"
 }
 
 vm_startup_kvm() {
