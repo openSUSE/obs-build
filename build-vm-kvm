@@ -178,7 +178,9 @@ vm_verify_options_kvm() {
     fi
 
     if test -n "$kvm_rng_device" ; then
-        if test -c /dev/hwrng ; then
+        if test -c /dev/hwrng &&
+	    test -f /sys/class/misc/hw_random/rng_current &&
+	    test "$(cat /sys/class/misc/hw_random/rng_current)" != none; then
             rng_dev="/dev/hwrng"
         else
             rng_dev="/dev/random"
