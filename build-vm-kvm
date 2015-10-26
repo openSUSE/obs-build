@@ -73,6 +73,7 @@ vm_verify_options_kvm() {
 	    test -e /boot/zImage.guest && vm_kernel=/boot/zImage.guest
 	    test -e /boot/initrd.guest && vm_initrd=/boot/initrd.guest
 	    kvm_device=virtio-blk-device
+	    kvm_rng_device=virtio-rng-device
 	    ;;
 	aarch64)
 	    kvm_bin="/usr/bin/qemu-system-aarch64"
