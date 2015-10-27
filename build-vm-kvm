@@ -176,12 +176,16 @@ vm_verify_options_kvm() {
         done
     fi
 
-    if test -c /dev/hwrng ; then
-        rng_dev="/dev/hwrng"
-    else
-        rng_dev="/dev/random"
+    if test -n "$kvm_rng_device" ; then
+        if test -c /dev/hwrng &&
+	    test -f /sys/class/misc/hw_random/rng_current &&
+	    test "$(cat /sys/class/misc/hw_random/rng_current)" != none; then
+            rng_dev="/dev/hwrng"
+        else
+            rng_dev="/dev/random"
+        fi
+        kvm_options="$kvm_options -object rng-random,filename=$rng_dev,id=rng0 -device $kvm_rng_device,rng=rng0"
     fi
-    kvm_options="$kvm_options -object rng-random,filename=$rng_dev,id=rng0 -device $kvm_rng_device,rng=rng0"
 }
 
 vm_startup_kvm() {
