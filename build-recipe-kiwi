@@ -319,10 +319,10 @@ build_kiwi_product() {
     fi
 
     # move created product to correct destination
-    for i in $BUILD_ROOT/$TOPDIR/KIWIROOT/main/* ; do
+    pushd $BUILD_ROOT/$TOPDIR/KIWIROOT/main
+    for i in * ; do
 	test -e "$i" || continue
-	f=${i##*/}
-	case $f in
+	case $i in
 	    *.iso) if [ -x /usr/bin/sha256sum ]; then
                        /usr/bin/sha256sum "$i" > "$i.sha256"
                        mv "$i.sha256" $BUILD_ROOT/$TOPDIR/KIWI/.
@@ -335,6 +335,7 @@ build_kiwi_product() {
 	    *) test -d $i -a "$drop_repo" != true  && mv $i $BUILD_ROOT/$TOPDIR/KIWI/. ;;
 	esac
     done
+    popd
 }
 
 build_kiwi_appliance() {
