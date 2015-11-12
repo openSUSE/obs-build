@@ -290,6 +290,11 @@ vm_shutdown() {
 vm_img_create() {
     local img="$1"
     local size="$2"
+    local origsize=$(cat "${img}.size" 2> /dev/null)
+
+    if test -n "$origsize"; then
+        test "$origsize" -eq "$size" && return
+    fi
 
     echo "Creating $img (${size}M)"
     mkdir -p "${img%/*}" || cleanup_and_exit 3
@@ -304,6 +309,8 @@ vm_img_create() {
     if test "$r" -gt 0 ; then
         dd if=/dev/zero of="$img" bs=1M count=0 seek="$size" || cleanup_and_exit 3
     fi
+
+    echo "$size" > "${img}.size"
 }
 
 vm_img_mkfs() {
@@ -571,13 +578,11 @@ vm_setup() {
 	    rm -rf "$VM_SWAP"
 	fi
     fi
-    if test ! -e "$VM_IMAGE" ; then
-	vm_img_create "$VM_IMAGE" "$VMDISK_ROOTSIZE"
-	if test -z "$CLEAN_BUILD" ; then
-	    vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE"
-	fi
+    vm_img_create "$VM_IMAGE" "$VMDISK_ROOTSIZE"
+    if test -z "$CLEAN_BUILD" ; then
+        vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE"
     fi
-    if test -n "$VM_SWAP" -a ! -e "$VM_SWAP" -a ! -b "$VM_SWAP" ; then
+    if test -n "$VM_SWAP" -a ! -b "$VM_SWAP" ; then
 	vm_img_create "$VM_SWAP" "$VMDISK_SWAPSIZE"
     fi
     if test ! -e "$VM_IMAGE" ; then
