@@ -51,8 +51,16 @@ vm_startup_lxc() {
 	mount --bind "$BUILD_ROOT" "$LXCROOTFS"
 	EOF
     chmod a+x "$LXCHOOK"
-    lxc-create -n "$LXCID" -t none -f "$LXCCONF" || cleanup_and_exit 1
-    lxc-start -n "$LXCID" -F "$vm_init_script"
+    case "$(lxc-create --version)" in
+        1.0*)
+           lxc-create -n "$LXCID" -f "$LXCCONF" || cleanup_and_exit 1
+           lxc-start -n "$LXCID" "$vm_init_script"
+           ;;
+        *)
+           lxc-create -n "$LXCID" -f "$LXCCONF" -t none || cleanup_and_exit 1
+           lxc-start -n "$LXCID" -F "$vm_init_script"
+           ;;
+    esac
     BUILDSTATUS="$?"
     test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
     cleanup_and_exit "$BUILDSTATUS"
