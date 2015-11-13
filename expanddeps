@@ -386,7 +386,10 @@ if (@sysdeps) {
 }
 
 # make sure all preinstalls are in bdeps;
-# XXX: also add vmdeps?
 @bdeps = Build::unify(@bdeps, Build::get_preinstalls($cf));
+
+if ($ENV{'VM_TYPE'}) {
+  @bdeps = Build::unify(@bdeps, Build::get_vminstalls($cf));
+}
 
 print_rpmlist(@bdeps);
