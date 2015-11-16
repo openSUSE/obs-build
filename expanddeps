@@ -28,7 +28,7 @@ use strict;
 
 use Build;
 
-my ($dist, $rpmdeps, $archs, $configdir, $useusedforbuild, $installonly, $noinstall);
+my ($dist, $rpmdeps, $archs, $configdir, $useusedforbuild, $installonly, $noinstall, $isvm);
 
 $configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
 
@@ -74,6 +74,11 @@ while (@ARGV)  {
     shift @ARGV;
     my $def = shift @ARGV;
     Build::define("_without_$def --without-$def");
+    next;
+  }
+  if ($ARGV[0] eq '--vm') {
+    shift @ARGV;
+    $isvm = 1;
     next;
   }
   last;
@@ -387,9 +392,6 @@ if (@sysdeps) {
 
 # make sure all preinstalls are in bdeps;
 @bdeps = Build::unify(@bdeps, Build::get_preinstalls($cf));
-
-if ($ENV{'VM_TYPE'}) {
-  @bdeps = Build::unify(@bdeps, Build::get_vminstalls($cf));
-}
+@bdeps = Build::unify(@bdeps, Build::get_vminstalls($cf)) if $isvm;
 
 print_rpmlist(@bdeps);

@@ -249,7 +249,6 @@ vm_parse_options() {
 	return 1
       ;;
     esac
-    export VM_TYPE
     nextargs=("$@")
     return 0
 }
