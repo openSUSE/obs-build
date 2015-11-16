@@ -204,9 +204,9 @@ recipe_run_rpmlint() {
     rm -f "$BUILD_ROOT$rpmlint_logfile"
     ret=0
     mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
-    (set -e -o pipefail; chroot $BUILD_ROOT su -s /opt/testing/bin/rpmlint "$BUILD_USER" -- \
+    chroot $BUILD_ROOT su -s /opt/testing/bin/rpmlint "$BUILD_USER" -- \
 	    --info ${LINT_RPM_FILE_LIST[*]#$BUILD_ROOT} \
-	    ${SRPM_FILE_LIST[*]#$BUILD_ROOT} | tee "$BUILD_ROOT$rpmlint_logfile") || ret=1
+	    ${SRPM_FILE_LIST[*]#$BUILD_ROOT} > >(tee "$BUILD_ROOT$rpmlint_logfile") 2>&1 || ret=1
     echo
     umount -n $BUILD_ROOT/proc 2>/dev/null || true 
     if test "$ret" = 1 ; then 
