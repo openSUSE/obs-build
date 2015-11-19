@@ -290,6 +290,10 @@ vm_shutdown() {
 vm_img_create() {
     local img="$1"
     local size="$2"
+
+    # sanity check
+    test -e ${img} || rm -f ${img}.size
+
     local origsize=$(cat "${img}.size" 2> /dev/null)
 
     if test -n "$origsize"; then
