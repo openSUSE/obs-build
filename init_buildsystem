@@ -1054,7 +1054,6 @@ if test -x $BUILD_ROOT/bin/rpm -a ! -f $BUILD_ROOT/var/lib/rpm/packages.rpm -a !
     pkg_initdb_rpm
     chroot $BUILD_ROOT rpm -q --whatprovides rpm >/dev/null 2>&1	# create provides index
 fi
-
 rm -f $BUILD_ROOT/.rpmmacros $BUILD_ROOT/root/.rpmmacros
 rm -rf "$BUILD_ROOT/.init_b_cache"
 rm -f $BUILD_IS_RUNNING

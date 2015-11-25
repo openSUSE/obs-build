@@ -222,6 +222,9 @@ vm_startup_kvm() {
     if test -z "$VM_NETOPT" -a -z "$VM_NETDEVOPT"; then
         kvm_options="$kvm_options -net none"
     fi
+    if test -n "$VM_TELNET"; then
+        kvm_options="$kvm_options -netdev user,id=telnet,hostfwd=tcp:127.0.0.1:$VM_TELNET-:23 -device e1000,netdev=telnet"
+    fi
     set -- $qemu_bin -nodefaults -no-reboot -nographic -vga none $kvm_options \
 	-kernel $vm_kernel \
 	-initrd $vm_initrd \

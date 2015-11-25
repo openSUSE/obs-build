@@ -324,6 +324,14 @@ Known Parameters:
   --vm-initrd FILE
               Kernel and initrd to use for VM (kvm and qemu only)
 
+  --vm-telnet PORT
+              Is forwarding PORT to a telnet session inside of the VM.
+              Specify also needed extra packages via -x parameter, usually:
+                 --vm-telnet 1234 -x telnet-server -x net-tools
+              And connect from the host via
+                 telnet 1234
+              NOTE: The telnet server gets started after all packages got installed.
+
   --vm-net OPTION
   --vm-netdev OPTION
   --vm-device OPTION
@@ -1236,12 +1244,30 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	    ip addr add 127.0.0.1/8 dev lo
 	    ip addr add ::1/128 dev lo
 	    ip link set lo up
+	    if test -n "$VM_TELNET"; then
+	       ip addr add 10.0.2.15/8 dev eth0
+	       ip addr add ::1/24 dev eth0
+	       ip link set eth0 up
+            fi
 	else
 	    ifconfig lo 127.0.0.1 up
 	    ifconfig lo add ::1/128
+	    if test -n "$VM_TELNET"; then
+	       # this IP is hardcoded inside of kvm
+	       ifconfig eth0 10.0.2.15 up
+	       ifconfig eth0 add ::1/24
+            fi
 	fi
 	if test -n "$MYHOSTNAME" ; then
 	    hostname "$MYHOSTNAME"
+	fi
+	if test -n "$VM_TELNET"; then
+	    echo WARNING: telnet option used, setting up telnet server
+	    if test -x /usr/sbin/in.telnetd; then
+	       ( /usr/sbin/in.telnetd -L /.build/telnet_login_wrapper -debug 23 & )
+	    else
+		echo "ERROR: /usr/sbin/in.telnetd is not running, please specify right package via -x option"
+	    fi
 	fi
     fi
 

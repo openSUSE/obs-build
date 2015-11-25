@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# login wrapper, just start a shell without arguments.
+# this skips all parameters and is the only way to open a shell without login
+# prompt on most telnetd implementations
+
+/bin/sh
+
