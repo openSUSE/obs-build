@@ -364,8 +364,13 @@ cleanup_and_exit () {
     test -z "$1" && set 0
     rm -f $BUILD_ROOT/exit
     if test "$1" -eq 1 -a -x /bin/df ; then
+        echo
+        echo "$HOST failed \"build $RECIPEFILE\" at `date --utc`."
+        echo
         # okay, it failed, but maybe because disk space?
 	if df $BUILD_ROOT 2>/dev/null | grep -q "100%"; then
+            echo "$HOST ran out of disk space. Please try again."
+            echo
 	    set 3
         fi
     fi
