@@ -904,7 +904,7 @@ for PKG in $MAIN_LIST ; do
 	read PKGID < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
 	read OLDPKGID < $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG
 	if test "$PKGID" = "$OLDPKGID" ; then
-	    #echo "keeping ${PKGID%% *}"
+	    echo "keeping ${PKGID%% *}"
 	    rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
 	    echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
 	    test -n "$PKG_HDRMD5" && echo "$PKG_HDRMD5 $PKGID" > $BUILD_ROOT/.preinstall_image/$PKG
@@ -921,7 +921,7 @@ for PKG in $MAIN_LIST ; do
 	    pkg_erase
 	else
 	    if test "$VERIFY_BUILD_SYSTEM" != true || pkg_verify_installed ; then
-		#echo "keeping ${PKGID%% *}"
+		echo "keeping ${PKGID%% *}"
 		echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
 		test -n "$PKG_HDRMD5" && echo "$PKG_HDRMD5 $PKGID" > $BUILD_ROOT/.preinstall_image/$PKG
 		continue
