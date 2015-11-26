@@ -4,5 +4,5 @@
 # this skips all parameters and is the only way to open a shell without login
 # prompt on most telnetd implementations
 
-/bin/sh
+/bin/bash --login || sh
 
