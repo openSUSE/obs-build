@@ -77,7 +77,16 @@ vm_verify_options_kvm() {
 	aarch64)
 	    kvm_bin="/usr/bin/qemu-system-aarch64"
 	    kvm_console=ttyAMA0
-	    kvm_options="-enable-kvm -M virt -cpu host"
+	    kvm_options="-enable-kvm -cpu host "
+            # This option only exists with QEMU 2.5 or newer
+            if $kvm_bin -machine 'virt,?' 2>&1 | grep -q gic-version ; then
+                # We want to use the host gic version in order to make use
+                # of all available features (e.g. more than 8 CPUs) and avoid
+                # the emulation overhead of vGICv2 on a GICv3 host.
+                kvm_options+="-M virt,gic-version=host"
+            else
+                kvm_options+="-M virt"
+            fi
 	    vm_kernel=/boot/Image
 	    vm_initrd=/boot/initrd
 	    # prefer the guest kernel/initrd
