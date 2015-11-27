@@ -85,6 +85,40 @@ recipe_prepare_spec() {
 	test -z "$ABUILD_TARGET" || echo "build target is $ABUILD_TARGET"
     fi
 
+    # if "Buildflags: dropunknownrpmtags is" set in prjconf, check if the target's rpmbuild can
+    # actually handle Suggests, Recommends and Supplements. If it can't, drop these lines.
+    DROP_UNKNOWN=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags dropunknownrpmtags)
+    if [ -n "$DROP_UNKNOWN" ]; then
+	if ! [ -e "$BUILD_ROOT/usr/bin/rpmbuild" ]; then
+	    echo "NOTE: no /usr/bin/rpmbuild in target, no check for unnown specfile tags"
+	else
+	    for i in Suggests: Recommends: Supplements:; do
+		# if no suggests/recommends, then we don't need to test
+		grep "^$i" "$BUILD_ROOT/.spec.new" >/dev/null 2>&1 || continue
+		rm -f "$BUILD_ROOT/.spec.test"
+		cat > "$BUILD_ROOT/.spec.test" <<-EOF
+		$i foo
+		Name: foo
+		Version: 0
+		Release: 0
+		Summary: foo
+		License: WTFPL
+		
+		%description
+		foo
+		EOF
+		UNKNOWN="`chroot $BUILD_ROOT /usr/bin/rpmbuild --nobuild /.spec.test 2>&1`"
+		# echo "found unknown tag '$UNKNOWN'"
+		RES=$?
+		rm -f "$BUILD_ROOT/.spec.test"
+		test $RES = 0 && continue
+		# echo "nobuild result for $i $RES"
+		echo "WARNING: removing unknown RPM tag: '$i'"
+		sed -i -e "/^$i/d" "$BUILD_ROOT/.spec.new"
+	    done
+	fi
+    fi
+
     # report specfile changes
     if test -f $BUILD_ROOT/.spec.new ; then
 	if ! cmp -s $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE $BUILD_ROOT/.spec.new ; then
