@@ -1272,6 +1272,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	       ( /usr/sbin/in.telnetd -L /.build/telnet_login_wrapper -debug 23 & )
 	    else
 		echo "ERROR: /usr/sbin/in.telnetd is not running, please specify right package via -x option"
+                cleanup_and_exit 1
 	    fi
 	fi
     fi
