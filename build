@@ -1245,24 +1245,35 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     mount -n -ttmpfs none $BUILD_ROOT/dev/shm 2> /dev/null
 
     if test -n "$RUNNING_IN_VM" ; then
-	if test -x /sbin/ip ; then
-	    ip addr add 127.0.0.1/8 dev lo
-	    ip addr add ::1/128 dev lo
-	    ip link set lo up
-	    if test -n "$VM_TELNET"; then
-	       ip addr add 10.0.2.15/8 dev eth0
-	       ip addr add ::1/24 dev eth0
-	       ip link set eth0 up
+        if test -x /sbin/ip ; then
+            ip addr add 127.0.0.1/8 dev lo
+            ip addr add ::1/128 dev lo
+            ip link set lo up
+        else
+            ifconfig lo 127.0.0.1 up
+            ifconfig lo add ::1/128
+        fi
+        if test -n "$VM_TELNET"; then
+            VM_TELNET_DEVICE=$( cd /sys/class/net/; echo * )
+            VM_TELNET_DEVICE=${VM_TELNET_DEVICE#lo }
+            VM_TELNET_DEVICE=${VM_TELNET_DEVICE%% *}
+	    if test -z "$VM_TELNET_DEVICE"; then
+	           echo "ERROR: no network device found for telnet server"
+                   cleanup_and_exit 1
             fi
-	else
-	    ifconfig lo 127.0.0.1 up
-	    ifconfig lo add ::1/128
-	    if test -n "$VM_TELNET"; then
-	       # this IP is hardcoded inside of kvm
-	       ifconfig eth0 10.0.2.15 up
-	       ifconfig eth0 add ::1/24
-            fi
-	fi
+            if test -x /sbin/ip ; then
+                   ip addr add 10.0.2.15/8 dev eth0
+                   ip addr add ::1/24 dev eth0
+                   ip link set ${VM_TELNET_DEVICE} up
+            else
+	           if ! test -x /sbin/ifconfig ; then
+	              echo "ERROR: /usr/sbin/in.telnetd is not running, please specify right package via -x option"
+                      cleanup_and_exit 1
+                   fi
+                   ifconfig ${VM_TELNET_DEVICE} 10.0.2.15 up
+                   ifconfig ${VM_TELNET_DEVICE} add ::1/24
+            fi  
+        fi
 	if test -n "$MYHOSTNAME" ; then
 	    hostname "$MYHOSTNAME"
 	fi
