@@ -42,6 +42,9 @@ recipe_prepare_spec() {
 	args=(--release "$RELEASE")
     fi
 
+    rpmmacros=.rpmmacros
+    test "$BUILDTYPE" = debbuild && rpmmacros=.debmacros
+
     # fixup specfile
     CHANGELOGARGS=
     test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" && CHANGELOGARGS="--changelog $BUILD_ROOT/.build-changelog"
@@ -55,8 +58,8 @@ recipe_prepare_spec() {
     fi
 
     # extract macros from configuration
-    queryconfig rawmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" > $BUILD_ROOT/root/.rpmmacros
-    if test -n "$BUILD_DEBUG" ; then
+    queryconfig rawmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" > $BUILD_ROOT/root/$rpmmacros
+    if test -n "$BUILD_DEBUG" && test "$BUILDTYPE" != debbuild ; then
 	echo '
 %prep %{?!__debug_package:%{?_build_create_debug:%?_build_insert_debug_package}}%%prep
 %package %{?!__debug_package:%{?_build_create_debug:%?_build_insert_debug_package}}%%package
@@ -65,16 +68,16 @@ recipe_prepare_spec() {
 %undefine _enable_debug_packages \
 %debug_package
 
-' >> $BUILD_ROOT/root/.rpmmacros
+' >> $BUILD_ROOT/root/$rpmmacros
     fi
 
     if test -n "$BUILD_JOBS" ; then
-	cat >> $BUILD_ROOT/root/.rpmmacros <<-EOF
+	cat >> $BUILD_ROOT/root/$rpmmacros <<-EOF
 		%jobs $BUILD_JOBS
 		%_smp_mflags -j$BUILD_JOBS
 		EOF
     fi
-    test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/.rpmmacros $BUILD_ROOT/home/abuild/.rpmmacros
+    test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/$rpmmacros $BUILD_ROOT/home/abuild/$rpmmacros
 
     # extract optflags from configuration
     queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" optflags ${BUILD_DEBUG:+debug} > $BUILD_ROOT/root/.rpmrc
