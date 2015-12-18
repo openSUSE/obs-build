@@ -41,7 +41,10 @@ recipe_setup_arch() {
 
 recipe_prepare_arch() {
     echo "Preparing sources..."
-    _arch_recipe_makepkg -so "2>&1" ">/dev/null" || exit 1
+    if ! _arch_recipe_makepkg -so "2>&1" ">/dev/null" ; then
+	echo "failed to prepare sources"
+	cleanup_and_exit 1
+    fi
 }
 
 recipe_build_arch() {
