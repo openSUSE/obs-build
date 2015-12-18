@@ -46,6 +46,15 @@ pkg_cumulate_arch() {
 }
 
 pkg_install_arch() {
+    # Pacman auto can't handle building x86_64 to i686. So make sure that correct architecture is used
+    case ${BUILD_ARCH} in
+         x86_64*)
+           (cd $BUILD_ROOT/etc && sed -i "s/^Architecture = auto/#Architecture = x86_64/g" pacman.conf)
+         ;;
+         i686*)
+           (cd $BUILD_ROOT/etc && sed -i "s/^Architecture = auto/#Architecture = i686/g" pacman.conf)
+         ;;
+    esac
     # -d -d disables deps checking
     ( cd $BUILD_ROOT && chroot $BUILD_ROOT pacman -U --force -d -d --noconfirm .init_b_cache/$PKG.$PSUF 2>&1 || touch $BUILD_ROOT/exit ) | \
 	perl -ne '$|=1;/^(warning: could not get filesystem information for |loading packages|looking for inter-conflicts|Targets |Total Installed Size: |Net Upgrade Size: |Proceed with installation|checking package integrity|loading package files|checking for file conflicts|checking keyring|Packages \(\d+\):|:: Proceed with installation|checking available disk space|installing |upgrading |warning:.*is up to date -- reinstalling|Optional dependencies for|    )/||/^$/||print'
