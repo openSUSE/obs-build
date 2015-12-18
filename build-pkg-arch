@@ -46,6 +46,9 @@ pkg_cumulate_arch() {
 }
 
 pkg_install_arch() {
+    # Pacman can't handle chroot
+    # https://bbs.archlinux.org/viewtopic.php?id=129661
+    (cd $BUILD_ROOT/etc && sed -i "s/^CheckSpace/#CheckSpace/g" pacman.conf)
     # -d -d disables deps checking
     ( cd $BUILD_ROOT && chroot $BUILD_ROOT pacman -U --force -d -d --noconfirm .init_b_cache/$PKG.$PSUF 2>&1 || touch $BUILD_ROOT/exit ) | \
 	perl -ne '$|=1;/^(warning: could not get filesystem information for |loading packages|looking for inter-conflicts|Targets |Total Installed Size: |Net Upgrade Size: |Proceed with installation|checking package integrity|loading package files|checking for file conflicts|checking keyring|Packages \(\d+\):|:: Proceed with installation|checking available disk space|installing |upgrading |warning:.*is up to date -- reinstalling|Optional dependencies for|    )/||/^$/||print'
