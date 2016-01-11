@@ -1223,6 +1223,7 @@ sub add_all_providers {
 
 sub recipe2buildtype {
   my ($recipe) = @_;
+  return undef unless defined $recipe;
   return $1 if $recipe =~ /\.(spec|dsc|kiwi|livebuild)$/;
   $recipe =~ s/.*\///;
   $recipe =~ s/^_service:.*://;
