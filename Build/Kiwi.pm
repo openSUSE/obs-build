@@ -24,6 +24,7 @@ use strict;
 use Build::SimpleXML;
 
 our $bootcallback;
+our $urlmapper;
 
 sub unify {
   my %h = map {$_ => 1} @_;
@@ -123,8 +124,14 @@ sub kiwiparse {
          push @repos, '_obsrepositories';
          next;
       }
-      die("bad instsource path: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
-      push @repos, "$1/$2";
+      if ($kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
+        push @repos, "$1/$2";
+      } else {
+	my $prp;
+	$prp = $urlmapper->($kiwisource->{'path'}) if $urlmapper;
+	die("bad instsource path: $kiwisource->{'path'}\n") unless $prp;
+	push @repos, $prp;
+      }
     }
     $ret->{'sourcemedium'} = -1;
     $ret->{'debugmedium'} = -1;
@@ -166,9 +173,15 @@ sub kiwiparse {
     if ($kiwisource->{'path'} eq 'obsrepositories:/') {
       push @repos, '_obsrepositories';
       next;
-    };
-    die("bad path using not obs:/ URL: $kiwisource->{'path'}\n") unless $kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/;
-    push @repos, "$1/$2";
+    }
+    if ($kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
+      push @repos, "$1/$2";
+    } else {
+      my $prp;
+      $prp = $urlmapper->($kiwisource->{'path'}) if $urlmapper;
+      die("bad path using not obs:/ URL: $kiwisource->{'path'}\n") unless $prp;
+      push @repos, $prp;
+    }
   }
 
   # Find packages and possible additional required architectures
