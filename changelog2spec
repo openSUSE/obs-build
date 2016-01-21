@@ -100,6 +100,7 @@ sub parse_suse {
   $dline = $_;
   my $year = $1;
   my $tdt = str2time($dt);
+  die "bad date <$dt>\n" unless $tdt;
   $dt =~ /([0-9]+)/;
   my $day = $1;
   if (!$tdt) {
