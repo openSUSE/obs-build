@@ -129,7 +129,7 @@ sub kiwiparse {
       } else {
 	my $prp;
 	$prp = $urlmapper->($kiwisource->{'path'}) if $urlmapper;
-	die("bad instsource path: $kiwisource->{'path'}\n") unless $prp;
+	die("instsource repo url not using obs:/ scheme: $kiwisource->{'path'}\n") unless $prp;
 	push @repos, $prp;
       }
     }
@@ -179,7 +179,7 @@ sub kiwiparse {
     } else {
       my $prp;
       $prp = $urlmapper->($kiwisource->{'path'}) if $urlmapper;
-      die("bad path using not obs:/ URL: $kiwisource->{'path'}\n") unless $prp;
+      die("repo url not using obs:/ scheme: $kiwisource->{'path'}\n") unless $prp;
       push @repos, $prp;
     }
   }
