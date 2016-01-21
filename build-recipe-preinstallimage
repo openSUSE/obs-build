@@ -45,6 +45,7 @@ recipe_build_preinstallimage() {
 	.build.kernel*) ;; # to be packaged
 	.build.initrd*) ;; # to be packaged
 	.build*) continue ;;
+	.nfs*) continue ;;
 	.preinstallimage*) continue ;;
 	.srcfiles*) continue ;;
 	.pkgs) continue ;;

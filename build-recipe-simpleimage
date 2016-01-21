@@ -47,6 +47,7 @@ recipe_build_simpleimage() {
       case "$DIR" in
 	.|..) continue ;;
 	.build*) continue ;;
+	.nfs*) continue ;;
 	.simpleimage*) continue ;;
 	.srcfiles*) continue ;;
 	.pkgs) continue ;;
