@@ -289,6 +289,7 @@ sub parse {
 
 sub show {
   my ($fn, $field, $arch) = @ARGV;
+  local $urlmapper = sub { return $_[0] };
   my $cf = {'arch' => $arch};
   my $d = parse($cf, $fn);
   die("$d->{'error'}\n") if $d->{'error'};
