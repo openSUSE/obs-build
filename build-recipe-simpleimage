@@ -74,8 +74,10 @@ recipe_build_simpleimage() {
     DEST="$BUILD_ROOT$TOPDIR/OTHER"
     mkdir -p "$DEST"
     mv $BUILD_ROOT/.simpleimage.tar.gz $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz
+    md5sum $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz | sed "s|$DEST/||" > $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz.md5
     if [ -r .simpleimage.squashfs ]; then
       mv $BUILD_ROOT/.simpleimage.squashfs $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs
+      md5sum $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs | sed "s|$DEST/||" > $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs.md5
     fi
     rm -f $BUILD_ROOT/.build.packages
     ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
