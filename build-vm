@@ -588,7 +588,7 @@ vm_setup() {
 	    rm -rf "$VM_SWAP"
 	fi
     fi
-    vm_img_create "$VM_IMAGE" "$VMDISK_ROOTSIZE"
+    test -b "$VM_IMAGE" || vm_img_create "$VM_IMAGE" "$VMDISK_ROOTSIZE"
     if test -z "$CLEAN_BUILD" ; then
         vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE"
     fi
