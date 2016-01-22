@@ -96,7 +96,10 @@ for my $dir (@ARGV) {
     for my $file (lsrpms($dir)) {
 	my $q = query($file);
 	next unless $q;
+	next if $q->{'arch'} eq 'src' || $q->{'arch'} eq 'nosrc';
+	next if $q->{'name'} =~  /-debug(:?info|source)/;	# no debug deltas
 	my $n = $q->{'name'}.'.'.$q->{'arch'};
+        
 	for my $oq (@{$oldpkgs{$n} || []}) {
 	    my $v = $oq->{'version'};
 	    my $r = $oq->{'release'};
