@@ -44,6 +44,7 @@ install:
 	    substitutedeps \
 	    debtransform \
 	    debtransformbz2 \
+	    debtransformxz \
 	    debtransformzip \
 	    mkbaselibs \
 	    mkdrpms \
