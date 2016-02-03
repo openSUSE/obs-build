@@ -984,6 +984,7 @@ sub expand {
       push @p, $p;
       next;
     }
+    next if $p{$q[0]};
     return (undef, "$q[0] $aconflicts{$q[0]}") if $aconflicts{$q[0]};
     print "added $q[0] because of $p (direct dep)\n" if $expand_dbg;
     push @p, $q[0];
