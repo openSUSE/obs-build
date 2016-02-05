@@ -22,7 +22,11 @@
 ################################################################
 
 recipe_setup_debbuild() {
-    TOPDIR=/usr/src/debian
+    TOPDIR=`chroot $BUILD_ROOT su -c "debbuild --eval '%_topdir'" - $BUILD_USER`
+    if test -z "$TOPDIR"; then
+	echo "Error: TOPDIR empty"
+	cleanup_and_exit 1
+    fi
     test "$DO_INIT_TOPDIR" = false || rm -rf "$BUILD_ROOT$TOPDIR"
     mkdir -p "$BUILD_ROOT$TOPDIR"
     mkdir -p "$BUILD_ROOT$TOPDIR/OTHER"
