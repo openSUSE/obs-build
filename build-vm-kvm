@@ -29,6 +29,13 @@ kvm_device=virtio-blk-pci
 kvm_serial_device=
 kvm_rng_device=virtio-rng-pci
 kvm_options=
+kvm_user=qemu
+sudo=/usr/bin/sudo
+if [ -x $sudo ] && grep -q "^$kvm_user:" /etc/passwd ; then
+    sudo="$sudo -u $kvm_user"
+else
+    sudo=""
+fi
 
 kvm_check_ppc970() {
     if ! grep -q -E '(kvm_rma_count.*kvm_hpt_count)|(kvm_hpt_count.*kvm_rma_count)' /proc/cmdline ; then 
@@ -201,6 +208,9 @@ vm_verify_options_kvm() {
 vm_startup_kvm() {
     qemu_bin="$kvm_bin"
     qemu_args=(-drive file="$VM_IMAGE",format=raw,if=none,id=disk,serial=0,cache=unsafe -device "$kvm_device",drive=disk)
+    for f in "$VM_IMAGE" "$VM_SWAP" "$vm_initrd" ; do
+        [ -n "$sudo" ] && [ -n "$f" ] && chown $kvm_user "$f"
+    done
     if test -n "$VM_SWAP" ; then
 	qemu_args=("${qemu_args[@]}" -drive file="$VM_SWAP",format=raw,if=none,id=swap,serial=1,cache=unsafe -device "$kvm_device",drive=swap)
     fi
@@ -235,7 +245,7 @@ vm_startup_kvm() {
     if test -n "$VM_TELNET"; then
         kvm_options="$kvm_options -netdev user,id=telnet,hostfwd=tcp:127.0.0.1:$VM_TELNET-:23 -device e1000,netdev=telnet"
     fi
-    set -- $qemu_bin -nodefaults -no-reboot -nographic -vga none $kvm_options \
+    set -- $sudo $qemu_bin -nodefaults -no-reboot -nographic -vga none $kvm_options \
 	-kernel $vm_kernel \
 	-initrd $vm_initrd \
 	-append "root=$qemu_rootdev $qemu_rootfstype $qemu_rootflags panic=1 quiet no-kvmclock nmi_watchdog=0 rw rd.driver.pre=binfmt_misc elevator=noop console=$kvm_console init=$vm_init_script" \
