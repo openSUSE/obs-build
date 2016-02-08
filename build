@@ -324,6 +324,9 @@ Known Parameters:
   --vm-initrd FILE
               Kernel and initrd to use for VM (kvm and qemu only)
 
+  --vm-user   USERNAME
+              User name to run qemu/kvm process
+
   --vm-telnet PORT
               Is forwarding PORT to a telnet session inside of the VM.
               Specify also needed extra packages via -x parameter, usually:
