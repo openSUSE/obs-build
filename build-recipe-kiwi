@@ -345,6 +345,10 @@ build_kiwi_appliance() {
 	echo "starting device mapper for kiwi..."
 	test -x /etc/init.d/boot.device-mapper && /etc/init.d/boot.device-mapper start
     fi
+    KIWI_PROFILE=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags kiwiprofile`
+    if test -n "$KIWI_PROFILE"; then
+        KIWI_PARAMETERS="$KIWI_PARAMETERS --add-profile $KIWI_PROFILE"
+    fi
     RUN_BUNDLE="true"
     for imgtype in $imagetype ; do
 	echo "running kiwi --prepare for $imgtype..."
