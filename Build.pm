@@ -1242,6 +1242,7 @@ sub show {
   my $d = Build::parse($cf, $fn);
   die("$d->{'error'}\n") if $d->{'error'};
   $d->{'sources'} = [ map {ref($d->{$_}) ? @{$d->{$_}} : $d->{$_}} grep {/^source/} sort keys %$d ];
+  $d->{'patches'} = [ map {ref($d->{$_}) ? @{$d->{$_}} : $d->{$_}} grep {/^patch/} sort keys %$d ];
   my $x = $d->{$field};
   $x = [ $x ] unless ref $x;
   print "$_\n" for @$x;
