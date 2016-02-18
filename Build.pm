@@ -947,7 +947,7 @@ sub expand {
   my $requires = $config->{'requiresh'};
 
   my %xignore = map {substr($_, 1) => 1} grep {/^-/} @p;
-  $ignoreignore = 1 if $xignore{'-ignoreignore--'};
+  $ignore = {} if $xignore{'-ignoreignore--'};
   my @directdepsend;
   if ($xignore{'-directdepsend--'}) {
     delete $xignore{'-directdepsend--'};
