@@ -225,6 +225,10 @@ sub kiwiparse {
        push @packages, "-".$package->{'name'};
        next;
     }
+    # handle replaces as buildignore
+    if ($package->{'replaces'}) {
+       push @packages, "-".$package->{'replaces'};
+    }
 
     # we need this package
     push @packages, $package->{'name'};
