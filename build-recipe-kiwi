@@ -357,7 +357,8 @@ perform_image_build() {
     if [ "$legacy" = "true" ]; then
         prepare_call="$prepare_call && /usr/sbin/kiwi --logfile terminal"
     else
-        prepare_call="$prepare_call && /usr/bin/kiwi --compat -- --debug"
+        prepare_call="$prepare_call && LANG=en_US.UTF-8 /usr/bin/kiwi"
+        prepare_call="$prepare_call --compat -- --debug"
     fi
     prepare_call="$prepare_call --prepare $TOPDIR/SOURCES"
     prepare_call="$prepare_call --root $TOPDIR/KIWIROOT-$imgtype"
@@ -369,7 +370,8 @@ perform_image_build() {
     mkdir -p $BUILD_ROOT/$TOPDIR/KIWI-$imgtype
     create_call="cd $TOPDIR/SOURCES"
     if [ "$legacy" = "true" ]; then
-        create_call="$create_call && /usr/sbin/kiwi --logfile terminal"
+        create_call="$create_call && LANG=en_US.UTF-8 /usr/sbin/kiwi"
+        create_call="$create_call --logfile terminal"
     else
         create_call="$create_call && /usr/bin/kiwi --compat -- --debug"
     fi
@@ -392,7 +394,7 @@ perform_image_bundle() {
         bundle_call="$bundle_call -d /$TOPDIR/KIWI.bundle/"
         bundle_call="$bundle_call --bundle-id Build$RELEASE"
     else
-        bundle_call="/usr/bin/kiwi result bundle"
+        bundle_call="LANG=en_US.UTF-8 /usr/bin/kiwi result bundle"
         bundle_call="$bundle_call --target-dir $TOPDIR/KIWI-$imgtype"
         bundle_call="$bundle_call --id Build$RELEASE"
         bundle_call="$bundle_call --bundle-dir /$TOPDIR/KIWI.bundle/"
