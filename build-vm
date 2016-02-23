@@ -64,7 +64,7 @@ HUGETLBFSPATH=
 # emulator specific?
 EMULATOR_SCRIPT=
 
-for i in ec2 emulator kvm lxc openstack qemu uml xen zvm docker ; do
+for i in ec2 emulator kvm lxc openstack qemu uml xen zvm docker pvm; do
     . "$BUILD_DIR/build-vm-$i"
 done
 
@@ -137,7 +137,7 @@ vm_parse_options() {
 	VM_TYPE="$ARG"
 	case "$VM_TYPE" in
 	    lxc|docker) ;;
-	    ec2|xen|kvm|uml|qemu|emulator|openstack|zvm)
+	    ec2|xen|kvm|uml|qemu|emulator|openstack|zvm|pvm)
 		test -z "$VM_IMAGE" && VM_IMAGE=1
 	    ;;
 	    none|chroot) VM_TYPE= ;;
@@ -588,7 +588,7 @@ vm_setup() {
 	    rm -rf "$VM_SWAP"
 	fi
     fi
-    vm_img_create "$VM_IMAGE" "$VMDISK_ROOTSIZE"
+    test -b "$VM_IMAGE" || vm_img_create "$VM_IMAGE" "$VMDISK_ROOTSIZE"
     if test -z "$CLEAN_BUILD" ; then
         vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE"
     fi

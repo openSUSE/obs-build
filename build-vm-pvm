@@ -1,0 +1,179 @@
+#PowerVM build functions
+test -z "$VM_WORKER_NR" && VM_WORKER_NR=1
+lpname="worker-$VM_WORKER_NR"
+lpartype="AIX/Linux"
+bootloader_size="8M"
+rootlv="$lpname"-root
+swaplv="$lpname"-swap
+master_lpar=$(cat /proc/device-tree/ibm,partition-name)
+
+size_gb(){
+    size_gb=`expr $1 / 1024`
+}
+
+setup_bootloader(){
+   disk=$1
+   parted -s $disk mklabel msdos
+   parted -s $disk mkpart primary ext2 0 $bootloader_size
+   parted -s $disk set 1 boot on
+   parted -s $disk set 1 prep on
+   parted -s $disk mkpart primary ext3 8M 100%
+   bl_target=${disk}1
+}
+
+getdiskname(){
+     lv=$1
+     if [ -z "$SKIP" ];then
+         args=$(pvmctl scsi list -f ' ' -d VirtualDisk.udid ClientAdapter.loc_code --where VirtualDisk.name=$lv)
+         eval $args
+         host=$(ls-vscsi | grep $loc_code| awk -F " " '{print $1}')
+         echo "- - -" >  /sys/class/scsi_host/$host/scan
+         udid=$(echo $udid | cut -c 3-)
+         devid="/dev/disk/by-id/scsi-SAIX_VDASD_$udid"
+         until test -L $devid;do
+             sleep 1;
+         done
+         dev=$(readlink -f $devid)
+     fi
+     case $lv in
+         *root) test -z "$SKIP" && setup_bootloader "$dev";
+                VM_IMAGE="${dev}2";;
+         *swap) VM_SWAP="${dev}";;
+     esac
+}
+createdev() {
+     name=$1
+     size=$2
+     target=$3
+     size_gb $size
+     test -z $3 && target=$master_lpar
+     is_created $name
+     if [ -z "$SKIP" ];then
+         execute lv create --name $name --size $size_gb
+         target=$master_lpar
+     fi
+     execute scsi create --vg name=rootvg --type lv --lpar name=$target --stor-id $name
+     test -z "$SKIP" && getdiskname $name
+}
+execute(){
+    cmd=$@
+    pvmctl $cmd
+}
+
+vm_kill_pvm() {
+   execute lpar power-off --hard -i name="$VM_NAME"
+}
+is_created() {
+    dev=$1
+    $(pvmctl lv list -d LogicalVolume.name | grep -q $dev) && SKIP=1
+}
+vm_attach_root_pvm(){
+    target=$1
+    createdev $rootlv $VMDISK_ROOTSIZE $target
+}
+
+vm_attach_swap_pvm(){
+    createdev $swaplv $VMDISK_SWAPSIZE $target
+}
+lpar_is_running(){
+    state=$(pvmctl lpar list -d LogicalPartition.state --where LogicalPartition.name=$lpname |awk -F "=" '{print $2}')
+    CONSOLEPID=`pgrep -f "cat $hvcdev"`
+    if [ "$state" = "running" ];then
+       return 0
+    else
+       test -n $CONSOLEPID && kill -TERM $CONSOLEPID
+       return 1
+    fi
+}
+watch_build(){
+    while lpar_is_running $lpname;do
+        sleep 10
+    done
+}
+vm_startup_pvm(){
+    cpus=$BUILD_JOBS
+    cores=`echo 0.05 \* $cpus| bc -l`
+    execute lpar create --name $lpname --mem $VM_MEMSIZE --proc-unit $cores --proc $cpus --proc-type shared --sharing-mode uncapped --type $lpartype
+    nametoid $lpname
+    vm_attach_root_pvm $lpname
+    vm_attach_swap_pvm $lpname
+    openconsole $lparid
+    execute lpar power-on -i name=$lpname
+    watch_build &
+    PID=$!
+    cat $hvcdev
+    vm_detach_root_pvm $lpname
+    vm_detach_swap_pvm $lpname
+}
+vm_verify_options_pvm(){
+     :
+}
+detachdev(){
+    lv=$1
+    lpar=$2
+    execute scsi delete --lpar name=$lpar --type lv --stor-id $lv
+}
+
+vm_detach_swap_pvm(){
+    lpar=$1
+    test -z $lpar && lpar=$master_lpar
+    detachdev $swaplv $lpar
+}
+vm_detach_root_pvm(){
+    lpar=$1
+    test -z $lpar && lpar=$master_lpar
+    detachdev $rootlv $lpar
+}
+deletelv(){
+    viosvrcmd --id 1 -c "rmbdsp -bd $1"
+}
+openconsole(){
+    id=$1
+    pvmutil -o create_vterm_dev --id $id
+    hvcsadmin -console $id
+    hvcdev=$(hvcsadmin -console $id|awk '{print $4}')
+}
+
+nametoid(){
+    local id
+    name=$1
+    lparid=$(pvmctl lpar list -d LogicalPartition.id -i name=$name | awk -F "=" '{print $2}')
+}
+closeconsole(){
+    hvcdev=$(hvcsadmin -console $id|awk '{print $4}')
+    hvcsadmin -close $hvcdev
+    pvmutil -o delete_vterm_dev --id $1
+}
+
+vm_cleanup_pvm(){
+    nametoid $lpname
+    closeconsole $lparid
+    vm_detach_root_pvm $lpname
+    vm_detach_root_pvm
+    vm_detach_swap_pvm $lpname
+    vm_detach_swap_pvm
+    execute lpar delete -i name=$lpname
+    deletelv $rootlv
+    deletelv $swaplv
+}
+vm_fixup_pvm(){
+    VM_SWAPDEV=/dev/sdb
+    GRUBDIR=`mktemp -d /tmp/grubinstall.XXXX`
+    modules="ext2 part_msdos linux disk elf"
+    grubcfg="$GRUBDIR/grub.cfg"
+    grubimg="$GRUBDIR/grub.img"
+    cat <<'EOF' >> $GRUBDIR/grub.cfg
+insmod ext2
+insmod part_msdos
+insmod linux
+insmod disk
+insmod elf
+set root='ieee1275//vdevice/v-scsi@30000002/disk@8100000000000000,msdos2'
+linux /.build.kernel.kvm init=/.build/build console=hvc0 root=/dev/sda2 rw elevator=noop
+initrd /.build.initrd.kvm
+boot
+EOF
+    grub2-mkimage -O powerpc-ieee1275 -o $grubimg -c $grubcfg $modules
+    dd if=$grubimg of=$bl_target
+    rm -rf $GRUBDIR
+}
