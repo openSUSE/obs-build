@@ -339,28 +339,112 @@ build_kiwi_product() {
     popd
 }
 
+perform_image_build() {
+    local imgtype=$1
+    local legacy=$2
+    local prepare_call
+    local create_call
+    # When people test mixed build with legacy and new kiwi version
+    # The zypper cache was used in different ways. Therefore this
+    # needs a cleanup before the build starts
+    echo "Cleanup zypper image build cache"
+    if [ -d "$BUILD_ROOT/var/cache/kiwi/zypper" ];then
+        rm -rf $BUILD_ROOT/var/cache/kiwi/zypper
+    fi
+    echo "running kiwi --prepare for $imgtype..."
+    # Do not use $BUILD_USER here, since we always need root permissions
+    prepare_call="cd $TOPDIR/SOURCES && rm -rf $TOPDIR/KIWIROOT-$imgtype"
+    if [ "$legacy" = "true" ]; then
+        prepare_call="$prepare_call && /usr/sbin/kiwi --logfile terminal"
+    else
+        prepare_call="$prepare_call && LANG=en_US.UTF-8 /usr/bin/kiwi"
+        prepare_call="$prepare_call --compat -- --debug"
+    fi
+    prepare_call="$prepare_call --prepare $TOPDIR/SOURCES"
+    prepare_call="$prepare_call --root $TOPDIR/KIWIROOT-$imgtype"
+    prepare_call="$prepare_call $KIWI_PARAMETERS"
+    chroot $BUILD_ROOT \
+        su -c "$prepare_call" - root < /dev/null || cleanup_and_exit 1
+
+    echo "running kiwi --create for $imgtype..."
+    mkdir -p $BUILD_ROOT/$TOPDIR/KIWI-$imgtype
+    create_call="cd $TOPDIR/SOURCES"
+    if [ "$legacy" = "true" ]; then
+        create_call="$create_call && LANG=en_US.UTF-8 /usr/sbin/kiwi"
+        create_call="$create_call --logfile terminal"
+    else
+        create_call="$create_call && /usr/bin/kiwi --compat -- --debug"
+    fi
+    create_call="$create_call --create $TOPDIR/KIWIROOT-$imgtype"
+    create_call="$create_call --type $imgtype"
+    create_call="$create_call -d $TOPDIR/KIWI-$imgtype"
+    create_call="$create_call $KIWI_PARAMETERS"
+    chroot $BUILD_ROOT \
+        su -c "$create_call" - root < /dev/null || cleanup_and_exit 1
+
+    rm -rf "/$TOPDIR/KIWI.bundle"
+}
+
+perform_image_bundle() {
+    local imgtype=$1
+    local legacy=$2
+    local bundle_call
+    if [ "$legacy" = "true" ]; then
+        bundle_call="/usr/sbin/kiwi --bundle-build $TOPDIR/KIWI-$imgtype"
+        bundle_call="$bundle_call -d /$TOPDIR/KIWI.bundle/"
+        bundle_call="$bundle_call --bundle-id Build$RELEASE"
+    else
+        bundle_call="LANG=en_US.UTF-8 /usr/bin/kiwi result bundle"
+        bundle_call="$bundle_call --target-dir $TOPDIR/KIWI-$imgtype"
+        bundle_call="$bundle_call --id Build$RELEASE"
+        bundle_call="$bundle_call --bundle-dir /$TOPDIR/KIWI.bundle/"
+    fi
+    if chroot $BUILD_ROOT su -c "$bundle_call" - root < /dev/null; then
+        mv "$BUILD_ROOT/$TOPDIR/KIWI.bundle/"* \
+            "$BUILD_ROOT/$TOPDIR/KIWI/" || cleanup_and_exit 1
+        rmdir "$BUILD_ROOT/$TOPDIR/KIWI.bundle"
+        # success
+        return 0
+    fi
+    # need another way to bundle
+    return 1
+}
+
+is_legacy_kiwi() {
+    if [ -L "$BUILD_ROOT/usr/bin/kiwi" ];then
+        # The next generation of kiwi is installed to /usr/bin
+        # If this file is found we expect the new kiwi to be
+        # installed
+        return 1
+    fi
+    # in any other case stick to the legacy kiwi
+    return 0
+}
+
 build_kiwi_appliance() {
     if test -z "$RUNNING_IN_VM" ; then
-	# NOTE: this must be done with the outer system, because it loads the dm-mod kernel modules, which needs to fit to the kernel.
-	echo "starting device mapper for kiwi..."
-	test -x /etc/init.d/boot.device-mapper && /etc/init.d/boot.device-mapper start
+        # NOTE: this must be done with the outer system, because it loads
+        # the dm-mod kernel modules, which needs to fit to the kernel.
+        echo "starting device mapper for kiwi..."
+        test -x /etc/init.d/boot.device-mapper && \
+            /etc/init.d/boot.device-mapper start
     fi
-    KIWI_PROFILE=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags kiwiprofile`
+    KIWI_PROFILE=$(queryconfig \
+        --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" \
+        --archpath "$BUILD_ARCH" buildflags kiwiprofile
+    )
     if test -n "$KIWI_PROFILE"; then
         KIWI_PARAMETERS="$KIWI_PARAMETERS --add-profile $KIWI_PROFILE"
     fi
+    local legacy=false
+    if is_legacy_kiwi; then
+        legacy=true
+    fi
     RUN_BUNDLE="true"
     for imgtype in $imagetype ; do
-	echo "running kiwi --prepare for $imgtype..."
-	# Do not use $BUILD_USER here, since we always need root permissions
-	chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && rm -rf $TOPDIR/KIWIROOT-$imgtype && kiwi --prepare $TOPDIR/SOURCES --logfile terminal --root $TOPDIR/KIWIROOT-$imgtype $KIWI_PARAMETERS" - root < /dev/null || cleanup_and_exit 1
-	echo "running kiwi --create for $imgtype..."
-	mkdir -p $BUILD_ROOT/$TOPDIR/KIWI-$imgtype
-	chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && kiwi --create $TOPDIR/KIWIROOT-$imgtype --logfile terminal --type $imgtype -d $TOPDIR/KIWI-$imgtype $KIWI_PARAMETERS" - root < /dev/null || cleanup_and_exit 1
-        rm -rf "/$TOPDIR/KIWI.bundle"
-        if chroot $BUILD_ROOT su -c "kiwi --bundle-build $TOPDIR/KIWI-$imgtype -d /$TOPDIR/KIWI.bundle/ --bundle-id Build$RELEASE" - root < /dev/null; then
-            mv "$BUILD_ROOT/$TOPDIR/KIWI.bundle/"* "$BUILD_ROOT/$TOPDIR/KIWI/" || cleanup_and_exit 1
-            rmdir "$BUILD_ROOT/$TOPDIR/KIWI.bundle"
+        perform_image_build $imagetype $legacy
+        if perform_image_bundle $imagetype $legacy; then
+            # bundling successful, skip alternative bundlers
             unset RUN_BUNDLE
         fi
     done
