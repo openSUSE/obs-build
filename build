@@ -508,11 +508,11 @@ setmemorylimit() {
 	case "$mem" in
 	    MemTotal:*)
 		set -- $mem
-		eval "limit=\$(($2/3*4))"
+		eval "limit=\$(($2/3*2))"
 	    ;;
 	    SwapTotal:*)
 		set -- $mem
-		eval "limit=\$(($2/3*4+$limit))"
+		eval "limit=\$(($2/3*2+$limit))"
 	    ;;
 	esac
     done < <(cat /proc/meminfo) # cat for proc stuff
