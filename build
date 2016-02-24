@@ -1321,9 +1321,24 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 
     cd $BUILD_ROOT$TOPDIR/SOURCES || cleanup_and_exit 1
 
+    for i in *.obscpio ; do
+	test -e "$i" || continue
+	echo "Unpacking $i ..."
+	echo "#!/bin/sh -e" > /.unpack.command
+	shellquote cd "$TOPDIR/SOURCES" >> /.unpack.command
+	echo >> /.unpack.command
+	echo -n 'cpio --extract --unconditional --preserve-modification-time --make-directories <' >> /.unpack.command
+	shellquote "$i" >> /.unpack.command
+	echo >> /.unpack.command
+	shellquote rm -f "$i" >> /.unpack.command
+	echo >> /.unpack.command
+	chroot $BUILD_ROOT su -c /.unpack.command - $BUILD_USER
+	rm -f $BUILD_ROOT/.unpack.command
+    done
+
     if  test -e _service; then
-      echo "Running build time source services..."
-      $BUILD_DIR/runservices --buildroot "$BUILD_ROOT" || cleanup_and_exit 1
+	echo "Running build time source services..."
+	$BUILD_DIR/runservices --buildroot "$BUILD_ROOT" || cleanup_and_exit 1
     fi
 
     echo -----------------------------------------------------------------
