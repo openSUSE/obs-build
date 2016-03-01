@@ -231,6 +231,11 @@ vm_parse_options() {
       -vm-watchdog)
 	VM_WATCHDOG=true
       ;;
+      -vm-user)
+        needarg
+        VM_USER="$ARG"
+        shift
+      ;;
       -vm-telnet)
         needarg
         VM_TELNET="$ARG"
