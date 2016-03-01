@@ -50,6 +50,7 @@ recipe_prepare_dsc() {
     # remove rpm macros (everything after "%")
     # they are not evaluated by the Debian build process
     DEB_RELEASE=`sed 's/%.*$//' <<< $RELEASE`
+    OBS_DCH_RELEASE=""
 
     if test -n "$DEB_TRANSFORM" ; then 
 	CHANGELOGARGS=
@@ -71,13 +72,14 @@ recipe_prepare_dsc() {
 
     # Alternative to debtransform: apply OBS release number if tag OBS-DCH-RELEASE is set.
     if test -z "$DEB_TRANSFORM" && grep -Eq '^OBS-DCH-RELEASE: 1' $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE; then
+        OBS_DCH_RELEASE="+$DEB_RELEASE"
         chroot $BUILD_ROOT su -c /bin/sh <<EOF
 cd $TOPDIR/BUILD
 [ ! -f debian/changelog ] && exit 0
 # avoid devscripts dependency and mimic dch
 PACKAGE=\$(dpkg-parsechangelog 2> /dev/null | grep -E '^Source:'  | awk '{ print \$NF }')
 VERSION=\$(dpkg-parsechangelog 2> /dev/null | grep -E '^Version:' | awk '{ print \$NF }')
-sed -i "s/\${PACKAGE} (\${VERSION})/\${PACKAGE} (\${VERSION}+$DEB_RELEASE)/" debian/changelog
+sed -i "s/\${PACKAGE} (\${VERSION})/\${PACKAGE} (\${VERSION}$OBS_DCH_RELEASE)/" debian/changelog
 EOF
     fi
 
@@ -106,7 +108,7 @@ dsc_build() {
     else
 	chroot $buildroot su -c "export DEB_BUILD_OPTIONS=${DSC_BUILD_OPTIONS} ; cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
 	if test "$BUILD_SUCCEEDED" = true -a "$DO_CHECKS" != "false" && ( chroot $buildroot su -c "which lintian > /dev/null" - $BUILD_USER < /dev/null ); then
-	   DEB_CHANGESFILE=${DEB_DSCFILE%.dsc}_"$(chroot $buildroot su -c 'dpkg-architecture -qDEB_BUILD_ARCH')".changes
+	   DEB_CHANGESFILE=${DEB_DSCFILE%.dsc}$OBS_DCH_RELEASE"_"$(chroot $buildroot su -c 'dpkg-architecture -qDEB_BUILD_ARCH')".changes"
 	   chroot $buildroot su -c "cd $TOPDIR && echo Running lintian && (set -x && lintian -i $TOPDIR/$DEB_CHANGESFILE)" - $BUILD_USER < /dev/null || BUILD_SUCCEEDED=false
 	fi
     fi
