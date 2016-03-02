@@ -49,6 +49,7 @@ VM_NETOPT=()
 VM_NETDEVOPT=()
 VM_DEVICEOPT=()
 VM_TELNET=
+VM_CONSOLE_INPUT=
 VMDISK_ROOTSIZE=4096
 VMDISK_SWAPSIZE=1024
 VMDISK_FILESYSTEM=
@@ -235,6 +236,9 @@ vm_parse_options() {
         needarg
         VM_USER="$ARG"
         shift
+      ;;
+      -vm-enable-console)
+        VM_CONSOLE_INPUT=true
       ;;
       -vm-telnet)
         needarg
@@ -731,6 +735,7 @@ vm_first_stage() {
     echo "DO_INIT_TOPDIR='${DO_INIT_TOPDIR//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     echo "KIWI_PARAMETERS='${KIWI_PARAMETERS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     echo "VM_TELNET='${VM_TELNET//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    echo "VM_CONSOLE_INPUT='${VM_CONSOLE_INPUT//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     test -n "$VM_SWAP" && echo "VM_SWAP='${VM_SWAPDEV//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     test -n "$VMDISK_MOUNT_OPTIONS" && echo "VMDISK_MOUNT_OPTIONS='${VMDISK_MOUNT_OPTIONS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     PERSONALITY=0

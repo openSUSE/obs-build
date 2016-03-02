@@ -225,6 +225,8 @@ vm_startup_kvm() {
     # which is why we can not use virtio-serial on other platforms
     if test -n "$kvm_serial_device" ; then
 	qemu_args=("${qemu_args[@]}" -device "$kvm_serial_device" -device virtconsole,chardev=virtiocon0 -chardev stdio,id=virtiocon0)
+    elsif test -n "$VM_CONSOLE_INPUT" ; then
+	qemu_args=("${qemu_args[@]}" -serial mon:stdio)
     else
 	qemu_args=("${qemu_args[@]}" -serial stdio)
     fi
