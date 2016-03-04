@@ -1329,7 +1329,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	echo "#!/bin/sh -e" > $BUILD_ROOT/.unpack.command
 	shellquote cd "$TOPDIR/SOURCES" >> $BUILD_ROOT/.unpack.command
 	echo >> $BUILD_ROOT/.unpack.command
-	echo -n 'cpio --extract --unconditional --preserve-modification-time --make-directories <' >> $BUILD_ROOT/.unpack.command
+	echo -n 'cpio --extract --owner="'$BUILD_USER'" --unconditional --preserve-modification-time --make-directories <' >> $BUILD_ROOT/.unpack.command
 	shellquote "$i" >> $BUILD_ROOT/.unpack.command
 	echo >> $BUILD_ROOT/.unpack.command
 	shellquote rm -f "$i" >> $BUILD_ROOT/.unpack.command
