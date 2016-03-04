@@ -1323,18 +1323,18 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
 
     cd $BUILD_ROOT$TOPDIR/SOURCES || cleanup_and_exit 1
-
     for i in *.obscpio ; do
 	test -e "$i" || continue
 	echo "Unpacking $i ..."
-	echo "#!/bin/sh -e" > /.unpack.command
-	shellquote cd "$TOPDIR/SOURCES" >> /.unpack.command
-	echo >> /.unpack.command
-	echo -n 'cpio --extract --unconditional --preserve-modification-time --make-directories <' >> /.unpack.command
-	shellquote "$i" >> /.unpack.command
-	echo >> /.unpack.command
-	shellquote rm -f "$i" >> /.unpack.command
-	echo >> /.unpack.command
+	echo "#!/bin/sh -e" > $BUILD_ROOT/.unpack.command
+	shellquote cd "$TOPDIR/SOURCES" >> $BUILD_ROOT/.unpack.command
+	echo >> $BUILD_ROOT/.unpack.command
+	echo -n 'cpio --extract --unconditional --preserve-modification-time --make-directories <' >> $BUILD_ROOT/.unpack.command
+	shellquote "$i" >> $BUILD_ROOT/.unpack.command
+	echo >> $BUILD_ROOT/.unpack.command
+	shellquote rm -f "$i" >> $BUILD_ROOT/.unpack.command
+	echo >> $BUILD_ROOT/.unpack.command
+	chmod 0755 $BUILD_ROOT/.unpack.command
 	chroot $BUILD_ROOT su -c /.unpack.command - $BUILD_USER
 	rm -f $BUILD_ROOT/.unpack.command
     done
