@@ -118,6 +118,25 @@ sub parse {
         my @alts = split('\s*\|\s*', $d);
         my @needed;
         for my $c (@alts) {
+          if ($c =~ /\s+<[^>]+>$/) {
+            my @build_profiles;  # Empty for now
+            my $bad = 1;
+            while ($c =~ s/\s+<([^>]+)>$//) {
+              next if (!$bad);
+              my $list_valid = 1;
+              for my $term (split(/\s+/, $1)) {
+                my $isneg = ($term =~ s/^\!//);
+                my $profile_match = grep(/^$term$/, @build_profiles);
+                if (( $profile_match &&  $isneg) ||
+                    (!$profile_match && !$isneg)) {
+                  $list_valid = 0;
+                  last;
+                }
+              }
+              $bad = 0 if ($list_valid);
+            }
+            next if ($bad);
+          }
           if ($c =~ /^(.*?)\s*\[(.*)\]$/) {
             $c = $1;
             my $isneg = 0;
@@ -134,10 +153,10 @@ sub parse {
                 $bad = 0;
               }
             }
-            push @needed, $c unless $bad;
-          } else {
-            push @needed, $c;
+            next if ($bad);
           }
+          $c =~ s/^([^:\s]*):(any|native)(.*)$/$1$3/;
+          push @needed, $c;
         }
         next unless @needed;
         $d = join(' | ', @needed);
