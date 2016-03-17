@@ -323,7 +323,7 @@ vm_img_create() {
     # allocate blocks
     if type -p fallocate > /dev/null ; then
         fallocate -p -l "${size}M" "$img"
-        fallocate -l "${size}M" "$img"
+        fallocate -l "${size}M" "$img" || cleanup_and_exit 3
     fi
 }
 
