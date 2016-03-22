@@ -29,7 +29,9 @@ build_host_arch() {
 
 extend_build_arch() {
     case $BUILD_ARCH in
-      aarch64) BUILD_ARCH="aarch64:armv8l" ;;
+      aarch64) BUILD_ARCH="aarch64:armv8l"
+	       [ "$VM_TYPE" = kvm ] && BUILD_ARCH="$BUILD_ARCH:armv7hl:armv7l:armv6hl:armv6l:armv5tel"
+	       ;;
       armv8l) BUILD_ARCH="armv8l" ;; # armv8l is aarch64 in 32bit mode. not a superset of armv7
       armv7hl) BUILD_ARCH="armv7hl:armv7l:armv6hl:armv6l:armv5tel" ;;
       armv7l) BUILD_ARCH="armv7l:armv6l:armv5tel" ;;
