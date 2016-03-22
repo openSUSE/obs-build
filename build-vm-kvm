@@ -85,7 +85,12 @@ vm_verify_options_kvm() {
 	aarch64)
 	    kvm_bin="/usr/bin/qemu-system-aarch64"
 	    kvm_console=ttyAMA0
-	    kvm_options="-enable-kvm -cpu host "
+            if [ "$PERSONALITY" != 0 ]; then
+                # Running an armv7 kernel on aarch64
+                kvm_options="-enable-kvm -cpu host,aarch64=off "
+            else
+                kvm_options="-enable-kvm -cpu host "
+            fi
             # This option only exists with QEMU 2.5 or newer
             if $kvm_bin -machine 'virt,?' 2>&1 | grep -q gic-version ; then
                 # We want to use the host gic version in order to make use

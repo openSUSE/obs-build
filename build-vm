@@ -750,7 +750,7 @@ vm_first_stage() {
     test "$PERSONALITY" = -1 && PERSONALITY=0	# syscall failed?
     case $(uname -m) in
 	ppc|ppcle|s390) PERSONALITY=8 ;;	# ppc/s390 kernel never tells us if a 32bit personality is active, assume we run on 64bit
-	aarch64) test "$BUILD_ARCH" != "${BUILD_ARCH#armv}" && PERSONALITY=8 ;; # workaround, to be removed
+	aarch64) [[ "$BUILD_ARCH" == armv[567]* ]] && PERSONALITY=8 ;; # workaround, to be removed
     esac
     test "$VM_TYPE" = lxc -o "$VM_TYPE" = docker && PERSONALITY=0
     echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
