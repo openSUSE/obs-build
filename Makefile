@@ -62,6 +62,7 @@ install:
 	    spectool \
 	    signdummy \
 	    unrpm \
+	    telnet_login_wrapper \
 	    $(DESTDIR)$(pkglibdir)
 	install -m755 emulator/emulator.sh $(DESTDIR)$(pkglibdir)/emulator/
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build
