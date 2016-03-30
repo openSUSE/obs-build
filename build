@@ -1281,7 +1281,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	    hostname "$MYHOSTNAME"
 	fi
 	if test -n "$VM_TELNET"; then
-	    echo WARNING: telnet option used, setting up telnet server
+	    echo WARNING: telnet option used, setting up telnet server ${VM_TELNET_DEVICE}
 	    if test -x /usr/sbin/in.telnetd; then
 	       ( /usr/sbin/in.telnetd -L /.build/telnet_login_wrapper -debug 23 & )
 	    else
