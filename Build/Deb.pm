@@ -42,6 +42,7 @@ my %obs2debian = (
   "armv7el" => "armel",
   "armv7l"  => "armhf",
   "armv7hl" => "armhf",
+  "aarch64" => "arm64",
 );
 
 sub basearch {
