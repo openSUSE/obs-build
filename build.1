@@ -165,6 +165,15 @@ Set a specific kernel to boot in the virtual machine.
 .TP
 .B --vm-disk-clean
 Force the recreation of the disk image.
+.TP
+.B "--vm-telnet" PORT
+Is forwarding PORT to a telnet session inside of the VM.
+Specify also needed extra packages via -x parameter, usually:
+.I   --vm-telnet 1234 -x telnet-server -x net-tools
+   And connect from the host via:
+.I   telnet localhost 1234
+   NOTE: The telnet server gets started after all packages got installed.
+
 
 .SH RECIPE FILE OPTIONS
 The

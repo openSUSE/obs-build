@@ -1265,8 +1265,8 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
                    cleanup_and_exit 1
             fi
             if test -x /sbin/ip ; then
-                   ip addr add 10.0.2.15/8 dev eth0
-                   ip addr add ::1/24 dev eth0
+                   ip addr add 10.0.2.15/8 dev ${VM_TELNET_DEVICE}
+                   ip addr add ::1/24 dev ${VM_TELNET_DEVICE}
                    ip link set ${VM_TELNET_DEVICE} up
             else
 	           if ! test -x /sbin/ifconfig ; then
@@ -1281,7 +1281,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	    hostname "$MYHOSTNAME"
 	fi
 	if test -n "$VM_TELNET"; then
-	    echo WARNING: telnet option used, setting up telnet server
+	    echo WARNING: telnet option used, setting up telnet server ${VM_TELNET_DEVICE}
 	    if test -x /usr/sbin/in.telnetd; then
 	       ( /usr/sbin/in.telnetd -L /.build/telnet_login_wrapper -debug 23 & )
 	    else
