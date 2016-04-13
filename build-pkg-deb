@@ -68,8 +68,22 @@ pkg_install_deb() {
 pkg_erase_deb() {
     export DEBIAN_FRONTEND=noninteractive
     export DEBIAN_PRIORITY=critical
-    ( cd $BUILD_ROOT && chroot $BUILD_ROOT dpkg --purge --force all $PKG 2>&1 || touch $BUILD_ROOT/exit ) | \
-	perl -ne '$|=1;/^(\(Reading database|Removing |Purging configuration files for )/||/^$/||print'
+    cd $BUILD_ROOT && chroot $BUILD_ROOT dpkg --purge --force all $PKG 2>&1 | {
+      local retry
+      while read line; do
+          case "$line" in
+              subprocess\ installed\ *script\ returned\ error\ exit\ status*)
+                 chroot $BUILD_ROOT rm -f /var/lib/dpkg/info/$PKG.{pre,post}rm
+                 retry=1
+              ;;
+              *) echo "$line" ;;
+          esac
+      done
+      if test -n "$retry"; then
+          echo "re-try deleting $PKG without post/pre remove scripts"
+          chroot $BUILD_ROOT dpkg --purge --force all $PKG 2>&1 || touch $BUILD_ROOT/exit
+      fi
+    } | perl -ne '$|=1;/^(\(Reading database|Removing |Purging configuration files for )/||/^$/||print'
 }
 
 pkg_cumulate_deb() {
