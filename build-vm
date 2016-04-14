@@ -645,6 +645,8 @@ vm_update_hostarch() {
     if test -z "$VM_KERNEL" -a -e "$BUILD_ROOT/.build.kernel.$VM_TYPE" ; then
 	kernel="$BUILD_ROOT/.build.kernel.$VM_TYPE"
 	hostarchfile="$BUILD_ROOT/.build.hostarch.$VM_TYPE"
+    elif test -n "$kernel" -a -e "$kernel" -a -e "$kernel.hostarch" ; then
+	hostarchfile="$kernel.hostarch"
     fi
     if test -n "$hostarchfile" -a -e "$hostarchfile"; then
 	newhostarch=`cat "$hostarchfile"`
@@ -750,7 +752,7 @@ vm_first_stage() {
     test "$PERSONALITY" = -1 && PERSONALITY=0	# syscall failed?
     case $(uname -m) in
 	ppc|ppcle|s390) PERSONALITY=8 ;;	# ppc/s390 kernel never tells us if a 32bit personality is active, assume we run on 64bit
-        aarch64) test "$BUILD_ARCH" != "${BUILD_ARCH#armv[567]}" && PERSONALITY=8 ;; # workaround, to be removed
+	aarch64) test "$BUILD_ARCH" != "${BUILD_ARCH#armv[567]}" && PERSONALITY=8 ;; # workaround, to be removed
     esac
     test "$VM_TYPE" = lxc -o "$VM_TYPE" = docker && PERSONALITY=0
     echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
