@@ -1,17 +1,6 @@
 #PowerVM build functions
-test -z "$VM_WORKER_NR" && VM_WORKER_NR=1
-lpname="worker-$VM_WORKER_NR"
-lpartype="AIX/Linux"
-bootloader_size="8M"
-rootlv="$lpname"-root
-swaplv="$lpname"-swap
-master_lpar=$(cat /proc/device-tree/ibm,partition-name)
 
-size_gb(){
-    size_gb=`expr $1 / 1024`
-}
-
-setup_bootloader(){
+pvm_setup_bootloader(){
    disk=$1
    parted -s $disk mklabel msdos
    parted -s $disk mkpart primary ext2 0 $bootloader_size
@@ -21,7 +10,7 @@ setup_bootloader(){
    bl_target=${disk}1
 }
 
-getdiskname(){
+pvm_getdiskname(){
      lv=$1
      if [ -z "$SKIP" ];then
          args=$(pvmctl scsi list -f ' ' -d VirtualDisk.udid ClientAdapter.loc_code --where VirtualDisk.name=$lv)
@@ -36,46 +25,38 @@ getdiskname(){
          dev=$(readlink -f $devid)
      fi
      case $lv in
-         *root) test -z "$SKIP" && setup_bootloader "$dev";
+         *root) test -z "$SKIP" && pvm_setup_bootloader "$dev";
                 VM_IMAGE="${dev}2";;
          *swap) VM_SWAP="${dev}";;
      esac
 }
-createdev() {
-     name=$1
-     size=$2
-     target=$3
-     size_gb $size
-     test -z $3 && target=$master_lpar
-     is_created $name
-     if [ -z "$SKIP" ];then
-         execute lv create --name $name --size $size_gb
-         target=$master_lpar
-     fi
-     execute scsi create --vg name=rootvg --type lv --lpar name=$target --stor-id $name
-     test -z "$SKIP" && getdiskname $name
-}
-execute(){
+
+pvm_execute(){
     cmd=$@
     pvmctl $cmd
 }
 
-vm_kill_pvm() {
-   execute lpar power-off --hard -i name="$VM_NAME"
-}
-is_created() {
+pvm_is_created() {
     dev=$1
     $(pvmctl lv list -d LogicalVolume.name | grep -q $dev) && SKIP=1
 }
-vm_attach_root_pvm(){
-    target=$1
-    createdev $rootlv $VMDISK_ROOTSIZE $target
+
+pvm_createdev() {
+     name=$1
+     size=$2
+     target=$3
+     size_gb=`expr $size / 1024`
+     test -z $3 && target=$master_lpar
+     pvm_is_created $name
+     if [ -z "$SKIP" ];then
+         pvm_execute lv create --name $name --size $size_gb
+         target=$master_lpar
+     fi
+     pvm_execute scsi create --vg name=rootvg --type lv --lpar name=$target --stor-id $name
+     test -z "$SKIP" && pvm_getdiskname $name
 }
 
-vm_attach_swap_pvm(){
-    createdev $swaplv $VMDISK_SWAPSIZE $target
-}
-lpar_is_running(){
+pvm_lpar_is_running(){
     state=$(pvmctl lpar list -d LogicalPartition.state --where LogicalPartition.name=$lpname |awk -F "=" '{print $2}')
     CONSOLEPID=`pgrep -f "cat $hvcdev"`
     if [ "$state" = "running" ];then
@@ -85,77 +66,106 @@ lpar_is_running(){
        return 1
     fi
 }
-watch_build(){
-    while lpar_is_running $lpname;do
+
+pvm_watch_build(){
+    while pvm_lpar_is_running $lpname;do
         sleep 10
     done
 }
-vm_startup_pvm(){
-    cpus=$BUILD_JOBS
-    cores=`echo 0.05 \* $cpus| bc -l`
-    execute lpar create --name $lpname --mem $VM_MEMSIZE --proc-unit $cores --proc $cpus --proc-type shared --sharing-mode uncapped --type $lpartype
-    nametoid $lpname
-    vm_attach_root_pvm $lpname
-    vm_attach_swap_pvm $lpname
-    openconsole $lparid
-    execute lpar power-on -i name=$lpname
-    watch_build &
-    PID=$!
-    cat $hvcdev
-    vm_detach_root_pvm $lpname
-    vm_detach_swap_pvm $lpname
-}
-vm_verify_options_pvm(){
-     :
-}
-detachdev(){
+
+pvm_detachdev(){
     lv=$1
     lpar=$2
-    execute scsi delete --lpar name=$lpar --type lv --stor-id $lv
+    pvm_execute scsi delete --lpar name=$lpar --type lv --stor-id $lv
 }
 
-vm_detach_swap_pvm(){
-    lpar=$1
-    test -z $lpar && lpar=$master_lpar
-    detachdev $swaplv $lpar
-}
-vm_detach_root_pvm(){
-    lpar=$1
-    test -z $lpar && lpar=$master_lpar
-    detachdev $rootlv $lpar
-}
-deletelv(){
+pvm_deletelv(){
     viosvrcmd --id 1 -c "rmbdsp -bd $1"
 }
-openconsole(){
+
+pvm_nametoid(){
+    local id
+    name=$1
+    lparid=$(pvmctl lpar list -d LogicalPartition.id -i name=$name | awk -F "=" '{print $2}')
+}
+
+
+pvm_openconsole(){
     id=$1
     pvmutil -o create_vterm_dev --id $id
     hvcsadmin -console $id
     hvcdev=$(hvcsadmin -console $id|awk '{print $4}')
 }
 
-nametoid(){
-    local id
-    name=$1
-    lparid=$(pvmctl lpar list -d LogicalPartition.id -i name=$name | awk -F "=" '{print $2}')
-}
-closeconsole(){
+pvm_closeconsole(){
     hvcdev=$(hvcsadmin -console $id|awk '{print $4}')
     hvcsadmin -close $hvcdev
     pvmutil -o delete_vterm_dev --id $1
 }
 
+vm_kill_pvm() {
+   pvm_execute lpar power-off --hard -i name="$VM_NAME"
+}
+
+vm_startup_pvm(){
+    cpus=$BUILD_JOBS
+    cores=`echo 0.05 \* $cpus| bc -l`
+    pvm_execute lpar create --name $lpname --mem $VM_MEMSIZE --proc-unit $cores --proc $cpus --proc-type shared --sharing-mode uncapped --type $lpartype
+    pvm_nametoid $lpname
+    vm_attach_root_pvm $lpname
+    vm_attach_swap_pvm $lpname
+    pvm_openconsole $lparid
+    pvm_execute lpar power-on -i name=$lpname
+    pvm_watch_build &
+    PID=$!
+    cat $hvcdev
+    vm_detach_root_pvm $lpname
+    vm_detach_swap_pvm $lpname
+}
+
+vm_verify_options_pvm(){
+    test -z "$VM_WORKER_NR" && VM_WORKER_NR=1
+    lpname="worker-$VM_WORKER_NR"
+    lpartype="AIX/Linux"
+    bootloader_size="8M"
+    rootlv="$lpname"-root
+    swaplv="$lpname"-swap
+    master_lpar=$(cat /proc/device-tree/ibm,partition-name)
+}
+
+vm_attach_root_pvm(){
+    target=$1
+    pvm_createdev $rootlv $VMDISK_ROOTSIZE $target
+}
+
+vm_attach_swap_pvm(){
+    pvm_createdev $swaplv $VMDISK_SWAPSIZE $target
+}
+
+vm_detach_swap_pvm(){
+    lpar=$1
+    test -z $lpar && lpar=$master_lpar
+    pvm_detachdev $swaplv $lpar
+}
+
+vm_detach_root_pvm(){
+    lpar=$1
+    test -z $lpar && lpar=$master_lpar
+    pvm_detachdev $rootlv $lpar
+}
+
 vm_cleanup_pvm(){
-    nametoid $lpname
+    pvm_nametoid $lpname
     closeconsole $lparid
     vm_detach_root_pvm $lpname
     vm_detach_root_pvm
     vm_detach_swap_pvm $lpname
     vm_detach_swap_pvm
-    execute lpar delete -i name=$lpname
-    deletelv $rootlv
-    deletelv $swaplv
+    pvm_execute lpar delete -i name=$lpname
+    pvm_deletelv $rootlv
+    pvm_deletelv $swaplv
 }
+
 vm_fixup_pvm(){
     VM_SWAPDEV=/dev/sdb
     GRUBDIR=`mktemp -d /tmp/grubinstall.XXXX`
