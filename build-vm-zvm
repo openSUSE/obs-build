@@ -39,7 +39,7 @@ zvm_fatal() {
     cleanup_and_exit 1
 }
 
-prevent_detach() {
+zvm_prevent_detach() {
     if test "$1" = "150" -o "$1" = "0150"; then
         zvm_fatal "don't detach local root"
     fi
@@ -157,7 +157,7 @@ zvm_volume_detach_local() {
     # 1. worker device number
     # 2. worker number
     DEVNR=$(zvm_get_local_devnr $1 $2)
-    prevent_detach $DEVNR
+    zvm_prevent_detach $DEVNR
     dasd_configure 0.0.0$DEVNR 0 0
     if ! vmcp detach $DEVNR >& /dev/null ; then
         zvm_fatal "Could not locally detach disk number $1 from worker $2"
@@ -209,7 +209,7 @@ zvm_worker_init() {
     done
     # Third, remove stale links
     for DEVNR in $DEVNR_ROOT $DEVNR_SWAP ; do
-        prevent_detach $DEVNR
+        zvm_prevent_detach $DEVNR
         if vmcp q v $DEVNR 2> /dev/null ; then
             vmcp detach $DEVNR
         fi
