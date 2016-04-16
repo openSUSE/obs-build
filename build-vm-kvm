@@ -87,7 +87,7 @@ vm_verify_options_kvm() {
 	    kvm_console=ttyAMA0
 	    vm_kernel=/boot/Image
 	    vm_initrd=/boot/initrd
-	    if [ "$PERSONALITY" != 0 ]; then
+            if test "$BUILD_ARCH" != "aarch64"; then
 		# Running an armv7 kernel on aarch64
 		kvm_options="-enable-kvm -cpu host,aarch64=off "
 		# prefer the guest kernel/initrd
