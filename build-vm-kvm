@@ -87,16 +87,16 @@ vm_verify_options_kvm() {
 	    kvm_console=ttyAMA0
 	    vm_kernel=/boot/Image
 	    vm_initrd=/boot/initrd
-            if test "$BUILD_ARCH" != "aarch64"; then
+            if test "${BUILD_ARCH#aarch}" != "$BUILD_ARCH" -o "${BUILD_ARCH#armv8}" != "$BUILD_ARCH"; then
+		kvm_options="-enable-kvm -cpu host "
+		test -e /boot/Image.guest && vm_kernel=/boot/Image.guest
+		test -e /boot/initrd.guest && vm_initrd=/boot/initrd.guest
+	    else
 		# Running an armv7 kernel on aarch64
 		kvm_options="-enable-kvm -cpu host,aarch64=off "
 		# prefer the guest kernel/initrd
 		test -e /boot/Image.guest32 && vm_kernel=/boot/Image.guest32
 		test -e /boot/initrd.guest32 && vm_initrd=/boot/initrd.guest32
-	    else
-		kvm_options="-enable-kvm -cpu host "
-		test -e /boot/Image.guest && vm_kernel=/boot/Image.guest
-		test -e /boot/initrd.guest && vm_initrd=/boot/initrd.guest
 	    fi
 	    # This option only exists with QEMU 2.5 or newer
 	    if $kvm_bin -machine 'virt,?' 2>&1 | grep -q gic-version ; then
