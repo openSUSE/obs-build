@@ -1313,15 +1313,6 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	echo "export SUSE_IGNORED_RPATHS=/etc/ld.so.conf" > "$BUILD_ROOT/etc/profile.d/buildsystem.sh"
     fi
 
-    # get rid of old src dir, it is no longer needed and just wastes space
-    test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir && rm -rf "$MYSRCDIR"
-
-    # patch recipes
-    recipe_prepare
-
-    # hmmm
-    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
-
     cd $BUILD_ROOT$TOPDIR/SOURCES || cleanup_and_exit 1
     for i in *.obscpio ; do
 	test -e "$i" || continue
@@ -1343,6 +1334,15 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	echo "Running build time source services..."
 	$BUILD_DIR/runservices --buildroot "$BUILD_ROOT" || cleanup_and_exit 1
     fi
+
+    # get rid of old src dir, it is no longer needed and just wastes space
+    test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir && rm -rf "$MYSRCDIR"
+
+    # patch recipes
+    recipe_prepare
+
+    # hmmm
+    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
 
     echo -----------------------------------------------------------------
     if test "$BUILD_USER" = root ; then
