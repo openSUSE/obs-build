@@ -82,7 +82,7 @@ vm_verify_options_kvm() {
 	    kvm_device=virtio-blk-device
 	    kvm_rng_device=virtio-rng-device
 	    ;;
-	aarch64)
+	armv8l|aarch64)
 	    kvm_bin="/usr/bin/qemu-system-aarch64"
 	    kvm_console=ttyAMA0
 	    vm_kernel=/boot/Image
