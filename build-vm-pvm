@@ -156,7 +156,7 @@ vm_detach_root_pvm(){
 
 vm_cleanup_pvm(){
     pvm_nametoid $lpname
-    closeconsole $lparid
+    pvm_closeconsole $lparid
     vm_detach_root_pvm $lpname
     vm_detach_root_pvm
     vm_detach_swap_pvm $lpname
