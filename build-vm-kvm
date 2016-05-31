@@ -216,9 +216,12 @@ vm_startup_kvm() {
     qemu_bin="$kvm_bin"
     qemu_args=(-drive file="$VM_IMAGE",format=raw,if=none,id=disk,serial=0,cache=unsafe -device "$kvm_device",drive=disk)
     if [ -n "$VM_USER" ] ; then
-	grep -q "^$VM_USER:" /etc/passwd || complain 22 "cannot find KVM user '$VM_USER'"
-	kvm_options="$kvm_options -runas $VM_USER"
+	getent passwd "$VM_USER" > /dev/null || complain 22 "cannot find KVM user '$VM_USER'"
+    else
+	# use qemu user by default if available
+	getent passwd qemu >/dev/null && VM_USER=qemu
     fi
+    [ -n "$VM_USER" ] && kvm_options="$kvm_options -runas $VM_USER"
     if test -n "$VM_SWAP" ; then
 	qemu_args=("${qemu_args[@]}" -drive file="$VM_SWAP",format=raw,if=none,id=swap,serial=1,cache=unsafe -device "$kvm_device",drive=swap)
     fi
