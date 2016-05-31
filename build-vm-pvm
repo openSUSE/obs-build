@@ -16,11 +16,11 @@ pvm_getdiskname(){
          args=$(pvmctl scsi list -f ' ' -d VirtualDisk.udid ClientAdapter.loc_code --where VirtualDisk.name=$lv)
          eval $args
          host=$(ls-vscsi | grep $loc_code| awk -F " " '{print $1}')
-         echo "- - -" >  /sys/class/scsi_host/$host/scan
          udid=$(echo $udid | cut -c 3-)
          devid="/dev/disk/by-id/scsi-SAIX_VDASD_$udid"
          until test -L $devid;do
              sleep 1;
+             echo "- - -" >  /sys/class/scsi_host/$host/scan
          done
          dev=$(readlink -f $devid)
      fi
@@ -156,7 +156,7 @@ vm_detach_root_pvm(){
 
 vm_cleanup_pvm(){
     pvm_nametoid $lpname
-    closeconsole $lparid
+    pvm_closeconsole $lparid
     vm_detach_root_pvm $lpname
     vm_detach_root_pvm
     vm_detach_swap_pvm $lpname
