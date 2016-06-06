@@ -143,7 +143,7 @@ sub dist_canon($$) {
   } elsif ($rpmdist =~ /suse linux (\d+)\.(\d+)\.[4-9]\d/) {
     # alpha version
     $dist = "$1.".($2 + 1)."-$rpmdista";
-  } elsif ($rpmdist =~ /suse linux (\d+\.\d+)/) {
+  } elsif ($rpmdist =~ /suse linux (?:leap )?(\d+\.\d+)/) {
     $dist = "$1-$rpmdista";
   }
   return $dist;
