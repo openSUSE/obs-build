@@ -58,7 +58,7 @@ pkg_initdb_deb() {
 	rm -f $BUILD_ROOT/.init_b_cache/dpkg.deb
 	cp $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb $BUILD_ROOT/.init_b_cache/dpkg.deb || cleanup_and_exit 1
     fi
-    deb_chroot $BUILD_ROOT dpkg -i --force all .init_b_cache/dpkg.deb >/dev/null 2>&1
+    deb_chroot $BUILD_ROOT dpkg --install --force-depends .init_b_cache/dpkg.deb >/dev/null 2>&1
 }
 
 pkg_prepare_deb() {
@@ -66,7 +66,7 @@ pkg_prepare_deb() {
 }
 
 pkg_install_deb() {
-    ( deb_chroot $BUILD_ROOT dpkg --install --force all .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
+    ( deb_chroot $BUILD_ROOT dpkg --install --force-depends .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
 	perl -ne '$|=1;/^(Configuration file|Installing new config file|Selecting previously deselected|Selecting previously unselected|\(Reading database|Unpacking |Setting up|Creating config file|Preparing to replace dpkg|Preparing to unpack )/||/^$/||print'
     # ugly workaround for upstart system. some packages (procps) try
     # to start a service in their configure phase. As we don't have
@@ -83,7 +83,7 @@ pkg_install_deb() {
 }
 
 pkg_erase_deb() {
-    deb_chroot $BUILD_ROOT dpkg --purge --force all $PKG 2>&1 | {
+    deb_chroot $BUILD_ROOT dpkg --purge --force-depends $PKG 2>&1 | {
       local retry
       while read line; do
           case "$line" in
@@ -96,7 +96,7 @@ pkg_erase_deb() {
       done
       if test -n "$retry"; then
           echo "re-try deleting $PKG without post/pre remove scripts"
-          deb_chroot $BUILD_ROOT dpkg --purge --force all $PKG 2>&1 || touch $BUILD_ROOT/exit
+          deb_chroot $BUILD_ROOT dpkg --purge --force-depends $PKG 2>&1 || touch $BUILD_ROOT/exit
       fi
     } | perl -ne '$|=1;/^(\(Reading database|Removing |Purging configuration files for )/||/^$/||print'
 }
