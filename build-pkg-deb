@@ -21,6 +21,25 @@
 #
 ################################################################
 
+#
+# A wrapper around chroot to set the environment correctly for dpkg and
+# pre/postinst scripts.
+#
+deb_chroot ()
+{
+    #
+    # to workaround some version of fileutils that doesn't do a 'chdir /'
+    # when doing a 'chroot /' call lets subshell and change dir manually
+    #
+    (
+	cd $1 &&
+	    DEBIAN_FRONTEND=noninteractive DEBIAN_PRIORITY=critical \
+			   DEBCONF_NONINTERACTIVE_SEEN=true \
+			   LC_ALL=C LANGUAGE=C LANG=C \
+			   chroot $*
+    )
+}
+
 deb_setup() {
     mkdir -p $BUILD_ROOT/var/lib/dpkg
     mkdir -p $BUILD_ROOT/var/log
@@ -39,7 +58,7 @@ pkg_initdb_deb() {
 	rm -f $BUILD_ROOT/.init_b_cache/dpkg.deb
 	cp $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb $BUILD_ROOT/.init_b_cache/dpkg.deb || cleanup_and_exit 1
     fi
-    chroot $BUILD_ROOT dpkg -i --force all .init_b_cache/dpkg.deb >/dev/null 2>&1
+    deb_chroot $BUILD_ROOT dpkg --install --force-depends .init_b_cache/dpkg.deb >/dev/null 2>&1
 }
 
 pkg_prepare_deb() {
@@ -47,9 +66,7 @@ pkg_prepare_deb() {
 }
 
 pkg_install_deb() {
-    export DEBIAN_FRONTEND=noninteractive
-    export DEBIAN_PRIORITY=critical
-    ( cd $BUILD_ROOT && chroot $BUILD_ROOT dpkg --install --force all .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
+    ( deb_chroot $BUILD_ROOT dpkg --install --force-depends .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
 	perl -ne '$|=1;/^(Configuration file|Installing new config file|Selecting previously deselected|Selecting previously unselected|\(Reading database|Unpacking |Setting up|Creating config file|Preparing to replace dpkg|Preparing to unpack )/||/^$/||print'
     # ugly workaround for upstart system. some packages (procps) try
     # to start a service in their configure phase. As we don't have
@@ -66,9 +83,7 @@ pkg_install_deb() {
 }
 
 pkg_erase_deb() {
-    export DEBIAN_FRONTEND=noninteractive
-    export DEBIAN_PRIORITY=critical
-    cd $BUILD_ROOT && chroot $BUILD_ROOT dpkg --purge --force all $PKG 2>&1 | {
+    deb_chroot $BUILD_ROOT dpkg --purge --force-depends $PKG 2>&1 | {
       local retry
       while read line; do
           case "$line" in
@@ -81,7 +96,7 @@ pkg_erase_deb() {
       done
       if test -n "$retry"; then
           echo "re-try deleting $PKG without post/pre remove scripts"
-          chroot $BUILD_ROOT dpkg --purge --force all $PKG 2>&1 || touch $BUILD_ROOT/exit
+          deb_chroot $BUILD_ROOT dpkg --purge --force-depends $PKG 2>&1 || touch $BUILD_ROOT/exit
       fi
     } | perl -ne '$|=1;/^(\(Reading database|Removing |Purging configuration files for )/||/^$/||print'
 }
@@ -99,9 +114,9 @@ pkg_finalize_deb() {
     # configure all packages after complete installation, not for each package like rpm does
     # We need to run this twice, because of cyclic dependencies as it does not succeed on most
     # debian based distros in the first attempt.
-    if ! chroot $BUILD_ROOT dpkg --configure --pending  2>&1; then
+    if ! deb_chroot $BUILD_ROOT dpkg --configure --pending  2>&1; then
          echo "first configure attempt failed, trying again..."
-         chroot $BUILD_ROOT dpkg --configure --pending  2>&1 || cleanup_and_exit 1
+         deb_chroot $BUILD_ROOT dpkg --configure --pending  2>&1 || cleanup_and_exit 1
     fi
 }
 
@@ -127,12 +142,18 @@ pkg_runscripts_deb() {
     fi
     if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre" ; then
 	echo "running $PKG preinstall script"
-	(cd $BUILD_ROOT && chroot $BUILD_ROOT ".init_b_cache/scripts/$PKG.pre" install < /dev/null )
+	deb_chroot $BUILD_ROOT ".init_b_cache/scripts/$PKG.pre" install \
+		   < /dev/null
 	rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre"
     fi
     if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post" ; then
 	echo "running $PKG postinstall script"
-	(cd $BUILD_ROOT && chroot $BUILD_ROOT ".init_b_cache/scripts/$PKG.post" configure '' < /dev/null )
+	deb_chroot $BUILD_ROOT ".init_b_cache/scripts/$PKG.post" configure '' \
+		   < /dev/null
 	rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post"
     fi
 }
+
+# Local Variables:
+# mode: Shell-script
+# End:
