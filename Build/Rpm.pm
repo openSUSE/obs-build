@@ -362,9 +362,9 @@ reexpand:
 	  if (defined($macros_args{$macname})) {
 	    # macro with args!
 	    if (!defined($macdata)) {
-	      $line =~ /^\s*([^\n]*).*?$/;
+	      $line =~ /^\s*([^\n]*).*$/;
 	      $macdata = $1;
-	      $line = $2;
+	      $line = '';
 	    }
 	    push @expandstack, ($expandedline, $line, $optmacros);
 	    $optmacros = adaptmacros(\%macros, $optmacros, grabargs($macname, $macros_args{$macname}, split(' ', $macdata)));
