@@ -187,6 +187,9 @@ sub kiwiparse {
   # Find packages and possible additional required architectures
   my @additionalarchs;
   my @pkgs;
+  for my $pattern (@{$kiwi->{'opensusePatterns'}}) {
+    push @pkgs, @{"pattern:$pattern->{'package'}"} if $pattern->{'package'};
+  }
   for my $packages (@{$kiwi->{'packages'}}) {
     next if $packages->{'type'} and $packages->{'type'} ne 'image' and $packages->{'type'} ne 'bootstrap';
     push @pkgs, @{$packages->{'package'}} if $packages->{'package'};
