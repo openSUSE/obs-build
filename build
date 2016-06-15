@@ -372,6 +372,8 @@ cleanup_and_exit () {
         echo
         # okay, it failed, but maybe because disk space?
 	if df $BUILD_ROOT 2>/dev/null | grep -q "100%"; then
+            df $BUILD_ROOT 2>/dev/null
+            echo
             echo "$HOST ran out of disk space. Please try again."
             echo
 	    set 3
