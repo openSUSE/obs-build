@@ -259,10 +259,16 @@ kiwi_post_unknown() {
 
 recipe_setup_kiwi() {
     TOPDIR=/usr/src/packages
+    test "$DO_INIT_TOPDIR" = false || rm -rf "$BUILD_ROOT$TOPDIR"
     mkdir -p "$BUILD_ROOT$TOPDIR"
     mkdir -p "$BUILD_ROOT$TOPDIR/OTHER"
     mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
     mkdir -p "$BUILD_ROOT$TOPDIR/KIWI"
+    # compat, older build versions did not clean TOPDIR ...
+    mkdir -p "$BUILD_ROOT$TOPDIR/BUILD
+    mkdir -p "$BUILD_ROOT$TOPDIR/RPMS
+    mkdir -p "$BUILD_ROOT$TOPDIR/SRPMS
+    
     chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
     if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then 
 	mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
