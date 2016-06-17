@@ -265,9 +265,9 @@ recipe_setup_kiwi() {
     mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
     mkdir -p "$BUILD_ROOT$TOPDIR/KIWI"
     # compat, older build versions did not clean TOPDIR ...
-    mkdir -p "$BUILD_ROOT$TOPDIR/BUILD
-    mkdir -p "$BUILD_ROOT$TOPDIR/RPMS
-    mkdir -p "$BUILD_ROOT$TOPDIR/SRPMS
+    mkdir -p "$BUILD_ROOT$TOPDIR/BUILD"
+    mkdir -p "$BUILD_ROOT$TOPDIR/RPMS"
+    mkdir -p "$BUILD_ROOT$TOPDIR/SRPMS"
     
     chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
     if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then 
