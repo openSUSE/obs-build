@@ -91,6 +91,9 @@ sub parse {
   push @{$ret->{'deps'}}, @{$vars{'checkdepends'} || []};
   push @{$ret->{'deps'}}, @{$vars{'depends'} || []};
   $ret->{'source'} = $vars{'source'} if $vars{'source'};
+  # Maintain architecture-specific sources for officially supported architectures
+  $ret->{'source_x86_64'} = $vars{'source_x86_64'} if $vars{'source_x86_64'};
+  $ret->{'source_i686'} = $vars{'source_i686'} if $vars{'source_i686'};
   return $ret;
 }
 
