@@ -32,6 +32,7 @@
 #
 export SRC
 export BUILD_DIR=${BUILD_DIR:-/usr/lib/build}
+PATH="$BUILD_DIR:$PATH"
 
 export YAST_IS_RUNNING=instsys
 
@@ -45,9 +46,6 @@ repos=()
 
 . $BUILD_DIR/common_functions || exit 1
 
-BUILD_IS_RUNNING=$BUILD_ROOT/not-ready
-TMPFILE=$BUILD_ROOT/tmpfile
-
 # should RPMs be installed with --force ?
 USE_FORCE=false
 PREPARE_VM=
@@ -58,6 +56,7 @@ CLEAN_BUILD=
 CREATE_BUILD_BINARIES=
 DLNOSIGNATURE=
 CACHE_DIR=/var/cache/build
+test -z "$CONFIG_DIR" && CONFIG_DIR="$BUILD_DIR/configs"
 
 while test -n "$1" ; do
     case "$1" in
@@ -100,12 +99,24 @@ while test -n "$1" ; do
 	    shift 2
 	    ;;
 	--configdir)
-	    CONFIG_DIR=$2
+	    CONFIG_DIR="$2"
 	    shift 2
 	    ;;
 	--nosignature)
 	    shift
 	    DLNOSIGNATURE="--nosignature"
+	    ;;
+	--root)
+	    BUILD_ROOT="$2"
+	    shift 2
+	    ;;
+	--arch)
+	    BUILD_ARCH="$2"
+	    shift 2
+	    ;;
+	--dist)
+	    BUILD_DIST="$2"
+	    shift 2
 	    ;;
 	*)
 	    break
@@ -113,6 +124,14 @@ while test -n "$1" ; do
     esac
 done
 PKGS=("$@")
+
+if test -z "$BUILD_ROOT" ; then
+    echo "Please specify a build root!"
+    exit 1
+fi
+
+BUILD_IS_RUNNING=$BUILD_ROOT/not-ready
+TMPFILE=$BUILD_ROOT/tmpfile
 
 #
 # needed functions
