@@ -34,6 +34,7 @@ our $do_kiwi;
 our $do_arch;
 our $do_collax;
 our $do_livebuild;
+our $do_snapcraft;
 
 sub import {
   for (@_) {
@@ -43,8 +44,9 @@ sub import {
     $do_arch = 1 if $_ eq ':arch';
     $do_collax = 1 if $_ eq ':collax';
     $do_livebuild = 1 if $_ eq ':livebuild';
+    $do_snapcraft = 1 if $_ eq ':snapcraft';
   }
-  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_collax = $do_livebuild = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild;
+  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft;
   if ($do_deb) {
     require Build::Deb;
   }
@@ -59,6 +61,9 @@ sub import {
   }
   if ($do_livebuild) {
     require Build::LiveBuild;
+  }
+  if ($do_snapcraft) {
+    require Build::Snapcraft;
   }
 }
 
@@ -1235,6 +1240,7 @@ sub recipe2buildtype {
   $recipe =~ s/^_service:.*://;
   return 'arch' if $recipe eq 'PKGBUILD';
   return 'collax' if $recipe eq 'build.collax';
+  return 'snapcraft' if $recipe eq 'snapcraft.yaml';
   return 'preinstallimage' if $recipe eq '_preinstallimage';
   return 'simpleimage' if $recipe eq 'simpleimage';
   return undef;
@@ -1278,6 +1284,7 @@ sub parse {
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /config\.xml$/;
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /\.kiwi$/;
   return Build::LiveBuild::parse($cf, $fn, @args) if $do_livebuild && $fn =~ /\.livebuild$/;
+  return Build::Snapcraft::parse($cf, $fn, @args) if $do_snapcraft && $fn =~ /snapcraft.yaml$/;
   return parse_simpleimage($cf, $fn, @args) if $fn eq 'simpleimage';
   my $fnx = $fn;
   $fnx =~ s/.*\///;
@@ -1296,6 +1303,7 @@ sub parse_typed {
   return Build::Deb::parse($cf, $fn, @args) if $do_deb && $buildtype eq 'dsc';
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $buildtype eq 'kiwi';
   return Build::LiveBuild::parse($cf, $fn, @args) if $do_livebuild && $buildtype eq 'livebuild';
+  return Build::Snapcraft::parse($cf, $fn, @args) if $do_snapcraft && $buildtype eq 'snapcraft';
   return parse_simpleimage($cf, $fn, @args) if $buildtype eq 'simpleimage';
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $buildtype eq 'arch';
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $buildtype eq 'collax';

@@ -1135,6 +1135,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	test "$BUILDTYPE" = mock && CREATE_BUILD_BINARIES=--create-build-binaries
 	test "$BUILDTYPE" = debootstrap && CREATE_BUILD_BINARIES=--create-build-binaries
 	test "$BUILDTYPE" = livebuild && CREATE_BUILD_BINARIES=--create-build-binaries
+	test "$BUILDTYPE" = snapcraft && CREATE_BUILD_BINARIES=--create-build-binaries
 	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $DLNOSIGNATURE $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
         start_time=`date +%s`
