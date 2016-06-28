@@ -489,7 +489,7 @@ if test -e "$BUILD_IS_RUNNING" ; then
     read ANSWER
     case "$ANSWER" in
 	c|C)
-	    rm -f $BUILD_IS_RUNNING ;;
+	    rm -f $BUILD_IS_RUNNING $BUILD_ROOT/exit ;;
 	y|Y)
 	    clean_build_root ;;
 	*)
