@@ -846,6 +846,7 @@ sub addproviders {
   my @p;
   my $whatprovides = $config->{'whatprovidesh'};
   $whatprovides->{$r} = \@p;
+  my $binarytype = $config->{'binarytype'};
   if ($r =~ /\|/) {
     for my $or (split(/\s*\|\s*/, $r)) {
       push @p, @{$whatprovides->{$or} || addproviders($config, $or)};
@@ -853,18 +854,22 @@ sub addproviders {
     @p = unify(@p) if @p > 1;
     return \@p;
   }
-  return \@p if $r !~ /^(.*?)\s*([<=>]{1,2})\s*(.*?)$/;
+  if ($r !~ /^(.*?)\s*([<=>]{1,2})\s*(.*?)$/) {
+    @p = @{$whatprovides->{$r} || addproviders($config, $r)} if $binarytype eq 'deb' && $r =~ s/:any$//;
+    return \@p;
+  }
   my $rn = $1;
   my $rv = $3;
   my $rf = $addproviders_fm{$2};
   return \@p unless $rf;
+  $rn =~ s/:any$// if $binarytype eq 'deb';
   my $provides = $config->{'providesh'};
   my @rp = @{$whatprovides->{$rn} || []};
   for my $rp (@rp) {
     for my $pp (@{$provides->{$rp} || []}) {
       if ($pp eq $rn) {
 	# debian: unversioned provides do not match
-	next if $config->{'binarytype'} eq 'deb';
+	next if $binarytype eq 'deb';
 	push @p, $rp;
 	last;
       }
@@ -885,7 +890,7 @@ sub addproviders {
       $rr &= 5 unless $pf & 2;
       # verscmp for spec and kiwi types
       my $vv;
-      if ($config->{'binarytype'} eq 'deb') {
+      if ($binarytype eq 'deb') {
 	$vv = Build::Deb::verscmp($pv, $rv, 1);
       } else {
 	$vv = Build::Rpm::verscmp($pv, $rv, 1);
