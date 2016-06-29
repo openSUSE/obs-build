@@ -21,6 +21,7 @@
 package Build::Snapcraft;
 
 use strict;
+use Build::Deb;
 
 eval { require YAML::XS; };
 *YAML::XS::LoadFile = sub {die("YAML::XS is not available\n")} unless defined &YAML::XS::LoadFile;
@@ -50,7 +51,14 @@ sub parse {
     }
   }
 
-#  $ret->{'exclarch'} = $exclarch if defined $exclarch;
+  my %exclarchs;
+  for my $arch (@{$yaml->{architectures} || []}) {
+    my @obsarchs = Build::Deb::obsarch($arch);
+    push @obsarchs, $arch unless @obsarchs;
+    $exclarchs{$_} = 1 for @obsarchs;
+  }
+
+  $ret->{'exclarch'} = [ sort keys %exclarchs ] if %exclarchs;
 #  $ret->{'badarch'} = $badarch if defined $badarch;
   $ret->{'deps'} = \@packdeps;
 #  $ret->{'prereqs'} = \@prereqs if @prereqs;
