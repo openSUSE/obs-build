@@ -29,7 +29,7 @@ sub parse {
   my ($cf, $fn) = @_;
 
   my ($yaml) = YAML::XS::LoadFile($fn);
-  return {'error' => "Failed to parse yaml file"} unless ($yaml);
+  return {'error' => "Failed to parse yaml file"} unless $yaml;
 
   my $ret = {};
   $ret->{'name'} = $yaml->{'name'};
@@ -39,20 +39,17 @@ sub parse {
   # how should we report the built apps?
 
   my @packdeps;
-  my @subpacks;
-  push @subpacks, $yaml->{'name'};
-  for my $key (keys($yaml->{'parts'})) {
-    my $part = $yaml->{parts}{$key};
-    push @packdeps, "snapcraft-plugin:$part->{plugin}" if defined($part->{plugin});
-    for my $p (@{$part->{'stage-packages'}||[]}) {
-       push @packdeps, $p;
+  for my $key (sort keys(%{$yaml->{'parts'} || {}})) {
+    my $part = $yaml->{'parts'}->{$key};
+    push @packdeps, "snapcraft-plugin:$part->{plugin}" if defined $part->{plugin};
+    for my $p (@{$part->{'stage-packages'} || []}) {
+      push @packdeps, $p;
     }
-    for my $p (@{$part->{'build-packages'}||[]}) {
-       push @packdeps, $p;
+    for my $p (@{$part->{'build-packages'} || []}) {
+      push @packdeps, $p;
     }
   }
 
-  $ret->{'subpacks'} = \@subpacks;
 #  $ret->{'exclarch'} = $exclarch if defined $exclarch;
 #  $ret->{'badarch'} = $badarch if defined $badarch;
   $ret->{'deps'} = \@packdeps;
@@ -60,16 +57,6 @@ sub parse {
 #  $ret->{'configdependent'} = 1 if $ifdeps;
 
   return $ret;
-}
-
-sub show {
-  my ($fn, $field, $arch) = @ARGV;
-}
-
-
-sub queryhdrmd5 {
-  my ($bin) = @_;
-  die("Build::Snapcraft::queryhdrmd5 unimplemented.\n");
 }
 
 1;

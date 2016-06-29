@@ -1284,12 +1284,12 @@ sub parse {
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /config\.xml$/;
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /\.kiwi$/;
   return Build::LiveBuild::parse($cf, $fn, @args) if $do_livebuild && $fn =~ /\.livebuild$/;
-  return Build::Snapcraft::parse($cf, $fn, @args) if $do_snapcraft && $fn =~ /snapcraft.yaml$/;
-  return parse_simpleimage($cf, $fn, @args) if $fn eq 'simpleimage';
   my $fnx = $fn;
   $fnx =~ s/.*\///;
   $fnx =~ s/^[0-9a-f]{32,}-//;	# hack for OBS srcrep implementation
   $fnx =~ s/^_service:.*://;
+  return parse_simpleimage($cf, $fn, @args) if $fnx eq 'simpleimage';
+  return Build::Snapcraft::parse($cf, $fn, @args) if $do_snapcraft && $fnx eq 'snapcraft.yaml';
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $fnx eq 'PKGBUILD';
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $fnx eq 'build.collax';
   return parse_preinstallimage($cf, $fn, @args) if $fnx eq '_preinstallimage';
