@@ -38,8 +38,14 @@ sub parse {
   $ret->{'epoch'} = $yaml->{'epoch'} if $yaml->{'epoch'};
 
   # how should we report the built apps?
-
   my @packdeps;
+  for my $p (@{$yaml->{'stage-packages'} || []}) {
+    push @packdeps, $p;
+  }
+  for my $p (@{$yaml->{'build-packages'} || []}) {
+    push @packdeps, $p;
+  }
+
   for my $key (sort keys(%{$yaml->{'parts'} || {}})) {
     my $part = $yaml->{'parts'}->{$key};
     push @packdeps, "snapcraft-plugin:$part->{plugin}" if defined $part->{plugin};
