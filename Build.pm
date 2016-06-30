@@ -370,6 +370,15 @@ sub read_config {
     $config->{'binarytype'} = 'rpm' if $config->{'type'} eq 'spec' || $config->{'type'} eq 'kiwi';
     $config->{'binarytype'} = 'deb' if $config->{'type'} eq 'dsc' || $config->{'type'} eq 'collax' || $config->{'type'} eq 'livebuild';
     $config->{'binarytype'} = 'arch' if $config->{'type'} eq 'arch';
+    if ($config->{'type'} eq 'snapcraft') {
+      if (grep {$_ eq 'rpm'} @{$config->{'preinstall'} || []}) {
+        $config->{'binarytype'} = 'rpm';
+      } elsif (grep {$_ eq 'debianutils'} @{$config->{'preinstall'} || []}) {
+        $config->{'binarytype'} = 'deb';
+      } elsif (grep {$_ eq 'pacman'} @{$config->{'preinstall'} || []}) {
+        $config->{'binarytype'} = 'arch';
+      }
+    }
     $config->{'binarytype'} ||= 'UNDEFINED';
   }
   # add rawmacros to our macro list
