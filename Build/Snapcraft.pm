@@ -45,6 +45,9 @@ sub parse {
   for my $p (@{$yaml->{'build-packages'} || []}) {
     push @packdeps, $p;
   }
+  for my $p (@{$yaml->{'after'} || []}) {
+    push @packdeps, "snapcraft-part:$p";
+  }
 
   for my $key (sort keys(%{$yaml->{'parts'} || {}})) {
     my $part = $yaml->{'parts'}->{$key};
@@ -54,6 +57,10 @@ sub parse {
     }
     for my $p (@{$part->{'build-packages'} || []}) {
       push @packdeps, $p;
+    }
+    for my $p (@{$part->{'after'} || []}) {
+      next if $yaml->{'parts'}->{$p};
+      push @packdeps, "build-snapcraft-part-$p";
     }
   }
 

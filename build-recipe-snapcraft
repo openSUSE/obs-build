@@ -106,6 +106,18 @@ createrepo_debian() {
     popd >/dev/null
 }
 
+collect_prebuild_parts() {
+
+  mkdir -p $BUILD_ROOT/root/.local/share/snapcraft/
+  rm -f $BUILD_ROOT/root/.local/share/snapcraft/parts.yaml
+  for part in $BUILD_ROOT/.build.snap_parts/*; do
+    if [ -e "$part" ]; then
+      cat "$part/part.yaml" >> \
+          $BUILD_ROOT/root/.local/share/snapcraft/parts.yaml
+    fi
+  done
+}
+
 # This script expects that the $BUILD_ROOT is a Debian installation with
 # snapcraft already installed!
 #
@@ -117,16 +129,21 @@ createrepo_debian() {
 
 recipe_build_snapcraft() {
     local ARCH=$(chroot $BUILD_ROOT su -c "dpkg-architecture -qDEB_BUILD_ARCH")
-#    local DIST=$(chroot $BUILD_ROOT su -c "lsb_release --codename" | awk '{ print $2 }')
+    local DIST="OBS"
     local SNAPCRAFT_ROOT="SNAPCRAFT_ROOT"
 
-#    [ -z "${ARCH}" -o -z "${DIST}" ] && cleanup_and_exit 1
+    [ -z "${ARCH}" -o -z "${DIST}" ] && cleanup_and_exit 1
 
     test -d $BUILD_ROOT/.build.binaries || cleanup_and_exit 1
     if test "$DO_INIT" = true -o ! -d "$BUILD_ROOT/.build.binaries/dists" ; then
 	echo "creating repository metadata..."
         createrepo_debian $BUILD_ROOT/.build.binaries ${ARCH} ${DIST}
+        # setup /etc/apt/sources.list
+        mkdir -p "$BUILD_ROOT/etc/apt"
+        echo "deb [trusted=yes] file:/.build.binaries OBS main" >> "$BUILD_ROOT/etc/apt/sources.list"
     fi
+
+    collect_prebuild_parts
 
     chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && snapcraft build" - root \
 	|| cleanup_and_exit 1
@@ -164,7 +181,6 @@ recipe_build_snapcraft() {
 }
 
 recipe_resultdirs_snapcraft() {
-    # our results are already in OTHER
     :
 }
 
