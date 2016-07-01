@@ -120,6 +120,12 @@ vm_verify_options_kvm() {
 		vm_kernel=/boot/vmlinuxle
 		vm_initrd=/boot/initrdle
 	    fi
+	    if test -e /boot/vmlinuxbe -a -e /boot/initrdbe ; then
+	        if test "$BUILD_ARCH" = ppc -o "$BUILD_ARCH" = ppc64 ; then
+		    vm_kernel=/boot/vmlinuxbe
+		    vm_initrd=/boot/initrdbe
+	        fi
+	    fi
 	    grep -q "pSeries" /proc/cpuinfo && kvm_device=scsi-hd	# no virtio on pSeries
 	    grep -q "PowerNV" /proc/cpuinfo || kvm_device=scsi-hd	# no virtio on ppc != power7 yet
 	    ;;
