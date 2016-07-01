@@ -145,6 +145,8 @@ recipe_build_snapcraft() {
 
     collect_prebuild_parts
 
+    chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && snapcraft pull" - root \
+	|| cleanup_and_exit 1
     chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && snapcraft build" - root \
 	|| cleanup_and_exit 1
     chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && snapcraft snap" - root \
