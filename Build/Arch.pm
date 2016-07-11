@@ -90,6 +90,14 @@ sub parse {
   $ret->{'deps'} = $vars{'makedepends'} || [];
   push @{$ret->{'deps'}}, @{$vars{'checkdepends'} || []};
   push @{$ret->{'deps'}}, @{$vars{'depends'} || []};
+  # Add to depends packages also architecture-dependent ones
+  # Suggestion of how to check architecture here are welcome
+  push @{$ret->{'deps'}}, @{$vars{'makedepends_i686'} || []};
+  push @{$ret->{'deps'}}, @{$vars{'depends_i686'} || []};
+  push @{$ret->{'deps'}}, @{$vars{'checkdepends_i686'} || []};
+  push @{$ret->{'deps'}}, @{$vars{'makedepends_x86_64'} || []};
+  push @{$ret->{'deps'}}, @{$vars{'checkdepends_x86_64'} || []};
+  push @{$ret->{'deps'}}, @{$vars{'depends_x86_64'} || []};
   $ret->{'source'} = $vars{'source'} if $vars{'source'};
   # Maintain architecture-specific sources for officially supported architectures
   $ret->{'source_x86_64'} = $vars{'source_x86_64'} if $vars{'source_x86_64'};
