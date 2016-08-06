@@ -52,7 +52,7 @@ vm_startup_lxc() {
 	EOF
     chmod a+x "$LXCHOOK"
     case "$(lxc-create --version)" in
-        1.0.8|1.1.*)
+        1.0.8|1.1.*|2.*)
            lxc-create -n "$LXCID" -f "$LXCCONF" -t none || cleanup_and_exit 1
            lxc-start -n "$LXCID" -F "$vm_init_script"
            ;;
