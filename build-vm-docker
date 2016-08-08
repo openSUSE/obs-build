@@ -29,6 +29,7 @@ vm_verify_options_docker() {
 
 vm_startup_docker() {
     local name="obsbuild.${BUILD_ROOT##*/}"
+    touch $BUILD_ROOT/.dockerenv
     docker rm "$name" >/dev/null 2>&1 || true
     docker run \
         --rm --name "$name" --cap-add=sys_admin --cap-add=MKNOD --net=none \
