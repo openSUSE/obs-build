@@ -464,8 +464,6 @@ reexpand:
       if ($line =~ /^(Name|Version|Disttag|Release)\s*:\s*(\S+)/i) {
 	$ret->{lc $1} = $2;
 	$macros{lc $1} = $2;
-      } elsif ($line =~ /^(Source\d*|Patch\d*|Url)\s*:\s*(\S+)/i) {
-	$ret->{lc $1} = $2;
       } elsif ($line =~ /^ExclusiveArch\s*:\s*(.*)/i) {
 	$exclarch ||= [];
 	push @$exclarch, split(' ', $1);
@@ -557,6 +555,16 @@ reexpand:
 	}
       }
       next;
+    } elsif ($preamble && $line =~ /^(Source\d*|Patch\d*|Url|Icon)\s*:\s*(\S+)/i) {
+      my ($tag, $val) = (lc($1), $2);
+      # associate url and icon tags with the corresponding subpackage
+      $tag .= scalar @subpacks if ($tag eq 'url' || $tag eq 'icon') && @subpacks;
+      if ($tag =~ /icon/) {
+        # there can be a gif and xpm icon
+        push @{$ret->{$tag}}, $val;
+      } else {
+        $ret->{$tag} = $val;
+      }
     }
 
     if ($line =~ /^\s*%package\s+(-n\s+)?(\S+)/) {
