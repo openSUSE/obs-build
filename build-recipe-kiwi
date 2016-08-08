@@ -426,15 +426,6 @@ is_legacy_kiwi() {
     return 0
 }
 
-setup_docker_loop() {
-    max_loop=`cat /sys/module/loop/parameters/max_loop`
-    if [ "$max_loop" = "0" ]; then
-       max_loop=16
-    fi
-    for $num in `seq 0 $max_loop`; do
-        test -b /dev/loop$num || mknod -m660 /dev/loop$num b 7 $num
-    done
-}
 build_kiwi_appliance() {
     if test -z "$RUNNING_IN_VM" ; then
         # NOTE: this must be done with the outer system, because it loads
@@ -442,9 +433,6 @@ build_kiwi_appliance() {
         echo "starting device mapper for kiwi..."
         test -x /etc/init.d/boot.device-mapper && \
             /etc/init.d/boot.device-mapper start
-        if test -f /.dockerenv ; then
-            setup_docker_loop
-        fi
     fi
     KIWI_PROFILE=$(queryconfig \
         --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" \

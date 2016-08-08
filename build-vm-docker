@@ -29,7 +29,6 @@ vm_verify_options_docker() {
 
 vm_startup_docker() {
     local name="obsbuild.${BUILD_ROOT##*/}"
-    touch $BUILD_ROOT/.dockerenv
     docker rm "$name" >/dev/null 2>&1 || true
     docker run \
         --rm --name "$name" --cap-add=sys_admin --cap-add=MKNOD --net=none \
@@ -45,7 +44,14 @@ vm_kill_docker() {
 }
 
 vm_fixup_docker() {
-    :
+    # loop devices are needed for kiwi builds at least
+    max_loop=`cat /sys/module/loop/parameters/max_loop`
+    if [ "$max_loop" = "0" ]; then
+       max_loop=16
+    fi
+    for $num in `seq 0 $max_loop`; do
+        test -b /dev/loop$num || mknod -m660 /dev/loop$num b 7 $num
+    done
 }
 
 vm_attach_root_docker() {
