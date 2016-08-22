@@ -447,8 +447,8 @@ build_kiwi_appliance() {
     fi
     RUN_BUNDLE="true"
     for imgtype in $imagetype ; do
-        perform_image_build $imagetype $legacy
-        if perform_image_bundle $imagetype $legacy; then
+        perform_image_build $imgtype $legacy
+        if perform_image_bundle $imgtype $legacy; then
             # bundling successful, skip alternative bundlers
             unset RUN_BUNDLE
         fi
