@@ -421,8 +421,7 @@ toshellscript() {
 setupccache() {
     if test -n "$CCACHE" ; then
 	if mkdir -p $BUILD_ROOT/var/lib/build/ccache/bin; then
-	    for i in $(ls $BUILD_ROOT/usr/bin | grep -E '^(cc|gcc|[cg][+][+])([-]?[234][.]?[0-9])*$'); do
-#                ln -sf /usr/bin/ccache $BUILD_ROOT/var/lib/build/ccache/bin/$i
+	    for i in $(ls $BUILD_ROOT/usr/bin | grep -E '^(cc|gcc|[cg][+][+]|clang|clang[+][+])([-]?[234][.]?[0-9])*$'); do
 		rm -f $BUILD_ROOT/var/lib/build/ccache/bin/$i
 		test -e $BUILD_ROOT/usr/bin/$i || continue
 		echo '#! /bin/sh' > $BUILD_ROOT/var/lib/build/ccache/bin/$i
@@ -438,7 +437,7 @@ setupccache() {
 	echo "export CCACHE_DIR=/.ccache" > "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
 	echo 'export PATH=/var/lib/build/ccache/bin:$PATH' >> "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
     else
-	rm -f "$BUILD_ROOT"/var/lib/build/ccache/bin/{gcc,g++,cc,c++}
+	rm -f "$BUILD_ROOT"/var/lib/build/ccache/bin/{gcc,g++,cc,c++,clang,clang++}
     fi
 }
 
