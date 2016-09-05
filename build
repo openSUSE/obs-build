@@ -95,6 +95,10 @@ CCACHE=
 DLNOSIGNATURE=
 CACHE_DIR=/var/cache/build
 
+# Input validation
+BUILDROOT_VALID=false
+PARAM_VALID=false
+BUILD_CONFIG=/etc/obs/build.conf
 
 # This is for insserv
 export YAST_IS_RUNNING=instsys
@@ -365,6 +369,11 @@ usage () {
 cleanup_and_exit () {
     trap EXIT
     test -z "$1" && set 0
+
+    # If input is not validated, we can't do any cleanup on $BUILD_ROOT
+    if test $BUILDROOT_VALID != true ; then
+        exit $1
+    fi
     rm -f $BUILD_ROOT/exit
     if test "$1" -eq 1 -a -x /bin/df ; then
         echo
@@ -684,6 +693,144 @@ run_rsync() {
     fi
 }
 
+# Function for checking whether whitelisted path and build root path match.
+#
+# param1: whitelisted path from configuration file
+# param2: build root path
+#
+# returns: 0 if paths match, 1 if they don't, 2 if build root parent does
+# not exist.
+whitepath_match(){
+    local white_path=$1
+    local build_root_path=$2
+
+    if [[ -z $white_path || -z $build_root_path ]] ; then
+        return
+    fi
+
+    # Trim whitespace
+    white_path=$(echo $white_path | sed -e 's/^[ \t]*//')
+    # Replace %user
+    white_path=${white_path//%user/$username}
+    local check_path=
+    # Resolve optional * wildcard from the end of white_path
+    if [[ $white_path == */\* ]] ; then
+        white_path=${white_path:0:${#white_path}-1}
+        white_path=$(readlink -m $white_path)
+        check_path=$white_path
+        if [[ $build_root_path == ${white_path}/* ]] ; then
+            BUILD_ROOT_STATUS=0
+        fi
+    elif [[ $white_path == *\* ]] ; then
+        white_path=${white_path:0:${#white_path}-1}
+        white_path=$(readlink -m $white_path)
+        check_path=$(readlink -m "$white_path/..")
+        if [[ $build_root_path == ${white_path}* ]] ; then
+            BUILD_ROOT_STATUS=0
+        fi
+    else
+        white_path=$(readlink -m $white_path)
+        check_path=$(readlink -m "$white_path/..")
+        if [[ $build_root_path == $white_path || $build_root_path == ${white_path}/* ]] ; then
+            BUILD_ROOT_STATUS=0
+        fi
+    fi
+
+    # If build root is valid, check that the parent of build root exists
+    if [[ ! -d $check_path && $BUILD_ROOT_STATUS == 0 ]] ; then
+        BUILD_ROOT_STATUS=2
+        BUILD_ROOT_ERROR="Directory $check_path does not exist"
+    fi
+}
+
+# Function for validating caller input. Contains the following:
+#
+# Whitelist check for $BUILD_ROOT
+#
+# $BUILD_ROOT must match a "ALLOW_BUILD_ROOT:" -line
+# in the $build_whitelist file, where %user is
+# replaced with $SUDO_USER. If $SUDO_USER does not
+# exist (called without sudo), it will use $USER instead.
+#
+# If zero BUILD_ROOTS are whitelisted, everything is allowed.
+#
+validate_buildroot() {
+    if test -f $BUILD_CONFIG ; then
+        local allow_all=true
+        local key="ALLOW_BUILD_ROOT:"
+
+        local username=$SUDO_USER
+        if test -z $username ; then
+            username="$USER"
+        fi
+
+        BUILD_ROOT_STATUS=1
+        BUILD_ROOT_ERROR="Build root $BUILD_ROOT not allowed for user $username"
+
+        local build_root_path=$(readlink -m $BUILD_ROOT)
+        while read p; do
+            if [[ $p == $key* ]] ; then
+                allow_all=false
+                # Disable globbing so that wildcards in configuration don't break everything
+                set -f
+                local white_path=${p:${#key}}
+                whitepath_match "$white_path" "$build_root_path"
+                # Reset globbing
+                set +f
+                if [[ $BUILD_ROOT_STATUS == 0 ]] ; then
+                    break;
+                fi
+            fi
+        done<$BUILD_CONFIG
+
+        if test $allow_all != true -a $BUILD_ROOT_STATUS != 0; then
+            echo "build: $BUILD_ROOT_ERROR"
+            return
+        fi
+    fi
+
+    BUILDROOT_VALID=true
+}
+
+# Function for validating the use of a parameter. Allowed
+# parameters are whitelisted in $build_whitelist file as
+# "ALLOW_PARAM:" -lines.
+#
+# If zero parameters are whitelisted, everything is allowed.
+validate_param() {
+    if test -f $BUILD_CONFIG ; then
+        local param_ok=false
+        local allow_all=true
+        local key="ALLOW_PARAM:"
+        local extra_error=
+        while read _key _flag _arg; do
+            if [[ $_key == $key ]] ; then
+                allow_all=false
+                if [[ "$_flag" = "$1" || "$_flag" = "-$1" ]] ; then
+                    if [[ -n "$_arg" ]] ; then
+                        if [[ "$_arg" = "$2" ]] ; then
+                            param_ok=true
+                            break
+                        else
+                            extra_error=" $2"
+                        fi
+                    else
+                        param_ok=true
+                        break
+                    fi
+                fi
+            fi
+        done<$BUILD_CONFIG
+
+        if test $allow_all != true -a $param_ok != true ; then
+            echo "build: Parameter '$1$extra_error' not allowed"
+            PARAM_VALID=false
+            return
+        fi
+    fi
+    PARAM_VALID=true
+}
+
 #### main ####
 
 trap fail_exit EXIT
@@ -720,6 +867,7 @@ while test -n "$1"; do
 	set -- "----noarg=$PARAM" "$@"
 	;;
     esac
+    SKIP_VALIDATION=false
     case ${PARAM/#--/-} in
       -help|-h)
 	echo_help
@@ -928,12 +1076,26 @@ while test -n "$1"; do
 	    echo "Unknown option '$PARAM'. Exit."
 	    cleanup_and_exit 1
 	fi
+	SKIP_VALIDATION=true
       ;;
       *)
 	RECIPEFILES[${#RECIPEFILES[@]}]="$PARAM"
+	SKIP_VALIDATION=true
       ;;
     esac
+
+    if test $SKIP_VALIDATION != true ; then
+        validate_param $PARAM $ARG
+        if test $PARAM_VALID != true ; then
+            cleanup_and_exit 1
+        fi
+    fi
 done
+
+validate_buildroot
+if test $BUILDROOT_VALID != true ; then
+    cleanup_and_exit 1
+fi
 
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
