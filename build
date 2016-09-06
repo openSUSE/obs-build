@@ -1131,7 +1131,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	echo "BUILD_INCARNATION=$INCARNATION" > $BUILD_ROOT/.buildenv
 	CREATE_BUILD_BINARIES=
 	test "$BUILDTYPE" = preinstallimage && mkdir -p $BUILD_ROOT/.preinstall_image
-	egrep '^#[       ]*needsbinariesforbuild[       ]*$' >/dev/null <$MYSRCDIR/$RECIPEFILE && CREATE_BUILD_BINARIES=--create-build-binaries
+	egrep '^#[[:blank:]]*needsbinariesforbuild[[:blank:]]*$' >/dev/null <$MYSRCDIR/$RECIPEFILE && CREATE_BUILD_BINARIES=--create-build-binaries
 	test "$BUILDTYPE" = mock && CREATE_BUILD_BINARIES=--create-build-binaries
 	test "$BUILDTYPE" = debootstrap && CREATE_BUILD_BINARIES=--create-build-binaries
 	test "$BUILDTYPE" = livebuild && CREATE_BUILD_BINARIES=--create-build-binaries
@@ -1187,9 +1187,9 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	test -n "$SUSE_VERSION" -a "${SUSE_VERSION:-0}" -le 1020 && BUILD_USER=root
     fi
     if test "$BUILD_USER" = abuild ; then
-	egrep '^#[       ]*needsrootforbuild[       ]*$' >/dev/null <$RECIPEFILE && BUILD_USER=root
+	egrep '^#[[:blank:]]*needsrootforbuild[[:blank:]]*$' >/dev/null <$RECIPEFILE && BUILD_USER=root
     else
-	egrep '^#[       ]*norootforbuild[       ]*$' >/dev/null <$RECIPEFILE && BUILD_USER=abuild
+	egrep '^#[[:blank:]]*norootforbuild[[:blank:]]*$' >/dev/null <$RECIPEFILE && BUILD_USER=abuild
     fi
     test -n "$NOROOTFORBUILD" && BUILD_USER=abuild
 
