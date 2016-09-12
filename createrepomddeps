@@ -138,6 +138,7 @@ for my $url (@ARGV) {
         push @packages, $_[0] if $opt_dump;
       }
       if ($opt_bc) {
+        binmode STDOUT, ":utf8";
 	Build::writedeps(\*STDOUT, $_[0], $baseurl);
       } elsif ($opt_old) {
 	printold($_[0], $baseurl, $old_seen);
