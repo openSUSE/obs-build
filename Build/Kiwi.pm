@@ -69,8 +69,13 @@ sub kiwiparse {
   my @packages;
   my @extrasources;
   my @requiredarch;
+  my @badarch;
   my $schemaversion = 0;
   my $schemaversion56 = versionstring("5.6");
+  my $obsexclusivearch;
+  my $obsexcludearch;
+  $obsexclusivearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExclusiveArch:\s+(.*)\s+-->\s*$/im;
+  $obsexcludearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExcludeArch:\s+(.*)\s+-->\s*$/im;
   my $kiwi = Build::SimpleXML::parse($xml);
   die("not a kiwi config\n") unless $kiwi && $kiwi->{'image'};
   $kiwi = $kiwi->{'image'}->[0];
@@ -171,7 +176,7 @@ sub kiwiparse {
     my $kiwisource = ($repository->{'source'} || [])->[0];
     next if $kiwisource->{'path'} eq '/var/lib/empty';	# grr
     if ($kiwisource->{'path'} eq 'obsrepositories:/') {
-      push @repos, '_obsrepositories';
+      push @repos, '_obsrepositories/';
       next;
     }
     if ($kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
@@ -261,7 +266,11 @@ sub kiwiparse {
     push @packages, "kiwi-packagemanager:instsource";
   }
 
+  push @requiredarch, split(' ', $obsexclusivearch) if $obsexclusivearch;
+  push @badarch , split(' ', $obsexcludearch) if $obsexcludearch;
+
   $ret->{'exclarch'} = [ unify(@requiredarch) ] if @requiredarch;
+  $ret->{'badarch'} = [ unify(@badarch) ] if @badarch;
   $ret->{'deps'} = [ unify(@packages) ];
   $ret->{'path'} = [ unify(@repos, @bootrepos) ];
   $ret->{'imagetype'} = [ unify(@types) ];
