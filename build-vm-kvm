@@ -108,6 +108,7 @@ vm_verify_options_kvm() {
 		kvm_options+="-M virt"
 	    fi
 	    kvm_device=virtio-blk-device
+	    kvm_rng_device=virtio-rng-device
 	    ;;
 	ppc|ppcle|ppc64|ppc64le)
 	    kvm_bin="/usr/bin/qemu-system-ppc64"
