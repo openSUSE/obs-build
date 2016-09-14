@@ -23,6 +23,13 @@
 
 lxc_get_id() {
     LXCID="obsbuild:${BUILD_ROOT##*/}"
+    if which lxc-config >/dev/null 2>&1; then
+	LXC_TYPE=standalone
+    elif which virsh >/dev/null 2>&1; then
+	LXC_TYPE=libvirt
+    else
+        LXC_TYPE=unknown
+    fi
 }
 
 vm_verify_options_lxc() {
@@ -30,13 +37,24 @@ vm_verify_options_lxc() {
     VM_SWAP=
 }
 
+lxcsh() {
+    virsh -c lxc:/// "$@"
+}
+
 vm_startup_lxc() {
     lxc_get_id
+    LXCCONF="$BUILD_ROOT/.build.lxc.conf"
+    rm -f "$LXCCONF"
+    vm_startup_lxc_$LXC_TYPE
+    BUILDSTATUS="$?"
+    test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
+    cleanup_and_exit "$BUILDSTATUS"
+}
+
+vm_startup_lxc_standalone() {
     LXCDIR="`lxc-config lxc.lxcpath`/$LXCID"
     LXCROOTFS="$LXCDIR/rootfs"
     LXCHOOK="$LXCDIR/pre-mount.hook"
-    LXCCONF="$BUILD_ROOT/.build.lxc.conf"
-    rm -f "$LXCCONF"
     cat $BUILD_DIR/lxc.conf > "$LXCCONF"
     cat >> "$LXCCONF" <<-EOF
 	lxc.rootfs = $LXCROOTFS
@@ -61,14 +79,71 @@ vm_startup_lxc() {
            lxc-start -n "$LXCID" "$vm_init_script"
            ;;
     esac
-    BUILDSTATUS="$?"
-    test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
-    cleanup_and_exit "$BUILDSTATUS"
+}
+
+vm_startup_lxc_libvirt() {
+    local lxc_arch
+    # x86 i686 x86_64 amd64
+    case $BUILD_ARCH in
+    i586:*)   lxc_arch=i686 ;;
+    x86_64:*) lxc_arch=x86_64 ;;
+    *)        lxc_arch=${BUILD_ARCH/:*} ;;
+    esac
+
+    lxcsh destroy "$LXCID" >/dev/null 2>&1 || true
+    cat <<-EOF > "$LXCCONF"
+	<domain type='lxc'>
+	  <name>$LXCID</name>
+	  <memory unit='MiB'>${VM_MEMSIZE:-512}</memory>
+	  <os>
+	    <type arch='$lxc_arch'>exe</type>
+	    <init>$vm_init_script</init>
+	  </os>
+	  <vcpu>1</vcpu>
+	  <clock offset='utc'/>
+	  <on_poweroff>destroy</on_poweroff>
+	  <on_reboot>restart</on_reboot>
+	  <on_crash>destroy</on_crash>
+	  <devices>
+	    <emulator>/usr/lib64/libvirt/libvirt_lxc</emulator>
+	    <filesystem type='mount'>
+	      <source dir='$BUILD_ROOT'/>
+	      <target dir='/'/>
+	    </filesystem>
+	    <!-- SLES11 and OpenSUSE 13.1 fails if cannot change /sys owner -->
+	    <!-- BTW, ro mode can be overlapped with mount -o remount,rw -->
+	    <filesystem type='mount'>
+	      <source dir='/sys'/>
+	      <target dir='/sys'/>
+	    </filesystem>
+	    <console type='pty'/>
+	  </devices>
+	  <features>
+	    <privnet/>
+	    <!-- SLES11 fails if cannot create nodes (mknode) -->
+	    <capabilities policy='default'>
+	     <mknod state='on'/>
+	    </capabilities>
+	  </features>
+	</domain>
+	EOF
+    # XXX: do this always instead of leaking the hosts' one?
+    echo "rootfs / rootfs rw 0 0" > $BUILD_ROOT/etc/mtab
+    lxcsh create --console $LXCCONF | sed -ure 's/\x0d//g;:redo /.\x08/{s/.\x08//; b redo}'
+    return $PIPESTATUS
 }
 
 vm_kill_lxc() {
     lxc_get_id
+    vm_kill_lxc_$LXC_TYPE
+}
+
+vm_kill_lxc_standalone() {
     lxc-stop -n "$LXCID" || true
+}
+
+vm_kill_lxc_libvirt() {
+    lxcsh destroy "$LXCID" || true
 }
 
 vm_fixup_lxc() {
@@ -94,7 +169,15 @@ vm_detach_swap_lxc() {
 vm_cleanup_lxc() {
     if test $$ -ne 1 && test $$ -ne 2 ; then
         lxc_get_id
-        lxc-destroy -n "$LXCID"
+        vm_cleanup_lxc_$LXC_TYPE
     fi
+}
+
+vm_cleanup_lxc_standalone() {
+    lxc-destroy -n "$LXCID"
+}
+
+vm_cleanup_lxc_libvirt() {
+    lxcsh destroy "$LXCID" >/dev/null 2>&1 || true
 }
 
