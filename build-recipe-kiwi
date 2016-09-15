@@ -24,7 +24,11 @@
 
 ############################################################
 
-# post scriptlet generation functions
+# post scriptlet generation functions for legacy bundling
+#
+# used for kiwi versions below 5.06.106 that do not support
+# a bundling method
+#
 
 kiwi_post_oem() {
     cat <<-EOF
@@ -255,6 +259,45 @@ kiwi_post_unknown() {
 	EOF
 }
 
+legacy_image_bundle() {
+    # create tar.gz of images, in case it makes sense
+    buildnum=
+    if test -n "$RELEASE"; then
+	buildnum="-Build$RELEASE"
+    fi
+    imagearch=`uname -m`
+    imageout="$imagename.$imagearch-$imageversion"
+    for imgtype in $imagetype ; do
+	case "$imgtype" in
+	    oem) kiwi_post_oem   > $BUILD_ROOT/kiwi_post.sh ;;
+	    vmx) kiwi_post_vmx   > $BUILD_ROOT/kiwi_post.sh ;;
+	    xen) kiwi_post_xen   > $BUILD_ROOT/kiwi_post.sh ;;
+	    pxe) kiwi_post_pxe   > $BUILD_ROOT/kiwi_post.sh ;;
+	    iso) kiwi_post_iso   > $BUILD_ROOT/kiwi_post.sh ;;
+	    tbz) kiwi_post_tbz   > $BUILD_ROOT/kiwi_post.sh ;;
+	    *) kiwi_post_unknown > $BUILD_ROOT/kiwi_post.sh ;;
+	esac
+	cat >> $BUILD_ROOT/kiwi_post.sh <<-EOF
+		cd /$TOPDIR/KIWI-$imgtype
+		if [ -e "$imageout.channel" ]; then
+		    echo "Found kiwi channel list file, exporting as well..."
+		    cp "$imageout.channel" "/$TOPDIR/OTHER/$imageout$buildnum-$imgtype.channel"
+		fi
+		if [ -e "$imageout.packages" ]; then
+		    echo "Found kiwi package list file, exporting as well..."
+		    cp "$imageout.packages" "/$TOPDIR/OTHER/$imageout$buildnum-$imgtype.packages"
+		fi
+		if [ -e "$imageout.verified" ]; then
+		    echo "Found rpm verification report, exporting as well..."
+		    cp "$imageout.verified" "/$TOPDIR/OTHER/$imageout$buildnum-$imgtype.verified"
+		fi
+		EOF
+	chroot $BUILD_ROOT su -c "sh -e /kiwi_post.sh" || cleanup_and_exit 1
+	rm -f $BUILD_ROOT/kiwi_post.sh
+    done
+}
+
+
 ############################################################
 
 recipe_setup_kiwi() {
@@ -347,6 +390,7 @@ build_kiwi_product() {
 perform_image_build() {
     local imgtype=$1
     local legacy=$2
+    local profile=$3
     local prepare_call
     local create_call
     # When people test mixed build with legacy and new kiwi version
@@ -356,7 +400,11 @@ perform_image_build() {
     if [ -d "$BUILD_ROOT/var/cache/kiwi/zypper" ];then
         rm -rf $BUILD_ROOT/var/cache/kiwi/zypper
     fi
-    echo "running kiwi --prepare for $imgtype..."
+    if test -n "$profile" -a "$profile" != __not__set ; then
+	echo "running kiwi --prepare for $imgtype, profile $profile..."
+    else
+	echo "running kiwi --prepare for $imgtype..."
+    fi
     # Do not use $BUILD_USER here, since we always need root permissions
     prepare_call="cd $TOPDIR/SOURCES && rm -rf $TOPDIR/KIWIROOT-$imgtype"
     if [ "$legacy" = "true" ]; then
@@ -367,11 +415,19 @@ perform_image_build() {
     fi
     prepare_call="$prepare_call --prepare $TOPDIR/SOURCES"
     prepare_call="$prepare_call --root $TOPDIR/KIWIROOT-$imgtype"
+    if test -n "$profile" -a "$profile" != __not__set ; then
+        prepare_call="$prepare_call --add-profile $profile"
+    fi
     prepare_call="$prepare_call $KIWI_PARAMETERS"
+    echo "$prepare_call"
     chroot $BUILD_ROOT \
         su -c "$prepare_call" - root < /dev/null || cleanup_and_exit 1
 
-    echo "running kiwi --create for $imgtype..."
+    if test -n "$profile" -a "$profile" != __not__set ; then
+	echo "running kiwi --create for $imgtype, profile $profile..."
+    else
+	echo "running kiwi --create for $imgtype..."
+    fi
     mkdir -p $BUILD_ROOT/$TOPDIR/KIWI-$imgtype
     create_call="cd $TOPDIR/SOURCES"
     if [ "$legacy" = "true" ]; then
@@ -383,17 +439,22 @@ perform_image_build() {
     create_call="$create_call --create $TOPDIR/KIWIROOT-$imgtype"
     create_call="$create_call --type $imgtype"
     create_call="$create_call -d $TOPDIR/KIWI-$imgtype"
+    if test -n "$profile" -a "$profile" != __not__set ; then
+        create_call="$create_call --add-profile $profile"
+    fi
     create_call="$create_call $KIWI_PARAMETERS"
+    echo "$create_call"
     chroot $BUILD_ROOT \
         su -c "$create_call" - root < /dev/null || cleanup_and_exit 1
-
-    rm -rf "/$TOPDIR/KIWI.bundle"
 }
 
 perform_image_bundle() {
     local imgtype=$1
     local legacy=$2
+    local profile=$3
     local bundle_call
+
+    rm -rf "/$TOPDIR/KIWI.bundle"
     if [ "$legacy" = "true" ]; then
         bundle_call="/usr/sbin/kiwi --bundle-build $TOPDIR/KIWI-$imgtype"
         bundle_call="$bundle_call -d /$TOPDIR/KIWI.bundle/"
@@ -404,6 +465,7 @@ perform_image_bundle() {
         bundle_call="$bundle_call --id Build$RELEASE"
         bundle_call="$bundle_call --bundle-dir /$TOPDIR/KIWI.bundle/"
     fi
+    echo "$bundle_call"
     if chroot $BUILD_ROOT su -c "$bundle_call" - root < /dev/null; then
         mv "$BUILD_ROOT/$TOPDIR/KIWI.bundle/"* \
             "$BUILD_ROOT/$TOPDIR/KIWI/" || cleanup_and_exit 1
@@ -434,71 +496,33 @@ build_kiwi_appliance() {
         test -x /etc/init.d/boot.device-mapper && \
             /etc/init.d/boot.device-mapper start
     fi
-    KIWI_PROFILE=$(queryconfig \
+    local kiwi_profile=$(queryconfig \
         --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" \
         --archpath "$BUILD_ARCH" buildflags kiwiprofile
     )
-    if test -n "$KIWI_PROFILE"; then
-        KIWI_PARAMETERS="$KIWI_PARAMETERS --add-profile $KIWI_PROFILE"
+    if test -z "$kiwi_profile"; then
+        kiwi_profile=__not__set
     fi
     local legacy=false
-    if is_legacy_kiwi; then
+    if is_legacy_kiwi ; then
         legacy=true
     fi
-    RUN_BUNDLE="true"
+    RUN_BUNDLE=true
     for imgtype in $imagetype ; do
-        perform_image_build $imgtype $legacy
-        if perform_image_bundle $imgtype $legacy; then
-            # bundling successful, skip alternative bundlers
-            unset RUN_BUNDLE
-        fi
+	for prof in ${kiwi_profile//,/ } ; do
+	    perform_image_build $imgtype $legacy $prof
+	    if perform_image_bundle $imgtype $legacy $prof; then
+		# bundling successful, skip legacy bundler
+		unset RUN_BUNDLE
+	    fi
+	done
     done
     BUILD_SUCCEEDED=true
 
-    if test -z "$RUN_BUNDLE"; then
-       # new kiwi has bundled our result already :)
-       return
+    if test -n "$RUN_BUNDLE"; then
+	# results are not bundled yet
+	legacy_image_bundle
     fi
-
-    #
-    # Legacy bundling code for kiwi version below 5.06.106
-    #
-
-    # create tar.gz of images, in case it makes sense
-    buildnum=
-    if test -n "$RELEASE"; then
-	buildnum="-Build$RELEASE"
-    fi
-    imagearch=`uname -m`
-    imageout="$imagename.$imagearch-$imageversion"
-    for imgtype in $imagetype ; do
-	case "$imgtype" in
-	    oem) kiwi_post_oem   > $BUILD_ROOT/kiwi_post.sh ;;
-	    vmx) kiwi_post_vmx   > $BUILD_ROOT/kiwi_post.sh ;;
-	    xen) kiwi_post_xen   > $BUILD_ROOT/kiwi_post.sh ;;
-	    pxe) kiwi_post_pxe   > $BUILD_ROOT/kiwi_post.sh ;;
-	    iso) kiwi_post_iso   > $BUILD_ROOT/kiwi_post.sh ;;
-	    tbz) kiwi_post_tbz   > $BUILD_ROOT/kiwi_post.sh ;;
-	    *) kiwi_post_unknown > $BUILD_ROOT/kiwi_post.sh ;;
-	esac
-	cat >> $BUILD_ROOT/kiwi_post.sh <<-EOF
-		cd /$TOPDIR/KIWI-$imgtype
-		if [ -e "$imageout.channel" ]; then
-		    echo "Found kiwi channel list file, exporting as well..."
-		    cp "$imageout.channel" "/$TOPDIR/OTHER/$imageout$buildnum-$imgtype.channel"
-		fi
-		if [ -e "$imageout.packages" ]; then
-		    echo "Found kiwi package list file, exporting as well..."
-		    cp "$imageout.packages" "/$TOPDIR/OTHER/$imageout$buildnum-$imgtype.packages"
-		fi
-		if [ -e "$imageout.verified" ]; then
-		    echo "Found rpm verification report, exporting as well..."
-		    cp "$imageout.verified" "/$TOPDIR/OTHER/$imageout$buildnum-$imgtype.verified"
-		fi
-		EOF
-	chroot $BUILD_ROOT su -c "sh -e /kiwi_post.sh" || cleanup_and_exit 1
-	rm -f $BUILD_ROOT/kiwi_post.sh
-    done
 }
 
 recipe_build_kiwi() {
