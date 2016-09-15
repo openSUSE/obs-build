@@ -347,6 +347,26 @@ run_suse_isolinux() {
     done
 }
 
+perform_product_bundle() {
+    pushd $BUILD_ROOT/$TOPDIR/KIWIROOT/main
+    for i in * ; do
+	test -e "$i" || continue
+	case $i in
+	    *.iso) if [ -x /usr/bin/sha256sum ]; then
+                       /usr/bin/sha256sum "$i" > "$i.sha256"
+                       mv "$i.sha256" $BUILD_ROOT/$TOPDIR/KIWI/.
+                   fi
+                   mv "$i" $BUILD_ROOT/$TOPDIR/KIWI/. ;;
+	    *.packages) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
+	    *.report) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
+	    scripts) ;;
+	    *0) ;;
+	    *) test -d $i -a "$drop_repo" != true  && mv $i $BUILD_ROOT/$TOPDIR/KIWI/. ;;
+	esac
+    done
+    popd
+}
+
 build_kiwi_product() {
     echo "running kiwi --create-instsource..."
     # runs always as abuild user
@@ -367,24 +387,8 @@ build_kiwi_product() {
 	chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX /usr/sbin/kiwi --root $TOPDIR/KIWIROOT $VERBOSE_OPTION --logfile terminal -p $TOPDIR/SOURCES --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
     fi
 
-    # move created product to correct destination
-    pushd $BUILD_ROOT/$TOPDIR/KIWIROOT/main
-    for i in * ; do
-	test -e "$i" || continue
-	case $i in
-	    *.iso) if [ -x /usr/bin/sha256sum ]; then
-                       /usr/bin/sha256sum "$i" > "$i.sha256"
-                       mv "$i.sha256" $BUILD_ROOT/$TOPDIR/KIWI/.
-                   fi
-                   mv "$i" $BUILD_ROOT/$TOPDIR/KIWI/. ;;
-	    *.packages) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
-	    *.report) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
-	    scripts) ;;
-	    *0) ;;
-	    *) test -d $i -a "$drop_repo" != true  && mv $i $BUILD_ROOT/$TOPDIR/KIWI/. ;;
-	esac
-    done
-    popd
+    # move created product to destination
+    perform_product_bundle
 }
 
 perform_image_build() {
