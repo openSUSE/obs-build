@@ -104,6 +104,7 @@ RUN_SHELL=
 CCACHE=
 DLNOSIGNATURE=
 CACHE_DIR=/var/cache/build
+MYHOSTNAME=
 
 
 # This is for insserv
@@ -375,6 +376,7 @@ usage () {
 cleanup_and_exit () {
     trap EXIT
     test -z "$1" && set 0
+    test -n "$2" && echo "$2"
     if test -z "$BUILD_OPTIONS_PARSED" ; then
 	# if we haven't parsed the options yet we do
 	# not know the correct build root. just exit.
@@ -629,34 +631,23 @@ copy_oldpackages() {
     done
 }
 
-become_root_or_fail() {
-    if test ! -w /root ; then
-	echo "You have to be root to use $0" >&2
-	exit 1
-    fi
-    cleanup_and_exit 1
-}
-
 mkdir_build_root() {
     # strip trailing slash
     test "$BUILD_ROOT" != / && BUILD_ROOT="${BUILD_ROOT%/}"
     if test -d "$BUILD_ROOT" ; then
 	# check if it is owned by root
 	if test -z "$RUNNING_IN_VM" -a \! -O "$BUILD_ROOT" -a "`stat -c %u $BUILD_ROOT`" -ne 0 ; then
-	    echo "BUILD_ROOT=$BUILD_ROOT must be owned by root. Exit..."
-	    cleanup_and_exit 1
+	    cleanup_and_exit 1 "BUILD_ROOT=$BUILD_ROOT must be owned by root. Exit..."
 	fi
     else
 	test "$BUILD_ROOT" != "${BUILD_ROOT%/*}" && mkdir -p "${BUILD_ROOT%/*}"
 	if ! mkdir $BUILD_ROOT ; then
-	    echo "can not create BUILD_ROOT=$BUILD_ROOT. Exit..."
-	    cleanup_and_exit 1
+	    cleanup_and_exit 1 "can not create BUILD_ROOT=$BUILD_ROOT. Exit..."
 	fi
     fi
 
     if test ! -w "$BUILD_ROOT" ; then
-	echo "Error: BUILD_ROOT=$BUILD_ROOT not writeable, try --clean."
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "Error: BUILD_ROOT=$BUILD_ROOT not writeable, try --clean."
     fi
 
     rm -rf "$BUILD_ROOT/.build.packages"
@@ -912,8 +903,7 @@ while test -n "$1"; do
       -uid)
 	needarg
 	if test -n "${ARG//[0-9:]/}" ; then
-	    echo "--uid argument must be uid:gid"
-	    cleanup_and_exit 1
+	    cleanup_and_exit 1 "--uid argument must be uid:gid"
 	fi
 	ABUILD_UID=${ARG%:*}
 	ABUILD_GID=${ARG#*:}
@@ -936,8 +926,7 @@ while test -n "$1"; do
 	DLNOSIGNATURE="--nosignature"
       ;;
       ---noarg)
-	echo "$ARG does not take an argument"
-	cleanup_and_exit 1
+	cleanup_and_exit 1 "$ARG does not take an argument"
       ;;
       -*)
 	if vm_parse_options "$@" ; then
@@ -945,8 +934,7 @@ while test -n "$1"; do
 	elif recipe_parse_options "$@" ; then
 	    set -- "${nextargs[@]}"
 	else
-	    echo "Unknown option '$PARAM'. Exit."
-	    cleanup_and_exit 1
+	    cleanup_and_exit 1 "Unknown option '$PARAM'. Exit."
 	fi
       ;;
       *)
@@ -990,11 +978,10 @@ if test -n "$KILL" ; then
         vm_kill
     else
 	if ! $BUILD_DIR/killchroot -s 9 $BUILD_ROOT ; then
-	    echo "could not kill build in $BUILD_ROOT"
-	    cleanup_and_exit 1
+	    cleanup_and_exit 1 "could not kill build in $BUILD_ROOT"
 	fi
     fi
-    cleanup_and_exit 0
+    cleanup_and_exit
 fi
 
 if test -n "$CLEAN_BUILD" ; then
@@ -1127,8 +1114,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     #
     cd "$SRCDIR"
     if ! test -s "$RECIPEFILE" ; then
-	 echo "$RECIPEFILE is empty.  This should not happen..."
-	 cleanup_and_exit 1
+	 cleanup_and_exit 1 "$RECIPEFILE is empty.  This should not happen..."
     fi
     MYSRCDIR="$SRCDIR"
 
@@ -1161,7 +1147,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 
     if test -n "$VM_TYPE" -a -z "$RUNNING_IN_VM"; then
 	vm_first_stage
-	cleanup_and_exit 0
+	cleanup_and_exit
     fi
 
     if test "$DO_INIT" = true ; then
@@ -1190,8 +1176,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
             # ensure that old stat is not failing (RHEL4)
             if df $BUILD_ROOT 2>/dev/null | grep -q "100%"; then
 		df -h $BUILD_ROOT
-		echo "build does not work on a completely full filesystem"
-		cleanup_and_exit 1
+		cleanup_and_exit 1 "build does not work on a completely full filesystem"
 	    fi
 	fi
 	mount -n -tproc none $BUILD_ROOT/proc || true
@@ -1306,8 +1291,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
             VM_TELNET_DEVICE=${VM_TELNET_DEVICE#lo }
             VM_TELNET_DEVICE=${VM_TELNET_DEVICE%% *}
 	    if test -z "$VM_TELNET_DEVICE"; then
-	           echo "ERROR: no network device found for telnet server"
-                   cleanup_and_exit 1
+	           cleanup_and_exit 1 "ERROR: no network device found for telnet server"
             fi
             if test -x /sbin/ip ; then
                    ip addr add 10.0.2.15/8 dev ${VM_TELNET_DEVICE}
@@ -1315,8 +1299,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
                    ip link set ${VM_TELNET_DEVICE} up
             else
 	           if ! test -x /sbin/ifconfig ; then
-	              echo "ERROR: /usr/sbin/in.telnetd is not running, please specify right package via -x option"
-                      cleanup_and_exit 1
+	              cleanup_and_exit 1 "ERROR: /usr/sbin/in.telnetd is not running, please specify correct package via -x option"
                    fi
                    ifconfig ${VM_TELNET_DEVICE} 10.0.2.15 up
                    ifconfig ${VM_TELNET_DEVICE} add ::1/24
@@ -1328,10 +1311,9 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	if test -n "$VM_TELNET"; then
 	    echo WARNING: telnet option used, setting up telnet server ${VM_TELNET_DEVICE}
 	    if test -x /usr/sbin/in.telnetd; then
-	       ( /usr/sbin/in.telnetd -L /.build/telnet_login_wrapper -debug 23 & )
+		( /usr/sbin/in.telnetd -L /.build/telnet_login_wrapper -debug 23 & )
 	    else
-		echo "ERROR: /usr/sbin/in.telnetd is not running, please specify right package via -x option"
-                cleanup_and_exit 1
+		cleanup_and_exit 1 "ERROR: /usr/sbin/in.telnetd is not running, please specify right package via -x option"
 	    fi
 	fi
     fi

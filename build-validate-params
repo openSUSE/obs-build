@@ -41,8 +41,7 @@ validate_init() {
 	    validate_buildroot[${#validate_buildroot[@]}]="$_flag"
 	    ;;
 	*)
-	    echo "unknown directive in $cf: $_key"
-	    cleanup_and_exit 1
+	    cleanup_and_exit 1 "unknown directive in $cf: $_key"
 	    ;;
 	  esac
     done < "$cf"
@@ -70,11 +69,10 @@ validate_param() {
     done
     if test -z "$ok" ; then
 	if test -n "$envvar" ; then
-	    echo "build: environment variable $envvar=$arg not allowed"
+	    cleanup_and_exit 1 "build: environment variable $envvar=$arg not allowed"
 	else
-	    echo "build: parameter --$param $arg not allowed"
+	    cleanup_and_exit 1 "build: parameter --$param $arg not allowed"
 	fi
-	cleanup_and_exit 1
     fi
 }
 
@@ -99,8 +97,7 @@ validate_buildroot() {
 	fi
     done
     if test -z "$ok" ; then
-	echo "$error"
-	cleanup_and_exit 1
+	cleanup_and_exit 1 "$error"
     fi
 }
 
