@@ -30,6 +30,11 @@ if test "$0" = /sbin/init ; then
     exec /.build/build "$@"
 fi
 
+BUILD_CONF=/etc/build.conf
+
+# ignore BUILD_DIR if we have a config
+test -e "$BUILD_CONF" && BUILD_DIR=/usr/lib/build
+
 test -z "$BUILD_DIR" -a -e /.build/build.data -a -z "$BUILD_IGNORE_2ND_STAGE" && BUILD_DIR=/.build
 test -z "$BUILD_DIR" && BUILD_DIR=/usr/lib/build
 test -z "$BUILD_ROOT" && BUILD_ROOT=/var/tmp/build-root
@@ -52,6 +57,9 @@ old_packages=()
 # slurp in package binary support
 . "$BUILD_DIR/build-pkg"
 
+# slurp in validation support
+. "$BUILD_DIR/build-validate-params"
+
 # need to restore build root owner for non-root builds
 browner=
 
@@ -59,6 +67,7 @@ browner=
 ABUILD_UID=399
 ABUILD_GID=399
 
+BUILD_OPTIONS_PARSED=
 DO_INIT=true
 DO_INIT_TOPDIR=true
 DO_LINT=
@@ -67,6 +76,7 @@ CLEAN_BUILD=
 RECIPEFILES=()
 SRCDIR=
 BUILD_JOBS=
+BUILD_THREADS=
 ABUILD_TARGET=
 CREATE_BASELIBS=
 USEUSEDFORBUILD=
@@ -365,6 +375,11 @@ usage () {
 cleanup_and_exit () {
     trap EXIT
     test -z "$1" && set 0
+    if test -z "$BUILD_OPTIONS_PARSED" ; then
+	# if we haven't parsed the options yet we do
+	# not know the correct build root. just exit.
+	exit $1
+    fi
     rm -f $BUILD_ROOT/exit
     if test "$1" -eq 1 -a -x /bin/df ; then
         echo
@@ -707,6 +722,8 @@ needarg() {
     fi
 }
 
+validate_init "$BUILD_CONF"
+
 while test -n "$1"; do
     PARAM="$1"
     ARG="$2"
@@ -745,6 +762,11 @@ while test -n "$1"; do
       -arch)
 	needarg
 	BUILD_ARCH="$ARG"
+	shift
+      ;;
+      -hostarch|-host-arch)
+	needarg
+	BUILD_HOST_ARCH="$ARG"
 	shift
       ;;
       -verify)
@@ -889,13 +911,12 @@ while test -n "$1"; do
       ;;
       -uid)
 	needarg
-	ABUILD_ID="$ARG"
-	if test -n "${ABUILD_ID//[0-9:]/}" ; then
+	if test -n "${ARG//[0-9:]/}" ; then
 	    echo "--uid argument must be uid:gid"
-	    cleanup_and_exit
+	    cleanup_and_exit 1
 	fi
-	ABUILD_UID=${ABUILD_ID%:*}
-	ABUILD_GID=${ABUILD_ID#*:}
+	ABUILD_UID=${ARG%:*}
+	ABUILD_GID=${ARG#*:}
 	shift
       ;;
       -rpmlist)
@@ -916,7 +937,7 @@ while test -n "$1"; do
       ;;
       ---noarg)
 	echo "$ARG does not take an argument"
-	cleanup_and_exit
+	cleanup_and_exit 1
       ;;
       -*)
 	if vm_parse_options "$@" ; then
@@ -930,9 +951,31 @@ while test -n "$1"; do
       ;;
       *)
 	RECIPEFILES[${#RECIPEFILES[@]}]="$PARAM"
+	# skip validation
+	PARAM=
       ;;
     esac
+    if test -n "$PARAM" ; then
+	validate_param "$PARAM" "$ARG"
+    fi
 done
+
+# validate params coming from the environment
+test -n "$BUILD_ARCH" && validate_param "--arch" "$BUILD_ARCH" BUILD_ARCH
+test -n "$BUILD_HOST_ARCH" && validate_param "--hostarch" "$BUILD_HOST_ARCH" BUILD_HOST_ARCH
+test -n "$BUILD_RPMS" && validate_param "--rpms" "$BUILD_RPMS" BUILD_RPMS
+test -n "$BUILD_EXTRA_PACKS" && validate_param "--extrapacks" "$BUILD_EXTRA_PACKS" BUILD_EXTRA_PACKS
+test -n "$BUILD_DIST" && validate_param "--dist" "$BUILD_DIST" BUILD_DIST
+test -n "$VERIFY_BUILD_SYSTEM" && validate_param "--verify" "$VERIFY_BUILD_SYSTEM" VERIFY_BUILD_SYSTEM
+test -n "$BUILD_RPM_BUILD_STAGE" && validate_param "--stage" "$BUILD_RPM_BUILD_STAGE" BUILD_RPM_BUILD_STAGE
+test "$BUILD_ROOT" != /var/tmp/build-root && validate_param "--root" "$BUILD_ROOT" BUILD_ROOT
+test "$CONFIG_DIR" != "$BUILD_DIR/configs" && validate_param "--configdir" "$CONFIG_DIR" CONFIG_DIR
+
+# validate the buildroot
+validate_buildroot "$BUILD_ROOT"
+
+# done option parsing
+BUILD_OPTIONS_PARSED=true
 
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage

@@ -50,11 +50,14 @@ VM_NETDEVOPT=()
 VM_DEVICEOPT=()
 VM_TELNET=
 VM_CONSOLE_INPUT=
+VM_USER=
 VMDISK_ROOTSIZE=4096
 VMDISK_SWAPSIZE=1024
 VMDISK_FILESYSTEM=
 VMDISK_MOUNT_OPTIONS=__default
 VMDISK_CLEAN=
+VM_VOLUME_NAME=
+VM_VOLUME_SWAP=
 
 # zvm specific?
 VM_WORKER_NR=
@@ -456,6 +459,7 @@ vm_detect_2nd_stage() {
     if test -z "$VM_TYPE" ; then
 	return 1
     fi
+    BUILD_OPTIONS_PARSED=true
     if test $$ -eq 1 || test $$ -eq 2 ; then
 	# ignore special init signals if we're init
 	# we're using ' ' instead of '' so that the signal handlers

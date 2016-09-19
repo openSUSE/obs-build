@@ -1,0 +1,106 @@
+#
+# parameter validation functions
+#
+################################################################
+#
+# Copyright (c) 2016 SUSE LLC
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+validate_param=()
+validate_buildroot=()
+
+validate_init() {
+    local cf="$1"
+    if ! test -f "$cf" ; then
+	return
+    fi
+    local _key _flag _arg
+    while read _key _flag _arg; do
+	case $_key in
+	\#* | '')
+	    continue ;;
+	ALLOW_PARAM:)
+	    validate_param[${#validate_param[@]}]="${_flag#--} $_arg"
+	    ;;
+	ALLOW_BUILD_ROOT:)
+	    validate_buildroot[${#validate_buildroot[@]}]="$_flag"
+	    ;;
+	*)
+	    echo "unknown directive in $cf: $_key"
+	    cleanup_and_exit 1
+	    ;;
+	  esac
+    done < "$cf"
+}
+
+validate_param() {
+    local param="$1"
+    local arg="$2"
+    local envvar="$3"
+
+    if test ${#validate_param[@]} -eq 0 ; then
+	return
+    fi
+    param=${param#-}
+    param=${param#-}
+    local t ok=
+    for t in "${validate_param[@]}" ; do
+	local targ="${t#$param }"
+	if test "$t" != "$targ" ; then
+	    if test -z "$targ" -o "$targ" == "$arg" ; then
+		ok=true
+		break
+	    fi
+	fi
+    done
+    if test -z "$ok" ; then
+	if test -n "$envvar" ; then
+	    echo "build: environment variable $envvar=$arg not allowed"
+	else
+	    echo "build: parameter --$param $arg not allowed"
+	fi
+	cleanup_and_exit 1
+    fi
+}
+
+validate_buildroot() {
+    local br="$1"
+
+    if test ${#validate_buildroot[@]} -eq 0 ; then
+	return
+    fi
+    local user=${SUDO_USER:-$USER}
+    local t ok= error="Build root $br not allowed for user $user"
+    for t in "${validate_buildroot[@]}" ; do
+	t=${t//\%user/$user}
+	t=$(readlink -m "$t")
+        if [[ "$br" == $t ]] ; then
+	    local tp=$(readlink -m "${t%/*}")
+	    if test -d "$tp" ; then
+		ok=true
+		break
+	    fi
+	    error="Directory $tp does not exist"
+	fi
+    done
+    if test -z "$ok" ; then
+	echo "$error"
+	cleanup_and_exit 1
+    fi
+}
+

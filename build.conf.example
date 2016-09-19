@@ -1,0 +1,27 @@
+# Example configuration for buildroot and parameter whitelisting.
+# Can be used to make multi-user environments more secure. Everything is
+# allowed by default if no whitelist is defined.
+#
+# List of whitelisted build roots.
+# %user will be replaced with $SUDO_USER (or $USER when running without sudo)
+#
+# ALLOW_BUILD_ROOT: /var/tmp/%user/build-root
+# ALLOW_BUILD_ROOT: /var/tmp/build-root
+
+# List of whitelisted parameters. Allowed parameters
+# must be listed in double dash format.
+#
+# ALLOW_PARAM:    --arch
+# ALLOW_PARAM:    --changelog
+# ALLOW_PARAM:    --clean
+# ALLOW_PARAM:    --dist
+# ALLOW_PARAM:    --jobs
+# ALLOW_PARAM:    --noinit
+# ALLOW_PARAM:    --norootforbuild
+# ALLOW_PARAM:    --root
+# ALLOW_PARAM:    --rpmlist
+#
+# Specific parameter arguments can be whitelisted (other arguments
+# are not allowed in that case):
+#
+# ALLOW_PARAM:    --jobs 1
