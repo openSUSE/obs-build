@@ -63,6 +63,7 @@ install:
 	    signdummy \
 	    unrpm \
 	    telnet_login_wrapper \
+	    build-validate-params \
 	    $(DESTDIR)$(pkglibdir)
 	install -m755 emulator/emulator.sh $(DESTDIR)$(pkglibdir)/emulator/
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build
