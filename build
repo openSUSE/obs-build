@@ -89,6 +89,7 @@ REASON=
 NOROOTFORBUILD=
 LOGFILE=
 KILL=
+DO_WIPE=false
 CHANGELOG=
 BUILD_DEBUG=
 INCARNATION=
@@ -157,6 +158,8 @@ Known Parameters:
               the build root.
 
   --clean     Delete old build root before initializing it
+
+  --wipe      Completely removes build root and exits.
 
   --no-init   Skip initialization of build root and start with build
               immediately.
@@ -689,6 +692,20 @@ run_rsync() {
     fi
 }
 
+wipe_build_root() {
+    echo "Wiping build root: '$BUILD_ROOT'"
+
+    # unmount all mounts still in the build root path
+    for m in $(cat /proc/mounts | grep "$BUILD_ROOT" | awk '{ print $2 }'); do
+        if ! umount -n "$m" 2>/dev/null ; then
+            echo "Failed to umount "$m", cannot wipe buildroot"
+            exit 1
+        fi
+    done
+
+    rm -rf $BUILD_ROOT
+}
+
 #### main ####
 
 trap fail_exit EXIT
@@ -741,6 +758,9 @@ while test -n "$1"; do
       ;;
       -clean)
 	CLEAN_BUILD='--clean'
+      ;;
+      -wipe)
+	DO_WIPE=true
       ;;
       -kill)
 	KILL=true
@@ -964,6 +984,11 @@ validate_buildroot "$BUILD_ROOT"
 
 # done option parsing
 BUILD_OPTIONS_PARSED=true
+
+if test "$DO_WIPE" = true ; then
+    wipe_build_root
+    cleanup_and_exit 0
+fi
 
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
