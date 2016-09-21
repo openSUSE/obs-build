@@ -29,6 +29,8 @@ zvm_param="root=/dev/disk/by-path/ccw-0.0.0150-part1 hvc_iucv=8 console=hvc0"
 zvm_mult_pass="THR4ME"
 zvm_init_script="/.build/build"
 
+ZVM_CLEANUP=
+
 #######################################################################################
 
 # this once was in zvm_functions
@@ -262,12 +264,10 @@ vm_verify_options_zvm() {
     fi
     # z/VM guest name that is already defined in z/VM
     if test -z "$VM_WORKER" ; then
-	echo "ERROR: No z/VM worker id specified"
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "ERROR: No z/VM worker id specified"
     fi
     if test -z "$VM_WORKER_NR" ; then
-	echo "ERROR: No z/VM worker number specified"
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "ERROR: No z/VM worker number specified"
     fi
     # need the name for a kernel in zvm
     if test -n "$VM_KERNEL" ; then
@@ -275,16 +275,14 @@ vm_verify_options_zvm() {
     elif test -e "/boot/vmlinux.gz" ; then
 	vm_kernel="/boot/vmlinux.gz"
     else
-	echo "ERROR: No z/VM kernel specified"
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "ERROR: No z/VM kernel specified"
     fi
     # need the name for an initrd in zvm
     # this normally will not be the local initrd
     if test -n "$VM_INITRD" ; then
 	vm_initrd="$VM_INITRD"
     else
-	echo "ERROR: No z/VM initrd specified"
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "ERROR: No z/VM initrd specified"
     fi
     zvm_cp worker_init $VM_WORKER $VM_VOLUME_ROOT $VM_VOLUME_SWAP $VM_WORKER_NR
     zvm_cp volume_detach $VM_WORKER $VM_VOLUME_ROOT
@@ -311,8 +309,7 @@ vm_startup_zvm() {
 vm_kill_zvm() {
     if vmcp q "$VM_WORKER" > /dev/null 2>&1 ; then
 	if ! zvm_cp destroy $VM_WORKER ; then
-	    echo "could not kill zvm worker $VM_WORKER"
-	    cleanup_and_exit 1
+	    cleanup_and_exit 1 "could not kill zvm worker $VM_WORKER"
 	fi
     fi
 }
@@ -334,8 +331,7 @@ vm_fixup_zvm() {
 vm_attach_root_zvm() {
     VM_IMAGE=$(ZVM_CLEANUP=1 zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_ROOT $zvm_mult_pass $VM_WORKER_NR )
     if test "${VM_IMAGE}" = "${VM_IMAGE#dasd}" ; then
-	echo "did not get a real device for VM_IMAGE: $VM_IMAGE"
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "did not get a real device for VM_IMAGE: $VM_IMAGE"
     fi
     VM_IMAGE="/dev/$VM_IMAGE"
 }
@@ -343,8 +339,7 @@ vm_attach_root_zvm() {
 vm_attach_swap_zvm() {
     VM_SWAP=$(ZVM_CLEANUP=1 zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_SWAP $zvm_mult_pass $VM_WORKER_NR )
     if test "${VM_SWAP}" = "${VM_SWAP#dasd}" ; then
-	echo "did not get a real device for VM_SWAP: $VM_SWAP"
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "did not get a real device for VM_SWAP: $VM_SWAP"
     fi
     VM_SWAP="/dev/$VM_SWAP"
 }

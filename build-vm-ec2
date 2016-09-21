@@ -57,8 +57,7 @@ cloud_volume_detach_ec2() {
 vm_verify_options_ec2() {
     # verify settings
     if test -z "$AWS_ACCESS_KEY" -o -z "$AWS_ACCESS_KEY" ; then
-        echo "ERROR: No amazon EC2 environment set. Set AWS_ACCESS_KEY and AWS_SECRET_KEY."
-        cleanup_and_exit 3
+        cleanup_and_exit 3 "ERROR: No amazon EC2 environment set. Set AWS_ACCESS_KEY and AWS_SECRET_KEY."
     fi
     . /etc/profile.d/ec2.sh
     EC2_INSTANCE_ID=`ec2-instance-id`
@@ -77,20 +76,16 @@ vm_verify_options_ec2() {
         us-gov-west-1)  BUILD_EC2_AKI=aki-79a4c05a ;;
     esac
     if test -z "$BUILD_EC2_AKI" ; then
-        echo "Unknown Amazon EC2 Zone: $BUILD_EC2_ZONE"
-	cleanup_and_exit 1
+	cleanup_and_exit 1 "Unknown Amazon EC2 Zone: $BUILD_EC2_ZONE"
     fi
     if test -z "$BUILD_EC2_AKI" ; then
-        echo "ERROR: No image refering to kernel and ramdisk is defined in BUILD_EC2_AKI env."
-        cleanup_and_exit 3
+        cleanup_and_exit 3 "ERROR: No image refering to kernel and ramdisk is defined in BUILD_EC2_AKI env."
     fi
     if test -z "$VM_VOLUME_NAME" ; then
-        echo "ERROR: No worker root VM volume name specified."
-        cleanup_and_exit 3
+        cleanup_and_exit 3 "ERROR: No worker root VM volume name specified."
     fi
     if test -z "$VM_VOLUME_SWAP" ; then
-        echo "ERROR: No worker swap VM volume name specified."
-        cleanup_and_exit 3
+        cleanup_and_exit 3 "ERROR: No worker swap VM volume name specified."
     fi
 
     VM_SWAPDEV=/dev/sdb1	# in the vm
@@ -154,8 +149,7 @@ vm_cleanup_ec2() {
 vm_kill_ec2() {
     if ec2-describe-instance-status "$VM_BUILD_INSTANCE" --region "$BUILD_EC2_REGION" >/dev/null 2>&1 ; then
 	if ec2-terminate-instances "$VM_BUILD_INSTANCE" >/dev/null 2>&1 ; then
-	    echo "could not kill EC2 instance $VM_BUILD_INSTANCE"
-	    cleanup_and_exit 1
+	    cleanup_and_exit 1 "could not kill EC2 instance $VM_BUILD_INSTANCE"
 	fi
     fi
 }
@@ -163,8 +157,7 @@ vm_kill_ec2() {
 vm_startup_ec2() {
     EC2_SNAP_root=`ec2-create-snapshot --region "$BUILD_EC2_REGION" "$VM_VOLUME_NAME" | awk '{ print $2 }'`
     if test "$EC2_SNAP_root" = "${EC2_SNAP_root#snap-}" ; then
-	echo "ERROR: Failed to create snapshot for root disk $VM_VOLUME_NAME"
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "ERROR: Failed to create snapshot for root disk $VM_VOLUME_NAME"
     fi
     EC2_SNAP_swap=`ec2-create-snapshot --region "$BUILD_EC2_REGION" "$VM_VOLUME_SWAP" | awk '{ print $2 }'`
     if test "$EC2_SNAP_swap" = "${EC2_SNAP_swap#snap-}" ; then

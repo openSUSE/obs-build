@@ -167,8 +167,7 @@ recipe_build_snapcraft() {
 
     # Fail the build if no build results are found
     if [ -z "${build_results}" ] ; then
-	echo "No live-build result found"
-	cleanup_and_exit 1
+	cleanup_and_exit 1 "No live-build result found"
     fi
 
     # move created products (and their metadata files) to destination

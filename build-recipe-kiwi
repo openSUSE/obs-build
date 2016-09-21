@@ -322,8 +322,7 @@ recipe_setup_kiwi() {
 	    cp -lR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
 	fi
 	if test "$?" != 0 ; then 
-	    echo "source copy failed"
-	    cleanup_and_exit 1
+	    cleanup_and_exit 1 "source copy failed"
 	fi
     fi
 

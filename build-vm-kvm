@@ -30,30 +30,20 @@ kvm_serial_device=
 kvm_rng_device=virtio-rng-pci
 kvm_options=
 
-function complain()
-{
-    local ex=$1; shift
-    printf "Error: %s\n" "$@" >&2
-    cleanup_and_exit $ex
-}
-
 kvm_check_ppc970() {
     if ! grep -q -E '(kvm_rma_count.*kvm_hpt_count)|(kvm_hpt_count.*kvm_rma_count)' /proc/cmdline ; then 
-	echo "put kvm_rma_count=<VM number> or kvm_hpt_count=<> to your boot options"
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "put kvm_rma_count=<VM number> or kvm_hpt_count=<> to your boot options"
     fi
 }
 
 kvm_check_hugetlb() {
     if ! grep -q "$HUGETLBFSPATH" /proc/mounts ; then
-	echo "hugetlbfs is not mounted to $HUGETLBFSPATH"
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "hugetlbfs is not mounted to $HUGETLBFSPATH"
     fi
     local HUGETLBBLKSIZE=$(stat -f -c "%S" "$HUGETLBFSPATH")
     HUGETLBBLKSIZE=$(( ${HUGETLBBLKSIZE:-0} / 1024 ))
     if test "$HUGETLBBLKSIZE" -lt 1 -o ! -e  "/sys/kernel/mm/hugepages/hugepages-${HUGETLBBLKSIZE}kB" ; then
-	echo "could not determine hugetlbfs block size"
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "could not determine hugetlbfs block size"
     fi
     local PAGES_FREE=$(cat /sys/kernel/mm/hugepages/hugepages-${HUGETLBBLKSIZE}kB/free_hugepages)
     local PAGES_REQ=$(( ${VM_MEMSIZE:-64} * 1024 / $HUGETLBBLKSIZE ))
@@ -222,7 +212,7 @@ vm_startup_kvm() {
     qemu_bin="$kvm_bin"
     qemu_args=(-drive file="$VM_IMAGE",format=raw,if=none,id=disk,serial=0,cache=unsafe -device "$kvm_device",drive=disk)
     if [ -n "$VM_USER" ] ; then
-	getent passwd "$VM_USER" > /dev/null || complain 22 "cannot find KVM user '$VM_USER'"
+	getent passwd "$VM_USER" > /dev/null || cleanup_and_exit 3 "cannot find KVM user '$VM_USER'"
     else
 	# use qemu user by default if available
 	getent passwd qemu >/dev/null && VM_USER=qemu
@@ -282,8 +272,7 @@ vm_startup_kvm() {
 
 vm_kill_kvm() {
     if ! fuser -k -TERM "$VM_IMAGE" ; then
-	echo "could not kill build in $VM_IMAGE"
-	cleanup_and_exit 1
+	cleanup_and_exit 1 "could not kill build in $VM_IMAGE"
     fi
 }
 

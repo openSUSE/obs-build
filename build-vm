@@ -146,8 +146,7 @@ vm_parse_options() {
 	    ;;
 	    none|chroot) VM_TYPE= ;;
 	    *)
-		echo "VM '$VM_TYPE' is not supported"
-		cleanup_and_exit
+		cleanup_and_exit 1 "VM '$VM_TYPE' is not supported"
 	    ;;
 	esac
 	shift
@@ -346,8 +345,7 @@ vm_img_mkfs() {
     eval "tunefs=\"\$vm_img_tunefs_${fs}\""
 
     if test -z "$mkfs"; then
-	echo "filesystem \"$fs\" is not supported"
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "filesystem \"$fs\" is not supported"
     fi
 
     echo "Creating $fs filesystem on $img"
@@ -442,7 +440,7 @@ vm_set_personality_syscall() {
 	sparc*) PERSONALITY_SYSCALL=191 ;;
 	ia64*) PERSONALITY_SYSCALL=1140 ;;
 	i?86*|ppc*|aarch64*|arm*|sh4|cris|m68k*|s390*|unicore32|microblaze)   PERSONALITY_SYSCALL=136 ;;
-	*) echo "Unknown architecture personality: '$archname'"; cleanup_and_exit 1 ;;
+	*) cleanup_and_exit 1 "Unknown architecture personality: '$archname'" ;;
     esac
 }
 
@@ -611,8 +609,7 @@ vm_setup() {
 	vm_img_create "$VM_SWAP" "$VMDISK_SWAPSIZE"
     fi
     if test ! -e "$VM_IMAGE" ; then
-	echo "you need to create $VM_IMAGE first"
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "you need to create $VM_IMAGE first"
     fi
     if test -n "$CLEAN_BUILD" ; then
 	vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE" || cleanup_and_exit 3

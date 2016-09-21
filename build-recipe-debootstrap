@@ -49,8 +49,7 @@ recipe_build_debootstrap() {
     echo "running debootstrap..."
     if ! "$@" || ! chroot $BUILD_ROOT dpkg --configure -a; then
         cat $BUILD_ROOT/debootstrap/debootstrap.log
-        echo "Failed to setup debootstrap chroot"
-        cleanup_and_exit 1
+        cleanup_and_exit 1 "Failed to setup debootstrap chroot"
     fi
 
     # adapt passwd

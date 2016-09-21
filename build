@@ -362,8 +362,7 @@ EOT
 }
 
 usage () {
-    echo "Usage: `basename $0` [--no-init|--clean|--rpms path|--verify|--help] [dir-to-build|recipe-to-build]"
-    cleanup_and_exit 1
+    cleanup_and_exit 1 "Usage: `basename $0` [--no-init|--clean|--rpms path|--verify|--help] [dir-to-build|recipe-to-build]"
 }
 
 #
@@ -376,7 +375,13 @@ usage () {
 cleanup_and_exit () {
     trap EXIT
     test -z "$1" && set 0
-    test -n "$2" && echo "$2"
+    if test -n "$2" ; then
+	if "$1" -ne 0 ; then
+	    echo "$2" >&2
+	else
+	    echo "$2"
+	fi
+    fi
     if test -z "$BUILD_OPTIONS_PARSED" ; then
 	# if we haven't parsed the options yet we do
 	# not know the correct build root. just exit.
@@ -708,8 +713,7 @@ export HOST
 
 needarg() {
     if test -z "$ARG" ; then
-	echo "$PARAM needs an agrument" >&2
-	cleanup_and_exit 1
+	cleanup_and_exit 1 "$PARAM needs an agrument"
     fi
 }
 

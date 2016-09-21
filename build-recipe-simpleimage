@@ -79,7 +79,7 @@ recipe_build_simpleimage() {
     rm -f $BUILD_ROOT/.build.packages
     ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
     test -d "$SRCDIR" && cd "$SRCDIR"
-    cleanup_and_exit 0
+    cleanup_and_exit
 }
 
 recipe_resultdirs_simpleimage() {

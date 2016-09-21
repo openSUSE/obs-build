@@ -36,8 +36,7 @@ vm_startup_uml() {
 
 vm_kill_uml() {
     if ! fuser -k -TERM "$VM_IMAGE"; then
-        echo "could not kill build in $VM_IMAGE"
-        cleanup_and_exit 1
+        cleanup_and_exit 1 "could not kill build in $VM_IMAGE"
     fi
 }
 

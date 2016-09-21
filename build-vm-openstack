@@ -75,24 +75,19 @@ cloud_volume_detach_openstack() {
 vm_verify_options_openstack() {
     # verify settings
     if test -z "$OS_AUTH_URL" ; then
-	echo "ERROR: No openstack environment set. This vm-type works only inside of an openstack VM."
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "ERROR: No openstack environment set. This vm-type works only inside of an openstack VM."
     fi
     if test -z "$OBS_OPENSTACK_KERNEL_IMAGE_ID" ; then
-	echo "ERROR: No image refering to kernel and ramdisk is defined in OBS_OPENSTACK_KERNEL_IMAGE_ID env."
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "ERROR: No image refering to kernel and ramdisk is defined in OBS_OPENSTACK_KERNEL_IMAGE_ID env."
     fi
     if test -z "$VM_VOLUME_NAME" ; then
-	echo "ERROR: No worker root VM volume name specified."
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "ERROR: No worker root VM volume name specified."
     fi
     if test -z "$VM_VOLUME_SWAP" ; then
-	echo "ERROR: No worker swap VM volume name specified."
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "ERROR: No worker swap VM volume name specified."
     fi
     if test -z "$VM_SERVER" ; then
-	echo "ERROR: No VM server nod name specified (usually this instance)."
-	cleanup_and_exit 3
+	cleanup_and_exit 3 "ERROR: No VM server nod name specified (usually this instance)."
     fi
 
     # XXX why here?
@@ -133,8 +128,7 @@ vm_fixup_openstack() {
 vm_kill_openstack() {
     if nova show "$VM_VOLUME_NAME" >/dev/null 2>&1 ; then
 	if ! nova delete "$VM_VOLUME_NAME" ; then
-	    echo "could not kill openstack vm build $VM_VOLUME_NAME"
-            cleanup_and_exit 1
+            cleanup_and_exit 1 "could not kill openstack vm build $VM_VOLUME_NAME"
 	fi
     fi
 }

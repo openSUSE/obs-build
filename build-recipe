@@ -79,8 +79,7 @@ recipe_set_buildtype() {
         *.livebuild) BUILDTYPE=livebuild ;;
     esac
     if test -z "$BUILDTYPE" ; then
-       echo "I don't know how to build $RECIPEFILE"
-       cleanup_and_exit 1
+       cleanup_and_exit 1 "I don't know how to build $RECIPEFILE"
     fi
     # we can't query right after vm startup, so we put the BUILDENGINE in the build.data
     if test -z "$RUNNING_IN_VM" ; then
@@ -142,7 +141,6 @@ expand_recipe_directories() {
 	fi
     done
     if test -z "$RECIPEFILES" ; then
-	echo "no recipe files found in $@. exit..."
-	cleanup_and_exit 1
+	cleanup_and_exit 1 "no recipe files found in $@. exit..."
     fi
 }

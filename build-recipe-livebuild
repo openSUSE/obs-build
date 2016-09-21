@@ -171,8 +171,7 @@ recipe_build_livebuild() {
     # Sanity check to not configure archives inside configuration
     files=($BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT/config/archives/*)
     if [ ${#files[@]} -gt 0 ]; then
-        echo "E: No configuration in config/archives/* allowed"
-        cleanup_and_exit 1
+        cleanup_and_exit 1 "E: No configuration in config/archives/* allowed"
     fi
 
     # TODO: Add the repository public key
@@ -226,8 +225,7 @@ recipe_build_livebuild() {
 
     # Fail the build if no build results are found
     if [ -z "${build_results}" ] ; then
-	echo "No live-build result found"
-	cleanup_and_exit 1
+	cleanup_and_exit 1 "No live-build result found"
     fi
 
     # move created products (and their metadata files) to destination

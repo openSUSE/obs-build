@@ -24,8 +24,7 @@
 recipe_setup_spec() {
     TOPDIR=`chroot $BUILD_ROOT su -c "rpm --eval '%_topdir'" - $BUILD_USER`
     if test -z "$TOPDIR"; then
-	echo "Error: TOPDIR empty"
-	cleanup_and_exit 1
+	cleanup_and_exit 1 "Error: TOPDIR empty"
     fi
     test "$DO_INIT_TOPDIR" = false || rm -rf "$BUILD_ROOT$TOPDIR"
     for i in BUILD RPMS/`uname -m` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS BUILDROOT OTHER ; do
@@ -167,8 +166,7 @@ recipe_unpack_srcrpm() {
     mkdir -p "$MYSRCDIR"
     cd $MYSRCDIR || cleanup_and_exit 1
     $BUILD_DIR/unrpm -q $SRCDIR/$RECIPEFILE || {
-	echo "could not unpack $RECIPEFILE."
-	cleanup_and_exit 1
+	cleanup_and_exit 1 "could not unpack $RECIPEFILE."
     }
     for RECIPEFILE in *.spec ; do : ; done
 }
@@ -185,8 +183,7 @@ recipe_check_file_owners() {
         fi
     done < <(rpm -qp --qf '[%{FILEUSERNAME} %{FILEGROUPNAME} %{FILENAMES}\n]' $RPMS)
     if test -n "$BADFILE" ; then
-        echo "please fix your filelist (e.g. add defattr)"
-        cleanup_and_exit 1
+        cleanup_and_exit 1 "please fix your filelist (e.g. add defattr)"
     fi
 }
 
