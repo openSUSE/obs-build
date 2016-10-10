@@ -463,7 +463,7 @@ perform_image_bundle() {
     fi
 
     rm -rf "/$TOPDIR/KIWI.bundle"
-    if [ "$legacy" = "true" ]; then    
+    if [ "$legacy" = "true" ]; then
         bundle_call="/usr/sbin/kiwi --bundle-build $TOPDIR/KIWI-$imgtype"
         bundle_call="$bundle_call -d /$TOPDIR/KIWI.bundle/"
         bundle_call="$bundle_call --bundle-id ${kiwi_profile}Build$RELEASE"
