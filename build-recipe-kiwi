@@ -457,12 +457,13 @@ perform_image_bundle() {
     local profile=$3
     local bundle_call
 
+    kiwi_profile=""
+    if [ "$profile" != "__not__set" ]; then
+        kiwi_profile="${profile}-"
+    fi
+
     rm -rf "/$TOPDIR/KIWI.bundle"
-    if [ "$legacy" = "true" ]; then
-        kiwi_profile=""
-        if [ "$profile" != "__not__set" ]; then
-            kiwi_profile="${profile}-"
-        fi
+    if [ "$legacy" = "true" ]; then    
         bundle_call="/usr/sbin/kiwi --bundle-build $TOPDIR/KIWI-$imgtype"
         bundle_call="$bundle_call -d /$TOPDIR/KIWI.bundle/"
         bundle_call="$bundle_call --bundle-id ${kiwi_profile}Build$RELEASE"
