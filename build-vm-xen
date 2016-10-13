@@ -28,6 +28,17 @@ vm_verify_options_xen() {
     test -e /boot/initrd-xen && vm_initrd=/boot/initrd-xen
     test -n "$VM_KERNEL" && vm_kernel="$VM_KERNEL"
     test -n "$VM_INITRD" && vm_initrd="$VM_INITRD"
+    XMCMD=xm
+    if test ! -x /usr/sbin/xm -a -x /usr/sbin/xl ; then
+	XMCMD=xl
+	VM_ROOTDEV=/dev/xvda
+	VM_SWAPDEV=/dev/xvdb
+	VM_CONSOLE=hvc0
+    else
+	VM_ROOTDEV=/dev/hda1
+	VM_SWAPDEV=/dev/hda2
+	VM_CONSOLE=ttyS0
+    fi
 }
 
 vm_startup_xen() {
@@ -35,12 +46,12 @@ vm_startup_xen() {
     test ! -x /usr/sbin/xm -a -x /usr/sbin/xl && XMCMD=xl
     XMROOT="file:$(readlink -f $VM_IMAGE)"
     XMROOT=${XMROOT/#file:\/dev/phy:/dev}
-    XMROOT="disk=$XMROOT,hda1,w"
+    XMROOT="disk=$XMROOT,${VM_ROOTDEV#/dev/},w"
     XMSWAP=
     if test -n "$VM_SWAP" ; then
 	XMSWAP="file:$(readlink -f $VM_SWAP)"
 	XMSWAP=${XMSWAP/#file:\/dev/phy:/dev}
-	XMSWAP="disk=$XMSWAP,hda2,w"
+	XMSWAP="disk=$XMSWAP,${VM_SWAPDEV#/dev/},w"
     fi
     XENID="${VM_IMAGE%/root}"
     XENID="${XENID%/tmpfs}"
@@ -58,18 +69,18 @@ vm_startup_xen() {
     echo "ramdisk = \"$vm_initrd\""                                          >> $XEN_CONF_FILE
     echo "memory = ${VM_MEMSIZE:-64}"                                        >> $XEN_CONF_FILE
     test -n "$BUILD_JOBS" && echo "vcpus = $BUILD_JOBS"                      >> $XEN_CONF_FILE
-    echo "root = \"/dev/hda1 ro\""                                           >> $XEN_CONF_FILE
-    echo "extra = \"init=/bin/bash console=ttyS0 panic=1 udev_timeout=360\"" >> $XEN_CONF_FILE
+    echo "root = \"$VM_ROOTDEV ro\""                                           >> $XEN_CONF_FILE
+    echo "extra = \"init=/bin/bash console=$VM_CONSOLE panic=1 udev_timeout=360\"" >> $XEN_CONF_FILE
     echo "on_poweroff = \"destroy\""                                         >> $XEN_CONF_FILE
     echo "on_reboot = \"destroy\""                                           >> $XEN_CONF_FILE
     echo "on_crash = \"destroy\""                                            >> $XEN_CONF_FILE
     if test "$XMCMD" = xm ; then
-	set -- xm create -c $XEN_CONF_FILE name="build_$XENID" $XMROOT $XMSWAP extra="panic=1 quiet init="$vm_init_script" rd.driver.pre=binfmt_misc elevator=noop console=ttyS0"
+	set -- xm create -c $XEN_CONF_FILE name="build_$XENID" $XMROOT $XMSWAP extra="panic=1 quiet init="$vm_init_script" rd.driver.pre=binfmt_misc elevator=noop console=$VM_CONSOLE"
     else
 	XLDISK=
 	XLDISK="\"${XMROOT#disk=}\""
 	test -n "$XMSWAP" && XLDISK="$XLDISK, \"${XMSWAP#disk=}\""
-	set -- xl create -c $XEN_CONF_FILE name="\"build_$XENID\"" "disk=[ $XLDISK ]" extra=\""panic=1 quiet init="$vm_init_script" rd.driver.pre=binfmt_misc elevator=noop console=ttyS0"\"
+	set -- xl create -c $XEN_CONF_FILE name="\"build_$XENID\"" "disk=[ $XLDISK ]" extra=\""panic=1 quiet init="$vm_init_script" rd.driver.pre=binfmt_misc elevator=noop console=$VM_CONSOLE"\"
     fi
     if test "$PERSONALITY" != 0 ; then
 	# have to switch back to PER_LINUX to make xm work
