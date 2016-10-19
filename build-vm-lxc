@@ -129,8 +129,18 @@ vm_startup_lxc_libvirt() {
 	EOF
     # XXX: do this always instead of leaking the hosts' one?
     echo "rootfs / rootfs rw 0 0" > $BUILD_ROOT/etc/mtab
+    # could LOGFILE be used instead?
     lxcsh create --console $LXCCONF | sed -ure 's/\x0d//g;:redo /.\x08/{s/.\x08//; b redo}'
-    return $PIPESTATUS
+    exitcode="${PIPESTATUS[0]}"
+    if [ "$exitcode" -gt 0 ]; then
+        return $exitcode # libvirt errors
+    fi
+    if ! [ -r "$BUILD_ROOT/.build/_exitcode" ]; then
+        echo "'$BUILD_ROOT/.build/_exitcode' not found"
+        return 3
+    fi
+    exitcode=$(cat $BUILD_ROOT/.build/_exitcode)
+    return "$exitcode"
 }
 
 vm_kill_lxc() {
