@@ -225,7 +225,11 @@ vm_startup_kvm() {
     # the serial console device needs to be compiled into the target kernel
     # which is why we can not use virtio-serial on other platforms
     if test -n "$kvm_serial_device" ; then
-	qemu_args=("${qemu_args[@]}" -device "$kvm_serial_device" -device virtconsole,chardev=virtiocon0 -chardev stdio,id=virtiocon0)
+	if test -n "$VM_CONSOLE_INPUT" ; then
+	    qemu_args=("${qemu_args[@]}" -device "$kvm_serial_device" -device virtconsole,chardev=virtiocon0 -chardev stdio,mux=on,id=virtiocon0 -mon chardev=virtiocon0)
+	else
+	    qemu_args=("${qemu_args[@]}" -device "$kvm_serial_device" -device virtconsole,chardev=virtiocon0 -chardev stdio,id=virtiocon0)
+	fi
     elif test -n "$VM_CONSOLE_INPUT" ; then
 	qemu_args=("${qemu_args[@]}" -serial mon:stdio)
     else
