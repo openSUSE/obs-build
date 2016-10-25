@@ -1,10 +1,12 @@
 #################################################################
 #
-# Debian live-build specific functions.
+# snapcraft specific functions.
 #
 # Author: Adrian Schroeter <adrian@suse.de>
 #
-# This file is part of build.
+################################################################
+#
+# Copyright (c) 2016 SUSE Linux Products GmbH
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 or 3 as
@@ -20,7 +22,7 @@
 # Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
 #
-#################################################################
+################################################################
 
 recipe_setup_snapcraft() {
     TOPDIR=/usr/src/packages
