@@ -363,6 +363,25 @@ vm_img_mkfs() {
     fi
 }
 
+wipe_build_environement() {
+    if test -n "$VM_TYPE"; then
+      vm_cleanup_$VM_TYPE "$@"
+    else
+      echo "Wiping build root: '$BUILD_ROOT'"
+
+      # unmount all mounts still in the build root path
+      for m in $(cat /proc/mounts | grep "$BUILD_ROOT" | awk '{ print $2 }'); do
+          if ! umount -n "$m" 2>/dev/null ; then
+              echo "Failed to umount "$m", cannot wipe buildroot"
+              exit 1
+          fi
+      done
+
+      rm -rf $BUILD_ROOT
+    fi
+}
+
+}
 background_monitor_process() {
     max_disk=0
     max_mem=0
