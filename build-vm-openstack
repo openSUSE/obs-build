@@ -125,6 +125,10 @@ vm_fixup_openstack() {
     chmod 0755 "$BUILD_ROOT/sbin/init"
 }
 
+vm_wipe_openstack() {
+    :
+}
+
 vm_kill_openstack() {
     if nova show "$VM_VOLUME_NAME" >/dev/null 2>&1 ; then
 	if ! nova delete "$VM_VOLUME_NAME" ; then

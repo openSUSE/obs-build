@@ -74,3 +74,7 @@ vm_cleanup_docker() {
     :
 }
 
+vm_wipe_docker() {
+    local name="obsbuild.${BUILD_ROOT##*/}"
+    docker rm "$name" >/dev/null 2>&1 || true
+}

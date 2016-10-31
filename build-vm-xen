@@ -141,3 +141,7 @@ vm_cleanup_xen() {
     :
 }
 
+vm_wipe_xen() {
+    :
+}
+

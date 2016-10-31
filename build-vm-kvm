@@ -314,3 +314,6 @@ vm_cleanup_kvm() {
     :
 }
 
+vm_wipe_kvm() {
+    :
+}

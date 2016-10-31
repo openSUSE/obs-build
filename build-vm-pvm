@@ -166,6 +166,10 @@ vm_cleanup_pvm(){
     pvm_deletelv $swaplv
 }
 
+vm_wipe_pvm(){
+    :
+}
+
 vm_fixup_pvm(){
     VM_SWAPDEV=/dev/sdb
     GRUBDIR=`mktemp -d /tmp/grubinstall.XXXX`

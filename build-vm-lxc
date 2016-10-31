@@ -176,6 +176,10 @@ vm_detach_swap_lxc() {
     :
 }
 
+vm_wipe_lxc() {
+    :
+}
+
 vm_cleanup_lxc() {
     if test $$ -ne 1 && test $$ -ne 2 ; then
         lxc_get_id

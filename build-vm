@@ -336,6 +336,17 @@ vm_img_create() {
     fi
 }
 
+vm_img_wipe() {
+    vm_wipe_$VM_TYPE "$@"
+
+    if test -n "$VM_IMAGE" -a ! -b "$VM_IMAGE" ; then
+       rm -f "$VM_IMAGE"
+    fi
+    if test -n "$VM_SWAP" -a ! -b "$VM_SWAP" ; then
+       rm -f "$VM_SWAP"
+    fi
+}
+
 vm_img_mkfs() {
     local fs="$1"
     local img="$2"

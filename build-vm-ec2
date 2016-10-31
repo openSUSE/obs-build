@@ -54,6 +54,11 @@ cloud_volume_detach_ec2() {
     return 0
 }
 
+vm_wipe_ec2() {
+    # not yet implemented
+    :
+}
+
 vm_verify_options_ec2() {
     # verify settings
     if test -z "$AWS_ACCESS_KEY" -o -z "$AWS_ACCESS_KEY" ; then
