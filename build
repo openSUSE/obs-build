@@ -89,7 +89,7 @@ REASON=
 NOROOTFORBUILD=
 LOGFILE=
 KILL=
-DO_WIPE=false
+DO_WIPE=
 CHANGELOG=
 BUILD_DEBUG=
 INCARNATION=
@@ -695,6 +695,23 @@ run_rsync() {
     else
 	echo "RSYNCSRC given, but not RSYNCDEST - skipping"
     fi
+}
+
+wipe_build_environement() {
+    if test -n "$VM_TYPE"; then
+	vm_cleanup
+    else
+	echo "Wiping build root: '$BUILD_ROOT'"
+
+	# unmount all mounts still in the build root path
+	for m in $(cat /proc/mounts | grep "$BUILD_ROOT" | awk '{ print $2 }'); do
+	    if ! umount -n "$m" 2>/dev/null ; then
+		echo "Failed to umount "$m", cannot wipe buildroot"
+		exit 1
+	    fi
+	done
+	rm -rf "$BUILD_ROOT"
+    fi  
 }
 
 #### main ####
