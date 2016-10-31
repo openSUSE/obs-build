@@ -381,7 +381,6 @@ wipe_build_environement() {
     fi
 }
 
-}
 background_monitor_process() {
     max_disk=0
     max_mem=0
