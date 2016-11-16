@@ -897,6 +897,7 @@ vm_save_statistics() {
     device="hda1"
     test -e /dev/sda && device="sda"
     test -e /dev/vda && device="vda"
+    test -e /dev/xvda && device="xvda"   # in newer XEN setups
     test -e /dev/dasda && device="dasda" # in z/VM
     test -e /dev/nfhd0 && device="nfhd0" # in aranym
     if test -e /sys/block/${device}/stat ; then
