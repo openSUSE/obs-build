@@ -1070,7 +1070,7 @@ if test -w /root ; then
     mkdir -p $BUILD_ROOT/sys
     mkdir -p $BUILD_ROOT/dev/pts
     mountpoint -q -- "$BUILD_ROOT/proc" || mount -n -tproc none "$BUILD_ROOT/proc" || true
-    mountpoint -q -- "$BUILD_ROOT/dev/pts" || mount -n -tdevpts -omode=0620,gid=5 none "$BUILD_ROOT/dev/pts"
+    mountpoint -q -- "$BUILD_ROOT/dev/pts" || mount -n -tdevpts -omode=0620,gid=5,ptmxmode=0666 none "$BUILD_ROOT/dev/pts"
 fi
 
 if test -z "$VM_IMAGE" -a -z "$LOGFILE" ; then
@@ -1212,7 +1212,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	    fi
 	fi
 	mountpoint -q -- "$BUILD_ROOT/proc" || mount -n -tproc none "$BUILD_ROOT/proc" || true
-	mountpoint -q -- "$BUILD_ROOT/dev/pts" || mount -n -tdevpts -omode=0620,gid=5 none "$BUILD_ROOT/dev/pts"
+	mountpoint -q -- "$BUILD_ROOT/dev/pts" || mount -n -tdevpts -omode=0620,gid=5,ptmxmode=0666 none "$BUILD_ROOT/dev/pts"
 
 	copy_oldpackages
     fi
@@ -1303,7 +1303,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     fi
 
     mountpoint -q -- "$BUILD_ROOT/proc" || mount -n -tproc none "$BUILD_ROOT/proc" 2> /dev/null
-    mountpoint -q -- "$BUILD_ROOT/dev/pts" || mount -n -tdevpts -omode=0620,gid=5 none "$BUILD_ROOT/dev/pts" 2> /dev/null
+    mountpoint -q -- "$BUILD_ROOT/dev/pts" || mount -n -tdevpts -omode=0620,gid=5,ptmxmode=0666 none "$BUILD_ROOT/dev/pts" 2> /dev/null
     # needed for POSIX semaphores
     test -d $BUILD_ROOT/dev/shm || rm -f $BUILD_ROOT/dev/shm
     mkdir -p $BUILD_ROOT/dev/shm
