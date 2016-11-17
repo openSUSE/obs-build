@@ -177,8 +177,8 @@ clean_build_root() {
 	mkdir -p "$BUILD_ROOT/proc"
 	mkdir -p "$BUILD_ROOT/dev/pts"
 	if test "$UID" = 0 ; then
-	    mount -n -tproc none "$BUILD_ROOT/proc"
-	    mount -n -tdevpts -omode=0620,gid=5 none "$BUILD_ROOT/dev/pts"
+	    mountpoint -q -- "$BUILD_ROOT/proc" || mount -n -tproc none "$BUILD_ROOT/proc"
+	    mountpoint -q -- "$BUILD_ROOT/dev/pts" || mount -n -tdevpts -omode=0620,gid=5 none "$BUILD_ROOT/dev/pts"
 	fi
     fi
 }
@@ -820,8 +820,8 @@ fi
 
 mkdir -p $BUILD_ROOT/proc
 mkdir -p $BUILD_ROOT/dev/pts
-mount -n -tproc none $BUILD_ROOT/proc 2>/dev/null || true
-mount -n -tdevpts -omode=0620,gid=5 none $BUILD_ROOT/dev/pts 2>/dev/null || true
+mountpoint -q -- "$BUILD_ROOT/proc" || mount -n -tproc none "$BUILD_ROOT/proc" 2>/dev/null || true
+mountpoint -q -- "$BUILD_ROOT/dev/pts" || mount -n -tdevpts -omode=0620,gid=5 none "$BUILD_ROOT/dev/pts" 2>/dev/null || true
 
 #
 # create .build.binaries directory if requested
