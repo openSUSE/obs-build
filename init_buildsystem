@@ -149,16 +149,18 @@ cleanup_and_exit() {
     fi
     test "$BUILD_ROOT" = / -a -n "$browner" && chown "$browner" "$BUILD_ROOT"
     # umount so init_buildsystem can be used standalone
+    if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
 # XXX: use stat -f /dev/pts/ -c %T  to check whether it's mounted and not suppress errors then?
-    umount -n "$BUILD_ROOT/proc/sys/fs/binfmt_misc" 2> /dev/null || true
-    umount -n "$BUILD_ROOT/proc" 2> /dev/null || true
-    umount -n "$BUILD_ROOT/dev/pts" 2> /dev/null || true
-    umount -n "$BUILD_ROOT/mnt" 2> /dev/null || true
+	umount -n "$BUILD_ROOT/proc/sys/fs/binfmt_misc" 2> /dev/null || true
+	umount -n "$BUILD_ROOT/proc" 2> /dev/null || true
+	umount -n "$BUILD_ROOT/dev/pts" 2> /dev/null || true
+	umount -n "$BUILD_ROOT/mnt" 2> /dev/null || true
+    fi
     exit $1
 }
 
 clean_build_root() {
-    if test -n "$BUILD_ROOT" ; then
+    if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
 	umount -n "$BUILD_ROOT/proc/sys/fs/binfmt_misc" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/proc" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/dev/pts" 2> /dev/null || true
@@ -472,6 +474,9 @@ fi
 #
 if test -e "$BUILD_IS_RUNNING" ; then
     echo "It seems that there was an incomplete setup of $BUILD_ROOT."
+    if test -z "$BUILD_ROOT" -o "$BUILD_ROOT" = / ; then
+	    cleanup_and_exit 1
+    fi
     echo "To be sure, we will build it again completely..."
     umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
     umount -n $BUILD_ROOT/proc 2> /dev/null
@@ -506,7 +511,7 @@ touch $BUILD_IS_RUNNING
 # mount /proc and /dev/pts
 mkdir -p $BUILD_ROOT/proc
 mkdir -p $BUILD_ROOT/dev/pts
-if test "$UID" = 0 ; then
+if test "$UID" = 0 -a -n "$BUILD_ROOT" -a "$BUILD_ROOT" = / ; then
     mount -n -tproc none "$BUILD_ROOT/proc"
     mount -n -tdevpts -omode=0620,gid=5 none "$BUILD_ROOT/dev/pts"
 fi

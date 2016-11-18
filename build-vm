@@ -508,6 +508,11 @@ vm_detect_2nd_stage() {
 #        # allow abuild user to run qemu
 #        chmod 0666 /dev/kqemu
 #    fi
+    test -d /dev/shm || rm -f /dev/shm
+    mkdir -p /dev/pts
+    mkdir -p /dev/shm
+    mount -n -tdevpts -omode=0620,gid=5 none /dev/pts
+    mount -n -ttmpfs none /dev/shm
 
     if test -n "$VM_SWAP" ; then
 	for i in 1 2 3 4 5 6 7 8 9 10 ; do
