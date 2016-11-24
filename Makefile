@@ -37,6 +37,7 @@ install:
 	    computeblocklists \
 	    extractbuild \
 	    getbinaryid \
+	    getbuildids \
 	    killchroot \
 	    queryconfig \
 	    common_functions \

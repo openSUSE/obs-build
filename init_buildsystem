@@ -864,6 +864,14 @@ if ! test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
     echo 'done'
 fi
 
+echo -n "querying package ids..."
+for PKG in $PACKAGES_TO_INSTALL ; do
+    test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" || continue
+    test -L "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" || continue
+    echo "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF"
+done | "$BUILD_DIR/getbuildids" 
+echo 'done'
+
 #
 # get list and ids of already installed packages
 #
@@ -948,7 +956,11 @@ for PKG in $MAIN_LIST ; do
 	fi
     fi
 
-    PKGID=$(perl -I$BUILD_DIR -MBuild -e Build::showquery "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" buildid)
+    if test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF.buildid" ; then
+	read PKGID < "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF.buildid"
+    else
+	PKGID=$(perl -I$BUILD_DIR -MBuild -e Build::showquery "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" buildid)
+    fi
 
     if test -f $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG ; then
 	read OLDPKGID < $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG
