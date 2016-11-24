@@ -480,6 +480,8 @@ vm_detect_2nd_stage() {
 
     test -n "$VM_WATCHDOG" -a -z "$PERSONALITY_SET" && echo "### WATCHDOG MARKER END ###"
     echo "2nd stage started in virtual machine"
+    # fedora packages sometimes do not have the needed links
+    ldconfig
     BUILD_ROOT=/
     BUILD_DIR=/.build
     echo "machine type: `uname -m`"
