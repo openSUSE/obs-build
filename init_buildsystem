@@ -356,15 +356,24 @@ create_cache_file() {
 		findonly=1
 		continue
 	    fi
+	    SRCREPOTYPE=$REPOTYPE
+	    case $SRC in
+		arch@* | debian@* | hdlist2@* | rpmmd@* | rpm-md@* | suse@*)
+		    SRCREPOTYPE=${SRC%%@*}
+		    SRC=${SRC#*@}
+		    ;;
+	    esac
 	    test -z "$SRC" && SRC=`pwd`
 	    if test "${SRC#http://}" != "$SRC" -o "${SRC#https://}" != "$SRC" -o "${SRC#ftp://}" != "$SRC" -o "${SRC#ftps://}" != "$SRC" ; then
 		# remote repo, cache binary packages
 		mkdir -p "$(getcachedir "$SRC")"
-		if test "$REPOTYPE" = arch ; then
+		if test "$SRCREPOTYPE" = arch ; then
 		    set -- $BUILD_DIR/createarchdeps --cachedir="$CACHE_DIR" "$SRC"
-		elif test "$REPOTYPE" = debian ; then
+		elif test "$SRCREPOTYPE" = debian ; then
 		    set -- $BUILD_DIR/createdebdeps --cachedir="$CACHE_DIR" --archpath "$BUILD_ARCH" "$SRC"
-		elif test "$REPOTYPE" = hdlist2 ; then
+		elif test "$SRCREPOTYPE" = suse ; then
+		    set -- $BUILD_DIR/createyastdeps --cachedir="$CACHE_DIR" "$SRC"
+		elif test "$SRCREPOTYPE" = hdlist2 ; then
 		    set -- $BUILD_DIR/createmdkdeps --cachedir="$CACHE_DIR" "$SRC"
 		else
 		    set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
@@ -434,6 +443,9 @@ downloadpkg() {
 getcachedir() {
     local url=$1
     for repo in "${repos[@]}" ; do
+	case $repo in
+	    arch@* | debian@* | hdlist2@* | rpmmd@* | rpm-md@* | suse@*) repo=${repo#*@} ;;
+	esac
 	if test "${url:0:${#repo}}" == "$repo" ; then
 	    read repoid dummy < <(echo -n "$repo" | md5sum)
 	    echo "$CACHE_DIR/$repoid"
