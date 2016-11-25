@@ -4,8 +4,9 @@
 # parameter are installed. All other packges will be deleted.
 #
 # BUILD_ROOT  here the packages will be installed/deleted
-# BUILD_RPMS  here we get our packages to install
+# BUILD_RPMS  here we get our packages to install (obsolete)
 # BUILD_ARCH  path of the architectures we try
+# BUILD_DIST  distribution to build for (will be guessed if not set)
 #
 ################################################################
 #
@@ -302,6 +303,8 @@ expand_plain_zypp_repo() {
 create_cache_file() {
     local findonly=
     expand_plain_zypp_repo
+
+    # check if we can reuse the old cache file
     if ! test -f $CACHE_FILE || ! test -f $CACHE_FILE.id || \
 	test "${repos[*]} ${BUILD_RPMS//:/ /}" != "$(cat $CACHE_FILE.id 2>/dev/null)"; then
 	rm -f $CACHE_FILE.id
@@ -322,82 +325,87 @@ create_cache_file() {
 	    fi
 	done
     fi
-    if ! test -f $CACHE_FILE.id ; then
-	test -z "$LIST_STATE" && echo initializing $CACHE_FILE ...
-	REPOTYPE=
-	if test -n "$BUILD_DIST" ; then
-	    for i in `queryconfig repotype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"` ; do
-		case $i in
-		    arch|debian|hdlist2|rpm-md) REPOTYPE=$i
-		esac
-		test -n "$REPOTYPE" && break
-	    done
-	    if test -z "$REPOTYPE"; then
-		BINTYPE=`queryconfig binarytype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
-		case "$BINTYPE" in
-		    arch) REPOTYPE=arch ;;
-		    deb)  REPOTYPE=debian ;;
-		esac
-	    fi
-	fi
-	if test -z "$REPOTYPE" ; then
-	    # check the first init_buildsystem arg, maybe it is a recipe
-	    case ${PKGS[0]} in
-		*.spec)
-		    REPOTYPE=rpm-md ;;
-		*.dsc)
-		    REPOTYPE=debian ;;
-		*/PKGBUILD|PKGBUILD)
-		    REPOTYPE=arch ;;
-	    esac
-	fi
-	for SRC in "${repos[@]}" -- ${BUILD_RPMS//:/ /}; do
-	    if test "$SRC" = '--' ; then
-		findonly=1
-		continue
-	    fi
-	    SRCREPOTYPE=$REPOTYPE
-	    case $SRC in
-		arch@* | debian@* | hdlist2@* | rpmmd@* | rpm-md@* | suse@*)
-		    SRCREPOTYPE=${SRC%%@*}
-		    SRC=${SRC#*@}
-		    ;;
-	    esac
-	    test -z "$SRC" && SRC=`pwd`
-	    if test "${SRC#http://}" != "$SRC" -o "${SRC#https://}" != "$SRC" -o "${SRC#ftp://}" != "$SRC" -o "${SRC#ftps://}" != "$SRC" ; then
-		# remote repo, cache binary packages
-		mkdir -p "$(getcachedir "$SRC")"
-		if test "$SRCREPOTYPE" = arch ; then
-		    set -- $BUILD_DIR/createarchdeps --cachedir="$CACHE_DIR" "$SRC"
-		elif test "$SRCREPOTYPE" = debian ; then
-		    set -- $BUILD_DIR/createdebdeps --cachedir="$CACHE_DIR" --archpath "$BUILD_ARCH" "$SRC"
-		elif test "$SRCREPOTYPE" = suse ; then
-		    set -- $BUILD_DIR/createyastdeps --cachedir="$CACHE_DIR" "$SRC"
-		elif test "$SRCREPOTYPE" = hdlist2 ; then
-		    set -- $BUILD_DIR/createmdkdeps --cachedir="$CACHE_DIR" "$SRC"
-		else
-		    set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
-		fi
-	    elif test "${SRC#zypp://}" != "$SRC" ; then
-		# special zypp repo
-		set -- $BUILD_DIR/createzyppdeps --cachedir="$CACHE_DIR" "$SRC"
-	    elif test ! -e "$SRC" ; then
-		cleanup_and_exit 1 "*** $SRC does not exist"
-	    elif test -z "$findonly" -a \( -e "$SRC"/suse/setup/descr/packages -o -e "$SRC"/suse/setup/descr/packages.gz \) ; then
-		set -- $BUILD_DIR/createyastdeps "$SRC"
-	    elif test -z "$findonly" -a -e "$SRC"/repodata/repomd.xml ; then
-		set -- $BUILD_DIR/createrepomddeps "$SRC"
-	    else
-		set -- $BUILD_DIR/createdirdeps --oldfile "$CACHE_FILE" "$SRC"
-	    fi
-	    echo "$@" >&2
-	    "$@" || cleanup_and_exit 1
-	    echo D:
-	done > $CACHE_FILE.new
-
-	mv $CACHE_FILE.new $CACHE_FILE
-	echo "${repos[*]} ${BUILD_RPMS//:/ /}" > $CACHE_FILE.id
+    if test -f $CACHE_FILE.id ; then
+	return
     fi
+
+    # nope, generate a new cache file
+    test -z "$LIST_STATE" && echo initializing $CACHE_FILE ...
+
+    # figure out a repository type default
+    REPOTYPE=
+    if test -n "$BUILD_DIST" ; then
+	for i in `queryconfig repotype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"` ; do
+	    case $i in
+		arch|debian|hdlist2|rpm-md) REPOTYPE=$i ;;
+	    esac
+	    test -n "$REPOTYPE" && break
+	done
+	if test -z "$REPOTYPE"; then
+	    BINTYPE=`queryconfig binarytype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
+	    case "$BINTYPE" in
+		arch) REPOTYPE=arch ;;
+		deb)  REPOTYPE=debian ;;
+	    esac
+	fi
+    fi
+    if test -z "$REPOTYPE" ; then
+	# check the first init_buildsystem arg, maybe it is a recipe
+	case ${PKGS[0]} in
+	    *.spec)
+		REPOTYPE=rpm-md ;;
+	    *.dsc)
+		REPOTYPE=debian ;;
+	    */PKGBUILD|PKGBUILD)
+		REPOTYPE=arch ;;
+	esac
+    fi
+    for SRC in "${repos[@]}" -- ${BUILD_RPMS//:/ /}; do
+	if test "$SRC" = '--' ; then
+	    findonly=1
+	    continue
+	fi
+	SRCREPOTYPE=$REPOTYPE
+	case $SRC in
+	    arch@* | debian@* | hdlist2@* | rpmmd@* | rpm-md@* | suse@*)
+		SRCREPOTYPE=${SRC%%@*}
+		SRC=${SRC#*@}
+		;;
+	esac
+	test -z "$SRC" && SRC=`pwd`
+	if test "${SRC#http://}" != "$SRC" -o "${SRC#https://}" != "$SRC" -o "${SRC#ftp://}" != "$SRC" -o "${SRC#ftps://}" != "$SRC" ; then
+	    # remote repo, cache binary packages
+	    mkdir -p "$(getcachedir "$SRC")"
+	    if test "$SRCREPOTYPE" = arch ; then
+		set -- $BUILD_DIR/createarchdeps --cachedir="$CACHE_DIR" "$SRC"
+	    elif test "$SRCREPOTYPE" = debian ; then
+		set -- $BUILD_DIR/createdebdeps --cachedir="$CACHE_DIR" --archpath "$BUILD_ARCH" "$SRC"
+	    elif test "$SRCREPOTYPE" = suse ; then
+		set -- $BUILD_DIR/createyastdeps --cachedir="$CACHE_DIR" "$SRC"
+	    elif test "$SRCREPOTYPE" = hdlist2 ; then
+		set -- $BUILD_DIR/createmdkdeps --cachedir="$CACHE_DIR" "$SRC"
+	    else
+		set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
+	    fi
+	elif test "${SRC#zypp://}" != "$SRC" ; then
+	    # special zypp repo
+	    set -- $BUILD_DIR/createzyppdeps --cachedir="$CACHE_DIR" "$SRC"
+	elif test ! -e "$SRC" ; then
+	    cleanup_and_exit 1 "*** $SRC does not exist"
+	elif test -z "$findonly" -a \( -e "$SRC"/suse/setup/descr/packages -o -e "$SRC"/suse/setup/descr/packages.gz \) ; then
+	    set -- $BUILD_DIR/createyastdeps "$SRC"
+	elif test -z "$findonly" -a -e "$SRC"/repodata/repomd.xml ; then
+	    set -- $BUILD_DIR/createrepomddeps "$SRC"
+	else
+	    set -- $BUILD_DIR/createdirdeps --oldfile "$CACHE_FILE" "$SRC"
+	fi
+	echo "$@" >&2
+	"$@" || cleanup_and_exit 1
+	echo D:
+    done > $CACHE_FILE.new
+
+    mv $CACHE_FILE.new $CACHE_FILE
+    echo "${repos[*]} ${BUILD_RPMS//:/ /}" > $CACHE_FILE.id
 }
 
 fail_exit() {
@@ -407,17 +415,16 @@ fail_exit() {
 # modifies $SRC
 downloadpkg() {
     local url="$1"
-    local cachedir
 
-    if test "${url:0:7}" == "zypp://" -o "${url:0:7}" == "http://" -o "${url:0:8}" == "https://" -o "${url:0:6}" == "ftp://" -o "${url:0:7}" == "ftps://" ; then
-	cachedir="$(getcachedir "$url")"
-	local name="$(basename "$url")"
-	name=${name/%.pkg.tar.?z/.arch}
-	SRC="$cachedir/$name"
-    else
-	cleanup_and_exit 1 "Invalid url: $url"
-    fi
+    case $url in 
+	zypp://* | http://* | https://* | ftp://* | ftps://*) ;;
+	*) cleanup_and_exit 1 "Invalid url: $url" ;;
+    esac
 
+    local cachedir="$(getcachedir "$url")"
+    local name="$(basename "$url")"
+    name=${name/%.pkg.tar.?z/.arch}
+    SRC="$cachedir/$name"
     local destdir="$cachedir/tmp"
     mkdir -p "$destdir"
     echo "downloading $url ... ";
