@@ -461,21 +461,6 @@ getcachedir() {
     done
 }
 
-can_reuse_cached_package() {
-    local cachepkgid pkgid xpkgid
-    test -s "$1" || return 1
-    if test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.id" ; then
-        pkgid=$(perl -I$BUILD_DIR -MBuild -e Build::showquery "$1" buildid)
-	read cachepkgid < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
-	# check if the build time is zero
-	case $cachepkgid in
-	    *" 0-"*) xpkgid="${pkgid##* }"; pkgid="${pkgid% *} 0-${xpkgid#*-}" ;;
-	esac
-	test "$cachepkgid" = "$pkgid" || return 1
-    fi
-    return 0
-}
-
 set_build_arch
 
 trap fail_exit EXIT
@@ -706,34 +691,33 @@ else
 	done
     fi
 
-    # check if we really can use cached versions for packages on the download list
+    # use cached packages where possible
     if test -s $BUILD_ROOT/.init_b_cache/rpmlist.download ; then
 	echo "calculating packages to download..."
-	rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download2
         while read PKG SRC ; do
-	    cachepkg="${SRC##*/}"
-	    cachepkg="${cachepkg/%.pkg.tar.?z/.arch}"
+	    SRCSUF=${SRC/%.pkg.tar.?z/.arch}
+	    if test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.id" ; then
+		read cachepkgid < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
+		echo "PKG $PKG $cachepkgid"
+	    else
+		echo "PKG $PKG"
+	    fi
+	    echo "DST $BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
 	    if test "$SRC" != "${SRC#zypp://}" ; then
 		# for zypp packages also look in the zypp cache
 		cachedir="/var/cache/zypp/packages/${SRC#zypp://}"
-		cachedir="${cachedir%/*}"
-		if can_reuse_cached_package "$cachedir/$cachepkg" ; then
-		    SRCSUF=${SRC/%.pkg.tar.?z/.arch}
-		    ln -s "$cachedir/$cachepkg" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
-		    continue
-		fi
+		echo "CACHE ${cachedir%/*}/${SRC##*/}"
 	    fi
 	    cachedir="$(getcachedir "$SRC")"
-	    if can_reuse_cached_package "$cachedir/$cachepkg" ; then
-		SRCSUF=${SRC/%.pkg.tar.?z/.arch}
-		ln -s "$cachedir/$cachepkg" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
-		continue
-	    fi
-	    # not found in cache or cache has different package
-	    rm -f "$cachedir/$cachepkg"
-	    echo "$PKG $SRC" >>$BUILD_ROOT/.init_b_cache/rpmlist.download2
+	    echo "CACHE $cachedir/${SRCSUF##*/}"
+	done < $BUILD_ROOT/.init_b_cache/rpmlist.download | "$BUILD_DIR/getbuildids" cachecheck
+        # remove found packages from download list
+        rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download2
+        while read PKG SRC ; do
+	    SRCSUF=${SRC/%.pkg.tar.?z/.arch}
+	    test -L "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}" || echo "$PKG $SRC" >>$BUILD_ROOT/.init_b_cache/rpmlist.download2
 	done < $BUILD_ROOT/.init_b_cache/rpmlist.download
-	rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download
+        rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download
 	test -s $BUILD_ROOT/.init_b_cache/rpmlist.download2 && mv $BUILD_ROOT/.init_b_cache/rpmlist.download2 $BUILD_ROOT/.init_b_cache/rpmlist.download
     fi
 
@@ -950,27 +934,14 @@ for PKG in $MAIN_LIST ; do
 
     test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF || continue
 
-    # check if we can keep an already installed package
-    if test "$VERIFY_BUILD_SYSTEM" != true -a -f $BUILD_ROOT/.init_b_cache/rpms/$PKG.id -a -f $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG ; then
-	read PKGID < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
-	read OLDPKGID < $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG
-	if test "$PKGID" = "$OLDPKGID" ; then
-	    echo "keeping ${PKGID%% *}"
-	    rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
-	    echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
-	    test -n "$PKG_HDRMD5" && echo "$PKG_HDRMD5 $PKGID" > $BUILD_ROOT/.preinstall_image/$PKG
-	    continue
-	fi
-    fi
-
     if test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF.buildid" ; then
 	read PKGID < "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF.buildid"
     else
 	PKGID=$(perl -I$BUILD_DIR -MBuild -e Build::showquery "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" buildid)
     fi
 
-    if test -f $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG ; then
-	read OLDPKGID < $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG
+    if test -f "$BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG" ; then
+	read OLDPKGID < "$BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG"
 	if test "$PKGID" != "$OLDPKGID" ; then
 	    echo "deleting unwanted ${OLDPKGID%% *}"
 	    pkg_erase

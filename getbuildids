@@ -27,14 +27,53 @@ BEGIN {
 use Build;
 use strict;
 
+sub getbuildid {
+  my ($pkg) = @_;
+  my $d = Build::query($pkg, 'evra' => 1, 'buildtime' => 1);
+  return $d ? Build::getbuildid($d) : undef;
+}
+
+if (@ARGV && $ARGV[0] eq 'cachecheck') {
+  my $pkg;
+  my $buildid;
+  my $dst;
+  while (<STDIN>) {
+    chomp;
+    if (/^PKG (\S+) (.+)$/) {
+      ($pkg, $buildid, $dst) = ($1, $2, undef);
+    } elsif (/^PKG (\S+)$/) {
+      ($pkg, $buildid, $dst) = ($1, undef, undef);
+    } elsif (/^DST (.+)$/) {
+      $dst = $1;
+      unlink($dst) if -e $dst;
+    } elsif (/^CACHE (.+)$/) {
+      next unless $dst;
+      my $cpkg = $1;
+      next unless -s $cpkg;
+      if ($buildid) {
+	my $bid = getbuildid($cpkg);
+	next unless $bid;
+	if ($bid =~ / 0-/) {
+	  my $buildid2 = $buildid;
+	  $buildid2 =~ s/ .*?-/0-/;
+	  next if $bid ne $buildid2;
+	} else {
+	  next if $bid ne $buildid;
+ 	}
+      }
+      symlink($cpkg, $dst);
+      $dst = undef;	# first hit wins
+    }
+  }
+  exit(0);
+}
+
 while (<STDIN>) {
   chomp;
-  my $pkg = $_;
-  my $d = Build::query($pkg, 'evra' => 1, 'buildtime' => 1);
-  next unless $d;
-  my $buildid = Build::getbuildid($d);
+  my $dst = $_;
+  my $buildid = getbuildid($dst);
   next unless $buildid;
-  open(F, '>', "$pkg.buildid") || next;
+  open(F, '>', "$dst.buildid") || next;
   print F "$buildid\n";
   close(F);
 }
