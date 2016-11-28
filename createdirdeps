@@ -51,7 +51,7 @@ my %old;
 if (defined($oldfile) && open(F, '<', $oldfile)) {
   while (<F>) {
     chomp;
-    $old{$1} = $_ if /^([PRCOI]:[^ ]+): /;
+    $old{$1} = $_ if /^([PRrCOI]:[^ ]+): /;
   }
   close F;
 }
@@ -78,14 +78,14 @@ for my $dir (@ARGV) {
 	  next if $seen{$idx};
 	  $seen{$idx} = 1;
 	  print "F:$idx: $path\n";
-	  for (qw{P R C O I}) {
+	  for (qw{P R r C O I}) {
 	    print $old{"$_:$idx"}."\n" if $old{"$_:$idx"};
 	  }
 	  next;
 	}
       }
     }
-    my $q = Build::query($path, 'addselfprovides' => 1, 'conflicts' => 1, 'evra' => 1, 'buildtime' => 1);
+    my $q = Build::query($path, 'addselfprovides' => 1, 'conflicts' => 1, 'evra' => 1, 'buildtime' => 1, 'weakdeps' => 1);
     next unless $q && defined($q->{'name'}) && defined($q->{'arch'}) && defined($q->{'version'});
     my $idx = "$q->{'name'}.$q->{'arch'}-$id";
     next if $seen{$idx};
