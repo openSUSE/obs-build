@@ -78,7 +78,7 @@ for my $dir (@ARGV) {
 	  next if $seen{$idx};
 	  $seen{$idx} = 1;
 	  print "F:$idx: $path\n";
-	  for (qw{P R r C O I}) {
+	  for (qw{P R C O I r s}) {
 	    print $old{"$_:$idx"}."\n" if $old{"$_:$idx"};
 	  }
 	  next;

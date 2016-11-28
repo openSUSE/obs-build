@@ -120,7 +120,7 @@ if (defined($dist) && $dist ne '') {
   $binarytype = $cf->{'binarytype'} if $cf->{'binarytype'} && $cf->{'binarytype'} ne 'UNDEFINED';
 }
 
-my (%fn, %prov, %req, %rec, %con, %obs);
+my (%fn, %prov, %req, %con, %obs, %rec, %sup);
 
 my %packs;
 my %repo;
@@ -131,7 +131,7 @@ my %packs_done;
 
 open(F, '<', $rpmdeps) || die("$rpmdeps: $!\n");
 # WARNING: the following code assumes that the 'I' tag comes last
-my ($pkgF, $pkgP, $pkgR, $pkgr, $pkgC, $pkgO);
+my ($pkgF, $pkgP, $pkgR, $pkgC, $pkgO, $pkgr, $pkgs);
 
 my $verscmp = \&Build::Rpm::verscmp;
 
@@ -156,6 +156,10 @@ while(<F>) {
     $pkgC = $2;
   } elsif (/^O:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
     $pkgO = $2;
+  } elsif (/^r:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
+    $pkgr = $2;
+  } elsif (/^s:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
+    $pkgs = $2;
   } elsif (/^I:(.*?)-\d+\/\d+\/\d+: (.*)$/) {
     next if $packs_done{$1};
     my ($i, $newid) = ($1, $2);
@@ -171,17 +175,21 @@ while(<F>) {
       delete $rec{$i};
       delete $con{$i};
       delete $obs{$i};
+      delete $rec{$i};
+      delete $sup{$i};
       $req{$i}  = $pkgR;
-      $rec{$i}  = $pkgr;
       $con{$i}  = $pkgC if defined $pkgC;
       $obs{$i}  = $pkgO if defined $pkgO;
+      $rec{$i}  = $pkgr if defined $pkgr;
+      $sup{$i}  = $pkgs if defined $pkgs;
     }
     undef $pkgF;
     undef $pkgP;
     undef $pkgR;
-    undef $pkgr;
     undef $pkgC;
     undef $pkgO;
+    undef $pkgr;
+    undef $pkgs;
   } elsif ($_ eq 'D:') {
     %packs_done = %ids;
   }
@@ -227,7 +235,7 @@ $dofileprovides = 1 if ($binarytype || 'rpm') ne 'rpm';
 
 for my $pack (keys %packs) {
   my $r = {};
-  my (@s, $s, @pr, @re, @rc, @co, @ob);
+  my (@s, $s, @pr, @re, @co, @ob, @rc, @su);
   @s = split(' ', $prov{$packs{$pack}} || '');
   while (@s) {
     $s = shift @s;
@@ -260,22 +268,6 @@ for my $pack (keys %packs) {
       splice(@s, 0, 2);
     }
   }
-  @s = split(' ', $rec{$packs{$pack}} || '');
-  while (@s) {
-    $s = shift @s;
-    next if !$dofileprovides && $s =~ /^\//;
-    if ($s =~ /^rpmlib\(/) {
-      splice(@s, 0, 2);
-      next;
-    }
-    push @rc, $s;
-    while (@s && $s[0] =~ /^[\(<=>|]/) {
-      $rc[-1] .= " $s[0] $s[1]";
-      $rc[-1] =~ s/ \((.*)\)/ $1/;
-      $rc[-1] =~ s/(<|>){2}/$1/;
-      splice(@s, 0, 2);
-    }
-  }
   @s = split(' ', $con{$packs{$pack}} || '');
   while (@s) {
     $s = shift @s;
@@ -300,11 +292,44 @@ for my $pack (keys %packs) {
       splice(@s, 0, 2);
     }
   }
+  @s = split(' ', $rec{$packs{$pack}} || '');
+  while (@s) {
+    $s = shift @s;
+    next if !$dofileprovides && $s =~ /^\//;
+    if ($s =~ /^rpmlib\(/) {
+      splice(@s, 0, 2);
+      next;
+    }
+    push @rc, $s;
+    while (@s && $s[0] =~ /^[\(<=>|]/) {
+      $rc[-1] .= " $s[0] $s[1]";
+      $rc[-1] =~ s/ \((.*)\)/ $1/;
+      $rc[-1] =~ s/(<|>){2}/$1/;
+      splice(@s, 0, 2);
+    }
+  }
+  @s = split(' ', $sup{$packs{$pack}} || '');
+  while (@s) {
+    $s = shift @s;
+    next if !$dofileprovides && $s =~ /^\//;
+    if ($s =~ /^rpmlib\(/) {
+      splice(@s, 0, 2);
+      next;
+    }
+    push @su, $s;
+    while (@s && $s[0] =~ /^[\(<=>|]/) {
+      $rc[-1] .= " $s[0] $s[1]";
+      $rc[-1] =~ s/ \((.*)\)/ $1/;
+      $rc[-1] =~ s/(<|>){2}/$1/;
+      splice(@s, 0, 2);
+    }
+  }
   $r->{'provides'} = \@pr;
   $r->{'requires'} = \@re;
-  $r->{'recommends'} = \@rc;
   $r->{'conflicts'} = \@co;
   $r->{'obsoletes'} = \@ob;
+  $r->{'recommends'} = \@rc;
+  $r->{'supplements'} = \@su;
   $repo{$pack} = $r;
 }
 
