@@ -753,6 +753,16 @@ else
 
 fi
 
+# XXX: should use an option instead of looking at the recipe?
+CREATE_PREINSTALL_DATA=
+case ${PKGS[0]} in
+  _preinstallimage | */_preinstallimage | _service:*:_preinstallimage | */_service:*:_preinstallimage)
+    mkdir -p $BUILD_ROOT/.preinstall_image
+    CREATE_PREINSTALL_DATA=true
+    echo "saving package data for preinstallimage generation"
+    ;;
+esac
+  
 #
 # test if we need to preinstall
 #
@@ -927,7 +937,7 @@ for PKG in $MAIN_LIST ; do
 
     # get the hdrmd5 if we want to create a preinstall image
     PKG_HDRMD5=
-    if test -d $BUILD_ROOT/.preinstall_image -a ! -e $BUILD_ROOT/.preinstall_image/$PKG ; then
+    if test -n "$CREATE_PREINSTALL_DATA" -a ! -e $BUILD_ROOT/.preinstall_image/$PKG ; then
 	PKG_HDRMD5=`perl -I$BUILD_DIR -MBuild -e 'print Build::queryhdrmd5($ARGV[0])' $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF`
 	test -n "$PKG_HDRMD5" || cleanup_and_exit 1
     fi
