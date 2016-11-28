@@ -865,13 +865,12 @@ if ! test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
     echo 'done'
 fi
 
-echo -n "querying package ids..."
+echo "querying package ids..."
 for PKG in $PACKAGES_TO_INSTALL ; do
     test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" || continue
     test -L "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" || continue
     echo "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF"
 done | "$BUILD_DIR/getbuildids" 
-echo 'done'
 
 #
 # get list and ids of already installed packages
