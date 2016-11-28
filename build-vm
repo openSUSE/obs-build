@@ -275,7 +275,7 @@ vm_parse_options() {
 # shutdown the system from inside the VM
 #
 vm_shutdown() {
-    test -n "$VM_WATCHDOG" && echo "### WATCHDOG MARKER START ###"
+    test -n "$VM_WATCHDOG" && echo "### VM INTERACTION START ###"
     cd /
     test -n "$1" || set 1
     if test -n "$VM_SWAP" -a -e "$VM_SWAP" ; then
@@ -411,10 +411,10 @@ background_watchdog() {
     WATCHDOG_START=
     WATCHDOG_TIMEOUT=300
     while sleep 5 ; do
-	WATCH=`grep -a "### WATCHDOG MARKER" "$LOGFILE" | tail -n 1`
+	WATCH=`grep -a "### VM INTERACTION" "$LOGFILE" | tail -n 1`
 	case $WATCH in
-	    *WATCHDOG\ MARKER\ START*) test -n "$WATCHDOG_START" || WATCHDOG_START=`date +%s` ;;
-	    *WATCHDOG\ MARKER\ END*) WATCHDOG_START= ;;
+	    *VM\ INTERACTION\ START*) test -n "$WATCHDOG_START" || WATCHDOG_START=`date +%s` ;;
+	    *VM\ INTERACTION\ END*) WATCHDOG_START= ;;
 	esac
 	if test -n "$WATCHDOG_START" ; then
 	    NOW=`date +%s`
@@ -478,7 +478,7 @@ vm_detect_2nd_stage() {
 	cleanup_and_exit $?
     fi
 
-    test -n "$VM_WATCHDOG" -a -z "$PERSONALITY_SET" && echo "### WATCHDOG MARKER END ###"
+    test -n "$VM_WATCHDOG" -a -z "$PERSONALITY_SET" && echo "### VM INTERACTION END ###"
     echo "2nd stage started in virtual machine"
     # fedora packages sometimes do not have the needed links
     ldconfig
@@ -833,18 +833,19 @@ vm_first_stage() {
     fi
     vm_detach_root
 
+    echo "booting $VM_TYPE..."
+
     # start watchdog if requested
     if test -n "$VM_WATCHDOG" ; then
 	start_watchdog
-	echo "### WATCHDOG MARKER START ###"
+	echo "### VM INTERACTION START ###"
     fi
 
-    echo "booting $VM_TYPE..."
     vm_startup
 
     # kill watchdog again
     if test -n "$VM_WATCHDOG" ; then
-	echo "### WATCHDOG MARKER END ###"
+	echo "### VM INTERACTION END ###"
 	kill_watchdog
     fi
 
