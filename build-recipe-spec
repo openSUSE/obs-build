@@ -203,12 +203,10 @@ recipe_run_rpmlint() {
     rpmlint_logfile=$TOPDIR/OTHER/rpmlint.log
     rm -f "$BUILD_ROOT$rpmlint_logfile"
     ret=0
-    mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
     chroot $BUILD_ROOT su -s /opt/testing/bin/rpmlint "$BUILD_USER" -- \
 	    --info ${LINT_RPM_FILE_LIST[*]#$BUILD_ROOT} \
 	    ${SRPM_FILE_LIST[*]#$BUILD_ROOT} > >(tee "$BUILD_ROOT$rpmlint_logfile") 2>&1 || ret=1
     echo
-    umount -n $BUILD_ROOT/proc 2>/dev/null || true 
     if test "$ret" = 1 ; then 
 	cleanup_and_exit 1
     fi   
@@ -217,7 +215,6 @@ recipe_run_rpmlint() {
 recipe_compare_oldpackages() {
     if test -x "$BUILD_ROOT/usr/lib/build/same-build-result.sh" ; then 
 	echo "... comparing built packages with the former built"
-	mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
 	if chroot $BUILD_ROOT /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/RPMS" "$TOPDIR/SRPMS"; then 
 	    chroot $BUILD_ROOT touch /.build/.same_result_marker
 	    # XXX: dirty build service hack. fix bs_worker. Search for
@@ -226,7 +223,6 @@ recipe_compare_oldpackages() {
 		exitcode=2
 	    fi
 	fi
-	umount -n $BUILD_ROOT/proc 2>/dev/null || true 
     fi   
 }
 

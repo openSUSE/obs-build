@@ -571,7 +571,6 @@ create_baselibs() {
 	pkgs=($RPMS)
     fi
 
-    mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
     # don't use -R as extracted sources, build root etc might be below $TOPDIR
     chown "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"/* "$BUILD_ROOT$TOPDIR"/RPMS/* || true
 
@@ -1403,6 +1402,11 @@ if test -n "$RUNNING_IN_VM" -a -n "$DO_STATISTICS" ; then
     touch /.build/_statistics.exit
 fi
 
+# mount /proc for the post processing steps
+if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
+    mount -n -tproc none $BUILD_ROOT/proc
+fi
+
 RPMS=`find $BUILD_ROOT/$TOPDIR/RPMS -type f -name "*.rpm" 2>/dev/null || true`
 DEBS=`find $BUILD_ROOT/$TOPDIR/DEBS -type f -name "*.deb" 2>/dev/null || true`
 
@@ -1412,7 +1416,7 @@ fi
 
 if test -n "$RPMS" -a -d "$BUILD_ROOT/usr/lib/build/checks" ; then
     export DO_RPM_REMOVE=true
-    # workaround for broken 13.1 check scripts which want to umount /proc
+    # workaround for broken 13.1 check scripts which umount /proc
     if test -n "$RUNNING_IN_VM" -a "$BUILD_ROOT" = / ; then
         umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2>/dev/null
     fi
@@ -1421,12 +1425,12 @@ if test -n "$RPMS" -a -d "$BUILD_ROOT/usr/lib/build/checks" ; then
     for SRPM in $BUILD_ROOT/$TOPDIR/SRPMS/*src.rpm ; do
 	test -f "$SRPM" && PNAME=`rpm --nodigest --nosignature -qp --qf "%{NAME}" $SRPM`
     done
-    mount -n -tproc none $BUILD_ROOT/proc 2> /dev/null
     for CHECKSCRIPT in $BUILD_ROOT/usr/lib/build/checks/* ; do
 	echo "... running ${CHECKSCRIPT##*/}"
 	$CHECKSCRIPT || cleanup_and_exit 1
     done
-    umount -n $BUILD_ROOT/proc 2>/dev/null || true
+    # workaround for broken 13.1 check scripts which umount /proc
+    test -e "$BUILD_ROOT/proc/self" || mount -n -tproc none $BUILD_ROOT/proc
 fi
 
 # checkscripts may have deleted some binaries
