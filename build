@@ -1391,7 +1391,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 
     # unmount stuff
     if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
-	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
+	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2>/dev/null || true
 	umount -n $BUILD_ROOT/proc 2>/dev/null || true
 	umount -n $BUILD_ROOT/dev/pts 2>/dev/null || true
 	umount -n $BUILD_ROOT/dev/shm 2>/dev/null || true
@@ -1412,6 +1412,10 @@ fi
 
 if test -n "$RPMS" -a -d "$BUILD_ROOT/usr/lib/build/checks" ; then
     export DO_RPM_REMOVE=true
+    # workaround for broken 13.1 check scripts which want to umount /proc
+    if test -n "$RUNNING_IN_VM" -a "$BUILD_ROOT" = / ; then
+        umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2>/dev/null
+    fi
     # find package name
     export PNAME=
     for SRPM in $BUILD_ROOT/$TOPDIR/SRPMS/*src.rpm ; do
