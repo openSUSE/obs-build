@@ -409,7 +409,7 @@ perform_image_build() {
 	echo "running kiwi --prepare for $imgtype..."
     fi
     # Do not use $BUILD_USER here, since we always need root permissions
-    prepare_call="cd $TOPDIR/SOURCES && rm -rf $TOPDIR/KIWIROOT-$imgtype"
+    prepare_call="export RELEASE=$RELEASE; cd $TOPDIR/SOURCES && rm -rf $TOPDIR/KIWIROOT-$imgtype"
     if [ "$legacy" = "true" ]; then
         prepare_call="$prepare_call && /usr/sbin/kiwi --logfile terminal"
     else
@@ -432,7 +432,7 @@ perform_image_build() {
 	echo "running kiwi --create for $imgtype..."
     fi
     mkdir -p $BUILD_ROOT/$TOPDIR/KIWI-$imgtype
-    create_call="cd $TOPDIR/SOURCES"
+    create_call="export RELEASE=$RELEASE; cd $TOPDIR/SOURCES"
     if [ "$legacy" = "true" ]; then
         create_call="$create_call && LANG=en_US.UTF-8 /usr/sbin/kiwi"
         create_call="$create_call --logfile terminal"
