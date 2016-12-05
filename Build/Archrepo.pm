@@ -28,6 +28,7 @@ if (!defined &Archive::Tar::iter) {
   *Archive::Tar::iter = sub {
     my ($class, $filename) = @_;
     die("Archive::Tar is not available\n") unless defined &Archive::Tar::new;
+    Archive::Tar->new();
     my $handle = $class->_get_handle($filename, 1, 'rb') or return undef;
     my @data;
     return sub {
@@ -80,7 +81,7 @@ sub parse {
   my $lastfn = '';
   my $d;
   while ($e = $repodb->()) {
-    next unless $e->type() == Archive::Tar::Constant::FILE;
+    next unless $e->type() == Archive::Tar::Constant::FILE();
     my $fn = $e->name();
     next unless $fn =~ s/\/(?:depends|desc|files)$//s;
     if ($lastfn ne $fn) {
