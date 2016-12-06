@@ -127,12 +127,14 @@ set +e
 	fi
 	if [ -n "$message" ]; then
 		echo -e "- $message"
-		echo
 	elif [ -n "$content" ]; then
 		cat "$content"
-		echo
 	elif [ ! $just_edit ]; then
 		echo "- "
+	fi
+	if [ -f "$changelog" ] && [ -s "$changelog" ]; then
+		# Avoid double newlines at EOF on a new blank .changes file,
+		# but do provide enough spacing between preexisting log entries.
 		echo
 	fi
 	cat $changelog
