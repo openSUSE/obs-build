@@ -457,7 +457,7 @@ perform_image_bundle() {
     local profile=$3
     local bundle_call
 
-    kiwi_profile=""
+    local kiwi_profile=""
     if [ "$profile" != "__not__set" ]; then
         kiwi_profile="${profile}-"
     fi
