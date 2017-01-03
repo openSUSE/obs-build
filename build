@@ -696,7 +696,7 @@ run_rsync() {
     fi
 }
 
-wipe_build_environement() {
+wipe_build_environment() {
     if test -n "$VM_TYPE"; then
 	vm_img_wipe
     else
