@@ -588,6 +588,10 @@ else
 	    if test "$mmap_min_addr" != 0 ; then
 		echo "Warning: mmap_min_addr is != 0. If programs fail at mmap this could be the reason."
 	    fi
+	    # FIXME: be more clever on which qemu binaries we need
+	    echo "copying qemu-linux-user binaries to $BUILD_ROOT/usr/bin"
+	    mkdir -p $BUILD_ROOT/usr/bin
+	    cp -av /usr/bin/qemu-* $BUILD_ROOT/usr/bin
 	fi
     fi
 
