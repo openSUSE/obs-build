@@ -410,6 +410,7 @@ background_monitor_process() {
 background_watchdog() {
     WATCHDOG_START=
     WATCHDOG_TIMEOUT=300
+    BUILD_OPTIONS_PARSED=
     while sleep 5 ; do
 	WATCH=`grep -a "### VM INTERACTION" "$LOGFILE" | tail -n 1`
 	case $WATCH in
@@ -421,11 +422,11 @@ background_watchdog() {
 	    ELAPSED=$((NOW-WATCHDOG_START))
 	    if test $ELAPSED -gt $WATCHDOG_TIMEOUT ; then
 		# kill the VM
-		 echo "### WATCHDOG TRIGGERED, KILLING VM ###"
-	    fuser -k -TERM "$VM_IMAGE"
-	    exit 0
-       fi
-    fi
+		echo "### WATCHDOG TRIGGERED, KILLING VM ###"
+		vm_kill
+	        exit 0
+            fi
+        fi
     done
 }
 
