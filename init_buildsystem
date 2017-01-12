@@ -515,7 +515,7 @@ touch $BUILD_IS_RUNNING
 # mount /proc and /dev/pts
 mkdir -p $BUILD_ROOT/proc
 mkdir -p $BUILD_ROOT/dev/pts
-if test "$UID" = 0 -a -n "$BUILD_ROOT" -a "$BUILD_ROOT" = / ; then
+if test "$UID" = 0 -a -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
     mount -n -tproc none "$BUILD_ROOT/proc"
     mount -n -tdevpts -omode=0620,gid=5 none "$BUILD_ROOT/dev/pts"
 fi
