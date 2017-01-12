@@ -339,10 +339,10 @@ vm_img_create() {
 vm_img_wipe() {
     vm_wipe_$VM_TYPE "$@"
 
-    if test -n "$VM_IMAGE" -a ! -b "$VM_IMAGE" ; then
+    if test -n "$VM_IMAGE" -a "$VM_IMAGE" != __not_attached__ -a ! -b "$VM_IMAGE" ; then
        rm -f "$VM_IMAGE"
     fi
-    if test -n "$VM_SWAP" -a ! -b "$VM_SWAP" ; then
+    if test -n "$VM_SWAP" -a "$VM_SWAP" != __not_attached__ -a ! -b "$VM_SWAP" ; then
        rm -f "$VM_SWAP"
     fi
 }
@@ -599,32 +599,32 @@ vm_setup() {
     vm_set_mount_options
     if test "$VM_IMAGE" = 1 ; then
 	VM_IMAGE="$BUILD_ROOT.img"
-	if test -z "$VM_SWAP" -a "$VM_TYPE" != emulator; then
+	if test -z "$VM_SWAP" -a "$VM_TYPE" != emulator ; then
 	    VM_SWAP="$BUILD_ROOT.swap"
 	fi
-	echo "VM_IMAGE: $VM_IMAGE, VM_SWAP: $VM_SWAP"
-    else
-	echo "VM_IMAGE: $VM_IMAGE, VM_SWAP: $VM_SWAP"
-        vm_attach_root
     fi
+    echo "VM_IMAGE: $VM_IMAGE, VM_SWAP: $VM_SWAP"
+    vm_attach_root
     # this should not be needed, but sometimes a xen instance got lost
     test "$VM_TYPE" = xen && vm_purge_xen
     if test -n "$VMDISK_CLEAN" ; then
 	# delete old root/swap to get rid of the old blocks
-	if test -n "$VM_IMAGE" -a -f "$VM_IMAGE" ; then
+	if test -n "$VM_IMAGE" -a "$VM_IMAGE" != __not_attached__ -a -f "$VM_IMAGE" ; then
 	    echo "Deleting old $VM_IMAGE"
 	    rm -rf "$VM_IMAGE"
 	fi
-	if test -n "$VM_SWAP" -a -f "$VM_SWAP" ; then
+	if test -n "$VM_SWAP" -a "$VM_SWAP" != __not_attached__ -a -f "$VM_SWAP" ; then
 	    echo "Deleting old $VM_SWAP"
 	    rm -rf "$VM_SWAP"
 	fi
     fi
-    test -b "$VM_IMAGE" || vm_img_create "$VM_IMAGE" "$VMDISK_ROOTSIZE"
+    if test ! -b "$VM_IMAGE" ; then
+	vm_img_create "$VM_IMAGE" "$VMDISK_ROOTSIZE"
+    fi
     if test -z "$CLEAN_BUILD" ; then
         vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE"
     fi
-    if test -n "$VM_SWAP" -a ! -b "$VM_SWAP" ; then
+    if test -n "$VM_SWAP" -a "$VM_SWAP" != __not_attached__ -a ! -b "$VM_SWAP" ; then
 	vm_img_create "$VM_SWAP" "$VMDISK_SWAPSIZE"
     fi
     if test ! -e "$VM_IMAGE" ; then
