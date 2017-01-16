@@ -24,11 +24,11 @@
 # defaults for vm_img_mkfs
 vm_img_mkfs_ext4_options='-O ^has_journal,^huge_file,^resize_inode,sparse_super'
 vm_img_mkfs_ext4_extra='-E lazy_itable_init,discard'
-vm_img_mkfs_ext4="mkfs.ext4 -m 0 -q -F $vm_img_mkfs_ext4_options"
+vm_img_mkfs_ext4="mkfs.ext4 -L obsrootfs -m 0 -q -F $vm_img_mkfs_ext4_options"
 vm_img_tunefs_ext4='tune2fs -c 0'
-vm_img_mkfs_ext3='mkfs.ext3 -m 0 -q -F'
+vm_img_mkfs_ext3='mkfs.ext3 -L obsrootfs -m 0 -q -F'
 vm_img_tunefs_ext3='tune2fs -c 0 -o journal_data_writeback'
-vm_img_mkfs_ext2='mkfs.ext2 -m 0 -q -F'
+vm_img_mkfs_ext2='mkfs.ext2 -L obsrootfs -m 0 -q -F'
 vm_img_tunefs_ext2='tune2fs -c 0'
 vm_img_mkfs_reiserfs='mkreiserfs -q -f'
 vm_img_mkfs_btrfs='mkfs.btrfs'
@@ -57,6 +57,7 @@ VMDISK_SWAPSIZE=1024
 VMDISK_FILESYSTEM=
 VMDISK_MOUNT_OPTIONS=__default
 VMDISK_CLEAN=
+VM_VOLUME_GRUB=
 VM_VOLUME_NAME=
 VM_VOLUME_SWAP=
 VM_HOSTNAME=
@@ -169,16 +170,6 @@ vm_parse_options() {
 	VM_SERVER="$ARG"
 	shift
       ;;
-      -vm-volumes)
-	needarg
-	VM_VOLUME_NAME="$ARG"
-	shift
-        ARG="$1"
-        test "$ARG" = "${ARG#-}" || ARG=
-	needarg
-	VM_VOLUME_SWAP="$ARG"
-	shift
-      ;;
       -vm-disk)
 	needarg
 	VM_IMAGE="$ARG"
@@ -268,6 +259,11 @@ vm_parse_options() {
       -vm-custom-opt)
         needarg
         VM_CUSTOMOPT="$ARG"
+        shift
+      ;;
+      -os-flavor)
+        needarg
+        VM_OS_FLAVOR="$ARG"
         shift
       ;;
       -*)
@@ -526,7 +522,7 @@ vm_detect_2nd_stage() {
     mount -n -ttmpfs none /dev/shm
 
     if test -n "$VM_SWAP" ; then
-	if "$VM_SWAP" != "${VM_SWAP#LABEL=}" ; then
+	if test "$VM_SWAP" != "${VM_SWAP#LABEL=}" ; then
 	    i=$(blkid -l -o device -t "$VM_SWAP")
 	    if test "$i" = "${i#/}" ; then
 		cleanup_and_exit 1 "could not find swap device with $VM_SWAP"
@@ -669,9 +665,9 @@ vm_setup() {
     if test -n "$VM_SWAP" ; then
 	vm_attach_swap
 	dd if=/dev/zero of="$VM_SWAP" bs=1024 count=1 conv=notrunc 2>/dev/null
-	if "$VM_SWAPDEV" != "${VM_SWAPDIR#LABEL=}"; then
+	if test "$VM_SWAPDEV" != "${VM_SWAPDEV#LABEL=}"; then
 	    # call mkswap to set a label
-	    mkswap -L "${VM_SWAPDIR#LABEL=}" "$VM_SWAP"
+	    mkswap -L "${VM_SWAPDEV#LABEL=}" "$VM_SWAP"
 	fi
 	vm_detach_swap
         # mkswap happens inside of the vm
