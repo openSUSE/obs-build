@@ -438,6 +438,8 @@ shellquote() {
 # through /bin/su -c
 toshellscript() {
     echo "#!/bin/sh -x"
+    echo "export PYTHONHASHSEED=42"
+    echo "export PERL_HASH_SEED=42"
     echo -n exec
     shellquote "$@"
     echo
