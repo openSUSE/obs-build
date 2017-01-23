@@ -178,6 +178,7 @@ vm_verify_options_kvm() {
 	    ;;
     esac
 
+    test -n "$VM_CUSTOMOPT" && kvm_options="$kvm_options $VM_CUSTOMOPT"
     if test -n "$VM_NETOPT" -o -n "$VM_NETDEVOPT" ; then
         if test -n "$VM_NETOPT" ; then
            for item in "${VM_NETOPT[@]}" ; do
