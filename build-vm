@@ -262,6 +262,10 @@ vm_parse_options() {
         VM_DEVICEOPT=("${VM_DEVICEOPT[@]}" "$ARG")
         shift
       ;;
+      -vm-custom-opt)
+        needarg
+        VM_CUSTOMOPT="$ARG"
+        shift
       -*)
 	return 1
       ;;
