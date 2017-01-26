@@ -105,7 +105,6 @@ RUN_SHELL=
 CCACHE=
 DLNOSIGNATURE=
 CACHE_DIR=/var/cache/build
-MYHOSTNAME=
 
 
 # This is for insserv

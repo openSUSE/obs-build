@@ -58,6 +58,7 @@ VMDISK_MOUNT_OPTIONS=__default
 VMDISK_CLEAN=
 VM_VOLUME_NAME=
 VM_VOLUME_SWAP=
+VM_HOSTNAME=
 
 # zvm specific?
 VM_WORKER_NR=
@@ -542,7 +543,7 @@ vm_detect_2nd_stage() {
 	mkswap "$VM_SWAP"
 	swapon -v "$VM_SWAP" || exit 1
     fi
-    HOST="$MYHOSTNAME"
+    HOST="$VM_HOSTNAME"
 
     # repair dracut damage, see bsc#922676
     test -L /var/run -a ! -e /var/run && rm -f /var/run
@@ -781,7 +782,7 @@ vm_first_stage() {
     esac
     test "$VM_TYPE" = lxc -o "$VM_TYPE" = docker && PERSONALITY=0
     echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
-    echo "MYHOSTNAME='$HOST'" >> $BUILD_ROOT/.build/build.data
+    echo "VM_HOSTNAME='$HOST'" >> $BUILD_ROOT/.build/build.data
     echo -n "definesnstuff=(" >> $BUILD_ROOT/.build/build.data
     shellquote "${definesnstuff[@]}" >> $BUILD_ROOT/.build/build.data
     echo ")" >> $BUILD_ROOT/.build/build.data
@@ -966,8 +967,8 @@ vm_setup_network() {
 	    cleanup_and_exit 1 "ERROR: neither /sbin/ifconfig nor /sbin/ip is installed, please specify correct package via -x option"
 	fi
     fi
-    if test -n "$MYHOSTNAME" ; then 
-	hostname "$MYHOSTNAME"
+    if test -n "$VM_HOSTNAME" ; then 
+	hostname "$VM_HOSTNAME"
     fi
     if test -n "$VM_TELNET"; then 
 	echo WARNING: telnet option used, setting up telnet server ${VM_TELNET_DEVICE}
