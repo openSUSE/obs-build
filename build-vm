@@ -776,7 +776,7 @@ vm_first_stage() {
     esac
     test "$VM_TYPE" = lxc -o "$VM_TYPE" = docker && PERSONALITY=0
     echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
-    echo "MYHOSTNAME='`hostname`'" >> $BUILD_ROOT/.build/build.data
+    echo "MYHOSTNAME='$HOST'" >> $BUILD_ROOT/.build/build.data
     echo -n "definesnstuff=(" >> $BUILD_ROOT/.build/build.data
     shellquote "${definesnstuff[@]}" >> $BUILD_ROOT/.build/build.data
     echo ")" >> $BUILD_ROOT/.build/build.data
