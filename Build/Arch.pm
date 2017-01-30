@@ -34,7 +34,7 @@ eval { require Archive::Tar; };
 sub quote {
   my ($str, $q, $vars) = @_;
   if ($q ne "'" && $str =~ /\$/) {
-    $str =~ s/\$([a-zA-Z0-9_]+|\{([^\}]+)\})/$vars->{$2 || $1} ? join(' ', @{$vars->{$2 || $1}}) : "\$$1"/ge;
+    $str =~ s/\$([a-zA-Z0-9_]+|\{([^\}]+)\})/join(' ', @{$vars->{$2 || $1} || []})/ge;
   }
   $str =~ s/([ \t\"\'\$])/sprintf("%%%02X", ord($1))/ge;
   return $str;
@@ -49,7 +49,7 @@ sub unquotesplit {
     last unless $str =~ s/$q(.*?)$q/quote($1, $q, $vars)/e;
   }
   if ($str =~ /\$/) {
-    $str =~ s/\$([a-zA-Z0-9_]+|\{([^\}]+)\})/$vars->{$2 || $1} ? join(' ', @{$vars->{$2 || $1}}) : "\$$1"/ge;
+    $str =~ s/\$([a-zA-Z0-9_]+|\{([^\}]+)\})/join(' ', @{$vars->{$2 || $1} || []})/ge;
   }
   my @args = split(/[ \t]+/, $str);
   for (@args) {
@@ -67,14 +67,39 @@ sub parse {
     return $ret;
   }
   my %vars;
+  my @ifs;
   while (<PKG>) {
     chomp;
     next if /^\s*$/;
     next if /^\s*#/;
-    last unless /^([a-zA-Z0-9_]*)=(\(?)(.*?)$/;
+    s/^\s+//;
+    if (/^(el)?if\s+(?:(?:test|\[)\s+(-n|-z)\s+)?(.*?)\s*\]?\s*;\s*then\s*$/) {
+      if ($1) {
+        $ifs[-1] += 1;
+        next if $ifs[-1] != 1;
+        pop @ifs;
+      }
+      my $flag = $2 || '-n';
+      my $t = join('', unquotesplit($3, \%vars));
+      $t = $t eq '' ? 'true' : '' if $flag eq '-z';
+      push @ifs, $t ne '' ? 1 : 0;
+      next;
+    }
+    if (@ifs) {
+      if (/^fi\s*$/) {
+        pop @ifs;
+        next;
+      } elsif (/^else\s*$/) {
+        $ifs[-1] += 1;
+        next;
+      }
+      next if grep {$_ != 1} @ifs;
+    }
+    last unless /^([a-zA-Z0-9_]*)(\+?)=(\(?)(.*?)$/;
     my $var = $1;
-    my $val = $3;
-    if ($2) {
+    my $app = $2;
+    my $val = $4;
+    if ($3) {
       while ($val !~ s/\)\s*(?:#.*)?$//s) {
 	my $nextline = <PKG>;
 	last unless defined $nextline;
@@ -82,7 +107,11 @@ sub parse {
 	$val .= ' ' . $nextline;
       }
     }
-    $vars{$var} = [ unquotesplit($val, \%vars) ];
+    if ($app) {
+      push @{$vars{$var}}, unquotesplit($val, \%vars);
+    } else {
+      $vars{$var} = [ unquotesplit($val, \%vars) ];
+    }
   }
   close PKG;
   $ret->{'name'} = $vars{'pkgname'}->[0] if $vars{'pkgname'};
