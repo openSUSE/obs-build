@@ -61,6 +61,10 @@ recipe_build_debootstrap() {
 	chown "$ABUILD_UID:$ABUILD_GID" $BUILD_ROOT/$myroot/home/abuild
     fi
 
+    if ! test -e $BUILD_ROOT/$myroot/etc/hosts ; then
+        cp $BUILD_ROOT/etc/hosts $BUILD_ROOT/$myroot/etc/hosts
+    fi
+
     # move topdir over
     mv "$BUILD_ROOT/$TOPDIR" "$BUILD_ROOT/$myroot/${TOPDIR%/*}"
 
