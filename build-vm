@@ -526,7 +526,7 @@ vm_detect_2nd_stage() {
 
     if test -n "$VM_SWAP" ; then
 	if "$VM_SWAP" != "${VM_SWAP#LABEL=}" ; then
-	    i=$(-l -o device -t "$VM_SWAP")
+	    i=$(blkid -l -o device -t "$VM_SWAP")
 	    if test "$i" = "${i#/}" ; then
 		cleanup_and_exit 1 "could not find swap device with $VM_SWAP"
 	    fi
