@@ -525,6 +525,14 @@ vm_detect_2nd_stage() {
     mount -n -ttmpfs none /dev/shm
 
     if test -n "$VM_SWAP" ; then
+	if "$VM_SWAP" != "${VM_SWAP#LABEL=}" ; then
+	    i=$(-l -o device -t "$VM_SWAP")
+	    if test "$i" = "${i#/}" ; then
+		cleanup_and_exit 1 "could not find swap device with $VM_SWAP"
+	    fi
+	    echo "resolved swap device $VM_SWAP to $i"
+	    VM_SWAP=$i
+	fi
 	for i in 1 2 3 4 5 6 7 8 9 10 ; do
 	    test -e "$VM_SWAP" && break
 	    test $i = 1 && echo "waiting for $VM_SWAP to appear"
@@ -660,6 +668,10 @@ vm_setup() {
     if test -n "$VM_SWAP" ; then
 	vm_attach_swap
 	dd if=/dev/zero of="$VM_SWAP" bs=1024 count=1 conv=notrunc 2>/dev/null
+	if "$VM_SWAPDEV" != "${VM_SWAPDIR#LABEL=}"; then
+	    # call mkswap to set a label
+	    mkswap -L "${VM_SWAPDIR#LABEL=}" "$VM_SWAP"
+	fi
 	vm_detach_swap
         # mkswap happens inside of the vm
     fi
