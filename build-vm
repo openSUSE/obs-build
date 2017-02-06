@@ -34,7 +34,8 @@ vm_img_mkfs_reiserfs='mkreiserfs -q -f'
 vm_img_mkfs_btrfs='mkfs.btrfs'
 vm_img_mkfs_xfs='mkfs.xfs -f'
 
-# guest visible swap device
+# guest visible devices
+VM_ROOTDEV=/dev/hda1
 VM_SWAPDEV=/dev/hda2
 
 VM_TYPE=

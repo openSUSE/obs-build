@@ -90,9 +90,8 @@ vm_verify_options_openstack() {
 	cleanup_and_exit 3 "ERROR: No VM server nod name specified (usually this instance)."
     fi
 
-    # XXX why here?
+    VM_ROOTDEV=/dev/vda
     VM_SWAPDEV=/dev/vdb
-    qemu_rootdev=/dev/vda
 }
 
 vm_attach_root_openstack() {
