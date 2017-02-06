@@ -246,14 +246,14 @@ vm_startup_kvm() {
 	test "$kvm_console" != ttyAMA0 && kvm_options="$kvm_options -cpu host"
 	test -n "$HUGETLBFSPATH" && kvm_options="$kvm_options -mem-prealloc -mem-path $HUGETLBFSPATH"
     fi
-    qemu_rootfstype=""
+    qemu_append="root=$VM_ROOTDEV"
     if test -n "$VMDISK_FILESYSTEM" ; then
-        qemu_rootfstype="rootfstype=$VMDISK_FILESYSTEM"
+        qemu_append="$qemu_append rootfstype=$VMDISK_FILESYSTEM"
     fi
-    qemu_rootflags=""
     if test -n "$VMDISK_MOUNT_OPTIONS" ; then
-        qemu_rootflags="rootflags=${VMDISK_MOUNT_OPTIONS#-o }"
+        qemu_append="$qemu_append rootflags=${VMDISK_MOUNT_OPTIONS#-o }"
     fi
+    qemu_append="$qemu_append panic=1 quiet no-kvmclock nmi_watchdog=0 rw rd.driver.pre=binfmt_misc elevator=noop console=$kvm_console init=$vm_init_script"
     if test -z "$VM_NETOPT" -a -z "$VM_NETDEVOPT"; then
         kvm_options="$kvm_options -net none"
     fi
@@ -263,7 +263,7 @@ vm_startup_kvm() {
     set -- $qemu_bin -nodefaults -no-reboot -nographic -vga none $kvm_options \
 	-kernel $vm_kernel \
 	-initrd $vm_initrd \
-	-append "root=$VM_ROOTDEV $qemu_rootfstype $qemu_rootflags panic=1 quiet no-kvmclock nmi_watchdog=0 rw rd.driver.pre=binfmt_misc elevator=noop console=$kvm_console init=$vm_init_script" \
+	-append "$qemu_append" \
 	${VM_MEMSIZE:+-m $VM_MEMSIZE} \
 	"${qemu_args[@]}"
 
