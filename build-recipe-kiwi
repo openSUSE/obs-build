@@ -387,7 +387,10 @@ build_kiwi_product() {
     fi
 
     # move created product to destination
-    perform_product_bundle
+    # NOTE: older kiwi versions exit also in error case with 0
+    if [ "$BUILD_SUCCEEDED" = "true" ]; then
+        perform_product_bundle
+    fi
 }
 
 perform_image_build() {
