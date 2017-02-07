@@ -124,8 +124,8 @@ vm_startup_pvm(){
 }
 
 vm_verify_options_pvm(){
-    test -z "$VM_WORKER_NR" && VM_WORKER_NR=1
-    lpname="worker-$VM_WORKER_NR"
+    test -z "$VM_WORKER_NO" && VM_WORKER_NO=1
+    lpname="worker-$VM_WORKER_NO"
     lpartype="AIX/Linux"
     bootloader_size="8M"
     rootlv="$lpname"-root

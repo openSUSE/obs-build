@@ -266,7 +266,7 @@ vm_verify_options_zvm() {
     if test -z "$VM_WORKER" ; then
 	cleanup_and_exit 3 "ERROR: No z/VM worker id specified"
     fi
-    if test -z "$VM_WORKER_NR" ; then
+    if test -z "$VM_WORKER_NO" ; then
 	cleanup_and_exit 3 "ERROR: No z/VM worker number specified"
     fi
     # need the name for a kernel in zvm
@@ -284,7 +284,7 @@ vm_verify_options_zvm() {
     else
 	cleanup_and_exit 3 "ERROR: No z/VM initrd specified"
     fi
-    zvm_cp worker_init $VM_WORKER $VM_VOLUME_ROOT $VM_VOLUME_SWAP $VM_WORKER_NR
+    zvm_cp worker_init $VM_WORKER $VM_VOLUME_ROOT $VM_VOLUME_SWAP $VM_WORKER_NO
     zvm_cp volume_detach $VM_WORKER $VM_VOLUME_ROOT
     zvm_cp volume_detach $VM_WORKER $VM_VOLUME_SWAP
 }
@@ -329,7 +329,7 @@ vm_fixup_zvm() {
 }
 
 vm_attach_root_zvm() {
-    VM_IMAGE=$(ZVM_CLEANUP=1 zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_ROOT $zvm_mult_pass $VM_WORKER_NR )
+    VM_IMAGE=$(ZVM_CLEANUP=1 zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_ROOT $zvm_mult_pass $VM_WORKER_NO )
     if test "${VM_IMAGE}" = "${VM_IMAGE#dasd}" ; then
 	cleanup_and_exit 3 "did not get a real device for VM_IMAGE: $VM_IMAGE"
     fi
@@ -337,7 +337,7 @@ vm_attach_root_zvm() {
 }
 
 vm_attach_swap_zvm() {
-    VM_SWAP=$(ZVM_CLEANUP=1 zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_SWAP $zvm_mult_pass $VM_WORKER_NR )
+    VM_SWAP=$(ZVM_CLEANUP=1 zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_SWAP $zvm_mult_pass $VM_WORKER_NO )
     if test "${VM_SWAP}" = "${VM_SWAP#dasd}" ; then
 	cleanup_and_exit 3 "did not get a real device for VM_SWAP: $VM_SWAP"
     fi
@@ -345,20 +345,20 @@ vm_attach_swap_zvm() {
 }
 
 vm_detach_root_zvm () {
-    zvm_cp volume_detach_local $VM_VOLUME_ROOT $VM_WORKER_NR
+    zvm_cp volume_detach_local $VM_VOLUME_ROOT $VM_WORKER_NO
 }
 
 vm_detach_swap_zvm() {
-    zvm_cp volume_detach_local $VM_VOLUME_SWAP $VM_WORKER_NR
+    zvm_cp volume_detach_local $VM_VOLUME_SWAP $VM_WORKER_NO
 }
 
 vm_cleanup_zvm() {
-    if test -n "$VM_WORKER" -a -n "$VM_WORKER_NR" -a -n "$VM_VOLUME_ROOT" -a -n "$VM_VOLUME_SWAP" ; then
+    if test -n "$VM_WORKER" -a -n "$VM_WORKER_NO" -a -n "$VM_VOLUME_ROOT" -a -n "$VM_VOLUME_SWAP" ; then
 	ZVM_CLEANUP=1
 	(zvm_cp volume_detach $VM_WORKER $VM_VOLUME_ROOT >/dev/null 2>&1)
 	(zvm_cp volume_detach $VM_WORKER $VM_VOLUME_SWAP >/dev/null 2>&1)
-	(zvm_cp volume_detach_local $VM_VOLUME_ROOT $VM_WORKER_NR >/dev/null 2>&1)
-	(zvm_cp volume_detach_local $VM_VOLUME_SWAP $VM_WORKER_NR >/dev/null 2>&1)
+	(zvm_cp volume_detach_local $VM_VOLUME_ROOT $VM_WORKER_NO >/dev/null 2>&1)
+	(zvm_cp volume_detach_local $VM_VOLUME_SWAP $VM_WORKER_NO >/dev/null 2>&1)
     fi
 }
 

@@ -62,7 +62,7 @@ VM_VOLUME_SWAP=
 VM_HOSTNAME=
 
 # zvm specific?
-VM_WORKER_NR=
+VM_WORKER_NO=
 
 # kvm specific?
 HUGETLBFSPATH=
@@ -161,7 +161,7 @@ vm_parse_options() {
       ;;
       -vm-worker-nr|-vm-worker-no)
         needarg
-        VM_WORKER_NR="$ARG"
+        VM_WORKER_NO="$ARG"
         shift
       ;;
       -vm-server|-vm-region)
