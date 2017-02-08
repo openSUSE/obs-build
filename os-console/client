@@ -1,4 +1,6 @@
 #!/usr/bin/python
+# This tool is based on novaconsole
+# https://github.com/larsks/novaconsole/
 
 import os
 import sys
@@ -11,26 +13,12 @@ import select
 import socket
 import re
 
-class UserExit(Exception):
-    '''Raised inside the event loop when someone enters the disconnect
-    escape sequence.'''
-    pass
-
-
-#pd_pattern = re.compile("\[\s*[0-9\.]*]\s+reboot: Power down")
-#pk_pattern = re.compile("Failed to boot both default and fallback entries.")
-
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument('--escape', '-e',
-                   default='~')
     p.add_argument('url')
     return p.parse_args()
 
-
-def process_line(line_buffer,ll):
-    ll.write("<<<" + line_buffer + ">>>\n")
-    ll.flush()
+def process_line(line_buffer):
     if re.match("\[\s*[0-9\.]*]\s+reboot: Power down",line_buffer):
         raise UserExit
 
@@ -51,11 +39,7 @@ def run_until_exit():
     poll.register(ws, select.POLLIN)
     poll.register(sys.stdin, select.POLLIN)
 
-    sol = False  # True if we are at the start of a line
-    esc = False  # True if we are looking for an escape sequence
     line_buffer = ""
-    lf = open("./logfile","w",0)
-    ll = open("./linelog","w",0)
     while True:
         events = poll.poll()
         for fd, event in events:
@@ -65,32 +49,16 @@ def run_until_exit():
                 for c in data:
                     # reset line buffer on carrige return
                     if (re.match("(\r|\n)",c)):
-                         process_line(line_buffer,ll)
+                         process_line(line_buffer)
                          line_buffer = ""
                     else:
                         line_buffer += c
                 
 
             elif fd == sys.stdin.fileno():
+                # do nothing  then read the data
+                # as we are not in an interactive session
                 data = sys.stdin.read(1)
-
-                if sol and data == args.escape:
-                    esc = True
-                    continue
-
-                if esc:
-                    if data == '.':
-                        raise UserExit
-                    else:
-                        ws.send(args.escape)
-                        esc = False
-
-                ws.send(data)
-
-                if data == '\r':
-                    sol = True
-                else:
-                    sol = False
 
 
 def main():
@@ -118,5 +86,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
