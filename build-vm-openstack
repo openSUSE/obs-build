@@ -28,13 +28,13 @@ _get_field() {
 }
 
 _get_disk_state() {
-    OUT=$(cinder show "$1")
+    OUT=$($CINDERCLIENT show "$1")
     _get_field "$OUT" status
 }
 
 cinder_volume2id() {
   VM_VOL_NAME=$1
-  OUT=$(cinder show $VM_VOL_NAME)
+  OUT=$($CINDERCLIENT show $VM_VOL_NAME)
   _get_field "$OUT" id
 }
 
@@ -52,7 +52,7 @@ cloud_volume_attach_openstack() {
     # | serverId | 175e470c-5869-4425-988a-6b334a2fa655 |
     # | volumeId | 793e9a04-7068-4cf1-86e7-26509f709b54 |
     # +----------+--------------------------------------+
-    OUT=$(nova volume-attach "$VM_SERVER" "$VM_VOL_ID")
+    OUT=$($NOVACLIENT volume-attach "$VM_SERVER" "$VM_VOL_ID")
 
     if [ $? -gt 0 ] ; then
 	echo "ERROR: nova attach failed. $?" >&2
@@ -69,7 +69,7 @@ cloud_volume_attach_openstack() {
         fi
         if test "$state" = available ; then
 	    echo "WARNING: volume $VM_VOL_NAME got not attached, retrying" >&2
-	    OUT=`nova volume-attach "$VM_SERVER" "$VM_VOL_ID"`
+	    OUT=`$NOVACLIENT volume-attach "$VM_SERVER" "$VM_VOL_ID"`
 
 	    if [ $? -gt 0 ] ; then
 		echo "ERROR: nova attach failed. $?" >&2
@@ -97,7 +97,7 @@ cloud_volume_detach_openstack() {
     local VM_VOL_ID=${1:0:36}
 
     # needed at all?
-    nova volume-detach "$VM_SERVER" "$VM_VOL_ID"
+    $NOVACLIENT volume-detach "$VM_SERVER" "$VM_VOL_ID"
 
     state=`_get_disk_state $VM_VOL_ID`
 
@@ -113,7 +113,7 @@ cloud_volume_detach_openstack() {
     # umount seems not to be enough
     sync
     
-    if ! nova volume-detach "$VM_SERVER" "$VM_VOL_ID"; then
+    if ! $NOVACLIENT volume-detach "$VM_SERVER" "$VM_VOL_ID"; then
 	echo "ERROR: nova detach of $VM_VOL_ID failed." >&2
         return 3
     fi
@@ -126,7 +126,21 @@ cloud_volume_detach_openstack() {
 }
 
 vm_verify_options_openstack() {
-    # verify settings
+
+    # Checking for required tools (nova and cinder)
+    
+    NOVACLIENT=`type -p nova`
+    if test -z "$NOVACLIENT" ; then
+        cleanup_and_exit 3 "ERROR: nova not installed. Please install nova and try again"
+    fi
+
+    CINDERCLIENT=`type -p cinder`
+    if test -z "$CINDERCLIENT" ; then
+        cleanup_and_exit 3 "ERROR: nova not installed. Please install cinder and try again"
+    fi
+
+    # verify options
+
     if test -z "$OS_AUTH_URL" ; then
 	cleanup_and_exit 3 "ERROR: No openstack environment set. This vm-type works only inside of an openstack VM."
     fi
@@ -149,6 +163,8 @@ vm_verify_options_openstack() {
     if test -z "$VM_OS_FLAVOR" ; then
 	cleanup_and_exit 3 "ERROR: No VM openstack flavor set (--os-flavor <FLAVOR-NAME|FLAVOR-ID>)."
     fi
+
+    # set default values
 
     VM_ROOTDEV="LABEL=obsrootfs"
     VM_SWAPDEV="LABEL=obsswapfs"
@@ -207,21 +223,21 @@ vm_fixup_openstack() {
 
 vm_wipe_openstack() {
     if [ -n "$VM_WORKER" ];then
-         nova delete $VM_WORKER
+         $NOVACLIENT delete $VM_WORKER
     fi
 }
 
 vm_kill_openstack() {
-    if nova show "$VM_WORKER" >/dev/null 2>&1 ; then
-	if ! nova delete "$VM_WORKER" ; then
+    if $NOVACLIENT show "$VM_WORKER" >/dev/null 2>&1 ; then
+	if ! $NOVACLIENT delete "$VM_WORKER" ; then
             cleanup_and_exit 1 "could not kill openstack vm build $VM_VOLUME_NAME"
 	fi
     fi
 }
 wait_for_delete_instance() {
-    FOUND=`nova list|grep $VM_WORKER`
+    FOUND=`$NOVACLIENT list|grep $VM_WORKER`
     while [ -n "$FOUND" ];do
-       FOUND=`nova list|grep $VM_WORKER`
+       FOUND=`$NOVACLIENT list|grep $VM_WORKER`
        sleep 1
     done
 }
@@ -232,21 +248,21 @@ vm_startup_openstack() {
     VM_VOL_BOOT_ID=`cinder_volume2id ${VM_VOLUME_GRUB}`
 
     OUTPUT=`\
-      nova boot \
+      $NOVACLIENT boot \
 	--flavor $VM_OS_FLAVOR \
 	--block-device source=volume,dest=volume,bootindex=0,id=${VM_VOL_BOOT_ID}\
 	--block-device source=volume,dest=volume,bootindex=1,id=${VM_VOL_ROOT_ID}\
 	--block-device source=volume,dest=volume,bootindex=2,id=${VM_VOL_SWAP_ID}\
 	--poll "$VM_WORKER" || cleanup_and_exit 3\
     `
-    WS_URL=`nova get-serial-console $VM_WORKER|grep serial |perl -p -e 's#.*(ws://.*) \|#$1#'`
+    WS_URL=`$NOVACLIENT get-serial-console $VM_WORKER|grep serial |perl -p -e 's#.*(ws://.*) \|#$1#'`
     VM_BUILD_ID=`_get_field "$OUTPUT" id`
 
     if ! $BUILD_DIR/os-console/client "${WS_URL}";then
-      nova delete $VM_BUILD_ID
+      $NOVACLIENT delete $VM_BUILD_ID
       cleanup_and_exit 3
     else
-      nova delete $VM_BUILD_ID
+      $NOVACLIENT delete $VM_BUILD_ID
       wait_for_delete_instance
     fi
 }
