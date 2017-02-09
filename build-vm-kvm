@@ -178,7 +178,6 @@ vm_verify_options_kvm() {
 	    ;;
     esac
 
-    test -n "$VM_CUSTOMOPT" && kvm_options="$kvm_options $VM_CUSTOMOPT"
     if test -n "$VM_NETOPT" -o -n "$VM_NETDEVOPT" ; then
         if test -n "$VM_NETOPT" ; then
            for item in "${VM_NETOPT[@]}" ; do
@@ -259,6 +258,9 @@ vm_startup_kvm() {
     fi
     if test -n "$VM_TELNET"; then
         kvm_options="$kvm_options -netdev user,id=telnet,hostfwd=tcp:127.0.0.1:$VM_TELNET-:23 -device e1000,netdev=telnet"
+    fi
+    if test -n "$VM_CUSTOMOPT"; then
+        kvm_options="$kvm_options $VM_CUSTOMOPT"
     fi
     set -- $qemu_bin -nodefaults -no-reboot -nographic -vga none $kvm_options \
 	-kernel $vm_kernel \
