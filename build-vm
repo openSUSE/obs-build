@@ -220,10 +220,14 @@ vm_parse_options() {
 	shift
       ;;
       -vm-disk-mount-options|-vmdisk-mount-options)
-       needarg
-       # options needs to be quoted to handle argument which might start with "-o ..."
-       VMDISK_MOUNT_OPTIONS=$(echo $ARG | sed 's/^\"\(.*\)\"$/\1/g')
-       shift
+        needarg
+	VMDISK_MOUNT_OPTIONS="$ARG"
+        shift
+        # silly compat code for old bs_worker versions...
+	if test "$ARG" != "${ARG#\"}" -a "$ARG" != "${ARG%\"}" ; then
+	    VMDISK_MOUNT_OPTIONS="${VMDISK_MOUNT_OPTIONS#\"}"
+	    VMDISK_MOUNT_OPTIONS="${VMDISK_MOUNT_OPTIONS%\"}"
+	fi
       ;;
       -vm-disk-clean|-vmdisk-clean)
 	# delete old root/swap to get rid of the old blocks
