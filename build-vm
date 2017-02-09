@@ -220,14 +220,14 @@ vm_parse_options() {
 	shift
       ;;
       -vm-disk-mount-options|-vmdisk-mount-options)
-        needarg
+	needarg
 	VMDISK_MOUNT_OPTIONS="$ARG"
-        shift
-        # silly compat code for old bs_worker versions...
-	if test "$ARG" != "${ARG#\"}" -a "$ARG" != "${ARG%\"}" ; then
+	# silly code for compat with old bs_worker versions...
+	if test "$1" != "----noarg=$PARAM" -a "$ARG" != "${ARG#\"}" -a "$ARG" != "${ARG%\"}" ; then
 	    VMDISK_MOUNT_OPTIONS="${VMDISK_MOUNT_OPTIONS#\"}"
 	    VMDISK_MOUNT_OPTIONS="${VMDISK_MOUNT_OPTIONS%\"}"
 	fi
+	shift
       ;;
       -vm-disk-clean|-vmdisk-clean)
 	# delete old root/swap to get rid of the old blocks
