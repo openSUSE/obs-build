@@ -56,8 +56,6 @@ createrepo_debian() {
     rm -fr dists
 
     mkdir -p dists/${DIST}
-    # Suite is symlinked to Codename
-    ln -s ${DIST} dists/stable
 
     # create Packages and Sources files
     mkdir -p dists/${DIST}/main/binary-${ARCH}
@@ -75,6 +73,12 @@ createrepo_debian() {
     local RESULT=$?
     rm -f $BUILD_ROOT/.createrepo_debian.tmp.sh
     [ "${RESULT}" != 0 ] && return
+
+    # Only add symlinks after running dpkg-scanpackages to avoid
+    # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=809219, which is at
+    # least present in the Ubuntu xenial version of dpkg
+    # Suite is symlinked to Codename
+    ln -s ${DIST} dists/stable
 
     # create Release file
     pushd dists/${DIST} >/dev/null
