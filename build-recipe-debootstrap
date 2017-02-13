@@ -61,11 +61,26 @@ recipe_build_debootstrap() {
 	chown "$ABUILD_UID:$ABUILD_GID" $BUILD_ROOT/$myroot/home/abuild
     fi
 
+    if ! test -e $BUILD_ROOT/$myroot/etc/hosts ; then
+        cp $BUILD_ROOT/etc/hosts $BUILD_ROOT/$myroot/etc/hosts
+    fi
+
+    # Mount special filesystem in the debootstrap build root
+    mount -n -tproc none $BUILD_ROOT/$myroot/proc
+    mount -n -tdevpts -omode=0620,ptmxmode=0666,gid=5,newinstance, none $BUILD_ROOT/$myroot/dev/pts
+    mkdir -p $BUILD_ROOT/$myroot/dev/shm
+    mount -n -ttmpfs none $BUILD_ROOT/$myroot/dev/shm
+
     # move topdir over
     mv "$BUILD_ROOT/$TOPDIR" "$BUILD_ROOT/$myroot/${TOPDIR%/*}"
 
     # do the build
     dsc_build "$BUILD_ROOT/$myroot"
+
+    umount -n $BUILD_ROOT/$myroot/proc/sys/fs/binfmt_misc 2>/dev/null || true
+    umount -n $BUILD_ROOT/$myroot/proc
+    umount -n $BUILD_ROOT/$myroot/dev/pts
+    umount -n $BUILD_ROOT/$myroot/dev/shm
 
     # move topdir back
     mv "$BUILD_ROOT/$myroot/$TOPDIR" "$BUILD_ROOT/${TOPDIR%/*}"
