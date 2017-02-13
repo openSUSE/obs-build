@@ -126,6 +126,15 @@ recipe_build_livebuild() {
 
     [ -z "${ARCH}" -o -z "${DIST}" ] && cleanup_and_exit 1
 
+    # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=845651
+    # For our use case it makes sense to always return the testing codename,
+    # as creating a dependency on live-build-desc-sid would not make sense. In
+    # the example cited in the above bug, the metadata for sid would be incorrect
+    # anyway, and we would want the ones for potato.
+    if test "${DIST}" = "n/a" ; then
+	DIST=$(chroot $BUILD_ROOT su -c "sed 's/\(.*\)\/.*/\1/' /etc/debian_version")
+    fi
+
     test -d $BUILD_ROOT/.build.binaries || cleanup_and_exit 1
     if test "$DO_INIT" = true -o ! -d "$BUILD_ROOT/.build.binaries/dists" ; then
 	echo "creating repository metadata..."
