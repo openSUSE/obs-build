@@ -24,19 +24,23 @@
 
 
 OPENSTACK_BUILD_ID=
+OPENSTACK_VOLUME_GRUB=
+
+OPENSTACK_IMAGE_ATTACH_INFO=
+OPENSTACK_SWAP_ATTACH_INFO=
 
 openstack_get_field() {
     echo -n "$1"|perl -n -e "\$_ =~ /^\|\s+$2\s+\|\s+(\S*)\s+\|\$/ && print \$1"
 }
 
 openstack_get_disk_state() {
-    OUT=$($CINDERCLIENT show "$1")
+    local OUT=$($CINDERCLIENT show "$1")
     openstack_get_field "$OUT" status
 }
 
 openstack_cinder_volume2id() {
-    VM_VOL_NAME=$1
-    OUT=$($CINDERCLIENT show $VM_VOL_NAME)
+    local VM_VOL_NAME=$1
+    local OUT=$($CINDERCLIENT show $VM_VOL_NAME)
     openstack_get_field "$OUT" id
 }
 
@@ -54,16 +58,16 @@ cloud_volume_attach_openstack() {
     # | serverId | 175e470c-5869-4425-988a-6b334a2fa655 |
     # | volumeId | 793e9a04-7068-4cf1-86e7-26509f709b54 |
     # +----------+--------------------------------------+
-    OUT=$($NOVACLIENT volume-attach "$VM_SERVER" "$VM_VOL_ID")
+    local OUT=$($NOVACLIENT volume-attach "$VM_SERVER" "$VM_VOL_ID")
 
     if [ $? -gt 0 ] ; then
 	echo "ERROR: nova attach failed. $?" >&2
 	return 3
     fi
-    device_path=`openstack_get_field "$OUT" device`
-    serverId=`openstack_get_field "$OUT" serverId`
-    while true; do
-	state=`openstack_get_disk_state "$VM_VOL_NAME"`
+    local device_path=`openstack_get_field "$OUT" device`
+    local serverId=`openstack_get_field "$OUT" serverId`
+    while true ; do
+	local state=`openstack_get_disk_state "$VM_VOL_NAME"`
 	test "$state" = "in-use" && break
         if test -z "$state" ; then
 	    echo "ERROR: unable to find state of volume $VM_VOL_NAME" >&2
@@ -82,61 +86,42 @@ cloud_volume_attach_openstack() {
         sleep 3
     done
 
-    # Example:
+    # return attach info. Example:
     # 793e9a04-7068-4cf1-86e7-26509f709b54:175e470c-5869-4425-988a-6b334a2fa655:/dev/vdb
     echo "$VM_VOL_ID:$serverId:$device_path"
-
 }
 
 cloud_volume_detach_openstack() {
-
-    if [ "$1" = "__not_attached__" ];then
-        echo "Skipping detach because device is not attached to any server"
-        return 0
-    fi
-
     local VM_SERVER=${1:37:36}
     local VM_VOL_ID=${1:0:36}
 
-    if [ -z "$VM_SERVER" -o -z "$VM_VOL_ID" ];then
-        # Cannot proceed anyway - guess volume never got attached
-        echo "__not_attached__"
-        return 0
-    fi
+    test -z "$VM_SERVER" -o -z "$VM_VOL_ID" && cleanup_and_exit 1 "cloud_volume_detach_openstack: bad attach info"
 
     # needed at all?
     $NOVACLIENT volume-detach "$VM_SERVER" "$VM_VOL_ID"
 
     state=`openstack_get_disk_state $VM_VOL_ID`
-
-    while [ "$state" = detaching ];do
+    while test "$state" = detaching ; do
         sleep 1
         state=`openstack_get_disk_state $VM_VOL_ID`
     done
 
-    if [ "$state" = "available" ];then
-        echo "__not_attached__"
+    if test "$state" = "available" ; then
         return 0
     fi
-    # umount seems not to be enough
-    sync
     
     if ! $NOVACLIENT volume-detach "$VM_SERVER" "$VM_VOL_ID"; then
-	echo "ERROR: nova detach of $VM_VOL_ID failed." >&2
-        return 3
+	cleanup_and_exit 3 "ERROR: nova detach of $VM_VOL_ID failed."
     fi
-    while [ "$state" != "available" ]; do
+    while test "$state" != "available" ; do
         state=`openstack_get_disk_state $VM_VOL_ID`
 	sleep 3
     done
-    return 0
-
 }
 
 vm_verify_options_openstack() {
 
     # Checking for required tools (nova and cinder)
-    
     NOVACLIENT=`type -p nova`
     if test -z "$NOVACLIENT" ; then
         cleanup_and_exit 3 "ERROR: nova not installed. Please install nova and try again"
@@ -148,7 +133,6 @@ vm_verify_options_openstack() {
     fi
 
     # verify options
-
     if test -z "$OS_AUTH_URL" ; then
 	cleanup_and_exit 3 "ERROR: No openstack environment set. This vm-type works only inside of an openstack VM."
     fi
@@ -168,55 +152,60 @@ vm_verify_options_openstack() {
 	cleanup_and_exit 3 "ERROR: No VM worker node name specified (the instance to be created)."
     fi
 
-    if test -z "$VM_OS_FLAVOR" ; then
+    if test -z "$VM_OPENSTACK_FLAVOR" ; then
 	cleanup_and_exit 3 "ERROR: No VM openstack flavor set (--os-flavor <FLAVOR-NAME|FLAVOR-ID>)."
     fi
 
     # set default values
-
     VM_ROOTDEV="LABEL=obsrootfs"
     VM_SWAPDEV="LABEL=obsswapfs"
 
 
-    qemu_rootdev=/dev/vda
-    VM_VOLUME_GRUB="$VM_KERNEL"
-    VM_KERNEL=__not_attached__
-    VM_VOLUME_NAME="$VM_IMAGE"
-    VM_IMAGE=__not_attached__
-    VM_VOLUME_SWAP="$VM_SWAP"
-    VM_SWAP=__not_attached__
+    # hack: mis-use kernel parameter
+    OPENSTACK_VOLUME_GRUB="$VM_KERNEL"
+    VM_KERNEL=
 
+    VM_IMAGE_STATE=__not_attached__
+    VM_SWAP_STATE=__not_attached__
 }
 
 vm_attach_root_openstack() {
-    TMP=`cloud_volume_attach_openstack "$VM_SERVER" "$VM_VOLUME_NAME"`
-    VM_IMAGE=`echo "$TMP"|cut -d: -f3`
-    test "${VM_IMAGE:0:5}" = "/dev/" || cleanup_and_exit 3
-    VM_IMAGE_ATTACH_INFO=${TMP:0:73}
+    test -n "$OPENSTACK_IMAGE_ATTACH_INFO" && cleanup_and_exit 1 "root is already attached"
+    TMP=`cloud_volume_attach_openstack "$VM_SERVER" "$VM_IMAGE"`
+    test "${TMP:74:5}" = "/dev/" || cleanup_and_exit 3
+    OPENSTACK_IMAGE_ATTACH_INFO=$TMP
+    VM_IMAGE_STATE=$VM_IMAGE
+    VM_IMAGE=${TMP:74}
 }
 
 vm_attach_swap_openstack() {
-    TMP=`cloud_volume_attach_openstack "$VM_SERVER" "$VM_VOLUME_SWAP"`
-    VM_SWAP=`echo "$TMP"|cut -d: -f3`
-    test "${VM_SWAP:0:5}" = "/dev/" || cleanup_and_exit 3
-    VM_SWAP_ATTACH_INFO=${TMP:0:73}
+    test -n "$OPENSTACK_SWAP_ATTACH_INFO" && cleanup_and_exit 1 "root is already attached"
+    TMP=`cloud_volume_attach_openstack "$VM_SERVER" "$VM_SWAP"`
+    test "${TMP:74:5}" = "/dev/" || cleanup_and_exit 3
+    OPENSTACK_SWAP_ATTACH_INFO=$TMP
+    VM_SWAP_STATE=$VM_SWAP
+    VM_SWAP=${TMP:74}
 }
 
 vm_detach_root_openstack() {
-    VM_IMAGE=`cloud_volume_detach_openstack "$VM_IMAGE_ATTACH_INFO"`
-    VM_IMAGE_ATTACH_INFO=__not_attached__
-    VM_IMAGE=__not_attached__
+    test -z "$OPENSTACK_IMAGE_ATTACH_INFO" && cleanup_and_exit 1 "root is not attached"
+    cloud_volume_detach_openstack "$OPENSTACK_IMAGE_ATTACH_INFO" || cleanup_and_exit 3
+    VM_IMAGE_ATTACH_INFO=
+    VM_IMAGE=$VM_IMAGE_STATE
+    VM_IMAGE_STATE=__not_attached__
 }
 
 vm_detach_swap_openstack() {
-    VM_SWAP=`cloud_volume_detach_openstack "$VM_SWAP_ATTACH_INFO"`
-    VM_SWAP_ATTACH_INFO=__not_attached__
-    VM_SWAP=__not_attached__
+    test -z "$OPENSTACK_SWAP_ATTACH_INFO" && cleanup_and_exit 1 "swap is not attached"
+    cloud_volume_detach_openstack "$OPENSTACK_SWAP_ATTACH_INFO" || cleanup_and_exit 3
+    VM_SWAP_ATTACH_INFO=
+    VM_SWAP=$VM_SWAP_STATE
+    VM_SWAP_STATE=__not_attached__
 }
 
 vm_cleanup_openstack() {
-    vm_detach_root_openstack
-    vm_detach_swap_openstack
+    test -n "$OPENSTACK_IMAGE_ATTACH_INFO" && vm_detach_root_openstack
+    test -n "$OPENSTACK_SWAP_ATTACH_INFO" && vm_detach_swap_openstack
 }
 
 vm_fixup_openstack() {
@@ -238,27 +227,25 @@ vm_wipe_openstack() {
 vm_kill_openstack() {
     if $NOVACLIENT show "$VM_WORKER" >/dev/null 2>&1 ; then
 	if ! $NOVACLIENT delete "$VM_WORKER" ; then
-            cleanup_and_exit 1 "could not kill openstack vm build $VM_VOLUME_NAME"
+            cleanup_and_exit 1 "could not kill openstack vm build $VM_WORKER"
 	fi
     fi
 }
 
 openstack_wait_for_delete_instance() {
-    FOUND=`$NOVACLIENT list|grep $VM_WORKER`
-    while test -n "$FOUND" ; do
+    while test -n "$($NOVACLIENT list|grep $VM_WORKER)" ; do
          sleep 1
-         FOUND=`$NOVACLIENT list|grep $VM_WORKER`
     done
 }
 
 vm_startup_openstack() {
-    VM_VOL_ROOT_ID=`openstack_cinder_volume2id ${VM_VOLUME_NAME}`    
-    VM_VOL_SWAP_ID=`openstack_cinder_volume2id ${VM_VOLUME_SWAP}`
-    VM_VOL_BOOT_ID=`openstack_cinder_volume2id ${VM_VOLUME_GRUB}`
+    local VM_VOL_ROOT_ID=`openstack_cinder_volume2id ${VM_IMAGE}`    
+    local VM_VOL_SWAP_ID=`openstack_cinder_volume2id ${VM_SWAP}`
+    local VM_VOL_BOOT_ID=`openstack_cinder_volume2id ${OPENSTACK_VOLUME_GRUB}`
 
-    OUTPUT=`\
+    local OUTPUT=`\
       $NOVACLIENT boot \
-	--flavor $VM_OS_FLAVOR \
+	--flavor $VM_OPENSTACK_FLAVOR \
 	--block-device source=volume,dest=volume,bootindex=0,id=${VM_VOL_BOOT_ID}\
 	--block-device source=volume,dest=volume,bootindex=1,id=${VM_VOL_ROOT_ID}\
 	--block-device source=volume,dest=volume,bootindex=2,id=${VM_VOL_SWAP_ID}\

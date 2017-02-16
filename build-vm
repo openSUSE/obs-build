@@ -41,6 +41,8 @@ VM_SWAPDEV=/dev/hda2
 VM_TYPE=
 VM_IMAGE=
 VM_SWAP=
+VM_IMAGE_STATE=
+VM_SWAP_STATE=
 VM_KERNEL=
 VM_INITRD=
 VM_WORKER=
@@ -57,7 +59,6 @@ VMDISK_SWAPSIZE=1024
 VMDISK_FILESYSTEM=
 VMDISK_MOUNT_OPTIONS=__default
 VMDISK_CLEAN=
-VM_VOLUME_GRUB=
 VM_VOLUME_NAME=
 VM_VOLUME_SWAP=
 VM_HOSTNAME=
@@ -71,6 +72,9 @@ VM_CUSTOMOPT=
 
 # emulator specific?
 EMULATOR_SCRIPT=
+
+# openstack specific
+VM_OPENSTACK_FLAVOR=
 
 for i in ec2 emulator kvm lxc openstack qemu uml xen zvm docker pvm; do
     . "$BUILD_DIR/build-vm-$i"
@@ -265,9 +269,9 @@ vm_parse_options() {
         VM_CUSTOMOPT="$ARG"
         shift
       ;;
-      -os-flavor)
+      -openstack-flavor)
         needarg
-        VM_OS_FLAVOR="$ARG"
+        VM_OPENSTACK_FLAVOR="$ARG"
         shift
       ;;
       -*)
@@ -347,10 +351,10 @@ vm_img_create() {
 vm_img_wipe() {
     vm_wipe_$VM_TYPE "$@"
 
-    if test -n "$VM_IMAGE" -a "$VM_IMAGE" != __not_attached__ -a ! -b "$VM_IMAGE" ; then
+    if test -n "$VM_IMAGE" -a "$VM_IMAGE_STATE" != __not_attached__ -a ! -b "$VM_IMAGE" ; then
        rm -f "$VM_IMAGE"
     fi
-    if test -n "$VM_SWAP" -a "$VM_SWAP" != __not_attached__ -a ! -b "$VM_SWAP" ; then
+    if test -n "$VM_SWAP" -a "$VM_SWAP_STATE" != __not_attached__ -a ! -b "$VM_SWAP" ; then
        rm -f "$VM_SWAP"
     fi
 }
@@ -625,11 +629,11 @@ vm_setup() {
     test "$VM_TYPE" = xen && vm_purge_xen
     if test -n "$VMDISK_CLEAN" ; then
 	# delete old root/swap to get rid of the old blocks
-	if test -n "$VM_IMAGE" -a "$VM_IMAGE" != __not_attached__ -a -f "$VM_IMAGE" ; then
+	if test -n "$VM_IMAGE" -a "$VM_IMAGE_STATE" != __not_attached__ -a -f "$VM_IMAGE" ; then
 	    echo "Deleting old $VM_IMAGE"
 	    rm -rf "$VM_IMAGE"
 	fi
-	if test -n "$VM_SWAP" -a "$VM_SWAP" != __not_attached__ -a -f "$VM_SWAP" ; then
+	if test -n "$VM_SWAP" -a "$VM_SWAP_STATE" != __not_attached__ -a -f "$VM_SWAP" ; then
 	    echo "Deleting old $VM_SWAP"
 	    rm -rf "$VM_SWAP"
 	fi
@@ -640,7 +644,7 @@ vm_setup() {
     if test -z "$CLEAN_BUILD" ; then
         vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE"
     fi
-    if test -n "$VM_SWAP" -a "$VM_SWAP" != __not_attached__ -a ! -b "$VM_SWAP" ; then
+    if test -n "$VM_SWAP" -a "$VM_SWAP_STATE" != __not_attached__ -a ! -b "$VM_SWAP" ; then
 	vm_img_create "$VM_SWAP" "$VMDISK_SWAPSIZE"
     fi
     if test ! -e "$VM_IMAGE" ; then
