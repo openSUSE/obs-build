@@ -96,6 +96,12 @@ cloud_volume_detach_openstack() {
     local VM_SERVER=${1:37:36}
     local VM_VOL_ID=${1:0:36}
 
+    if [ -z "$VM_SERVER" -o -z "$VM_VOL_ID" ];then
+        # Cannot proceed anyway - guess volume never got attached
+        echo "__not_attached__"
+        return 0
+    fi
+
     # needed at all?
     $NOVACLIENT volume-detach "$VM_SERVER" "$VM_VOL_ID"
 
@@ -256,9 +262,16 @@ vm_startup_openstack() {
 	--poll "$VM_WORKER" || cleanup_and_exit 3\
     `
     WS_URL=`$NOVACLIENT get-serial-console $VM_WORKER|grep serial |perl -p -e 's#.*(ws://.*) \|#$1#'`
+ 
+    while [ -z "$WS_URL" -a $COUNTER -gt 0 ];do
+      WS_URL=`$NOVACLIENT get-serial-console $VM_WORKER|grep serial |perl -p -e 's#.*(ws://.*) \|#$1#'`
+      sleep 1
+      COUNTER=$(($COUNTER - 1))
+    done
+
     VM_BUILD_ID=`_get_field "$OUTPUT" id`
 
-    if ! $BUILD_DIR/os-console/client "${WS_URL}";then
+    if ! $BUILD_DIR/openstack-console "${WS_URL}";then
       $NOVACLIENT delete $VM_BUILD_ID
       cleanup_and_exit 3
     else
