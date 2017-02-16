@@ -4,7 +4,7 @@
 #
 ################################################################
 #
-# Copyright (c) 1995-2014 SUSE Linux Products GmbH
+# Copyright (c) 2017 SUSE Linux Products GmbH
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 or 3 as
@@ -23,25 +23,27 @@
 ################################################################
 
 
-_get_field() {
+OPENSTACK_BUILD_ID=
+
+openstack_get_field() {
     echo -n "$1"|perl -n -e "\$_ =~ /^\|\s+$2\s+\|\s+(\S*)\s+\|\$/ && print \$1"
 }
 
-_get_disk_state() {
+openstack_get_disk_state() {
     OUT=$($CINDERCLIENT show "$1")
-    _get_field "$OUT" status
+    openstack_get_field "$OUT" status
 }
 
-cinder_volume2id() {
-  VM_VOL_NAME=$1
-  OUT=$($CINDERCLIENT show $VM_VOL_NAME)
-  _get_field "$OUT" id
+openstack_cinder_volume2id() {
+    VM_VOL_NAME=$1
+    OUT=$($CINDERCLIENT show $VM_VOL_NAME)
+    openstack_get_field "$OUT" id
 }
 
 cloud_volume_attach_openstack() {
     local VM_SERVER="$1"
     local VM_VOL_NAME="$2"
-    local VM_VOL_ID=$(cinder_volume2id $VM_VOL_NAME)
+    local VM_VOL_ID=$(openstack_cinder_volume2id $VM_VOL_NAME)
 
     # Example output of "nova volume-attach
     # +----------+--------------------------------------+
@@ -58,10 +60,10 @@ cloud_volume_attach_openstack() {
 	echo "ERROR: nova attach failed. $?" >&2
 	return 3
     fi
-    device_path=`_get_field "$OUT" device`
-    serverId=`_get_field "$OUT" serverId`
+    device_path=`openstack_get_field "$OUT" device`
+    serverId=`openstack_get_field "$OUT" serverId`
     while true; do
-	state=`_get_disk_state "$VM_VOL_NAME"`
+	state=`openstack_get_disk_state "$VM_VOL_NAME"`
 	test "$state" = "in-use" && break
         if test -z "$state" ; then
 	    echo "ERROR: unable to find state of volume $VM_VOL_NAME" >&2
@@ -75,7 +77,7 @@ cloud_volume_attach_openstack() {
 		echo "ERROR: nova attach failed. $?" >&2
 		return 3
 	    fi
-	    device_path=`_get_field "$OUT" device`
+	    device_path=`openstack_get_field "$OUT" device`
         fi
         sleep 3
     done
@@ -105,11 +107,11 @@ cloud_volume_detach_openstack() {
     # needed at all?
     $NOVACLIENT volume-detach "$VM_SERVER" "$VM_VOL_ID"
 
-    state=`_get_disk_state $VM_VOL_ID`
+    state=`openstack_get_disk_state $VM_VOL_ID`
 
     while [ "$state" = detaching ];do
         sleep 1
-        state=`_get_disk_state $VM_VOL_ID`
+        state=`openstack_get_disk_state $VM_VOL_ID`
     done
 
     if [ "$state" = "available" ];then
@@ -124,7 +126,7 @@ cloud_volume_detach_openstack() {
         return 3
     fi
     while [ "$state" != "available" ]; do
-        state=`_get_disk_state $VM_VOL_ID`
+        state=`openstack_get_disk_state $VM_VOL_ID`
 	sleep 3
     done
     return 0
@@ -228,7 +230,7 @@ vm_fixup_openstack() {
 }
 
 vm_wipe_openstack() {
-    if [ -n "$VM_WORKER" ];then
+    if test -n "$VM_WORKER" ; then
          $NOVACLIENT delete $VM_WORKER
     fi
 }
@@ -240,18 +242,19 @@ vm_kill_openstack() {
 	fi
     fi
 }
-wait_for_delete_instance() {
+
+openstack_wait_for_delete_instance() {
     FOUND=`$NOVACLIENT list|grep $VM_WORKER`
-    while [ -n "$FOUND" ];do
-       FOUND=`$NOVACLIENT list|grep $VM_WORKER`
-       sleep 1
+    while test -n "$FOUND" ; do
+         sleep 1
+         FOUND=`$NOVACLIENT list|grep $VM_WORKER`
     done
 }
 
 vm_startup_openstack() {
-    VM_VOL_ROOT_ID=`cinder_volume2id ${VM_VOLUME_NAME}`    
-    VM_VOL_SWAP_ID=`cinder_volume2id ${VM_VOLUME_SWAP}`
-    VM_VOL_BOOT_ID=`cinder_volume2id ${VM_VOLUME_GRUB}`
+    VM_VOL_ROOT_ID=`openstack_cinder_volume2id ${VM_VOLUME_NAME}`    
+    VM_VOL_SWAP_ID=`openstack_cinder_volume2id ${VM_VOLUME_SWAP}`
+    VM_VOL_BOOT_ID=`openstack_cinder_volume2id ${VM_VOLUME_GRUB}`
 
     OUTPUT=`\
       $NOVACLIENT boot \
@@ -261,22 +264,20 @@ vm_startup_openstack() {
 	--block-device source=volume,dest=volume,bootindex=2,id=${VM_VOL_SWAP_ID}\
 	--poll "$VM_WORKER" || cleanup_and_exit 3\
     `
-    WS_URL=`$NOVACLIENT get-serial-console $VM_WORKER|grep serial |perl -p -e 's#.*(ws://.*) \|#$1#'`
- 
-    while [ -z "$WS_URL" -a $COUNTER -gt 0 ];do
-      WS_URL=`$NOVACLIENT get-serial-console $VM_WORKER|grep serial |perl -p -e 's#.*(ws://.*) \|#$1#'`
-      sleep 1
-      COUNTER=$(($COUNTER - 1))
+    OPENSTACK_BUILD_ID=`openstack_get_field "$OUTPUT" id`
+
+    for try in 1 2 3 4 5 ; do
+        WS_URL=`$NOVACLIENT get-serial-console $VM_WORKER|grep serial |perl -p -e 's#.*(ws://.*) \|#$1#'`
+	test -n "$WS_URL" && break
+        sleep 1
     done
 
-    VM_BUILD_ID=`_get_field "$OUTPUT" id`
-
-    if ! $BUILD_DIR/openstack-console "${WS_URL}";then
-      $NOVACLIENT delete $VM_BUILD_ID
-      cleanup_and_exit 3
+    if ! $BUILD_DIR/openstack-console "${WS_URL}" ; then
+        $NOVACLIENT delete $OPENSTACK_BUILD_ID
+        cleanup_and_exit 3
     else
-      $NOVACLIENT delete $VM_BUILD_ID
-      wait_for_delete_instance
+        $NOVACLIENT delete $OPENSTACK_BUILD_ID
+        openstack_wait_for_delete_instance
     fi
 }
 
