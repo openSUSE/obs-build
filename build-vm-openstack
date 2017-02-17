@@ -26,7 +26,7 @@
 OPENSTACK_BUILD_ID=
 OPENSTACK_VOLUME_GRUB=
 
-OPENSTACK_IMAGE_ATTACH_INFO=
+OPENSTACK_ROOT_ATTACH_INFO=
 OPENSTACK_SWAP_ATTACH_INFO=
 
 openstack_get_field() {
@@ -137,9 +137,9 @@ vm_verify_options_openstack() {
 	cleanup_and_exit 3 "ERROR: No openstack environment set. This vm-type works only inside of an openstack VM."
     fi
     if test -z "$VM_KERNEL" ; then
-	cleanup_and_exit 3 "ERROR: No worker root VM volume name specified."
+	cleanup_and_exit 3 "ERROR: No worker boot VM volume name specified."
     fi
-    if test -z "$VM_IMAGE" ; then
+    if test -z "$VM_ROOT" ; then
 	cleanup_and_exit 3 "ERROR: No worker root VM volume name specified."
     fi
     if test -z "$VM_SWAP" ; then
@@ -165,17 +165,17 @@ vm_verify_options_openstack() {
     OPENSTACK_VOLUME_GRUB="$VM_KERNEL"
     VM_KERNEL=
 
-    VM_IMAGE_STATE=__not_attached__
+    VM_ROOT_STATE=__not_attached__
     VM_SWAP_STATE=__not_attached__
 }
 
 vm_attach_root_openstack() {
-    test -n "$OPENSTACK_IMAGE_ATTACH_INFO" && cleanup_and_exit 1 "root is already attached"
-    TMP=`cloud_volume_attach_openstack "$VM_SERVER" "$VM_IMAGE"`
+    test -n "$OPENSTACK_ROOT_ATTACH_INFO" && cleanup_and_exit 1 "root is already attached"
+    TMP=`cloud_volume_attach_openstack "$VM_SERVER" "$VM_ROOT"`
     test "${TMP:74:5}" = "/dev/" || cleanup_and_exit 3
-    OPENSTACK_IMAGE_ATTACH_INFO=$TMP
-    VM_IMAGE_STATE=$VM_IMAGE
-    VM_IMAGE=${TMP:74}
+    OPENSTACK_ROOT_ATTACH_INFO=$TMP
+    VM_ROOT_STATE=$VM_ROOT
+    VM_ROOT=${TMP:74}
 }
 
 vm_attach_swap_openstack() {
@@ -188,11 +188,11 @@ vm_attach_swap_openstack() {
 }
 
 vm_detach_root_openstack() {
-    test -z "$OPENSTACK_IMAGE_ATTACH_INFO" && cleanup_and_exit 1 "root is not attached"
-    cloud_volume_detach_openstack "$OPENSTACK_IMAGE_ATTACH_INFO" || cleanup_and_exit 3
-    VM_IMAGE_ATTACH_INFO=
-    VM_IMAGE=$VM_IMAGE_STATE
-    VM_IMAGE_STATE=__not_attached__
+    test -z "$OPENSTACK_ROOT_ATTACH_INFO" && cleanup_and_exit 1 "root is not attached"
+    cloud_volume_detach_openstack "$OPENSTACK_ROOT_ATTACH_INFO" || cleanup_and_exit 3
+    VM_ROOT_ATTACH_INFO=
+    VM_ROOT=$VM_ROOT_STATE
+    VM_ROOT_STATE=__not_attached__
 }
 
 vm_detach_swap_openstack() {
@@ -204,7 +204,7 @@ vm_detach_swap_openstack() {
 }
 
 vm_cleanup_openstack() {
-    test -n "$OPENSTACK_IMAGE_ATTACH_INFO" && vm_detach_root_openstack
+    test -n "$OPENSTACK_ROOT_ATTACH_INFO" && vm_detach_root_openstack
     test -n "$OPENSTACK_SWAP_ATTACH_INFO" && vm_detach_swap_openstack
 }
 
@@ -239,7 +239,7 @@ openstack_wait_for_delete_instance() {
 }
 
 vm_startup_openstack() {
-    local VM_VOL_ROOT_ID=`openstack_cinder_volume2id ${VM_IMAGE}`    
+    local VM_VOL_ROOT_ID=`openstack_cinder_volume2id ${VM_ROOT}`    
     local VM_VOL_SWAP_ID=`openstack_cinder_volume2id ${VM_SWAP}`
     local VM_VOL_BOOT_ID=`openstack_cinder_volume2id ${OPENSTACK_VOLUME_GRUB}`
 

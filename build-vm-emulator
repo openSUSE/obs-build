@@ -36,7 +36,7 @@ vm_startup_emulator() {
     elif test "${EMULATOR_SCRIPT:0:1}" != / ; then
        EMULATOR_SCRIPT="./$EMULATOR_SCRIPT"
     fi
-    set -- "$EMULATOR_SCRIPT" "$VM_IMAGE" "$VM_SWAP"
+    set -- "$EMULATOR_SCRIPT" "$VM_ROOT" "$VM_SWAP"
     echo "$@"
     if ! "$@"; then
 	 popd
@@ -52,7 +52,7 @@ vm_startup_emulator() {
     mkdir -p $BUILD_ROOT/.build.packages
     cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
     mkdir -p .mount
-    mount $VM_IMAGE -o loop .mount
+    mount $VM_ROOT -o loop .mount
     if test -e .mount/.build.packages ; then
         cp -a .mount/.build.packages/* .
     fi
@@ -63,8 +63,8 @@ vm_startup_emulator() {
 }
 
 vm_kill_emulator() {
-    if ! fuser -k -TERM "$VM_IMAGE" ; then
-        cleanup_and_exit 1 "could not kill build in $VM_IMAGE"
+    if ! fuser -k -TERM "$VM_ROOT" ; then
+        cleanup_and_exit 1 "could not kill build in $VM_ROOT"
     fi
 }
 

@@ -39,9 +39,9 @@ VM_ROOTDEV=/dev/hda1
 VM_SWAPDEV=/dev/hda2
 
 VM_TYPE=
-VM_IMAGE=
+VM_ROOT=
 VM_SWAP=
-VM_IMAGE_STATE=
+VM_ROOT_STATE=
 VM_SWAP_STATE=
 VM_KERNEL=
 VM_INITRD=
@@ -134,9 +134,9 @@ vm_parse_options() {
       ;;
       -xen|-kvm|-uml|-qemu|-emulator)
 	VM_TYPE=${PARAM##*-}
-	test -z "$VM_IMAGE" && VM_IMAGE=1
+	test -z "$VM_ROOT" && VM_ROOT=1
 	if test -n "$ARG" ; then
-	    VM_IMAGE="$ARG"
+	    VM_ROOT="$ARG"
 	    shift
 	fi
       ;;
@@ -150,7 +150,7 @@ vm_parse_options() {
 	case "$VM_TYPE" in
 	    lxc|docker) ;;
 	    ec2|xen|kvm|uml|qemu|emulator|openstack|zvm|pvm)
-		test -z "$VM_IMAGE" && VM_IMAGE=1
+		test -z "$VM_ROOT" && VM_ROOT=1
 	    ;;
 	    none|chroot) VM_TYPE= ;;
 	    *)
@@ -176,7 +176,7 @@ vm_parse_options() {
       ;;
       -vm-disk)
 	needarg
-	VM_IMAGE="$ARG"
+	VM_ROOT="$ARG"
 	shift
       ;;
       -vm-swap|-xenswap|-swap)
@@ -351,8 +351,8 @@ vm_img_create() {
 vm_img_wipe() {
     vm_wipe_$VM_TYPE "$@"
 
-    if test -n "$VM_IMAGE" -a "$VM_IMAGE_STATE" != __not_attached__ -a ! -b "$VM_IMAGE" ; then
-       rm -f "$VM_IMAGE"
+    if test -n "$VM_ROOT" -a "$VM_ROOT_STATE" != __not_attached__ -a ! -b "$VM_ROOT" ; then
+       rm -f "$VM_ROOT"
     fi
     if test -n "$VM_SWAP" -a "$VM_SWAP_STATE" != __not_attached__ -a ! -b "$VM_SWAP" ; then
        rm -f "$VM_SWAP"
@@ -619,56 +619,56 @@ vm_set_mount_options() {
 vm_setup() {
     vm_set_filesystem_type
     vm_set_mount_options
-    if test "$VM_IMAGE" = 1 ; then
-	VM_IMAGE="$BUILD_ROOT.img"
+    if test "$VM_ROOT" = 1 ; then
+	VM_ROOT="$BUILD_ROOT.img"
 	if test -z "$VM_SWAP" -a "$VM_TYPE" != emulator ; then
 	    VM_SWAP="$BUILD_ROOT.swap"
 	fi
     fi
-    echo "VM_IMAGE: $VM_IMAGE, VM_SWAP: $VM_SWAP"
+    echo "VM_ROOT: $VM_ROOT, VM_SWAP: $VM_SWAP"
     vm_attach_root
     # this should not be needed, but sometimes a xen instance got lost
     test "$VM_TYPE" = xen && vm_purge_xen
     if test -n "$VMDISK_CLEAN" ; then
 	# delete old root/swap to get rid of the old blocks
-	if test -n "$VM_IMAGE" -a "$VM_IMAGE_STATE" != __not_attached__ -a -f "$VM_IMAGE" ; then
-	    echo "Deleting old $VM_IMAGE"
-	    rm -rf "$VM_IMAGE"
+	if test -n "$VM_ROOT" -a "$VM_ROOT_STATE" != __not_attached__ -a -f "$VM_ROOT" ; then
+	    echo "Deleting old $VM_ROOT"
+	    rm -rf "$VM_ROOT"
 	fi
 	if test -n "$VM_SWAP" -a "$VM_SWAP_STATE" != __not_attached__ -a -f "$VM_SWAP" ; then
 	    echo "Deleting old $VM_SWAP"
 	    rm -rf "$VM_SWAP"
 	fi
     fi
-    if test ! -b "$VM_IMAGE" ; then
-	vm_img_create "$VM_IMAGE" "$VMDISK_ROOTSIZE"
+    if test ! -b "$VM_ROOT" ; then
+	vm_img_create "$VM_ROOT" "$VMDISK_ROOTSIZE"
     fi
     if test -z "$CLEAN_BUILD" ; then
-        vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE"
+        vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT"
     fi
     if test -n "$VM_SWAP" -a "$VM_SWAP_STATE" != __not_attached__ -a ! -b "$VM_SWAP" ; then
 	vm_img_create "$VM_SWAP" "$VMDISK_SWAPSIZE"
     fi
-    if test ! -e "$VM_IMAGE" ; then
-	cleanup_and_exit 3 "you need to create $VM_IMAGE first"
+    if test ! -e "$VM_ROOT" ; then
+	cleanup_and_exit 3 "you need to create $VM_ROOT first"
     fi
     if test -n "$CLEAN_BUILD" ; then
-	vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_IMAGE" || cleanup_and_exit 3
+	vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" || cleanup_and_exit 3
     fi
     # now mount root/swap
     mkdir_build_root
     if test -w /root ; then
-	if test -b $VM_IMAGE ; then
+	if test -b $VM_ROOT ; then
 	    # mount device directly
-	    mount $VMDISK_MOUNT_OPTIONS $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 3
+	    mount $VMDISK_MOUNT_OPTIONS $VM_ROOT $BUILD_ROOT || cleanup_and_exit 3
 	else
-	    mount ${VMDISK_MOUNT_OPTIONS},loop $VM_IMAGE $BUILD_ROOT || cleanup_and_exit 3
+	    mount ${VMDISK_MOUNT_OPTIONS},loop $VM_ROOT $BUILD_ROOT || cleanup_and_exit 3
 	fi
     else
 	if ! mount $BUILD_ROOT; then
 	    echo "mounting the build root failed. An fstab entry is probably missing or incorrect."
 	    echo "/etc/fstab should contain an entry like this:"
-	    echo "$VM_IMAGE $BUILD_ROOT auto noauto,user,loop 0 0"
+	    echo "$VM_ROOT $BUILD_ROOT auto noauto,user,loop 0 0"
 	    cleanup_and_exit 3
 	fi
     fi
@@ -756,7 +756,7 @@ vm_first_stage() {
     vm_fixup
 
     # update the hostarch
-    if test -n "$VM_IMAGE" ; then
+    if test -n "$VM_ROOT" ; then
 	vm_update_hostarch
     fi
 
@@ -830,7 +830,7 @@ vm_first_stage() {
     if check_use_emulator ; then
 	vm_init_script="/.build/$INITVM_NAME"
     fi
-    if test -n "$VM_IMAGE" ; then
+    if test -n "$VM_ROOT" ; then
 	# copy out kernel & initrd (if they exist) during unmounting VM image
 	KERNEL_TEMP_DIR=
 	if test -z "$VM_KERNEL" -a -e "$BUILD_ROOT/.build.kernel.$VM_TYPE" ; then
@@ -885,7 +885,7 @@ vm_first_stage() {
 	    mkdir -p $BUILD_ROOT/.build.packages
 	    cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
 	    echo "build: extracting built packages..."
-	    extractbuild --disk "$VM_IMAGE" --input "$VM_SWAP" --skip 512 -v || cleanup_and_exit 3
+	    extractbuild --disk "$VM_ROOT" --input "$VM_SWAP" --skip 512 -v || cleanup_and_exit 3
 	    if test "$DO_STATISTICS" = 1 ; then
 		mkdir -p OTHER
 		TIME_TOTAL=$(( `date +%s` - $TIME_START_TIME ))

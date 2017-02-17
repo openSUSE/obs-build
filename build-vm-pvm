@@ -25,8 +25,8 @@ pvm_getdiskname(){
          dev=$(readlink -f $devid)
      fi
      case $lv in
-         *root) test -z "$SKIP" && pvm_setup_bootloader "$dev";
-                VM_IMAGE="${dev}2";;
+         *root) test -z "$SKIP" && pvm_setup_bootloader "$dev"
+                VM_ROOT="${dev}2";;
          *swap) VM_SWAP="${dev}";;
      esac
 }

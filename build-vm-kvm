@@ -211,7 +211,7 @@ vm_verify_options_kvm() {
 
 vm_startup_kvm() {
     qemu_bin="$kvm_bin"
-    qemu_args=(-drive file="$VM_IMAGE",format=raw,if=none,id=disk,serial=0,cache=unsafe -device "$kvm_device",drive=disk)
+    qemu_args=(-drive file="$VM_ROOT",format=raw,if=none,id=disk,serial=0,cache=unsafe -device "$kvm_device",drive=disk)
     if [ -n "$VM_USER" ] ; then
 	getent passwd "$VM_USER" > /dev/null || cleanup_and_exit 3 "cannot find KVM user '$VM_USER'"
     else
@@ -279,8 +279,8 @@ vm_startup_kvm() {
 }
 
 vm_kill_kvm() {
-    if ! fuser -k -TERM "$VM_IMAGE" ; then
-	cleanup_and_exit 1 "could not kill build in $VM_IMAGE"
+    if ! fuser -k -TERM "$VM_ROOT" ; then
+	cleanup_and_exit 1 "could not kill build in $VM_ROOT"
     fi
 }
 

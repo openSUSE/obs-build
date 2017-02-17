@@ -97,8 +97,8 @@ vm_verify_options_ec2() {
 }
 
 vm_attach_root_ec2() {
-    VM_IMAGE=`cloud_volume_attach_ec2 "$VM_SERVER" "$VM_VOLUME_NAME" "$VM_IMAGE"`
-    test "${VM_IMAGE:0:5}" = /dev/ || cleanup_and_exit 3
+    VM_ROOT=`cloud_volume_attach_ec2 "$VM_SERVER" "$VM_VOLUME_NAME" "$VM_ROOT"`
+    test "${VM_ROOT:0:5}" = /dev/ || cleanup_and_exit 3
 }
 
 vm_attach_swap_ec2() {

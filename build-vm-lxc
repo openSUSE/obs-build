@@ -33,7 +33,7 @@ lxc_get_id() {
 }
 
 vm_verify_options_lxc() {
-    VM_IMAGE=
+    VM_ROOT=
     VM_SWAP=
 }
 

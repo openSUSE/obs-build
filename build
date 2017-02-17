@@ -413,7 +413,7 @@ cleanup_and_exit () {
 	umount -n $BUILD_ROOT/dev/pts 2>/dev/null || true
 	umount -n $BUILD_ROOT/dev/shm 2>/dev/null || true
 	umount -n $BUILD_ROOT/sys 2>/dev/null || true
-	test -n "$VM_IMAGE" -a "$VM_IMAGE" != 1 && umount $BUILD_ROOT 2>/dev/null || true
+	test -n "$VM_ROOT" -a "$VM_ROOT" != 1 && umount $BUILD_ROOT 2>/dev/null || true
 	test -n "$VM_TYPE" && vm_cleanup
     fi
     exit $1
@@ -527,7 +527,7 @@ setupicecream() {
 }
 
 setmemorylimit() {
-    if test -n "$VM_IMAGE" -o -n "$RUNNING_IN_VM" ; then
+    if test -n "$VM_ROOT" -o -n "$RUNNING_IN_VM" ; then
 	return
     fi
     local mem
@@ -997,7 +997,7 @@ fi
 
 if test -n "$KILL" ; then
     test -z "$SRCDIR" || usage
-    if test -n "$VM_IMAGE" -a -n "$VM_SWAP" -a -n "$VM_TYPE" -a "$VM_SWAP_STATE" != __not_attached__ ; then
+    if test -n "$VM_ROOT" -a -n "$VM_SWAP" -a -n "$VM_TYPE" -a "$VM_SWAP_STATE" != __not_attached__ ; then
 	# mark job as failed so that we don't extract packages
 	if test "$VM_TYPE" != zvm ; then
 	    echo -n "BUILDSTATUS1" >"$VM_SWAP"
@@ -1051,7 +1051,7 @@ if test -n "$LIST_STATE" ; then
 fi
 
 # do vm setup if needed
-if test -z "$RUNNING_IN_VM" -a -n "$VM_TYPE" -a -n "$VM_IMAGE" ; then
+if test -z "$RUNNING_IN_VM" -a -n "$VM_TYPE" -a -n "$VM_ROOT" ; then
     vm_setup
 fi
 
@@ -1063,7 +1063,7 @@ fi
 
 rm -f $BUILD_ROOT/exit
 
-if test -z "$VM_IMAGE" -a -z "$LOGFILE" ; then
+if test -z "$VM_ROOT" -a -z "$LOGFILE" ; then
     if test -z "$RUNNING_IN_VM"; then
         LOGFILE="$BUILD_ROOT/.build.log"
     else
@@ -1088,7 +1088,7 @@ if test -n "$LOGFILE" -a -z "$RUN_SHELL" ; then
     if test -n "$RUNNING_IN_VM" ; then
         # no additional timestamps in inner vm build system
 	exec 1> >(exec -a 'build logging' tee -a $LOGFILE) 2>&1
-    elif test -n "$VM_IMAGE" ; then
+    elif test -n "$VM_ROOT" ; then
         # external run of virtualization build
 	exec 1> >(exec -a 'build logging' perl -e 'open(F,">>",$ARGV[0])||die("$ARGV[0]: $!\n");$|=1;select(F);$|=1;while(<STDIN>){my $p=sprintf("[%5ds] ", time()-'$STARTTIME');print STDOUT $p.$_;s/^\r//s;s/\r\n/\n/gs;print F $p.$_}' $LOGFILE) 2>&1
     else
@@ -1108,7 +1108,7 @@ if test -z "$RUNNING_IN_VM" ; then
     echo Using BUILD_ROOT=$BUILD_ROOT
     test -n "$BUILD_RPMS" && echo Using BUILD_RPMS=$BUILD_RPMS
     echo Using BUILD_ARCH=$BUILD_ARCH
-    test -n "$VM_TYPE" && echo "Doing $VM_TYPE build${VM_IMAGE:+ in $VM_IMAGE}"
+    test -n "$VM_TYPE" && echo "Doing $VM_TYPE build${VM_ROOT:+ in $VM_ROOT}"
     echo
 fi
 

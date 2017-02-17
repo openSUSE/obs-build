@@ -240,7 +240,7 @@ zvm_cp() {
 #######################################################################################
 
 vm_verify_options_zvm() {
-    VM_IMAGE=/dev/dasda1
+    VM_ROOT=/dev/dasda1
     VM_SWAP=/dev/dasdb1
 
     VM_SWAPDEV=/dev/dasdb1	# in the vm
@@ -329,11 +329,11 @@ vm_fixup_zvm() {
 }
 
 vm_attach_root_zvm() {
-    VM_IMAGE=$(ZVM_CLEANUP=1 zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_ROOT $zvm_mult_pass $VM_WORKER_NO )
-    if test "${VM_IMAGE}" = "${VM_IMAGE#dasd}" ; then
-	cleanup_and_exit 3 "did not get a real device for VM_IMAGE: $VM_IMAGE"
+    VM_ROOT=$(ZVM_CLEANUP=1 zvm_cp volume_link_local $VM_WORKER $VM_VOLUME_ROOT $zvm_mult_pass $VM_WORKER_NO )
+    if test "${VM_ROOT}" = "${VM_ROOT#dasd}" ; then
+	cleanup_and_exit 3 "did not get a real device for VM_ROOT: $VM_ROOT"
     fi
-    VM_IMAGE="/dev/$VM_IMAGE"
+    VM_ROOT="/dev/$VM_ROOT"
 }
 
 vm_attach_swap_zvm() {

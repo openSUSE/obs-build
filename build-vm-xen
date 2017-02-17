@@ -21,6 +21,15 @@
 #
 ################################################################
 
+xen_set_xenid_xmcmd() {
+    XENID="${VM_ROOT%/root}"
+    XENID="${XENID%/tmpfs}"
+    XENID="${XENID##*/}"
+    XENID="${XENID#root_}"
+    XMCMD=xm
+    test ! -x /usr/sbin/xm -a -x /usr/sbin/xl && XMCMD=xl
+}
+
 vm_verify_options_xen() {
     vm_kernel=/boot/vmlinuz
     vm_initrd=/boot/initrd
@@ -28,9 +37,7 @@ vm_verify_options_xen() {
     test -e /boot/initrd-xen && vm_initrd=/boot/initrd-xen
     test -n "$VM_KERNEL" && vm_kernel="$VM_KERNEL"
     test -n "$VM_INITRD" && vm_initrd="$VM_INITRD"
-    XMCMD=xm
     if test ! -x /usr/sbin/xm -a -x /usr/sbin/xl ; then
-	XMCMD=xl
 	VM_ROOTDEV=/dev/xvda
 	VM_SWAPDEV=/dev/xvdb
 	VM_CONSOLE=hvc0
@@ -42,9 +49,8 @@ vm_verify_options_xen() {
 }
 
 vm_startup_xen() {
-    XMCMD=xm
-    test ! -x /usr/sbin/xm -a -x /usr/sbin/xl && XMCMD=xl
-    XMROOT="file:$(readlink -f $VM_IMAGE)"
+    xen_set_xenid_xmcmd
+    XMROOT="file:$(readlink -f $VM_ROOT)"
     XMROOT=${XMROOT/#file:\/dev/phy:/dev}
     XMROOT="disk=$XMROOT,${VM_ROOTDEV#/dev/},w"
     XMSWAP=
@@ -53,10 +59,6 @@ vm_startup_xen() {
 	XMSWAP=${XMSWAP/#file:\/dev/phy:/dev}
 	XMSWAP="disk=$XMSWAP,${VM_SWAPDEV#/dev/},w"
     fi
-    XENID="${VM_IMAGE%/root}"
-    XENID="${XENID%/tmpfs}"
-    XENID="${XENID##*/}"
-    XENID="${XENID#root_}"
 
     if $XMCMD list "build_$XENID" >/dev/null 2>&1 ; then
        echo "Instance already exists, something really went wrong..."
@@ -92,12 +94,7 @@ vm_startup_xen() {
 }
 
 vm_kill_xen() {
-    XMCMD=xm
-    test ! -x /usr/sbin/xm -a -x /usr/sbin/xl && XMCMD=xl
-    XENID="${VM_IMAGE%/root}"
-    XENID="${XENID%/tmpfs}"
-    XENID="${XENID##*/}"
-    XENID="${XENID#root_}"
+    xen_set_xenid_xmcmd
     if $XMCMD list "build_$XENID" >/dev/null 2>&1 ; then 
 	if ! $XMCMD destroy "build_$XENID" ; then 
 	    cleanup_and_exit 1 "could not kill xen build $XENID"
@@ -108,12 +105,7 @@ vm_kill_xen() {
 # XEN only
 vm_purge_xen() {
     # this should not be needed, but sometimes a xen instance gets lost
-    XMCMD=xm
-    test ! -x /usr/sbin/xm -a -x /usr/sbin/xl && XMCMD=xl
-    XENID="${VM_IMAGE%/root}"
-    XENID="${XENID%/tmpfs}"
-    XENID="${XENID##*/}"
-    XENID="${XENID#root_}"
+    xen_set_xenid_xmcmd
     $XMCMD destroy "build_$XENID" >/dev/null 2>&1
 }
 
