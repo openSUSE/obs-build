@@ -21,12 +21,14 @@
 #
 ################################################################
 
-BUILD_EC2_TYPE="t1.micro"
+EC2_BUILD_TYPE="t1.micro"
+EC2_INSTANCE_ID=
+EC2_VOLUME_ROOT=
+EC2_VOLUME_SWAP=
 
 cloud_volume_attach_ec2() {
     local VM_SERVER="$1"
     local VM_VOL_NAME="$2"
-    local VM_VOL_DEV="$3"
 
     temp_file=`mktemp`
     if ! ec2-attach-volume "$VM_VOL_NAME" -d /dev/sdz -i `ec2-instance-id` --region "$BUILD_EC2_REGION" > "$temp_file"; then
@@ -86,32 +88,40 @@ vm_verify_options_ec2() {
     if test -z "$BUILD_EC2_AKI" ; then
         cleanup_and_exit 3 "ERROR: No image refering to kernel and ramdisk is defined in BUILD_EC2_AKI env."
     fi
-    if test -z "$VM_VOLUME_NAME" ; then
+    if test -z "$VM_ROOT" ; then
         cleanup_and_exit 3 "ERROR: No worker root VM volume name specified."
     fi
-    if test -z "$VM_VOLUME_SWAP" ; then
+    if test -z "$VM_SWAP" ; then
         cleanup_and_exit 3 "ERROR: No worker swap VM volume name specified."
     fi
+    EC2_VOLUME_ROOT=$VM_ROOT
+    EC2_VOLUME_SWAP=$VM_SWAP
+    VM_ROOT_TYPE=unattached
+    VM_SWAP_TYPE=unattached
 
     VM_SWAPDEV=/dev/sdb1	# in the vm
 }
 
 vm_attach_root_ec2() {
-    VM_ROOT=`cloud_volume_attach_ec2 "$VM_SERVER" "$VM_VOLUME_NAME" "$VM_ROOT"`
+    VM_ROOT=`cloud_volume_attach_ec2 "$VM_SERVER" "$EC2_VOLUME_ROOT"
     test "${VM_ROOT:0:5}" = /dev/ || cleanup_and_exit 3
+    VM_ROOT_TYPE=device
 }
 
 vm_attach_swap_ec2() {
-    VM_SWAP=`cloud_volume_attach_ec2 "$VM_SERVER" "$EC2_EXTRACT_VOLUME_swap" "$VM_SWAP"`
+    VM_SWAP=`cloud_volume_attach_ec2 "$VM_SERVER" "$EC2_VOLUME_SWAP"
     test "${VM_SWAP:0:5}" = /dev/ || cleanup_and_exit 3
+    VM_SWAP_TYPE=device
 }
 
 vm_detach_root_ec2() {
-    cloud_volume_detach_ec2 "$VM_SERVER" "$VM_VOLUME_NAME"
+    cloud_volume_detach_ec2 "$VM_SERVER" "$EC2_VOLUME_ROOT"
+    VM_ROOT_TYPE=unattached
 }
 
 vm_detach_swap_ec2() {
-    cloud_volume_detach_ec2 "$VM_SERVER" "$VM_VOLUME_SWAP"
+    cloud_volume_detach_ec2 "$VM_SERVER" "$EC2_VOLUME_SWAP"
+    VM_SWAP_TYPE=unattached
 }
 
 vm_fixup_ec2() {
@@ -141,10 +151,8 @@ vm_fixup_ec2() {
 }
 
 vm_cleanup_ec2() {
-    cloud_volume_detach_ec2 "$VM_SERVER" "$VM_VOLUME_NAME"
-    cloud_volume_detach_ec2 "$VM_SERVER" "$VM_VOLUME_SWAP"
-    test -n "$EC2_EXTRACT_VOLUME_root" && cloud_volume_detach_ec2 "$VM_SERVER" "$EC2_EXTRACT_VOLUME_root"
-    test -n "$EC2_EXTRACT_VOLUME_swap" && cloud_volume_detach_ec2 "$VM_SERVER" "$EC2_EXTRACT_VOLUME_swap"
+    cloud_volume_detach_ec2 "$VM_SERVER" "$EC2_VOLUME_ROOT"
+    cloud_volume_detach_ec2 "$VM_SERVER" "$EC2_VOLUME_SWAP"
     test -n "$EC2_SNAP_root" && ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_root"
     test -n "$EC2_SNAP_swap" && ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_swap"
     test -n "$EC2_EXTRACT_VOLUME_root" && ec2-delete-volume --region "$BUILD_EC2_REGION" "$EC2_EXTRACT_VOLUME_root"
@@ -160,13 +168,13 @@ vm_kill_ec2() {
 }
 
 vm_startup_ec2() {
-    EC2_SNAP_root=`ec2-create-snapshot --region "$BUILD_EC2_REGION" "$VM_VOLUME_NAME" | awk '{ print $2 }'`
+    EC2_SNAP_root=`ec2-create-snapshot --region "$BUILD_EC2_REGION" "$EC2_VOLUME_ROOT" | awk '{ print $2 }'`
     if test "$EC2_SNAP_root" = "${EC2_SNAP_root#snap-}" ; then
-	cleanup_and_exit 3 "ERROR: Failed to create snapshot for root disk $VM_VOLUME_NAME"
+	cleanup_and_exit 3 "ERROR: Failed to create snapshot for root disk $EC2_VOLUME_ROOT"
     fi
-    EC2_SNAP_swap=`ec2-create-snapshot --region "$BUILD_EC2_REGION" "$VM_VOLUME_SWAP" | awk '{ print $2 }'`
+    EC2_SNAP_swap=`ec2-create-snapshot --region "$BUILD_EC2_REGION" "$EC2_VOLUME_SWAP" | awk '{ print $2 }'`
     if test "$EC2_SNAP_swap" = "${EC2_SNAP_swap#snap-}" ; then
-	echo "ERROR: Failed to create snapshot for swap disk $VM_VOLUME_SWAP"
+	echo "ERROR: Failed to create snapshot for swap disk $EC2_VOLUME_SWAP"
 	ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_root"
 	cleanup_and_exit 3
     fi
@@ -175,14 +183,14 @@ vm_startup_ec2() {
 	c=`ec2-describe-snapshots --region "$BUILD_EC2_REGION" "$EC2_SNAP_root" "$EC2_SNAP_swap" | grep completed | wc -l`
 	test "$c" = 2 && break
     done
-    EC2_AMI=`ec2-register --region "$BUILD_EC2_REGION" -n build-$VM_VOLUME_NAME  -a x86_64 -b "/dev/sda1=$EC2_SNAP_root::false" -b "/dev/sdb1=$EC2_SNAP_swap::false" --kernel "$BUILD_EC2_AKI" | awk '{ print $2 }'`
+    EC2_AMI=`ec2-register --region "$BUILD_EC2_REGION" -n build-$EC2_VOLUME_ROOT  -a x86_64 -b "/dev/sda1=$EC2_SNAP_root::false" -b "/dev/sdb1=$EC2_SNAP_swap::false" --kernel "$BUILD_EC2_AKI" | awk '{ print $2 }'`
     if test "$EC2_AMI" == "${EC2_AMI#ami-}" ; then
 	echo "ERROR: Failed to register the AMI"
 	ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_root"
 	ec2-delete-snapshot --region "$BUILD_EC2_REGION" "$EC2_SNAP_swap"
 	cleanup_and_exit 3
     fi
-    INSTANCE=`ec2-run-instances --region "$BUILD_EC2_REGION" -z "$BUILD_EC2_ZONE" -t $BUILD_EC2_TYPE --kernel "$BUILD_EC2_AKI" --instance-initiated-shutdown-behavior terminate "$EC2_AMI" | grep ^INSTANCE | awk '{ print $2 }'`
+    INSTANCE=`ec2-run-instances --region "$BUILD_EC2_REGION" -z "$BUILD_EC2_ZONE" -t $EC2_BUILD_TYPE --kernel "$BUILD_EC2_AKI" --instance-initiated-shutdown-behavior terminate "$EC2_AMI" | grep ^INSTANCE | awk '{ print $2 }'`
     if test "$INSTANCE" == "${INSTANCE#i-}" ; then
 	echo "ERROR: Failed to run the instance for AMI $EC2_AMI"
 	ec2-deregister --region "$BUILD_EC2_REGION" "$EC2_AMI"
@@ -222,5 +230,8 @@ vm_startup_ec2() {
     rm -f "$temp_file"
     echo
     ec2-deregister --region "$BUILD_EC2_REGION" "$EC2_AMI"
+    # switch to extract volumnes
+    EC2_VOLUME_ROOT=$EC2_EXTRACT_VOLUME_root
+    EC2_VOLUME_SWAP=$EC2_EXTRACT_VOLUME_swap
     # snapshots get deleted after extract
 }

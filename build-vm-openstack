@@ -24,8 +24,10 @@
 
 
 OPENSTACK_BUILD_ID=
-OPENSTACK_VOLUME_GRUB=
 
+OPENSTACK_VOLUME_GRUB=
+OPENSTACK_VOLUME_ROOT=
+OPENSTACK_VOLUME_SWAP=
 OPENSTACK_ROOT_ATTACH_INFO=
 OPENSTACK_SWAP_ATTACH_INFO=
 
@@ -153,54 +155,55 @@ vm_verify_options_openstack() {
     fi
 
     if test -z "$VM_OPENSTACK_FLAVOR" ; then
-	cleanup_and_exit 3 "ERROR: No VM openstack flavor set (--os-flavor <FLAVOR-NAME|FLAVOR-ID>)."
+	cleanup_and_exit 3 "ERROR: No VM openstack flavor set (--openstack-flavor <FLAVOR-NAME|FLAVOR-ID>)."
     fi
 
     # set default values
     VM_ROOTDEV="LABEL=obsrootfs"
     VM_SWAPDEV="LABEL=obsswapfs"
 
-
     # hack: mis-use kernel parameter
     OPENSTACK_VOLUME_GRUB="$VM_KERNEL"
     VM_KERNEL=
 
-    VM_ROOT_STATE=__not_attached__
-    VM_SWAP_STATE=__not_attached__
+    OPENSTACK_VOLUME_ROOT="$VM_ROOT"
+    OPENSTACK_VOLUME_SWAP="$VM_SWAP"
+    VM_ROOT_TYPE=unattached
+    VM_SWAP_TYPE=unattached
 }
 
 vm_attach_root_openstack() {
     test -n "$OPENSTACK_ROOT_ATTACH_INFO" && cleanup_and_exit 1 "root is already attached"
-    TMP=`cloud_volume_attach_openstack "$VM_SERVER" "$VM_ROOT"`
+    TMP=`cloud_volume_attach_openstack "$VM_SERVER" "$OPENSTACK_VOLUME_ROOT"`
     test "${TMP:74:5}" = "/dev/" || cleanup_and_exit 3
     OPENSTACK_ROOT_ATTACH_INFO=$TMP
-    VM_ROOT_STATE=$VM_ROOT
     VM_ROOT=${TMP:74}
+    VM_ROOT_TYPE=device
 }
 
 vm_attach_swap_openstack() {
     test -n "$OPENSTACK_SWAP_ATTACH_INFO" && cleanup_and_exit 1 "root is already attached"
-    TMP=`cloud_volume_attach_openstack "$VM_SERVER" "$VM_SWAP"`
+    TMP=`cloud_volume_attach_openstack "$VM_SERVER" "$OPENSTACK_VOLUME_SWAP"`
     test "${TMP:74:5}" = "/dev/" || cleanup_and_exit 3
     OPENSTACK_SWAP_ATTACH_INFO=$TMP
-    VM_SWAP_STATE=$VM_SWAP
     VM_SWAP=${TMP:74}
+    VM_SWAP_TYPE=device
 }
 
 vm_detach_root_openstack() {
     test -z "$OPENSTACK_ROOT_ATTACH_INFO" && cleanup_and_exit 1 "root is not attached"
     cloud_volume_detach_openstack "$OPENSTACK_ROOT_ATTACH_INFO" || cleanup_and_exit 3
     VM_ROOT_ATTACH_INFO=
-    VM_ROOT=$VM_ROOT_STATE
-    VM_ROOT_STATE=__not_attached__
+    VM_ROOT=$OPENSTACK_VOLUME_ROOT
+    VM_ROOT_TYPE=unattached
 }
 
 vm_detach_swap_openstack() {
     test -z "$OPENSTACK_SWAP_ATTACH_INFO" && cleanup_and_exit 1 "swap is not attached"
     cloud_volume_detach_openstack "$OPENSTACK_SWAP_ATTACH_INFO" || cleanup_and_exit 3
     VM_SWAP_ATTACH_INFO=
-    VM_SWAP=$VM_SWAP_STATE
-    VM_SWAP_STATE=__not_attached__
+    VM_SWAP=$OPENSTACK_VOLUME_SWAP
+    VM_SWAP_TYPE=unattached
 }
 
 vm_cleanup_openstack() {

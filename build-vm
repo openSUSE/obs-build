@@ -41,8 +41,8 @@ VM_SWAPDEV=/dev/hda2
 VM_TYPE=
 VM_ROOT=
 VM_SWAP=
-VM_ROOT_STATE=
-VM_SWAP_STATE=
+VM_ROOT_TYPE=
+VM_SWAP_TYPE=
 VM_KERNEL=
 VM_INITRD=
 VM_WORKER=
@@ -59,8 +59,6 @@ VMDISK_SWAPSIZE=1024
 VMDISK_FILESYSTEM=
 VMDISK_MOUNT_OPTIONS=__default
 VMDISK_CLEAN=
-VM_VOLUME_NAME=
-VM_VOLUME_SWAP=
 VM_HOSTNAME=
 
 # zvm specific?
@@ -84,10 +82,6 @@ VM_WATCHDOG=
 VM_WATCHDOG_PID=
 
 # the following functions just call the corresponding vm versions
-vm_kill() {
-    vm_kill_$VM_TYPE "$@"
-}
-
 vm_verify_options() {
     vm_verify_options_$VM_TYPE "$@"
 }
@@ -282,6 +276,11 @@ vm_parse_options() {
     return 0
 }
 
+vm_set_buildstatus() {
+    if test -n "$VM_ROOT" -a -n "$VM_SWAP" -a "$VM_SWAP_TYPE" != unattached -a -e "$VM_SWAP" ; then
+        echo -n "BUILDSTATUS$1" >"$VM_SWAP"
+    fi
+}
 
 #
 # shutdown the system from inside the VM
@@ -351,10 +350,10 @@ vm_img_create() {
 vm_img_wipe() {
     vm_wipe_$VM_TYPE "$@"
 
-    if test -n "$VM_ROOT" -a "$VM_ROOT_STATE" != __not_attached__ -a ! -b "$VM_ROOT" ; then
+    if test -n "$VM_ROOT" -a "$VM_ROOT_TYPE" = file ; then
        rm -f "$VM_ROOT"
     fi
-    if test -n "$VM_SWAP" -a "$VM_SWAP_STATE" != __not_attached__ -a ! -b "$VM_SWAP" ; then
+    if test -n "$VM_SWAP" -a "$VM_SWAP_TYPE" = file ; then
        rm -f "$VM_SWAP"
     fi
 }
@@ -613,40 +612,61 @@ vm_set_mount_options() {
     fi
 }
 
-#
-# create file system and swap space, mount file system to $BUILD_ROOT
-#
-vm_setup() {
-    vm_set_filesystem_type
-    vm_set_mount_options
+vm_set_defaults() {
+    # setup root/swap defaults and type
     if test "$VM_ROOT" = 1 ; then
 	VM_ROOT="$BUILD_ROOT.img"
 	if test -z "$VM_SWAP" -a "$VM_TYPE" != emulator ; then
 	    VM_SWAP="$BUILD_ROOT.swap"
 	fi
     fi
+    if test -n "$VM_ROOT" -a -z "$VM_ROOT_TYPE" ; then
+	VM_ROOT_TYPE=file
+	test -b "$VM_ROOT" && VM_ROOT_TYPE=device
+    fi
+    if test -n "$VM_SWAP" -a -z "$VM_SWAP_TYPE" ; then
+	VM_SWAP_TYPE=file
+	test -b "$VM_SWAP" && VM_SWAP_TYPE=device
+    fi
+}
+
+#
+# create file system and swap space, mount file system to $BUILD_ROOT
+#
+vm_setup() {
+    vm_set_filesystem_type
+    vm_set_mount_options
+    vm_set_defaults
     echo "VM_ROOT: $VM_ROOT, VM_SWAP: $VM_SWAP"
+
     vm_attach_root
     # this should not be needed, but sometimes a xen instance got lost
     test "$VM_TYPE" = xen && vm_purge_xen
     if test -n "$VMDISK_CLEAN" ; then
 	# delete old root/swap to get rid of the old blocks
-	if test -n "$VM_ROOT" -a "$VM_ROOT_STATE" != __not_attached__ -a -f "$VM_ROOT" ; then
+	if test -n "$VM_ROOT" -a "$VM_ROOT_TYPE" = file -a -f "$VM_ROOT" ; then
 	    echo "Deleting old $VM_ROOT"
-	    rm -rf "$VM_ROOT"
+	    rm -f "$VM_ROOT"
 	fi
-	if test -n "$VM_SWAP" -a "$VM_SWAP_STATE" != __not_attached__ -a -f "$VM_SWAP" ; then
+	if test -n "$VM_SWAP" -a "$VM_SWAP_TYPE" = file -a -f "$VM_SWAP" ; then
 	    echo "Deleting old $VM_SWAP"
-	    rm -rf "$VM_SWAP"
+	    rm -f "$VM_SWAP"
 	fi
     fi
-    if test ! -b "$VM_ROOT" ; then
-	vm_img_create "$VM_ROOT" "$VMDISK_ROOTSIZE"
+    if test "$VM_ROOT_TYPE" = file ; then
+	if test -n "$CLEAN_BUILD" ; then
+	    vm_img_create "$VM_ROOT" "$VMDISK_ROOTSIZE"
+	else
+	    local origrootsize
+	    test -e "$VM_ROOT" -a -e "${VM_ROOT}.size" && origrootsize=$(cat "${VM_ROOT}.size" 2>/dev/null)
+	    if test -z "$origrootsize" -o "$origrootsize" != "$VMDISK_ROOTSIZE" ; then
+		# the size has changed, re-create file system
+		vm_img_create "$VM_ROOT" "$VMDISK_ROOTSIZE"
+		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" || cleanup_and_exit 3
+	    fi
+	fi
     fi
-    if test -z "$CLEAN_BUILD" ; then
-        vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT"
-    fi
-    if test -n "$VM_SWAP" -a "$VM_SWAP_STATE" != __not_attached__ -a ! -b "$VM_SWAP" ; then
+    if test -n "$VM_SWAP" -a "$VM_SWAP_TYPE" = file ; then
 	vm_img_create "$VM_SWAP" "$VMDISK_SWAPSIZE"
     fi
     if test ! -e "$VM_ROOT" ; then
