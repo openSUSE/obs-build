@@ -696,8 +696,7 @@ run_rsync() {
 }
 
 wipe_build_environment() {
-    if test -n "$VM_TYPE"; then
-	vm_set_defaults
+    if test -n "$VM_TYPE" ; then
 	vm_img_wipe
     else
 	echo "Wiping build root: '$BUILD_ROOT'"
@@ -711,6 +710,20 @@ wipe_build_environment() {
 	done
 	rm -rf "$BUILD_ROOT"
     fi  
+}
+
+kill_running_build() {
+    test -z "$SRCDIR" || usage
+    (set -C; > "$BUILD_ROOT/exit" 2>/dev/null || true)
+    if test -n "$VM_TYPE" ; then
+	# mark job as failed so that we don't extract packages
+	vm_set_buildstatus 1
+	vm_kill
+    else
+	if ! $BUILD_DIR/killchroot -s 9 $BUILD_ROOT ; then
+	    cleanup_and_exit 1 "could not kill build in $BUILD_ROOT"
+	fi
+    fi
 }
 
 #### main ####
@@ -991,34 +1004,25 @@ validate_buildroot "$BUILD_ROOT"
 # done option parsing
 BUILD_OPTIONS_PARSED=true
 
-if test "$DO_WIPE" = true ; then
+
+if test -n "$VM_TYPE" -a -z "$RUNNING_IN_VM" ; then
+    vm_verify_options
+    vm_set_defaults
+fi
+
+if test -n "$DO_WIPE" ; then
     wipe_build_environment
-    cleanup_and_exit 0
+    cleanup_and_exit
 fi
 
 if test -n "$KILL" ; then
-    test -z "$SRCDIR" || usage
-    (set -C; > "$BUILD_ROOT/exit" 2>/dev/null || true)
-    if test -n "$VM_TYPE" ; then
-	vm_set_defaults
-	# mark job as failed so that we don't extract packages
-	vm_set_buildstatus 1
-	vm_kill
-    else
-	if ! $BUILD_DIR/killchroot -s 9 $BUILD_ROOT ; then
-	    cleanup_and_exit 1 "could not kill build in $BUILD_ROOT"
-	fi
-    fi
+    kill_running_build
     cleanup_and_exit
 fi
 
 if test -n "$CLEAN_BUILD" ; then
     DO_INIT=true
     DO_INIT_TOPDIR=true
-fi
-
-if test -n "$VM_TYPE" -a -z "$RUNNING_IN_VM" ; then
-    vm_verify_options
 fi
 
 if test -z "$RPMLIST" -a -z "$RUNNING_IN_VM" ; then

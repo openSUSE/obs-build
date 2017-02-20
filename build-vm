@@ -613,7 +613,7 @@ vm_set_mount_options() {
 }
 
 vm_set_defaults() {
-    # setup root/swap defaults and type
+    # setup root/swap defaults and type, called after option verification
     if test "$VM_ROOT" = 1 ; then
 	VM_ROOT="$BUILD_ROOT.img"
 	if test -z "$VM_SWAP" -a "$VM_TYPE" != emulator ; then
@@ -636,7 +636,6 @@ vm_set_defaults() {
 vm_setup() {
     vm_set_filesystem_type
     vm_set_mount_options
-    vm_set_defaults
     echo "VM_ROOT: $VM_ROOT, VM_SWAP: $VM_SWAP"
 
     vm_attach_root

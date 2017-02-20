@@ -113,6 +113,10 @@ cloud_volume_detach_openstack() {
 }
 
 vm_verify_options_openstack() {
+    OPENSTACK_VOLUME_ROOT="$VM_ROOT"
+    OPENSTACK_VOLUME_SWAP="$VM_SWAP"
+    VM_ROOT_TYPE=unattached
+    VM_SWAP_TYPE=unattached
 
     # Checking for required tools (nova and cinder)
     NOVACLIENT=`type -p nova`
@@ -123,6 +127,10 @@ vm_verify_options_openstack() {
     CINDERCLIENT=`type -p cinder`
     if test -z "$CINDERCLIENT" ; then
         cleanup_and_exit 3 "ERROR: nova not installed. Please install cinder and try again"
+    fi
+
+    if test -n "$KILL" -o -n "$DO_WIPE" ; then
+        return
     fi
 
     # verify options
@@ -156,11 +164,6 @@ vm_verify_options_openstack() {
     # hack: mis-use kernel parameter
     OPENSTACK_VOLUME_GRUB="$VM_KERNEL"
     VM_KERNEL=
-
-    OPENSTACK_VOLUME_ROOT="$VM_ROOT"
-    OPENSTACK_VOLUME_SWAP="$VM_SWAP"
-    VM_ROOT_TYPE=unattached
-    VM_SWAP_TYPE=unattached
 }
 
 vm_attach_root_openstack() {

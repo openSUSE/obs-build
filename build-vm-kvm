@@ -55,6 +55,10 @@ kvm_check_hugetlb() {
 }
 
 vm_verify_options_kvm() {
+    if test -n "$KILL" -o -n "$DO_WIPE" ; then
+	return
+    fi  
+
     vm_kernel=
     vm_initrd=
     

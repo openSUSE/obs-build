@@ -258,11 +258,14 @@ vm_verify_options_zvm() {
 	VM_SWAP="0250"
     fi
 
-    ZVM_VOLUME_ROOT=$VM_ROOT
-    ZVM_VOLUME_SWAP=$VM_SWAP
+    ZVM_VOLUME_ROOT="$VM_ROOT"
+    ZVM_VOLUME_SWAP="$VM_SWAP"
     VM_ROOT_TYPE=unattached
     VM_SWAP_TYPE=unattached
 
+    if test -n "$KILL" -o -n "$DO_WIPE" ; then
+        return
+    fi  
 
     # z/VM guest name that is already defined in z/VM
     if test -z "$VM_WORKER" ; then
