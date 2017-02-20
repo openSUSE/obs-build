@@ -41,11 +41,11 @@ openstack_get_disk_state() {
 }
 
 openstack_cinder_volume2id() {
-    local VM_VOL_NAME=$1
-    local OUT=$($CINDERCLIENT show $VM_VOL_NAME)
+    local OUT=$($CINDERCLIENT show "$1")
     openstack_get_field "$OUT" id
 }
 
+# sets OPENSTACK_ATTACH_INFO
 cloud_volume_attach_openstack() {
     local VM_SERVER="$1"
     local VM_VOL_NAME="$2"
@@ -61,36 +61,27 @@ cloud_volume_attach_openstack() {
     # | volumeId | 793e9a04-7068-4cf1-86e7-26509f709b54 |
     # +----------+--------------------------------------+
     local OUT=$($NOVACLIENT volume-attach "$VM_SERVER" "$VM_VOL_ID")
+    test $? -gt 0 && cleanup_and_exit 3 "ERROR: nova volume-attach failed. $?"
 
-    if [ $? -gt 0 ] ; then
-	echo "ERROR: nova attach failed. $?" >&2
-	return 3
-    fi
     local device_path=`openstack_get_field "$OUT" device`
     local serverId=`openstack_get_field "$OUT" serverId`
     while true ; do
 	local state=`openstack_get_disk_state "$VM_VOL_NAME"`
 	test "$state" = "in-use" && break
-        if test -z "$state" ; then
-	    echo "ERROR: unable to find state of volume $VM_VOL_NAME" >&2
-            return 3
-        fi
+        test -z "$state" && cleanup_and_exit 3 "ERROR: unable to find state of volume $VM_VOL_NAME"
         if test "$state" = available ; then
 	    echo "WARNING: volume $VM_VOL_NAME got not attached, retrying" >&2
 	    OUT=`$NOVACLIENT volume-attach "$VM_SERVER" "$VM_VOL_ID"`
-
-	    if [ $? -gt 0 ] ; then
-		echo "ERROR: nova attach failed. $?" >&2
-		return 3
-	    fi
+	    test $? -gt 0 && cleanup_and_exit 3 "ERROR: nova attach failed. $?"
 	    device_path=`openstack_get_field "$OUT" device`
         fi
         sleep 3
     done
+    test "${device_path:0:5}" = "/dev/" || cleanup_and_exit 3 "device path not starting with /dev/: $device_path"
 
     # return attach info. Example:
     # 793e9a04-7068-4cf1-86e7-26509f709b54:175e470c-5869-4425-988a-6b334a2fa655:/dev/vdb
-    echo "$VM_VOL_ID:$serverId:$device_path"
+    OPENSTACK_ATTACH_INFO="$VM_VOL_ID:$serverId:$device_path"
 }
 
 cloud_volume_detach_openstack() {
@@ -112,7 +103,7 @@ cloud_volume_detach_openstack() {
         return 0
     fi
     
-    if ! $NOVACLIENT volume-detach "$VM_SERVER" "$VM_VOL_ID"; then
+    if ! $NOVACLIENT volume-detach "$VM_SERVER" "$VM_VOL_ID" ; then
 	cleanup_and_exit 3 "ERROR: nova detach of $VM_VOL_ID failed."
     fi
     while test "$state" != "available" ; do
@@ -174,34 +165,36 @@ vm_verify_options_openstack() {
 
 vm_attach_root_openstack() {
     test -n "$OPENSTACK_ROOT_ATTACH_INFO" && cleanup_and_exit 1 "root is already attached"
-    TMP=`cloud_volume_attach_openstack "$VM_SERVER" "$OPENSTACK_VOLUME_ROOT"`
-    test "${TMP:74:5}" = "/dev/" || cleanup_and_exit 3
-    OPENSTACK_ROOT_ATTACH_INFO=$TMP
-    VM_ROOT=${TMP:74}
+    local OPENSTACK_ATTACH_INFO
+    cloud_volume_attach_openstack "$VM_SERVER" "$OPENSTACK_VOLUME_ROOT"
+    OPENSTACK_ROOT_ATTACH_INFO=$OPENSTACK_ATTACH_INFO
+    VM_ROOT=${OPENSTACK_ATTACH_INFO:74}
     VM_ROOT_TYPE=device
 }
 
 vm_attach_swap_openstack() {
     test -n "$OPENSTACK_SWAP_ATTACH_INFO" && cleanup_and_exit 1 "root is already attached"
-    TMP=`cloud_volume_attach_openstack "$VM_SERVER" "$OPENSTACK_VOLUME_SWAP"`
-    test "${TMP:74:5}" = "/dev/" || cleanup_and_exit 3
-    OPENSTACK_SWAP_ATTACH_INFO=$TMP
-    VM_SWAP=${TMP:74}
+    local OPENSTACK_ATTACH_INFO
+    cloud_volume_attach_openstack "$VM_SERVER" "$OPENSTACK_VOLUME_SWAP"
+    OPENSTACK_SWAP_ATTACH_INFO=$OPENSTACK_ATTACH_INFO
+    VM_SWAP=${OPENSTACK_ATTACH_INFO:74}
     VM_SWAP_TYPE=device
 }
 
 vm_detach_root_openstack() {
     test -z "$OPENSTACK_ROOT_ATTACH_INFO" && cleanup_and_exit 1 "root is not attached"
-    cloud_volume_detach_openstack "$OPENSTACK_ROOT_ATTACH_INFO" || cleanup_and_exit 3
-    VM_ROOT_ATTACH_INFO=
+    local OPENSTACK_ATTACH_INFO=$OPENSTACK_ROOT_ATTACH_INFO
+    OPENSTACK_ROOT_ATTACH_INFO=
+    cloud_volume_detach_openstack "$OPENSTACK_ATTACH_INFO" || cleanup_and_exit 3
     VM_ROOT=$OPENSTACK_VOLUME_ROOT
     VM_ROOT_TYPE=unattached
 }
 
 vm_detach_swap_openstack() {
     test -z "$OPENSTACK_SWAP_ATTACH_INFO" && cleanup_and_exit 1 "swap is not attached"
-    cloud_volume_detach_openstack "$OPENSTACK_SWAP_ATTACH_INFO" || cleanup_and_exit 3
-    VM_SWAP_ATTACH_INFO=
+    local OPENSTACK_ATTACH_INFO=$OPENSTACK_SWAP_ATTACH_INFO
+    OPENSTACK_SWAP_ATTACH_INFO=
+    cloud_volume_detach_openstack "$OPENSTACK_ATTACH_INFO" || cleanup_and_exit 3
     VM_SWAP=$OPENSTACK_VOLUME_SWAP
     VM_SWAP_TYPE=unattached
 }
