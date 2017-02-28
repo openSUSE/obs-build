@@ -67,6 +67,7 @@ recipe_build_debootstrap() {
 
     # Mount special filesystem in the debootstrap build root
     mount -n -tproc none $BUILD_ROOT/$myroot/proc
+    mount -n -tsysfs -o ro none $BUILD_ROOT/$myroot/sys
     mount -n -tdevpts -omode=0620,ptmxmode=0666,gid=5,newinstance, none $BUILD_ROOT/$myroot/dev/pts
     mkdir -p $BUILD_ROOT/$myroot/dev/shm
     mount -n -ttmpfs none $BUILD_ROOT/$myroot/dev/shm
@@ -79,6 +80,7 @@ recipe_build_debootstrap() {
 
     umount -n $BUILD_ROOT/$myroot/proc/sys/fs/binfmt_misc 2>/dev/null || true
     umount -n $BUILD_ROOT/$myroot/proc
+    umount -n $BUILD_ROOT/$myroot/sys
     umount -n $BUILD_ROOT/$myroot/dev/pts
     umount -n $BUILD_ROOT/$myroot/dev/shm
 
