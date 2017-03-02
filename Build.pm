@@ -842,7 +842,7 @@ sub makewhatprovidesh {
     push @{$whatprovides{$_}}, $p for unify(@pp);
   }
   for my $p (keys %{$config->{'fileprovides'}}) {
-    my @pp = map {@{$whatprovides{$_} || []}} @{$config->{'fileprovides'}->{$p}};
+    my @pp = grep {@{$provides->{$_} || []}} @{$config->{'fileprovides'}->{$p}};
     @{$whatprovides{$p}} = unify(@{$whatprovides{$p} || []}, @pp) if @pp;
   }
   $config->{'whatprovidesh'} = \%whatprovides;
