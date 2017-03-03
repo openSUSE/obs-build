@@ -615,7 +615,10 @@ recipe_build_kiwi() {
 
     # Hook for running post kiwi build scripts like QA scripts if installed
     if test -x $BUILD_ROOT/usr/lib/build/kiwi_post_run ; then
-	chroot $BUILD_ROOT su -c /usr/lib/build/kiwi_post_run || cleanup_and_exit 1
+      if ! chroot $BUILD_ROOT su -c /usr/lib/build/kiwi_post_run; then
+        echo "/usr/lib/build/kiwi_post_run script failed!"
+        cleanup_and_exit 1
+      fi
     fi
 }
 
