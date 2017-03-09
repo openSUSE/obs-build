@@ -35,6 +35,7 @@ our $do_arch;
 our $do_collax;
 our $do_livebuild;
 our $do_snapcraft;
+our $do_appimage;
 
 sub import {
   for (@_) {
@@ -45,8 +46,9 @@ sub import {
     $do_collax = 1 if $_ eq ':collax';
     $do_livebuild = 1 if $_ eq ':livebuild';
     $do_snapcraft = 1 if $_ eq ':snapcraft';
+    $do_appimage = 1 if $_ eq ':appimage';
   }
-  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft;
+  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage;
   if ($do_deb) {
     require Build::Deb;
   }
@@ -64,6 +66,9 @@ sub import {
   }
   if ($do_snapcraft) {
     require Build::Snapcraft;
+  }
+  if ($do_appimage) {
+    require Build::Appimage;
   }
 }
 
@@ -370,7 +375,7 @@ sub read_config {
     $config->{'binarytype'} = 'rpm' if $config->{'type'} eq 'spec' || $config->{'type'} eq 'kiwi';
     $config->{'binarytype'} = 'deb' if $config->{'type'} eq 'dsc' || $config->{'type'} eq 'collax' || $config->{'type'} eq 'livebuild';
     $config->{'binarytype'} = 'arch' if $config->{'type'} eq 'arch';
-    if ($config->{'type'} eq 'snapcraft') {
+    if ($config->{'type'} eq 'snapcraft' || $config->{'type'} eq 'appimage') {
       if (grep {$_ eq 'rpm'} @{$config->{'preinstall'} || []}) {
         $config->{'binarytype'} = 'rpm';
       } elsif (grep {$_ eq 'debianutils'} @{$config->{'preinstall'} || []}) {
@@ -1295,6 +1300,7 @@ sub recipe2buildtype {
   return 'arch' if $recipe eq 'PKGBUILD';
   return 'collax' if $recipe eq 'build.collax';
   return 'snapcraft' if $recipe eq 'snapcraft.yaml';
+  return 'appimage' if $recipe eq 'appimage.yaml';
   return 'preinstallimage' if $recipe eq '_preinstallimage';
   return 'simpleimage' if $recipe eq 'simpleimage';
   return undef;
@@ -1344,6 +1350,7 @@ sub parse {
   $fnx =~ s/^_service:.*://;
   return parse_simpleimage($cf, $fn, @args) if $fnx eq 'simpleimage';
   return Build::Snapcraft::parse($cf, $fn, @args) if $do_snapcraft && $fnx eq 'snapcraft.yaml';
+  return Build::Appimage::parse($cf, $fn, @args) if $do_appimage && $fnx eq 'appimage.yml';
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $fnx eq 'PKGBUILD';
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $fnx eq 'build.collax';
   return parse_preinstallimage($cf, $fn, @args) if $fnx eq '_preinstallimage';
@@ -1358,6 +1365,7 @@ sub parse_typed {
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $buildtype eq 'kiwi';
   return Build::LiveBuild::parse($cf, $fn, @args) if $do_livebuild && $buildtype eq 'livebuild';
   return Build::Snapcraft::parse($cf, $fn, @args) if $do_snapcraft && $buildtype eq 'snapcraft';
+  return Build::Appimage::parse($cf, $fn, @args) if $do_appimage && $buildtype eq 'appimage';
   return parse_simpleimage($cf, $fn, @args) if $buildtype eq 'simpleimage';
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $buildtype eq 'arch';
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $buildtype eq 'collax';
