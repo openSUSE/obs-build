@@ -537,7 +537,9 @@ sub get_build {
     @directdepsend = grep {!/^-/} splice(@directdepsend, @deps + 1);
   }
   my @extra = (@{$config->{'required'}}, @{$config->{'support'}});
-  if (@{$config->{'keep'} || []}) {
+  if ($config->{'type'} eq 'dsc') {
+	  ;
+  } elsif (@{$config->{'keep'} || []}) {
     my %keep = map {$_ => 1} (@deps, @{$config->{'keep'} || []}, @{$config->{'preinstall'}});
     for (@{$subpacks || []}) {
       next if $keep{$_};
