@@ -72,6 +72,8 @@ recipe_build_debootstrap() {
     mkdir -p $BUILD_ROOT/$myroot/dev/shm
     mount -n -ttmpfs none $BUILD_ROOT/$myroot/dev/shm
 
+    chroot $BUILD_ROOT/$myroot apt-cache gencaches
+
     # move topdir over
     mv "$BUILD_ROOT/$TOPDIR" "$BUILD_ROOT/$myroot/${TOPDIR%/*}"
 
