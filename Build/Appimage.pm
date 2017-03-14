@@ -1,6 +1,6 @@
 ################################################################
 #
-# Copyright (c) 1995-2014 SUSE Linux Products GmbH
+# Copyright (c) 2017 SUSE Linux Products GmbH
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 or 3 as

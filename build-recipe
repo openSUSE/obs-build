@@ -24,7 +24,7 @@
 
 KIWI_PARAMETERS=
 
-for i in spec dsc kiwi arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild; do
+for i in spec dsc kiwi arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild appimage; do
     . "$BUILD_DIR/build-recipe-$i"
 done
 
@@ -73,6 +73,7 @@ recipe_set_buildtype() {
         *.kiwi) BUILDTYPE=kiwi ;;
         PKGBUILD) BUILDTYPE=arch ;;
         snapcraft.yaml) BUILDTYPE=snapcraft ;;
+        appimage.yml) BUILDTYPE=appimage ;;
         build.collax) BUILDTYPE=collax ;;
         _preinstallimage) BUILDTYPE=preinstallimage ;;
         simpleimage) BUILDTYPE=simpleimage ;;
