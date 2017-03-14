@@ -36,18 +36,26 @@ recipe_setup_spec() {
 }
 
 recipe_prepare_spec() {
+    # fixup specfile
     args=()
-    if test -n "$RELEASE"; then
-	args=(--release "$RELEASE")
+    if test -n "$RELEASE" ; then
+	args[${#args[@]}]="--release"
+	args[${#args[@]}]="$RELEASE"
+    fi
+    if test -n "$OBS_MULTIBUILD" ; then
+	args[${#args[@]}]="--obsmultibuild"
+	args[${#args[@]}]="$OBS_MULTIBUILD"
+    fi
+    if test -n "$OBS_PACKAGE" ; then
+	args[${#args[@]}]="--obspackage"
+	args[${#args[@]}]="$OBS_PACKAGE"
+    fi
+    if test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" ; then
+	args[${#args[@]}]="--changelog"
+	args[${#args[@]}]="$BUILD_ROOT/.build-changelog"
     fi
 
-    rawcfgmacros=.rpmmacros
-    test "$BUILDTYPE" = debbuild && rawcfgmacros=.debmacros
-
-    # fixup specfile
-    CHANGELOGARGS=
-    test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" && CHANGELOGARGS="--changelog $BUILD_ROOT/.build-changelog"
-    substitutedeps "${args[@]}" --root "$BUILD_ROOT" --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" $CHANGELOGARGS "$BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE" "$BUILD_ROOT/.spec.new" || cleanup_and_exit 1
+    substitutedeps "${args[@]}" --root "$BUILD_ROOT" --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" "$BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE" "$BUILD_ROOT/.spec.new" || cleanup_and_exit 1
 
     # fix rpmrc if we are compiling for i686
     test -f $BUILD_ROOT/usr/lib/rpm/rpmrc_i586 && mv $BUILD_ROOT/usr/lib/rpm/rpmrc_i586 $BUILD_ROOT/usr/lib/rpm/rpmrc
@@ -57,6 +65,8 @@ recipe_prepare_spec() {
     fi
 
     # extract macros from configuration
+    rawcfgmacros=.rpmmacros
+    test "$BUILDTYPE" = debbuild && rawcfgmacros=.debmacros
     queryconfig rawmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" > $BUILD_ROOT/root/$rawcfgmacros
     if test -n "$BUILD_DEBUG" && test "$BUILDTYPE" != debbuild ; then
 	echo '
