@@ -36,6 +36,10 @@ recipe_setup_appimage() {
     else
 	cp -p "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
     fi
+
+    rawcfgmacros=.rpmmacros
+    test "$BUILDTYPE" = debbuild && rawcfgmacros=.debmacros
+    queryconfig rawmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" > $BUILD_ROOT/root/$rawcfgmacros
 }
 
 recipe_prepare_appimage() {
