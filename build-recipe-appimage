@@ -89,7 +89,7 @@ recipe_build_appimage() {
 
     # extract build result basenames
     local build_results=""
-    for i in $BUILD_ROOT/$TOPDIR/SOURCES/* ; do
+    for i in $BUILD_ROOT/$TOPDIR/OTHER/* ; do
 	test -f "$i" || continue
 	case "${i##*/}" in
 	    *.AppImage|*.AppImage.digest|*.AppImage.zsync)
@@ -105,15 +105,7 @@ recipe_build_appimage() {
 	cleanup_and_exit 1 "No live-build result found"
     fi
 
-    # move created products (and their metadata files) to destination
-    local buildnum="${RELEASE:+-Build${RELEASE}}"
-    for prefix in $(echo -e ${build_results} | sort | uniq) ; do
-	for f in ${prefix}.* ; do
-	    mv ${f} \
-		$BUILD_ROOT/$TOPDIR/OTHER/${prefix##*/}${buildnum}${f#${prefix}}
-	    BUILD_SUCCEEDED=true
-	done
-    done
+    BUILD_SUCCEEDED=true
 }
 
 recipe_resultdirs_appimage() {
