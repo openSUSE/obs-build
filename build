@@ -1154,7 +1154,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     fi
     MYSRCDIR="$SRCDIR"
 
-    # special hack to build from a .src.rpm
+    # special hack to build from a .src.rpm (modifies MYSRCDIR)
     test "$RECIPEFILE" != "${RECIPEFILE%.src.rpm}" && recipe_unpack_srcrpm
 
     echo "processing recipe $MYSRCDIR/$RECIPEFILE ..."
@@ -1170,18 +1170,10 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 
     # we need to do this before the vm is started
     if test -n "$CHANGELOG" -a -z "$RUNNING_IN_VM" ; then
-	rm -f $BUILD_ROOT/.build-changelog
-	case $RECIPEFILE in
-	    *.dsc) CFFORMAT=debian ;;
-	    *) CFFORMAT=rpm ;;
-	esac
-	echo "running changelog2spec --target $CFFORMAT --file $MYSRCDIR/$RECIPEFILE"
-	if ! $BUILD_DIR/changelog2spec --target $CFFORMAT --file "$MYSRCDIR/$RECIPEFILE" > $BUILD_ROOT/.build-changelog ; then
-	    rm -f $BUILD_ROOT/.build-changelog
-	fi
+        recipe_create_changelog "$MYSRCDIR/$RECIPEFILE"
     fi
 
-    if test -n "$VM_TYPE" -a -z "$RUNNING_IN_VM"; then
+    if test -n "$VM_TYPE" -a -z "$RUNNING_IN_VM" ; then
 	vm_first_stage
 	cleanup_and_exit
     fi
@@ -1193,14 +1185,11 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	#
 	test -z "$INCARNATION" && INCARNATION=0
 	echo "BUILD_INCARNATION=$INCARNATION" > $BUILD_ROOT/.buildenv
-	CREATE_BUILD_BINARIES=
 	test "$BUILDTYPE" = preinstallimage && mkdir -p $BUILD_ROOT/.preinstall_image
-	egrep '^#[[:blank:]]*needsbinariesforbuild[[:blank:]]*$' >/dev/null <$MYSRCDIR/$RECIPEFILE && CREATE_BUILD_BINARIES=--create-build-binaries
-	test "$BUILDTYPE" = mock && CREATE_BUILD_BINARIES=--create-build-binaries
-	test "$BUILDTYPE" = debootstrap && CREATE_BUILD_BINARIES=--create-build-binaries
-	test "$BUILDTYPE" = livebuild && CREATE_BUILD_BINARIES=--create-build-binaries
-	test "$BUILDTYPE" = snapcraft && CREATE_BUILD_BINARIES=--create-build-binaries
-	test "$BUILDTYPE" = appimage && CREATE_BUILD_BINARIES=--create-build-binaries
+	CREATE_BUILD_BINARIES=
+	if recipe_needs_build_binaries "$MYSRCDIR/$RECIPEFILE" ; then
+	    CREATE_BUILD_BINARIES=--create-build-binaries
+	fi
 	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $DLNOSIGNATURE $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
         start_time=`date +%s`

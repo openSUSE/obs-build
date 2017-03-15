@@ -53,38 +53,34 @@ recipe_prepare_appimage() {
 # $RECIPEFILE the name of the appimage.yml config file
 
 recipe_build_appimage() {
-    local ARCH
+    local ARCH DEB
     if [ -x /bin/rpm ]; then
-      ARCH=$(chroot $BUILD_ROOT su -c "rpm --eval '%{_target_cpu}'")
-      unset DEB
+        ARCH=$(chroot $BUILD_ROOT su -c "rpm --eval '%{_target_cpu}'")
     else
-      ARCH=$(chroot $BUILD_ROOT su -c "dpkg-architecture -qDEB_BUILD_ARCH")
-      DEB=1
+        ARCH=$(chroot $BUILD_ROOT su -c "dpkg-architecture -qDEB_BUILD_ARCH")
+        DEB=1
     fi
     local DIST="OBS"
 
-    [ -z "${ARCH}" -o -z "${DIST}" ] && cleanup_and_exit 1
+    test -z "${ARCH}" -o -z "${DIST}" && cleanup_and_exit 1
 
-    if ! test -d $BUILD_ROOT/.build.binaries; then
-        echo "No binaries available in $BUILD_ROOT/.build.binaries"
-        cleanup_and_exit 1
-    fi
+    test -d $BUILD_ROOT/.build.binaries || cleanup_and_exit 1 "missing $BUILD_ROOT/.build.binaries"
 
     if test "$DO_INIT" = true; then
         if test -n "$DEB" -a ! -d "$BUILD_ROOT/.build.binaries/dists" ; then
-  	  echo "creating debian repository metadata..."
-          createrepo_debian $BUILD_ROOT/.build.binaries ${ARCH} ${DIST}
-          # setup /etc/apt/sources.list
-          mkdir -p "$BUILD_ROOT/etc/apt"
-          echo "deb [trusted=yes] file:/.build.binaries OBS main" >> "$BUILD_ROOT/etc/apt/sources.list"
+  	    echo "creating debian repository metadata..."
+            createrepo_debian $BUILD_ROOT/.build.binaries ${ARCH} ${DIST}
+            # setup /etc/apt/sources.list
+            mkdir -p "$BUILD_ROOT/etc/apt"
+            echo "deb [trusted=yes] file:/.build.binaries OBS main" >> "$BUILD_ROOT/etc/apt/sources.list"
         fi
         if test -z "$DEB" -a ! -d "$BUILD_ROOT/.build.binaries/repodata" ; then
-  	  echo "creating repository metadata..."
-          if [ -x /usr/bin/createrepo_c ]; then 
-            createrepo_c $BUILD_ROOT/.build.binaries
-          else
-            createrepo $BUILD_ROOT/.build.binaries
-          fi
+  	    echo "creating repository metadata..."
+            if [ -x /usr/bin/createrepo_c ]; then 
+                createrepo_c $BUILD_ROOT/.build.binaries
+            else
+                createrepo $BUILD_ROOT/.build.binaries
+            fi
         fi
     fi
 

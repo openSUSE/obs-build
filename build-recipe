@@ -145,3 +145,26 @@ expand_recipe_directories() {
 	cleanup_and_exit 1 "no recipe files found in $@. exit..."
     fi
 }
+
+# generate a .build-changelog file from a .changes file
+recipe_create_changelog() {
+   rm -f $BUILD_ROOT/.build-changelog
+   case $1 in
+	*.dsc) CFFORMAT=debian ;;
+	*) CFFORMAT=rpm ;;
+    esac
+    echo "running changelog2spec --target $CFFORMAT --file $1"
+    if ! $BUILD_DIR/changelog2spec --target $CFFORMAT --file "$1" > $BUILD_ROOT/.build-changelog ; then 
+	rm -f $BUILD_ROOT/.build-changelog
+    fi
+}
+
+recipe_needs_build_binaries() {
+    test "$BUILDTYPE" = mock && return 0
+    test "$BUILDTYPE" = debootstrap && return 0
+    test "$BUILDTYPE" = livebuild && return 0
+    test "$BUILDTYPE" = snapcraft && return 0
+    test "$BUILDTYPE" = appimage && return 0
+    egrep '^#[[:blank:]]*needsbinariesforbuild[[:blank:]]*$' >/dev/null <"$1" && return 0
+    return 1
+}
