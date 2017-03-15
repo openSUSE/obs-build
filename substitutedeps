@@ -37,8 +37,8 @@ sub expand {
   return @xspec && ref($xspec[0]) ? $xspec[0]->[1] : '';
 }
 
-my ($dist, $buildroot, $rpmdeps, $archs, $configdir, $release, $changelog, $multibuild, $obspackage);
-$multibuild = '';	# default to empty
+my ($dist, $buildroot, $rpmdeps, $archs, $configdir, $release, $changelog, $buildflavor, $obspackage);
+$buildflavor = '';	# default to empty
 
 $configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
 
@@ -73,9 +73,9 @@ while (@ARGV)  {
     $changelog = shift @ARGV;
     next;
   }
-  if ($ARGV[0] eq '--obsmultibuild') {
+  if ($ARGV[0] eq '--buildflavor') {
     shift @ARGV;
-    $multibuild = shift @ARGV;
+    $buildflavor = shift @ARGV;
     next;
   }
   if ($ARGV[0] eq '--obspackage') {
@@ -116,8 +116,12 @@ my $mainpkg = '';
 my $pkg;
 
 for my $line (@$xspec) {
-  $line =~ s/\@OBS_MULTIBUILD\@/$multibuild/g if defined $multibuild;
-  $line =~ s/\@OBS_PACKAGE\@/$obspackage/g if defined $obspackage;
+  $line =~ s/\@BUILD_FLAVOR\@/$buildflavor/g if defined $buildflavor;
+  if (defined($obspackage)) {
+    $line =~ s/\@OBS_PACKAGE\@/$obspackage/g;
+  } else {
+    die("recipe contains \@OBS_PACKAGE\@, but no package is set\n") if $line =~ /\@OBS_PACKAGE\@/;
+  }
   $used = 1;
   if (ref($line)) {
     if (!defined($line->[1])) {

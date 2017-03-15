@@ -42,9 +42,9 @@ recipe_prepare_spec() {
 	args[${#args[@]}]="--release"
 	args[${#args[@]}]="$RELEASE"
     fi
-    if test -n "$OBS_MULTIBUILD" ; then
-	args[${#args[@]}]="--obsmultibuild"
-	args[${#args[@]}]="$OBS_MULTIBUILD"
+    if test -n "$BUILD_FLAVOR" ; then
+	args[${#args[@]}]="--buildflavor"
+	args[${#args[@]}]="$BUILD_FLAVOR"
     fi
     if test -n "$OBS_PACKAGE" ; then
 	args[${#args[@]}]="--obspackage"

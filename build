@@ -104,7 +104,7 @@ DO_STATISTICS=
 RUN_SHELL=
 CCACHE=
 DLNOSIGNATURE=
-OBS_MULTIBUILD=
+BUILD_FLAVOR=
 OBS_PACKAGE=
 CACHE_DIR=/var/cache/build
 
@@ -966,9 +966,9 @@ while test -n "$1"; do
       -nosignature)
 	DLNOSIGNATURE="--nosignature"
       ;;
-      -obsmultibuild|-obs-multibuild)
+      -obsmultibuild|-obs-multibuild|-buildflavor|-build-flavor)
 	needarg
-	OBS_MULTIBUILD=$ARG
+	BUILD_FLAVOR=$ARG
 	shift
       ;;
       -obspackage|-obs-package)
