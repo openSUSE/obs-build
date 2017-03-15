@@ -1300,7 +1300,7 @@ sub recipe2buildtype {
   return 'arch' if $recipe eq 'PKGBUILD';
   return 'collax' if $recipe eq 'build.collax';
   return 'snapcraft' if $recipe eq 'snapcraft.yaml';
-  return 'appimage' if $recipe eq 'appimage.yaml';
+  return 'appimage' if $recipe eq 'appimage.yml';
   return 'preinstallimage' if $recipe eq '_preinstallimage';
   return 'simpleimage' if $recipe eq 'simpleimage';
   return undef;

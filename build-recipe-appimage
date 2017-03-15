@@ -46,7 +46,7 @@ recipe_prepare_appimage() {
 # $BUILD_ROOT is the chroot
 # $TOPDIR/SOURCES includes the appimages sources
 # $TOPDIR/$APPIMAGE_ROOT where appimage will be called
-# $RECIPEFILE the name of the appimage.yaml config file
+# $RECIPEFILE the name of the appimage.yml config file
 
 recipe_build_appimage() {
     local ARCH
