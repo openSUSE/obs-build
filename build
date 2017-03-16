@@ -1022,6 +1022,16 @@ if test -n "$VM_TYPE" -a -z "$RUNNING_IN_VM" ; then
     vm_set_defaults
 fi
 
+initbuildsysstuff=()
+if test -n "$BUILD_FLAVOR" ; then
+    initbuildsysstuff[${#initbuildsysstuff[@]}]="--buildflavor"
+    initbuildsysstuff[${#initbuildsysstuff[@]}]="$BUILD_FLAVOR"
+fi
+if test -n "$OBS_PACKAGE" ; then
+    initbuildsysstuff[${#initbuildsysstuff[@]}]="--obspackage"
+    initbuildsysstuff[${#initbuildsysstuff[@]}]="$OBS_PACKAGE"
+fi
+
 if test -n "$DO_WIPE" ; then
     wipe_build_environment
     cleanup_and_exit
@@ -1058,7 +1068,7 @@ if test -n "$LIST_STATE" ; then
 	recipe_unpack_srcrpm
 	RECIPEFILE="$MYSRCDIR/$RECIPEFILE"
     fi
-    init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --list-state "${definesnstuff[@]}" "${repos[@]}" $DLNOSIGNATURE $USEUSEDFORBUILD $RECIPEFILE $BUILD_EXTRA_PACKS
+    init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --list-state "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $DLNOSIGNATURE $USEUSEDFORBUILD $RECIPEFILE $BUILD_EXTRA_PACKS
     ERR=$?
     rm -rf "$BUILD_ROOT"
     cleanup_and_exit $ERR
@@ -1190,7 +1200,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	if recipe_needs_build_binaries "$MYSRCDIR/$RECIPEFILE" ; then
 	    CREATE_BUILD_BINARIES=--create-build-binaries
 	fi
-	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $DLNOSIGNATURE $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS
+	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $DLNOSIGNATURE $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
         start_time=`date +%s`
 	"$@" || cleanup_and_exit 1

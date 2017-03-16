@@ -740,7 +740,7 @@ vm_first_stage() {
     if test "$DO_INIT" = true ; then
 	# do first stage of init_buildsystem
 	rm -f $BUILD_ROOT/.build.success
-	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS
+	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
 	start_time=`date +%s`
 	"$@" || cleanup_and_exit 1
@@ -837,6 +837,7 @@ vm_first_stage() {
     echo "CCACHE='$CCACHE'" >> $BUILD_ROOT/.build/build.data
     echo "ABUILD_TARGET='$ABUILD_TARGET'" >> $BUILD_ROOT/.build/build.data
     echo "BUILD_FLAVOR='$BUILD_FLAVOR'" >> $BUILD_ROOT/.build/build.data
+    echo "OBS_PACKAGE='$OBS_PACKAGE'" >> $BUILD_ROOT/.build/build.data
     # fallback time for broken hosts
     date '+@%s' > $BUILD_ROOT/.build/.date
     # we're done with the root file system, unmount

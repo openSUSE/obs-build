@@ -82,7 +82,7 @@ while test -n "$1" ; do
 	    RPMLIST=$1
 	    shift
 	    ;;
-	--define|--with|--without)
+	--define|--with|--without|--buildflavor|--obspackage)
 	    definesnstuff[${#definesnstuff[@]}]="$1";
 	    definesnstuff[${#definesnstuff[@]}]="$2";
 	    shift 2

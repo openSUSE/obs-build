@@ -225,6 +225,8 @@ sub parse {
   my $inspec = 0;
   my $hasif = 0;
   my $lineno = 0;
+  my $obspackage = defined($config->{'obspackage'}) ? $config->{'obspackage'} : '@OBS_PACKAGE@';
+  my $buildflavor = defined($config->{'buildflavor'}) ? $config->{'buildflavor'} : '';
   while (1) {
     my $line;
     if (@macros) {
@@ -422,6 +424,11 @@ reexpand:
       $xspec->[-1] = [ $xspec->[-1], undef ] if $xspec;
       $ifdeps = 1 if $line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts)\s*:\s*(\S.*)$/i;
       next;
+    }
+
+    if ($line =~ /\@/) {
+      $line =~ s/\@BUILD_FLAVOR\@/$buildflavor/g;
+      $line =~ s/\@OBS_PACKAGE\@/$obspackage/g;
     }
 
     if ($line =~ /^\s*%ifarch(.*)$/) {

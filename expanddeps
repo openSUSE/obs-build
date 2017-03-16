@@ -29,6 +29,7 @@ use strict;
 use Build;
 
 my ($dist, $rpmdeps, $archs, $configdir, $useusedforbuild, $installonly, $noinstall, $isvm);
+my ($obspackage, $buildflavor);
 
 $configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
 
@@ -79,6 +80,16 @@ while (@ARGV)  {
   if ($ARGV[0] eq '--vm') {
     shift @ARGV;
     $isvm = 1;
+    next;
+  }
+  if ($ARGV[0] eq '--buildflavor') {
+    shift @ARGV;
+    $buildflavor = shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--obspackage') {
+    shift @ARGV;
+    $obspackage = shift @ARGV;
     next;
   }
   last;
@@ -229,6 +240,8 @@ if (!defined($dist) || $dist eq '') {
 
 $cf ||= Build::read_config_dist($dist, $archs[0], $configdir);
 $cf->{'warnings'} = 1;
+$cf->{'buildflavor'} = $buildflavor if defined $buildflavor;
+$cf->{'obspackage'} = $obspackage if defined $obspackage;
 
 my $dofileprovides = %{$cf->{'fileprovides'}};
 $dofileprovides = 1 if ($binarytype || 'rpm') ne 'rpm';
