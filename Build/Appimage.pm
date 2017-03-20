@@ -43,6 +43,11 @@ sub parse {
       push @packdeps, $pkg;
     }
   }
+  if ($yml->{'build'}) {
+    for my $pkg (@{$yml->{'build'}->{'packages'} || {}}) {
+      push @packdeps, $pkg;
+    }
+  }
 
   $ret->{'deps'} = \@packdeps;
 
