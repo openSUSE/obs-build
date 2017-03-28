@@ -367,24 +367,32 @@ perform_product_bundle() {
 }
 
 build_kiwi_product() {
-    echo "running kiwi --create-instsource..."
+    echo "running product builder..."
     # runs always as abuild user
     mkdir -p "$BUILD_ROOT/$TOPDIR/KIWIROOT"
     # XXX: again?
     chroot "$BUILD_ROOT" chown -R abuild.abuild "$TOPDIR"
     chroot "$BUILD_ROOT" rm -rf "$TOPDIR/KIWIROOT"
-    ver=`chroot "$BUILD_ROOT" su -c "/usr/sbin/kiwi --version | sed -n 's,.*kiwi version v\(.*\),\1,p'"`
-    test -n "$ver" || ver=`chroot "$BUILD_ROOT" su -c "/usr/sbin/kiwi --version | sed -n 's,.* vnr: \(.*\),\1,p'"`
-    if test "${ver:0:1}" == "3" ; then
-        # old style kiwi 3 builds
-	chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX /usr/sbin/kiwi --root $TOPDIR/KIWIROOT -v --logfile terminal -p $TOPDIR/SOURCES --instsource-local --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
-	test ${ver:2:2} == "01" && run_suse_isolinux
+set -x
+    if test -x "$BUILD_ROOT/usr/bin/product-builder"; then
+       # current implementation of product generation
+       chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX /usr/bin/product-builder --root $TOPDIR/KIWIROOT $VERBOSE_OPTION --logfile terminal --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
     else
-	VERBOSE_OPTION="-v 2"
-	# broken kiwi version, not accepting verbose level
-        test "${ver:0:1}" == "4" -a "${ver:2:2}" -lt 90 && VERBOSE_OPTION="-v -v"
-	chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX /usr/sbin/kiwi --root $TOPDIR/KIWIROOT $VERBOSE_OPTION --logfile terminal -p $TOPDIR/SOURCES --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
+      # before openSUSE Leap 43 and SLE 13
+      ver=`chroot "$BUILD_ROOT" su -c "/usr/sbin/kiwi --version | sed -n 's,.*kiwi version v\(.*\),\1,p'"`
+      test -n "$ver" || ver=`chroot "$BUILD_ROOT" su -c "/usr/sbin/kiwi --version | sed -n 's,.* vnr: \(.*\),\1,p'"`
+      if test "${ver:0:1}" == "3" ; then
+          # old style kiwi 3 builds
+          chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX /usr/sbin/kiwi --root $TOPDIR/KIWIROOT -v --logfile terminal -p $TOPDIR/SOURCES --instsource-local --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
+          test ${ver:2:2} == "01" && run_suse_isolinux
+      else
+          VERBOSE_OPTION="-v 2"
+          # broken kiwi version, not accepting verbose level
+          test "${ver:0:1}" == "4" -a "${ver:2:2}" -lt 90 && VERBOSE_OPTION="-v -v"
+          chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX /usr/sbin/kiwi --root $TOPDIR/KIWIROOT $VERBOSE_OPTION --logfile terminal -p $TOPDIR/SOURCES --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
+      fi
     fi
+set +x
 
     # move created product to destination
     # NOTE: older kiwi versions exit also in error case with 0
