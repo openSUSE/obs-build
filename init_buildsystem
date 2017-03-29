@@ -1014,6 +1014,14 @@ test -e $BUILD_ROOT/etc/nsswitch.conf && {
 }
 
 #
+# make sure /etc/machine-id is populated (boo#1024740)
+# systemd itself may not be installed, so use host version
+#
+if [ ! -e "$BUILD_ROOT"/etc/machine-id -a -x /usr/bin/systemd-machine-id-setup ]; then
+    /usr/bin/systemd-machine-id-setup --root "$BUILD_ROOT"
+fi
+
+#
 # create some default directories and files
 #
 for DIR in /usr/share/doc/packages \
