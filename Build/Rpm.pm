@@ -1165,4 +1165,87 @@ sub getrpmheaders {
   return (substr($buf, 0, 96), substr($buf, 96, $hlen - 96), substr($buf, $hlen, $hlen2 - $hlen), $hdrmd5);
 }
 
+sub getnevr_rich {
+  my ($d) = @_;
+  my $n = '';
+  my $bl = 0;
+  while ($d =~ /^([^ ,\)]+)/) {
+    $n .= $1;
+    $d = substr($d, length($n));
+    if ($d =~ /^\(/) {
+      $n .= '(';
+      $bl++;
+      $d = substr($d, 1);
+    } elsif ($d =~ /\)/) {
+      last if $bl-- <= 0;
+    }
+  }
+  return $n;
+}
+
+my %richops  = (
+  'and'  => 1,
+  'or'   => 2,
+  'if'   => 3,
+  'else' => 4,
+);
+
+sub parse_rich_rec {
+  my ($dep, $chainop) = @_;
+  my $d = $dep;
+  $chainop ||= 0;
+  return ($d, undef) unless $d =~ s/^\(\s*//;
+  my ($r, $r2);
+  if ($d =~ /^\(/) {
+    ($d, $r) = parse_rich_rec($d);
+    return ($d, undef) unless $r;
+  } else {
+    my $n = getnevr_rich($d);
+    $d = substr($d, length($n));
+    $d =~ s/^ +//;
+    if ($d =~ /^([<=>]+)/) {
+      $n .= " $1 ";
+      $d =~ s/^[<=>]+ +//;
+      my $evr = getnevr_rich($d);
+      $d = substr($d, length($evr));
+      $n .= $evr;
+    }
+    $r = [0, $n];
+  }
+  $d =~ s/^\s+//;
+  return ($d, undef) unless $d ne '';
+  return ($d, $r) if $d =~ s/^\)//;
+  return ($d, undef) unless $d =~ s/([a-z]+)\s+//;
+  my $op = $richops {$1};
+  return ($d, undef) unless $op;
+  return ($d, undef) if $op == 4 && $chainop != 3;
+  $chainop = 0 if $op == 4;
+  return ($d, undef) if $chainop && (($chainop != 1 && $chainop != 2) || $op != $chainop);
+  ($d, $r2) = parse_rich_rec("($d", $op);
+  return ($d, undef) unless $r2;
+  if ($op == 3 && $r2->[0] == 4) {
+    $r = [$op, $r, $r2->[1], $r2->[2]];
+  } else {
+    $r = [$op, $r, $r2];
+  }
+  return ($d, $r);
+}
+
+sub parse_rich_dep {
+  my ($dep) = @_;
+  my ($d, $r) = parse_rich_rec($dep);
+  return ($d, undef) if $d ne '';
+  return $r;
+}
+
+sub shiftrich {
+  my ($s) = @_;
+  # FIXME: do this right!
+  my $dep = shift @$s;
+  while (@$s && ($dep =~ y/\(/\(/) > ($dep =~ y/\)/\)/)) {
+    $dep .= ' ' . shift(@$s);
+  }
+  return $dep;
+}
+
 1;

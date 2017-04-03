@@ -1,0 +1,10 @@
+P:a.noarch-0/0/0: a = 1-1
+R:a.noarch-0/0/0: (b if c) d
+P:b.noarch-0/0/0: b = 1-1
+P:c.noarch-0/0/0: c = 1-1
+P:d.noarch-0/0/0: d = 1-1
+R:d.noarch-0/0/0: c
+P:n1.noarch-0/0/0: n1 = 1-1
+R:n1.noarch-0/0/0: n
+P:n2.noarch-0/0/0: n2 = 1-1
+C:n2.noarch-0/0/0: d

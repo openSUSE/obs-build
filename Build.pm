@@ -732,6 +732,10 @@ sub readdeps {
 	    splice(@s, 0, 3);
 	    next;
 	}
+	if ($s[0] =~ /^\(/) {
+	    push @ss, Build::Rpm::shiftrich(\@s);
+	    next;
+	}
 	push @ss, shift @s;
 	while (@s && $s[0] =~ /^[\(<=>|]/) {
 	  $ss[-1] .= " $s[0] $s[1]";
@@ -987,6 +991,164 @@ sub todo2recommended {
   }
 }
 
+sub cplx_mix {
+  my ($q1, $q2, $todnf) = @_;
+  my @q;
+  for my $qq1 (@$q1) {
+    for my $qq2 (@$q2) {
+      my @qq = sort(@$qq1, @$qq2);
+      my %qq = map {$_ => 1} @qq;
+      push @q, \@qq unless grep {$qq{"-$_"}} @qq;
+    }
+  }
+  return $todnf ? 0 : 1 unless @q;
+  return (-1, @q);
+}
+
+sub cplx_inv {
+  my ($f, @q) = @_;
+  return 1 - $f if $f == 0 || $f == 1;
+  my @iq;
+  for my $q (@q) {
+    $q = [ map {"-$_"} @$q ];
+    s/^--// for @$q;
+  }
+  return (-1, @q);
+}
+
+sub normalize_cplx_rec {
+  my ($c, $r, $todnf) = @_;
+  if ($r->[0] == 0) {
+    my $ri = (split(/[ <=>]/, $r->[1], 2))[0];
+    my ($config, $p, $ignore, $xignore) = @$c;
+    return 1 if $ignore->{$ri} || $xignore->{$ri};
+    return 1 if $ignore->{"$p:$ri"} || $xignore->{"$p:$ri"};
+    my $whatprovides = $config->{'whatprovidesh'};
+    my @q = @{$whatprovides->{$r->[1]} || addproviders($config, $r->[1])};
+    return (0, "nothing provides $r->[1]") unless @q;
+    if ($todnf) {
+      return (-1, map { [ $_ ] } @q);
+    } else {
+      return (-1, [ @q ]);
+    }
+  }
+  if ($r->[0] == 3 && @$r == 4) {
+    # complex if/then/else case
+    if ($todnf) {
+      # we want OR: A IF (B ELSE C) -> (A AND B) OR (A AND C) OR (~B AND C)
+      my ($n1, @q1) = normalize_cplx_rec($c, [1, $r->[1], $r->[2]], $todnf);
+      my ($n2, @q2) = normalize_cplx_rec($c, [1, $r->[1], $r->[3]], $todnf);
+      my ($n3, @q3) = normalize_cplx_rec($c, [4, $r->[3], $r->[2]], $todnf);
+      return 1 if $n1 == 1 || $n2 == 1 || $n3 == 1;
+      return (0, @q1, @q2, @q3) if $n1 == 0 && $n2 == 0 && $n3 == 0;
+      my @q;
+      push @q, @q1 if $n1;
+      push @q, @q2 if $n2;
+      push @q, @q3 if $n3;
+      return (-1, @q);
+    } else {
+      # we want AND: A IF (B ELSE C) -> (A OR ~B) AND (C OR B) */
+      my ($n1, @q1) = normalize_cplx_rec($c, [3, $r->[1], $r->[2]], $todnf);
+      my ($n2, @q2) = normalize_cplx_rec($c, [2, $r->[2], $r->[3]], $todnf);
+      return (0, @q1, @q2) if $n1 == 0 && $n2 == 0;
+      return (0, @q1) if $n1 == 0;
+      return (0, @q2) if $n2 == 0;
+      return 1 if $n1 == 1 && $n2 == 1;
+      my @q;
+      return (-1, @q1, @q2);
+    }
+  }
+  if ($r->[0] == 1 || $r->[0] == 4) {
+    # and / else
+    my $todnf2 = $r->[0] == 4 ? !$todnf : $todnf;
+    my ($n1, @q1) = normalize_cplx_rec($c, $r->[1], $todnf);
+    my ($n2, @q2) = normalize_cplx_rec($c, $r->[2], $todnf);
+    ($n2, @q2) = cplx_inv($n2, @q2) if $r->[0] == 4;
+    return (0, @q1, @q2) if $n1 == 0 && $n2 == 0;
+    return (0, @q1) if $n1 == 0;
+    return (0, @q2) if $n2 == 0;
+    return ($n2, @q2) if $n1 == 1;
+    return ($n1, @q1) if $n2 == 1;
+    if (!$todnf) {
+      return (-1, @q1, @q2);
+    } else {
+      return cplx_mix(\@q1, \@q2, $todnf);
+    }
+  }
+  if ($r->[0] == 2 || $r->[0] == 3) {
+    # or / if
+    my $todnf2 = $r->[0] == 3 ? !$todnf : $todnf;
+    my ($n1, @q1) = normalize_cplx_rec($c, $r->[1], $todnf);
+    my ($n2, @q2) = normalize_cplx_rec($c, $r->[2], $todnf2);
+    ($n2, @q2) = cplx_inv($n2, @q2) if $r->[0] == 3;
+    return 1 if $n1 == 1 || $n2 == 1;
+    return (0, @q1, @q2) if $n1 == 0 && $n2 == 0;
+    return ($n2, @q2) if $n1 == 0;
+    return ($n1, @q1) if $n2 == 0;
+    if ($todnf) {
+      return (-1, @q1, @q2);
+    } else {
+      return cplx_mix(\@q1, \@q2, $todnf);
+    }
+  }
+  return 0;
+}
+
+sub normalizerich {
+  my ($config, $p, $dep, $error, $ignore, $xignore, $iscon) = @_;
+  my $r = Build::Rpm::parse_rich_dep($dep);
+  if (!$r) {
+    if ($dep ne $p) {
+      push @$error, "cannot parse rich dependency $dep from package $p";
+    } else {
+      push @$error, "cannot parse rich dependency $dep";
+    }
+    return ();
+  }
+  my $c = [$config, $p, $ignore, $xignore];
+  my ($n, @q);
+  if (!$iscon) {
+    ($n, @q) = normalize_cplx_rec($c, $r);
+    return () if $n == 1;
+    if (!$n) {
+      @q = map {"$_ needed by $p"} @q if $p ne $dep;
+      my %e = map {$_ => 1} @$error;
+      push @$error, grep {!$e{$_}} @q;
+      return ();
+    }
+  } else {
+    ($n, @q) = normalize_cplx_rec($c, $r, 1);
+    ($n, @q) = cplx_inv($n, @q);
+  }
+  for my $q (@q) {
+    my @neg = @$q;
+    @neg = grep {s/^-//} @neg;
+    @$q = grep {!/^-/} @$q;
+    $q = [$dep, \@neg, @$q];
+  }
+  return @q;
+}
+
+sub handlerichcon {
+  my ($config, $p, $dep, $error, $installed, $aconflicts) = @_;
+  my @c = normalizerich($config, $p, $dep, $error, {}, {}, 1);
+  for my $c (@c) {
+    my ($r, $cond, @q) = @$c;
+    @q = grep {!$installed->{$_}} @q;
+    if (@q) {
+      push @$error, "$p contains unsupported conflict $dep";
+      next;
+    }
+    next unless @$cond;
+    my @notyet = grep{!$installed->{$_}} @$cond;
+    if (!@notyet) {
+      push @$error, "$p conflicts with installed ".join(' and ', @$cond);
+    } elsif (@notyet == 1) {
+      $aconflicts->{$notyet[0]} = "conflicts with installed $p";
+    }
+  }
+}
+
 sub expand {
   my ($config, @p) = @_;
 
@@ -1050,6 +1212,12 @@ sub expand {
     $aconflicts{$_} = "conflict from project config with $q[0]" for @{$conflicts->{$q[0]} || []};
     if (!$ignoreconflicts) {
       for my $r (@{$pkgconflicts->{$q[0]}}) {
+	if ($r =~ /^\(.*\)$/) {
+	  my @rerror;
+	  handlerichcon($config, $q[0], $r, \@rerror, \%p, \%aconflicts);
+	  return (undef, $rerror[0]) if @rerror;
+	  next;
+	}
 	$aconflicts{$_} = "conflicts with installed $q[0]" for @{$whatprovides->{$r} || addproviders($config, $r)};
       }
       for my $r (@{$pkgobsoletes->{$q[0]}}) {
@@ -1062,17 +1230,39 @@ sub expand {
 
   my @pamb = ();
   my $doamb = 0;
+  my %pcond;
   while (@p) {
     my @error = ();
     my @rerror = ();
     for my $p (splice @p) {
-      for my $r (@{$requires->{$p} || [$p]}) {
-	my $ri = (split(/[ <=>]/, $r, 2))[0];
-	if (!$ignoreignore) {
-	  next if $ignore->{"$p:$ri"} || $xignore{"$p:$ri"};
-	  next if $ignore->{$ri} || $xignore{$ri};
+      my @r = @{$requires->{$p} || [$p]};
+      while (@r) {
+	my $r = shift @r;
+	my @q;
+	if (ref($r)) {
+	  my $cond;
+	  ($r, $cond, @q) = @$r;
+	  my @c = grep {!$p{$_}} @$cond;
+	  if (@c) {
+	    $pcond{$_}->{$p} = 1 for @c;
+	    next;
+	  }
+	} else {
+          if ($r =~ /^\(.*\)$/) {
+	    if ($ignoreignore) {
+	      unshift @r, normalizerich($config, $p, $r, \@rerror, {}, {});
+	    } else {
+	      unshift @r, normalizerich($config, $p, $r, \@rerror, $ignore, \%xignore);
+	    }
+	    next;
+	  }
+	  my $ri = (split(/[ <=>]/, $r, 2))[0];
+	  if (!$ignoreignore) {
+	    next if $ignore->{"$p:$ri"} || $xignore{"$p:$ri"};
+	    next if $ignore->{$ri} || $xignore{$ri};
+	  }
+	  @q = @{$whatprovides->{$r} || addproviders($config, $r)};
 	}
-	my @q = @{$whatprovides->{$r} || addproviders($config, $r)};
 	next if grep {$p{$_}} @q;
 	if (!$ignoreignore) {
 	  next if grep {$xignore{$_}} @q;
@@ -1144,9 +1334,18 @@ sub expand {
 	push @p, $q[0];
 	print "added $q[0] because of $p:$r\n" if $expand_dbg;
 	$p{$q[0]} = 1;
+
+	# recheck conditional requires
+	push @p, sort(keys(%{delete $pcond{$q[0]}})) if $pcond{$q[0]};
+
+        # update conflicts
 	$aconflicts{$_} = "conflict from project config with $q[0]" for @{$conflicts->{$q[0]} || []};
 	if (!$ignoreconflicts) {
 	  for my $r (@{$pkgconflicts->{$q[0]}}) {
+	    if ($r =~ /^\(.*\)$/) {
+	      handlerichcon($config, $q[0], $r, \@rerror, \%p, \%aconflicts);
+	      next;
+	    }
 	    $aconflicts{$_} = "conflicts with installed $q[0]" for @{$whatprovides->{$r} || addproviders($config, $r)};
 	  }
 	  for my $r (@{$pkgobsoletes->{$q[0]}}) {
