@@ -956,10 +956,16 @@ sub nevrmatch {
   return grep {$_ eq $rn} @p;
 }
 
+# check if package $q has a conflict against an installed package.
+# if yes, add message to @$eq and return true
 sub checkconflicts {
   my ($config, $ins, $q, $eq, @r) = @_;
   my $whatprovides = $config->{'whatprovidesh'};
   for my $r (@r) {
+    if ($r =~ /^\(.*\)$/) {
+      return 1 if handlerichcon_notins($config, $q, $r, $ins, $eq);
+      next;
+    }
     my @eq = grep {$ins->{$_}} @{$whatprovides->{$r} || addproviders($config, $r)};
     next unless @eq;
     push @$eq, map {"provider $q conflicts with installed $_"} @eq;
@@ -1122,7 +1128,7 @@ sub normalizerich {
   }
   for my $q (@q) {
     my @neg = @$q;
-    @neg = grep {s/^-//} @neg;
+    @neg = grep {s/^-// && $_ ne $p} @neg;
     @$q = grep {!/^-/} @$q;
     $q = [$dep, \@neg, @$q];
   }
@@ -1147,6 +1153,23 @@ sub handlerichcon {
       $aconflicts->{$notyet[0]} = "conflicts with installed $p";
     }
   }
+}
+
+sub handlerichcon_notins {
+  my ($config, $p, $dep, $installed, $eq) = @_;
+  my @error;
+  my @c = normalizerich($config, $p, $dep, \@error, {}, {}, 1);
+  return 0 if @error;	# error out later
+  for my $c (@c) {
+    my ($r, $cond, @q) = @$c;
+    @q = grep {!$installed->{$_}} @q;
+    next if @q || !@$cond;
+    my @notyet = grep{!$installed->{$_}} @$cond;
+    next if @notyet;
+    push @$eq, "provider $p conflicts with installed ".join(' and ', @$cond);
+    return 1;
+  }
+  return 0;
 }
 
 sub expand {

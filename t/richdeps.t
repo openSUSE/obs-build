@@ -21,7 +21,7 @@
 ################################################################
 
 use strict;
-use Test::More tests => 11;
+use Test::More tests => 12;
 use Build;
 use Data::Dumper;
 
@@ -67,3 +67,5 @@ is_deeply(\@r, [undef, "have choice for (n2 or d): d n2"], "install (n2 or d)");
 @r = expand($config, "a");
 is_deeply(\@r, [1, qw{a b c d}], "install a");
 
+@r = expand($config, 'i', 'j');
+is_deeply(\@r, [undef, "conflict for providers of k needed by j (provider k conflicts with installed i and j)"], "install i j");
