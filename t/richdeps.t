@@ -21,7 +21,7 @@
 ################################################################
 
 use strict;
-use Test::More tests => 8;
+use Test::More tests => 11;
 use Build;
 use Data::Dumper;
 
@@ -33,6 +33,15 @@ sub expand {
 my $config = Build::read_config('x86_64');
 Build::readdeps($config, undef, "t/richdeps.repo");
 my @r;
+
+@r = expand($config, "()");
+is_deeply(\@r, [undef, 'cannot parse rich dependency ()'], 'install ()');
+
+@r = expand($config, "(n and )");
+is_deeply(\@r, [undef, 'cannot parse rich dependency (n and )'], 'install (n and )');
+
+@r = expand($config, "(n foo m)");
+is_deeply(\@r, [undef, 'cannot parse rich dependency (n foo m)'], 'install (n foo m)');
 
 @r = expand($config, "n");
 is_deeply(\@r, [undef, 'nothing provides n'], 'install n');

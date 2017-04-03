@@ -1200,6 +1200,7 @@ sub parse_rich_rec {
     ($d, $r) = parse_rich_rec($d);
     return ($d, undef) unless $r;
   } else {
+    return ($d, undef) if $d =~ /^\)/;
     my $n = getnevr_rich($d);
     $d = substr($d, length($n));
     $d =~ s/^ +//;
@@ -1234,7 +1235,7 @@ sub parse_rich_rec {
 sub parse_rich_dep {
   my ($dep) = @_;
   my ($d, $r) = parse_rich_rec($dep);
-  return ($d, undef) if $d ne '';
+  return undef if !$r || $d ne '';
   return $r;
 }
 
