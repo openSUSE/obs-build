@@ -503,7 +503,23 @@ reexpand:
       # BuildRequire: foo > 17 [i586,x86_64]
       # BuildRequire: foo [home:bar]
       # BuildRequire: foo [!home:bar]
-      my @deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
+      my @deps;
+      if (" $deps" =~ /[\s,]\(/) {
+	# we need to be careful, there could be a rich dep
+	my $d = $deps;
+	while ($d ne '') {
+	  if ($d =~ /^\(/) {
+	    my @s = split(' ', $d);
+	    push @deps, shiftrich(\@s), undef, undef;
+	    $d = join(' ', @s);
+	  } else {
+	    last unless $d =~ s/([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*//;
+	    push @deps, $1, $2, $3;
+	  }
+	}
+      } else {
+        @deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
+      }
       my $replace = 0;
       my @ndeps = ();
       while (@deps) {
