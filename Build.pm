@@ -1302,7 +1302,7 @@ sub expand {
 	  }
 	}
 	if (!@q) {
-	  my $eq = @eq ? " (".join(', ', @eq).")" : '';
+	  my $eq = @eq ? " (".join(', ', sort(@eq)).")" : '';
 	  my $msg = @eq ? 'conflict for providers of' : 'nothing provides';
 	  if ($r eq $p) {
 	    push @rerror, "$msg $r$eq";
@@ -1346,6 +1346,7 @@ sub expand {
 	  @q = @pq if @pq;
 	}
 	if (@q > 1) {
+	  @q = sort(@q);
 	  if ($r ne $p) {
 	    push @error, "have choice for $r needed by $p: @q";
 	  } else {
