@@ -22,25 +22,12 @@
 
 use strict;
 use Test::More tests => 7;
-use Build;
-use Data::Dumper;
 
-sub expand {
-  my ($c, @r) = Build::expand(@_);
-  return ($c, sort(@r));
-}
+require 't/testlib.pm';
 
-my $config = Build::read_config('x86_64');
-Build::readdeps($config, undef, "t/requires.repo");
-my $config2 = Build::read_config('x86_64', [
-  'Prefer: d',
-]);
-Build::readdeps($config2, undef, "t/requires.repo");
-my $config3 = Build::read_config('x86_64', [
-  'Prefer: -d',
-]);
-Build::readdeps($config3, undef, "t/requires.repo");
-
+my $config = setuptest('t/requires.repo');
+my $config2 = setuptest('t/requires.repo', 'Prefer: d');
+my $config3 = setuptest('t/requires.repo', 'Prefer: -d');
 my @r;
 
 @r = expand($config);

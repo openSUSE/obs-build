@@ -1,12 +1,12 @@
-P:a.noarch-0/0/0: a = 1-1
-R:a.noarch-0/0/0: p
-P:b.noarch-0/0/0: b = 1-1 p
-P:c.noarch-0/0/0: c = 1-1 p
-P:d.noarch-0/0/0: d = 1-1
-C:d.noarch-0/0/0: b
-P:e.noarch-0/0/0: e = 1-1
-C:e.noarch-0/0/0: c
-P:f.noarch-0/0/0: f = 1-1
-C:f.noarch-0/0/0: p
-P:g.noarch-0/0/0: g = 1-1
-C:g.noarch-0/0/0: b c
+P: a = 1-1
+R: p
+P: b = 1-1 p
+P: c = 1-1 p
+P: d = 1-1
+C: b
+P: e = 1-1
+C: c
+P: f = 1-1
+C: p
+P: g = 1-1
+C: b c

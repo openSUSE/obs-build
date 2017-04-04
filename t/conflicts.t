@@ -22,16 +22,10 @@
 
 use strict;
 use Test::More tests => 5;
-use Build;
-use Data::Dumper;
 
-sub expand {
-  my ($c, @r) = Build::expand(@_);
-  return ($c, sort(@r));
-}
+require 't/testlib.pm';
 
-my $config = Build::read_config('x86_64');
-Build::readdeps($config, undef, "t/conflicts.repo");
+my $config = setuptest('t/conflicts.repo');
 my @r;
 
 @r = expand($config, 'a');

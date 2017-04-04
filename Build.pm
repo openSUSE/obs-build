@@ -705,7 +705,11 @@ sub readdeps {
       next;
     }
     # XXX: we don't support different architectures per file
-    open(F, '<', $depfile) || die("$depfile: $!\n");
+    if (ref($depfile)) {
+      *F = $depfile;
+    } else {
+      open(F, '<', $depfile) || die("$depfile: $!\n");
+    }
     while(<F>) {
       my @s = split(' ', $_);
       my $s = shift @s;
@@ -784,7 +788,7 @@ sub readdeps {
 	}
       }
     }
-    close F;
+    close F unless ref($depfile);
   }
   if ($pkginfo) {
     # extract evr from self provides if there is no 'I' line
