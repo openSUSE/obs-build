@@ -1154,7 +1154,7 @@ sub handlerichcon {
     if (!@notyet) {
       push @$error, "$p conflicts with installed ".join(' and ', sort(@$cond));
     } elsif (@notyet == 1) {
-      $aconflicts->{$notyet[0]} = "conflicts with installed $p";
+      $aconflicts->{$notyet[0]} = "is conflicted by installed $p";
     }
   }
 }
@@ -1252,7 +1252,7 @@ sub expand {
 	  return (undef, $rerror[0]) if @rerror;
 	  next;
 	}
-	$aconflicts{$_} = "conflicts with installed $q[0]" for @{$whatprovides->{$r} || addproviders($config, $r)};
+	$aconflicts{$_} = "is conflicted by installed $q[0]" for @{$whatprovides->{$r} || addproviders($config, $r)};
       }
       for my $r (@{$pkgobsoletes->{$q[0]}}) {
 	$aconflicts{$_} = "is obsoleted by installed $q[0]" for nevrmatch($config, $r, @{$whatprovides->{$r} || addproviders($config, $r)});
