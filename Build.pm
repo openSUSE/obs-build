@@ -972,7 +972,7 @@ sub checkconflicts {
     }
     my @eq = grep {$ins->{$_}} @{$whatprovides->{$r} || addproviders($config, $r)};
     next unless @eq;
-    push @$eq, map {"provider $q conflicts with installed $_"} @eq;
+    push @$eq, map {"(provider $q conflicts with installed $_)"} @eq;
     return 1;
   }
   return 0;
@@ -984,7 +984,7 @@ sub checkobsoletes {
   for my $r (@r) {
     my @eq = grep {$ins->{$_}} nevrmatch($config, $r, @{$whatprovides->{$r} || addproviders($config, $r)});
     next unless @eq;
-    push @$eq, map {"provider $q is obsoleted by installed $_"} @eq;
+    push @$eq, map {"(provider $q is obsoleted by installed $_)"} @eq;
     return 1;
   }
   return 0;
@@ -1152,7 +1152,7 @@ sub handlerichcon {
     next unless @$cond;
     my @notyet = grep{!$installed->{$_}} @$cond;
     if (!@notyet) {
-      push @$error, "$p conflicts with installed ".join(' and ', @$cond);
+      push @$error, "$p conflicts with installed ".join(' and ', sort(@$cond));
     } elsif (@notyet == 1) {
       $aconflicts->{$notyet[0]} = "conflicts with installed $p";
     }
@@ -1170,7 +1170,7 @@ sub handlerichcon_notins {
     next if @q || !@$cond;
     my @notyet = grep{!$installed->{$_}} @$cond;
     next if @notyet;
-    push @$eq, "provider $p conflicts with installed ".join(' and ', @$cond);
+    push @$eq, "(provider $p conflicts with installed ".join(' and ', sort(@$cond)).")";
     return 1;
   }
   return 0;
@@ -1237,7 +1237,7 @@ sub expand {
       my @eq;
       if ((@{$pkgconflicts->{$q[0]} || []} && checkconflicts($config, \%p, $q[0], \@eq, @{$pkgconflicts->{$q[0]}})) ||
           (@{$pkgobsoletes->{$q[0]} || []} && checkobsoletes($config, \%p, $q[0], \@eq, @{$pkgobsoletes->{$q[0]}}))) {
-        return (undef, "conflict for $q[0] (".join(', ', sort(@eq)).")");
+        return (undef, "conflict for package $q[0]", sort(@eq));
       }
     }
     print "added $q[0] because of $p (direct dep)\n" if $expand_dbg;
@@ -1302,7 +1302,7 @@ sub expand {
 	  next if grep {$xignore{$_}} @q;
 	  next if grep {$ignore->{"$p:$_"} || $xignore{"$p:$_"}} @q;
 	}
-	my @eq = map {"provider $_ $aconflicts{$_}"} grep {$aconflicts{$_}} @q;
+	my @eq = map {"(provider $_ $aconflicts{$_})"} grep {$aconflicts{$_}} @q;
 	@q = grep {!$aconflicts{$_}} @q;
 	if (!$ignoreconflicts) {
 	  for my $q (splice @q) {
@@ -1313,13 +1313,12 @@ sub expand {
 	  }
 	}
 	if (!@q) {
-	  my $eq = @eq ? " (".join(', ', sort(@eq)).")" : '';
 	  my $msg = @eq ? 'conflict for providers of' : 'nothing provides';
 	  if ($r eq $p) {
-	    push @rerror, "$msg $r$eq";
+	    push @rerror, "$msg $r", sort(@eq);
 	  } else {
 	    next if $r =~ /^\// && !@eq;
-	    push @rerror, "$msg $r needed by $p$eq";
+	    push @rerror, "$msg $r needed by $p", sort(@eq);
 	  }
 	  next;
 	}

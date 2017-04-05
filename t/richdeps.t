@@ -71,7 +71,7 @@ is_deeply(\@r, [undef, 'nothing provides n', 'nothing provides o'], 'install (n 
 is_deeply(\@r, [undef, "nothing provides n needed by n1"], "install n1");
 
 @r = expand($config, "(n2 and d)");
-is_deeply(\@r, [undef, "conflict for providers of (n2 and d) (provider d conflicts with installed n2)"], "install (n2 and d)");
+is_deeply(\@r, [undef, '(provider d conflicts with installed n2)', "conflict for providers of (n2 and d)"], "install (n2 and d)");
 
 @r = expand($config, "(n2 or d)");
 is_deeply(\@r, [undef, "have choice for (n2 or d): d n2"], "install (n2 or d)");
@@ -80,4 +80,4 @@ is_deeply(\@r, [undef, "have choice for (n2 or d): d n2"], "install (n2 or d)");
 is_deeply(\@r, [1, qw{a b c d}], "install a");
 
 @r = expand($config, 'i', 'j');
-is_deeply(\@r, [undef, "conflict for providers of k needed by j (provider k conflicts with installed i and j)"], "install i j");
+is_deeply(\@r, [undef, '(provider k conflicts with installed i and j)', "conflict for providers of k needed by j"], "install i j");

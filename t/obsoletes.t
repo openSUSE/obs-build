@@ -53,7 +53,7 @@ is_deeply(\@r, [1, 'a', 'c', 'd'], 'install a d');
 is_deeply(\@r, [1, 'a', 'b', 'e'], 'install a e');
 
 @r = expand($config, 'a', 'd', 'e');
-is_deeply(\@r, [undef, 'conflict for providers of p needed by a (provider b is obsoleted by installed d, provider c is obsoleted by installed e)'], 'install a d e');
+is_deeply(\@r, [undef, '(provider b is obsoleted by installed d)', '(provider c is obsoleted by installed e)', 'conflict for providers of p needed by a'], 'install a d e');
 
 @r = expand($config, 'a', 'f');
 is_deeply(\@r, [undef, 'have choice for p needed by a: b c'], 'install a f');
