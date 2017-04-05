@@ -22,6 +22,7 @@
 
 use strict;
 use Digest::MD5;
+use Digest::SHA;
 
 sub usage
 {
@@ -64,7 +65,13 @@ sub writedsc {
   my @seq = @{$tags->{'__seq'} || []};
   my %seq = map {uc($_) => 1} @seq;
   for (sort keys %$tags) {
-    push @seq, ucfirst(lc($_)) unless $seq{$_};
+    if (! $seq{$_}) {
+      # ucfirst will change checksums-sha1 to Checksums-sha1 but the canonical
+      # form is Checksums-Sha1, hence the need for the second transformation
+      my $camel_tag = ucfirst(lc($_));
+      $camel_tag =~ s/-\K(\w)/\U$1/g;
+      push @seq, $camel_tag;
+    }
   }
   for my $seq (@seq) {
     my $ucseq = uc($seq);
@@ -231,13 +238,20 @@ sub doseries {
 }
 
 sub addfile {
-  my ($file) = @_;
+  my ($file, $algorithm) = @_;
   my $base = $file;
   $base =~ s/.*\///;
   local *F;
   open(F, '<', $file) || die("Error in reading $file: $!\n");
   my $size = -s F;
-  my $ctx = Digest::MD5->new;
+  my $ctx;
+  if ($algorithm =~ /^MD5/) {
+    $ctx = Digest::MD5->new;
+  } elsif ($algorithm =~ /^SHA/) {
+    $ctx = Digest::SHA->new($algorithm);
+  } else {
+    die("Unknown digest $algorithm\n");
+  }
   $ctx->addfile(*F);
   close F;
   my $md5 = $ctx->hexdigest();
@@ -371,6 +385,8 @@ if ( $tags->{'DEBTRANSFORM-RELEASE'} && $release ) {
 }
 
 my @files;
+my @checksums_sha1;
+my @checksums_sha256;
 my $v = $version;
 $v =~ s/-[^-]*$//;
 $tarfile =~ /.*(\.tar.*?)$/;
@@ -383,7 +399,9 @@ if( $tmptar ) {
   print "Hardlinking $dir/$tarfile to $out/$ntarfile\n";
   link("$dir/$tarfile", "$out/$ntarfile") || die("link: $!\n");
 }
-push @files, addfile("$out/$ntarfile");
+push @files, addfile("$out/$ntarfile", "MD5");
+push @checksums_sha1, addfile("$out/$ntarfile", "SHA1");
+push @checksums_sha256, addfile("$out/$ntarfile", "SHA256");
 print "files @files\n";
 
 my $tarpath = "$out/$ntarfile";
@@ -446,12 +464,18 @@ if (! -s "$out/${name}_$version.diff") {
 } else {
   system('gzip', '-9', "$out/${name}_$version.diff");
   if (-f "$out/${name}_$version.diff.gz") {
-    push @files, addfile("$out/${name}_$version.diff.gz");
+    push @files, addfile("$out/${name}_$version.diff.gz", "MD5");
+    push @checksums_sha1, addfile("$out/${name}_$version.diff.gz", "SHA1");
+    push @checksums_sha256, addfile("$out/${name}_$version.diff.gz", "SHA256");
   } else {
-    push @files, addfile("$out/${name}_$version.diff");
+    push @files, addfile("$out/${name}_$version.diff", "MD5");
+    push @checksums_sha1, addfile("$out/${name}_$version.diff", "SHA1");
+    push @checksums_sha256, addfile("$out/${name}_$version.diff", "SHA256");
   }
 }
 
+$tags->{'CHECKSUMS-SHA1'} = "\n".join("\n", @checksums_sha1);
+$tags->{'CHECKSUMS-SHA256'} = "\n".join("\n", @checksums_sha256);
 $tags->{'FILES'} = "\n".join("\n", @files);
 delete $tags->{'DEBTRANSFORM-SERIES'};
 delete $tags->{'DEBTRANSFORM-TAR'};
