@@ -25,9 +25,21 @@ use Test::More tests => 7;
 
 require 't/testlib.pm';
 
-my $config = setuptest('t/requires.repo');
-my $config2 = setuptest('t/requires.repo', 'Prefer: d');
-my $config3 = setuptest('t/requires.repo', 'Prefer: -d');
+my $repo = <<'EOR';
+P: a = 1-1
+R: b
+P: b = 1-1
+P: c = 1-1
+R: p
+P: d = 1-1 p
+P: e = 1-1 p
+P: f = 1-1
+R: n
+EOR
+
+my $config = setuptest($repo);
+my $config2 = setuptest($repo, 'Prefer: d');
+my $config3 = setuptest($repo, 'Prefer: -d');
 my @r;
 
 @r = expand($config);

@@ -21,11 +21,28 @@
 ################################################################
 
 use strict;
-use Test::More tests => 5;
+use Test::More tests => 7;
 
 require 't/testlib.pm';
 
-my $config = setuptest('t/conflicts.repo');
+my $repo = <<'EOR';
+P: a = 1-1
+R: p
+P: b = 1-1 p
+P: c = 1-1 p
+P: d = 1-1
+C: b
+P: e = 1-1
+C: c
+P: f = 1-1
+C: p
+P: g = 1-1
+C: b c
+P: h = 1-1
+R: f
+EOR
+
+my $config = setuptest($repo);
 my @r;
 
 @r = expand($config, 'a');
@@ -42,3 +59,9 @@ is_deeply(\@r, [undef, 'conflict for providers of p needed by a (provider b conf
 
 @r = expand($config, 'a', 'f');
 is_deeply(\@r, [undef, 'conflict for providers of p needed by a (provider b conflicts with installed f, provider c conflicts with installed f)'], 'install a f');
+
+@r = expand($config, 'b', 'f');
+is_deeply(\@r, [undef, 'conflict for f (provider f conflicts with installed b)'], 'install b f');
+
+@r = expand($config, 'b', 'h');
+is_deeply(\@r, [undef, 'conflict for providers of f needed by h (provider f conflicts with installed b)'], 'install b h');

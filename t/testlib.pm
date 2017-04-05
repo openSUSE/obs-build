@@ -9,15 +9,13 @@ sub expand {
 sub setuptest {
   my ($repo, $conf) = @_;
   my $l = '';
-  local *F;
-  open(F, '<', $repo) || die("$repo: $!\n");
   my $id = '';
-  while (<F>) {
+  for (split("\n", $repo)) {
     $id = "$1.noarch-0/0/0:" if /^P: (\S+)/;
     s/:/:$id/;
-    $l .= $_;
+    $l .= "$_\n";
   }
-  close F;
+  local *F;
   open(F, '<', \$l);
   my $config = Build::read_config('noarch', [ split("\n", $conf || '') ]);
   Build::readdeps($config, undef, \*F);

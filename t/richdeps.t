@@ -25,7 +25,25 @@ use Test::More tests => 12;
 
 require 't/testlib.pm';
 
-my $config = setuptest('t/richdeps.repo');
+my $repo = <<'EOR';
+P: a = 1-1
+R: (b if c) d
+P: b = 1-1
+P: c = 1-1
+P: d = 1-1
+R: c
+P: n1 = 1-1
+R: n
+P: n2 = 1-1
+C: d
+P: i = 1-1
+P: j = 1-1
+R: k
+P: k = 1-1
+C: (i and j)
+EOR
+
+my $config = setuptest($repo);
 my @r;
 
 @r = expand($config, "()");
