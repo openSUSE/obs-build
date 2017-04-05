@@ -1233,6 +1233,13 @@ sub expand {
     }
     next if $p{$q[0]};
     return (undef, "$q[0] $aconflicts{$q[0]}") if $aconflicts{$q[0]};
+    if (!$ignoreconflicts) {
+      my @eq;
+      if ((@{$pkgconflicts->{$q[0]} || []} && checkconflicts($config, \%p, $q[0], \@eq, @{$pkgconflicts->{$q[0]}})) ||
+          (@{$pkgobsoletes->{$q[0]} || []} && checkobsoletes($config, \%p, $q[0], \@eq, @{$pkgobsoletes->{$q[0]}}))) {
+        return (undef, "conflict for $q[0] (".join(', ', sort(@eq)).")");
+      }
+    }
     print "added $q[0] because of $p (direct dep)\n" if $expand_dbg;
     push @p, $q[0];
     $p{$q[0]} = 1;
