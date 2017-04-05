@@ -357,6 +357,19 @@ if ($tarfile =~ /\.tgz$/) {
     system ( ("mv",  "$dir/$old",  "$tmptar" ) ) == 0 || die("cannot rename .tgz to .tar.gz");
 }
 
+if ( $tags->{'DEBTRANSFORM-RELEASE'} && $release ) {
+    # if dsc file contains the tag DEBTRANSFORM-RELEASE
+    # and "release" is given as a commad line parameter,
+    # replace "version" from dsc file by "version-release".
+    # From "version" the current release is stripped before
+    # (last "-" and the part after the last "-").
+    # On OBS, release is incremented automatically
+    # (same as for RPMs)
+    $version = $version . "+" . $release;
+    $tags->{'VERSION'} = $version;
+    print "Modifying dsc Version field to \"$tags->{VERSION}\"\n";
+}
+
 my @files;
 my $v = $version;
 $v =~ s/-[^-]*$//;
@@ -372,19 +385,6 @@ if( $tmptar ) {
 }
 push @files, addfile("$out/$ntarfile");
 print "files @files\n";
-
-if ( $tags->{'DEBTRANSFORM-RELEASE'} && $release ) {
-    # if dsc file contains the tag DEBTRANSFORM-RELEASE
-    # and "release" is given as a commad line parameter,
-    # replace "version" from dsc file by "version-release".
-    # From "version" the current release is stripped before
-    # (last "-" and the part after the last "-").
-    # On OBS, release is incremented automatically
-    # (same as for RPMs)
-    $version = $v . "+" . $release;
-    $tags->{'VERSION'} = $version;
-    print "Modifying dsc Version field to \"$tags->{VERSION}\"\n";
-}
 
 my $tarpath = "$out/$ntarfile";
 my $tardir = $tarfile;
