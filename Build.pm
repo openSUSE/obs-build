@@ -1057,14 +1057,13 @@ sub normalize_cplx_rec {
       push @q, @q3 if $n3;
       return (-1, @q);
     } else {
-      # we want AND: A IF (B ELSE C) -> (A OR ~B) AND (C OR B) */
+      # we want AND: A IF (B ELSE C) -> (A OR ~B) AND (C OR B)
       my ($n1, @q1) = normalize_cplx_rec($c, [3, $r->[1], $r->[2]], $todnf);
       my ($n2, @q2) = normalize_cplx_rec($c, [2, $r->[2], $r->[3]], $todnf);
       return (0, @q1, @q2) if $n1 == 0 && $n2 == 0;
       return (0, @q1) if $n1 == 0;
       return (0, @q2) if $n2 == 0;
       return 1 if $n1 == 1 && $n2 == 1;
-      my @q;
       return (-1, @q1, @q2);
     }
   }
@@ -1233,30 +1232,29 @@ sub expand {
     }
     next if $p{$q[0]};
     return (undef, "$q[0] $aconflicts{$q[0]}") if $aconflicts{$q[0]};
-    if (!$ignoreconflicts) {
-      my @eq;
-      if ((@{$pkgconflicts->{$q[0]} || []} && checkconflicts($config, \%p, $q[0], \@eq, @{$pkgconflicts->{$q[0]}})) ||
-          (@{$pkgobsoletes->{$q[0]} || []} && checkobsoletes($config, \%p, $q[0], \@eq, @{$pkgobsoletes->{$q[0]}}))) {
-        return (undef, "conflict for package $q[0]", sort(@eq));
-      }
-    }
     print "added $q[0] because of $p (direct dep)\n" if $expand_dbg;
     push @p, $q[0];
     $p{$q[0]} = 1;
-    $aconflicts{$_} = "conflict from project config with $q[0]" for @{$conflicts->{$q[0]} || []};
+    my %naconflicts;
+    $naconflicts{$_} = "conflict from project config with $q[0]" for @{$conflicts->{$q[0]} || []};
     if (!$ignoreconflicts) {
       for my $r (@{$pkgconflicts->{$q[0]}}) {
 	if ($r =~ /^\(.*\)$/) {
 	  my @rerror;
-	  handlerichcon($config, $q[0], $r, \@rerror, \%p, \%aconflicts);
+	  handlerichcon($config, $q[0], $r, \@rerror, \%p, \%naconflicts);
 	  return (undef, $rerror[0]) if @rerror;
 	  next;
 	}
-	$aconflicts{$_} = "is conflicted by installed $q[0]" for @{$whatprovides->{$r} || addproviders($config, $r)};
+	$naconflicts{$_} = "is conflicted by installed $q[0]" for @{$whatprovides->{$r} || addproviders($config, $r)};
       }
       for my $r (@{$pkgobsoletes->{$q[0]}}) {
-	$aconflicts{$_} = "is obsoleted by installed $q[0]" for nevrmatch($config, $r, @{$whatprovides->{$r} || addproviders($config, $r)});
+	$naconflicts{$_} = "is obsoleted by installed $q[0]" for nevrmatch($config, $r, @{$whatprovides->{$r} || addproviders($config, $r)});
       }
+    }
+    if (%naconflicts) {
+      my @rerror = map {"package $q[0] conflicts with $_"} grep {$p{$_}} sort keys %naconflicts;
+      return (undef, @rerror) if @rerror;
+      $aconflicts{$_} = $naconflicts{$_} for keys %naconflicts;
     }
     push @rec_todo, $q[0] if $userecommendsforchoices;
   }

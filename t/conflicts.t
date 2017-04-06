@@ -61,7 +61,7 @@ is_deeply(\@r, [undef, '(provider b is conflicted by installed d)', '(provider c
 is_deeply(\@r, [undef, '(provider b is conflicted by installed f)', '(provider c is conflicted by installed f)', 'conflict for providers of p needed by a'], 'install a f');
 
 @r = expand($config, 'b', 'f');
-is_deeply(\@r, [undef, '(provider f conflicts with installed b)', 'conflict for package f'], 'install b f');
+is_deeply(\@r, [undef, 'package f conflicts with b'], 'install b f');
 
 @r = expand($config, 'b', 'h');
 is_deeply(\@r, [undef, '(provider f conflicts with installed b)', 'conflict for providers of f needed by h'], 'install b h');
