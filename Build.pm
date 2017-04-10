@@ -1035,7 +1035,7 @@ sub normalize_cplx_rec {
     return 1 if $ignore->{"$p:$ri"} || $xignore->{"$p:$ri"};
     my $whatprovides = $config->{'whatprovidesh'};
     my @q = @{$whatprovides->{$r->[1]} || addproviders($config, $r->[1])};
-    return (0, "nothing provides $r->[1]") unless @q;
+    return 0 unless @q;
     if ($todnf) {
       return (-1, map { [ $_ ] } @q);
     } else {
@@ -1050,19 +1050,13 @@ sub normalize_cplx_rec {
       my ($n2, @q2) = normalize_cplx_rec($c, [1, $r->[1], $r->[3]], $todnf);
       my ($n3, @q3) = normalize_cplx_rec($c, [4, $r->[3], $r->[2]], $todnf);
       return 1 if $n1 == 1 || $n2 == 1 || $n3 == 1;
-      return (0, @q1, @q2, @q3) if $n1 == 0 && $n2 == 0 && $n3 == 0;
-      my @q;
-      push @q, @q1 if $n1;
-      push @q, @q2 if $n2;
-      push @q, @q3 if $n3;
-      return (-1, @q);
+      return 0 if $n1 == 0 && $n2 == 0 && $n3 == 0;
+      return (-1, @q1, @q2, @q3);
     } else {
       # we want AND: A IF (B ELSE C) -> (A OR ~B) AND (C OR B)
       my ($n1, @q1) = normalize_cplx_rec($c, [3, $r->[1], $r->[2]], $todnf);
       my ($n2, @q2) = normalize_cplx_rec($c, [2, $r->[2], $r->[3]], $todnf);
-      return (0, @q1, @q2) if $n1 == 0 && $n2 == 0;
-      return (0, @q1) if $n1 == 0;
-      return (0, @q2) if $n2 == 0;
+      return 0 if $n1 == 0 || $n2 == 0;
       return 1 if $n1 == 1 && $n2 == 1;
       return (-1, @q1, @q2);
     }
@@ -1073,9 +1067,7 @@ sub normalize_cplx_rec {
     my ($n1, @q1) = normalize_cplx_rec($c, $r->[1], $todnf);
     my ($n2, @q2) = normalize_cplx_rec($c, $r->[2], $todnf);
     ($n2, @q2) = cplx_inv($n2, @q2) if $r->[0] == 4;
-    return (0, @q1, @q2) if $n1 == 0 && $n2 == 0;
-    return (0, @q1) if $n1 == 0;
-    return (0, @q2) if $n2 == 0;
+    return 0 if $n1 == 0 || $n2 == 0;
     return ($n2, @q2) if $n1 == 1;
     return ($n1, @q1) if $n2 == 1;
     if (!$todnf) {
@@ -1091,7 +1083,6 @@ sub normalize_cplx_rec {
     my ($n2, @q2) = normalize_cplx_rec($c, $r->[2], $todnf2);
     ($n2, @q2) = cplx_inv($n2, @q2) if $r->[0] == 3;
     return 1 if $n1 == 1 || $n2 == 1;
-    return (0, @q1, @q2) if $n1 == 0 && $n2 == 0;
     return ($n2, @q2) if $n1 == 0;
     return ($n1, @q1) if $n2 == 0;
     if ($todnf) {
@@ -1104,7 +1095,7 @@ sub normalize_cplx_rec {
 }
 
 sub normalizerich {
-  my ($config, $p, $dep, $error, $ignore, $xignore, $iscon) = @_;
+  my ($config, $p, $dep, $deptype, $error, $ignore, $xignore) = @_;
   my $r = Build::Rpm::parse_rich_dep($dep);
   if (!$r) {
     if ($dep ne $p) {
@@ -1116,13 +1107,15 @@ sub normalizerich {
   }
   my $c = [$config, $p, $ignore, $xignore];
   my ($n, @q);
-  if (!$iscon) {
+  if ($deptype == 0) {
     ($n, @q) = normalize_cplx_rec($c, $r);
     return () if $n == 1;
     if (!$n) {
-      @q = map {"$_ needed by $p"} @q if $p ne $dep;
-      my %e = map {$_ => 1} @$error;
-      push @$error, grep {!$e{$_}} @q;
+      if ($dep ne $p) {
+        push @$error, "nothing provides $dep needed by $p";
+      } else {
+        push @$error, "nothing provides $dep";
+      }
       return ();
     }
   } else {
@@ -1133,16 +1126,16 @@ sub normalizerich {
     my @neg = @$q;
     @neg = grep {s/^-// && $_ ne $p} @neg;
     @$q = grep {!/^-/} @$q;
-    $q = [$dep, \@neg, @$q];
+    $q = [$dep, $deptype, \@neg, @$q];
   }
   return @q;
 }
 
 sub handlerichcon {
   my ($config, $p, $dep, $error, $installed, $aconflicts) = @_;
-  my @c = normalizerich($config, $p, $dep, $error, {}, {}, 1);
+  my @c = normalizerich($config, $p, $dep, 1, $error, {}, {});
   for my $c (@c) {
-    my ($r, $cond, @q) = @$c;
+    my ($r, $rtype, $cond, @q) = @$c;
     @q = grep {!$installed->{$_}} @q;
     if (@q) {
       push @$error, "$p contains unsupported conflict $dep";
@@ -1151,9 +1144,9 @@ sub handlerichcon {
     next unless @$cond;
     my @notyet = grep{!$installed->{$_}} @$cond;
     if (!@notyet) {
-      push @$error, "$p conflicts with installed ".join(' and ', sort(@$cond));
+      push @$error, map {"$p is conflicted by installed $_"} sort(@$cond);
     } elsif (@notyet == 1) {
-      $aconflicts->{$notyet[0]} = "is conflicted by installed $p";
+      push @{$aconflicts->{$notyet[0]}}, "is conflicted by installed $p";
     }
   }
 }
@@ -1161,15 +1154,15 @@ sub handlerichcon {
 sub handlerichcon_notins {
   my ($config, $p, $dep, $installed, $eq) = @_;
   my @error;
-  my @c = normalizerich($config, $p, $dep, \@error, {}, {}, 1);
+  my @c = normalizerich($config, $p, $dep, 1, \@error, {}, {});
   return 0 if @error;	# error out later
   for my $c (@c) {
-    my ($r, $cond, @q) = @$c;
+    my ($r, $rtype, $cond, @q) = @$c;
     @q = grep {!$installed->{$_}} @q;
     next if @q || !@$cond;
     my @notyet = grep{!$installed->{$_}} @$cond;
     next if @notyet;
-    push @$eq, "(provider $p conflicts with installed ".join(' and ', sort(@$cond)).")";
+    push @$eq, map {"(provider $p conflicts with installed $_)"} sort(@$cond);
     return 1;
   }
   return 0;
@@ -1208,7 +1201,7 @@ sub expand {
     my $r = /^!!/ ? substr($_, 2) : substr($_, 1);
     my @q = @{$whatprovides->{$r} || addproviders($config, $r)};
     @q = nevrmatch($config, $r, @q) if /^!!/;
-    $aconflicts{$_} = "is in BuildConflicts" for @q;
+    push @{$aconflicts{$_}}, "is conflicted" for @q;
   }
   my %recommended;	# recommended by installed packages
   my @rec_todo;		# installed todo
@@ -1231,12 +1224,12 @@ sub expand {
       next;
     }
     next if $p{$q[0]};
-    return (undef, "$q[0] $aconflicts{$q[0]}") if $aconflicts{$q[0]};
+    return (undef, map {"$q[0] $_"} @{$aconflicts{$q[0]}}) if $aconflicts{$q[0]};
     print "added $q[0] because of $p (direct dep)\n" if $expand_dbg;
     push @p, $q[0];
     $p{$q[0]} = 1;
     my %naconflicts;
-    $naconflicts{$_} = "conflict from project config with $q[0]" for @{$conflicts->{$q[0]} || []};
+    $naconflicts{$_} = "is conflicted by installed $q[0]" for @{$conflicts->{$q[0]} || []};
     if (!$ignoreconflicts) {
       for my $r (@{$pkgconflicts->{$q[0]}}) {
 	if ($r =~ /^\(.*\)$/) {
@@ -1252,9 +1245,9 @@ sub expand {
       }
     }
     if (%naconflicts) {
-      my @rerror = map {"package $q[0] conflicts with $_"} grep {$p{$_}} sort keys %naconflicts;
+      my @rerror = map {"$q[0] conflicts with $_"} grep {$p{$_}} sort keys %naconflicts;
       return (undef, @rerror) if @rerror;
-      $aconflicts{$_} = $naconflicts{$_} for keys %naconflicts;
+      push @{$aconflicts{$_}}, $naconflicts{$_} for keys %naconflicts;
     }
     push @rec_todo, $q[0] if $userecommendsforchoices;
   }
@@ -1272,8 +1265,8 @@ sub expand {
 	my $r = shift @r;
 	my @q;
 	if (ref($r)) {
-	  my $cond;
-	  ($r, $cond, @q) = @$r;
+	  my ($cond, $rtype);
+	  ($r, $rtype, $cond, @q) = @$r;
 	  my @c = grep {!$p{$_}} @$cond;
 	  if (@c) {
 	    $pcond{$_}->{$p} = 1 for @c;
@@ -1282,9 +1275,9 @@ sub expand {
 	} else {
           if ($r =~ /^\(.*\)$/) {
 	    if ($ignoreignore) {
-	      unshift @r, normalizerich($config, $p, $r, \@rerror, {}, {});
+	      unshift @r, normalizerich($config, $p, $r, 0, \@rerror, {}, {});
 	    } else {
-	      unshift @r, normalizerich($config, $p, $r, \@rerror, $ignore, \%xignore);
+	      unshift @r, normalizerich($config, $p, $r, 0, \@rerror, $ignore, \%xignore);
 	    }
 	    next;
 	  }
@@ -1300,7 +1293,10 @@ sub expand {
 	  next if grep {$xignore{$_}} @q;
 	  next if grep {$ignore->{"$p:$_"} || $xignore{"$p:$_"}} @q;
 	}
-	my @eq = map {"(provider $_ $aconflicts{$_})"} grep {$aconflicts{$_}} @q;
+	my @eq;
+	for my $q (@q) {
+	  push @eq, map {"(provider $q $_)"} @{$aconflicts{$q}} if $aconflicts{$q};
+	}
 	@q = grep {!$aconflicts{$_}} @q;
 	if (!$ignoreconflicts) {
 	  for my $q (splice @q) {
@@ -1371,17 +1367,17 @@ sub expand {
 	push @p, sort(keys(%{delete $pcond{$q[0]}})) if $pcond{$q[0]};
 
         # update conflicts
-	$aconflicts{$_} = "conflict from project config with $q[0]" for @{$conflicts->{$q[0]} || []};
+	push @{$aconflicts{$_}}, "is conflicted by installed $q[0]" for @{$conflicts->{$q[0]} || []};
 	if (!$ignoreconflicts) {
 	  for my $r (@{$pkgconflicts->{$q[0]}}) {
 	    if ($r =~ /^\(.*\)$/) {
 	      handlerichcon($config, $q[0], $r, \@rerror, \%p, \%aconflicts);
 	      next;
 	    }
-	    $aconflicts{$_} = "conflicts with installed $q[0]" for @{$whatprovides->{$r} || addproviders($config, $r)};
+	    push @{$aconflicts{$_}}, "is conflicted by installed $q[0]" for @{$whatprovides->{$r} || addproviders($config, $r)};
 	  }
 	  for my $r (@{$pkgobsoletes->{$q[0]}}) {
-	    $aconflicts{$_} = "is obsoleted by installed $q[0]" for nevrmatch($config, $r, @{$whatprovides->{$r} || addproviders($config, $r)});
+	    push @{$aconflicts{$_}}, "is obsoleted by installed $q[0]" for nevrmatch($config, $r, @{$whatprovides->{$r} || addproviders($config, $r)});
 	  }
         }
 	push @rec_todo, $q[0] if $userecommendsforchoices;

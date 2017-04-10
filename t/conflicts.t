@@ -21,7 +21,7 @@
 ################################################################
 
 use strict;
-use Test::More tests => 7;
+use Test::More tests => 11;
 
 require 't/testlib.pm';
 
@@ -40,11 +40,16 @@ P: g = 1-1
 C: b c
 P: h = 1-1
 R: f
+P: i = 1-1
+P: j = 1-1
+P: k = 1-1
+R: j
 EOR
 
-my $config = setuptest($repo);
+my $config = setuptest($repo, "Conflict: i:j");
 my @r;
 
+# test that conflicts can fix choices
 @r = expand($config, 'a');
 is_deeply(\@r, [undef, 'have choice for p needed by a: b c'], 'install a');
 
@@ -54,14 +59,30 @@ is_deeply(\@r, [1, 'a', 'c', 'd'], 'install a d');
 @r = expand($config, 'a', 'e');
 is_deeply(\@r, [1, 'a', 'b', 'e'], 'install a e');
 
+# test test conflicting all providers works
 @r = expand($config, 'a', 'd', 'e');
 is_deeply(\@r, [undef, '(provider b is conflicted by installed d)', '(provider c is conflicted by installed e)', 'conflict for providers of p needed by a'], 'install a d e');
 
 @r = expand($config, 'a', 'f');
 is_deeply(\@r, [undef, '(provider b is conflicted by installed f)', '(provider c is conflicted by installed f)', 'conflict for providers of p needed by a'], 'install a f');
 
+# test that conflicting jobs work
 @r = expand($config, 'b', 'f');
-is_deeply(\@r, [undef, 'package f conflicts with b'], 'install b f');
+is_deeply(\@r, [undef, 'f conflicts with b'], 'install b f');
 
 @r = expand($config, 'b', 'h');
 is_deeply(\@r, [undef, '(provider f conflicts with installed b)', 'conflict for providers of f needed by h'], 'install b h');
+
+# test conflicts specified in the job
+@r = expand($config, 'i', '!i');
+is_deeply(\@r, [undef, 'i is conflicted'], 'install i !i');
+
+@r = expand($config, 'k', '!j');
+is_deeply(\@r, [undef, '(provider j is conflicted)', 'conflict for providers of j needed by k'], 'install k !j');
+
+# test conflicts from project config
+@r = expand($config, 'i', 'j');
+is_deeply(\@r, [undef, 'j is conflicted by installed i'], 'install i j');
+
+@r = expand($config, 'i', 'k');
+is_deeply(\@r, [undef, '(provider j is conflicted by installed i)', 'conflict for providers of j needed by k'], 'install i k');
