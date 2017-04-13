@@ -965,29 +965,33 @@ sub nevrmatch {
 sub checkconflicts {
   my ($config, $ins, $q, $eq, @r) = @_;
   my $whatprovides = $config->{'whatprovidesh'};
+  my $ret = 0;
   for my $r (@r) {
     if ($r =~ /^\(.*\)$/) {
-      return 1 if handlerichcon_notins($config, $q, $r, $ins, $eq);
+      # note the []: we ignore errors here. they will be reported if the package is chosen.
+      my $n = normalizerich($config, $q, $r, 1, []);
+      $ret = 1 if check_conddeps_notinst($q, $n, $eq, $ins);
       next;
     }
     my @eq = grep {$ins->{$_}} @{$whatprovides->{$r} || addproviders($config, $r)};
     next unless @eq;
-    push @$eq, map {"(provider $q conflicts with installed $_)"} @eq;
-    return 1;
+    push @$eq, map {"(provider $q conflicts with $_)"} @eq;
+    $ret = 1;
   }
-  return 0;
+  return $ret;
 }
 
 sub checkobsoletes {
   my ($config, $ins, $q, $eq, @r) = @_;
   my $whatprovides = $config->{'whatprovidesh'};
+  my $ret = 0;
   for my $r (@r) {
     my @eq = grep {$ins->{$_}} nevrmatch($config, $r, @{$whatprovides->{$r} || addproviders($config, $r)});
     next unless @eq;
-    push @$eq, map {"(provider $q is obsoleted by installed $_)"} @eq;
-    return 1;
+    push @$eq, map {"(provider $q obsoletes $_)"} @eq;
+    $ret = 1;
   }
-  return 0;
+  return $ret;
 }
 
 sub todo2recommended {
@@ -1031,8 +1035,10 @@ sub normalize_cplx_rec {
   if ($r->[0] == 0) {
     my $ri = (split(/[ <=>]/, $r->[1], 2))[0];
     my ($config, $p, $ignore, $xignore) = @$c;
-    return 1 if $ignore->{$ri} || $xignore->{$ri};
-    return 1 if $ignore->{"$p:$ri"} || $xignore->{"$p:$ri"};
+    if (!$todnf) {
+      return 1 if $ignore->{$ri} || $xignore->{$ri};
+      return 1 if defined($p) && ($ignore->{"$p:$ri"} || $xignore->{"$p:$ri"});
+    }
     my $whatprovides = $config->{'whatprovidesh'};
     my @q = @{$whatprovides->{$r->[1]} || addproviders($config, $r->[1])};
     return 0 unless @q;
@@ -1098,74 +1104,93 @@ sub normalizerich {
   my ($config, $p, $dep, $deptype, $error, $ignore, $xignore) = @_;
   my $r = Build::Rpm::parse_rich_dep($dep);
   if (!$r) {
-    if ($dep ne $p) {
-      push @$error, "cannot parse rich dependency $dep from package $p";
+    if (defined($p)) {
+      push @$error, "cannot parse dependency $dep from $p";
     } else {
-      push @$error, "cannot parse rich dependency $dep";
+      push @$error, "cannot parse dependency $dep";
     }
-    return ();
+    return [];
   }
-  my $c = [$config, $p, $ignore, $xignore];
+  my $c = [$config, $p, $ignore || {}, $xignore || {}];
   my ($n, @q);
   if ($deptype == 0) {
     ($n, @q) = normalize_cplx_rec($c, $r);
     return () if $n == 1;
     if (!$n) {
-      if ($dep ne $p) {
+      if (defined($p)) {
         push @$error, "nothing provides $dep needed by $p";
       } else {
         push @$error, "nothing provides $dep";
       }
-      return ();
+      return [];
     }
   } else {
     ($n, @q) = normalize_cplx_rec($c, $r, 1);
     ($n, @q) = cplx_inv($n, @q);
+    if (!$n) {
+      if (defined($p)) {
+        push @$error, "$p conflicts with always true $dep";
+      } else {
+        push @$error, "conflict with always true $dep";
+      }
+    }
   }
   for my $q (@q) {
     my @neg = @$q;
-    @neg = grep {s/^-// && $_ ne $p} @neg;
+    @neg = grep {s/^-//} @neg;
+    @neg = grep {$_ ne $p} @neg if defined $p;
     @$q = grep {!/^-/} @$q;
     $q = [$dep, $deptype, \@neg, @$q];
   }
-  return @q;
+  return \@q;
 }
 
-sub handlerichcon {
-  my ($config, $p, $dep, $error, $installed, $aconflicts) = @_;
-  my @c = normalizerich($config, $p, $dep, 1, $error, {}, {});
-  for my $c (@c) {
-    my ($r, $rtype, $cond, @q) = @$c;
-    @q = grep {!$installed->{$_}} @q;
-    if (@q) {
-      push @$error, "$p contains unsupported conflict $dep";
-      next;
-    }
-    next unless @$cond;
-    my @notyet = grep{!$installed->{$_}} @$cond;
-    if (!@notyet) {
-      push @$error, map {"$p is conflicted by installed $_"} sort(@$cond);
-    } elsif (@notyet == 1) {
-      push @{$aconflicts->{$notyet[0]}}, "is conflicted by installed $p";
+# handle a normalized rich dependency from install of package p
+# todo_cond is undef if we are re-checking the cond queue
+sub check_conddeps_inst {
+  my ($p, $n, $error, $installed, $aconflicts, $todo, $todo_cond) = @_;
+  for my $c (@$n) {
+    my ($r, $rtype, $cond, @q) = @$c; 
+    next unless defined $cond;			# already handled?
+    next if grep {$installed->{$_}} @q;         # already fulfilled
+    my @cx = grep {!$installed->{$_}} @$cond;   # open conditions
+    if (!@cx) {
+      $c->[2] = undef;				# mark as handled to avoid dups
+      if (@q) {
+        push @$todo, $c, $p;
+      } else {
+	if (defined($p)) {
+	  push @$error, map {"$p conflicts with $_"} sort(@$cond);
+	} else {
+	  push @$error, map {"conflicts with $_"} sort(@$cond);
+	}
+      }    
+    } else {
+      if (!@q && @cx == 1) { 
+	if (defined($p)) {
+          $aconflicts->{$cx[0]} = "is in conflict with $p";
+	} else {
+          $aconflicts->{$cx[0]} = "is in conflict";
+	}
+      } elsif ($todo_cond) {
+        push @{$todo_cond->{$_}}, [ $c, $p ] for @cx;
+      }
     }
   }
 }
 
-sub handlerichcon_notins {
-  my ($config, $p, $dep, $installed, $eq) = @_;
-  my @error;
-  my @c = normalizerich($config, $p, $dep, 1, \@error, {}, {});
-  return 0 if @error;	# error out later
-  for my $c (@c) {
-    my ($r, $rtype, $cond, @q) = @$c;
-    @q = grep {!$installed->{$_}} @q;
-    next if @q || !@$cond;
-    my @notyet = grep{!$installed->{$_}} @$cond;
-    next if @notyet;
-    push @$eq, map {"(provider $p conflicts with installed $_)"} sort(@$cond);
-    return 1;
+# handle a normalized rich dependency from a not-yet installed package
+# (we just check conflicts)
+sub check_conddeps_notinst {
+  my ($p, $n, $eq, $installed) = @_;
+  my $ret = 0;
+  for my $c (@$n) {
+    my ($r, $rtype, $cond, @q) = @$c; 
+    next if @q || !@$cond || grep {!$installed->{$_}} @$cond;
+    push @$eq, map {"(provider $p conflicts with $_)"} sort(@$cond);
+    $ret = 1;
   }
-  return 0;
+  return $ret;
 }
 
 sub expand {
@@ -1183,12 +1208,16 @@ sub expand {
   my $whatprovides = $config->{'whatprovidesh'};
   my $requires = $config->{'requiresh'};
 
-  my %xignore = map {substr($_, 1) => 1} grep {/^-/} @p;
-  $ignore = {} if $xignore{'-ignoreignore--'};
+  my $xignore = { map {substr($_, 1) => 1} grep {/^-/} @p };
+  $ignore = {} if $xignore->{'-ignoreignore--'};
+  if ($ignoreignore) {
+    $xignore = {};
+    $ignore = {};
+  }
   my @directdepsend;
-  if ($xignore{'-directdepsend--'}) {
-    delete $xignore{'-directdepsend--'};
-    my @directdepsend = @p;
+  if ($xignore->{'-directdepsend--'}) {
+    delete $xignore->{'-directdepsend--'};
+    @directdepsend = @p;
     for my $p (splice @p) {
       last if $p eq '--directdepsend--';
       push @p, $p;
@@ -1196,103 +1225,173 @@ sub expand {
     @directdepsend = grep {!/^-/} splice(@directdepsend, @p + 1);
   }
 
-  my %aconflicts;	# packages we are conflicting with
-  for (grep {/^!/} @p) {
-    my $r = /^!!/ ? substr($_, 2) : substr($_, 1);
-    my @q = @{$whatprovides->{$r} || addproviders($config, $r)};
-    @q = nevrmatch($config, $r, @q) if /^!!/;
-    push @{$aconflicts{$_}}, "is conflicted" for @q;
-  }
+  my %p;		# expanded packages
+  my @todo;		# dependencies to install
+  my @todo_inst;	# packages we decided to install
+  my %todo_cond;
   my %recommended;	# recommended by installed packages
   my @rec_todo;		# installed todo
+  my @error;
+  my %aconflicts;	# packages we are conflicting with
 
+  # handle direct conflicts
+  for (grep {/^!/} @p) {
+    my $r = /^!!/ ? substr($_, 2) : substr($_, 1);
+    if ($r =~ /^\(.*\)$/) {
+      my $n = normalizerich($config, undef, $r, 1, \@error, $ignore, $xignore);
+      my %naconflicts;
+      check_conddeps_inst(undef, $n, \@error, \%p, \%naconflicts, \@todo, \%todo_cond);
+      push @{$aconflicts{$_}}, $naconflicts{$_} for keys %naconflicts;
+      next;
+    }
+    my @q = @{$whatprovides->{$r} || addproviders($config, $r)};
+    @q = nevrmatch($config, $r, @q) if /^!!/;
+    push @{$aconflicts{$_}}, "is in conflict" for @q;
+  }
   @p = grep {!/^[-!]/} @p;
-  my %p;		# expanded packages
 
   # add direct dependency packages. this is different from below,
   # because we add packages even if the dep is already provided and
   # we break ambiguities if the name is an exact match.
-  for my $p (splice @p) {
-    my @q = @{$whatprovides->{$p} || addproviders($config, $p)};
+  for my $r (splice @p) {
+    if ($r =~ /^\(.*\)$/) {
+      push @p, $r;	# rich deps are never direct
+      next;
+    }
+    my @q = @{$whatprovides->{$r} || addproviders($config, $r)};
     if (@q > 1) {
-      my $pn = $p;
+      my $pn = $r;
       $pn =~ s/ .*//;
       @q = grep {$_ eq $pn} @q;
     }
     if (@q != 1) {
-      push @p, $p;
+      push @p, $r;
       next;
     }
-    next if $p{$q[0]};
-    return (undef, map {"$q[0] $_"} @{$aconflicts{$q[0]}}) if $aconflicts{$q[0]};
-    print "added $q[0] because of $p (direct dep)\n" if $expand_dbg;
-    push @p, $q[0];
-    $p{$q[0]} = 1;
-    my %naconflicts;
-    $naconflicts{$_} = "is conflicted by installed $q[0]" for @{$conflicts->{$q[0]} || []};
-    if (!$ignoreconflicts) {
-      for my $r (@{$pkgconflicts->{$q[0]}}) {
-	if ($r =~ /^\(.*\)$/) {
-	  my @rerror;
-	  handlerichcon($config, $q[0], $r, \@rerror, \%p, \%naconflicts);
-	  return (undef, $rerror[0]) if @rerror;
-	  next;
-	}
-	$naconflicts{$_} = "is conflicted by installed $q[0]" for @{$whatprovides->{$r} || addproviders($config, $r)};
-      }
-      for my $r (@{$pkgobsoletes->{$q[0]}}) {
-	$naconflicts{$_} = "is obsoleted by installed $q[0]" for nevrmatch($config, $r, @{$whatprovides->{$r} || addproviders($config, $r)});
-      }
-    }
-    if (%naconflicts) {
-      my @rerror = map {"$q[0] conflicts with $_"} grep {$p{$_}} sort keys %naconflicts;
-      return (undef, @rerror) if @rerror;
-      push @{$aconflicts{$_}}, $naconflicts{$_} for keys %naconflicts;
-    }
-    push @rec_todo, $q[0] if $userecommendsforchoices;
+    my $p = $q[0];
+    print "added $p because of $p (direct dep)\n" if $expand_dbg;
+    push @todo_inst, $p;
   }
-  push @p, @directdepsend;
 
-  my @pamb = ();
-  my $doamb = 0;
-  my %pcond;
-  while (@p) {
-    my @error = ();
-    my @rerror = ();
-    for my $p (splice @p) {
-      my @r = @{$requires->{$p} || [$p]};
-      while (@r) {
-	my $r = shift @r;
-	my @q;
-	if (ref($r)) {
-	  my ($cond, $rtype);
-	  ($r, $rtype, $cond, @q) = @$r;
-	  my @c = grep {!$p{$_}} @$cond;
-	  if (@c) {
-	    $pcond{$_}->{$p} = 1 for @c;
-	    next;
+  for my $r (@p, @directdepsend) {
+    if ($r =~ /^\(.*\)$/) {
+      # rich dep. normalize, put on todo.
+      my $n = normalizerich($config, undef, $r, 0, \@error, $ignore, $xignore);
+      my %naconflicts;
+      check_conddeps_inst(undef, $n, \@error, \%p, \%naconflicts, \@todo, \%todo_cond);
+      push @{$aconflicts{$_}}, $naconflicts{$_} for keys %naconflicts;
+    } else {
+      push @todo, $r, undef;
+    }
+  }
+
+  for my $p (@todo_inst) {
+    push @error, map {"$p $_"} @{$aconflicts{$p}} if $aconflicts{$p};
+  }
+  return (undef, @error) if @error;
+
+  while (@todo || @todo_inst) {
+    # install a set of chosen packages
+    # ($aconficts must not be set for any of them)
+    if (@todo_inst) {
+      @todo_inst = unify(@todo_inst) if @todo_inst > 1;
+
+      # check aconflicts (just in case)
+      for my $p (@todo_inst) {
+        push @error, map {"$p $_"} @{$aconflicts{$p}} if $aconflicts{$p};
+      }
+      return (undef, @error) if @error;
+
+      # check against old cond dependencies. we do this step by step so we don't get dups.
+      for my $p (@todo_inst) {
+	$p{$p} = 1;
+	if ($todo_cond{$p}) {
+          for my $c (@{delete $todo_cond{$p}}) {
+	    my %naconflicts;
+	    check_conddeps_inst($c->[1], [ $c->[0] ], \@error, \%p, \%naconflicts, \@todo);
+	    push @{$aconflicts{$_}}, $naconflicts{$_} for keys %naconflicts;
 	  }
-	} else {
-          if ($r =~ /^\(.*\)$/) {
-	    if ($ignoreignore) {
-	      unshift @r, normalizerich($config, $p, $r, 0, \@rerror, {}, {});
-	    } else {
-	      unshift @r, normalizerich($config, $p, $r, 0, \@rerror, $ignore, \%xignore);
-	    }
+	}
+        delete $aconflicts{$p};		# no longer needed
+      }
+      return undef, @error if @error;
+
+      # now check our own dependencies
+      for my $p (@todo_inst) {
+	my %naconflicts;
+	my %naobsoletes;
+	$naconflicts{$_} = "is in conflict with $p" for @{$conflicts->{$p} || []};
+	for my $r (@{$requires->{$p} || []}) {
+	  if ($r =~ /^\(.*\)$/) {
+	    my $n = normalizerich($config, $p, $r, 0, \@error, $ignore, $xignore);
+	    check_conddeps_inst($p, $n, \@error, \%p, \%naconflicts, \@todo, \%todo_cond);
 	    next;
 	  }
 	  my $ri = (split(/[ <=>]/, $r, 2))[0];
-	  if (!$ignoreignore) {
-	    next if $ignore->{"$p:$ri"} || $xignore{"$p:$ri"};
-	    next if $ignore->{$ri} || $xignore{$ri};
+	  next if $ignore->{"$p:$ri"} || $xignore->{"$p:$ri"};
+	  next if $ignore->{$ri} || $xignore->{$ri};
+	  push @todo, ($r, $p);
+	}
+	if (!$ignoreconflicts) {
+	  for my $r (@{$pkgconflicts->{$p}}) {
+	    if ($r =~ /^\(.*\)$/) {
+	      my $n = normalizerich($config, $p, $r, 1, \@error);
+	      check_conddeps_inst($p, $n, \@error, \%p, \%naconflicts, \@todo, \%todo_cond);
+	      next;
+	    }
+	    $naconflicts{$_} = "is in conflict with $p" for @{$whatprovides->{$r} || addproviders($config, $r)};
 	  }
+	  for my $r (@{$pkgobsoletes->{$p}}) {
+	    $naobsoletes{$_} =  "is obsoleted by $p" for nevrmatch($config, $r, @{$whatprovides->{$r} || addproviders($config, $r)});
+	  }
+	}
+	if (%naconflicts) {
+	  push @error, map {"$p conflicts with $_"} grep {$p{$_}} sort keys %naconflicts;
+	  push @{$aconflicts{$_}}, $naconflicts{$_} for keys %naconflicts;
+	}
+	if (%naobsoletes) {
+	  push @error, map {"$p obsoletes $_"} grep {$p{$_}} sort keys %naobsoletes;
+	  push @{$aconflicts{$_}}, $naobsoletes{$_} for keys %naobsoletes;
+	}
+	push @rec_todo, $p if $userecommendsforchoices;
+      }
+      return undef, @error if @error;
+      @todo_inst = ();
+    }
+ 
+    for my $pass (0, 1, 2, 3, 4) {
+      my @todo_next;
+      while (@todo) {
+	my ($r, $p) = splice(@todo, 0, 2);
+	my $rtodo = $r;
+	my @q;
+	if (ref($r)) {
+	  ($r, undef, undef, @q) = @$r;
+	} else {
 	  @q = @{$whatprovides->{$r} || addproviders($config, $r)};
 	}
 	next if grep {$p{$_}} @q;
+	my $pp = defined($p) ? "$p:" : '';
+	my $pn = defined($p) ? " needed by $p" : '';
 	if (!$ignoreignore) {
-	  next if grep {$xignore{$_}} @q;
-	  next if grep {$ignore->{"$p:$_"} || $xignore{"$p:$_"}} @q;
+	  next if grep {$ignore->{$_} || $xignore->{$_}} @q;
+	  next if grep {$ignore->{"$pp$_"} || $xignore->{"$pp$_"}} @q;
 	}
+
+	if (!@q) {
+	  next if $r =~ /^\// && defined($p);
+	  push @error, "nothing provides $r$pn";
+	  next;
+	}
+
+	if (@q > 1 && $pass == 0) {
+	  push @todo_next, $rtodo, $p;
+	  next;
+	}
+
+	# pass 0: only one provider
+	# pass 1: conflict pruning
+        my $nq = @q;
 	my @eq;
 	for my $q (@q) {
 	  push @eq, map {"(provider $q $_)"} @{$aconflicts{$q}} if $aconflicts{$q};
@@ -1306,25 +1405,27 @@ sub expand {
 	    push @q, $q unless @{$pkgobsoletes->{$q} || []} && checkobsoletes($config, \%p, $q, \@eq, @{$pkgobsoletes->{$q}});
 	  }
 	}
+
 	if (!@q) {
-	  my $msg = @eq ? 'conflict for providers of' : 'nothing provides';
-	  if ($r eq $p) {
-	    push @rerror, "$msg $r", sort(@eq);
-	  } else {
-	    next if $r =~ /^\// && !@eq;
-	    push @rerror, "$msg $r needed by $p", sort(@eq);
-	  }
+	  push @error, "conflict for providers of $r$pn", sort(@eq);
 	  next;
 	}
-	if (@q > 1 && !$doamb) {
-	  push @pamb, $p unless @pamb && $pamb[-1] eq $p;
-	  print "undecided about $p:$r: @q\n" if $expand_dbg;
+        if (@q == 1) {
+	  push @todo_inst, $q[0];
+	  print "added $q[0] because of $pp$r\n" if $expand_dbg;
+          next;
+        }
+
+	# pass 2: prune prefers
+        if ($pass < 2) {
+	  print "undecided about $pp$r: @q\n" if $expand_dbg;
+	  push @todo_next, $rtodo, $p;
 	  next;
-	}
+        }
 	if (@q > 1) {
-	  my @pq = grep {!$prefer->{"-$_"} && !$prefer->{"-$p:$_"}} @q;
+	  my @pq = grep {!$prefer->{"-$_"} && !$prefer->{"-$pp$_"}} @q;
 	  @q = @pq if @pq;
-	  @pq = grep {$prefer->{$_} || $prefer->{"$p:$_"}} @q;
+	  @pq = grep {$prefer->{$_} || $prefer->{"$pp$_"}} @q;
 	  if (@pq > 1) {
 	    my %pq = map {$_ => 1} @pq;
 	    @q = (grep {$pq{$_}} @{$config->{'prefer'}})[0];
@@ -1333,72 +1434,56 @@ sub expand {
 	  }
 	}
 	if (@q > 1 && $r =~ /\|/) {
-	    # choice op, implicit prefer of first match...
-	    my %pq = map {$_ => 1} @q;
-	    for my $rr (split(/\s*\|\s*/, $r)) {
-		next unless $whatprovides->{$rr};
-		my @pq = grep {$pq{$_}} @{$whatprovides->{$rr}};
-		next unless @pq;
-		@q = @pq;
-		last;
-	    }
-	}
-	if ($doamb == 2) {
-	  todo2recommended($config, \%recommended, \@rec_todo) if @rec_todo;
-	  my @pq = grep {$recommended{$_}} @q;
-	  print "recommended [@pq] among [@q]\n" if $expand_dbg;
-	  @q = @pq if @pq;
-	}
-	if (@q > 1) {
-	  @q = sort(@q);
-	  if ($r ne $p) {
-	    push @error, "have choice for $r needed by $p: @q";
-	  } else {
-	    push @error, "have choice for $r: @q";
+	  # choice op, implicit prefer of first match...
+	  my %pq = map {$_ => 1} @q;
+	  for my $rr (split(/\s*\|\s*/, $r)) {
+	    next unless $whatprovides->{$rr};
+	    my @pq = grep {$pq{$_}} @{$whatprovides->{$rr}};
+	      next unless @pq;
+	      @q = @pq;
+	      last;
 	  }
-	  push @pamb, $p unless @pamb && $pamb[-1] eq $p;
-	  next;
 	}
-	push @p, $q[0];
-	print "added $q[0] because of $p:$r\n" if $expand_dbg;
-	$p{$q[0]} = 1;
-
-	# recheck conditional requires
-	push @p, sort(keys(%{delete $pcond{$q[0]}})) if $pcond{$q[0]};
-
-        # update conflicts
-	push @{$aconflicts{$_}}, "is conflicted by installed $q[0]" for @{$conflicts->{$q[0]} || []};
-	if (!$ignoreconflicts) {
-	  for my $r (@{$pkgconflicts->{$q[0]}}) {
-	    if ($r =~ /^\(.*\)$/) {
-	      handlerichcon($config, $q[0], $r, \@rerror, \%p, \%aconflicts);
-	      next;
-	    }
-	    push @{$aconflicts{$_}}, "is conflicted by installed $q[0]" for @{$whatprovides->{$r} || addproviders($config, $r)};
-	  }
-	  for my $r (@{$pkgobsoletes->{$q[0]}}) {
-	    push @{$aconflicts{$_}}, "is obsoleted by installed $q[0]" for nevrmatch($config, $r, @{$whatprovides->{$r} || addproviders($config, $r)});
-	  }
+        if (@q == 1) {
+	  push @todo_inst, $q[0];
+	  print "added $q[0] because of $pp$r\n" if $expand_dbg;
+          next;
         }
-	push @rec_todo, $q[0] if $userecommendsforchoices;
-	@error = ();
-	$doamb = 0;
-      }
-    }
-    return undef, @rerror if @rerror;
-    next if @p;		# still work to do
 
-    # only ambig stuff left
-    if (@pamb && ($doamb == 0 || $doamb == 1)) {
-      @p = @pamb;
-      @pamb = ();
-      todo2recommended($config, \%recommended, \@rec_todo) if @rec_todo;
-      $doamb = %recommended ? 2 : 3;
-      print "now doing undecided dependencies, $doamb = $doamb\n" if $expand_dbg;
-      next;
+
+	# pass 3: prune recommends
+        if ($pass < 3) {
+	  push @todo_next, $rtodo, $p;
+	  next;
+        }
+	todo2recommended($config, \%recommended, \@rec_todo) if @rec_todo;
+	my @pq = grep {$recommended{$_}} @q;
+	print "recommended [@pq] among [@q]\n" if $expand_dbg;
+	@q = @pq if @pq;
+        if (@q == 1) {
+	  push @todo_inst, $q[0];
+	  print "added $q[0] because of $pp$r\n" if $expand_dbg;
+          next;
+        }
+
+        # pass 4: record error
+        if ($pass < 4) {
+	  push @todo_next, $rtodo, $p;
+	  next;
+        }
+	@q = sort(@q);
+	if (defined($p)) {
+	  push @error, "have choice for $r needed by $p: @q";
+	} else {
+	  push @error, "have choice for $r: @q";
+	}
+      }
+      @todo = @todo_next;
+      last if @todo_inst;
     }
     return undef, @error if @error;
   }
+
   return 1, (sort keys %p);
 }
 
