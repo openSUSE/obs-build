@@ -27,26 +27,29 @@ require 't/testlib.pm';
 
 my $repo = <<'EOR';
 P: a = 1-1
-R: p
-P: b = 1-1 p
-P: c = 1-1 p
+R: x | y
+P: b = 1-1
+R: d | e
+P: c = 1-1
+R: d | f
 P: d = 1-1
-r: b
 P: e = 1-1
-r: c
+P: f = 1-1
+P: g = 1-1
+R: x | e | d
 EOR
 
-my $config = setuptest($repo);
+my $config = setuptest($repo, "Binarytype: deb\nPrefer: f\n");
 my @r;
 
 @r = expand($config, 'a');
-is_deeply(\@r, [undef, 'have choice for p needed by a: b c'], 'install a');
+is_deeply(\@r, [undef, 'nothing provides x | y needed by a'], 'install a');
 
-@r = expand($config, 'a', 'd');
-is_deeply(\@r, [1, 'a', 'b', 'd'], 'install a d');
+@r = expand($config, 'b');
+is_deeply(\@r, [1, 'b', 'd'], 'install b');
 
-@r = expand($config, 'a', 'e');
-is_deeply(\@r, [1, 'a', 'c', 'e'], 'install a e');
+@r = expand($config, 'c');
+is_deeply(\@r, [1, 'c', 'f'], 'install c');
 
-@r = expand($config, 'a', 'd', 'e');
-is_deeply(\@r, [undef, 'have choice for p needed by a: b c'], 'install a d e');
+@r = expand($config, 'g');
+is_deeply(\@r, [1, 'e', 'g'], 'install g');

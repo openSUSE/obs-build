@@ -2,7 +2,7 @@
 
 ################################################################
 #
-# Copyright (c) 1995-2014 SUSE Linux Products GmbH
+# Copyright (c) 2017 SUSE Linux Products GmbH
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 or 3 as
@@ -21,7 +21,7 @@
 ################################################################
 
 use strict;
-use Test::More tests => 5;
+use Test::More tests => 9;
 
 require 't/testlib.pm';
 
@@ -38,6 +38,8 @@ P: f = 1-1
 O: p
 P: g = 1-1
 O: b c
+P: h = 1-1
+R: b d
 EOR
 
 my $config = setuptest($repo);
@@ -53,7 +55,19 @@ is_deeply(\@r, [1, 'a', 'c', 'd'], 'install a d');
 is_deeply(\@r, [1, 'a', 'b', 'e'], 'install a e');
 
 @r = expand($config, 'a', 'd', 'e');
-is_deeply(\@r, [undef, '(provider b is obsoleted by installed d)', '(provider c is obsoleted by installed e)', 'conflict for providers of p needed by a'], 'install a d e');
+is_deeply(\@r, [undef, '(provider b is obsoleted by d)', '(provider c is obsoleted by e)', 'conflict for providers of p needed by a'], 'install a d e');
 
 @r = expand($config, 'a', 'f');
 is_deeply(\@r, [undef, 'have choice for p needed by a: b c'], 'install a f');
+
+@r = expand($config, 'b', 'd');
+is_deeply(\@r, [undef, 'd obsoletes b'], 'install b d');
+
+@r = expand($config, 'h');
+is_deeply(\@r, [undef, 'd obsoletes b'], 'install h');
+
+@r = expand($config, 'h', 'd');
+is_deeply(\@r, [undef, '(provider b is obsoleted by d)', 'conflict for providers of b needed by h'], 'install h d');
+
+@r = expand($config, 'h', 'b');
+is_deeply(\@r, [undef, '(provider d obsoletes b)', 'conflict for providers of d needed by h'], 'install h b');

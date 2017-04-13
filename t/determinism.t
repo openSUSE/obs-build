@@ -21,32 +21,22 @@
 ################################################################
 
 use strict;
-use Test::More tests => 4;
+use Test::More tests => 1;
 
 require 't/testlib.pm';
 
 my $repo = <<'EOR';
 P: a = 1-1
-R: p
-P: b = 1-1 p
-P: c = 1-1 p
-P: d = 1-1
-r: b
-P: e = 1-1
-r: c
+R: b c
+P: b1 = 1-1 b
+C: c1
+P: b2 = 1-1 b
+P: c1 = 1-1 c
+P: c2 = 1-1 c
 EOR
 
-my $config = setuptest($repo);
+my $config = setuptest($repo, 'Prefer: b1 c1');
 my @r;
 
 @r = expand($config, 'a');
-is_deeply(\@r, [undef, 'have choice for p needed by a: b c'], 'install a');
-
-@r = expand($config, 'a', 'd');
-is_deeply(\@r, [1, 'a', 'b', 'd'], 'install a d');
-
-@r = expand($config, 'a', 'e');
-is_deeply(\@r, [1, 'a', 'c', 'e'], 'install a e');
-
-@r = expand($config, 'a', 'd', 'e');
-is_deeply(\@r, [undef, 'have choice for p needed by a: b c'], 'install a d e');
+is_deeply(\@r, [undef, 'b1 conflicts with c1'], 'install a');

@@ -2,7 +2,7 @@
 
 ################################################################
 #
-# Copyright (c) 1995-2014 SUSE Linux Products GmbH
+# Copyright (c) 2017 SUSE Linux Products GmbH
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 or 3 as
@@ -21,7 +21,7 @@
 ################################################################
 
 use strict;
-use Test::More tests => 11;
+use Test::More tests => 12;
 
 require 't/testlib.pm';
 
@@ -44,6 +44,8 @@ P: i = 1-1
 P: j = 1-1
 P: k = 1-1
 R: j
+P: l = 1-1
+R: b d
 EOR
 
 my $config = setuptest($repo, "Conflict: i:j");
@@ -61,28 +63,31 @@ is_deeply(\@r, [1, 'a', 'b', 'e'], 'install a e');
 
 # test test conflicting all providers works
 @r = expand($config, 'a', 'd', 'e');
-is_deeply(\@r, [undef, '(provider b is conflicted by installed d)', '(provider c is conflicted by installed e)', 'conflict for providers of p needed by a'], 'install a d e');
+is_deeply(\@r, [undef, '(provider b is in conflict with d)', '(provider c is in conflict with e)', 'conflict for providers of p needed by a'], 'install a d e');
 
 @r = expand($config, 'a', 'f');
-is_deeply(\@r, [undef, '(provider b is conflicted by installed f)', '(provider c is conflicted by installed f)', 'conflict for providers of p needed by a'], 'install a f');
+is_deeply(\@r, [undef, '(provider b is in conflict with f)', '(provider c is in conflict with f)', 'conflict for providers of p needed by a'], 'install a f');
 
 # test that conflicting jobs work
 @r = expand($config, 'b', 'f');
 is_deeply(\@r, [undef, 'f conflicts with b'], 'install b f');
 
 @r = expand($config, 'b', 'h');
-is_deeply(\@r, [undef, '(provider f conflicts with installed b)', 'conflict for providers of f needed by h'], 'install b h');
+is_deeply(\@r, [undef, '(provider f conflicts with b)', 'conflict for providers of f needed by h'], 'install b h');
 
 # test conflicts specified in the job
 @r = expand($config, 'i', '!i');
-is_deeply(\@r, [undef, 'i is conflicted'], 'install i !i');
+is_deeply(\@r, [undef, 'i is in conflict'], 'install i !i');
 
 @r = expand($config, 'k', '!j');
-is_deeply(\@r, [undef, '(provider j is conflicted)', 'conflict for providers of j needed by k'], 'install k !j');
+is_deeply(\@r, [undef, '(provider j is in conflict)', 'conflict for providers of j needed by k'], 'install k !j');
 
 # test conflicts from project config
 @r = expand($config, 'i', 'j');
-is_deeply(\@r, [undef, 'j is conflicted by installed i'], 'install i j');
+is_deeply(\@r, [undef, 'i conflicts with j', 'j conflicts with i'], 'install i j');
 
 @r = expand($config, 'i', 'k');
-is_deeply(\@r, [undef, '(provider j is conflicted by installed i)', 'conflict for providers of j needed by k'], 'install i k');
+is_deeply(\@r, [undef, '(provider j is in conflict with i)', 'conflict for providers of j needed by k'], 'install i k');
+
+@r = expand($config, 'l');
+is_deeply(\@r, [undef, 'd conflicts with b'], 'install l');

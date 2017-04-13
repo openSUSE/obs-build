@@ -2,7 +2,7 @@
 
 ################################################################
 #
-# Copyright (c) 1995-2014 SUSE Linux Products GmbH
+# Copyright (c) 2017 SUSE Linux Products GmbH
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 or 3 as
@@ -21,7 +21,7 @@
 ################################################################
 
 use strict;
-use Test::More tests => 7;
+use Test::More tests => 16;
 
 require 't/testlib.pm';
 
@@ -35,9 +35,20 @@ P: d = 1-1 p
 P: e = 1-1 p
 P: f = 1-1
 R: n
+P: ign2 = 1-1
+R: ign1
+P: ign3 = 1-1
+R: ign4
+P: ign5 = 1-1 ign4
+P: ign6 = 1-1
+R: ign7
+P: ign8 = 1-1
+R: ign7
+P: g = 1-1 h
+P: h = 1-1
 EOR
 
-my $config = setuptest($repo);
+my $config = setuptest($repo, 'Ignore: ign1 ign5 ign6:ign7');
 my $config2 = setuptest($repo, 'Prefer: d');
 my $config3 = setuptest($repo, 'Prefer: -d');
 my @r;
@@ -62,3 +73,31 @@ is_deeply(\@r, [1, 'c', 'd'], 'install c with prefer');
 
 @r = expand($config3, "c");
 is_deeply(\@r, [1, 'c', 'e'], 'install c with neg prefer');
+
+@r = expand($config, "ign1");
+is_deeply(\@r, [undef, 'nothing provides ign1'], 'install ign1');
+
+@r = expand($config, "ign2");
+is_deeply(\@r, [1, 'ign2'], 'install ign2');
+
+@r = expand($config, "ign3");
+is_deeply(\@r, [1, 'ign3'], 'install ign3');
+
+@r = expand($config, "ign6");
+is_deeply(\@r, [1, 'ign6'], 'install ign6');
+
+@r = expand($config, "ign8");
+is_deeply(\@r, [undef, 'nothing provides ign7 needed by ign8'], 'install ign8');
+
+@r = expand($config, "ign2", "-ign2");
+is_deeply(\@r, [1, 'ign2'], 'install ign2 -ign2');
+
+@r = expand($config, "ign8", "-ign7");
+is_deeply(\@r, [1, 'ign8'], 'install ign8 -ign7');
+
+@r = expand($config, "h");
+is_deeply(\@r, [1, 'h'], 'install h');
+
+@r = expand($config, "--directdepsend--", "h");
+is_deeply(\@r, [undef, 'have choice for h: g h'], 'install --directdepsend-- h');
+
