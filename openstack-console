@@ -22,20 +22,41 @@
 
 import websocket
 import sys
+import re
+import time
+url = ''
 
 if len(sys.argv) != 2:
     sys.exit("usage: openstack-console <url>")
-ws = websocket.create_connection(sys.argv[1],
+else:
+    url = sys.argv[1]
+
+print("openstack-console: Using url '%s'" % url)
+ws = websocket.create_connection(url,
                                  header={'Sec-WebSocket-Protocol: binary'})
 buf = ''
+
+timeout=120
+
+while timeout > 0:
+    try:
+        data = ws.recv()
+        break
+    except websocket._exceptions.WebSocketConnectionClosedException:
+        print("Failed to get data from websocket %d retries left." % timeout)
+        ws = websocket.create_connection(url,
+                                         header={'Sec-WebSocket-Protocol: binary'})
+        timeout -= 1
+        time.sleep(1)
+
 while True:
-    data = ws.recv()
     sys.stdout.write(data)
     if not ws.connected:
         sys.stdout.write("[connection closed]\n")
         break
     buf += data
     buf = buf[-256:]
-    if re.searcg("[\r\n]\[\s*[0-9\.]*]\s+reboot: Power down", buf):
+    if re.search("[\r\n]\[\s*[0-9\.]*]\s+reboot: Power down", buf):
         break
+    data = ws.recv()
 ws.close()
