@@ -1158,7 +1158,7 @@ sub check_conddeps_inst {
       $c->[2] = undef;				# mark as handled to avoid dups
       if (@q) {
         push @$todo, $c, $p;
-      } else {
+      } elsif (@$cond) {
 	if (defined($p)) {
 	  push @$error, map {"$p conflicts with $_"} sort(@$cond);
 	} else {
@@ -1346,11 +1346,11 @@ sub expand {
 	  }
 	}
 	if (%naconflicts) {
-	  push @error, map {"$p conflicts with $_"} grep {$p{$_}} sort keys %naconflicts;
+	  push @error, map {"$p conflicts with $_"} grep {$_ ne $p && $p{$_}} sort keys %naconflicts;
 	  push @{$aconflicts{$_}}, $naconflicts{$_} for keys %naconflicts;
 	}
 	if (%naobsoletes) {
-	  push @error, map {"$p obsoletes $_"} grep {$p{$_}} sort keys %naobsoletes;
+	  push @error, map {"$p obsoletes $_"} grep {$_ ne $p && $p{$_}} sort keys %naobsoletes;
 	  push @{$aconflicts{$_}}, $naobsoletes{$_} for keys %naobsoletes;
 	}
 	push @rec_todo, $p if $userecommendsforchoices;

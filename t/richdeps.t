@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 27;
+use Test::More tests => 28;
 
 require 't/testlib.pm';
 
@@ -43,6 +43,8 @@ P: bad1 = 1-1
 R: (n foo m)
 P: bad2 = 1-1
 C: (n foo m)
+P: sc = 1-1
+C: (a or sc) (n or sc)
 EOR
 
 my $config = setuptest($repo, 'Ignore: ign');
@@ -130,3 +132,6 @@ is_deeply(\@r, [undef, 'cannot parse dependency (n foo m) from bad1'], 'install 
 
 @r = expand($config, 'bad2');
 is_deeply(\@r, [undef, 'cannot parse dependency (n foo m) from bad2'], 'install bad2');
+
+@r = expand($config, 'sc', 'b');
+is_deeply(\@r, [1, 'b', 'sc'], 'install sc b');
