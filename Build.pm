@@ -1360,7 +1360,7 @@ sub expand {
       @todo_inst = ();
     }
  
-    for my $pass (0, 1, 2, 3, 4) {
+    for my $pass (0, 1, 2, 3, 4, 5) {
       my @todo_next;
       while (@todo) {
 	my ($r, $p) = splice(@todo, 0, 2);
@@ -1417,7 +1417,7 @@ sub expand {
           next;
         }
 
-	# pass 2: prune prefers
+	# pass 2: prune neg prefers and simple pos prefers
         if ($pass < 2) {
 	  print "undecided about $pp$r: @q\n" if $expand_dbg;
 	  push @todo_next, $rtodo, $p;
@@ -1427,13 +1427,28 @@ sub expand {
 	  my @pq = grep {!$prefer->{"-$_"} && !$prefer->{"-$pp$_"}} @q;
 	  @q = @pq if @pq;
 	  @pq = grep {$prefer->{$_} || $prefer->{"$pp$_"}} @q;
+	  @q = @pq if @pq == 1;
+	}
+        if (@q == 1) {
+	  push @todo_inst, $q[0];
+	  print "added $q[0] because of $pp$r\n" if $expand_dbg;
+          next;
+        }
+
+	# pass 3: prune pos prefers and debian choice deps
+        if ($pass < 3) {
+	  push @todo_next, $rtodo, $p;
+	  next;
+        }
+	if (@q > 1) {
+	  my @pq = grep {$prefer->{$_} || $prefer->{"$pp$_"}} @q;
 	  if (@pq > 1) {
 	    my %pq = map {$_ => 1} @pq;
 	    @q = (grep {$pq{$_}} @{$config->{'prefer'}})[0];
 	  } elsif (@pq == 1) {
 	    @q = @pq;
 	  }
-	}
+        }
 	if (@q > 1 && $r =~ /\|/) {
 	  # choice op, implicit prefer of first match...
 	  my %pq = map {$_ => 1} @q;
@@ -1451,9 +1466,8 @@ sub expand {
           next;
         }
 
-
-	# pass 3: prune recommends
-        if ($pass < 3) {
+	# pass 4: prune recommends
+        if ($pass < 4) {
 	  push @todo_next, $rtodo, $p;
 	  next;
         }
@@ -1467,8 +1481,8 @@ sub expand {
           next;
         }
 
-        # pass 4: record error
-        if ($pass < 4) {
+        # pass 5: record error
+        if ($pass < 5) {
 	  push @todo_next, $rtodo, $p;
 	  next;
         }
