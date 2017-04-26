@@ -2,6 +2,7 @@
 #
 # Debian live-build specific functions.
 #
+# Copyright (c) 2014,2015 Brocade Communications Systems, Inc.
 # Author: Jan Blunck <jblunck@infradead.org>
 #
 # This file is part of build.
