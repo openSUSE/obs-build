@@ -756,6 +756,8 @@ vm_first_stage() {
 
     # start up VM, rerun ourself
     cp -a $BUILD_DIR/. $BUILD_ROOT/.build
+    # hack to propagate ccache setting into $BUILD_ROOT: just edit the build script...
+    sed -i -e "s/^ccache=0/ccache=$ccache/" $BUILD_ROOT/.build/build
     if ! test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
 	rm -rf "$BUILD_ROOT/.build-srcdir"
 	mkdir "$BUILD_ROOT/.build-srcdir"
