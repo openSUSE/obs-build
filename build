@@ -439,6 +439,8 @@ shellquote() {
 # through /bin/su -c
 toshellscript() {
     echo "#!/bin/sh -x"
+    SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH//[^0-9]/} # sanitize
+    echo "export SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
     echo -n exec
     shellquote "$@"
     echo
