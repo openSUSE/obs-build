@@ -1,5 +1,6 @@
 ################################################################
 #
+# Copyright (c) 2014 Brocade Communications Systems, Inc.
 # Author: Jan Blunck <jblunck@infradead.org>
 #
 # This file is part of build.
