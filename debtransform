@@ -295,6 +295,7 @@ if (!$tarfile || !@debtarfiles) {
     print "No DEBTRANSFORM-TAR line in the .dsc file.\n";
     print "Attempting automatic discovery of a suitable source archive.\n";
     @tars = grep {!/^debian\.tar(?:\.gz|\.bz2|\.xz)?$/} @tars;
+    @tars = grep {!/\.tar?$/} @tars;
     if (@debtarfiles) {
       my %debtarfiles = map {$_ => 1} @debtarfiles;
       @tars = grep {!$debtarfiles{$_}} @tars;
