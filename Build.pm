@@ -194,6 +194,9 @@ sub read_config {
   my @macros = split("\n", $std_macros.$extra_macros);
   push @macros, "%define _target_cpu $arch";
   push @macros, "%define _target_os linux";
+  my $host_arch = `uname -m`;
+  chomp $host_arch;
+  push @macros, "%define _host_arch $host_arch";
   my $config = {'macros' => \@macros, 'arch' => $arch};
   my @config;
   if (ref($cfile)) {
