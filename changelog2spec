@@ -29,7 +29,6 @@ BEGIN {
 }
 
 use Date::Parse;
-use Time::Zone;
 
 use strict;
 
@@ -37,7 +36,6 @@ my @wday = qw{Sun Mon Tue Wed Thu Fri Sat};
 my @mon = qw{Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec};
 
 my $ok;
-my $zone;
 my $test;
 my $printtype;
 my $input = '';
@@ -101,12 +99,8 @@ sub parse_suse {
   $dt =~ /([0-9][0-9][0-9][0-9])/;
   $dline = $_;
   my $year = $1;
-  if (!defined($zone) && $dt =~ /\s([a-z]{3,4})(dst)?\s[0-9]{4}/) {
-    my $dst = $2;
-    $zone = tz_offset($1);
-    $zone += 3600 if defined($zone) && $dst;
-  }
   my $tdt = str2time($dt);
+  die "bad date <$dt>\n" unless $tdt;
   $dt =~ /([0-9]+)/;
   my $day = $1;
   if (!$tdt) {
@@ -123,7 +117,6 @@ sub parse_suse {
     $tdt = str2time("$year-1-1");
   }
   $tdt += 12 * 3600 unless $dt =~ /\d:\d/;	# 12:00 if not specified
-  $tdt += ($zone || 0);
   my $ok = 1;
   my $change = '';
   while(<>) {
@@ -173,10 +166,6 @@ sub parse_debian {
     $changes .= "$_\n";
   }
   die("no maintainer line in last entry\n") unless defined $date;
-  if (!defined($zone) && ($date =~ /([-+])(\d\d)(\d\d)$/)) {
-    $zone = 60 * ($3 + 60 * $2);
-    $zone = -$zone if $1 eq '-';
-  }
   my $tdt = str2time($date);
   return ('', $tdt, $_, $who, $changes);
 }
