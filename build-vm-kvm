@@ -237,7 +237,7 @@ vm_startup_kvm() {
     elif test -n "$VM_CONSOLE_INPUT" ; then
 	qemu_args=("${qemu_args[@]}" -serial mon:stdio)
     else
-	qemu_args=("${qemu_args[@]}" -serial stdio)
+	qemu_args=("${qemu_args[@]}" -serial mon:stdio)
     fi
 
     if test -n "$BUILD_JOBS" -a "$icecream" = 0 -a -z "$BUILD_THREADS" ; then
