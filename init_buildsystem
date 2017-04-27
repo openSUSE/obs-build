@@ -227,6 +227,7 @@ preinstall() {
     else
 	unsafe_preinstall_check
 	CPIO="cpio --extract --unconditional --preserve-modification-time --make-directories --no-absolute-filenames --quiet"
+	cpio --help 2>/dev/null | grep -q -e --extract-over-symlinks && CPIO="$CPIO --extract-over-symlinks"
 	TAR="tar -x"
     fi
     pkg_preinstall
