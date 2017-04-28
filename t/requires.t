@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 16;
+use Test::More tests => 20;
 
 require 't/testlib.pm';
 
@@ -74,6 +74,18 @@ is_deeply(\@r, [1, 'ign2'], 'install ign2 -ign2');
 
 @r = expand($config, "ign8", "-ign7");
 is_deeply(\@r, [1, 'ign8'], 'install ign8 -ign7');
+
+@r = expand($config2, "ign5", "-ign5");
+is_deeply(\@r, [1, 'ign5'], 'install ign5 -ign5');
+
+@r = expand($config2, "ign4", "-ign5");
+is_deeply(\@r, [1, 'ign5'], 'install ign4 -ign5');
+
+@r = expand($config, "ign5");
+is_deeply(\@r, [1, 'ign5'], 'install ign5');
+
+@r = expand($config, "ign4");
+is_deeply(\@r, [1, 'ign5'], 'install ign4');
 
 @r = expand($config, "h");
 is_deeply(\@r, [1, 'h'], 'install h');

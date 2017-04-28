@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 28;
+use Test::More tests => 29;
 
 require 't/testlib.pm';
 
@@ -127,6 +127,9 @@ is_deeply(\@r, [1, 'ign3'], 'install ign3');
 @r = expand($config, 'b', 'ign4');
 is_deeply(\@r, [1, 'b', 'ign4'], 'install b ign4');
 
+@r = expand($config, '(ign and b)');
+is_deeply(\@r, [undef, 'nothing provides (ign and b)'], 'install b');
+
 @r = expand($config, 'bad1');
 is_deeply(\@r, [undef, 'cannot parse dependency (n foo m) from bad1'], 'install bad1');
 
@@ -135,3 +138,4 @@ is_deeply(\@r, [undef, 'cannot parse dependency (n foo m) from bad2'], 'install 
 
 @r = expand($config, 'sc', 'b');
 is_deeply(\@r, [1, 'b', 'sc'], 'install sc b');
+

@@ -1239,7 +1239,7 @@ sub expand {
   for (grep {/^!/} @p) {
     my $r = /^!!/ ? substr($_, 2) : substr($_, 1);
     if ($r =~ /^\(.*\)$/) {
-      my $n = normalizerich($config, undef, $r, 1, \@error, $ignore, $xignore);
+      my $n = normalizerich($config, undef, $r, 1, \@error);
       my %naconflicts;
       check_conddeps_inst(undef, $n, \@error, \%p, \%naconflicts, \@todo, \%todo_cond);
       push @{$aconflicts{$_}}, $naconflicts{$_} for keys %naconflicts;
@@ -1260,24 +1260,22 @@ sub expand {
       next;
     }
     my @q = @{$whatprovides->{$r} || addproviders($config, $r)};
-    if (@q > 1) {
-      my $pn = $r;
-      $pn =~ s/ .*//;
-      @q = grep {$_ eq $pn} @q;
-    }
+    my $pn = $r;
+    $pn =~ s/ .*//;
+    @q = grep {$_ eq $pn} @q;
     if (@q != 1) {
       push @p, $r;
       next;
     }
     my $p = $q[0];
-    print "added $p because of $p (direct dep)\n" if $expand_dbg;
+    print "added $p because of $r (direct dep)\n" if $expand_dbg;
     push @todo_inst, $p;
   }
 
   for my $r (@p, @directdepsend) {
     if ($r =~ /^\(.*\)$/) {
       # rich dep. normalize, put on todo.
-      my $n = normalizerich($config, undef, $r, 0, \@error, $ignore, $xignore);
+      my $n = normalizerich($config, undef, $r, 0, \@error);
       my %naconflicts;
       check_conddeps_inst(undef, $n, \@error, \%p, \%naconflicts, \@todo, \%todo_cond);
       push @{$aconflicts{$_}}, $naconflicts{$_} for keys %naconflicts;
@@ -1374,7 +1372,7 @@ sub expand {
 	next if grep {$p{$_}} @q;
 	my $pp = defined($p) ? "$p:" : '';
 	my $pn = defined($p) ? " needed by $p" : '';
-	if (!$ignoreignore) {
+	if (defined($p) && !$ignoreignore) {
 	  next if grep {$ignore->{$_} || $xignore->{$_}} @q;
 	  next if grep {$ignore->{"$pp$_"} || $xignore->{"$pp$_"}} @q;
 	}
