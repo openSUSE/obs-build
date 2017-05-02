@@ -239,9 +239,11 @@ sub query {
     s/:.*// for @suggests;
     $ret->{'suggests'} = \@suggests if @suggests;
   }
-  # arch packages don't seem to have a source :(
-  # fake it so that the package isn't confused with a src package
-  $ret->{'source'} = $ret->{'name'} if defined $ret->{'name'};
+  # Keep consistent to Arch style; refer to sources as the upstream sources
+  # The 'source' array is always defined and referred to sources needed for building the package
+  $ret->{'source'} = $ret->{'source'} || [];
+  push @{$ret->{'source'}}, @{$ret{'source_i686'} || []};
+  push @{$ret->{'source'}}, @{$vars{'source_x86_64'} || []};
   $ret->{'buildtime'} = $vars->{'builddate'}->[0] if $opts{'buildtime'} && $vars->{'builddate'};
   return $ret;
 }
