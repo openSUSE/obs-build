@@ -49,6 +49,13 @@ sub addpkg {
     $selfprovides .= "=$data->{'version'}" if defined $data->{'version'};
     push @{$data->{'provides'}}, $selfprovides unless @{$data->{'provides'} || []} && $data->{'provides'}->[-1] eq $selfprovides;
   }
+  if ($options->{'normalizedeps'}) {
+    # our normalized dependencies have spaces around the op
+    for my $dep (qw {provides requires conflicts obsoletes suggests}) {
+      next unless $data->{$dep};
+      s/ ?([<=>]+) ?/ $1 / for @{$data->{$dep}};
+    }
+  }
   if (defined($data->{'version'})) {
     # split version into evr
     $data->{'epoch'} = $1 if $data->{'version'} =~ s/^(\d+)://s;

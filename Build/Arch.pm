@@ -284,6 +284,8 @@ sub parserepodata {
       push @{$d->{'provides'}}, @p;
     } elsif ($p eq '%DEPENDS%') {
       push @{$d->{'requires'}}, @p;
+    } elsif ($p eq '%OPTDEPENDS%') {
+      push @{$d->{'suggests'}}, @p;
     } elsif ($p eq '%CONFLICTS%') {
       push @{$d->{'conflicts'}}, @p;
     } elsif ($p eq '%REPLACES%') {
