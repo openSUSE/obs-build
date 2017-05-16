@@ -36,6 +36,7 @@ our $do_collax;
 our $do_livebuild;
 our $do_snapcraft;
 our $do_appimage;
+our $do_docker;
 
 sub import {
   for (@_) {
@@ -47,8 +48,9 @@ sub import {
     $do_livebuild = 1 if $_ eq ':livebuild';
     $do_snapcraft = 1 if $_ eq ':snapcraft';
     $do_appimage = 1 if $_ eq ':appimage';
+    $do_docker = 1 if $_ eq ':docker';
   }
-  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage;
+  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker;
   if ($do_deb) {
     require Build::Deb;
   }
@@ -69,6 +71,9 @@ sub import {
   }
   if ($do_appimage) {
     require Build::Appimage;
+  }
+  if ($do_docker) {
+    require Build::Docker;
   }
 }
 
@@ -375,7 +380,7 @@ sub read_config {
     $config->{'binarytype'} = 'rpm' if $config->{'type'} eq 'spec' || $config->{'type'} eq 'kiwi';
     $config->{'binarytype'} = 'deb' if $config->{'type'} eq 'dsc' || $config->{'type'} eq 'collax' || $config->{'type'} eq 'livebuild';
     $config->{'binarytype'} = 'arch' if $config->{'type'} eq 'arch';
-    if ($config->{'type'} eq 'snapcraft' || $config->{'type'} eq 'appimage') {
+    if ($config->{'type'} eq 'snapcraft' || $config->{'type'} eq 'appimage' || $config->{'type'} eq 'docker') {
       if (grep {$_ eq 'rpm'} @{$config->{'preinstall'} || []}) {
         $config->{'binarytype'} = 'rpm';
       } elsif (grep {$_ eq 'debianutils'} @{$config->{'preinstall'} || []}) {
@@ -481,6 +486,9 @@ my %subst_defaults = (
   ],
   'system-packages:kiwi-product' => [
     'kiwi',
+  ],
+  'system-packages:docker' => [
+    'docker',
   ],
   'system-packages:deltarpm' => [
     'deltarpm',
@@ -592,6 +600,9 @@ sub get_sysbuild {
     @sysdeps = @{$config->{'substitute'}->{'kiwi-setup:product'} || []} unless @sysdeps;
     @sysdeps = @{$subst_defaults{'system-packages:kiwi-product'} || []} unless @sysdeps;
     push @sysdeps, @$extradeps if $extradeps;
+  } elsif ($buildtype eq 'docker') {
+    @sysdeps = @{$config->{'substitute'}->{'system-packages:docker'} || []} unless @sysdeps;
+    @sysdeps = @{$subst_defaults{'system-packages:docker'} || []} unless @sysdeps;
   } elsif ($buildtype eq 'deltarpm') {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:deltarpm'} || []};
     @sysdeps = @{$subst_defaults{'system-packages:deltarpm'} || []} unless @sysdeps;
@@ -1626,6 +1637,7 @@ sub recipe2buildtype {
   return 'collax' if $recipe eq 'build.collax';
   return 'snapcraft' if $recipe eq 'snapcraft.yaml';
   return 'appimage' if $recipe eq 'appimage.yml';
+  return 'docker' if $recipe eq 'Dockerfile';
   return 'preinstallimage' if $recipe eq '_preinstallimage';
   return 'simpleimage' if $recipe eq 'simpleimage';
   return undef;
@@ -1676,6 +1688,7 @@ sub parse {
   return parse_simpleimage($cf, $fn, @args) if $fnx eq 'simpleimage';
   return Build::Snapcraft::parse($cf, $fn, @args) if $do_snapcraft && $fnx eq 'snapcraft.yaml';
   return Build::Appimage::parse($cf, $fn, @args) if $do_appimage && $fnx eq 'appimage.yml';
+  return Build::Docker::parse($cf, $fn, @args) if $do_docker && $fnx eq 'Dockerfile';
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $fnx eq 'PKGBUILD';
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $fnx eq 'build.collax';
   return parse_preinstallimage($cf, $fn, @args) if $fnx eq '_preinstallimage';
@@ -1691,6 +1704,7 @@ sub parse_typed {
   return Build::LiveBuild::parse($cf, $fn, @args) if $do_livebuild && $buildtype eq 'livebuild';
   return Build::Snapcraft::parse($cf, $fn, @args) if $do_snapcraft && $buildtype eq 'snapcraft';
   return Build::Appimage::parse($cf, $fn, @args) if $do_appimage && $buildtype eq 'appimage';
+  return Build::Docker::parse($cf, $fn, @args) if $do_docker && $buildtype eq 'docker';
   return parse_simpleimage($cf, $fn, @args) if $buildtype eq 'simpleimage';
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $buildtype eq 'arch';
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $buildtype eq 'collax';
