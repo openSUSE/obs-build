@@ -101,6 +101,29 @@ sub kiwiparse {
         # for kiwi 3.8 and before
         push @types, $type->{'_content'};
       }
+      if ($type->{'derived_from'}) {
+	my $derived = $type->{'derived_from'};
+	if ($derived =~ /^obs:\/{1,3}([^\/]+)\/([^\/]+)\/(.*)(?:#([^\#\/]+))$/) {
+	  my $name = defined($4) ? "$3:$4" : "$3";
+	  push @packages, "container:$1/$2/$name";
+	} elsif ($derived =~ /^obsrepositories:\/{1,3}([^\/].*)(?:#([^\#\/]+))$/) {
+	  my $name = defined($2) ? "$1:$2" : "$1";
+	  push @packages, "container:_obsrepositories//$name";
+	} elsif ($derived !~ /^file:/ && $derived =~ /^(.*)\/([^\/]+)(?:#([^\#\/]+))$/) {
+	  my $url = $1;
+	  my $name = defined($3) ? "$2:$3" : "$2";
+	  my $prp;
+	  $prp = $urlmapper->($url) if $urlmapper;
+	  # try again with one element moved from url to name
+	  if (!$prp && $derived =~ /^(.*)\/([^\/]+\/[^\/]+)(?:#([^\#\/]+))$/) {
+	    $url = $1;
+	    $name = defined($3) ? "$2:$3" : "$2";
+	    $prp = $urlmapper->($url) if $urlmapper;
+	  }
+	  die("derived_from url not using obs:/ scheme: $derived\n") unless $prp;
+	  push @packages, "container:$prp/$name";
+	}
+      }
       push @packages, "kiwi-filesystem:$type->{'filesystem'}" if $type->{'filesystem'};
       if (defined $type->{'boot'}) {
         if ($type->{'boot'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
