@@ -48,13 +48,9 @@ sub findFallBackArchs {
 # sles10 perl does not have the version.pm
 # implement own hack
 sub versionstring {
-  my ($str) = @_;
-  my @xstr = split (/\./,$str);
+  my ($str) = @_; 
   my $result = 0;
-  while (my $digit = shift(@xstr)) {
-    $result = $result * 100;
-    $result += $digit;
-  }
+  $result = $result * 100 + $_ for split (/\./, $str);
   return $result;
 }
 
@@ -72,7 +68,7 @@ sub kiwiparse {
   my @requiredarch;
   my @badarch;
   my $schemaversion = 0;
-  my $schemaversion56 = versionstring("5.6");
+  my $schemaversion56 = versionstring('5.6');
   my $obsexclusivearch;
   my $obsexcludearch;
   $obsexclusivearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExclusiveArch:\s+(.*)\s+-->\s*$/im;
@@ -232,11 +228,11 @@ sub kiwiparse {
   for my $package (@pkgs) {
     # filter packages, which are not targeted for the wanted plattform
     if ($package->{'arch'}) {
-      my $valid=undef;
+      my $valid;
       if (@requiredarch) {
         # this is a product
-        foreach my $ma(@requiredarch) {
-          foreach my $pa(split(",", $package->{'arch'})) {
+        for my $ma (@requiredarch) {
+          for my $pa (split(",", $package->{'arch'})) {
             $valid = 1 if $ma eq $pa;
           }
         }
@@ -244,7 +240,7 @@ sub kiwiparse {
         # live appliance
         my $ma = $arch;
         $ma =~ s/i[456]86/i386/;
-        foreach my $pa(split(",", $package->{'arch'})) {
+        for my $pa (split(",", $package->{'arch'})) {
           $pa =~ s/i[456]86/i386/;
           $valid = 1 if $ma eq $pa;
         }
