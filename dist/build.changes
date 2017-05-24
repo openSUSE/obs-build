@@ -1,0 +1,1439 @@
+-------------------------------------------------------------------
+Fri Mar 17 12:57:03 UTC 2017 - adrian@suse.de
+
+- fix usage of the right service generated files.
+- debootstrap: Also mount sysfs
+- Fileprovides should only match package names, not provides
+- avoid export of build results of sym links pointing to external files
+- support build of different flavors via multibuild
+- experimental AppImage build support
+- reworked openstack support (still experimental)
+
+-------------------------------------------------------------------
+Thu Feb  9 13:15:55 UTC 2017 - adrian@suse.de
+
+- updated confguration for tumbleweed
+- Arch linux fixes
+- mount swap by label
+- allow custom qemu options
+- allow to override hostname
+- fix build with vm-type lxc
+
+-------------------------------------------------------------------
+Wed Jan 25 16:06:13 UTC 2017 - adrian@suse.de
+
+- fix haskell builds (bsc#1018895)
+- fix multi type kiwi profile handling
+- minor distribution config and bug fixes
+
+-------------------------------------------------------------------
+Tue Dec  6 15:36:20 UTC 2016 - adrian@suse.de
+
+- add config for openSUSE Leap 42.3 (alpha, non-final)
+- handle Fedora 25 special cases
+- Improve /proc mount behaviour
+- fix dependency on CentOS (build#2415)
+- Use weak dependencies as 3rd choice breaker
+- support statistics from xvda devices
+- build env wipe support (--wipe command)
+
+-------------------------------------------------------------------
+Tue Nov 29 07:01:58 UTC 2016 - adrian@suse.de
+
+- speed up build (for preinstall and keeping packages)
+- Recognize Recommends and Supplements relations of RPMs.
+- fix build against susetags repos
+
+-------------------------------------------------------------------
+Tue Oct 25 15:51:17 UTC 2016 - adrian@suse.de
+
+- Add clang binaries to ccache symlinking
+- Fix a probable tabs to spaces bug
+- Kiwi: allow to specify ExclusiveArch and ExcludeArch
+- build-vm-kvm: use virtio-rng-device also on aarch64
+- Add support for LXC as libvirt driver
+- support multiple image builds for multiple profiles
+- Add optional whitelisting for allowed buildroots and parameters
+- build-vm-xen: use xvd devices for disks and hvc0 for console for recent xen
+- build-vm-kvm: fix vm_enable_console also for kvm_serial_console case
+- sl13.3.conf: Prepare for bash 4.4, using libreadline7
+- Add and clarify licenses
+
+-------------------------------------------------------------------
+Wed Aug 10 11:51:43 UTC 2016 - lnussel@suse.de
+
+- calculate leap version for default config
+
+-------------------------------------------------------------------
+Tue Aug  9 13:36:48 UTC 2016 - adrian@suse.de
+
+- first version of Leap 42.2 configuration
+- provide loop devices in docker VM
+- support lxc 2.0
+- Add architecture-specific sources extract for Arch Linux
+- snapcraft improvements
+
+-------------------------------------------------------------------
+Thu Jun 30 05:47:52 UTC 2016 - adrian@suse.de
+
+- adding first snapcraft support
+
+-------------------------------------------------------------------
+Wed Apr 27 15:03:56 UTC 2016 - adrian@suse.de
+
+- fix build on armv7hl
+
+-------------------------------------------------------------------
+Wed Apr 27 06:31:53 UTC 2016 - adrian@suse.de
+
+- run debtransform after buildtime source services
+- Handle also aarch32* and armv8 cases for kvm cpu switches
+- add support for LXC 1.0.8
+- added DoD for aarch64 repositories on Debian
+
+-------------------------------------------------------------------
+Fri Apr  8 09:37:41 UTC 2016 - adrian@suse.de
+
+- support unpacking of obscpio archives in source
+- added DoD for aarch64 repositories on Debian
+- aarch64_ilp32 support
+- KVM: telnet feature fixes and documentation
+- KVM: run qemu as user
+- fail when space allocation is not successful (on supported FS)
+
+-------------------------------------------------------------------
+Fri Mar  4 07:29:26 UTC 2016 - adrian@suse.de
+
+- add switch to enable VM console input
+- add --vm-user option to run kvm as non-root
+- Implement experimental obscpio unpacking
+- Use fallocate -p for a fast zero-fill, correctly truncate.
+- PowerVM backend
+- Make --ignoreignore only ignore ignores from the project config
+- aggregate patches fields
+- Fail simpleimage build when integration scripts fail
+- mkdrpms: do not create debuginfo/source deltas
+
+Kiwi:
+- Support new Kiwi v8 (experimental)
+- Make sure kiwi is called in UTF-8 locale
+- Kiwi appliance: support "replaces" attribute and handle it as buildignore
+- KIWI profile support
+- Support a way to map urls to OBS project/repos
+
+Debian:
+- Support lintian when OBS_DCH_RELEASE set
+- Add support for debbuild's eval and .debmacros
+
+-------------------------------------------------------------------
+Thu Nov  5 14:59:24 UTC 2015 - adrian@suse.de
+
+- add openSUSE 42.1 config (bnc#953782)
+- avoid full path in sha256 files of products
+- support virtio-rng device in kvm builds
+- lxc 1.1 support
+
+-------------------------------------------------------------------
+Fri Oct  9 08:41:04 UTC 2015 - adrian@suse.de
+
+- avoid dependency to perl(parent) again
+- fixed buildtime source service execution
+- fixed debian collax support
+
+-------------------------------------------------------------------
+Thu Sep 17 10:45:57 UTC 2015 - adrian@suse.de
+
+- collax support added
+- Fix auto-detection of -p1 option to patch
+- Handle .deb files that have sysv ar(1) filenames
+- Exported RECIPEFILE in build-recipe-livebuild
+
+-------------------------------------------------------------------
+Wed Sep  2 15:29:28 UTC 2015 - adrian@suse.de
+
+- openSUSE 13.3 config added (bnc#944121)
+- Support old versions of Archive::Tar
+- debtransformer xz archive support
+- workaround for broken chroot command (Mageia:5 shipped with it)
+- Support building with Mandriva/Mageia Repositories
+- debian: Various bugfixes for lintian support
+- debian: Generate .changes files when building deb packages.
+- create /dev/loop-control for kernel >= 3.1
+- support singleexport flag handling
+- Fix precedence of unary '-' and '!'
+- fix ppc qemu registration rules
+
+-------------------------------------------------------------------
+Wed Jun 17 15:01:43 UTC 2015 - adrian@suse.de
+
+- fixing test suite call
+
+-------------------------------------------------------------------
+Mon Jun 15 11:41:12 UTC 2015 - adrian@suse.de
+
+- support build time source services
+- docker VM support
+- Simple image creation support
+- vc: create changelog file only in case of a change
+- get hostarch based on preinstalled kernel image
+- architecture CanDo updates
+- avoid endless loops during in binfmt misc registration
+- debian debootstrap fixes
+- added support of debbuild build engine
+- optional support of network inside of KVM
+- allow lintian to break the build
+
+-------------------------------------------------------------------
+Tue Mar 17 07:20:36 UTC 2015 - adrian@suse.de
+
+- workaround initrd breakage when using initrd for systemd with older systems
+- fixes for building in LXC containers
+- avoid emulator for arm on aarch64
+- Fixing UTC symlink resolving when setting localtime
+- ppc64le can build ppc64 with KVM
+- build-vm-kvm: Switch armv7 to virt machine
+- Fix --no-checks with older rpmbuild
+- documenation updates
+
+-------------------------------------------------------------------
+Fri Jan 30 07:23:36 UTC 2015 - adrian@suse.de
+
+- add recommend to perl(Net::SSL) (bnc#880212)
+- add support for debian debootstrap build engine
+- Update arch config
+- Add support for conflicts, addselfprovides, weakdeps to query functions
+- installed package handling works also for arch and debian now
+- large code cleanup
+- bugfixes and documentation updates
+
+-------------------------------------------------------------------
+Mon Nov 24 15:45:59 UTC 2014 - adrian@suse.de
+
+- Add releasesuffix hack for new PTF handling
+- support parallel build jobs for debs
+- Fix repocfg usage in the "exact match" case
+- Improve exclarch handling for deb builds
+- rewritten workaround for broken chroot tool
+
+-------------------------------------------------------------------
+Mon Oct 27 09:01:57 UTC 2014 - adrian@suse.de
+
+- add support for new chroot tool
+  * fixes Ubuntu 14.10 builds
+- man pages for unrpm and vc
+
+-------------------------------------------------------------------
+Fri Sep 19 05:37:09 UTC 2014 - adrian@suse.de
+
+- drop not available packages from SLE 12 config
+
+-------------------------------------------------------------------
+Thu Sep 18 10:46:25 UTC 2014 - adrian@suse.de
+
+- fix syntax error in SLE 12 config
+
+-------------------------------------------------------------------
+Tue Sep 16 06:29:02 UTC 2014 - adrian@suse.de
+
+- add SLE 12 config (bnc#893618)
+- build-vm-kvm: Always use -mem-prealloc when using -mem-path
+- debian livebuild support
+- various ppc handling fixes
+- various smaller fixes
+
+-------------------------------------------------------------------
+Thu Apr 24 19:09:19 UTC 2014 - adrian@suse.de
+
+- build script got refactored and split in multiple modules
+
+-------------------------------------------------------------------
+Thu Feb 20 18:41:16 UTC 2014 - adrian@suse.de
+
+- bugfix release
+  - /sys mounting
+  - binfmtmisc setup
+
+-------------------------------------------------------------------
+Thu Dec  5 13:26:34 UTC 2013 - adrian@suse.de
+
+- fix ppc64le vs. ppc64 emulator check (none needed)
+
+-------------------------------------------------------------------
+Thu Dec  5 10:01:44 UTC 2013 - adrian@suse.de
+
+- fix vc tool regression from "minor fixes"
+
+-------------------------------------------------------------------
+Wed Dec  4 08:26:56 UTC 2013 - adrian@suse.de
+
+- support for project side configured VM kernels
+- ppc64le support
+- minor fixes
+
+-------------------------------------------------------------------
+Tue Oct 15 09:37:05 UTC 2013 - adrian@suse.de
+
+- update openSUSE 13.1 build configuration
+- add openSUSE 13.2 build configuration
+- add support for m86k
+- add support for Tizen changelog date format
+- export .packages, .verified and .ova files for kiwi
+- initvm code cleanup
+- Do not specify compression format for Arch packages when extracting
+- export kiwi-image:$type for kiwi files with schemaversion 5.6 or newer 
+- mount tmpfs on $BUILD_ROOT/dev/shm
+- Create devices nodes if udev is not running
+- more arm architectures
+- make version '0' a valid version
+- fix the call to lintian, lintian gets a dsc file as input
+- adding generic parameter to hand over kiwi parameters
+
+-------------------------------------------------------------------
+Fri Aug  2 20:35:02 UTC 2013 - dvlaeev@suse.com
+
+- add requires for Fedora
+
+-------------------------------------------------------------------
+Fri May 17 09:44:35 UTC 2013 - adrian@suse.de
+
+- fix build for non-SUSE rpm distros
+
+-------------------------------------------------------------------
+Fri May 17 09:24:49 UTC 2013 - adrian@suse.de
+
+- fix a number of issues regarding statistics collection
+  => works with more udev versions now
+
+-------------------------------------------------------------------
+Wed May 15 16:17:04 UTC 2013 - adrian@suse.de
+
+- fix qemu-binfmt registration in chroot builds
+
+-------------------------------------------------------------------
+Tue May 14 10:52:18 UTC 2013 - adrian@suse.de
+
+- debian builds call linitian now if installed
+- Arch Linux: support new pacman tool syntax
+- support kiwi installation medias with new kiwi versions
+- fixed regression using build host rpm instead of the version from chroot
+- fixed repository priority ordering, when only some repos have a priority
+  and kiwi appliances get build
+
+-------------------------------------------------------------------
+Wed May  8 11:12:37 UTC 2013 - adrian@suse.de
+
+- support multi architecture initvm binaries
+  => vminit gets build as subpackage now again
+- De-hardcode hugetlbfs from ppc
+- Do not emulate VGA
+- support new nameing scheme of install images of kiwi builds
+
+-------------------------------------------------------------------
+Mon Apr 29 07:40:19 UTC 2013 - adrian@suse.de
+
+- disabling fsync again for newer rpm versions to speed up
+  installation phase again.
+
+-------------------------------------------------------------------
+Fri Apr 26 11:35:37 UTC 2013 - adrian@suse.de
+
+- cloud support for Amanzon EC2 and openstack
+- fixed SPEC_REL support
+- fixed zvm build
+- fixed uml support
+- fixing ext4 usage on old distros
+- final openSUSE 12.3 config
+- arm build support fixes
+
+-------------------------------------------------------------------
+Tue Apr  2 11:09:59 UTC 2013 - coolo@suse.com
+
+- add sl13.1.conf (openSUSE:Factory prjconf of 2013-03-29)
+- have ncurses-devel-32bit require ncurses-devel and not ncurses-32bit
+- do not put .socket files into the 32bit packages
+- unbreak kvm for x86_64
+
+-------------------------------------------------------------------
+Fri Mar  8 09:43:58 UTC 2013 - adrian@suse.de
+
+- fix kvm support for x86_64 again
+
+-------------------------------------------------------------------
+Mon Mar  4 11:03:17 UTC 2013 - adrian@suse.de
+
+- avoid writing out incomplete IO statistics
+
+-------------------------------------------------------------------
+Wed Feb 27 09:14:05 UTC 2013 - adrian@suse.de
+
+- ARM AArch64 support added
+- Generic system emulator support as VM added
+- s390 z/VM build environment support added
+- support collecting resource statistics during build (for OBS 2.4)
+- rpm5 fixes
+- kvm support for armv7l
+- mount /dev/pts with right permissions
+
+-------------------------------------------------------------------
+Mon Nov 26 08:49:59 UTC 2012 - adrian@suse.de
+
+- fixed deb building
+- collecting statistics during VM build
+
+-------------------------------------------------------------------
+Fri Oct  5 10:58:15 UTC 2012 - adrian@suse.de
+
+- backport /proc mounting for rpmlint for factory
+
+-------------------------------------------------------------------
+Thu Sep 27 07:33:21 UTC 2012 - coolo@suse.com
+
+- change to automatic date version in _service
+- update from git (4afd9f0ee03f9e51cf8db9a27fae4663e3f4dde6)
+
+Martin Koegler (1):
+      Bug fix: ignore links in orig tar files
+
+Michael Schroeder (1):
+      - be more verbose when the preinstallimage unpack fails
+
+Stephan Kulow (2):
+      the difference between openSUSE and SLE is outdated
+      do not cumulate packages with 12.2's rpm
+
+-------------------------------------------------------------------
+Tue Sep 25 11:25:49 UTC 2012 - coolo@suse.com
+
+- remove build-mkbaselibs-sle, the split is no longer necessary
+- remove default requires for devel-32bit
+
+-------------------------------------------------------------------
+Tue Sep 25 08:30:55 UTC 2012 - coolo@suse.com
+
+- fix logic for cumulating packages
+
+-------------------------------------------------------------------
+Mon Sep 24 15:47:27 UTC 2012 - coolo@suse.com
+
+- update to current git (03587016a7eca7788f404820642a2b5a1556aa0b)
+
+Adrian Schröter (1):
+      - use default MEMSIZE in check_for_ppc
+
+Anas Nashif (2):
+      pass --use-system-qemu option to init_buildsystem
+      Support https repositories
+
+Frank Lichtenheld (1):
+      init_buildsystem: fail early on reorder failure
+
+Martin Koegler (4):
+      Diff can't handle empty files
+      Refactor diff generation
+      Handle overriden files already present in the orig.tar.gz correctly in debtransform
+      Correct version number of binaries, if necessary
+
+Michael Schroeder (3):
+      - don't add self-provides for src packages
+      - support binary rpms with fo SOURCERPM header element
+      - drop '-o' bsdtar flag when unpacking preinstall images
+
+Werner Fink (1):
+      Make init_buildsystem able to use the features of newer rpm
+
+-------------------------------------------------------------------
+Fri Aug 24 14:04:11 CEST 2012 - mls@suse.de
+
+- update to current git
+  * fixed arch PKGBUILD parsing
+  * add .qcow2 file handling for kiwi
+  * support root tar ball output format of kiwi
+
+-------------------------------------------------------------------
+Tue Aug 21 08:56:05 UTC 2012 - adrian@suse.de
+
+- update to current git
+  * fixed cross build initialsation with chroot
+  * ignore prereqs for subpacks to be built
+  * more Arch Linux support
+  * new --vmdisk-clean switch
+- add recommends to qemu-linux-user
+
+-------------------------------------------------------------------
+Thu Jul 19 07:47:23 UTC 2012 - adrian@suse.de
+
+- update openSUSE 12.2 config to RC1 state
+- add openSUSE 12.3 config to fix build for factory
+- do not package compressed _and_ uncompressed kiwi images
+- add build timestamps in each logfile line
+
+-------------------------------------------------------------------
+Mon Jul  2 08:40:26 UTC 2012 - adrian@suse.de
+
+- preinstallimage support added
+
+-------------------------------------------------------------------
+Thu Jun 14 13:54:42 UTC 2012 - adrian@suse.de
+
+- build fixes for Fedora 17
+- syntax error fix for kiwi vmx builds
+
+-------------------------------------------------------------------
+Tue Jun  5 14:25:08 UTC 2012 - coolo@suse.com
+
+- update from git:
+   (mls) simplify debug package code so that it also works with --target
+
+-------------------------------------------------------------------
+Thu May 31 12:24:32 UTC 2012 - adrian@suse.de
+
+- take care of prjconf target: definition for spec file parsing
+
+-------------------------------------------------------------------
+Wed May 30 12:51:09 UTC 2012 - adrian@suse.de
+
+- support for breakages in Fedora:17
+  * support enforced ordering during preinstall and vminstall phase
+  * allow to extract files via symlinked directories
+
+-------------------------------------------------------------------
+Mon May 14 14:54:27 UTC 2012 - coolo@suse.com
+
+- work around command line size limit
+  mkbaselibs may fail on an excessive number of packages (bnc#761977)
+- improve build root owner setting
+- don't die at compile time if Archive::Tar is not available
+
+-------------------------------------------------------------------
+Tue Apr 24 13:59:49 UTC 2012 - adrian@suse.de
+
+- fixed breakage with older perls
+- ~ support for rpm version compare
+- handle broken deb packages better
+- no more hardcoded copy-in of qemu* binaries
+
+-------------------------------------------------------------------
+Mon Apr 23 09:49:45 UTC 2012 - adrian@suse.de
+
+- do not use sle-baselibs.conf on openSUSE
+
+-------------------------------------------------------------------
+Tue Apr 17 13:54:12 UTC 2012 - cfarrell@suse.com
+
+- license update: GPL-2.0+ and GPL-2.0
+  See e.g. spec2changelog by Pascal Bleser. Also, there should be a copy of
+  the GPL-2.0 license in the package
+
+-------------------------------------------------------------------
+Wed Mar  7 09:55:02 UTC 2012 - adrian@suse.de
+
+- check_emulator needs to use $BUILD_DIR for initvm checks or obs
+  worker builds may break
+- Introduce --vmdisk-mount-options
+
+-------------------------------------------------------------------
+Wed Feb 29 10:02:52 UTC 2012 - adrian@suse.de
+
+- using xz compression for kiwi raw files
+- progress counters during installing
+- 12.2 config added
+
+-------------------------------------------------------------------
+Mon Feb 13 08:49:34 UTC 2012 - adrian@suse.de
+
+- Support for openSUSE 12.2 (current factory)
+- Support for crossbuild via Hostarch directive
+- PPC KVM support
+- swap space gets taken into account for ulimits
+- Failure on not supported personality set
+
+-------------------------------------------------------------------
+Tue Oct 25 14:40:05 UTC 2011 - adrian@suse.de
+
+- use github.com as git repo now
+- fix build for rpmv5
+
+-------------------------------------------------------------------
+Mon Oct 10 19:29:20 CEST 2011 - mls@suse.de
+
+- add sles11sp2 build config and adapt autodetection [bnc#711770]
+
+-------------------------------------------------------------------
+Tue Oct  4 12:43:27 UTC 2011 - adrian@suse.de
+
+- use new qemu-*-binfmt handler to run commands with correct $0
+- fix build for Factory
+
+-------------------------------------------------------------------
+Mon Sep 26 20:33:59 UTC 2011 - adrian@suse.de
+
+- fixing kvm cpuid setting for AMD and Intel CPU's
+- support new xen tools
+- fixed qemu build initialisation
+
+-------------------------------------------------------------------
+Sun Aug  7 19:58:28 UTC 2011 - opensuse@cboltz.de
+
+- Requires:/Recommends: were part of the package description.
+  Moved them to the correct place.
+
+-------------------------------------------------------------------
+Fri Jul  1 07:26:34 UTC 2011 - adrian@suse.de
+
+- compat mode for broken kiwi of openSUSE 11.4
+
+-------------------------------------------------------------------
+Thu Jun 30 10:42:15 UTC 2011 - adrian@suse.de
+
+- fixed kiwi execution call for some versions
+
+-------------------------------------------------------------------
+Fri Jun 17 08:35:15 UTC 2011 - adrian@suse.de
+
+- support new kiwi command line mode
+
+-------------------------------------------------------------------
+Mon Jun  6 14:57:47 UTC 2011 - adrian@suse.de
+
+- do not build ia64 baselibs packages for openSUSE anymore
+
+-------------------------------------------------------------------
+Wed May 25 12:14:38 UTC 2011 - adrian@suse.de
+
+- allow to use simple spec file parser via Build::show
+
+-------------------------------------------------------------------
+Thu May 12 10:20:53 UTC 2011 - adrian@suse.de
+
+- conflict with old bsdtar (not supporting --chroot)
+
+-------------------------------------------------------------------
+Wed Apr 27 12:34:17 UTC 2011 - adrian@suse.de
+
+- revert to single cpu build default for debian packages
+
+-------------------------------------------------------------------
+Fri Apr 15 08:55:14 UTC 2011 - adrian@suse.de
+
+- switch back to single process build for debian to be conform with
+  their policy
+- use cpuid kvm64 on kvm for 64bit as workaround for a cpuid bug
+
+-------------------------------------------------------------------
+Tue Mar 29 14:59:28 UTC 2011 - lnussel@suse.de
+
+- make sure default.conf is no stale symlink
+
+-------------------------------------------------------------------
+Tue Mar  1 15:35:21 UTC 2011 - adrian@suse.de
+
+- support new cross build initvm. Done by James Perkins from LinuxFoundation
+- do not use loop device anymore when using block devices directly
+
+-------------------------------------------------------------------
+Thu Nov 11 12:24:13 UTC 2010 - adrian@suse.de
+
+- workaround for distros with appstart like Ubuntu 10.10
+
+-------------------------------------------------------------------
+Tue Nov  2 16:32:42 UTC 2010 - lnussel@suse.de
+
+- delta size limit 80%
+- actually unlink the delta file if the delta is too big
+
+-------------------------------------------------------------------
+Wed Oct 27 13:38:48 UTC 2010 - lnussel@suse.de
+
+- use '.drpm' suffix instead of '.delta.rpm' for delta rpms
+- makedeltarpms -> mkdrpms and also rename subpackage to match
+  script name
+- since mkdrpms needs Build.pm make perl-TimeDate dependency of
+  build optional
+
+-------------------------------------------------------------------
+Mon Oct 18 14:38:16 UTC 2010 - lnussel@suse.de
+
+- add missing optional perl dependencies
+
+-------------------------------------------------------------------
+Fri Oct 15 10:27:08 UTC 2010 - adrian@suse.de
+
+- update to current git
+  * export also fallback archs as exclusive archs for kiwi product 
+    building, fixes factory dvd5 64bit media
+  * cross build fixes by Martin Mohring
+  * correct disk image file creation, it was one byte too large by James Perkins
+
+-------------------------------------------------------------------
+Tue Sep 21 13:23:00 UTC 2010 - adrian@suse.de
+
+- update to current git
+  * workaround for supporting rpm install on cross build with native
+    acceleration
+
+-------------------------------------------------------------------
+Mon Sep 20 12:25:56 UTC 2010 - lnussel@suse.de
+
+- package mkdrpms script in separate package
+
+-------------------------------------------------------------------
+Tue Aug 24 08:32:05 UTC 2010 - adrian@suse.de
+
+- update to current git
+  * support for mips cross build
+
+-------------------------------------------------------------------
+Wed Aug  4 15:31:41 UTC 2010 - adrian@suse.de
+
+- update to current git
+  * replace release number macros with 0 if not specified
+
+-------------------------------------------------------------------
+Wed Jul 28 15:44:41 CEST 2010 - mls@suse.de
+
+- update to current git
+  * document --repo and --dist
+  * update wiki links
+  * fix bugs in repo handling
+  * fix distribution autodetection code
+
+-------------------------------------------------------------------
+Thu Jul 22 09:22:03 UTC 2010 - adrian@suse.de
+
+- update to current git
+  * support for Files provide
+
+-------------------------------------------------------------------
+Thu Jul  8 13:15:42 UTC 2010 - adrian@suse.de
+
+- update to current git
+  * export BUILD_DEBUG so rpmlint can check for it (bnc#618004)
+
+-------------------------------------------------------------------
+Tue Jun 29 15:06:06 CEST 2010 - mls@suse.de
+
+- update to current git
+  * add 11.3 config
+  * fix repo creation in --noinit case
+  * support ovf files directly
+  * allow multiple --oldpackages
+  * delta rpm support
+
+-------------------------------------------------------------------
+Mon Jun 21 12:20:36 UTC 2010 - adrian@suse.de
+
+- update to current git
+  * fixes for image building for SLE 10
+  * fix parsing of macros that contain {} blocks
+  * support xz decoder helper script
+  * don't substitute in lines with %(), the parser cannot handle it (bnc#613965)
+  * run kvm instance with the right number of cpus according to given parallel build jobs
+
+-------------------------------------------------------------------
+Sat May 29 13:35:34 UTC 2010 - adrian@suse.de
+
+- update to current git
+  * noatime VM mount
+  * _service file rename happens inside of chroot/vm now.
+
+-------------------------------------------------------------------
+Tue May  4 08:26:13 UTC 2010 - adrian@suse.de
+
+- update to current git
+  * CBinstall and CBPreninstall directive support from Jan-Simon
+
+-------------------------------------------------------------------
+Wed Apr 21 09:58:46 UTC 2010 - adrian@suse.de
+
+- detect kvm virtio initrds on SUSE systems automatically
+
+-------------------------------------------------------------------
+Mon Apr 19 00:54:32 CEST 2010 - ro@suse.de
+
+- build-mkbaselibs: also move baselibs*conf to subpackage 
+
+-------------------------------------------------------------------
+Fri Apr 16 01:11:45 CEST 2010 - ro@suse.de
+
+- add BuildIgnore build-mkbaselibs to be able to bootstrap 
+
+-------------------------------------------------------------------
+Thu Apr 15 14:04:56 UTC 2010 - adrian@suse.de
+
+- split out -mkbaselibs package to avoid build dependency problems
+  on perl version updates in future.
+- update to current git
+  * added armv6el to emulator archs by Jan-Simon.
+  * fixing a logic error in arch= attribute handling for kiwi
+
+-------------------------------------------------------------------
+Fri Apr  9 07:58:24 UTC 2010 - adrian@suse.de
+
+- update to current git
+  * Support for remote yum repos by yi.y.yang@intel.com
+  * fixed kiwi file parsing for arch= attributes
+
+-------------------------------------------------------------------
+Wed Mar 31 15:00:48 UTC 2010 - adrian@suse.de
+
+- update to current git
+  * kvm autosetup enhancements
+  * multiple bugfixes and refactoring
+
+-------------------------------------------------------------------
+Wed Mar 10 13:34:45 UTC 2010 - adrian@suse.de
+
+- update to current git
+  * Kiwi exclude arch handling
+
+-------------------------------------------------------------------
+Mon Mar  8 12:07:03 UTC 2010 - adrian@suse.de
+
+- create default.conf symlink to correct *.conf based on 
+  %suse_version and %sles_version macros
+
+-------------------------------------------------------------------
+Thu Feb 25 08:22:52 UTC 2010 - adrian@suse.de
+
+- add dependency to tar (needed for deb builds)
+- use current git
+  * Added '--uid uid:gid' feature to specify abuild id in chroot
+    (by David Greaves)
+
+-------------------------------------------------------------------
+Sat Feb 20 10:49:00 UTC 2010 - adrian@suse.de
+
+- update to current git
+  * fix for permissions for debian (done by Jan-Simon)
+
+-------------------------------------------------------------------
+Thu Feb 11 19:09:11 UTC 2010 - adrian@suse.de
+
+- update to current git
+  * fixed handling of kiwi build results
+
+-------------------------------------------------------------------
+Mon Feb  8 15:52:12 UTC 2010 - adrian@suse.de
+
+- update to current git
+  * support kiwi 4.1 schema files
+
+-------------------------------------------------------------------
+Tue Jan 19 14:57:22 UTC 2010 - adrian@suse.de
+
+- update to current git
+  * fixed missing --root parameter for substitutedeps call
+
+-------------------------------------------------------------------
+Mon Jan 18 16:38:58 UTC 2010 - adrian@suse.de
+
+- update to current git
+  * create .sha256 files for kiwi image results
+
+-------------------------------------------------------------------
+Wed Jan 13 15:21:28 UTC 2010 - adrian@suse.de
+
+- update to current git repo
+  * unbreaking kiwi builds again
+
+-------------------------------------------------------------------
+Sun Jan  3 13:02:40 UTC 2010 - adrian@suse.de
+
+- update to current git repo, update to commit 549cf6c6e148b7f8c05c12ee06f3094cb67149f9
+  * minor bugfixes
+  * sparc support fixes
+
+-------------------------------------------------------------------
+Thu Dec 10 07:00:00 UTC 2009 - adrian@suse.de
+
+- switch to git repository, update to commit c8b33e430bfb40b80df43249279bd561d874d786
+  * product building via abuild user
+  * prodoct building speedup
+
+-------------------------------------------------------------------
+Fri Nov 27 09:44:56 UTC 2009 - adrian@suse.de
+
+- update to svn(r9279)
+  Debian packages get configured at install time  again now.
+  But keeping additional configuration step afterwards for failed 
+  configutions (due to dep cycles)
+
+-------------------------------------------------------------------
+Fri Nov 27 09:11:15 UTC 2009 - adrian@suse.de
+
+- add requires to perl-TimeDate for changelog2spec app
+
+-------------------------------------------------------------------
+Wed Nov 25 10:54:24 UTC 2009 - adrian@suse.de
+
+- update to svn(r9238)
+  * Debian chroot enviroments are running post installation scripts
+    now after all packages got installed, not after each installation
+    (partly fixes Ubuntu 9.10 setup)
+
+-------------------------------------------------------------------
+Sat Nov 21 19:50:44 UTC 2009 - adrian@suse.de
+
+- update to current svn(r9154)
+  * add support for xz compressed rpms (Fedora 12) on platforms without xz support in
+    rpm.
+  * speed up install by disabling fsync in rpm config
+
+-------------------------------------------------------------------
+Thu Nov  5 06:16:05 UTC 2009 - adrian@suse.de
+
+- update to current svn (r8506)
+  - product iso generation is done by kiwi now
+  - debs get generated via "make install"
+
+-------------------------------------------------------------------
+Wed Sep 23 12:01:05 CEST 2009 - mls@suse.de
+
+- update to current svn (r8048)
+  - support openSUSE 11.2 [bnc#539914]
+
+-------------------------------------------------------------------
+Mon Jul 27 17:03:47 CEST 2009 - ro@suse.de
+
+- update to current svn (r7751)
+  - support for legacy releasepkg mechanism
+  - only print parse warnings if $config->{'warnings'} is set
+  - set warnings for expanddeps/substitutedeps
+  - use UTC as default timezone
+  - also consider patches as sources
+  - do not call depmod until we use also the native kernel,
+    it can't match otherwise
+  - return with value 3, if basic file system creation fails.
+    bs_worker will mark the build host as bad and retries on another one.
+  - handle files from service correctly and strip their prefix.
+  - - also add rpmv3 compatibility hack to createrpmdeps
+  - mount proc filesystem for build compare run
+  - fix for ccache support from
+  - add build-ids for debuginfo packages for subpacks
+
+-------------------------------------------------------------------
+Wed Jun  3 13:40:08 CEST 2009 - adrian@suse.de
+
+- update to current svn (r7483)
+  * Jan-Simons "ChangeTarget" support
+  * fix for handling missing self provides with rpm format 3.0.6
+
+-------------------------------------------------------------------
+Thu Apr 23 12:14:36 CEST 2009 - adrian@suse.de
+
+- update to current svn (r7164)
+  * package vc tool correctly
+  * avoid running fsck on vm instances after 23 build runs
+- install files via Makefile instead of manual calls in spec file
+
+-------------------------------------------------------------------
+Mon Apr 20 14:48:41 CEST 2009 - adrian@suse.de
+
+- update to current svn (r7126)
+  * new blocklist based build result export
+  * Martin Mohrings cross build extensions
+  * vc tool included now
+
+-------------------------------------------------------------------
+Wed Mar 23 15:20:17 CET 2009 - adrian@suse.de
+
+- Fix for "Requires(pre/post)" tags
+- fix missing abuild group in /etc/gshadow on debian like distros
+
+-------------------------------------------------------------------
+Wed Feb 25 15:20:17 CET 2009 - adrian@suse.de
+
+- Update for bug fix for image build with additional packages in --create step
+  (fix from cthiel, bnc#479537)
+
+-------------------------------------------------------------------
+Fri Feb 20 12:04:00 CET 2009 - adrian@suse.de
+
+- Fix kvm support together with Alexander
+- Support for new disturl containing a complete pointer to build
+  service instance resource
+- add support for package compare to allow Build Service to drop
+  same packages after build
+- image repack support from Christoph
+
+-------------------------------------------------------------------
+Tue Jan 27 14:27:19 CET 2009 - adrian@suse.de
+
+- update to current buildservice/1.5 branch 
+- More fixes for kiwi image build
+- Move Susetags.pm to correct Build:: namespace
+
+-------------------------------------------------------------------
+Wed Dec 10 14:27:19 CET 2008 - froh@suse.de
+
+- update to r5853:
+- added: new armv7el arch for all binaries for up to ARMv7 EABI with VFP
+- Fix kiwi image build support within osc
+
+-------------------------------------------------------------------
+Fri Dec  5 09:11:19 CET 2008 - froh@suse.de
+
+- remove baselibs.conf from the spec file, too
+
+-------------------------------------------------------------------
+Fri Dec  5 02:26:21 CET 2008 - ro@suse.de
+
+- delete baselibs.conf (nowadays stored in package sources) 
+
+-------------------------------------------------------------------
+Wed Dec  3 13:17:26 CET 2008 - ro@suse.de
+
+- delete automatic requires for debuginfo-xxbit
+
+-------------------------------------------------------------------
+Wed Dec  3 11:30:37 CET 2008 - froh@suse.de
+
+- config update
+
+-------------------------------------------------------------------
+Fri Nov 28 15:19:21 CET 2008 - froh@suse.de
+
+- many kiwi fixes
+- _no_ cross build support yet
+
+-------------------------------------------------------------------
+Thu Nov 13 15:01:59 CET 2008 - ro@suse.de
+
+- update mkbaselibs broken by previous debuginfo change
+- various fixes for kiwi build
+- add sl11.1.conf
+- add support for --disturl
+- also save .desktopfiles for coolo
+
+-------------------------------------------------------------------
+Thu Oct 23 14:59:19 CEST 2008 - ro@suse.de
+
+- disable ppc:ia32 stuff again, causes trouble and can not work
+
+-------------------------------------------------------------------
+Tue Oct 21 13:25:50 CEST 2008 - jblunck@suse.de
+
+- Generate debuginfo packages for baselibs (bnc #396196)
+
+-------------------------------------------------------------------
+Mon Oct 20 17:56:20 CEST 2008 - ro@suse.de
+
+- update to svn trunk of today:
+- init_buildsystem: check for some left space before calling rpmbuild
+  - create dev/shm as directory
+- baselibs_global.conf: update to current internal revision
+  - add ia32 stuff for x86 binaries on ppc
+  - add ldconfig for all non-devel baselibs packages
+- changed: to function also with emulators better use fakeroot-tcp
+  for debian build
+- fixed: changed basis for memory calculation to assume also a stack
+  which can be swapped well. gcc often needs much memory here
+- recognize SLES10
+- fix boolification in && and ||
+- re-preinstall critical packages on update
+- fix creation of buildenv to do it the same time with and without VM.
+- fixes installation-images build for ppc
+- fixed #406596: don't ignore BuildRequires in subpackages
+- print finished message
+- set BUILD_USER depending on the suse_version like it is done in
+  old autobuild
+- added documentation for specfile control comments for build(1)
+- add --incarnation
+- add --create-build-binaries
+- support badarch (aka excludearch)
+- add support for Requires(pre) or (post) semantic
+
+-------------------------------------------------------------------
+Mon Aug 11 16:15:23 CEST 2008 - adrian@suse.de
+
+Update from current svn trunk:
+- Improved XEN support (XEN call only once per build)
+- Add post build check hooks
+- rpmlint support
+- added kvm support
+- refactored code in various places
+
+-------------------------------------------------------------------
+Tue Jun  3 17:53:22 CEST 2008 - mls@suse.de
+
+- fix debtransform bug [bnc#396766]
+
+-------------------------------------------------------------------
+Thu May 29 16:17:17 CEST 2008 - mls@suse.de
+
+- add 11.0 config
+- fix debian provides
+- fix rpm tag parsing
+- add with/without/define/ccache/icecream/debug options
+- update mkbaselibs
+
+-------------------------------------------------------------------
+Fri Sep 14 18:27:13 CEST 2007 - mls@suse.de
+
+- add sl10.3 config [#310089]
+- also look for BuildRequires in subpackage definitions [#305568]
+- allow removal of more config parameters
+
+-------------------------------------------------------------------
+Thu Aug  2 15:56:09 CEST 2007 - mls@suse.de
+
+- support 'order' config option
+- support 'patterntype' config option
+- new setdeps() method
+- support for flexible query options
+- support 'description' query
+- fix bug in changelog2spec time cutoff
+- make debtransform understand Debtransform-Tar/Debtransform-Files-Tar/
+  Debtransform-Series
+- fix bug in substitutedeps
+
+-------------------------------------------------------------------
+Wed Jun 13 17:18:17 CEST 2007 - mls@suse.de
+
+- implement rpm installation order calculation in perl
+- make substitute code modify requires, too
+- add filelist query support
+- add prereq parsing support
+- speed up version comparison a bit
+
+-------------------------------------------------------------------
+Thu May 10 20:02:29 CEST 2007 - mls@suse.de
+
+- add _vendor to configs
+- fix deban dependency compare
+- allow not operator in configs
+- fix build from source rpms
+
+-------------------------------------------------------------------
+Thu Apr 12 16:22:16 CEST 2007 - mls@suse.de
+
+- add --root to rpm call in rpm to work around a bug in rpm [#255720]
+
+-------------------------------------------------------------------
+Thu Apr  5 15:59:21 CEST 2007 - mls@suse.de
+
+- update to 1561:
+  * support architecture dependand requires in dsc files
+  * support "global" definitions for rpm
+  * support vminstall config option
+
+-------------------------------------------------------------------
+Mon Mar 12 15:40:49 CET 2007 - mls@suse.de
+
+- update to r1419:
+  * fix buildroot in debtransform
+  * obey version numbers when expanding
+
+-------------------------------------------------------------------
+Fri Mar  2 21:23:40 CET 2007 - mls@suse.de
+
+- transform suse changes file to rpm specfile format
+- improved debian support
+
+-------------------------------------------------------------------
+Fri Jan 26 17:14:08 CET 2007 - poeml@suse.de
+
+- update to r1114:
+  - re-add the lost unrpm script
+
+-------------------------------------------------------------------
+Fri Jan 26 15:58:32 CET 2007 - poeml@suse.de
+
+- update to r1110:
+ - make exclarch an array
+ - remount root rw in xen case, needed if root is not reiserfs
+ - add repotype/runscripts options
+ - remove devs in sl10.1/10.2
+ - fix boolean test to make "00" false like rpm does
+ - add rpm_verscmp for version comparison
+ - runscripts
+ - macro blocks
+ - read_config_dist
+ - useful xen exit status
+ - add --kill
+ - update 10.2 config
+ - extend spec/dsc parser
+ - fixed two bugs in the specfile parser
+
+-------------------------------------------------------------------
+Fri Nov 24 17:43:28 CET 2006 - mls@suse.de
+
+- fix suse_version in sl10.1/sles10 config
+- add sl10.2 config
+- make dist autodetection work with opensuse
+- fix macro sequencing and expression parser bugs
+- treat preinstalls as keep
+
+-------------------------------------------------------------------
+Thu Aug 24 00:49:19 CEST 2006 - ro@suse.de
+
+- init_buildsystem: when preinstalling, handle only sh scripts 
+
+-------------------------------------------------------------------
+Wed Jun 14 17:42:26 CEST 2006 - mls@suse.de
+
+- support for buildservice and debian packages
+
+-------------------------------------------------------------------
+Fri Apr 28 17:07:30 CEST 2006 - mls@suse.de
+
+- add ndeps back to expansion calls
+- save original macro name so that other regexp calls don't destroy
+  it
+
+-------------------------------------------------------------------
+Wed Apr 19 15:34:10 CEST 2006 - mls@suse.de
+
+- add --list-state option [#119869]
+- suppress stat messages when deleting rpms [#154385]
+- delete not-ready flag when rpm expansion failes [#133568]
+- update baselibs.conf
+
+-------------------------------------------------------------------
+Tue Apr 11 16:00:53 CEST 2006 - mls@suse.de
+
+- fix typo in configs
+- fix macro handling
+
+-------------------------------------------------------------------
+Fri Apr  7 19:06:09 CEST 2006 - mls@suse.de
+
+- mkbaselibs: do not leave .src.rpm in the release [#158816]
+
+-------------------------------------------------------------------
+Tue Apr  4 12:26:24 CEST 2006 - mls@suse.de
+
+- add update-alternatives to java2-devel-packages macro [#156137]
+
+-------------------------------------------------------------------
+Mon Mar 27 20:01:01 CEST 2006 - mls@suse.de
+
+- run zic to set default timezone [#142363]
+- update baselibs.conf
+
+-------------------------------------------------------------------
+Fri Mar 24 17:04:41 CET 2006 - mls@suse.de
+
+- fix handling of "keep" [#160346]
+- fix old configs [#159947]
+
+-------------------------------------------------------------------
+Mon Mar 20 14:35:11 CET 2006 - mls@suse.de
+
+- make mkbaselibs use the right version for the srcrpm
+- update mkbaselibs configuration files
+
+-------------------------------------------------------------------
+Fri Mar 10 14:15:40 CET 2006 - mls@suse.de
+
+- add package expansion and dependency substitution support
+
+-------------------------------------------------------------------
+Wed Feb  8 21:29:48 CET 2006 - agruen@suse.de
+
+- Adjust the package lists so that the build script can at least
+  be used again.
+
+-------------------------------------------------------------------
+Wed Jan 25 21:45:57 CET 2006 - mls@suse.de
+
+- converted neededforbuild to BuildRequires
+
+-------------------------------------------------------------------
+Mon Sep 12 11:11:30 CEST 2005 - mls@suse.de
+
+- also search for ix86 packages when building x86_64 [#116069]
+
+-------------------------------------------------------------------
+Mon Sep  5 12:13:09 CEST 2005 - mls@suse.de
+
+- add --baselibs option
+- fix --extra-packs
+
+-------------------------------------------------------------------
+Thu May 12 14:45:32 CEST 2005 - mls@suse.de
+
+- Fix typo in init_buildsystem that prevented the reuse of the build
+  environment [#74714]
+
+-------------------------------------------------------------------
+Fri Mar 11 18:03:30 CET 2005 - mls@suse.de
+
+- integrated patches into tarball
+- allowed build for older dists [#65506]
+
+-------------------------------------------------------------------
+Wed Mar  2 12:28:07 CET 2005 - agruen@suse.de
+
+- Some more cleanups for 9.3.
+- When using the default list of packages, also try to include the
+  packages in neededforbuild.
+
+-------------------------------------------------------------------
+Mon Feb 28 17:36:02 CET 2005 - agruen@suse.de
+
+- ldconfig must be called with its absolute path.
+
+-------------------------------------------------------------------
+Tue May 25 14:49:13 CEST 2004 - mls@suse.de
+
+- overhaul the manpage
+
+-------------------------------------------------------------------
+Thu Mar 25 18:31:56 CET 2004 - mls@suse.de
+
+- incorporate ro's diff
+
+-------------------------------------------------------------------
+Wed Mar 24 20:26:39 CET 2004 - mls@suse.de
+
+- really adapt to 9.1
+- add --root and --extra-packs options
+- use BuildRequires: line
+- use user 'abuild' if norootforbuild found
+- fix BUILD_DIR security issue (#35281)
+
+-------------------------------------------------------------------
+Thu Mar 11 20:00:13 CET 2004 - ro@suse.de
+
+- adapted for 9.1
+
+-------------------------------------------------------------------
+Mon Nov 10 23:54:37 CET 2003 - mmj@suse.de
+
+- Accept "-h" for help
+- rpm -ba is now rpmbuild -ba
+- Add Maximum RPM reference
+
+-------------------------------------------------------------------
+Mon Nov 10 13:48:39 CET 2003 - mmj@suse.de
+
+- Update the default USEDFORBUILD to match todays packages
+- Don't build as root
+
+-------------------------------------------------------------------
+Wed Oct 15 12:23:49 CEST 2003 - mmj@suse.de
+
+- Fix to work on amd64 (from mls) [#32229]
+
+-------------------------------------------------------------------
+Fri Sep  5 16:01:54 CEST 2003 - mls@suse.de
+
+- select i586 on i686 is user didn't specify arch
+- complain if user wan't to build i686 on a not-i686 processor
+- patch rpmrc so that i686 rpms are written if building for i686
+
+-------------------------------------------------------------------
+Thu Sep  4 16:12:03 CEST 2003 - mls@suse.de
+
+- port to sl90
+- allow path for BUILD_RPMS
+- add BUILD_ARCH and autodetection
+- add --jobs and --target options
+
+-------------------------------------------------------------------
+Fri Aug 29 05:40:30 CEST 2003 - nashif@suse.de
+
+- fixed call for "head"
+
+-------------------------------------------------------------------
+Thu Aug  7 11:58:11 CEST 2003 - schwab@suse.de
+
+- Fix typo.
+
+-------------------------------------------------------------------
+Thu Aug  7 09:57:35 CEST 2003 - mmj@suse.de
+
+- Enhance build.1 a bit
+
+-------------------------------------------------------------------
+Sat Mar  8 08:11:29 CET 2003 - kukuk@suse.de
+
+- Fix build on 8.2 (coreutils) [Bug #24895]
+
+-------------------------------------------------------------------
+Fri Jan 31 19:58:17 CET 2003 - kukuk@suse.de
+
+- Fix build patch from bk.
+
+-------------------------------------------------------------------
+Wed Jan 29 14:08:09 CET 2003 - kukuk@suse.de
+
+- Add workaround for duplicate packages for different archs
+- Add support for upcoming 8.2
+
+-------------------------------------------------------------------
+Fri Oct  4 17:18:26 CEST 2002 - bk@suse.de
+
+- integrate 8.1 diff into tarball and update README
+- build.dif: init_buildsystem: add support for earlyer distributions
+
+-------------------------------------------------------------------
+Mon Sep  9 13:00:19 MEST 2002 - mls@suse.de
+
+- Adjust for SuSE Linux 8.1 again
+- Fix parameter parsing
+- Changed build to accept .src.rpm sources
+
+-------------------------------------------------------------------
+Mon Aug 19 11:14:50 CEST 2002 - kukuk@suse.de
+
+- Adjust for SuSE Linux 8.1
+
+-------------------------------------------------------------------
+Tue Jul 30 16:00:16 CEST 2002 - kukuk@suse.de
+
+- Fix get_version_number.sh
+
+-------------------------------------------------------------------
+Thu Jul 18 13:19:11 CEST 2002 - kukuk@suse.de
+
+- Don't create /etc/rc.config
+
+-------------------------------------------------------------------
+Wed Jul  3 09:48:44 CEST 2002 - kukuk@suse.de
+
+- Add default package list for new spec files without usedforbuild
+- Make it work with gcc 2.95 and gcc 3.1
+
+-------------------------------------------------------------------
+Thu Mar  7 16:58:21 CET 2002 - kukuk@suse.de
+
+- Fix build/init_buildsystem
+
+-------------------------------------------------------------------
+Mon Jan 14 16:38:56 CET 2002 - kukuk@suse.de
+
+- Add manual page from Gerd Knorr
+
+------------------------------------------------------------------
+Fri Dec 14 21:27:00 CET 2001 - kukuk@suse.de
+
+- Fix file list
+- Ignore new RPMs from pre-8.0 on 7.3
+
+------------------------------------------------------------------
+Fri Dec 14 15:49:38 CET 2001 - kukuk@suse.de
+
+- More fixes
+
+-------------------------------------------------------------------
+Tue Nov 27 16:10:57 CET 2001 - kukuk@suse.de
+
+- New build script which uses "usedforbuild"
+
+-------------------------------------------------------------------
+Thu Jan 18 13:11:25 CET 2001 - kukuk@suse.de
+
+- Update Readme and init_buildsystem for 7.1
+
+-------------------------------------------------------------------
+Thu Nov 30 18:09:49 CET 2000 - kukuk@suse.de
+
+- Update init_buildsystem, add README
+
+-------------------------------------------------------------------
+Wed Nov 15 18:07:58 CET 2000 - kukuk@suse.de
+
+- First version
+

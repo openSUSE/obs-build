@@ -1,0 +1,201 @@
+build (20160531) unstable; urgency=low
+
+  * Update to current git trunk
+    - add sles11sp2 build config and adapt autodetection
+
+ -- Michael Schroeder <mls@suse.de>  Mon, 10 Oct 2011 19:30:22 +0200
+
+build (2011.09.26-1) unstable; urgency=low
+
+  * Update to current git trunk
+
+ -- Adrian Schroeter <adrian@suse.de>  Fri, 01 Jul 2010 10:03:54 +0200
+
+build (2011.07.01-1) unstable; urgency=low
+
+  * Update to current git trunk
+
+ -- Adrian Schroeter <adrian@suse.de>  Fri, 01 Jul 2010 10:03:54 +0200
+
+build (2010.12.15-1) unstable; urgency=low
+
+  * Update to current git trunk
+    - support bsdtar for setting up build enviroment
+    - make expanddeps use the highest version of a package if multiple 
+      versions aver available in a repository [bnc#656599]
+
+ -- Michael Schroeder <mls@suse.de>  Wed, 15 Dec 2010 14:08:29 +0200
+
+build (2010.07.28-1) unstable; urgency=low
+
+  * Update to current git trunk
+    - document --repo and --dist
+    - update wiki links
+    - fix bugs in repo handling
+    - fix distribution autodetection code
+
+ -- Michael Schroeder <mls@suse.de>  Wed, 28 Jul 2010 12:46:52 +0200
+
+build (2010.07.08-1) unstable; urgency=low
+
+  * Update to current git trunk
+
+ -- Adrian Schroeter <adrian@suse.de>  Wed, 08 Jul 2010 10:03:54 +0200
+
+build (2010.06.29-1) unstable; urgency=low
+
+  * Update to current git trunk
+    - add 11.3 config
+    - fix repo creation in --noinit case
+    - support ovf files directly
+    - allow multiple --oldpackages
+    - delta rpm support
+
+ -- Adrian Schroeter <adrian@suse.de>  Tue, 29 Jun 2010 10:03:54 +0200
+
+build (2010.02.02-1) unstable; urgency=low
+
+  * Update to current git trunk
+    - Support new kiwi 4.1 schema files
+
+ -- Adrian Schroeter <adrian@suse.de>  Tue, 02 Feb 2010 10:03:54 +0200
+
+build (2009.09.23-1) unstable; urgency=low
+
+  * Update to current svn trunk
+
+ -- Michael Schroeder <mls@suse.de>  Wed, 23 Sep 2009 12:03:54 +0200
+
+build (2009.04.20-1) unstable; urgency=low
+
+  * Update to current svn trunk
+
+ -- Adrian Schroeter <adrian@suse.de>  Mon, 20 Feb 2009 08:27:13 +0200
+
+build (2009.02.20-1) unstable; urgency=low
+
+  * Fix kvm support together with Alexander
+  * Support for new disturl containing a complete pointer to build
+    service instance resource
+  * add support for package compare to allow Build Service to drop
+    same packages after build
+  * image repack support from Christoph
+
+ -- Adrian Schroeter <adrian@suse.de>  Fri, 20 Feb 2009 08:27:13 +0200
+
+build (2007.09.14-1) unstable; urgency=low
+
+  * update to 2173:
+    - add sl10.3 config [#310089]
+    - also look for BuildRequires in subpackage definitions [#305568]
+    - allow removal of more config parameters
+
+ -- Michael Schroeder <mls@suse.de>  Fri, 14 Sep 2007 18:27:13 +0200
+
+build (2007.08.02-1) unstable; urgency=low
+
+  * update to 1902:
+    - support 'order' config option
+    - support 'patterntype' config option
+    - new setdeps() method
+    - support for flexible query options
+    - support 'description' query
+    - fix bug in changelog2spec time cutoff
+    - make debtransform understand Debtransform-Tar/Debtransform-Files-Tar/
+      Debtransform-Series
+    - fix bug in substitutedeps
+
+ -- Michael Schroeder <mls@suse.de>  Thu, 2 Aug 2007 15:58:48 +0200
+
+build (2007.06.13-1) unstable; urgency=low
+
+  * update to 1727:
+    - implement rpm installation order calculation in perl
+    - make substitute code modify requires, too
+    - add filelist query support
+    - add prereq parsing support
+    - speed up version comparison a bit
+
+ -- Michael Schroeder <mls@suse.de>  Wed, 13 Jun 2007 17:18:17 +0100
+
+build (2007.05.10-1) unstable; urgency=low
+
+  * update to 1653:
+    - add _vendor to configs
+    - fix deban dependency compare
+    - allow not operator in configs
+    - fix build from source rpms
+
+ -- Michael Schroeder <mls@suse.de>  Thu, 10 May 2007 20:02:29 +0100
+
+build (2007.04.12-1) unstable; urgency=low
+
+  * update to 1575:
+    - add --root to rpm call in rpm to work around a bug in rpm [#255720]
+
+ -- Michael Schroeder <mls@suse.de>  Thu, 12 Apr 2007 16:22:51 +0100
+
+build (2007.04.05-1) unstable; urgency=low
+
+  * update to 1561:
+    - support architecture dependand requires in dsc files
+    - support "global" definitions for rpm
+    - support vminstall config option
+
+ -- Michael Schroeder <mls@suse.de>  Thu, 5 Apr 2007 16:01:51 +0100
+
+build (2007.03.12-1) unstable; urgency=low
+
+  * update to r1419:
+    - fix buildroot in debtransform call
+    - obey version numbers when expanding
+
+ -- Michael Schroeder <mls@suse.de>  Mon, 12 Mar 2007 15:42:48 +0100
+
+build (2007.03.02-1) unstable; urgency=low
+
+  * update
+    - transform suse changes file to rpm specfile format
+    - improved debian support
+
+ -- Michael Schroeder <mls@suse.de>  Fri, 2 Mar 2007 21:22:41 +0100
+
+build (2007.01.26-1) unstable; urgency=low
+
+  * update to r1114
+    - re-add the lost unrpm script
+    - make exclarch an array
+    - remount root rw in xen case, needed if root is not reiserfs
+    - add repotype/runscripts options
+    - remove devs in sl10.1/10.2
+    - fix boolean test to make "00" false like rpm does
+    - add rpm_verscmp for version comparison
+    - runscripts
+    - macro blocks
+    - read_config_dist
+    - useful xen exit status
+    - add --kill
+    - update 10.2 config
+    - extend spec/dsc parser
+    - fixed two bugs in the specfile parser
+
+ -- Peter Poeml <poeml@suse.de>  Fri, 26 Jan 2007 14:15:22 +0100
+
+build (2006.10.5-1) unstable; urgency=low
+
+  * update for fixed XEN build
+
+ -- Michael Schroeder <mls@suse.de>  Thu, 5 Oct 2006 10:58:42 +0200
+
+build (2006.8.10-1) unstable; urgency=low
+
+  * update for fixed XEN build and proc mounting
+
+ -- Adrian Schroeter <adrian@suse.de>  Thu, 10 Aug 2006 12:01:08 +0200
+
+build (2006.6.14-1) unstable; urgency=low
+
+  * Initial release based on build-2006.6.14-5.1.src.rpm
+
+ -- Rene Engelhard <rengelhard@suse.de>  Thu, 22 Jun 2006 12:01:08 +0200
+

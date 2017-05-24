@@ -1,0 +1,21 @@
+This package was debianized by Rene Engelhard <rengelhard@suse.de> on
+Thu, 22 Jun 2006 12:01:08 +0200.
+
+It was downloaded from http://software.opensuse.org/download/openSUSE:/Tools/SUSE_Linux_Factory/src
+
+Upstream authors: Thorsten Kukuk <kukuk@suse.de>
+                  Michael Schröter <mls@suse.de>
+		  Bernhard Kaindl <bk@suse.de>
+		  Mad Martin Jorgensen <mmj@suse.de>
+		  Andreas Schwab <schwab@suse.de>
+		  Rüdiger Oertel <ro@suse.de>
+		  Andreas Gruenbacher <agruen@suse.de>
+
+Copyright: (c) 1997-2007 SuSE GmbH Nuernberg, Germany
+
+License:
+
+GPL
+
+The Debian packaging is (C) 2006, Rene Engelhard <rengelhard@suse.de> and
+is licensed under the GPL, see `/usr/share/common-licenses/GPL'.
