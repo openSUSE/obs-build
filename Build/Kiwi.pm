@@ -182,19 +182,19 @@ sub kiwiparse {
     }
   }
 
-  # set default values for priority
+  my $packman = $preferences->[0]->{'packagemanager'}->[0]->{'_content'} || '';
+
+  # calculate priority for sorting
   for (@{$kiwi->{'repository'} || []}) {
-    next if defined $_->{'priority'};
-    if ($preferences->[0]->{'packagemanager'}->[0]->{'_content'} eq 'smart') {
-       $_->{'priority'} = 0;
-    } else {
-       $_->{'priority'} = 99;
+    $_->{'sortprio'} = 0;
+    if (defined($_->{'priority'})) {
+      $_->{'sortprio'} = $packman eq 'smart' ? $_->{'priority'} : 99 - $_->{'priority'};
     }
   }
-  my @repositories = sort {$a->{'priority'} <=> $b->{'priority'}} @{$kiwi->{'repository'} || []};
-  if ($preferences->[0]->{'packagemanager'}->[0]->{'_content'} eq 'smart') {
-    @repositories = reverse @repositories;
-  }
+
+  my @repositories = sort {$b->{'sortprio'} <=> $a->{'sortprio'}} @{$kiwi->{'repository'} || []};
+
+  my %repoprio;
   for my $repository (@repositories) {
     my $kiwisource = ($repository->{'source'} || [])->[0];
     next if $kiwisource->{'path'} eq '/var/lib/empty';	# grr
@@ -202,14 +202,15 @@ sub kiwiparse {
       push @repos, '_obsrepositories/';
       next;
     }
-    if ($kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
-      push @repos, "$1/$2";
+    my $prp;
+    if ($kiwisource->{'path'} =~ /^obs:\/{1,3}([^\/]+)\/([^\/]+)\/?$/) {
+      $prp = "$1/$2";
     } else {
-      my $prp;
       $prp = $urlmapper->($kiwisource->{'path'}) if $urlmapper;
       die("repo url not using obs:/ scheme: $kiwisource->{'path'}\n") unless $prp;
-      push @repos, $prp;
     }
+    push @repos, $prp;
+    $repoprio{$prp} = $repository->{'sortprio'} if defined $repository->{'priority'};
   }
 
   # Find packages and possible additional required architectures
@@ -283,7 +284,6 @@ sub kiwiparse {
   @requiredarch = unify(@requiredarch, @fallbackarchs);
 
   if (!$instsource) {
-    my $packman = $preferences->[0]->{'packagemanager'}->[0]->{'_content'};
     push @packages, "kiwi-packagemanager:$packman";
   } else {
     push @packages, "kiwi-packagemanager:instsource";
@@ -301,6 +301,7 @@ sub kiwiparse {
   for (@{$ret->{'path'}}) {
     my @s = split('/', $_, 2);
     $_ = {'project' => $s[0], 'repository' => $s[1]};
+    $_->{'priority'} = $repoprio{"$s[0]/$s[1]"} if defined $repoprio{"$s[0]/$s[1]"};
   }
   return $ret;
 }
