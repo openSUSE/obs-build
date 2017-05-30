@@ -36,6 +36,7 @@ BuildRequires:  build-mkbaselibs
 # Keep the following dependencies in sync with obs-worker package
 Requires:       bash
 Requires:       binutils
+Requires:       gnu_parallel
 Requires:       perl
 Requires:       tar
 %if 0%{?fedora}

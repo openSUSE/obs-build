@@ -1439,9 +1439,19 @@ if test -n "$RPMS" -a -d "$BUILD_ROOT/usr/lib/build/checks" ; then
     for SRPM in $BUILD_ROOT/$TOPDIR/SRPMS/*src.rpm ; do
 	test -f "$SRPM" && PNAME=`rpm --nodigest --nosignature -qp --qf "%{NAME}" $SRPM`
     done
-    for CHECKSCRIPT in $BUILD_ROOT/usr/lib/build/checks/* ; do
-	echo "... running ${CHECKSCRIPT##*/}"
-	$CHECKSCRIPT || cleanup_and_exit 1
+    declare -A check_script_schedule
+    for n in $BUILD_ROOT/usr/lib/build/checks/* ; do
+        if [[ "$n" =~ .*/([^-]+)-[^/]* ]]; then
+            check_script_schedule[${BASH_REMATCH[1]}]+=" $n"
+        else
+            cleanup_and_exit 1 "post-build check script name $n lacks a recognizable ordering prefix"
+        fi
+    done
+    indices=( ${!check_script_schedule[@]} )
+    IFS=$'\n' indices=( $(echo -e "${indices[@]/%/\\n}" | sed -r -e 's/^ *//' -e '/^$/d' | sort) )
+    for n in ${indices[@]}; do
+        eval scripts=( ${check_script_schedule[$n]} )
+        parallel --halt now,fail=1 'echo ... running $(basename {}); {}' ::: ${scripts[@]} || cleanup_and_exit 1
     done
     # workaround for broken 13.1 check scripts which umount /proc
     test -e "$BUILD_ROOT/proc/self" || mount -n -tproc none $BUILD_ROOT/proc
