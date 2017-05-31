@@ -62,6 +62,11 @@ vm_verify_options_kvm() {
     vm_kernel=
     vm_initrd=
     
+    # newer Ubuntu versions have only kvm executable
+    if test -x "/usr/bin/kvm" -a ! -x "$kvm_bin"; then
+	kvm_bin="/usr/bin/kvm"
+    fi
+
     # overwrite some options for specific host architectures
     case `uname -m` in
 	armv7l)
@@ -82,12 +87,12 @@ vm_verify_options_kvm() {
 	    vm_kernel=/boot/Image
 	    vm_initrd=/boot/initrd
             if test "${BUILD_ARCH#aarch}" != "$BUILD_ARCH" -o "${BUILD_ARCH#armv8}" != "$BUILD_ARCH"; then
-		kvm_options="-enable-kvm -cpu host "
+		kvm_options="-enable-kvm -cpu host"
 		test -e /boot/Image.guest && vm_kernel=/boot/Image.guest
 		test -e /boot/initrd.guest && vm_initrd=/boot/initrd.guest
 	    else
 		# Running an armv7 kernel on aarch64
-		kvm_options="-enable-kvm -cpu host,aarch64=off "
+		kvm_options="-enable-kvm -cpu host,aarch64=off"
 		# prefer the guest kernel/initrd
 		test -e /boot/Image.guest32 && vm_kernel=/boot/Image.guest32
 		test -e /boot/initrd.guest32 && vm_initrd=/boot/initrd.guest32
@@ -97,9 +102,9 @@ vm_verify_options_kvm() {
 		# We want to use the host gic version in order to make use
 		# of all available features (e.g. more than 8 CPUs) and avoid
 		# the emulation overhead of vGICv2 on a GICv3 host.
-		kvm_options+="-M virt,gic-version=host"
+		kvm_options="$kvm_options -M virt,gic-version=host"
 	    else
-		kvm_options+="-M virt"
+		kvm_options="$kvm_options -M virt"
 	    fi
 	    kvm_device=virtio-blk-device
 	    kvm_rng_device=virtio-rng-device
@@ -133,12 +138,6 @@ vm_verify_options_kvm() {
 	    kvm_device=virtio-blk-ccw
 	    kvm_serial_device=virtio-serial-ccw
 	    kvm_rng_device=virtio-rng-ccw
-	    ;;
-	*)
-	    # newer Ubuntu versions have only kvm executable
-	    if test -x "/usr/bin/kvm" -a ! -x "$kvm_bin"; then
-	        kvm_bin="/usr/bin/kvm"
-	    fi
 	    ;;
     esac
 
