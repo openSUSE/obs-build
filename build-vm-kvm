@@ -134,6 +134,12 @@ vm_verify_options_kvm() {
 	    kvm_serial_device=virtio-serial-ccw
 	    kvm_rng_device=virtio-rng-ccw
 	    ;;
+	*)
+	    # newer Ubuntu versions have only kvm executable
+	    if test -x "/usr/bin/kvm" -a ! -x "$kvm_bin"; then
+	        kvm_bin="/usr/bin/kvm"
+	    fi
+	    ;;
     esac
 
     # check if we can run kvm
