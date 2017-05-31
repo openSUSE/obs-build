@@ -29,7 +29,8 @@ eval { require YAML::XS; };
 sub parse {
   my ($cf, $fn) = @_;
 
-  my ($yaml) = YAML::XS::LoadFile($fn);
+  my $yaml;
+  eval {$yaml = YAML::XS::LoadFile($fn);};
   return {'error' => "Failed to parse yaml file"} unless $yaml;
 
   my $ret = {};
