@@ -25,7 +25,7 @@ use Build::SimpleXML;
 
 our $bootcallback;
 our $urlmapper;
-our $repopriorities = 0;
+our $repoextras = 0;	# priority, flags, ...
 
 sub unify {
   my %h = map {$_ => 1} @_;
@@ -298,7 +298,7 @@ sub kiwiparse {
   for (@{$ret->{'path'}}) {
     my @s = split('/', $_, 2);
     $_ = {'project' => $s[0], 'repository' => $s[1]};
-    $_->{'priority'} = $repoprio{"$s[0]/$s[1]"} if $repopriorities && defined $repoprio{"$s[0]/$s[1]"};
+    $_->{'priority'} = $repoprio{"$s[0]/$s[1]"} if $repoextras && defined $repoprio{"$s[0]/$s[1]"};
   }
   return $ret;
 }
