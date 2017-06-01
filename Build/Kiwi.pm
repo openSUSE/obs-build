@@ -87,6 +87,7 @@ sub kiwiparse {
   if ($preferences->[0]->{'version'}) {
     $ret->{'version'} = $preferences->[0]->{'version'}->[0]->{'_content'};
   }
+  my $containerconfig;
   for my $pref (@{$preferences || []}) {
     for my $type (@{$pref->{'type'} || []}) {
       next unless @{$pref->{'type'}} == 1 || !$type->{'optional'};
@@ -98,6 +99,7 @@ sub kiwiparse {
         # for kiwi 3.8 and before
         push @types, $type->{'_content'};
       }
+      $containerconfig = $type->{'containerconfig'}->[0] if $type->{'containerconfig'};
       if ($type->{'derived_from'}) {
 	my $derived = $type->{'derived_from'};
 	if ($derived =~ /^obs:\/{1,3}([^\/]+)\/([^\/]+)\/(.*)(?:#([^\#\/]+))$/) {
@@ -300,6 +302,10 @@ sub kiwiparse {
     $_ = {'project' => $s[0], 'repository' => $s[1]};
     $_->{'priority'} = $repoprio{"$s[0]/$s[1]"} if $repoextras && defined $repoprio{"$s[0]/$s[1]"};
   }
+  if (!$instsource && $containerconfig) {
+    $ret->{'container_name'} = $containerconfig->{'name'} if $containerconfig->{'name'};
+    $ret->{'container_tags'} = ref($containerconfig->{'tag'}) ? $containerconfig->{'tag'} : [ $containerconfig->{'tag'} ] if $containerconfig->{'tag'};
+  }
   return $ret;
 }
 
@@ -333,6 +339,24 @@ sub show {
   my $x = $d->{$field};
   $x = [ $x ] unless ref $x;
   print "@$x\n";
+}
+
+sub showcontainerinfo {
+  my ($fn, $image) = @ARGV;
+  local $urlmapper = sub { return $_[0] };
+  my $d = parse({}, $fn);
+  die("$d->{'error'}\n") if $d->{'error'};
+  die("not a container build\n") unless defined $d->{'container_name'};
+  print "{\n";
+  print "  \"name\": \"$d->{'container_name'}\",\n";
+  print "  \"version\": \"$d->{'version'}\",\n";
+  my @tags = map {"\"$_\""} @{$d->{'container_tags'} || []};
+  print "  \"tags\": [ ".join(', ', @tags)." ],\n" if @tags;
+  if ($image) {
+    $image =~ s/.*\///;
+    print "  \"file\": \"$image\",\n" if $image;
+  }
+  print "}\n";
 }
 
 # not implemented yet.
