@@ -44,8 +44,8 @@ sub parse {
   # Remove all whitespace from end of lines to make parsing easier
   $dockerfile_data =~ s/[^\S\n\r]+$//gm;
 
-  my @deps = ();
-  my @repos = ();
+  my @deps;
+  my @repos;
   my $pkg_string;
 
   # Match lines that start with "RUN" up to where the "RUN" command ends. It
@@ -76,13 +76,17 @@ sub parse {
     while ($run_command =~ /obs_pkg_mgr\s+add_repo\s+(.+?)\s+/g) {
       my $repo_url = $1;
       print "Converting repo to obs format: $repo_url\n";
-      # Convert string:/string2:/package to obs:/string:string2/package
-      if ($repo_url =~ /((?:[^\/]+:\/)*(?:[^\/]+?)\/([^\/]+\/?))$/) {
-        $repo_url = $1;
-        $repo_url =~ s/:\//:/;
-        push @repos, ("obs://$repo_url");
+      if ($Build::Kiwi::urlmapper) {
+	my $repo_prp = $Build::Kiwi::urlmapper->($repo_url);
+	return {'error' => "cannot map '$repo_url' to obs"} unless $repo_prp;
+	my ($projid, $repoid) = split('/', $repo_prp, 2);
+	push @repos, {'project' => $projid, 'repository' => $repoid};
       } else {
-        die "Format of additional repository not recognized";
+	# this is just for testing purposes...
+	$repo_url =~ s/^\/+$//;
+	$repo_url =~ s/:\//:/g;
+	my @repo_url = split('/', $repo_url);
+	push @repos, {'project' => $repo_url[-2], 'repository' => $repo_url[-1]} if @repo_url >= 2;
       }
     }
   }
