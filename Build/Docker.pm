@@ -100,6 +100,7 @@ sub parse {
   print STDERR "Repositories: @repos \n";
 
   my $ret = {};
+  $ret->{'name'} = 'docker';
   $ret->{'deps'} = \@deps;
   $ret->{'path'} = \@repos;
 
