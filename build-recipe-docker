@@ -1,0 +1,115 @@
+
+#################################################################
+#
+# Docker specific functions.
+#
+# Author: TODO
+#
+################################################################
+#
+# Copyright (c) 2017 SUSE Linux Products GmbH
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+recipe_setup_docker() {
+  TOPDIR="/docker"
+  mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
+  mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES/packages"
+
+  echo "Copying packages"
+  for package in $(find repos -name \*.rpm); do
+    cp $package "$BUILD_ROOT$TOPDIR/SOURCES/packages/"
+  done
+
+  # Exclude the "repos" directory which was handled above
+  find . -maxdepth 1 ! -name "repos" ! -name '.' -exec cp -rp -t $BUILD_ROOT$TOPDIR/SOURCES/ {} \+
+}
+
+recipe_prepare_docker() {
+    :
+}
+
+# Variables:
+# $BUILD_ROOT is the chroot
+# $TOPDIR/SOURCES includes the docker sources
+# $TOPDIR/$DOCKERIMAGE_ROOT where docker will be called
+# $RECIPEFILE the name of the Dockerfile
+
+recipe_build_docker() {
+    echo "Starting docker service"
+    systemctl start docker
+
+    # The tarball should be a "docker load" compatible image (not a filesystem one).
+    # Make sure it is generated using "docker save".
+    # This means the repository and tag are automatically generated (they are
+    # included in the tarball).
+    echo "Loading images to docker from /var/lib/docker_base_images"
+    for image in /var/lib/docker_base_images/*; do
+      echo "Loading '$image' in docker"
+      docker load --input $image
+    done
+
+    # Start the local zypper repository
+    # TODO [TBD] Should we inject the OBS_REPOSITORY_URL in the Dockerfile as described in
+    # the following link or is this a user's responsibility?
+    #  https://github.com/SUSE/cloudfoundry/blob/NativeDockerInOBS_research_results/NativeDockerInOBS.md
+    # TODO [TBD] What about SLES? Are dependencies fetched automatically from osc/OBS?
+    #  What about registration?
+
+    # This is where we copied the downloaded dependencies in the setup method above.
+    REPOPATH=$BUILD_ROOT$TOPDIR/SOURCES/packages
+    # Prepare the zypper repository
+    # TODO: Handle other distribution repositories as well (deb, arch etc)
+    createrepo  $REPOPATH
+    pushd $REPOPATH > /dev/null
+    # TODO Add Python as a default building dependency.
+    python -m SimpleHTTPServer 8080 &
+    HTTP_SERVER_PID=$!
+    popd > /dev/null
+
+    # Build the repository url
+    # TODO: "/bin/ip" comes from iproute2 package on openSUSE. Is that always
+    # available in the building machine? Consider adding it as a default building
+    # dependency (like the python above).
+    default_interface=$(ip route list | grep default | cut -d' ' -f5)
+    interface_ip=$(ip addr show $default_interface | grep "inet " | tr -s " " | cut -d' ' -f3 | cut -d'/' -f1)
+    REPO_URL=http://$interface_ip:8080/
+
+    # TODO Use the TAG file to read the desired tag or use a no tag otherwise
+    # Also, use the package name as the name of the image.
+    echo "Building image"
+    docker build -t obs_image --build-arg obs_repository_url=$REPO_URL $BUILD_ROOT$TOPDIR/SOURCES/
+
+    # Save the resulting image to a tarball.
+    mkdir $BUILD_ROOT$TOPDIR/DOCKER/
+    docker save --output $BUILD_ROOT$TOPDIR/DOCKER/obs_image.tar obs_image
+
+    echo "Stopping local repository server"
+    kill $HTTP_SERVER_PID
+    kill $(pidof dockerd)
+
+    BUILD_SUCCEEDED=true
+}
+
+recipe_resultdirs_docker() {
+    # TODO: Implement this to copy the results outside a VM
+    :
+}
+
+# Local Variables:
+# mode: Shell-script
+# End:

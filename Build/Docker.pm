@@ -28,7 +28,7 @@
 # - build the Dockerfile
 # - export the image tarball [OPTIONAL]
 
-package Build::Dockerimage;
+package Build::Docker;
 
 use strict;
 
@@ -37,7 +37,7 @@ sub parse {
 
   # Perl slurp mode
   local $/=undef;
-  open DOCKERFILE, $fn or die "Couldn't open Dockefile";
+  open DOCKERFILE, $fn or die "Couldn't open Dockerfile";
   my $dockerfile_data = <DOCKERFILE>;
   close DOCKERFILE;
 
@@ -45,32 +45,59 @@ sub parse {
   $dockerfile_data =~ s/[^\S\n\r]+$//gm;
 
   my @deps = ();
+  my @repos = ();
   my $pkg_string;
 
-  # Match from start of line until an end of line which doesn't have a backslash
-  # as the last character (Negative lookbehind).
-  # That would mean, continue to the next line. E.g.
-  # RUN obs_install package1 package2 \
+  # Match lines that start with "RUN" up to where the "RUN" command ends. It
+  # might span multiple lines if "\" is used (handled with negative lookbehind).
+  # E.g.
+  # RUN obs_pkg_mgr install package1 package2 \
   #   package3
-  while ($dockerfile_data =~ /^\s*RUN\s+obs_install\s+((.|\n|\r)*?)(?<!\\)$/gm) {
-    $pkg_string = $1;
+  while ($dockerfile_data =~ /(^\s*RUN(?:.|\n|\r)*?(?<!\\)$)/gm) {
+    my $run_command = $1;
 
-    # Remove the Dockerfile escape character and merge multiple lines in one
-    $pkg_string =~ s/\\(\n|\r)*//gm;
+    # Remove the Dockerfile escape character and merge multiple lines in one.
+    $run_command =~ s/\\(\n|\r)*//gm;
 
-    # Make sure we only match obs_install arguments and not any commands that
-    # follow. E.g.
-    # RUN obs_install vim && do_something_else
-    $pkg_string =~ s/(.*?)[;&].*/$1/;
+    # Match all obs_pkg_mgr commands up to the next command.
+    # A command stops at [;&#] or end of line. E.g.
+    #  RUN obs_pkg_mgr install one \
+    #   two && ls ; obs_pkg_mgr install three
+    while ($run_command =~ /obs_pkg_mgr\s+install\s+(.*?)(?:[;&]|(?:\s+#)|$)/g) {
+      $pkg_string = $1;
+      my @packages = split(/\s+/, $pkg_string);
+      if (0+@packages != 0) { push @deps, @packages; }
+    }
 
-    my @packages = split(/\s+/, $pkg_string);
-    if (0+@packages != 0) { push @deps, @packages; }
+    # Supported command:
+    # RUN obs_pkg_mgr add_repo http://download.opensuse.org/repositories/Virtualization:/containers/openSUSE_Leap_42.2/ "Virtualization:Containers (openSUSE_Leap_42.2)"
+    # Adds this to @repos:
+    # "obs://Virtualization:containers/openSUSE_Leap_42.2/"
+    while ($run_command =~ /obs_pkg_mgr\s+add_repo\s+(.+?)\s+/g) {
+      my $repo_url = $1;
+      print "Converting repo to obs format: $repo_url\n";
+      # Convert string:/string2:/package to obs:/string:string2/package
+      if ($repo_url =~ /((?:[^\/]+:\/)*(?:[^\/]+?)\/([^\/]+\/?))$/) {
+        $repo_url = $1;
+        $repo_url =~ s/:\//:/;
+        push @repos, ("obs://$repo_url");
+      } else {
+        die "Format of additional repository not recognized";
+      }
+    }
+  }
+
+  # Find the base image to add it to dependencies
+  if ($dockerfile_data =~ /^\s*FROM\s+(.*)$/gm) {
+    push @deps, ("container://$1");
   }
 
   print STDERR "Dependencies: @deps \n";
+  print STDERR "Repositories: @repos \n";
 
   my $ret = {};
   $ret->{'deps'} = \@deps;
+  $ret->{'path'} = \@repos;
 
   return $ret;
 }
