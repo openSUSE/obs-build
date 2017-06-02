@@ -347,16 +347,14 @@ sub showcontainerinfo {
   my $d = parse({}, $fn);
   die("$d->{'error'}\n") if $d->{'error'};
   die("not a container build\n") unless defined $d->{'container_name'};
-  print "{\n";
-  print "  \"name\": \"$d->{'container_name'}\",\n";
-  print "  \"version\": \"$d->{'version'}\",\n";
+  $image =~ s/.*\/// if defined $image;
   my @tags = map {"\"$_\""} @{$d->{'container_tags'} || []};
-  print "  \"tags\": [ ".join(', ', @tags)." ],\n" if @tags;
-  if ($image) {
-    $image =~ s/.*\///;
-    print "  \"file\": \"$image\",\n" if $image;
-  }
-  print "}\n";
+  print "{\n";
+  print "  \"name\": \"$d->{'container_name'}\"";
+  print ",\n  \"version\": \"$d->{'version'}\"" if defined $d->{'version'};
+  print ",\n  \"tags\": [ ".join(', ', @tags)." ]" if @tags;
+  print ",\n  \"file\": \"$image\"" if defined $image;
+  print "\n}\n";
 }
 
 # not implemented yet.
