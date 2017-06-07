@@ -296,15 +296,15 @@ sub kiwiparse {
   $ret->{'badarch'} = [ unify(@badarch) ] if @badarch;
   $ret->{'deps'} = [ unify(@packages) ];
   $ret->{'path'} = [ unify(@repos, @bootrepos) ];
-  $ret->{'containerpath'} = [ unify(@containerrepos) ];
+  $ret->{'containerpath'} = [ unify(@containerrepos) ] if @containerrepos;
   $ret->{'imagetype'} = [ unify(@types) ];
   $ret->{'extrasource'} = \@extrasources if @extrasources;
-  for (@{$ret->{'path'}}) {
+  for (@{$ret->{'path'} || []}) {
     my @s = split('/', $_, 2);
     $_ = {'project' => $s[0], 'repository' => $s[1]};
     $_->{'priority'} = $repoprio{"$s[0]/$s[1]"} if $repoextras && defined $repoprio{"$s[0]/$s[1]"};
   }
-  for (@{$ret->{'containerpath'}}) {
+  for (@{$ret->{'containerpath'} || []}) {
     my @s = split('/', $_, 2);
     $_ = {'project' => $s[0], 'repository' => $s[1]};
   }
