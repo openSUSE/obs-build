@@ -304,6 +304,11 @@ sub kiwiparse {
     $_ = {'project' => $s[0], 'repository' => $s[1]};
     $_->{'priority'} = $repoprio{"$s[0]/$s[1]"} if $repoextras && defined $repoprio{"$s[0]/$s[1]"};
   }
+  for (@{$ret->{'containerpath'}}) {
+    my @s = split('/', $_, 2);
+    $_ = {'project' => $s[0], 'repository' => $s[1]};
+    $_->{'priority'} = $repoprio{"$s[0]/$s[1]"} if $repoextras && defined $repoprio{"$s[0]/$s[1]"};
+  }
   if (!$instsource && $containerconfig) {
     $ret->{'container_name'} = $containerconfig->{'name'} if $containerconfig->{'name'};
     $ret->{'container_tags'} = ref($containerconfig->{'tag'}) ? $containerconfig->{'tag'} : [ $containerconfig->{'tag'} ] if $containerconfig->{'tag'};
