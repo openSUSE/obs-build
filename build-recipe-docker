@@ -78,7 +78,6 @@ recipe_build_docker() {
     pushd $REPOPATH > /dev/null
     # TODO Add Python as a default building dependency.
     python -m SimpleHTTPServer 8080 &
-    HTTP_SERVER_PID=$!
     popd > /dev/null
 
     # Build the repository url
@@ -128,7 +127,8 @@ containerinfo
 
 cleanup_build_processes() {
   echo "Stopping local repository server"
-  kill $HTTP_SERVER_PID
+  kill $(pgrep -f "python -m SimpleHTTPServer 8080")
+  echo "Stopping the docker daemon"
   kill $(pidof dockerd)
 }
 
