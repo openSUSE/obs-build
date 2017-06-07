@@ -63,6 +63,7 @@ sub kiwiparse {
   my @types;
   my @repos;
   my @bootrepos;
+  my @containerrepos;
   my @packages;
   my @extrasources;
   my @requiredarch;
@@ -104,10 +105,11 @@ sub kiwiparse {
 	my $derived = $type->{'derived_from'};
 	if ($derived =~ /^obs:\/{1,3}([^\/]+)\/([^\/]+)\/(.*)(?:#([^\#\/]+))$/) {
 	  my $name = defined($4) ? "$3:$4" : "$3";
-	  push @packages, "container:$1/$2/$name";
+	  push @packages, "container:$name";
+	  push @containerrepos, "$1/$2";
 	} elsif ($derived =~ /^obsrepositories:\/{1,3}([^\/].*)(?:#([^\#\/]+))$/) {
 	  my $name = defined($2) ? "$1:$2" : "$1";
-	  push @packages, "container:_obsrepositories//$name";
+	  push @packages, "container:$name";
 	} elsif ($derived !~ /^file:/ && $derived =~ /^(.*)\/([^\/]+)(?:#([^\#\/]+))$/) {
 	  my $url = $1;
 	  my $name = defined($3) ? "$2:$3" : "$2";
@@ -295,6 +297,7 @@ sub kiwiparse {
   $ret->{'badarch'} = [ unify(@badarch) ] if @badarch;
   $ret->{'deps'} = [ unify(@packages) ];
   $ret->{'path'} = [ unify(@repos, @bootrepos) ];
+  $ret->{'containerpath'} = [ unify(@containerrepos) ];
   $ret->{'imagetype'} = [ unify(@types) ];
   $ret->{'extrasource'} = \@extrasources if @extrasources;
   for (@{$ret->{'path'}}) {
