@@ -529,9 +529,10 @@ sub get_build {
     my $err = expandpreinstalls($config);
     return (undef, $err) if $err;
   }
-  if ($config->{'type'} eq 'livebuild') {
-    push @deps, @{$config->{'substitute'}->{'build-packages:livebuild'}
-		  || $subst_defaults{'build-packages:livebuild'} || []};
+  my $buildtype = $config->{'type'} || '';
+  if ($buildtype eq 'livebuild' || $buildtype eq 'docker' || $buildtype eq 'kiwi') {
+    push @deps, @{$config->{'substitute'}->{"build-packages:$buildtype"}
+		  || $subst_defaults{"build-packages:$buildtype"} || []};
   }
   my @ndeps = grep {/^-/} @deps;
   my %ndeps = map {$_ => 1} @ndeps;
