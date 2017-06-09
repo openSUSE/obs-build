@@ -106,22 +106,22 @@ recipe_build_docker() {
       exit 1
     fi
 
-    VERSION=$TAG
-    FILENAME="$IMAGE_NAME.tar"
+    # Use tag to generate the filename for the image
+    FILENAME="$IMAGE_NAME:$TAG"
+    FILENAME="${FILENAME//[\/:]/-}"
 
     echo "Building image"
     docker build -t $IMAGE_NAME:$TAG --build-arg obs_repository_url=$REPO_URL $BUILD_ROOT$TOPDIR/SOURCES/
 
     # Save the resulting image to a tarball.
-    mkdir -p $BUILD_ROOT$TOPDIR/DOCKER/
-    docker save --output $BUILD_ROOT$TOPDIR/DOCKER/$FILENAME $IMAGE_NAME:$TAG
+    mkdir -p $BUILD_ROOT$TOPDIR/DOCKER
+    docker save --output $BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.tar $IMAGE_NAME:$TAG
 
-cat > $BUILD_ROOT$TOPDIR/DOCKER/$IMAGE_NAME.containerinfo <<containerinfo
+cat > $BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo <<containerinfo
 {
-  "name": "$IMAGE_NAME",
-  "version": "$TAG",
-  "tags": [ "$TAG" ],
-  "file": "$FILENAME",
+  "name": "$FILENAME",
+  "tags": [ "$IMAGE_NAME:$TAG" ],
+  "file": "$FILENAME.tar",
 }
 containerinfo
 
@@ -131,15 +131,14 @@ containerinfo
 }
 
 cleanup_build_processes() {
-  echo "Stopping local repository server"
-  kill $(pgrep -f "python -m SimpleHTTPServer 8080")
-  echo "Stopping the docker daemon"
-  kill $(pidof dockerd)
+    echo "Stopping local repository server"
+    kill $(pgrep -f "python -m SimpleHTTPServer 8080")
+    echo "Stopping the docker daemon"
+    kill $(pidof dockerd)
 }
 
 recipe_resultdirs_docker() {
-    # TODO: Implement this to copy the results outside a VM
-    :
+    echo DOCKER
 }
 
 # Local Variables:
