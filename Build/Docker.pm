@@ -96,9 +96,6 @@ sub parse {
     push @deps, ("container:$1");
   }
 
-  print STDERR "Dependencies: @deps \n";
-  print STDERR "Repositories: @repos \n";
-
   my $ret = {};
   $ret->{'name'} = 'docker';
   $ret->{'deps'} = \@deps;

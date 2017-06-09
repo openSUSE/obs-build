@@ -53,15 +53,20 @@ recipe_build_docker() {
     echo "Starting docker service"
     systemctl start docker
 
-    # The tarball should be a "docker load" compatible image (not a filesystem one).
-    # Make sure it is generated using "docker save".
-    # This means the repository and tag are automatically generated (they are
-    # included in the tarball).
-    echo "Loading images to docker from /var/lib/docker_base_images"
-    for image in /var/lib/docker_base_images/*; do
-      echo "Loading '$image' in docker"
-      docker load --input $image
-    done
+    echo "Loading base image"
+    base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|xz).{0,4}$" -print -quit)
+
+    # Inspect the content of the image to decide if this is a layered image
+    # or a filesystem one. We need to know if we will "docker load" it or
+    # "docker import" it.
+    if tar -tf $base_image_path | grep "^manifest.json" -q; then
+      echo "Layered image found"
+      docker load --input $base_image_path
+    else
+      echo "Filesystem image found"
+      desired_tag=$(grep "^\s*FROM" Dockerfile | cut -d" " -f2)
+      docker import $base_image_path $desired_tag
+    fi
 
     # Start the local zypper repository
     # TODO [TBD] Should we inject the OBS_REPOSITORY_URL in the Dockerfile as described in
@@ -95,7 +100,7 @@ recipe_build_docker() {
     docker build -t obs_image --build-arg obs_repository_url=$REPO_URL $BUILD_ROOT$TOPDIR/SOURCES/
 
     # Save the resulting image to a tarball.
-    mkdir $BUILD_ROOT$TOPDIR/DOCKER/
+    mkdir -p $BUILD_ROOT$TOPDIR/DOCKER/
     docker save --output $BUILD_ROOT$TOPDIR/DOCKER/obs_image.tar obs_image
 
     echo "Stopping local repository server"
