@@ -83,7 +83,6 @@ recipe_build_docker() {
     pushd $REPOPATH > /dev/null
     # TODO Add Python as a default building dependency.
     python -m SimpleHTTPServer 8080 &
-    HTTP_SERVER_PID=$!
     popd > /dev/null
 
     # Build the repository url
@@ -94,20 +93,48 @@ recipe_build_docker() {
     interface_ip=$(ip addr show $default_interface | grep "inet " | tr -s " " | cut -d' ' -f3 | cut -d'/' -f1)
     REPO_URL=http://$interface_ip:8080/
 
-    # TODO Use the TAG file to read the desired tag or use a no tag otherwise
-    # Also, use the package name as the name of the image.
+    # Create the needed file to publish the generated image
+    if [ -f "TAG" ] && [ $(cat TAG | grep ":") ]; then
+      IMAGE_NAME=$(cat TAG | cut -d":" -f1)
+      TAG=$(cat TAG | cut -d":" -f2)
+    fi
+
+    if [ -z "$IMAGE_NAME" ] || [ -z "$TAG" ]; then
+      echo "TAG file missing of contents invalid (use image_name:tag format)"
+      cleanup_build_processes
+      BUILD_SUCCEEDED=false
+      exit 1
+    fi
+
+    VERSION=$TAG
+    FILENAME="$IMAGE_NAME.tar"
+
     echo "Building image"
-    docker build -t obs_image --build-arg obs_repository_url=$REPO_URL $BUILD_ROOT$TOPDIR/SOURCES/
+    docker build -t $IMAGE_NAME:$TAG --build-arg obs_repository_url=$REPO_URL $BUILD_ROOT$TOPDIR/SOURCES/
 
     # Save the resulting image to a tarball.
     mkdir -p $BUILD_ROOT$TOPDIR/DOCKER/
-    docker save --output $BUILD_ROOT$TOPDIR/DOCKER/obs_image.tar obs_image
+    docker save --output $BUILD_ROOT$TOPDIR/DOCKER/$FILENAME $IMAGE_NAME:$TAG
 
-    echo "Stopping local repository server"
-    kill $HTTP_SERVER_PID
-    kill $(pidof dockerd)
+cat > $BUILD_ROOT$TOPDIR/DOCKER/$IMAGE_NAME.containerinfo <<containerinfo
+{
+  "name": "$IMAGE_NAME",
+  "version": "$TAG",
+  "tags": [ "$TAG" ],
+  "file": "$FILENAME",
+}
+containerinfo
+
+    cleanup_build_processes
 
     BUILD_SUCCEEDED=true
+}
+
+cleanup_build_processes() {
+  echo "Stopping local repository server"
+  kill $(pgrep -f "python -m SimpleHTTPServer 8080")
+  echo "Stopping the docker daemon"
+  kill $(pidof dockerd)
 }
 
 recipe_resultdirs_docker() {
