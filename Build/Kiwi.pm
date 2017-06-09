@@ -78,9 +78,10 @@ sub kiwiparse {
   die("not a kiwi config\n") unless $kiwi && $kiwi->{'image'};
   $kiwi = $kiwi->{'image'}->[0];
   $schemaversion = versionstring($kiwi->{'schemaversion'}) if $kiwi->{'schemaversion'}; 
+  $ret->{'name'} = $kiwi->{'name'} if $kiwi->{'name'};
   $ret->{'filename'} = $kiwi->{'name'} if $kiwi->{'name'};
   my $description = (($kiwi->{'description'} || [])->[0]) || {};
-  if ($description->{'specification'}) {
+  if (!$ret->{'name'} && $description->{'specification'}) {
     $ret->{'name'} = $description->{'specification'}->[0]->{'_content'};
   }
   # take default version setting
@@ -309,8 +310,17 @@ sub kiwiparse {
     $_ = {'project' => $s[0], 'repository' => $s[1]};
   }
   if (!$instsource && $containerconfig) {
-    $ret->{'container_name'} = $containerconfig->{'name'} if $containerconfig->{'name'};
-    $ret->{'container_tags'} = ref($containerconfig->{'tag'}) ? $containerconfig->{'tag'} : [ $containerconfig->{'tag'} ] if $containerconfig->{'tag'};
+    my $containername = $containerconfig->{'name'};
+    my $containertags = $containerconfig->{'tag'};
+    $containertags = [ $containertags ] if defined($containertags) && !ref($containertags);
+    if ($containertags && defined($containername)) {
+      for (@$containertags) {
+	$_ = "$containername:$_" unless /:/;
+      }
+    }
+    $containertags = undef if $containertags && !@$containertags;
+    $containertags = [ "$containername:latest" ] if defined($containername) && !$containertags;
+    $ret->{'container_tags'} = $containertags if $containertags;
   }
   return $ret;
 }
@@ -352,11 +362,10 @@ sub showcontainerinfo {
   local $urlmapper = sub { return $_[0] };
   my $d = parse({}, $fn);
   die("$d->{'error'}\n") if $d->{'error'};
-  die("not a container build\n") unless defined $d->{'container_name'};
   $image =~ s/.*\/// if defined $image;
   my @tags = map {"\"$_\""} @{$d->{'container_tags'} || []};
   print "{\n";
-  print "  \"name\": \"$d->{'container_name'}\"";
+  print "  \"name\": \"$d->{'name'}\"";
   print ",\n  \"version\": \"$d->{'version'}\"" if defined $d->{'version'};
   print ",\n  \"tags\": [ ".join(', ', @tags)." ]" if @tags;
   print ",\n  \"file\": \"$image\"" if defined $image;
