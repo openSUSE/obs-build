@@ -139,7 +139,7 @@ recipe_build_docker() {
 {
   "name": "$FILENAME",
   "tags": [ "$IMAGE_NAME:$TAG" ],
-  "file": "$FILENAME.tar",
+  "file": "$FILENAME.tar"
 }
 containerinfo
 
