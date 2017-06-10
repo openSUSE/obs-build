@@ -50,8 +50,21 @@ recipe_prepare_docker() {
 # $RECIPEFILE the name of the Dockerfile
 
 recipe_build_docker() {
-    echo "Starting docker service"
-    systemctl start docker
+    #systemctl start docker
+    echo "Starting container daemon"
+    /usr/sbin/containerd --listen unix:///run/containerd/containerd.sock &
+    echo "Starting docker daemon"
+    /usr/bin/dockerd --containerd /run/containerd/containerd.sock --add-runtime oci=/usr/bin/docker-runc -D &
+    echo "Waiting for docker daemon to start"
+    for i in 1 2 3 4 5 6 7 8 9 10 ;do
+        docker version && break
+        sleep 1
+    done
+    if ! docker version >/dev/null 2>&1 ;then
+        echo  "Docker is dead"
+        cleanup_and_exit 1
+    fi
+
 
     echo "Loading base image"
     base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|xz).{0,4}$" -print -quit)
@@ -95,15 +108,15 @@ recipe_build_docker() {
 
     # Create the needed file to publish the generated image
     if [ -f "TAG" ] && [ $(cat TAG | grep ":") ]; then
-      IMAGE_NAME=$(cat TAG | cut -d":" -f1)
-      TAG=$(cat TAG | cut -d":" -f2)
+        IMAGE_NAME=$(cat TAG | cut -d":" -f1)
+        TAG=$(cat TAG | cut -d":" -f2)
     fi
 
     if [ -z "$IMAGE_NAME" ] || [ -z "$TAG" ]; then
-      echo "TAG file missing of contents invalid (use image_name:tag format)"
-      cleanup_build_processes
-      BUILD_SUCCEEDED=false
-      exit 1
+        echo "TAG file missing of contents invalid (use image_name:tag format)"
+        cleanup_build_processes
+        BUILD_SUCCEEDED=false
+        return
     fi
 
     # Use tag to generate the filename for the image
@@ -111,13 +124,22 @@ recipe_build_docker() {
     FILENAME="${FILENAME//[\/:]/-}"
 
     echo "Building image"
-    docker build -t $IMAGE_NAME:$TAG --build-arg obs_repository_url=$REPO_URL $BUILD_ROOT$TOPDIR/SOURCES/
+    if ! docker build -t $IMAGE_NAME:$TAG --build-arg obs_repository_url=$REPO_URL $BUILD_ROOT$TOPDIR/SOURCES/ ; then
+        cleanup_build_processes
+        BUILD_SUCCEEDED=false
+        return
+    fi
 
     # Save the resulting image to a tarball.
     mkdir -p $BUILD_ROOT$TOPDIR/DOCKER
-    docker save --output $BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.tar $IMAGE_NAME:$TAG
+    if ! docker save --output $BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.tar $IMAGE_NAME:$TAG ; then
+        cleanup_build_processes
+        BUILD_SUCCEEDED=false
+        return
+    fi
+    
 
-cat > $BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo <<containerinfo
+    cat > $BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo <<containerinfo
 {
   "name": "$FILENAME",
   "tags": [ "$IMAGE_NAME:$TAG" ],
@@ -135,6 +157,7 @@ cleanup_build_processes() {
     kill $(pgrep -f "python -m SimpleHTTPServer 8080")
     echo "Stopping the docker daemon"
     kill $(pidof dockerd)
+    kill $(pidof containerd)
 }
 
 recipe_resultdirs_docker() {
