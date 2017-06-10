@@ -50,6 +50,9 @@ recipe_prepare_docker() {
 # $RECIPEFILE the name of the Dockerfile
 
 recipe_build_docker() {
+    touch $BUILD_ROOT/etc/resolv.conf
+    chmod 755 $BUILD_ROOT/$TOPDIR/SOURCES/obs_pkg_mgr
+
     echo "Starting container daemon"
     chroot $BUILD_ROOT /usr/sbin/containerd --listen unix:///run/containerd/containerd.sock &
     echo "Starting docker daemon"
@@ -63,7 +66,6 @@ recipe_build_docker() {
         echo  "Docker is dead"
         cleanup_and_exit 1
     fi
-
 
     echo "Loading base image"
     base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|xz).{0,4}$" -print -quit)
