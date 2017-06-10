@@ -26,17 +26,17 @@
 ################################################################
 
 recipe_setup_docker() {
-  TOPDIR="/docker"
-  mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
-  mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES/packages"
+    TOPDIR="/usr/src/packages"
+    mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
+    mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES/packages"
 
-  echo "Copying packages"
-  for package in $(find repos -name \*.rpm); do
-    cp $package "$BUILD_ROOT$TOPDIR/SOURCES/packages/"
-  done
+    echo "Copying packages"
+    for package in $(find repos -name \*.rpm); do
+        cp $package "$BUILD_ROOT$TOPDIR/SOURCES/packages/"
+    done
 
-  # Exclude the "repos" directory which was handled above
-  find . -maxdepth 1 ! -name "repos" ! -name '.' -exec cp -rp -t $BUILD_ROOT$TOPDIR/SOURCES/ {} \+
+    # Exclude the "repos" directory which was handled above
+    find . -maxdepth 1 ! -name "repos" ! -name '.' -exec cp -rp -t $BUILD_ROOT$TOPDIR/SOURCES/ {} \+
 }
 
 recipe_prepare_docker() {
@@ -50,17 +50,16 @@ recipe_prepare_docker() {
 # $RECIPEFILE the name of the Dockerfile
 
 recipe_build_docker() {
-    #systemctl start docker
     echo "Starting container daemon"
-    /usr/sbin/containerd --listen unix:///run/containerd/containerd.sock &
+    chroot $BUILD_ROOT /usr/sbin/containerd --listen unix:///run/containerd/containerd.sock &
     echo "Starting docker daemon"
-    /usr/bin/dockerd --containerd /run/containerd/containerd.sock --add-runtime oci=/usr/bin/docker-runc -D &
+    chroot $BUILD_ROOT /usr/bin/dockerd --containerd /run/containerd/containerd.sock --add-runtime oci=/usr/bin/docker-runc &
     echo "Waiting for docker daemon to start"
-    for i in 1 2 3 4 5 6 7 8 9 10 ;do
-        docker version && break
+    for i in 1 2 3 4 5 6 7 8 9 10 ; do
+        chroot $BUILD_ROOT docker version >/dev/null 2>&1 && break
         sleep 1
     done
-    if ! docker version >/dev/null 2>&1 ;then
+    if ! chroot $BUILD_ROOT docker version >/dev/null 2>&1 ; then
         echo  "Docker is dead"
         cleanup_and_exit 1
     fi
@@ -73,12 +72,12 @@ recipe_build_docker() {
     # or a filesystem one. We need to know if we will "docker load" it or
     # "docker import" it.
     if tar -tf $base_image_path | grep "^manifest.json" -q; then
-      echo "Layered image found"
-      docker load --input $base_image_path
+        echo "Layered image found"
+        chroot $BUILD_ROOT docker load --input $TOPDIR/SOURCES/$base_image_path
     else
-      echo "Filesystem image found"
-      desired_tag=$(grep "^\s*FROM" Dockerfile | cut -d" " -f2)
-      docker import $base_image_path $desired_tag
+        echo "Filesystem image found"
+        desired_tag=$(grep "^\s*FROM" Dockerfile | cut -d" " -f2)
+        chroot $BUILD_ROOT docker import $TOPDIR/SOURCES/$base_image_path $desired_tag
     fi
 
     # Start the local zypper repository
@@ -89,22 +88,15 @@ recipe_build_docker() {
     #  What about registration?
 
     # This is where we copied the downloaded dependencies in the setup method above.
-    REPOPATH=$BUILD_ROOT$TOPDIR/SOURCES/packages
+    REPOPATH=$TOPDIR/SOURCES/packages
     # Prepare the zypper repository
     # TODO: Handle other distribution repositories as well (deb, arch etc)
-    createrepo  $REPOPATH
-    pushd $REPOPATH > /dev/null
+    chroot $BUILD_ROOT createrepo $REPOPATH > /dev/null
     # TODO Add Python as a default building dependency.
-    python -m SimpleHTTPServer 8080 &
-    popd > /dev/null
+    chroot $BUILD_ROOT bash -c "cd $REPOPATH && python -m SimpleHTTPServer 8080 &"
 
     # Build the repository url
-    # TODO: "/bin/ip" comes from iproute2 package on openSUSE. Is that always
-    # available in the building machine? Consider adding it as a default building
-    # dependency (like the python above).
-    default_interface=$(ip route list | grep default | cut -d' ' -f5)
-    interface_ip=$(ip addr show $default_interface | grep "inet " | tr -s " " | cut -d' ' -f3 | cut -d'/' -f1)
-    REPO_URL=http://$interface_ip:8080/
+    REPO_URL=http://127.0.0.1:8080/
 
     # Create the needed file to publish the generated image
     if [ -f "TAG" ] && [ $(cat TAG | grep ":") ]; then
@@ -124,7 +116,8 @@ recipe_build_docker() {
     FILENAME="${FILENAME//[\/:]/-}"
 
     echo "Building image"
-    if ! docker build -t $IMAGE_NAME:$TAG --build-arg obs_repository_url=$REPO_URL $BUILD_ROOT$TOPDIR/SOURCES/ ; then
+    if ! chroot $BUILD_ROOT docker build -t "$IMAGE_NAME:$TAG" --build-arg obs_repository_url=$REPO_URL $TOPDIR/SOURCES/ ; then
+        echo "Docker build command failed"
         cleanup_build_processes
         BUILD_SUCCEEDED=false
         return
@@ -132,7 +125,8 @@ recipe_build_docker() {
 
     # Save the resulting image to a tarball.
     mkdir -p $BUILD_ROOT$TOPDIR/DOCKER
-    if ! docker save --output $BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.tar $IMAGE_NAME:$TAG ; then
+    if ! chroot $BUILD_ROOT docker save --output $TOPDIR/DOCKER/$FILENAME.tar "$IMAGE_NAME:$TAG" ; then
+        echo "Docker save command failed"
         cleanup_build_processes
         BUILD_SUCCEEDED=false
         return
