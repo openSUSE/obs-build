@@ -1,0 +1,15 @@
+-------------------------------------------------------------------
+Thu Jun 30 19:05:52 CEST 2011 - ro@suse.de
+
+- provide build-mkbaselibs so this can really be used 
+
+-------------------------------------------------------------------
+Tue Jun  7 09:31:51 UTC 2011 - k0da@opensuse.org
+
+- fix build 
+
+-------------------------------------------------------------------
+Mon Jun  6 15:12:13 UTC 2011 - adrian@suse.de
+
+- new package for SLE baselibsconf, including ia64 arch defaults
+
