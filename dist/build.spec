@@ -27,8 +27,6 @@ Release:        0
 Source:         obs-build-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildArch:      noarch
-# Manual requires to avoid hard require to bash-static
-AutoReqProv:    off
 %if 0%{?suse_version} > 1200
 # required for test suite
 BuildRequires:  build-mkbaselibs

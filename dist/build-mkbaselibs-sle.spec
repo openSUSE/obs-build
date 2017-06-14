@@ -30,8 +30,6 @@ Provides:       build-mkbaselibs
 Source:         build-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildArch:      noarch
-# Manual requires to avoid hard require to bash-static
-AutoReqProv:    off
 
 %description
 This package contains the parts which may be installed in the inner build system
