@@ -100,6 +100,7 @@ if (@ARGV > 1 && $ARGV[0] eq '--buildroot') {
   shift @ARGV;
   $buildroot = shift @ARGV;
   $buildroot = '' if $buildroot && $buildroot eq '/';
+  $buildroot =~ s@//+@/@;      # or we may fail with 'bad tempdir' later. 
   die("bad buildroot\n") unless $buildroot eq '' || $buildroot =~ /^\//;
 }
 
