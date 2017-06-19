@@ -155,6 +155,6 @@ if [ -z "$message" ]; then
 fi
 mode=`stat -c "%a" "$changelog"`
 user=`stat -c "%u:%g" "$changelog"`
-mv "$tmpfile" "$changelog"
+cat "$tmpfile" > "$changelog"
 chmod $mode "$changelog"
 chown $user "$changelog"
