@@ -145,7 +145,19 @@ recipe_build_docker() {
     chroot $BUILD_ROOT bash -c "cd $REPOPATH && python -m SimpleHTTPServer 8080 &"
 
     # Build the repository url
-    REPO_URL=http://127.0.0.1:8080/
+    
+    if test -x /sbin/ip ; then
+        REPO_URL=$(ip addr show docker0 | sed -n -e 's@.*inet \([^ /]*\).*@\1@p')
+    else
+        REPO_URL=$(ifconfig docker0 | sed -n -e 's@.*inet addr:\([^ /]*\).*@\1@p')
+    fi
+    if test -z "$REPO_URL" ; then
+        echo "network setup error"
+        cleanup_build_processes
+        BUILD_SUCCEEDED=false
+        return
+    fi
+    REPO_URL="http://$REPO_URL:8080"
 
     # Create the needed file to publish the generated image
     if [ -f "TAG" ] && [ $(cat TAG | grep ":") ]; then
@@ -165,7 +177,7 @@ recipe_build_docker() {
     FILENAME="${FILENAME//[\/:]/-}"
 
     echo "Building image"
-    if ! chroot $BUILD_ROOT docker build -t "$IMAGE_NAME:$TAG" --build-arg obs_repository_url=$REPO_URL $TOPDIR/SOURCES/ ; then
+    if ! chroot $BUILD_ROOT docker build -t "$IMAGE_NAME:$TAG" --build-arg OBS_REPOSITORY_URL=$REPO_URL $TOPDIR/SOURCES/ ; then
         echo "Docker build command failed"
         cleanup_build_processes
         BUILD_SUCCEEDED=false
