@@ -43,6 +43,38 @@ recipe_prepare_docker() {
     :
 }
 
+docker_umount_setup() {
+    if test -z "$BUILD_ROOT" -o "$BUILD_ROOT" = / ; then
+	return
+    fi
+    mount --make-rslave "$BUILD_ROOT/sys/fs/cgroup" 2>/dev/null
+    umount -n -R $BUILD_ROOT/sys/fs/cgroup 2>/dev/null
+    # get rid of the bind mount
+    umount -n $BUILD_ROOT/dev/shm 2>/dev/null
+    umount -n -l $BUILD_ROOT
+}
+
+docker_mount_setup() {
+    if test -z "$BUILD_ROOT" -o "$BUILD_ROOT" = / ; then
+	return
+    fi
+    test -d /sys/fs/cgroup || cleanup_and_exit 1 "/sys/fs/cgroup does not exist"
+
+    # make build root a mount point
+    mount --rbind --make-private "$BUILD_ROOT" "$BUILD_ROOT"
+    mount --make-rprivate "$BUILD_ROOT"
+
+    if ! test -e $BUILD_ROOT/sys/block; then
+	mkdir -p $BUILD_ROOT/sys
+	mount -n -tsysfs sys $BUILD_ROOT/sys
+    fi
+    mount --rbind /sys/fs/cgroup "$BUILD_ROOT/sys/fs/cgroup"
+    mount --make-rslave "$BUILD_ROOT/sys/fs/cgroup"
+
+    # work around docker pivot root failure (to be investigated)
+    export DOCKER_RAMDISK=true
+}
+
 # Variables:
 # $BUILD_ROOT is the chroot
 # $TOPDIR/SOURCES includes the docker sources
@@ -52,6 +84,17 @@ recipe_prepare_docker() {
 recipe_build_docker() {
     touch $BUILD_ROOT/etc/resolv.conf
     chmod 755 $BUILD_ROOT/$TOPDIR/SOURCES/obs_pkg_mgr
+
+    base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
+    test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
+
+    # load needed kernel modules
+    modprobe bridge br_netfilter
+    modprobe nf_nat
+    modprobe xt_conntrack
+    modprobe ip_tables
+
+    docker_mount_setup
 
     echo "Starting container daemon"
     chroot $BUILD_ROOT /usr/sbin/containerd --listen unix:///run/containerd/containerd.sock &
@@ -63,12 +106,16 @@ recipe_build_docker() {
         sleep 1
     done
     if ! chroot $BUILD_ROOT docker version >/dev/null 2>&1 ; then
-        echo  "Docker is dead"
-        cleanup_and_exit 1
+	docker_umount_setup
+        cleanup_and_exit 1 "Docker is dead"
     fi
 
     echo "Loading base image"
-    base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|xz).{0,4}$" -print -quit)
+    if test -L "$base_image_path" ; then
+	# copy into build root
+	cp -L "$base_image_path" "$base_image_path.lnk"
+	mv "$base_image_path.lnk" "$base_image_path"
+    fi
 
     # Inspect the content of the image to decide if this is a layered image
     # or a filesystem one. We need to know if we will "docker load" it or
@@ -79,7 +126,7 @@ recipe_build_docker() {
     else
         echo "Filesystem image found"
         desired_tag=$(grep "^\s*FROM" Dockerfile | cut -d" " -f2)
-        chroot $BUILD_ROOT docker import $TOPDIR/SOURCES/$base_image_path $desired_tag
+        chroot $BUILD_ROOT docker import $TOPDIR/SOURCES/$base_image_path "$desired_tag"
     fi
 
     # Start the local zypper repository
@@ -93,7 +140,7 @@ recipe_build_docker() {
     REPOPATH=$TOPDIR/SOURCES/packages
     # Prepare the zypper repository
     # TODO: Handle other distribution repositories as well (deb, arch etc)
-    chroot $BUILD_ROOT createrepo $REPOPATH > /dev/null
+    chroot $BUILD_ROOT createrepo $REPOPATH >/dev/null
     # TODO Add Python as a default building dependency.
     chroot $BUILD_ROOT bash -c "cd $REPOPATH && python -m SimpleHTTPServer 8080 &"
 
@@ -134,7 +181,6 @@ recipe_build_docker() {
         return
     fi
     
-
     cat > $BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo <<containerinfo
 {
   "name": "$FILENAME",
@@ -144,7 +190,6 @@ recipe_build_docker() {
 containerinfo
 
     cleanup_build_processes
-
     BUILD_SUCCEEDED=true
 }
 
@@ -154,6 +199,7 @@ cleanup_build_processes() {
     echo "Stopping the docker daemon"
     kill $(pidof dockerd)
     kill $(pidof containerd)
+    docker_umount_setup
 }
 
 recipe_resultdirs_docker() {
