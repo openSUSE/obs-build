@@ -84,7 +84,12 @@ recipe_build_appimage() {
         fi
     fi
 
-    chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && /usr/lib/appimagetool/pkg2appimage" - root \
+    release_option=""
+    if test -n "$RELEASE" ; then
+        release_option="--release $RELEASE"
+    fi
+
+    chroot $BUILD_ROOT su -c "cd $TOPDIR/SOURCES && /usr/lib/appimagetool/pkg2appimage $release_option" - root \
 	|| cleanup_and_exit 1
 
     # extract build result basenames
