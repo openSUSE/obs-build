@@ -152,7 +152,7 @@ recipe_build_docker() {
         REPO_URL=$(ifconfig docker0 | sed -n -e 's@.*inet addr:\([^ /]*\).*@\1@p')
     fi
     if test -z "$REPO_URL" ; then
-        echo "network setup error"
+        echo "network setup error, no docker0 interface?"
         cleanup_build_processes
         BUILD_SUCCEEDED=false
         return
@@ -160,6 +160,8 @@ recipe_build_docker() {
     REPO_URL="http://$REPO_URL:8080"
 
     # Create the needed file to publish the generated image
+    IMAGE_NAME=
+    TAG=
     if [ -f "TAG" ] && [ $(cat TAG | grep ":") ]; then
         IMAGE_NAME=$(cat TAG | cut -d":" -f1)
         TAG=$(cat TAG | cut -d":" -f2)
@@ -186,20 +188,15 @@ recipe_build_docker() {
 
     # Save the resulting image to a tarball.
     mkdir -p $BUILD_ROOT$TOPDIR/DOCKER
-    if ! chroot $BUILD_ROOT docker save --output $TOPDIR/DOCKER/$FILENAME.tar "$IMAGE_NAME:$TAG" ; then
+    if ! chroot $BUILD_ROOT docker save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$IMAGE_NAME:$TAG" ; then
         echo "Docker save command failed"
         cleanup_build_processes
         BUILD_SUCCEEDED=false
         return
     fi
     
-    cat > $BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo <<containerinfo
-{
-  "name": "$FILENAME",
-  "tags": [ "$IMAGE_NAME:$TAG" ],
-  "file": "$FILENAME.tar"
-}
-containerinfo
+    # Create containerinfo
+    perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$IMAGE_NAME:$TAG" containers/annotation> "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
 
     cleanup_build_processes
     BUILD_SUCCEEDED=true

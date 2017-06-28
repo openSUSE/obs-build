@@ -30,22 +30,32 @@
 
 package Build::Docker;
 
+use Build::SimpleXML;
+
 use strict;
+
+sub slurp {
+  my ($fn) = @_;
+  local *F;
+  return undef unless open(F, '<', $fn);
+  local $/ = undef;	# Perl slurp mode
+  my $content = <F>;
+  close F;
+  return $content;
+}
 
 sub parse {
   my ($cf, $fn) = @_;
 
-  # Perl slurp mode
-  local $/=undef;
-  open DOCKERFILE, $fn or die "Couldn't open Dockerfile";
-  my $dockerfile_data = <DOCKERFILE>;
-  close DOCKERFILE;
+  my $dockerfile_data = slurp($fn);
+  return { 'error' => 'could not open Dockerfile' } unless defined $dockerfile_data;
 
   # Remove all whitespace from end of lines to make parsing easier
   $dockerfile_data =~ s/[^\S\n\r]+$//gm;
 
   my @deps;
   my @repos;
+  my @repo_urls;
   my $pkg_string;
 
   # Match lines that start with "RUN" up to where the "RUN" command ends. It
@@ -75,18 +85,19 @@ sub parse {
     # "obs://Virtualization:containers/openSUSE_Leap_42.2/"
     while ($run_command =~ /obs_pkg_mgr\s+add_repo\s+(.+?)\s+/g) {
       my $repo_url = $1;
-      print "Converting repo to obs format: $repo_url\n";
+      unshift @repo_urls, $repo_url;
       if ($Build::Kiwi::urlmapper) {
 	my $repo_prp = $Build::Kiwi::urlmapper->($repo_url);
 	return {'error' => "cannot map '$repo_url' to obs"} unless $repo_prp;
 	my ($projid, $repoid) = split('/', $repo_prp, 2);
-	push @repos, {'project' => $projid, 'repository' => $repoid};
+	unshift @repos, {'project' => $projid, 'repository' => $repoid};
       } else {
+        print "Converting repo to obs format: $repo_url\n";
 	# this is just for testing purposes...
 	$repo_url =~ s/^\/+$//;
 	$repo_url =~ s/:\//:/g;
 	my @repo_url = split('/', $repo_url);
-	push @repos, {'project' => $repo_url[-2], 'repository' => $repo_url[-1]} if @repo_url >= 2;
+	unshift @repos, {'project' => $repo_url[-2], 'repository' => $repo_url[-1]} if @repo_url >= 2;
       }
     }
   }
@@ -100,8 +111,38 @@ sub parse {
   $ret->{'name'} = 'docker';
   $ret->{'deps'} = \@deps;
   $ret->{'path'} = \@repos;
+  $ret->{'repo_urls'} = \@repo_urls;
 
   return $ret;
+}
+
+sub showcontainerinfo {
+  my ($fn, $image, $taglist, $annotationfile) = @ARGV;
+  local $Build::Kiwi::urlmapper = sub { return $_[0] };
+  my $d = parse({}, $fn);
+  die("$d->{'error'}\n") if $d->{'error'};
+  $image =~ s/.*\/// if defined $image;
+  my @tags = split(' ', $taglist);
+  @tags = map {"\"$_\""} @tags;
+  my @repos = map {"{ \"url\": \"$_\" }"} @{$d->{'repo_urls'} || []};
+  if ($annotationfile) {
+    my $annotation = slurp($annotationfile);
+    $annotation = Build::SimpleXML::parse($annotation) if $annotation;
+    $annotation = $annotation && ref($annotation) eq 'HASH' ? $annotation->{'annotation'} : undef;
+    $annotation = $annotation && ref($annotation) eq 'ARRAY' ? $annotation->[0] : undef;
+    my $annorepos = $annotation && ref($annotation) eq 'HASH' ? $annotation->{'repo'} : undef;
+    $annorepos = undef unless $annorepos && ref($annorepos) eq 'ARRAY';
+    for my $annorepo (@{$annorepos || []}) {
+      next unless $annorepo && ref($annorepo) eq 'HASH' && $annorepo->{'url'};
+      push @repos, "{ \"url\": \"$annorepo->{'url'}\" }";
+    }
+  }
+  print "{\n";
+  print "  \"name\": \"$d->{'name'}\"";
+  print ",\n  \"tags\": [ ".join(', ', @tags)." ]" if @tags;
+  print ",\n  \"repos\": [ ".join(', ', @repos)." ]" if @repos;
+  print ",\n  \"file\": \"$image\"" if defined $image;
+  print "\n}\n";
 }
 
 1;
