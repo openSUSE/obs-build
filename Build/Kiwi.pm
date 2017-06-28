@@ -101,7 +101,10 @@ sub kiwiparse {
         # for kiwi 3.8 and before
         push @types, $type->{'_content'};
       }
+      # save containerconfig so that we can retrievethe tag
       $containerconfig = $type->{'containerconfig'}->[0] if $type->{'containerconfig'};
+
+      # add derived container dependency
       if ($type->{'derived_from'}) {
 	my $derived = $type->{'derived_from'};
 	my ($name, $prp);
@@ -125,6 +128,7 @@ sub kiwiparse {
         push @packages, "container:$name";
         push @containerrepos, $prp if $prp;
       }
+
       push @packages, "kiwi-filesystem:$type->{'filesystem'}" if $type->{'filesystem'};
       if (defined $type->{'boot'}) {
         if ($type->{'boot'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
@@ -198,6 +202,8 @@ sub kiwiparse {
   my %repoprio;
   for my $repository (@repositories) {
     my $kiwisource = ($repository->{'source'} || [])->[0];
+    next unless $kiwisource;	# huh?
+    next if $repository->{'imageonly'};
     next if $kiwisource->{'path'} eq '/var/lib/empty';	# grr
     if ($kiwisource->{'path'} eq 'obsrepositories:/') {
       push @repos, '_obsrepositories/';
