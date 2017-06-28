@@ -62,6 +62,7 @@ sub kiwiparse {
   my $ret = {};
   my @types;
   my @repos;
+  my @imagerepos;
   my @bootrepos;
   my @containerrepos;
   my @packages;
@@ -203,8 +204,14 @@ sub kiwiparse {
   for my $repository (@repositories) {
     my $kiwisource = ($repository->{'source'} || [])->[0];
     next unless $kiwisource;	# huh?
-    next if $repository->{'imageonly'};
     next if $kiwisource->{'path'} eq '/var/lib/empty';	# grr
+    if ($repository->{'imageonly'} || $repository->{'imageinclude'}) {
+      # this repo will be configured in the image. Save so that we can write it into the containerinfo
+      my $imagerepo = { 'url' => $kiwisource->{'path'} };
+      $imagerepo->{'priority'} = $repository->{'sortprio'} if defined $repository->{'priority'};
+      push @imagerepos, $imagerepo;
+    }
+    next if $repository->{'imageonly'};
     if ($kiwisource->{'path'} eq 'obsrepositories:/') {
       push @repos, '_obsrepositories/';
       next;
@@ -315,6 +322,7 @@ sub kiwiparse {
     my @s = split('/', $_, 2);
     $_ = {'project' => $s[0], 'repository' => $s[1]};
   }
+  $ret->{'imagerepos'} = \@imagerepos if @imagerepos;
   if (!$instsource && $containerconfig) {
     my $containername = $containerconfig->{'name'};
     my $containertags = $containerconfig->{'tag'};
@@ -370,10 +378,19 @@ sub showcontainerinfo {
   die("$d->{'error'}\n") if $d->{'error'};
   $image =~ s/.*\/// if defined $image;
   my @tags = map {"\"$_\""} @{$d->{'container_tags'} || []};
+  my @repos;
+  for my $repo (@{$d->{'imagerepos'} || []}) {
+    if (defined $repo->{'priority'}) {
+      push @repos, "{ \"url\": \"$repo->{'url'}\", \"priority\": $repo->{'priority'} }";
+    } else {
+      push @repos, "{ \"url\": \"$repo->{'url'}\" }";
+    }
+  }
   print "{\n";
   print "  \"name\": \"$d->{'name'}\"";
   print ",\n  \"version\": \"$d->{'version'}\"" if defined $d->{'version'};
   print ",\n  \"tags\": [ ".join(', ', @tags)." ]" if @tags;
+  print ",\n  \"repos\": [ ".join(', ', @repos)." ]" if @repos;
   print ",\n  \"file\": \"$image\"" if defined $image;
   print "\n}\n";
 }
