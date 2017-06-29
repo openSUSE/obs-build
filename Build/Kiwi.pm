@@ -126,7 +126,7 @@ sub kiwiparse {
 	  }
 	  die("derived_from url not using obs:/ scheme: $derived\n") unless $prp;
 	}
-        push @packages, "container:$name";
+        push @packages, "container:$name" defined $name;
         push @containerrepos, $prp if $prp;
       }
 
