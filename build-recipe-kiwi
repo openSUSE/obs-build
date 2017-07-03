@@ -396,115 +396,151 @@ set +x
 
     # move created product to destination
     # NOTE: older kiwi versions exit also in error case with 0
-    if [ "$BUILD_SUCCEEDED" = "true" ]; then
+    if test "$BUILD_SUCCEEDED" = true ; then
         perform_product_bundle
     fi
 }
 
 perform_image_build() {
     local imgtype=$1
-    local legacy=$2
-    local profile=$3
-    local prepare_call
-    local create_call
-    # When people test mixed build with legacy and new kiwi version
-    # The zypper cache was used in different ways. Therefore this
-    # needs a cleanup before the build starts
-    echo "Cleanup zypper image build cache"
-    if [ -d "$BUILD_ROOT/var/cache/kiwi/zypper" ];then
-        rm -rf $BUILD_ROOT/var/cache/kiwi/zypper
-    fi
-    if test -n "$profile" -a "$profile" != __not__set ; then
-	echo "running kiwi --prepare for $imgtype, profile $profile..."
-    else
-	echo "running kiwi --prepare for $imgtype..."
-    fi
-    # Do not use $BUILD_USER here, since we always need root permissions
-    prepare_call="cd $TOPDIR/SOURCES && rm -rf $TOPDIR/KIWIROOT-$imgtype"
-    if [ "$legacy" = "true" ]; then
-        prepare_call="$prepare_call && /usr/sbin/kiwi --logfile terminal"
-    else
-        prepare_call="$prepare_call && LANG=en_US.UTF-8 /usr/bin/kiwi"
-        prepare_call="$prepare_call --compat -- --debug"
-    fi
-    prepare_call="$prepare_call --prepare $TOPDIR/SOURCES"
-    prepare_call="$prepare_call --root $TOPDIR/KIWIROOT-$imgtype"
-    if test -n "$profile" -a "$profile" != __not__set ; then
-        prepare_call="$prepare_call --add-profile $profile"
-    fi
-    prepare_call="$prepare_call $KIWI_PARAMETERS"
-    echo "$prepare_call"
-    chroot $BUILD_ROOT \
-        su -c "$prepare_call" - root < /dev/null || cleanup_and_exit 1
+    local profile=$2
 
-    if test -n "$profile" -a "$profile" != __not__set ; then
-	echo "running kiwi --create for $imgtype, profile $profile..."
+    # When people test mixed build with legacy and new kiwi version
+    # the zypper cache was used in different ways. Therefore this
+    # needs a cleanup before the build starts
+    if test -d "$BUILD_ROOT/var/cache/kiwi/zypper" ; then
+	echo "cleaning up zypper image build cache"
+	rm -rf $BUILD_ROOT/var/cache/kiwi/zypper
+    fi
+
+    # Do not use $BUILD_USER here, since we always need root permissions
+
+    if test "$kiwi_legacy" = true ; then
+	# old kiwi, do a prepare and a create call
+	local prepare_call
+	echo "running kiwi prepare for $imgtype${profile:+, profile $profile}..."
+	prepare_call="cd $TOPDIR/SOURCES && rm -rf $TOPDIR/KIWIROOT-$imgtype"
+	prepare_call="$prepare_call && $kiwi_path --logfile terminal"
+	prepare_call="$prepare_call --prepare $TOPDIR/SOURCES"
+	prepare_call="$prepare_call --root $TOPDIR/KIWIROOT-$imgtype"
+	test -n "$profile" && prepare_call="$prepare_call --add-profile $profile"
+	prepare_call="$prepare_call $KIWI_PARAMETERS"
+	echo "$prepare_call"
+	chroot $BUILD_ROOT su -c "$prepare_call" - root </dev/null || cleanup_and_exit 1
+	mkdir -p $BUILD_ROOT/$TOPDIR/KIWI-$imgtype
+	echo "running kiwi create for $imgtype${profile:+, profile $profile}..."
+	local create_call
+	create_call="cd $TOPDIR/SOURCES"
+	create_call="$create_call && $kiwi_path --logfile terminal"
+	create_call="$create_call --create $TOPDIR/KIWIROOT-$imgtype"
+	create_call="$create_call --type $imgtype"
+	create_call="$create_call -d $TOPDIR/KIWI-$imgtype"
+	test -n "$profile" && create_call="$create_call --add-profile $profile"
+	create_call="$create_call $KIWI_PARAMETERS"
+	echo "$create_call"
+	chroot $BUILD_ROOT su -c "$create_call" - root < /dev/null || cleanup_and_exit 1
     else
-	echo "running kiwi --create for $imgtype..."
+	# new kiwi, do a "system build" call
+	mkdir -p $BUILD_ROOT/$TOPDIR/KIWI-$imgtype
+	local build_call
+	echo "running kiwi system build for $imgtype${profile:+, profile $profile}..."
+	build_call="cd $TOPDIR/SOURCES && rm -rf $TOPDIR/KIWI-$imgtype"
+	build_call="$build_call && LANG=en_US.UTF-8 $kiwi_path --debug $KIWI_MAIN_PARAMETERS"
+	test -n "$profile" && build_call="$build_call --profile $profile"
+	build_call="$build_call system build --description $TOPDIR/SOURCES --target-dir $TOPDIR/KIWI-$imgtype"
+	build_call="$build_call $KIWI_BUILD_PARAMETERS"
+	echo "$build_call"
+	chroot $BUILD_ROOT su -c "$build_call" - root < /dev/null || cleanup_and_exit 1
+	# ceate compat link
+	ln -sf "KIWI-$imgtype/build/image-root" "$BUILD_ROOT/$TOPDIR/KIWIROOT-$imgtype"
     fi
-    mkdir -p $BUILD_ROOT/$TOPDIR/KIWI-$imgtype
-    create_call="cd $TOPDIR/SOURCES"
-    if [ "$legacy" = "true" ]; then
-        create_call="$create_call && LANG=en_US.UTF-8 /usr/sbin/kiwi"
-        create_call="$create_call --logfile terminal"
-    else
-        create_call="$create_call && /usr/bin/kiwi --compat -- --debug"
-    fi
-    create_call="$create_call --create $TOPDIR/KIWIROOT-$imgtype"
-    create_call="$create_call --type $imgtype"
-    create_call="$create_call -d $TOPDIR/KIWI-$imgtype"
-    if test -n "$profile" -a "$profile" != __not__set ; then
-        create_call="$create_call --add-profile $profile"
-    fi
-    create_call="$create_call $KIWI_PARAMETERS"
-    echo "$create_call"
-    chroot $BUILD_ROOT \
-        su -c "$create_call" - root < /dev/null || cleanup_and_exit 1
 }
 
 perform_image_bundle() {
     local imgtype=$1
-    local legacy=$2
-    local profile=$3
+    local profile=$2
     local bundle_call
 
-    local kiwi_profile=""
-    if [ "$profile" != "__not__set" ]; then
-        kiwi_profile="${profile}-"
-    fi
+    local bundle_id="Build$RELEASE"
+    test -n "$profile" && bundle_id="${profile}-$bundle_id"
 
     rm -rf "/$TOPDIR/KIWI.bundle"
-    if [ "$legacy" = "true" ]; then
-        bundle_call="/usr/sbin/kiwi --bundle-build $TOPDIR/KIWI-$imgtype"
+    if test "$kiwi_legacy" = true ; then
+        bundle_call="$kiwi_path --bundle-build $TOPDIR/KIWI-$imgtype"
         bundle_call="$bundle_call -d /$TOPDIR/KIWI.bundle/"
-        bundle_call="$bundle_call --bundle-id ${kiwi_profile}Build$RELEASE"
+        bundle_call="$bundle_call --bundle-id $bundle_id"
     else
-        bundle_call="LANG=en_US.UTF-8 /usr/bin/kiwi result bundle"
-        bundle_call="$bundle_call --target-dir $TOPDIR/KIWI-$imgtype"
-        bundle_call="$bundle_call --id ${kiwi_profile}Build$RELEASE"
+        bundle_call="LANG=en_US.UTF-8 $kiwi_path result bundle --target-dir $TOPDIR/KIWI-$imgtype"
+        bundle_call="$bundle_call --id $bundle_id"
         bundle_call="$bundle_call --bundle-dir /$TOPDIR/KIWI.bundle/"
+	bundle_call="$bundle_call $KIWI_BUNDLE_PARAMETERS"
     fi
     echo "$bundle_call"
     if chroot $BUILD_ROOT su -c "$bundle_call" - root < /dev/null; then
-        mv "$BUILD_ROOT/$TOPDIR/KIWI.bundle/"* \
-            "$BUILD_ROOT/$TOPDIR/KIWI/" || cleanup_and_exit 1
+        mv "$BUILD_ROOT/$TOPDIR/KIWI.bundle/"* "$BUILD_ROOT/$TOPDIR/KIWI/" || cleanup_and_exit 1
         rmdir "$BUILD_ROOT/$TOPDIR/KIWI.bundle"
-        # success
-        return 0
+        return 0	# success
     fi
     # need another way to bundle
     return 1
 }
 
-is_legacy_kiwi() {
-    if [ -L "$BUILD_ROOT/usr/bin/kiwi" ];then
-        # The next generation of kiwi is installed to /usr/bin
-        # If this file is found we expect the new kiwi to be
-        # installed
-        return 1
+# translate kiwi8 parameters to kiwi9
+translate_kiwi_parameters() {
+    local i lasti
+    local add_repo_url=() add_repo_type=() add_repo_alias=() add_repo_priority=()
+    local set_repo_url set_repo_type set_repo_alias set_repo_priority
+
+    # return values
+    KIWI_MAIN_PARAMETERS=
+    KIWI_BUILD_PARAMETERS=
+    KIWI_BUNDLE_PARAMETERS=
+    for i in $KIWI_PARAMETERS ; do
+	if test -n "$lasti" ; then
+	    i="$lasti=$i"
+	    lasti=
+	fi
+	case "$i" in
+	    --add-profile|-t|--type|-l|--logfile|-d|--dest-dir|--root|--add-repo|--add-repoalias|--add-repopriority|--add-repotype|--set-repo|--set-repoalias|--set-repopriority|--set-repotype)
+		lasti="$i"
+		;;
+	esac
+	test -n "$lasti" && continue
+	case "$i" in
+	    --version|--debug) KIWI_MAIN_PARAMETERS="$KIWI_MAIN_PARAMETERS $i" ;;
+	    --add-profile=*) KIWI_MAIN_PARAMETERS="$KIWI_MAIN_PARAMETERS --profile ${i#*=}" ;;
+	    -t=|--type=*) KIWI_MAIN_PARAMETERS="$KIWI_MAIN_PARAMETERS --type ${i#*=}" ;;
+	    -l=|--logfile=*) KIWI_MAIN_PARAMETERS="$KIWI_MAIN_PARAMETERS --logfile ${i#*=}" ;;
+	    -d=*|--dest-dir=*) KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS --target-dir ${i#*=}" ;;
+	    --root=*) echo "WARNING: ignored unsupported kiwi option $i" ;; # unsupported for system build...
+	    --ignore-repos) KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS --ignore-repos" ;;
+	    --recycle-root) KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS --allow-existing-root" ;;
+	    --add-repo=*) add_repo_url[${#add_repo_url[@]}]="${i#*=}" ;;
+	    --add-repotype=*) add_repo_type[${#add_repo_type[@]}]="${i#*=}" ;;
+	    --add-repoalias=*) add_repo_alias[${#add_repo_alias[@]}]="${i#*=}" ;;
+	    --add-repopriority=*) add_repo_priority[${#add_repo_priority[@]}]="${i#*=}" ;;
+	    --set-repo=*) set_repo_url="${i#*=}" ;;
+	    --set-repotype=*) set_repo_type="${i#*=}" ;;
+	    --set-repoalias=*) set_repo_alias="${i#*=}" ;;
+	    --set-repopriority=*) set_repo_priority="${i#*=}" ;;
+	    --main:*) KIWI_MAIN_PARAMETERS="$KIWI_MAIN_PARAMETERS --${i#--main:}" ;;
+	    --bundle:*) KIWI_BUNDLE_PARAMETERS="$KIWI_BUNDLE_PARAMETERS --${i#--bundle:}" ;;
+	    # everything else just gues through to kiwi build
+	    *) KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS $i" ;;
+	esac
+    done
+    # now add the repo options
+    lasti=0
+    for i in "${add_repo_url[@]}" ; do
+	local repo_prio="${add_repo_priority[$lasti]}"
+	test -z "$repo_prio" && repo_prio=99
+	KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS --add-repo $i,${add_repo_type[$lasti]},${add_repo_alias[$lasti]},$repo_prio"
+	let lasti++
+    done
+    if test -n "$set_repo_url" ; then
+	test -z "$set_repo_priority" && set_repo_priority=99
+	KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS --set-repo $set_repo_url,$set_repo_type,$set_repo_alias,$set_repo_priority"
     fi
-    # in any other case stick to the legacy kiwi
-    return 0
 }
 
 build_kiwi_appliance() {
@@ -522,23 +558,30 @@ build_kiwi_appliance() {
     if test -z "$kiwi_profile"; then
         kiwi_profile=__not__set
     fi
-    local legacy=false
-    if is_legacy_kiwi ; then
-        legacy=true
+    local kiwi_path=/usr/bin/kiwi kiwi_legacy=false
+    if ! test -L "$BUILD_ROOT/usr/bin/kiwi" ; then
+	kiwi_path=/usr/sbin/kiwi
+        kiwi_legacy=true
     fi
-    RUN_BUNDLE=true
+
+    if test "$kiwi_legacy" != true ; then
+	translate_kiwi_parameters
+    fi
+
+    local run_bundle=true
     for imgtype in $imagetype ; do
 	for prof in ${kiwi_profile//,/ } ; do
-	    perform_image_build $imgtype $legacy $prof
-	    if perform_image_bundle $imgtype $legacy $prof; then
+	    test "$prof" = __not__set && prof=
+	    perform_image_build $imgtype $prof
+	    if perform_image_bundle $imgtype $prof ; then
 		# bundling successful, skip legacy bundler
-		unset RUN_BUNDLE
+		run_bundle=
 	    fi
 	done
     done
     BUILD_SUCCEEDED=true
 
-    if test -n "$RUN_BUNDLE"; then
+    if test -n "$run_bundle"; then
 	# results are not bundled yet
 	legacy_image_bundle
     fi
@@ -552,6 +595,7 @@ recipe_build_kiwi() {
 
     # prepare rpms as source and createrepo on the repositories
     ln -sf $TOPDIR/SOURCES/repos $BUILD_ROOT/repos
+    test -d $BUILD_ROOT/$TOPDIR/SOURCES/containers && ln -sf $TOPDIR/SOURCES/containers $BUILD_ROOT/containers
     cd $BUILD_ROOT/$TOPDIR/SOURCES/repos
     for r in *[^:]/* ; do
         test -L $r && continue
