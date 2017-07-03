@@ -23,8 +23,8 @@ package Build;
 use strict;
 use Digest::MD5;
 use Build::Rpm;
-use Data::Dumper;
 use POSIX qw(strftime);
+#use Data::Dumper;
 
 our $expand_dbg;
 

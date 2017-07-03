@@ -21,7 +21,7 @@
 package Build::Mdkrepo;
 
 use strict;
-use Data::Dumper;
+#use Data::Dumper;
 
 sub addpkg {
   my ($res, $data, $options) = @_;
