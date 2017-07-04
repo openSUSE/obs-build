@@ -501,7 +501,7 @@ translate_kiwi_parameters() {
 	    lasti=
 	fi
 	case "$i" in
-	    --add-profile|-t|--type|-l|--logfile|-d|--dest-dir|--root|--add-repo|--add-repoalias|--add-repopriority|--add-repotype|--set-repo|--set-repoalias|--set-repopriority|--set-repotype)
+	    --add-profile|-t|--type|-l|--logfile|-d|--dest-dir|--root|--add-repo|--add-repoalias|--add-repoprio|--add-repopriority|--add-repotype|--set-repo|--set-repoalias|--set-repoprio|--set-repopriority|--set-repotype)
 		lasti="$i"
 		;;
 	esac
@@ -518,11 +518,11 @@ translate_kiwi_parameters() {
 	    --add-repo=*) add_repo_url[${#add_repo_url[@]}]="${i#*=}" ;;
 	    --add-repotype=*) add_repo_type[${#add_repo_type[@]}]="${i#*=}" ;;
 	    --add-repoalias=*) add_repo_alias[${#add_repo_alias[@]}]="${i#*=}" ;;
-	    --add-repopriority=*) add_repo_priority[${#add_repo_priority[@]}]="${i#*=}" ;;
+	    --add-repopriority=*|--add-repoprio=*) add_repo_priority[${#add_repo_priority[@]}]="${i#*=}" ;;
 	    --set-repo=*) set_repo_url="${i#*=}" ;;
 	    --set-repotype=*) set_repo_type="${i#*=}" ;;
 	    --set-repoalias=*) set_repo_alias="${i#*=}" ;;
-	    --set-repopriority=*) set_repo_priority="${i#*=}" ;;
+	    --set-repopriority=*|--set-repoprio=*) set_repo_priority="${i#*=}" ;;
 	    --main:*) KIWI_MAIN_PARAMETERS="$KIWI_MAIN_PARAMETERS --${i#--main:}" ;;
 	    --bundle:*) KIWI_BUNDLE_PARAMETERS="$KIWI_BUNDLE_PARAMETERS --${i#--bundle:}" ;;
 	    # everything else just gues through to kiwi build
