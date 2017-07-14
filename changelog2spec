@@ -39,6 +39,7 @@ my @mon = qw{Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec};
 my $ok;
 my $zone;
 my $test;
+my $fulltimestamps;
 my $printtype;
 my $input = '';
 my $target = 'rpm';
@@ -51,6 +52,11 @@ while (@ARGV) {
   }
   if ($ARGV[0] eq '--type') {
     $printtype = 1;
+    shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--fulltimestamps') {
+    $fulltimestamps = 1;
     shift @ARGV;
     next;
   }
@@ -237,7 +243,11 @@ while(defined($_)) {
   # silly rpm can't hande dates < 1997, so we fold everything to
   # Thu Jan 02 1997
   @gm = (0, 0, 0, 2, 0, 97, 4) if $gm[5] < 97 || ($gm[5] == 97 && $gm[4] == 0 && $gm[3] <= 1);
-  printf("* %s %s %2d %4d %s\n", $wday[$gm[6]], $mon[$gm[4]], $gm[3], $gm[5] + 1900, $who);
+  if($fulltimestamps) {
+    printf("* %s %s %2d %02d:%02d:%02d UTC %4d %s\n", $wday[$gm[6]], $mon[$gm[4]], $gm[3], @gm[2,1,0], $gm[5] + 1900, $who);
+  } else {
+    printf("* %s %s %2d %4d %s\n", $wday[$gm[6]], $mon[$gm[4]], $gm[3], $gm[5] + 1900, $who);
+  }
   $changes =~ s/%/%%/g;
   $changes =~ s/^(\s*)%%(\S*)/$1\[%%$2\]/;
   $changes =~ s/^(\s*)(\#\d*)/$1\[$2\]/mg;
