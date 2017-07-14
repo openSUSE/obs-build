@@ -41,7 +41,7 @@ install: build
 	dh_testroot
 	dh_clean -k 
 	dh_installdirs
-	make DESTDIR=$(CURDIR)/debian/build install
+	make DESTDIR=$(CURDIR)/debian/obs-build install
 
 binary-arch: build install
 	dh_testdir
