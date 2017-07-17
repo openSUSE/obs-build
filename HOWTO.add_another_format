@@ -28,7 +28,7 @@ Build code running inside of environment.
    somehow into the build system. In best case via some dependency.
  - Incompatible changes can be implemented inside of these packages
    pulled into the build environment.
- - network is not possible here.
+ - external network access is not possible here.
 
 
 1) Implement the parse() function into Build/XYZ.pm
