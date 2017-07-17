@@ -1,0 +1,149 @@
+#!/bin/bash
+
+export BUILD_DIR=${BUILD_DIR:-/usr/lib/build}
+
+cleanup_and_exit() {
+    test -z "$1" && set 0
+    if test -n "$2" ; then 
+	if test "$1" -ne 0 ; then 
+	    echo "$2" >&2
+	else
+	    echo "$2"
+	fi
+    fi   
+    exit $1
+}
+
+
+BUILD_ROOT=
+IS_UNSHARED=
+KILL=
+WEBSERVER=
+
+CONTAINERD_PID=0
+DOCKERD_PID=0
+WEBSERVER_PID=0
+
+while test -n "$1" ; do
+    case "$1" in
+	--root)
+	    BUILD_ROOT="$2"
+	    shift 2
+	    ;;
+	--webserver)
+	    WEBSERVER="$2"
+	    shift 2
+	    ;;
+	--isunshared)
+	    IS_UNSHARED=true
+	    shift
+	    ;;
+	--kill)
+	    KILL=true
+	    shift
+	    ;;
+	*)
+	    break
+	    ;;
+    esac
+done
+
+if test -n "$1" -o -z "$BUILD_ROOT" ; then
+    cleanup_and_exit 1 "Usage: startdockerd --root <buildroot>"
+    echo "Usage: startdockerd --root <buildroot>"
+fi
+
+if test -n "$KILL" ; then
+    if test -e "$BUILD_ROOT/.startdockerd.pids" ; then
+	read CONTAINERD_PID DOCKERD_PID WEBSERVER_PID < $BUILD_ROOT/.startdockerd.pids
+	if test -n "$WEBSERVER_PID" -a "$WEBSERVER_PID" != 0 ; then
+	    echo "Stopping local repository server"
+	    kill "$WEBSERVER_PID"
+	fi
+	if test -n "$DOCKERD_PID" -a "$DOCKERD_PID" != 0 ; then
+	    echo "Stopping docker daemon"
+	    kill "$DOCKERD_PID"
+	fi
+	if test -n "$CONTAINERD_PID" -a "$CONTAINERD_PID" != 0 ; then
+	    echo "Stopping container daemon"
+	    kill "$CONTAINERD_PID"
+	fi
+	rm -f "$BUILD_ROOT/.startdockerd.pids"
+    fi
+    exit 0
+fi
+
+rm -f $BUILD_ROOT/.startdockerd.pids
+
+if test -z "$IS_UNSHARED" ; then
+    echo "Unsharing environment"
+    # unshare mounts and network
+    exec unshare -m -n $BUILD_DIR/startdockerd --isunshared --root "$BUILD_ROOT" --webserver "$WEBSERVER" "$@"
+    cleanup_and_exit 1 "exec unshare returned"
+fi
+
+# load needed kernel modules
+modprobe bridge br_netfilter
+modprobe nf_nat
+modprobe xt_conntrack
+modprobe ip_tables
+
+# setup cgroups
+if test "$BUILD_ROOT" != '/' ; then
+    test -d /sys/fs/cgroup || cleanup_and_exit 1 "/sys/fs/cgroup does not exist"
+
+    test -n "$IS_UNSHARED" && mount --make-rprivate /
+
+    # make build root a mount point
+    mount --rbind --make-private "$BUILD_ROOT" "$BUILD_ROOT"
+    mount --make-rprivate "$BUILD_ROOT"
+    if ! test -e $BUILD_ROOT/sys/block; then
+	mkdir -p $BUILD_ROOT/sys
+	mount -n -tsysfs sys $BUILD_ROOT/sys
+    fi
+    mount --rbind /sys/fs/cgroup "$BUILD_ROOT/sys/fs/cgroup"
+    mount --make-rslave "$BUILD_ROOT/sys/fs/cgroup"
+    export DOCKER_RAMDISK=true
+fi
+
+# create loopback interface
+if test -x /sbin/ip ; then 
+    ip addr add 127.0.0.1/8 dev lo
+    ip addr add ::1/128 dev lo
+    ip link set lo up
+else 
+    ifconfig lo 127.0.0.1 up
+    ifconfig lo add ::1/128
+fi   
+
+# setup mounts
+test -e "$BUILD_ROOT/proc/self" || mount -n -tproc none $BUILD_ROOT/proc
+
+echo "Starting container daemon"
+chroot $BUILD_ROOT /usr/sbin/containerd --listen unix:///run/containerd/containerd.sock &
+CONTAINERD_PID=$!
+echo "$CONTAINERD_PID $DOCKERD_PID $WEBSERVER_PID" > $BUILD_ROOT/.startdockerd.pids
+
+echo "Starting docker daemon"
+chroot $BUILD_ROOT /usr/bin/dockerd --containerd /run/containerd/containerd.sock --bridge=none --add-runtime oci=/usr/bin/docker-runc &
+DOCKERD_PID=$!
+echo "$CONTAINERD_PID $DOCKERD_PID $WEBSERVER_PID" > $BUILD_ROOT/.startdockerd.pids
+
+echo "Waiting for docker daemon to complete startup"
+for i in 1 2 3 4 5 6 7 8 9 10 ; do
+    chroot $BUILD_ROOT docker version >/dev/null 2>&1 && break
+    sleep 1
+done
+if ! chroot $BUILD_ROOT docker version >/dev/null 2>&1 ; then
+    cleanup_and_exit 1 "Docker is dead"
+fi
+
+if test -n "$WEBSERVER" ; then
+    echo "Starting local repository server"
+    chroot $BUILD_ROOT bash -c "cd $WEBSERVER && python -m SimpleHTTPServer 80 &"
+    WEBSERVER_PID=$!
+    echo "$CONTAINERD_PID $DOCKERD_PID $WEBSERVER_PID" > $BUILD_ROOT/.startdockerd.pids
+fi
+
+echo "Docker is running"
+exit 0

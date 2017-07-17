@@ -43,38 +43,6 @@ recipe_prepare_docker() {
     :
 }
 
-docker_umount_setup() {
-    if test -z "$BUILD_ROOT" -o "$BUILD_ROOT" = / ; then
-	return
-    fi
-    mount --make-rslave "$BUILD_ROOT/sys/fs/cgroup" 2>/dev/null
-    umount -n -R $BUILD_ROOT/sys/fs/cgroup 2>/dev/null
-    # get rid of the bind mount
-    umount -n $BUILD_ROOT/dev/shm 2>/dev/null
-    umount -n -l $BUILD_ROOT
-}
-
-docker_mount_setup() {
-    if test -z "$BUILD_ROOT" -o "$BUILD_ROOT" = / ; then
-	return
-    fi
-    test -d /sys/fs/cgroup || cleanup_and_exit 1 "/sys/fs/cgroup does not exist"
-
-    # make build root a mount point
-    mount --rbind --make-private "$BUILD_ROOT" "$BUILD_ROOT"
-    mount --make-rprivate "$BUILD_ROOT"
-
-    if ! test -e $BUILD_ROOT/sys/block; then
-	mkdir -p $BUILD_ROOT/sys
-	mount -n -tsysfs sys $BUILD_ROOT/sys
-    fi
-    mount --rbind /sys/fs/cgroup "$BUILD_ROOT/sys/fs/cgroup"
-    mount --make-rslave "$BUILD_ROOT/sys/fs/cgroup"
-
-    # work around docker pivot root failure (to be investigated)
-    export DOCKER_RAMDISK=true
-}
-
 # Variables:
 # $BUILD_ROOT is the chroot
 # $TOPDIR/SOURCES includes the docker sources
@@ -88,26 +56,8 @@ recipe_build_docker() {
     base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
     test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
 
-    # load needed kernel modules
-    modprobe bridge br_netfilter
-    modprobe nf_nat
-    modprobe xt_conntrack
-    modprobe ip_tables
-
-    docker_mount_setup
-
-    echo "Starting container daemon"
-    chroot $BUILD_ROOT /usr/sbin/containerd --listen unix:///run/containerd/containerd.sock &
-    echo "Starting docker daemon"
-    chroot $BUILD_ROOT /usr/bin/dockerd --containerd /run/containerd/containerd.sock --add-runtime oci=/usr/bin/docker-runc &
-    echo "Waiting for docker daemon to start"
-    for i in 1 2 3 4 5 6 7 8 9 10 ; do
-        chroot $BUILD_ROOT docker version >/dev/null 2>&1 && break
-        sleep 1
-    done
-    if ! chroot $BUILD_ROOT docker version >/dev/null 2>&1 ; then
-	docker_umount_setup
-        cleanup_and_exit 1 "Docker is dead"
+    if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver "$TOPDIR/SOURCES/packages" ; then
+	cleanup_and_exit 1
     fi
 
     echo "Loading base image"
@@ -136,28 +86,9 @@ recipe_build_docker() {
     # TODO [TBD] What about SLES? Are dependencies fetched automatically from osc/OBS?
     #  What about registration?
 
-    # This is where we copied the downloaded dependencies in the setup method above.
-    REPOPATH=$TOPDIR/SOURCES/packages
     # Prepare the zypper repository
     # TODO: Handle other distribution repositories as well (deb, arch etc)
-    chroot $BUILD_ROOT createrepo $REPOPATH >/dev/null
-    # TODO Add Python as a default building dependency.
-    chroot $BUILD_ROOT bash -c "cd $REPOPATH && python -m SimpleHTTPServer 8080 &"
-
-    # Build the repository url
-    
-    if test -x /sbin/ip ; then
-        REPO_URL=$(ip addr show docker0 | sed -n -e 's@.*inet \([^ /]*\).*@\1@p')
-    else
-        REPO_URL=$(ifconfig docker0 | sed -n -e 's@.*inet addr:\([^ /]*\).*@\1@p')
-    fi
-    if test -z "$REPO_URL" ; then
-        echo "network setup error, no docker0 interface?"
-        cleanup_build_processes
-        BUILD_SUCCEEDED=false
-        return
-    fi
-    REPO_URL="http://$REPO_URL:8080"
+    chroot $BUILD_ROOT createrepo "$TOPDIR/SOURCES/packages" >/dev/null
 
     # Create the needed file to publish the generated image
     IMAGE_NAME=
@@ -169,7 +100,7 @@ recipe_build_docker() {
 
     if [ -z "$IMAGE_NAME" ] || [ -z "$TAG" ]; then
         echo "TAG file missing of contents invalid (use image_name:tag format)"
-        cleanup_build_processes
+	$BUILD_DIR/startdockerd --root "$BUILD_ROOT" --kill
         BUILD_SUCCEEDED=false
         return
     fi
@@ -179,9 +110,9 @@ recipe_build_docker() {
     FILENAME="${FILENAME//[\/:]/-}"
 
     echo "Building image"
-    if ! chroot $BUILD_ROOT docker build -t "$IMAGE_NAME:$TAG" --build-arg OBS_REPOSITORY_URL=$REPO_URL $TOPDIR/SOURCES/ ; then
+    if ! chroot $BUILD_ROOT docker build --network=host -t "$IMAGE_NAME:$TAG" --build-arg OBS_REPOSITORY_URL=http://localhost:80 $TOPDIR/SOURCES/ ; then
         echo "Docker build command failed"
-        cleanup_build_processes
+	$BUILD_DIR/startdockerd --root "$BUILD_ROOT" --kill
         BUILD_SUCCEEDED=false
         return
     fi
@@ -190,7 +121,7 @@ recipe_build_docker() {
     mkdir -p $BUILD_ROOT$TOPDIR/DOCKER
     if ! chroot $BUILD_ROOT docker save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$IMAGE_NAME:$TAG" ; then
         echo "Docker save command failed"
-        cleanup_build_processes
+	$BUILD_DIR/startdockerd --root "$BUILD_ROOT" --kill
         BUILD_SUCCEEDED=false
         return
     fi
@@ -198,17 +129,8 @@ recipe_build_docker() {
     # Create containerinfo
     perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$IMAGE_NAME:$TAG" containers/annotation> "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
 
-    cleanup_build_processes
+    $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --kill
     BUILD_SUCCEEDED=true
-}
-
-cleanup_build_processes() {
-    echo "Stopping local repository server"
-    kill $(pgrep -f "python -m SimpleHTTPServer 8080")
-    echo "Stopping the docker daemon"
-    kill $(pidof dockerd)
-    kill $(pidof containerd)
-    docker_umount_setup
 }
 
 recipe_resultdirs_docker() {
