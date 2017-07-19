@@ -98,3 +98,7 @@ recipe_resultdirs_mock() {
     echo RPMS SRPMS
 }
 
+recipe_cleanup_mock() {
+    echo RPMS SRPMS
+}
+

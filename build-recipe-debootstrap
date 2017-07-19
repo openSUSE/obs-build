@@ -100,3 +100,7 @@ recipe_resultdirs_debootstrap() {
     echo DEBS
 }
 
+recipe_cleanup_debootstrap() {
+    :
+}
+

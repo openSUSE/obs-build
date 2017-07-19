@@ -2,6 +2,10 @@
 
 export BUILD_DIR=${BUILD_DIR:-/usr/lib/build}
 
+CONTAINERD_PID=0
+DOCKERD_PID=0
+WEBSERVER_PID=0
+
 cleanup_and_exit() {
     test -z "$1" && set 0
     if test -n "$2" ; then 
@@ -11,6 +15,11 @@ cleanup_and_exit() {
 	    echo "$2"
 	fi
     fi   
+    if test "$1" != 0 ; then
+	test -n "$WEBSERVER_PID" -a "$WEBSERVER_PID" != 0 && kill "$WEBSERVER_PID"
+	test -n "$DOCKERD_PID" -a "$DOCKERD_PID" != 0 && kill "$DOCKERD_PID"
+	test -n "$CONTAINERD_PID" -a "$CONTAINERD_PID" != 0 && kill "$CONTAINERD_PID"
+    fi
     exit $1
 }
 
@@ -19,10 +28,6 @@ BUILD_ROOT=
 IS_UNSHARED=
 KILL=
 WEBSERVER=
-
-CONTAINERD_PID=0
-DOCKERD_PID=0
-WEBSERVER_PID=0
 
 while test -n "$1" ; do
     case "$1" in

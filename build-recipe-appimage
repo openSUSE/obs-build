@@ -117,6 +117,10 @@ recipe_resultdirs_appimage() {
     :
 }
 
+recipe_cleanup_appimage() {
+    :
+}
+
 # Local Variables:
 # mode: Shell-script
 # End:

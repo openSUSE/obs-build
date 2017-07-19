@@ -134,3 +134,7 @@ recipe_build_dsc() {
 recipe_resultdirs_dsc() {
     echo DEBS
 }
+
+recipe_cleanup_dsc() {
+    :
+}

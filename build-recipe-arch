@@ -54,6 +54,10 @@ recipe_resultdirs_arch() {
     echo ARCHPKGS
 }
 
+recipe_cleanup_arch() {
+    :
+}
+
 _arch_recipe_makepkg() {
     chroot $BUILD_ROOT su -lc "source /etc/profile; cd $TOPDIR/SOURCES && makepkg --config ../makepkg.conf $*" $BUILD_USER
 }

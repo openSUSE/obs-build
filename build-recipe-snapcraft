@@ -121,6 +121,10 @@ recipe_resultdirs_snapcraft() {
     :
 }
 
+recipe_cleanup_snapcraft() {
+    :
+}
+
 # Local Variables:
 # mode: Shell-script
 # End:

@@ -50,3 +50,7 @@ recipe_resultdirs_debbuild() {
     echo DEBS SDEBS
 }
 
+recipe_cleanup_debbuild() {
+    :
+}
+

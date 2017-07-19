@@ -108,6 +108,7 @@ BUILD_FLAVOR=
 OBS_PACKAGE=
 CACHE_DIR=/var/cache/build
 
+RECIPE_BUILD_START_TIME=
 
 # This is for insserv
 export YAST_IS_RUNNING=instsys
@@ -392,6 +393,11 @@ cleanup_and_exit () {
 	exit $1
     fi
     rm -f $BUILD_ROOT/exit
+
+    # add build time statistics
+    recipe_build_time_statistics
+
+    # check for disk full
     if test "$1" -eq 1 -a -x /bin/df ; then
         echo
         echo "$HOST failed \"build $RECIPEFILE\" at `date --utc`."
@@ -405,6 +411,13 @@ cleanup_and_exit () {
 	    set 3
         fi
     fi
+
+    # run recipe cleanup code
+    if test -z "$VM_TYPE" -o -n "$RUNNING_IN_VM" ; then
+	test -n "$BUILDTYPE" && recipe_cleanup
+    fi
+
+    # shutdown
     if test -n "$RUNNING_IN_VM" ; then
 	echo "$1" >  /.build/_exitcode
 	test -n "$browner" && chown "$browner" $BUILD_ROOT
@@ -1391,15 +1404,13 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	run_rsync
     fi
 
-    start_time=`date +%s`
+    RECIPE_BUILD_START_TIME=`date +%s`
     recipe_build
-    if test "$DO_STATISTICS" = 1; then
-        mkdir -p $TOPDIR/OTHER
-        echo "TIME_main_build: $(( `date +%s` - $start_time ))"  >> $TOPDIR/OTHER/_statistics
-    fi
-    unset start_time
-
     test "$BUILD_SUCCEEDED" = true || cleanup_and_exit 1
+
+    recipe_build_time_statistics
+    recipe_cleanup
+
     test -d "$SRCDIR" && cd "$SRCDIR"
 
     # unmount stuff
@@ -1412,11 +1423,11 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     fi
 done
 
-if test -n "$RUNNING_IN_VM" -a -n "$DO_STATISTICS" ; then
-    touch /.build/_statistics.exit
+if test -n "$RUNNING_IN_VM" ; then
+    vm_exit_statistics
 fi
 
-# mount /proc for the post processing steps
+# mount /proc again for the post processing steps
 if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
     mount -n -tproc none $BUILD_ROOT/proc
 fi

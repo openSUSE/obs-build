@@ -106,3 +106,7 @@ recipe_resultdirs_simpleimage() {
     :
 }
 
+recipe_cleanup_simpleimage() {
+    :
+}
+

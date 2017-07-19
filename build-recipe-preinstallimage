@@ -77,3 +77,7 @@ recipe_resultdirs_preinstallimage() {
     :
 }
 
+recipe_cleanup_preinstallimage() {
+    :
+}
+

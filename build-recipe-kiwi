@@ -684,3 +684,7 @@ recipe_build_kiwi() {
 recipe_resultdirs_kiwi() {
     echo KIWI
 }
+
+recipe_cleanup_kiwi() {
+    :
+}

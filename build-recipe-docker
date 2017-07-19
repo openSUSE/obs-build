@@ -25,6 +25,8 @@
 #
 ################################################################
 
+DOCKERD_STARTED=
+
 recipe_setup_docker() {
     TOPDIR="/usr/src/packages"
     mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
@@ -59,6 +61,7 @@ recipe_build_docker() {
     if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver "$TOPDIR/SOURCES/packages" ; then
 	cleanup_and_exit 1
     fi
+    DOCKERD_STARTED=true
 
     echo "Loading base image"
     if test -L "$base_image_path" ; then
@@ -99,10 +102,7 @@ recipe_build_docker() {
     fi
 
     if [ -z "$IMAGE_NAME" ] || [ -z "$TAG" ]; then
-        echo "TAG file missing of contents invalid (use image_name:tag format)"
-	$BUILD_DIR/startdockerd --root "$BUILD_ROOT" --kill
-        BUILD_SUCCEEDED=false
-        return
+        cleanup_and_exit 1 "TAG file missing of contents invalid (use image_name:tag format)"
     fi
 
     # Use tag to generate the filename for the image
@@ -111,30 +111,33 @@ recipe_build_docker() {
 
     echo "Building image"
     if ! chroot $BUILD_ROOT docker build --network=host -t "$IMAGE_NAME:$TAG" --build-arg OBS_REPOSITORY_URL=http://localhost:80 $TOPDIR/SOURCES/ ; then
-        echo "Docker build command failed"
-	$BUILD_DIR/startdockerd --root "$BUILD_ROOT" --kill
-        BUILD_SUCCEEDED=false
-        return
+        cleanup_and_exit 1 "Docker build command failed"
     fi
 
     # Save the resulting image to a tarball.
+    echo "Saving image"
     mkdir -p $BUILD_ROOT$TOPDIR/DOCKER
     if ! chroot $BUILD_ROOT docker save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$IMAGE_NAME:$TAG" ; then
-        echo "Docker save command failed"
-	$BUILD_DIR/startdockerd --root "$BUILD_ROOT" --kill
-        BUILD_SUCCEEDED=false
-        return
+        cleanup_and_exit 1 "Docker save command failed"
     fi
     
     # Create containerinfo
     perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$IMAGE_NAME:$TAG" containers/annotation> "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
 
-    $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --kill
+    recipe_cleanup_docker
+
     BUILD_SUCCEEDED=true
 }
 
 recipe_resultdirs_docker() {
     echo DOCKER
+}
+
+recipe_cleanup_docker() {
+    if test -n "$DOCKERD_STARTED" ; then
+	DOCKERD_STARTED=
+	$BUILD_DIR/startdockerd --root "$BUILD_ROOT" --kill
+    fi
 }
 
 # Local Variables:

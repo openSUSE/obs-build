@@ -258,6 +258,10 @@ recipe_resultdirs_livebuild() {
     :
 }
 
+recipe_cleanup_livebuild() {
+    :
+}
+
 # Local Variables:
 # mode: Shell-script
 # End:

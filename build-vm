@@ -474,6 +474,19 @@ linux64() {
     perl -e 'syscall('$PERSONALITY_SYSCALL', 0); exec(@ARGV) || die("$ARGV[0]: $!\n")' "$@"
 }
 
+vm_start_statistics() {
+    if test "$DO_STATISTICS" = 1 ; then
+	rm -f /.build/_statistics.exit
+        ( background_monitor_process & )
+    fi
+}
+
+vm_exit_statistics() {
+    if test "$DO_STATISTICS" = 1 ; then
+	rm -f /.build/_statistics.exit
+    fi
+}
+
 vm_detect_2nd_stage() {
     if test ! -e /.build/build.data -o -n "$BUILD_IGNORE_2ND_STAGE" ; then
 	return 1
@@ -564,11 +577,8 @@ vm_detect_2nd_stage() {
     test -L /var/run -a ! -e /var/run && rm -f /var/run
     test -L /var/lock -a ! -e /var/lock && rm -f /var/lock
 
-    # fork a process monitoring max filesystem usage during build
-    if test "$DO_STATISTICS" = 1 ; then
-	rm -f /.build/_statistics.exit
-        ( background_monitor_process & )
-    fi
+    # start a process monitoring max filesystem usage during build
+    vm_start_statistics
 
     if test ! -e /dev/.udev ; then
         echo "WARNING: udev not running, creating extra device nodes"
