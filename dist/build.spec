@@ -1,7 +1,7 @@
 #
 # spec file for package build
 #
-# Copyright (c) 2016 SUSE LINUX GmbH, Nuernberg, Germany.
+# Copyright (c) 2017 SUSE LINUX GmbH, Nuernberg, Germany.
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -22,7 +22,7 @@ Name:           build
 Summary:        A Script to Build SUSE Linux RPMs
 License:        GPL-2.0+ and GPL-2.0
 Group:          Development/Tools/Building
-Version:        20160531
+Version:        20170719
 Release:        0
 Source:         obs-build-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
@@ -154,6 +154,10 @@ test -e default.conf || exit 1
 %check
 if [ `whoami` != "root" ]; then
   echo "WARNING: Not building as root, tests did not run!"
+  exit 0
+fi
+if [ ! -f "$RPM_BUILD_ROOT/usr/lib/build/configs/default.conf" ]; then
+  echo "WARNING: No default config, tests did not run!"
   exit 0
 fi
 # get back the default.conf link
