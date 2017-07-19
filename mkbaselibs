@@ -379,6 +379,7 @@ sub parse_config {
   my $pkghasmatched;
 
   my $pkgmatches = 1;
+  my $packageseen = 0;
   $prefix = '';
   $legacyversion = '';
   $extension = '';
@@ -407,6 +408,12 @@ sub parse_config {
     s/\s+$//;
     next if $_ eq '' || $_ =~ /^#/;
 
+    if ($_ eq 'end_of_config') {
+      $pkgmatches = 0;
+      $packageseen = 0;
+      next;
+    }
+
     s/\<targettype\>/$targettype/g;
     s/\<targetarch\>/$targetarch/g;
     s/\<name\>/$pkgname/g;
@@ -421,10 +428,12 @@ sub parse_config {
     }
     next if /^targets\s+/;
     if (/\s+package\s+[-+_a-zA-Z0-9]+$/) {
-      $pkgmatches = 0;	# XXX: hack
+      $pkgmatches = 0;	# XXX: hack for targettype/targetarch conditional
+      $packageseen = 1;
     }
     if (/\s+package\s+\/[-+_a-zA-Z0-9]+\/$/) {
       $pkgmatches = 0;	# XXX: hack
+      $packageseen = 1;
     }
     if (/^targettype\s+/) {
       next unless s/^targettype\s+\Q$targettype\E\s+//;
@@ -436,18 +445,23 @@ sub parse_config {
     if (/^legacyversion\s+(.*?)$/) { $legacyversion = $1; next; }
     if (/^extension\s+(.*?)$/) { $extension = $1; next; }
     if (/^configdir\s+(.*?)$/) { $configdir= $1; next; }
-    if (/^targetname\s+(.*?)$/) { $targetname = $1; next; }
+    if (/^targetname\s+(.*?)$/) {
+      $targetname = $1 if $pkgmatches || !$packageseen;
+      next;
+    }
 
     $_ = "baselib $_" if /^[\+\-\"]/;
     $_ = "package $_" if /^[-+_a-zA-Z0-9]+$/;
     if (/^package\s+\/(.*?)\/$/) {
       my $pm = $1;
+      $packageseen = 1;
       $pkgmatches = $pkgname =~ /$pm/;
-      $match1 = $1 if defined $1;
+      $match1 = defined($1) ? $1 : '' if $pkgmatches;
       $pkghasmatched |= $pkgmatches if $pkgname =~ /-debuginfo$/ && $target_matched{$target};
       next;
     }
     if (/^package\s+(.*?)$/) {
+      $packageseen = 1;
       $pkgmatches = $1 eq $pkgname;
       $pkghasmatched |= $pkgmatches;
       next;
@@ -481,7 +495,8 @@ sub read_config {
   my @cf = <F>;
   close F;
   $config .= join('', @cf);
-  $config .= "\npackage __does_not_match__\n";
+  # add end of config marker to reset package matching
+  $config .= "\nend_of_config\n";
 }
 
 sub get_targets {
@@ -1094,18 +1109,21 @@ sub handle_debs {
   }
 }
 
-# args is a list of full pathnames to rpm/deb files
-die("Usage: mkbaselibs <rpms>\n") unless @ARGV;
+while (@ARGV) {
+  if ($ARGV[0] eq '-v') {
+    $verbose = 1;
+    shift @ARGV;
+  } elsif ($ARGV[0] eq '-c') {
+    shift @ARGV;
+    read_config($ARGV[0]);
+    shift @ARGV;
+  } else {
+    last;
+  }
+}
 
-if ($ARGV[0] eq '-v') {
-  $verbose = 1;
-  shift @ARGV;
-}
-while ($ARGV[0] eq '-c') {
-  shift @ARGV;
-  read_config($ARGV[0]);
-  shift @ARGV;
-}
+# args is a list of full pathnames to rpm/deb files
+die("Usage: mkbaselibs [-v] [-c config] <rpms>\n") unless @ARGV;
 
 my %goodpkgs = map {$_ => 1} get_pkgnames();  # These are packages named in the config file
 my @pkgs = @ARGV;
@@ -1129,7 +1147,7 @@ for my $rpm (@pkgs) {
   $rpmn =~ s/\.rpm$//; # remove extension
   push @rpms, $rpm if $goodpkgs{$rpmn};
   if ($rpmn =~ s/-debuginfo$//) {
-      push @debugrpms, $rpm if $goodpkgs{$rpmn};
+    push @debugrpms, $rpm if $goodpkgs{$rpmn};
   }
 }
 for (@rpms) {
@@ -1152,19 +1170,18 @@ for my $deb (@pkgs) {
   print "ignoring $deb as $debn not in baselibs.conf\n" if !$debs_to_process{$debn};
 }
 for (@debs) {
-    die("$_: need absolute path to package\n") unless /^\//;
+  die("$_: need absolute path to package\n") unless /^\//;
 }
 
 exit 0 unless @rpms or @debs;
 
 if (@rpms) {
-    @filesystem = split("\n", `rpm -ql filesystem 2>/dev/null`);
-    die("filesystem rpm is not installed\n") unless @filesystem;
-
-    handle_rpms(@rpms);
-    handle_rpms(@debugrpms);
+  @filesystem = split("\n", `rpm -ql filesystem 2>/dev/null`);
+  die("filesystem rpm is not installed\n") unless @filesystem;
+  handle_rpms(@rpms);
+  handle_rpms(@debugrpms);
 }
 
 if (@debs) {
-    handle_debs(@debs);
+  handle_debs(@debs);
 }
