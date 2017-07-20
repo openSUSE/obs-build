@@ -1,0 +1,11 @@
+Name: "uaa-fissile-package"
+Version: 0.0
+Release: 0
+Summary: This package generates docker images for uaa-fissile-release
+License: [TBD]
+Description: "This is a very long description"
+DockerImageDeps:
+  - "fissile-dev:201707081450"
+Build: "./build"
+Artifacts:
+  - ".bosh/cache/*"

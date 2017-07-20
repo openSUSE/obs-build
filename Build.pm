@@ -37,6 +37,7 @@ our $do_livebuild;
 our $do_snapcraft;
 our $do_appimage;
 our $do_docker;
+our $do_fissile;
 
 sub import {
   for (@_) {
@@ -49,8 +50,10 @@ sub import {
     $do_snapcraft = 1 if $_ eq ':snapcraft';
     $do_appimage = 1 if $_ eq ':appimage';
     $do_docker = 1 if $_ eq ':docker';
+    $do_fissile = 1 if $_ eq ':fissile';
   }
-  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker;
+  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker && !$do_fissile;
+
   if ($do_deb) {
     require Build::Deb;
   }
@@ -74,6 +77,9 @@ sub import {
   }
   if ($do_docker) {
     require Build::Docker;
+  }
+  if ($do_fissile) {
+    require Build::Fissile;
   }
 }
 
@@ -389,7 +395,7 @@ sub read_config {
     $config->{'binarytype'} = 'rpm' if $config->{'type'} eq 'spec' || $config->{'type'} eq 'kiwi';
     $config->{'binarytype'} = 'deb' if $config->{'type'} eq 'dsc' || $config->{'type'} eq 'collax' || $config->{'type'} eq 'livebuild';
     $config->{'binarytype'} = 'arch' if $config->{'type'} eq 'arch';
-    if ($config->{'type'} eq 'snapcraft' || $config->{'type'} eq 'appimage' || $config->{'type'} eq 'docker') {
+    if (grep {$_ eq $config->{'type'}} @{['snapcraft', 'appimages', 'docker', 'fissile']}){
       if (grep {$_ eq 'rpm'} @{$config->{'preinstall'} || []}) {
         $config->{'binarytype'} = 'rpm';
       } elsif (grep {$_ eq 'debianutils'} @{$config->{'preinstall'} || []}) {
@@ -499,6 +505,9 @@ my %subst_defaults = (
   'system-packages:docker' => [
     'docker',
   ],
+  'system-packages:fissile' => [
+    'docker', # TODO: Add fissile here as soon as it is packaged
+  ],
   'system-packages:deltarpm' => [
     'deltarpm',
   ],
@@ -539,7 +548,7 @@ sub get_build {
     return (undef, $err) if $err;
   }
   my $buildtype = $config->{'type'} || '';
-  if ($buildtype eq 'livebuild' || $buildtype eq 'docker' || $buildtype eq 'kiwi') {
+  if (grep {$_ eq $buildtype} @{['livebuild', 'docker', 'kiwi', 'fissile']}){
     push @deps, @{$config->{'substitute'}->{"build-packages:$buildtype"}
 		  || $subst_defaults{"build-packages:$buildtype"} || []};
   }
@@ -613,6 +622,9 @@ sub get_sysbuild {
   } elsif ($buildtype eq 'docker') {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:docker'} || []} unless @sysdeps;
     @sysdeps = @{$subst_defaults{'system-packages:docker'} || []} unless @sysdeps;
+  } elsif ($buildtype eq 'fissile') {
+    @sysdeps = @{$config->{'substitute'}->{'system-packages:fissile'} || []} unless @sysdeps;
+    @sysdeps = @{$subst_defaults{'system-packages:fissile'} || []} unless @sysdeps;
   } elsif ($buildtype eq 'deltarpm') {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:deltarpm'} || []};
     @sysdeps = @{$subst_defaults{'system-packages:deltarpm'} || []} unless @sysdeps;
@@ -1648,6 +1660,7 @@ sub recipe2buildtype {
   return 'snapcraft' if $recipe eq 'snapcraft.yaml';
   return 'appimage' if $recipe eq 'appimage.yml';
   return 'docker' if $recipe eq 'Dockerfile';
+  return 'fissile' if $recipe eq 'fissile.yml';
   return 'preinstallimage' if $recipe eq '_preinstallimage';
   return 'simpleimage' if $recipe eq 'simpleimage';
   return undef;
@@ -1699,6 +1712,7 @@ sub parse {
   return Build::Snapcraft::parse($cf, $fn, @args) if $do_snapcraft && $fnx eq 'snapcraft.yaml';
   return Build::Appimage::parse($cf, $fn, @args) if $do_appimage && $fnx eq 'appimage.yml';
   return Build::Docker::parse($cf, $fn, @args) if $do_docker && $fnx eq 'Dockerfile';
+  return Build::Fissile::parse($cf, $fn, @args) if $do_fissile && $fnx eq 'fissile.yml';
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $fnx eq 'PKGBUILD';
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $fnx eq 'build.collax';
   return parse_preinstallimage($cf, $fn, @args) if $fnx eq '_preinstallimage';
@@ -1715,6 +1729,7 @@ sub parse_typed {
   return Build::Snapcraft::parse($cf, $fn, @args) if $do_snapcraft && $buildtype eq 'snapcraft';
   return Build::Appimage::parse($cf, $fn, @args) if $do_appimage && $buildtype eq 'appimage';
   return Build::Docker::parse($cf, $fn, @args) if $do_docker && $buildtype eq 'docker';
+  return Build::Fissile::parse($cf, $fn, @args) if $do_fissile && $buildtype eq 'fissile';
   return parse_simpleimage($cf, $fn, @args) if $buildtype eq 'simpleimage';
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $buildtype eq 'arch';
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $buildtype eq 'collax';
