@@ -135,20 +135,44 @@ chmod 0644 $RPM_BUILD_ROOT/usr/lib/build/initvm.*
 
 # main
 make DESTDIR=$RPM_BUILD_ROOT install
-cd $RPM_BUILD_ROOT/usr/lib/build/configs/
-%if "0%{?suse_version}" == "1315" && 0%{?is_opensuse}
-# super special leap distro
- ln -s sl42.1.conf default.conf
-%else
+
+# tweak default config on suse
 %if 0%{?suse_version}
-%if 0%{?sles_version}
- ln -s sles%{sles_version}.conf default.conf
-%else
- V=%suse_version
- ln -s sl${V:0:2}.${V:2:1}.conf default.conf
+cd $RPM_BUILD_ROOT/usr/lib/build/configs/
+SUSE_V=%suse_version
+SLE_V=%sle_version
+%if 0{?sle_version} && 0%{?is_opensuse} && %suse_version == 1315
+# this is SUSE Leap 42.X
+ln -s sl42.${SLE_V:3:1} default.conf
 %endif
+%if 0{?sle_version} && 0%{?is_opensuse} && %suse_version > 1315
+# this is SUSE Leap 15 and higher
+ln -s sl${SLE_V:0:2}.${SLE_V:3:1} default.conf
+%endif
+%if !0{?sle_version} && 0%{?is_opensuse}
+# this is old openSUSE releases and Factory
+ln -s sl${SUSE_V:0:2}.${SUSE_V:2:1}.conf default.conf
+%endif
+%if 0{?sle_version} && !0%{?is_opensuse}
+# this is SUSE SLE 12 and higher
+ln -s sle${SLE_V:0:2}.${SLE_V:3:1} default.conf
+%endif
+# make sure that we have a config
 test -e default.conf || exit 1
 %endif
+
+# tweak baselibs config on suse
+%if 0%{?suse_version}
+cd $RPM_BUILD_ROOT/usr/lib/build/baselibs_configs
+%if %suse_version == 1500
+# SLE 15 / Leap 15
+ln -sf baselibs_configs/baselibs_global-sle15.conf baselibs_global.conf
+%endif
+%if %suse_version <= 1315
+# SLE 12 / Leap 42 and older
+ln -sf baselibs_configs/baselibs_global-sle12.conf baselibs_global.conf
+%endif
+test -e baselibs_global.conf || exit 1
 %endif
 
 %check

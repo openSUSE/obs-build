@@ -29,6 +29,7 @@ test:
 install:
 	install -m755 -d \
 	    $(DESTDIR)$(pkglibdir)/configs \
+	    $(DESTDIR)$(pkglibdir)/baselibs_configs \
 	    $(DESTDIR)$(pkglibdir)/Build \
 	    $(DESTDIR)$(pkglibdir)/emulator \
 	    $(DESTDIR)$(bindir) \
@@ -79,14 +80,17 @@ install:
 	install -m644 build-vm build-vm-* $(DESTDIR)$(pkglibdir)
 	install -m644 build-recipe build-recipe-* $(DESTDIR)$(pkglibdir)
 	install -m644 build-pkg build-pkg-* $(DESTDIR)$(pkglibdir)
-	install -m644 *.pm baselibs_global*.conf lxc.conf $(DESTDIR)$(pkglibdir)
+	install -m644 *.pm lxc.conf $(DESTDIR)$(pkglibdir)
 	install -m644 configs/* $(DESTDIR)$(pkglibdir)/configs
+	install -m644 baselibs_configs/* $(DESTDIR)$(pkglibdir)/baselibs_configs
 	install -m644 build.1 $(DESTDIR)$(man1dir)
 	install -m644 vc.1 $(DESTDIR)$(man1dir)
 	install -m644 unrpm.1 $(DESTDIR)$(man1dir)
 	ln -sf $(pkglibdir)/build $(DESTDIR)$(bindir)/build
 	ln -sf $(pkglibdir)/vc    $(DESTDIR)$(bindir)/buildvc
 	ln -sf $(pkglibdir)/unrpm $(DESTDIR)$(bindir)/unrpm
+	ln -s baselibs_configs/baselibs_global.conf $(DESTDIR)$(pkglibdir)/baselibs_global.conf
+	ln -s baselibs_configs/baselibs_global-deb.conf $(DESTDIR)$(pkglibdir)/baselibs_global-deb.conf
 
 # Allow initvm to be packaged seperately from the rest of build.  This
 # is useful because it is distributed as a static binary package (e.g.
