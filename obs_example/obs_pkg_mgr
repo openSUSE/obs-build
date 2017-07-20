@@ -21,7 +21,7 @@ function enable_repos {
 
   # Enable all repos
   for repo in "${repos[@]}"; do
-    zypper modifyrepo -d $repo
+    zypper modifyrepo -e $repo
   done
 }
 
@@ -34,7 +34,8 @@ install() {
   [ ! -z "$OBS_REPOSITORY_URL" ] && disable_repos
 
   zypper ref
-  zypper -n in "$@"
+  # TODO: use the "-r" option to avoid disabling/enabling repos
+  zypper --no-gpg-checks -n in "$@"
 
   [ ! -z "$OBS_REPOSITORY_URL" ] && enable_repos
 }

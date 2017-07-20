@@ -33,16 +33,14 @@ sub parse {
   return {'error' => "Failed to parse yml file"} unless $yml;
 
   my $ret = {};
-  $ret->{'name'} = $yml->{'Name'};
-  $ret->{'version'} = $yml->{'Version'} || "0";
+  $ret->{'name'} = $yml->{'Name'} || 'fissile';
+  $ret->{'version'} = $yml->{'Version'} if $yml->{'Version'};
 
   my @deps;
-  foreach (@{$yml->{'DockerImageDeps'}}) {
+  for (@{$yml->{'DockerImageDeps'} || []}) {
     # This generates something like: "container:fissile-dev:201707081450"
-    # Will that work? (2 colons etc)
-    push @deps, ("container:$_");
+    push @deps, "container:$_";
   }
-
   $ret->{'deps'} = \@deps;
 
   return $ret;

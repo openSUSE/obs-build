@@ -387,15 +387,14 @@ sub read_config {
       $config->{'type'} = 'dsc';
     } elsif (grep {$_ eq 'pacman'} @{$config->{'preinstall'} || []}) {
       $config->{'type'} = 'arch';
-    } else {
-      $config->{'type'} = 'UNDEFINED';
     }
+    $config->{'type'} ||= 'UNDEFINED';
   }
   if (!$config->{'binarytype'}) {
-    $config->{'binarytype'} = 'rpm' if $config->{'type'} eq 'spec' || $config->{'type'} eq 'kiwi';
+    $config->{'binarytype'} = 'rpm' if $config->{'type'} eq 'spec';
     $config->{'binarytype'} = 'deb' if $config->{'type'} eq 'dsc' || $config->{'type'} eq 'collax' || $config->{'type'} eq 'livebuild';
     $config->{'binarytype'} = 'arch' if $config->{'type'} eq 'arch';
-    if (grep {$_ eq $config->{'type'}} @{['snapcraft', 'appimages', 'docker', 'fissile']}){
+    if (grep {$_ eq $config->{'type'}} qw{snapcraft appimage docker fissile kiwi}){
       if (grep {$_ eq 'rpm'} @{$config->{'preinstall'} || []}) {
         $config->{'binarytype'} = 'rpm';
       } elsif (grep {$_ eq 'debianutils'} @{$config->{'preinstall'} || []}) {
@@ -548,7 +547,7 @@ sub get_build {
     return (undef, $err) if $err;
   }
   my $buildtype = $config->{'type'} || '';
-  if (grep {$_ eq $buildtype} @{['livebuild', 'docker', 'kiwi', 'fissile']}){
+  if (grep {$_ eq $buildtype} qw{livebuild docker kiwi fissile}) {
     push @deps, @{$config->{'substitute'}->{"build-packages:$buildtype"}
 		  || $subst_defaults{"build-packages:$buildtype"} || []};
   }
