@@ -1,7 +1,7 @@
 #
 # spec file for package build-mkbaselibs-sle
 #
-# Copyright (c) 2011 SUSE LINUX Products GmbH, Nuernberg, Germany.
+# Copyright (c) 2017 SUSE LINUX GmbH, Nuernberg, Germany.
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -15,19 +15,16 @@
 # Please submit bugfixes or comments via http://bugs.opensuse.org/
 #
 
-# norootforbuild
-
 
 Name:           build-mkbaselibs-sle
-License:        GPLv2+
-Group:          Development/Tools/Building
-AutoReqProv:    on
 Summary:        Tools to generate base lib packages
-Version:        2011.07.01
-Release:        1
+License:        GPL-2.0+
+Group:          Development/Tools/Building
+Version:        20170720
+Release:        0
 #!BuildIgnore:  build-mkbaselibs
 Provides:       build-mkbaselibs
-Source:         build-%{version}.tar.gz
+Source:         obs-build-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildArch:      noarch
 
@@ -38,7 +35,7 @@ for generating base lib packages.
 This is the SLE variant including IA64 binary generation.
 
 %prep
-%setup -q -n build-%{version}
+%setup -q -n obs-build-%{version}
 
 %build
 
