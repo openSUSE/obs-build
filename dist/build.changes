@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Thu Jul 20 13:59:20 CEST 2017 - mls@suse.de
+
+- switch baselibs scheme for debuginfo packages from
+  foo-debuginfo-32bit to foo-32bit-debuginfo [fate#323217]
+
+-------------------------------------------------------------------
 Fri Mar 17 12:57:03 UTC 2017 - adrian@suse.de
 
 - fix usage of the right service generated files.
