@@ -139,21 +139,21 @@ make DESTDIR=$RPM_BUILD_ROOT install
 # tweak default config on suse
 %if 0%{?suse_version}
 cd $RPM_BUILD_ROOT/usr/lib/build/configs/
-SUSE_V=%suse_version
-SLE_V=%sle_version
-%if 0{?sle_version} && 0%{?is_opensuse} && %suse_version == 1315
+SUSE_V=%{?suse_version}
+SLE_V=%{?sle_version}
+%if 0%{?sle_version} && 0%{?is_opensuse} && %suse_version == 1315
 # this is SUSE Leap 42.X
 ln -s sl42.${SLE_V:3:1} default.conf
 %endif
-%if 0{?sle_version} && 0%{?is_opensuse} && %suse_version > 1315
+%if 0%{?sle_version} && 0%{?is_opensuse} && %suse_version > 1315
 # this is SUSE Leap 15 and higher
 ln -s sl${SLE_V:0:2}.${SLE_V:3:1} default.conf
 %endif
-%if !0{?sle_version} && 0%{?is_opensuse}
+%if !0%{?sle_version} && 0%{?is_opensuse}
 # this is old openSUSE releases and Factory
 ln -s sl${SUSE_V:0:2}.${SUSE_V:2:1}.conf default.conf
 %endif
-%if 0{?sle_version} && !0%{?is_opensuse}
+%if 0%{?sle_version} && !0%{?is_opensuse}
 # this is SUSE SLE 12 and higher
 ln -s sle${SLE_V:0:2}.${SLE_V:3:1} default.conf
 %endif
@@ -163,7 +163,7 @@ test -e default.conf || exit 1
 
 # tweak baselibs config on suse
 %if 0%{?suse_version}
-cd $RPM_BUILD_ROOT/usr/lib/build/baselibs_configs
+cd $RPM_BUILD_ROOT/usr/lib/build
 %if %suse_version == 1500
 # SLE 15 / Leap 15
 ln -sf baselibs_configs/baselibs_global-sle15.conf baselibs_global.conf
