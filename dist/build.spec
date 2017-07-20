@@ -143,11 +143,11 @@ SUSE_V=%{?suse_version}
 SLE_V=%{?sle_version}
 %if 0%{?sle_version} && 0%{?is_opensuse} && %suse_version == 1315
 # this is SUSE Leap 42.X
-ln -s sl42.${SLE_V:3:1} default.conf
+ln -s sl42.${SLE_V:3:1}.conf default.conf
 %endif
 %if 0%{?sle_version} && 0%{?is_opensuse} && %suse_version > 1315
 # this is SUSE Leap 15 and higher
-ln -s sl${SLE_V:0:2}.${SLE_V:3:1} default.conf
+ln -s sl${SLE_V:0:2}.${SLE_V:3:1}.conf default.conf
 %endif
 %if !0%{?sle_version} && 0%{?is_opensuse}
 # this is old openSUSE releases and Factory
@@ -155,7 +155,7 @@ ln -s sl${SUSE_V:0:2}.${SUSE_V:2:1}.conf default.conf
 %endif
 %if 0%{?sle_version} && !0%{?is_opensuse}
 # this is SUSE SLE 12 and higher
-ln -s sle${SLE_V:0:2}.${SLE_V:3:1} default.conf
+ln -s sle${SLE_V:0:2}.${SLE_V:3:1}.conf default.conf
 %endif
 # make sure that we have a config
 test -e default.conf || exit 1
