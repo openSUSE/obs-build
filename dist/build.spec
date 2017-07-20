@@ -22,7 +22,7 @@ Name:           build
 Summary:        A Script to Build SUSE Linux RPMs
 License:        GPL-2.0+ and GPL-2.0
 Group:          Development/Tools/Building
-Version:        20170719
+Version:        20170720
 Release:        0
 Source:         obs-build-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
@@ -149,13 +149,17 @@ ln -s sl42.${SLE_V:3:1}.conf default.conf
 # this is SUSE Leap 15 and higher
 ln -s sl${SLE_V:0:2}.${SLE_V:3:1}.conf default.conf
 %endif
-%if !0%{?sle_version} && 0%{?is_opensuse}
+%if !0%{?sle_version} && ( 0%{?suse_version} <= 1310 || 0%{?suse_version} == 1320 || 0%{?suse_version} == 1330 )
 # this is old openSUSE releases and Factory
 ln -s sl${SUSE_V:0:2}.${SUSE_V:2:1}.conf default.conf
 %endif
 %if 0%{?sle_version} && !0%{?is_opensuse}
 # this is SUSE SLE 12 and higher
 ln -s sle${SLE_V:0:2}.${SLE_V:3:1}.conf default.conf
+%endif
+%if 0%{?sles_version} == 1110
+# this is SUSE SLE 11 
+ln -s sles11sp2.conf default.conf
 %endif
 # make sure that we have a config
 test -e default.conf || exit 1
