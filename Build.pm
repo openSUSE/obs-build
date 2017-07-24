@@ -52,7 +52,7 @@ sub import {
     $do_docker = 1 if $_ eq ':docker';
     $do_fissile = 1 if $_ eq ':fissile';
   }
-  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker && !$do_fissile;
+  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = $do_fissile = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker && !$do_fissile;
 
   if ($do_deb) {
     require Build::Deb;
