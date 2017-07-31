@@ -75,9 +75,9 @@ recipe_build_fissile() {
     cd $BUILD_ROOT/$TOPDIR/SOURCES
     # Extract the release directory.
     if [ -f release.tar.xz ]; then
-      tar -xf release.tar.xz
+	tar -xf release.tar.xz
     else
-      cleanup_and_exit 1 "Couldn't find the release source tarball. Check your _service file if you use one."
+	cleanup_and_exit 1 "Couldn't find the release source tarball. Check your _service file if you use one."
     fi
 
     # Move cached bosh tarballs to the directory where fissile will look
@@ -87,7 +87,7 @@ recipe_build_fissile() {
     cd release
     # Extract cached release ymls to their locations.
     if [ -f ../yml-cache.tar.gz ]; then
-      tar -xf ../yml-cache.tar.gz
+	tar -xf ../yml-cache.tar.gz
     fi
 
     # TODO: Remove this hackery when we use a later runc package (that already provides this symlink)
