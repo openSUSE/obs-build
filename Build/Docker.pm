@@ -138,7 +138,6 @@ sub showcontainerinfo {
     }
   }
   print "{\n";
-  print "  \"name\": \"$d->{'name'}\"";
   print ",\n  \"tags\": [ ".join(', ', @tags)." ]" if @tags;
   print ",\n  \"repos\": [ ".join(', ', @repos)." ]" if @repos;
   print ",\n  \"file\": \"$image\"" if defined $image;
