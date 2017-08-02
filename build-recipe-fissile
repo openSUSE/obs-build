@@ -67,9 +67,11 @@ recipe_build_fissile() {
         echo "Layered image found"
         chroot $BUILD_ROOT docker load --input $TOPDIR/SOURCES/$docker_image_path
     else
-        echo "Filesystem image found"
-        desired_tag=$(grep "^\s*FROM" Dockerfile | cut -d" " -f2)
-        chroot $BUILD_ROOT docker import $TOPDIR/SOURCES/$docker_image_path "$desired_tag"
+      # We allow more than one docker image dependencies so we can't map
+      # the tarballs to image names (in fissile.yml). Let it break if the
+      # images are not layered but consider some solution based on the tarball
+      # names (TODO)
+      cleanup_and_exit 1 "Docker images are not layered. No way to map to image name/tags."
     fi
   
     cd $BUILD_ROOT/$TOPDIR/SOURCES
@@ -81,8 +83,9 @@ recipe_build_fissile() {
     fi
 
     # Move cached bosh tarballs to the directory where fissile will look
-    mkdir -p $BUILD_ROOT/root/.bosh/cache
-    find . -maxdepth 1 -regextype posix-egrep -regex '.{40,}' -exec cp -t $BUILD_ROOT/root/.bosh/cache/ {} +
+    export FISSILE_CACHE_DIR=/root/.bosh/cache/
+    mkdir -p $BUILD_ROOT$FISSILE_CACHE_DIR
+    find . -maxdepth 1 -regextype posix-egrep -regex '.{40,}' -exec cp -t $BUILD_ROOT$FISSILE_CACHE_DIR {} +
 
     cd release
     # Extract cached release ymls to their locations.
@@ -94,20 +97,29 @@ recipe_build_fissile() {
     ln -fs /usr/sbin/runc $BUILD_ROOT/usr/bin/docker-runc
 
     echo "Building packages with fissile"
-    chroot $BUILD_ROOT /bin/bash -c "cd $TOPDIR/SOURCES/release && . .envrc && fissile build packages"
+    if ! chroot $BUILD_ROOT /bin/bash -c "cd $TOPDIR/SOURCES/release && . .envrc && fissile build packages"; then
+      cleanup_and_exit 1 "fissile build packages failed"
+    fi
 
     echo "Building images with fissile"
-    chroot $BUILD_ROOT /bin/bash -c "cd $TOPDIR/SOURCES/release && . .envrc && fissile build images"
+    if ! chroot $BUILD_ROOT /bin/bash -c "cd $TOPDIR/SOURCES/release && . .envrc && fissile build images"; then
+      cleanup_and_exit 1 "fissile build images failed"
+    fi
 
-    # Save the resulting image to a tarball.
-    # echo "Saving image"
-    # mkdir -p $BUILD_ROOT$TOPDIR/DOCKER
-    # if ! chroot $BUILD_ROOT docker save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$IMAGE_NAME:$TAG" ; then
-    #     cleanup_and_exit 1 "Docker save command failed"
-    # fi
-    
+    # Save the resulting images to tarballs.
+    mkdir -p $BUILD_ROOT$TOPDIR/FISSILE
+    non_built_images=$(perl -MYAML::XS -e "print join('|', @{YAML::XS::LoadFile('$BUILD_ROOT$TOPDIR/SOURCES/fissile.yml')->{'DockerImageDeps'}})")
+
+    for image in $(chroot $BUILD_ROOT docker images --format "{{.Repository}}:{{.Tag}}" | grep -v $non_built_images); do
+      echo "Saving image $image"
+      filename=$(echo $image | sed 's/\//_/g')
+      if ! chroot $BUILD_ROOT docker save --output "$TOPDIR/FISSILE/$filename.tar" $image ; then
+        cleanup_and_exit 1 "Docker save command failed"
+      fi
+    done
+
     # Create containerinfo
-    # perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$IMAGE_NAME:$TAG" containers/annotation> "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
+    # perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$IMAGE_NAME:$TAG" containers/annotation> "$BUILD_ROOT$TOPDIR/FISSILE/$FILENAME.containerinfo"
 
     recipe_cleanup_fissile
 
@@ -115,7 +127,7 @@ recipe_build_fissile() {
 }
 
 recipe_resultdirs_fissile() {
-    echo DOCKER
+    echo FISSILE
 }
 
 recipe_cleanup_fissile() {
