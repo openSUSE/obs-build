@@ -43,9 +43,9 @@ This is the SLE variant including IA64 binary generation.
 install -m 0755 -d $RPM_BUILD_ROOT/usr/lib/build
 install -m 0755 mkbaselibs \
                 $RPM_BUILD_ROOT/usr/lib/build/mkbaselibs
-install -m 0644 baselibs_global-deb.conf \
+install -m 0644 baselibs_configs/baselibs_global-deb.conf \
                 $RPM_BUILD_ROOT/usr/lib/build/baselibs_global-deb.conf
-install -m 0644 baselibs_global-sle.conf \
+install -m 0644 baselibs_configs/baselibs_global-sle.conf \
                 $RPM_BUILD_ROOT/usr/lib/build/baselibs_global.conf
 
 %files
