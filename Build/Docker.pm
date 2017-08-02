@@ -119,7 +119,8 @@ sub parse {
 sub showcontainerinfo {
   my ($fn, $image, $taglist, $annotationfile) = @ARGV;
   local $Build::Kiwi::urlmapper = sub { return $_[0] };
-  my $d = parse({}, $fn);
+  my $d = {};
+  $d = parse({}, $fn) if $fn;
   die("$d->{'error'}\n") if $d->{'error'};
   $image =~ s/.*\/// if defined $image;
   my @tags = split(' ', $taglist);

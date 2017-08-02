@@ -98,12 +98,12 @@ recipe_build_fissile() {
 
     echo "Building packages with fissile"
     if ! chroot $BUILD_ROOT /bin/bash -c "cd $TOPDIR/SOURCES/release && . .envrc && fissile build packages"; then
-      cleanup_and_exit 1 "fissile build packages failed"
+	cleanup_and_exit 1 "fissile build packages failed"
     fi
 
     echo "Building images with fissile"
     if ! chroot $BUILD_ROOT /bin/bash -c "cd $TOPDIR/SOURCES/release && . .envrc && fissile build images"; then
-      cleanup_and_exit 1 "fissile build images failed"
+	cleanup_and_exit 1 "fissile build images failed"
     fi
 
     # Save the resulting images to tarballs.
@@ -111,15 +111,14 @@ recipe_build_fissile() {
     non_built_images=$(perl -MYAML::XS -e "print join('|', @{YAML::XS::LoadFile('$BUILD_ROOT$TOPDIR/SOURCES/fissile.yml')->{'DockerImageDeps'}})")
 
     for image in $(chroot $BUILD_ROOT docker images --format "{{.Repository}}:{{.Tag}}" | grep -v $non_built_images); do
-      echo "Saving image $image"
-      filename=$(echo $image | sed 's/\//_/g')
-      if ! chroot $BUILD_ROOT docker save --output "$TOPDIR/FISSILE/$filename.tar" $image ; then
-        cleanup_and_exit 1 "Docker save command failed"
-      fi
+        echo "Saving image $image"
+        filename=$(echo $image | sed 's/\//_/g')
+        if ! chroot $BUILD_ROOT docker save --output "$TOPDIR/FISSILE/$filename.tar" "$image" ; then
+	    cleanup_and_exit 1 "Docker save command failed"
+        fi
+	# Create containerinfo
+	perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo '' "$filename.tar" "$image" containers/annotation> "$BUILD_ROOT$TOPDIR/FISSILE/$filename.containerinfo"
     done
-
-    # Create containerinfo
-    # perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$IMAGE_NAME:$TAG" containers/annotation> "$BUILD_ROOT$TOPDIR/FISSILE/$FILENAME.containerinfo"
 
     recipe_cleanup_fissile
 
