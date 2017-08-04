@@ -1208,6 +1208,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	#
 	test -z "$INCARNATION" && INCARNATION=0
 	echo "BUILD_INCARNATION=$INCARNATION" > $BUILD_ROOT/.buildenv
+	test -n "$DISTURL" && echo "BUILD_DISTURL=$DISTURL" >> $BUILD_ROOT/.buildenv
 	test "$BUILDTYPE" = preinstallimage && mkdir -p $BUILD_ROOT/.preinstall_image
 	CREATE_BUILD_BINARIES=
 	if recipe_needs_build_binaries "$MYSRCDIR/$RECIPEFILE" ; then
