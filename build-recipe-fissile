@@ -97,7 +97,7 @@ recipe_build_fissile() {
     ln -fs /usr/sbin/runc $BUILD_ROOT/usr/bin/docker-runc
 
     echo "Building packages with fissile"
-    if ! chroot $BUILD_ROOT /bin/bash -c "cd $TOPDIR/SOURCES/release && . .envrc && fissile build packages"; then
+    if ! chroot $BUILD_ROOT /bin/bash -c "cd $TOPDIR/SOURCES/release && . .envrc && fissile build packages --docker-network-mode host"; then
 	cleanup_and_exit 1 "fissile build packages failed"
     fi
 
