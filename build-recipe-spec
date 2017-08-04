@@ -149,6 +149,12 @@ recipe_build_spec() {
 	rpmbopts[${#rpmbopts[@]}]="RSYNCDONE 1"
     fi
 
+    buildrootoverride=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags rpm-buildroot-override)
+    if test -n "$buildrootoverride" ; then
+	rpmbopts[${#rpmbopts[@]}]='--buildroot'
+	rpmbopts[${#rpmbopts[@]}]="$buildrootoverride"
+    fi
+
     # su involves a shell which would require even more
     # complicated quoting to bypass than this
     toshellscript $rpmbuild \
