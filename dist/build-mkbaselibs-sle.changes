@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Wed Aug  2 14:58:59 UTC 2017 - lnussel@suse.de
+
+- Fix path to files
+
+-------------------------------------------------------------------
 Thu Jun 30 19:05:52 CEST 2011 - ro@suse.de
 
 - provide build-mkbaselibs so this can really be used 

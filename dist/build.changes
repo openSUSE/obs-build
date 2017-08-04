@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Wed Aug  2 14:59:15 UTC 2017 - lnussel@suse.de
+
+- Temporary hack to aid liblua5_3 -> liblua5_3-5 rename
+
+-------------------------------------------------------------------
 Thu Jul 20 13:59:20 CEST 2017 - mls@suse.de
 
 - switch baselibs scheme for debuginfo packages from
