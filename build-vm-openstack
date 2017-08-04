@@ -79,6 +79,15 @@ cloud_volume_attach_openstack() {
     done
     test "${device_path:0:5}" = "/dev/" || cleanup_and_exit 3 "device path not starting with /dev/: $device_path"
 
+    if ! test -e "$device_path" ; then
+	echo "waiting for $device_path to appear"
+	for i in 1 2 3 4 5 6 7 8 9 10 ; do
+	    sleep 1
+	    test -e "$device_path" && break
+	done
+	test -e "$device_path" || cleanup_and_exit 3 "$device_path did not appear"
+    fi
+
     # return attach info. Example:
     # 793e9a04-7068-4cf1-86e7-26509f709b54:175e470c-5869-4425-988a-6b334a2fa655:/dev/vdb
     OPENSTACK_ATTACH_INFO="$VM_VOL_ID:$serverId:$device_path"
