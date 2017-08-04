@@ -85,7 +85,7 @@ cloud_volume_attach_openstack() {
 	    sleep 1
 	    test -e "$device_path" && break
 	done
-	test -e "$device_path" || cleanup_and_exit 3 "$device_path did not appear"
+	test -b "$device_path" || cleanup_and_exit 3 "$device_path did not appear"
     fi
 
     # return attach info. Example:
