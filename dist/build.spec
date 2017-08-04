@@ -22,7 +22,7 @@ Name:           build
 Summary:        A Script to Build SUSE Linux RPMs
 License:        GPL-2.0+ and GPL-2.0
 Group:          Development/Tools/Building
-Version:        20170720
+Version:        20170802
 Release:        0
 Source:         obs-build-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
@@ -124,8 +124,10 @@ chroot or a secure virtualized
 make CFLAGS="$RPM_BUILD_FLAGS" initvm-all
 #XXX temporary hack until lua is actually in
 %if 0%{?suse_version} == 1330
- V=%suse_version
- sed -i -e 's/liblua5_3/liblua5_3-5/g' configs/sl${V:0:2}.${V:2:1}.conf
+if rpm -q liblua5_3-5; then
+  V=%suse_version
+  sed -i -e 's/liblua5_3/liblua5_3-5/g' configs/sl${V:0:2}.${V:2:1}.conf
+fi
 %endif
 %endif
 
