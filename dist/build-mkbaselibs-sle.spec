@@ -24,6 +24,7 @@ Version:        20170720
 Release:        0
 #!BuildIgnore:  build-mkbaselibs
 Provides:       build-mkbaselibs
+Conflicts:      otherproviders(build-mkbaselibs)
 Source:         obs-build-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildArch:      noarch
