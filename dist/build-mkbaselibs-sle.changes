@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Thu Aug 24 17:46:23 UTC 2017 - jengelh@inai.de
+
+- Replace old $RPM_* variables by macros.
+- Add conflicts between build-mkbaselibs and build-mkbaselibs-sle
+  to please factory bots.
+
+-------------------------------------------------------------------
 Wed Aug  2 14:58:59 UTC 2017 - lnussel@suse.de
 
 - Fix path to files
