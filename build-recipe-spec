@@ -167,6 +167,18 @@ recipe_build_spec() {
     if test -n "$RUN_SHELL"; then
 	chroot $BUILD_ROOT su -
     else
+
+	# fix su imposed path for newer rhel variants
+	if [ -e "/etc/redhat-release" ];then
+	    min_ver="7"
+	    dist_version=`rpm -qf /etc/redhat-release --queryformat '%{Version}\n'`
+
+	    echo -e "${min_ver}\n${dist_version}" | sort -V | head -n 1 | grep -q "${min_ver}"
+	    if [ $? -eq 0 ];then
+		echo "ENV_PATH /usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin" >> $BUILD_ROOT/etc/login.defs
+	    fi
+	fi
+
 	chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
     fi
 }
