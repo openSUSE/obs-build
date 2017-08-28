@@ -39,8 +39,7 @@ sub parse {
       $xml = substr($xml, length($1));
     }
     if (substr($xml, 0, 4) eq '<!--') {
-      die("bad xml, missing end of comment") unless $xml =~ /.*?-->/s;
-      $xml =~ s/.*?-->//s;
+      die("bad xml, missing end of comment\n") unless $xml =~ s/.*?-->//s;
       next;
     }
     die("bad xml\n") unless $xml =~ /(.*?\>)/s;
