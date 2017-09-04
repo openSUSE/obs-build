@@ -230,13 +230,25 @@ sub kiwiparse {
   # Find packages and possible additional required architectures
   my @additionalarchs;
   my @pkgs;
-  for my $pattern (@{$kiwi->{'opensusePatterns'}}) {
-    push @pkgs, @{"pattern:$pattern->{'package'}"} if $pattern->{'package'};
-  }
+  my $patterntype;
   for my $packages (@{$kiwi->{'packages'}}) {
-    next if $packages->{'type'} and $packages->{'type'} ne 'image' and $packages->{'type'} ne 'bootstrap';
+    next if $packages->{'type'} && $packages->{'type'} ne 'image' && $packages->{'type'} ne 'bootstrap';
+    $patterntype ||= $packages->{'patternType'};
     push @pkgs, @{$packages->{'package'}} if $packages->{'package'};
+    for my $pattern (@{$kiwi->{'namedCollection'} || []}) {
+      push @pkgs, { %$pattern, 'name' => "pattern()=$pattern->{'name'}" } if $pattern->{'name'};
+    }
+    for my $product (@{$kiwi->{'product'} || []}) {
+      push @pkgs, { %$product, 'name' => "product()=$product->{'name'}" } if $product->{'name'};
+    }
+    for my $pattern (@{$kiwi->{'opensusePatterns'} || []}) {
+      push @pkgs, { %$pattern, 'name' => "pattern()=$pattern->{'name'}" } if $pattern->{'name'};
+    }
+    for my $product (@{$kiwi->{'opensuseProduct'} || []}) {
+      push @pkgs, { %$product, 'name' => "product()=$product->{'name'}" } if $product->{'name'};
+    }
   }
+  $patterntype ||= 'onlyRequired';
   if ($instsource) {
     push @pkgs, @{$instsource->{'metadata'}->[0]->{'repopackage'} || []} if $instsource->{'metadata'};
     push @pkgs, @{$instsource->{'repopackages'}->[0]->{'repopackage'} || []} if $instsource->{'repopackages'};
@@ -299,6 +311,7 @@ sub kiwiparse {
 
   if (!$instsource) {
     push @packages, "kiwi-packagemanager:$packman";
+    push @packages, "--dorecommends--", "--dosupplements--" if $patterntype && $patterntype eq 'plusRecommended';
   } else {
     push @packages, "kiwi-packagemanager:instsource";
   }
