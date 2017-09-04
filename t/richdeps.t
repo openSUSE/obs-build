@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 37;
+use Test::More tests => 45;
 
 require 't/testlib.pm';
 
@@ -51,6 +51,9 @@ P: unless = 1-1
 C: (b unless i)
 P: unlesselse = 1-1
 C: (b unless i else c)
+P: wa = 1-1 wx
+P: wb = 1-1 wx wy
+P: wc = 1-1 wy
 EOR
 
 my $config = setuptest($repo, 'Ignore: ign');
@@ -168,3 +171,28 @@ is_deeply(\@r, [1, 'b', 'i', 'unlesselse'], 'install unlesselse b');
 
 @r = expand($config, 'unlesselse', 'c');
 is_deeply(\@r, [1, 'c', 'unlesselse'], 'install unlesselse c');
+
+@r = expand($config, '(wx and wy)');
+is_deeply(\@r, [undef, 'have choice for (wx and wy): wa wb', 'have choice for (wx and wy): wb wc'], 'install (wx and wy)');
+
+@r = expand($config, '(wx with wy)');
+is_deeply(\@r, [1, 'wb'], 'install (wx with wy)');
+
+@r = expand($config, '(wx without wy)');
+is_deeply(\@r, [1, 'wa'], 'install (wx without wy)');
+
+@r = expand($config, '(wy without wx)');
+is_deeply(\@r, [1, 'wc'], 'install (wy without wx)');
+
+@r = expand($config, '(wa with wa)');
+is_deeply(\@r, [1, 'wa'], 'install (wa with wa)');
+
+@r = expand($config, '(wa with nnn)');
+is_deeply(\@r, [undef, 'nothing provides (wa with nnn)'], 'install (wa with nnn)');
+
+@r = expand($config, '(wa without wa)');
+is_deeply(\@r, [undef, 'nothing provides (wa without wa)'], 'install (wa without wa)');
+
+@r = expand($config, '(wa without nnn)');
+is_deeply(\@r, [1, 'wa'], 'install (wa without nnn)');
+

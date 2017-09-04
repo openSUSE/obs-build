@@ -1141,7 +1141,7 @@ sub normalize_cplx_rec {
     # with / without
     my ($n1, @q1) = normalize_cplx_rec($c, $r->[1], 0);
     my ($n2, @q2) = normalize_cplx_rec($c, $r->[2], 0);
-    if ($n2 == 0 && $r->[0] == 6) {
+    if ($n2 == 0 && $r->[0] == 7) {
       @q2 = ( [] );
       $n2 = -1;
     }
@@ -1153,7 +1153,7 @@ sub normalize_cplx_rec {
     return 0 if grep {/^-/} @q2;
     my %q2 = map {$_ => 1} @q2;
     my @q;
-    if ($r->[0] == 5) {
+    if ($r->[0] == 6) {
       @q = grep {$q2{$_}} @q1;
     } else {
       @q = grep {!$q2{$_}} @q1;
