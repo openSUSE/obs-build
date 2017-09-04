@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 29;
+use Test::More tests => 37;
 
 require 't/testlib.pm';
 
@@ -45,6 +45,12 @@ P: bad2 = 1-1
 C: (n foo m)
 P: sc = 1-1
 C: (a or sc) (n or sc)
+P: ifelse = 1-1
+R: (b if i else c)
+P: unless = 1-1
+C: (b unless i)
+P: unlesselse = 1-1
+C: (b unless i else c)
 EOR
 
 my $config = setuptest($repo, 'Ignore: ign');
@@ -139,3 +145,26 @@ is_deeply(\@r, [undef, 'cannot parse dependency (n foo m) from bad2'], 'install 
 @r = expand($config, 'sc', 'b');
 is_deeply(\@r, [1, 'b', 'sc'], 'install sc b');
 
+@r = expand($config, 'ifelse');
+is_deeply(\@r, [undef, 'have choice for (b if i else c) needed by ifelse: c i'], 'install ifelse');
+
+@r = expand($config, 'ifelse', 'i');
+is_deeply(\@r, [1, 'b', 'i', 'ifelse'], 'install ifelse i');
+
+@r = expand($config, 'ifelse', 'c');
+is_deeply(\@r, [1, 'c', 'ifelse'], 'install ifelse c');
+
+@r = expand($config, 'unless', 'b');
+is_deeply(\@r, [1, 'b', 'i', 'unless'], 'install unless b');
+
+@r = expand($config, 'unless', 'b', '!i');
+is_deeply(\@r, [undef, '(provider i is in conflict)', 'conflict for providers of (b unless i) needed by unless'], 'install unless b !i');
+
+@r = expand($config, 'unlesselse', 'b', 'c');
+is_deeply(\@r, [undef, '(provider i is in conflict with unlesselse)', 'conflict for providers of (b unless i else c) needed by unlesselse'], 'install unlesselse b c');
+
+@r = expand($config, 'unlesselse', 'b');
+is_deeply(\@r, [1, 'b', 'i', 'unlesselse'], 'install unlesselse b');
+
+@r = expand($config, 'unlesselse', 'c');
+is_deeply(\@r, [1, 'c', 'unlesselse'], 'install unlesselse c');

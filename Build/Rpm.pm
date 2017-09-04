@@ -1200,10 +1200,13 @@ sub getnevr_rich {
 }
 
 my %richops  = (
-  'and'  => 1,
-  'or'   => 2,
-  'if'   => 3,
-  'else' => 4,
+  'and'     => 1,
+  'or'      => 2,
+  'if'      => 3,
+  'unless'  => 4,
+  'else'    => 5,
+  'with'    => 6,
+  'without' => 7,
 );
 
 sub parse_rich_rec {
@@ -1235,12 +1238,12 @@ sub parse_rich_rec {
   return ($d, undef) unless $d =~ s/([a-z]+)\s+//;
   my $op = $richops {$1};
   return ($d, undef) unless $op;
-  return ($d, undef) if $op == 4 && $chainop != 3;
-  $chainop = 0 if $op == 4;
-  return ($d, undef) if $chainop && (($chainop != 1 && $chainop != 2) || $op != $chainop);
+  return ($d, undef) if $op == 5 && $chainop != 3 && $chainop != 4;
+  $chainop = 0 if $op == 5;
+  return ($d, undef) if $chainop && (($chainop != 1 && $chainop != 2 && $chainop != 6) || $op != $chainop);
   ($d, $r2) = parse_rich_rec("($d", $op);
   return ($d, undef) unless $r2;
-  if ($op == 3 && $r2->[0] == 4) {
+  if (($op == 3 || $op == 4) && $r2->[0] == 5) {
     $r = [$op, $r, $r2->[1], $r2->[2]];
   } else {
     $r = [$op, $r, $r2];

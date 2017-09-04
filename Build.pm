@@ -1043,7 +1043,7 @@ sub cplx_mix {
   my @q;
   for my $qq1 (@$q1) {
     for my $qq2 (@$q2) {
-      my @qq = sort(@$qq1, @$qq2);
+      my @qq = unify(sort(@$qq1, @$qq2));
       my %qq = map {$_ => 1} @qq;
       push @q, \@qq unless grep {$qq{"-$_"}} @qq;
     }
@@ -1082,26 +1082,33 @@ sub normalize_cplx_rec {
     }
   }
   if ($r->[0] == 3 && @$r == 4) {
-    # complex if/then/else case
-    if ($todnf) {
-      # we want OR: A IF (B ELSE C) -> (A AND B) OR (A AND C) OR (~B AND C)
-      my ($n1, @q1) = normalize_cplx_rec($c, [1, $r->[1], $r->[2]], $todnf);
-      my ($n2, @q2) = normalize_cplx_rec($c, [1, $r->[1], $r->[3]], $todnf);
-      my ($n3, @q3) = normalize_cplx_rec($c, [4, $r->[3], $r->[2]], $todnf);
-      return 1 if $n1 == 1 || $n2 == 1 || $n3 == 1;
-      return 0 if $n1 == 0 && $n2 == 0 && $n3 == 0;
-      return (-1, @q1, @q2, @q3);
-    } else {
-      # we want AND: A IF (B ELSE C) -> (A OR ~B) AND (C OR B)
-      my ($n1, @q1) = normalize_cplx_rec($c, [3, $r->[1], $r->[2]], $todnf);
-      my ($n2, @q2) = normalize_cplx_rec($c, [2, $r->[2], $r->[3]], $todnf);
-      return 0 if $n1 == 0 || $n2 == 0;
-      return 1 if $n1 == 1 && $n2 == 1;
+    # complex if/else case: A IF (B ELSE C) -> (A OR ~B) AND (C OR B)
+    my ($n1, @q1) = normalize_cplx_rec($c, [3, $r->[1], $r->[2]], $todnf);
+    my ($n2, @q2) = normalize_cplx_rec($c, [2, $r->[2], $r->[3]], $todnf);
+    return 0 if $n1 == 0 || $n2 == 0;
+    return ($n2, @q2) if $n1 == 1;
+    return ($n1, @q1) if $n2 == 1;
+    if (!$todnf) {
       return (-1, @q1, @q2);
+    } else {
+      return cplx_mix(\@q1, \@q2, $todnf);
+    }
+  }
+  if ($r->[0] == 4 && @$r == 4) {
+    # complex unless/else case: A UNLESS (B ELSE C) -> (A AND ~B) OR (C AND B)
+    my ($n1, @q1) = normalize_cplx_rec($c, [4, $r->[1], $r->[2]], $todnf);
+    my ($n2, @q2) = normalize_cplx_rec($c, [1, $r->[2], $r->[3]], $todnf);
+    return 1 if $n1 == 1 || $n2 == 1;
+    return ($n2, @q2) if $n1 == 0;
+    return ($n1, @q1) if $n2 == 0;
+    if ($todnf) {
+      return (-1, @q1, @q2);
+    } else {
+      return cplx_mix(\@q1, \@q2, $todnf);
     }
   }
   if ($r->[0] == 1 || $r->[0] == 4) {
-    # and / else
+    # and / unless
     my $todnf2 = $r->[0] == 4 ? !$todnf : $todnf;
     my ($n1, @q1) = normalize_cplx_rec($c, $r->[1], $todnf);
     my ($n2, @q2) = normalize_cplx_rec($c, $r->[2], $todnf);
@@ -1128,6 +1135,34 @@ sub normalize_cplx_rec {
       return (-1, @q1, @q2);
     } else {
       return cplx_mix(\@q1, \@q2, $todnf);
+    }
+  }
+  if ($r->[0] == 6 || $r->[0] == 7) {
+    # with / without
+    my ($n1, @q1) = normalize_cplx_rec($c, $r->[1], 0);
+    my ($n2, @q2) = normalize_cplx_rec($c, $r->[2], 0);
+    if ($n2 == 0 && $r->[0] == 6) {
+      @q2 = ( [] );
+      $n2 = -1;
+    }
+    return 0 if $n1 != -1 || $n2 != -1;
+    return 0 if @q1 != 1 || @q2 != 1;
+    @q1 = @{$q1[0]};
+    @q2 = @{$q2[0]};
+    return 0 if grep {/^-/} @q1;
+    return 0 if grep {/^-/} @q2;
+    my %q2 = map {$_ => 1} @q2;
+    my @q;
+    if ($r->[0] == 5) {
+      @q = grep {$q2{$_}} @q1;
+    } else {
+      @q = grep {!$q2{$_}} @q1;
+    }
+    return 0 unless @q;
+    if ($todnf) {
+      return (-1, map { [ $_ ] } @q);
+    } else {
+      return (-1, [ @q ]);
     }
   }
   return 0;
