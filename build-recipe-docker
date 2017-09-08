@@ -54,6 +54,7 @@ recipe_prepare_docker() {
 recipe_build_docker() {
     touch $BUILD_ROOT/etc/resolv.conf
     chmod 755 $BUILD_ROOT/$TOPDIR/SOURCES/obs_pkg_mgr
+    cp $BUILD_DIR/obs-docker-support $BUILD_ROOT/$TOPDIR/SOURCES/obs-docker-support
 
     base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
     test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
@@ -69,6 +70,9 @@ recipe_build_docker() {
 	cp -L "$base_image_path" "$base_image_path.lnk"
 	mv "$base_image_path.lnk" "$base_image_path"
     fi
+
+    sed -i '/FROM/a ADD obs-docker-support /usr/local/sbin/obs-docker-support\nRUN chmod a+x /usr/local/sbin/obs-docker-support\nRUN obs-docker-support  --install' $BUILD_ROOT/$TOPDIR/SOURCES/Dockerfile
+    echo "RUN obs-docker-support --uninstall" >> $BUILD_ROOT/$TOPDIR/SOURCES/Dockerfile
 
     # Inspect the content of the image to decide if this is a layered image
     # or a filesystem one. We need to know if we will "docker load" it or

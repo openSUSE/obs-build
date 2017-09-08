@@ -1,0 +1,106 @@
+#!/bin/bash
+################################################################
+#
+# Enable docker build support in container.
+#
+# Author: TODO
+#
+################################################################
+#
+# Copyright (c) 2017 SUSE Linux Products GmbH
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+LOCAL_REPOS_D="/etc/zypp/repos_obs.d/"
+UNINSTALL=
+
+install_obs_masq_apt() {
+  echo "apt not supported yet."
+  rm -- "$0"
+  exit 1
+}
+
+uninstall_obs_masq_zypper() {
+  echo "apt not supported yet."
+  rm -- "$0"
+  exit 1
+}
+
+install_obs_masq_zypper() {
+	/usr/bin/zypper -D $LOCAL_REPOS_D ar -C -G http://localhost:80 obs_repository
+	/usr/bin/zypper -D $LOCAL_REPOS_D ref
+	echo "#!/bin/bash
+
+LOCAL_REPOS_D=\"/etc/zypp/repos_obs.d/\"
+if [ \"\$1\" == \"install\" ]; then
+  shift
+  echo \"Will use custom zypper script\"
+  /usr/bin/zypper -D \$LOCAL_REPOS_D --no-gpg-checks -n in \"\$@\"
+elif [ \"\$1\" == \"ar\" ]; then
+  shift
+  /usr/bin/zypper ar -G \"\$@\" 
+else
+  /usr/bin/zypper \"\$@\"
+fi" > /usr/local/sbin/zypper
+	chmod +x /usr/local/sbin/zypper
+}
+
+uninstall_obs_masq_zypper() {
+	rm -rf $LOCAL_REPOS_D
+	rm /usr/local/sbin/zypper
+}
+
+if type zypper > /dev/null 2>&1 ; then
+	PKGMGR="zypper"
+elif type apt > /dev/null 2>&1 ; then
+  PKGMGR="apt"
+fi
+
+while test -n "$1"; do
+	PARAM="$1"
+	ARG="$2"
+	test "$ARG" = "${ARG#-}" || ARG=
+    shift
+    case $PARAM in
+      *-*=*)
+        ARG=${PARAM#*=}
+        PARAM=${PARAM%%=*}
+        set -- "----noarg=$PARAM" "$@"
+        ;;
+    esac
+    case ${PARAM/#--/-} in
+    -install|-i)
+		install_obs_masq_$PKGMGR
+    	shift
+    	;;
+    -uninstall|-u)
+		uninstall_obs_masq_$PKGMGR
+		UNINSTALL=true
+    	shift
+    	;;
+    -*)
+    	echo "Unkown param $PARAM"
+    	exit 1
+    	;;
+    esac
+done
+
+if test -n "$UNINSTALL" ; then 
+	rm -- "$0"
+fi
+exit 0
+
