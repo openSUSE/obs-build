@@ -3,7 +3,7 @@
 #
 # Enable docker build support in container.
 #
-# Author: TODO
+# Author: Marco Strigl
 #
 ################################################################
 #
@@ -25,82 +25,162 @@
 #
 ################################################################
 
-LOCAL_REPOS_D="/etc/zypp/repos_obs.d/"
-UNINSTALL=
+LOCAL_REPOS_D="/etc/repos_obs_dockersupport.d/"
 
-install_obs_masq_apt() {
-  echo "apt not supported yet."
-  rm -- "$0"
-  exit 1
-}
-
-uninstall_obs_masq_zypper() {
-  echo "apt not supported yet."
-  rm -- "$0"
-  exit 1
-}
-
-install_obs_masq_zypper() {
-	/usr/bin/zypper -D $LOCAL_REPOS_D ar -C -G http://localhost:80 obs_repository
-	/usr/bin/zypper -D $LOCAL_REPOS_D ref
-	echo "#!/bin/bash
-
-LOCAL_REPOS_D=\"/etc/zypp/repos_obs.d/\"
-if [ \"\$1\" == \"install\" ]; then
-  shift
-  echo \"Will use custom zypper script\"
-  /usr/bin/zypper -D \$LOCAL_REPOS_D --no-gpg-checks -n in \"\$@\"
-elif [ \"\$1\" == \"ar\" ]; then
-  shift
-  /usr/bin/zypper ar -G \"\$@\" 
-else
-  /usr/bin/zypper \"\$@\"
-fi" > /usr/local/sbin/zypper
-	chmod +x /usr/local/sbin/zypper
-}
-
-uninstall_obs_masq_zypper() {
-	rm -rf $LOCAL_REPOS_D
-	rm /usr/local/sbin/zypper
-}
-
-if type zypper > /dev/null 2>&1 ; then
-	PKGMGR="zypper"
-elif type apt > /dev/null 2>&1 ; then
-  PKGMGR="apt"
-fi
-
-while test -n "$1"; do
-	PARAM="$1"
-	ARG="$2"
-	test "$ARG" = "${ARG#-}" || ARG=
-    shift
-    case $PARAM in
-      *-*=*)
-        ARG=${PARAM#*=}
-        PARAM=${PARAM%%=*}
-        set -- "----noarg=$PARAM" "$@"
-        ;;
+zypper() {
+    cmd=
+    # try to find command
+    globalopts=()
+    while test -n "$1"; do
+        case $1 in
+        -*)
+	    globalopts[${#globalopts[@]}]="$1"
+	    shift
+	    ;;
+	*)  
+	    cmd=$1
+	    shift
+	    break
+	    ;;
+	esac
+    done
+    case $cmd in
+	in|install|rm|remove|up|update)
+	    exec /usr/bin/zypper -D $LOCAL_REPOS_D "${globalopts[@]}" "$cmd" "$@"
+	    ;;
+	ar|addrepo)
+	    exec /usr/bin/zypper "${globalopts[@]}" "$cmd" -C "$@"
+	    ;;
+	ref|refresh)
+	    echo "skipping zypper refresh"
+	    exit 0
+	    ;;
+	*)
+	    exec /usr/bin/zypper "${globalopts[@]}" "$cmd" "$@"
+	    ;;
     esac
-    case ${PARAM/#--/-} in
-    -install|-i)
-		install_obs_masq_$PKGMGR
-    	shift
-    	;;
-    -uninstall|-u)
-		uninstall_obs_masq_$PKGMGR
-		UNINSTALL=true
-    	shift
-    	;;
-    -*)
-    	echo "Unkown param $PARAM"
-    	exit 1
-    	;;
-    esac
-done
+}
 
-if test -n "$UNINSTALL" ; then 
-	rm -- "$0"
-fi
-exit 0
+obs_pkg_mgr() {
+    case "$1" in
+    install|remove)
+	shift
+	exec /usr/bin/zypper -D $LOCAL_REPOS_D --no-gpg-checks -n in "$@"
+	;;
+    add_repo)
+	shift
+	exec /usr/bin/zypper ar -C "$@"
+	;;
+    *)
+	echo "Usage: obs_pkg_mgr (install|add_repo) args" >&2
+	exit 1
+	;;
+    esac
+}
+
+apt_get() {
+    exec /usr/bin/apt-get "$@"
+}
+
+dnf() {
+    # try to find command
+    globalopts=()
+    while test -n "$1"; do
+        case $1 in
+        -*)
+	    globalopts[${#globalopts[@]}]="$1"
+	    shift
+	    ;;
+	*)  
+	    cmd=$1
+	    shift
+	    break
+	    ;;
+	esac
+    done
+    case $cmd in
+	in|install)
+	    exec /usr/bin/dnf --setopt=reposdir=$LOCAL_REPOS_D "${globalopts[@]}" "$cmd" "$@"
+	    ;;
+	*)
+	    exec /usr/bin/dnf "${globalopts[@]}" "$cmd" "$@"
+	    ;;
+    esac
+}
+
+yum() {
+    # try to find command
+    globalopts=()
+    while test -n "$1"; do
+        case $1 in
+        -*)
+	    globalopts[${#globalopts[@]}]="$1"
+	    shift
+	    ;;
+	*)  
+	    cmd=$1
+	    shift
+	    break
+	    ;;
+	esac
+    done
+    case $cmd in
+	in|install)
+	    exec /usr/bin/yum --setopt=reposdir=$LOCAL_REPOS_D "${globalopts[@]}" "$cmd" "$@"
+	    ;;
+	*)
+	    exec /usr/bin/yum "${globalopts[@]}" "$cmd" "$@"
+	    ;;
+    esac
+}
+
+obs_docker_support() {
+    case "$1" in
+	--install|-i)
+	    test -e /usr/bin/zypper && ln -s obs-docker-support /usr/local/sbin/zypper
+	    test -e /usr/bin/yum && ln -s obs-docker-support /usr/local/sbin/yum
+	    test -e /usr/bin/dnf && ln -s obs-docker-support /usr/local/sbin/dnf
+	    test -e /usr/bin/apt-get && ln -s obs-docker-support /usr/local/sbin/apt-get
+	    ln -s obs-docker-support /usr/local/sbin/obs_pkg_mgr
+	    mkdir -p "$LOCAL_REPOS_D"
+	    cat >$LOCAL_REPOS_D/obs_repository.repo <<'EOF'
+[obs_repository]
+name=obs_repository
+enabled=1
+autorefresh=0
+baseurl=http://localhost:80/
+type=rpm-md
+gpgcheck=0
+EOF
+	    /usr/bin/zypper -D $LOCAL_REPOS_D ref
+	;;
+	--uninstall|-u)
+	    rm -rf "$LOCAL_REPOS_D"
+	    rm -f /usr/local/sbin/zypper
+	    rm -f /usr/local/sbin/yum
+	    rm -f /usr/local/sbin/dnf
+	    rm -f /usr/local/sbin/apt-get
+	    rm -f /usr/local/sbin/obs_pkg_mgr
+	    rm -f /usr/local/sbin/obs-docker-support
+	;;
+    esac
+}
+
+case ${0##*/} in
+    obs-docker-support)
+	obs_docker_support "$@"
+	;;
+    obs_pkg_mgr)
+	obs_pkg_mgr "$@"
+	;;
+    zypper)
+	zypper "$@"
+	;;
+    apt-get)
+	apt_get "$@"
+	;;
+    *)
+	echo "obs-docker-support: unsupported mode ${0##*/}" >&2
+	exit 1
+esac
 

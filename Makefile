@@ -73,6 +73,7 @@ install:
 	    build-validate-params \
 	    openstack-console \
 	    startdockerd \
+	    obs-docker-support \
 	    $(DESTDIR)$(pkglibdir)
 	install -m755 emulator/emulator.sh $(DESTDIR)$(pkglibdir)/emulator/
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build

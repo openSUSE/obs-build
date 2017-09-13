@@ -1,4 +1,3 @@
-
 #################################################################
 #
 # Docker specific functions.
@@ -53,8 +52,6 @@ recipe_prepare_docker() {
 
 recipe_build_docker() {
     touch $BUILD_ROOT/etc/resolv.conf
-    chmod 755 $BUILD_ROOT/$TOPDIR/SOURCES/obs_pkg_mgr
-    cp $BUILD_DIR/obs-docker-support $BUILD_ROOT/$TOPDIR/SOURCES/obs-docker-support
 
     base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
     test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
@@ -64,15 +61,15 @@ recipe_build_docker() {
     fi
     DOCKERD_STARTED=true
 
+    cp $BUILD_DIR/obs-docker-support "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
+    chmod 755 "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
+
     echo "Loading base image"
     if test -L "$base_image_path" ; then
 	# copy into build root
 	cp -L "$base_image_path" "$base_image_path.lnk"
 	mv "$base_image_path.lnk" "$base_image_path"
     fi
-
-    sed -i '/FROM/a ADD obs-docker-support /usr/local/sbin/obs-docker-support\nRUN chmod a+x /usr/local/sbin/obs-docker-support\nRUN obs-docker-support  --install' $BUILD_ROOT/$TOPDIR/SOURCES/Dockerfile
-    echo "RUN obs-docker-support --uninstall" >> $BUILD_ROOT/$TOPDIR/SOURCES/Dockerfile
 
     # Inspect the content of the image to decide if this is a layered image
     # or a filesystem one. We need to know if we will "docker load" it or
@@ -86,18 +83,11 @@ recipe_build_docker() {
         chroot $BUILD_ROOT docker import $TOPDIR/SOURCES/$base_image_path "$desired_tag"
     fi
 
-    # Start the local zypper repository
-    # TODO [TBD] Should we inject the OBS_REPOSITORY_URL in the Dockerfile as described in
-    # the following link or is this a user's responsibility?
-    #  https://github.com/SUSE/cloudfoundry/blob/NativeDockerInOBS_research_results/NativeDockerInOBS.md
-    # TODO [TBD] What about SLES? Are dependencies fetched automatically from osc/OBS?
-    #  What about registration?
-
     # Prepare the zypper repository
     # TODO: Handle other distribution repositories as well (deb, arch etc)
     chroot $BUILD_ROOT createrepo "$TOPDIR/SOURCES/packages" >/dev/null
 
-    # Create the needed file to publish the generated image
+    # Find name and tag
     IMAGE_NAME=
     TAG=
     if [ -f "TAG" ] && [ $(cat TAG | grep ":") ]; then
@@ -109,18 +99,22 @@ recipe_build_docker() {
         cleanup_and_exit 1 "TAG file missing of contents invalid (use image_name:tag format)"
     fi
 
-    # Use tag to generate the filename for the image
-    FILENAME="$IMAGE_NAME:$TAG"
-    FILENAME="${FILENAME//[\/:]/-}"
+    # patch in obs-docker-support helper
+    sed -i '/^[ 	]*[fF][rR][oO][mM]/a COPY .obs-docker-support /usr/local/sbin/obs-docker-support\nRUN obs-docker-support --install' $BUILD_ROOT/$TOPDIR/SOURCES/Dockerfile
+    echo >> $BUILD_ROOT/$TOPDIR/SOURCES/Dockerfile
+    echo 'RUN obs-docker-support --uninstall' >> $BUILD_ROOT/$TOPDIR/SOURCES/Dockerfile
 
+    # now do the build
     echo "Building image"
-    if ! chroot $BUILD_ROOT docker build --network=host -t "$IMAGE_NAME:$TAG" --build-arg OBS_REPOSITORY_URL=http://localhost:80 $TOPDIR/SOURCES/ ; then
+    if ! chroot $BUILD_ROOT docker build --network=host -t "$IMAGE_NAME:$TAG" $TOPDIR/SOURCES/ ; then
         cleanup_and_exit 1 "Docker build command failed"
     fi
 
-    # Save the resulting image to a tarball.
+    # Save the resulting image to a tarball. Use tag for generating the file name.
     echo "Saving image"
     mkdir -p $BUILD_ROOT$TOPDIR/DOCKER
+    FILENAME="$IMAGE_NAME:$TAG"
+    FILENAME="${FILENAME//[\/:]/-}"
     if ! chroot $BUILD_ROOT docker save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$IMAGE_NAME:$TAG" ; then
         cleanup_and_exit 1 "Docker save command failed"
     fi
@@ -128,8 +122,8 @@ recipe_build_docker() {
     # Create containerinfo
     perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$IMAGE_NAME:$TAG" containers/annotation> "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
 
+    # We're done. Clean up.
     recipe_cleanup_docker
-
     BUILD_SUCCEEDED=true
 }
 
@@ -139,6 +133,7 @@ recipe_resultdirs_docker() {
 
 recipe_cleanup_docker() {
     if test -n "$DOCKERD_STARTED" ; then
+	test -n "$TOPDIR" && rm -f "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
 	DOCKERD_STARTED=
 	$BUILD_DIR/startdockerd --root "$BUILD_ROOT" --kill
     fi
