@@ -29,15 +29,18 @@ DOCKERD_STARTED=
 recipe_setup_docker() {
     TOPDIR="/usr/src/packages"
     mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
-    mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES/packages"
-
-    echo "Copying packages"
-    for package in $(find repos -name \*.rpm); do
-        cp $package "$BUILD_ROOT$TOPDIR/SOURCES/packages/"
-    done
-
-    # Exclude the "repos" directory which was handled above
-    find . -maxdepth 1 ! -name "repos" ! -name '.' -exec cp -rp -t $BUILD_ROOT$TOPDIR/SOURCES/ {} \+
+    if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then 
+        mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+    else
+        if test -z "$LINKSOURCES" ; then 
+            cp -dLR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+        else
+            cp -lR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+        fi
+        if test "$?" != 0 ; then 
+            cleanup_and_exit 1 "source copy failed"
+        fi
+    fi  
 }
 
 recipe_prepare_docker() {
@@ -56,7 +59,7 @@ recipe_build_docker() {
     base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
     test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
 
-    if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver "$TOPDIR/SOURCES/packages" ; then
+    if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver "$TOPDIR/SOURCES/repos" ; then
 	cleanup_and_exit 1
     fi
     DOCKERD_STARTED=true
@@ -83,9 +86,13 @@ recipe_build_docker() {
         chroot $BUILD_ROOT docker import $TOPDIR/SOURCES/$base_image_path "$desired_tag"
     fi
 
-    # Prepare the zypper repository
-    # TODO: Handle other distribution repositories as well (deb, arch etc)
-    chroot $BUILD_ROOT createrepo "$TOPDIR/SOURCES/packages" >/dev/null
+    # Prepare the package repository
+    if test -x $BUILD_ROOT/usr/bin/createrepo ; then
+	chroot $BUILD_ROOT createrepo "$TOPDIR/SOURCES/packages" >/dev/null
+    fi
+    if test -x $BUILD_ROOT/usr/bin/dpkg-scanpackages ; then
+	chroot $BUILD_ROOT "bash -c 'cd $TOPDIR/SOURCES/packages && dpkg-scanpackages -m . | gzip > Packages.gz'" >/dev/null
+    fi
 
     # Find name and tag
     IMAGE_NAME=
