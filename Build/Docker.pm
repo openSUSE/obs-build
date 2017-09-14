@@ -84,30 +84,14 @@ sub cmd_zypper {
   if ($args[0] eq 'in' || $args[0] eq 'install') {
     shift @args;
     while (@args && $args[0] =~ /^-/) {
-      if ($args[0] =~ /^--(?:from|repo|type)=/) {
-        shift @args;
-        next;
-      }
-      if ($args[0] =~ /^--(?:from|repo|type)$/) {
-        shift @args;
-      } elsif ($args[0] =~ /^-[tr]$/) {
-        shift @args;
-      }
+      shift @args if $args[0] =~ /^--(?:from|repo|type)$/ || $args[0] =~ /^-[tr]$/;
       shift @args;
     }
     push @{$ret->{'deps'}}, grep {/^[a-zA-Z_0-9]/} @args;
   } elsif ($args[0] eq 'ar' || $args[0] eq 'addrepo') {
     shift @args;
     while (@args && $args[0] =~ /^-/) {
-      if ($args[0] =~ /^--(?:repo|type)=/) {
-        shift @args;
-        next;
-      }
-      if ($args[0] =~ /^--(?:repo|type)$/) {
-        shift @args;
-      } elsif ($args[0] =~ /^-[rt]$/) {
-        shift @args;
-      }
+      shift @args if $args[0] =~ /^--(?:repo|type)$/ || $args[0] =~ /^-[rt]$/;
       shift @args;
     }
     addrepo($ret, $args[0]) if @args;
@@ -130,14 +114,23 @@ sub cmd_dnf {
   my ($ret, @args) = @_;
   # skip global options
   shift @args while @args && $args[0] =~ /^-/;
+  return unless @args;
   if ($args[0] eq 'in' || $args[0] eq 'install') {
     shift @args;
     while (@args && $args[0] =~ /^-/) {
       shift @args;
     }
-    push @{$ret->{'deps'}}, @args;
+    push @{$ret->{'deps'}}, grep {/^[a-zA-Z_0-9]/} @args;
   }
+}
+
+sub cmd_apt_get {
+  my ($ret, @args) = @_;
+  shift @args while @args && $args[0] =~ /^-/;
   return unless @args;
+  if ($args[0] eq 'install') {
+    push @{$ret->{'deps'}}, grep {/^[a-zA-Z_0-9]/} @args;
+  }
 }
 
 sub parse {
@@ -196,6 +189,8 @@ sub parse {
 	  cmd_zypper($ret, @args);
 	} elsif ($rcmd eq 'yum' || $rcmd eq 'dnf') {
 	  cmd_dnf($ret, @args);
+	} elsif ($rcmd eq 'apt-get') {
+	  cmd_apt_get($ret, @args);
 	} elsif ($rcmd eq 'obs_pkg_mgr') {
 	  cmd_obs_pkg_mgr($ret, @args);
 	}
