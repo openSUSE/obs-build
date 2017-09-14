@@ -129,6 +129,7 @@ sub cmd_apt_get {
   shift @args while @args && $args[0] =~ /^-/;
   return unless @args;
   if ($args[0] eq 'install') {
+    shift @args;
     push @{$ret->{'deps'}}, grep {/^[a-zA-Z_0-9]/} @args;
   }
 }

@@ -131,7 +131,9 @@ fi
 test -e "$BUILD_ROOT/proc/self" || mount -n -tproc none $BUILD_ROOT/proc
 
 echo "Starting container daemon"
-chroot $BUILD_ROOT /usr/sbin/containerd --listen unix:///run/containerd/containerd.sock &
+CONTAINERD_BIN=/usr/sbin/containerd
+test -x $BUILD_ROOT/usr/bin/containerd && CONTAINERD_BIN=/usr/bin/containerd
+chroot $BUILD_ROOT $CONTAINERD_BIN --listen unix:///run/containerd/containerd.sock &
 CONTAINERD_PID=$!
 echo "$CONTAINERD_PID $DOCKERD_PID $WEBSERVER_PID" > $BUILD_ROOT/.startdockerd.pids
 

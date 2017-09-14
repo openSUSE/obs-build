@@ -97,8 +97,11 @@ apt_get() {
 	esac
     done
     case $cmd in
+    update)
+	exit 0
+	;;
     install|upgrade)
-	exec /usr/bin/apt-get -o Dir::Etc::SourceList=$LOCAL_APTREPOS_D/obssource -o Dir::Etc::SourceParts=$LOCAL_APTREPOS_D "${globalopts[@]}" "$cmd" "$@"
+	exec /usr/bin/apt-get -o Dir::Etc::SourceList=$LOCAL_APTREPOS_D/obssource -o Dir::Etc::SourceParts=$LOCAL_APTREPOS_D --allow-unauthenticated "${globalopts[@]}" "$cmd" "$@"
 	;;
     *)
 	exec /usr/bin/apt-get "${globalopts[@]}" "$cmd" "$@"
