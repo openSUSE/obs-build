@@ -83,7 +83,7 @@ recipe_build_docker() {
         chroot $BUILD_ROOT docker load --input $TOPDIR/SOURCES/$base_image_path
     else
         echo "Filesystem image found"
-        desired_tag=$(grep "^\s*FROM" Dockerfile | cut -d" " -f2)
+        desired_tag=$(grep "^\s*FROM" "$RECIPEFILE" | cut -d" " -f2)
         chroot $BUILD_ROOT docker import $TOPDIR/SOURCES/$base_image_path "$desired_tag"
     fi
 
@@ -95,40 +95,52 @@ recipe_build_docker() {
 	chroot $BUILD_ROOT bash -c "cd $TOPDIR/SOURCES/repos && dpkg-scanpackages -m . | gzip > Packages.gz"
     fi
 
-    # Find name and tag
-    IMAGE_NAME=
-    TAG=
-    if [ -f "TAG" ] && [ $(cat TAG | grep ":") ]; then
-        IMAGE_NAME=$(cat TAG | cut -d":" -f1)
-        TAG=$(cat TAG | cut -d":" -f2)
+    # Find tags
+    FIRSTTAG=
+    ALLTAGS=
+    for t in $(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showtags "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE") ; do
+	test -n "$FIRSTTAG" || FIRSTTAG="$t"
+        ALLTAGS="$ALLTAGS $t"
+    done
+    if test -z "$FIRSTTAG" -a -f TAG ; then
+	for t in $(egrep -v '^#' TAG) ; do
+	    test -n "$FIRSTTAG" || FIRSTTAG="$t"
+	    ALLTAGS="$ALLTAGS $t"
+	done
     fi
+    if test -z "$FIRSTTAG" ; then
+        cleanup_and_exit 1 "please specify a tag for the container"
+    fi
+    ALLTAGS="${ALLTAGS# }"
 
-    if [ -z "$IMAGE_NAME" ] || [ -z "$TAG" ]; then
-        cleanup_and_exit 1 "TAG file missing of contents invalid (use image_name:tag format)"
-    fi
+    tagargs=()
+    for t in $ALLTAGS; do
+	tagargs[${#tagargs[@]}]='-t'
+	tagargs[${#tagargs[@]}]="$t"
+    done
 
     # patch in obs-docker-support helper
-    sed -i '/^[ 	]*[fF][rR][oO][mM]/a COPY .obs-docker-support /usr/local/sbin/obs-docker-support\nRUN obs-docker-support --install' $BUILD_ROOT/$TOPDIR/SOURCES/Dockerfile
-    echo >> $BUILD_ROOT/$TOPDIR/SOURCES/Dockerfile
-    echo 'RUN obs-docker-support --uninstall' >> $BUILD_ROOT/$TOPDIR/SOURCES/Dockerfile
+    sed -i '/^[ 	]*[fF][rR][oO][mM]/a COPY .obs-docker-support /usr/local/sbin/obs-docker-support\nRUN obs-docker-support --install' $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE
+    echo >> $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE
+    echo 'RUN obs-docker-support --uninstall' >> $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE
 
     # now do the build
-    echo "Building image"
-    if ! chroot $BUILD_ROOT docker build --network=host -t "$IMAGE_NAME:$TAG" $TOPDIR/SOURCES/ ; then
+    echo "Building image $ALLTAGS"
+    if ! chroot $BUILD_ROOT docker build --network=host "${tagargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
         cleanup_and_exit 1 "Docker build command failed"
     fi
 
     # Save the resulting image to a tarball. Use tag for generating the file name.
-    echo "Saving image"
+    echo "Saving image $FIRSTTAG"
     mkdir -p $BUILD_ROOT$TOPDIR/DOCKER
-    FILENAME="$IMAGE_NAME:$TAG"
+    FILENAME="$FIRSTTAG"
     FILENAME="${FILENAME//[\/:]/-}"
-    if ! chroot $BUILD_ROOT docker save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$IMAGE_NAME:$TAG" ; then
+    if ! chroot $BUILD_ROOT docker save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$FIRSTTAG" ; then
         cleanup_and_exit 1 "Docker save command failed"
     fi
     
     # Create containerinfo
-    perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$IMAGE_NAME:$TAG" containers/annotation> "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
+    perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$ALLTAGS" containers/annotation> "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
 
     # We're done. Clean up.
     recipe_cleanup_docker

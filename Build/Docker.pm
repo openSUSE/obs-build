@@ -152,9 +152,17 @@ sub parse {
   while (@lines) {
     my $line = shift @lines;
     $line =~ s/^\s+//;
-    next if $line =~ /^#/;
+    if ($line =~ /^#/) {
+      if ($line =~ /^#!BuildTag:\s*(.*?)$/) {
+	my @tags = split(' ', $1);
+	push @{$ret->{'containertags'}}, @tags if @tags;
+      }
+      next;
+    }
+    # add continuation lines
     while (@lines && $line =~ s/\\[ \t]*$//) {
-      $line .= shift(@lines);
+      shift @lines while @lines && $lines[0] =~ /^\s*#/;
+      $line .= shift(@lines) if @lines;
     }
     $line =~ s/^\s+//;
     $line =~ s/\s+$//;
@@ -176,7 +184,10 @@ sub parse {
     @args = split(/[ \t]+/, $line);
     s/%([a-fA-F0-9]{2})/chr(hex($1))/ge for @args;
     if ($cmd eq 'FROM') {
-      $basecontainer ||= $args[0] if @args;
+      if (@args && !$basecontainer) {
+        $basecontainer = $args[0];
+        $basecontainer .= ':latest' unless $basecontainer =~ /:[^:\/]+$/;
+      }
     } elsif ($cmd eq 'RUN') {
       $line =~ s/#.*//;	# get rid of comments
       for my $l (split(/(?:\||\|\||\&|\&\&|;)/, $line)) {
@@ -210,6 +221,9 @@ sub showcontainerinfo {
   die("$d->{'error'}\n") if $d->{'error'};
   $image =~ s/.*\/// if defined $image;
   my @tags = split(' ', $taglist);
+  for (@tags) {
+    $_ .= ':latest' unless /:[^:\/]+$/;
+  }
   @tags = map {"\"$_\""} @tags;
   my @repos = map {"{ \"url\": \"$_\" }"} @{$d->{'repo_urls'} || []};
   if ($annotationfile) {
@@ -229,6 +243,15 @@ sub showcontainerinfo {
   print ",\n  \"repos\": [ ".join(', ', @repos)." ]" if @repos;
   print ",\n  \"file\": \"$image\"" if defined $image;
   print "\n}\n";
+}
+
+sub showtags {
+  my ($fn, $image) = @ARGV;
+  local $Build::Kiwi::urlmapper = sub { return $_[0] };
+  my $d = {};
+  $d = parse({}, $fn) if $fn;
+  die("$d->{'error'}\n") if $d->{'error'};
+  print "$_\n" for @{$d->{'containertags'} || []};
 }
 
 1;
