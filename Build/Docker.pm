@@ -18,16 +18,6 @@
 #
 ################################################################
 
-# TODO:
-# - parse Dockerfile and extract dependecies
-# - start docker daemon
-# - import base image to the docker daemon
-# - setup the dependencies directory
-# - setup a zypper repository that will serve the dependecies directory
-# - inject this repository as and ARG in the Dockerfile
-# - build the Dockerfile
-# - export the image tarball [OPTIONAL]
-
 package Build::Docker;
 
 use Build::SimpleXML;
@@ -246,7 +236,7 @@ sub showcontainerinfo {
 }
 
 sub showtags {
-  my ($fn, $image) = @ARGV;
+  my ($fn) = @ARGV;
   local $Build::Kiwi::urlmapper = sub { return $_[0] };
   my $d = {};
   $d = parse({}, $fn) if $fn;
