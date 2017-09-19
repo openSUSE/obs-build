@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Thu Aug 24 17:46:44 UTC 2017 - jengelh@inai.de
+
+- Replace old $RPM_* variables by macros.
+
+-------------------------------------------------------------------
 Wed Aug  2 14:59:15 UTC 2017 - lnussel@suse.de
 
 - Temporary hack to aid liblua5_3 -> liblua5_3-5 rename
