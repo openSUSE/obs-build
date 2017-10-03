@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Wed Aug 23 10:44:57 UTC 2017 - dimstar@opensuse.org
+
+- Conflict with other implementations of mkbaselibs (packages
+  conflict on file level).
+
+-------------------------------------------------------------------
 Wed Aug  2 14:58:59 UTC 2017 - lnussel@suse.de
 
 - Fix path to files
