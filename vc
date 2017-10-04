@@ -132,7 +132,7 @@ set +e
 	elif [ ! $just_edit ]; then
 		echo "- "
 	fi
-	if [ -f "$changelog" ] && [ -s "$changelog" ]; then
+	if [ -f "$changelog" ] && [ -s "$changelog" ] && [ ! $just_edit ]; then
 		# Avoid double newlines at EOF on a new blank .changes file,
 		# but do provide enough spacing between preexisting log entries.
 		echo
