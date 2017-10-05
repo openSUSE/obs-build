@@ -183,9 +183,9 @@ recipe_build_livebuild() {
     fi
 
     # Sanity check to not configure archives inside configuration
-    files=($BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT/config/archives/*)
+    files=($BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT/config/archives/*.chroot)
     if [ ${#files[@]} -gt 0 ]; then
-        cleanup_and_exit 1 "E: No configuration in config/archives/* allowed"
+        cleanup_and_exit 1 "E: No configuration in config/archives/*.chroot allowed"
     fi
 
     # TODO: Add the repository public key
