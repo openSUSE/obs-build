@@ -122,13 +122,6 @@ chroot or a secure virtualized
 %if 0%{?suse_version}
 # initvm
 make CFLAGS="$RPM_BUILD_FLAGS" initvm-all
-#XXX temporary hack until lua is actually in
-%if 0%{?suse_version} == 1330
-if rpm -q liblua5_3-5; then
-  V=%suse_version
-  sed -i -e 's/liblua5_3/liblua5_3-5/g' configs/sl${V:0:2}.${V:2:1}.conf
-fi
-%endif
 %endif
 
 %install
