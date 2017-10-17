@@ -107,6 +107,10 @@ while test -n "$1" ; do
 	    shift
 	    DLNOSIGNATURE="--nosignature"
 	    ;;
+	--remote-io-exec)
+	    REMOTE_IO_EXEC="$2"
+	    shift 2
+	    ;;
 	*)
 	    break
 	    ;;
@@ -117,6 +121,24 @@ PKGS=("$@")
 #
 # needed functions
 #
+
+REMOTE_IO_EXEC() {
+    # This helper can offload intensive and dumb I/O operations like
+    # (un-)tarballing and (de-)compression from workers using shared
+    # media (e.g. NFS build roots) to a remote system with higher
+    # performance in this regard, by setting this option:
+    #   export REMOTE_IO_EXEC="ssh root@nfsserver"
+    # in the workers' /etc/sysconfig/obs-worker files. This also
+    # assumes that the apparent filesystem paths are the same on both
+    # the worker and remote helper - e.g. /mnt/nas/workerX/root_Y/
+    # and that appropriate ssh-key trusts have been set up.
+    if [ -n "$REMOTE_IO_EXEC" ]; then
+        $REMOTE_IO_EXEC "cd `pwd` && $*" ; return $?
+    else
+        "$@" ; return $?
+    fi
+    return 22
+}
 
 cleanup_and_exit() {
     trap EXIT
@@ -137,16 +159,16 @@ clean_build_root() {
 	umount -n "$BUILD_ROOT/dev/pts" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/dev/shm" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/mnt" 2> /dev/null || true
-	rm -rf -- "$BUILD_ROOT"/* 2> /dev/null || true
-	chattr -a -A -i -R -- "$BUILD_ROOT" 2> /dev/null || true
-	rm -rf -- "$BUILD_ROOT"/*
-	rm -rf -- "$BUILD_ROOT/.build"
-	rm -rf -- "$BUILD_ROOT"/.build.kernel.*
-	rm -rf -- "$BUILD_ROOT"/.build.initrd.*
-	rm -rf -- "$BUILD_ROOT/.root"
-	rm -rf -- "$BUILD_ROOT/.init_b_cache"
-	rm -rf -- "$BUILD_ROOT"/.preinstall_image/*
-	rm -rf -- "$BUILD_ROOT"/.preinstallimage*
+	REMOTE_IO_EXEC rm -rf -- "$BUILD_ROOT"/* 2> /dev/null || true
+	REMOTE_IO_EXEC chattr -a -A -i -R -- "$BUILD_ROOT" 2> /dev/null || true
+	REMOTE_IO_EXEC rm -rf -- "$BUILD_ROOT"/*
+	REMOTE_IO_EXEC rm -rf -- "$BUILD_ROOT/.build"
+	REMOTE_IO_EXEC rm -rf -- "$BUILD_ROOT"/.build.kernel.*
+	REMOTE_IO_EXEC rm -rf -- "$BUILD_ROOT"/.build.initrd.*
+	REMOTE_IO_EXEC rm -rf -- "$BUILD_ROOT/.root"
+	REMOTE_IO_EXEC rm -rf -- "$BUILD_ROOT/.init_b_cache"
+	REMOTE_IO_EXEC rm -rf -- "$BUILD_ROOT"/.preinstall_image/*
+	REMOTE_IO_EXEC rm -rf -- "$BUILD_ROOT"/.preinstallimage*
 	mkdir -p "$BUILD_ROOT/proc"
 	mkdir -p "$BUILD_ROOT/dev/pts"
 	if test "$UID" = 0 ; then
@@ -174,6 +196,7 @@ preinstall_image_filter() {
 }
 
 preinstall_image() {
+    local RES_TAR=-1
     check_exit
     echo "unpacking preinstall image${2:+ $2}"
     cd $BUILD_ROOT || cleanup_and_exit 1
@@ -183,8 +206,13 @@ preinstall_image() {
 	unsafe_preinstall_check
 	TAR="tar -x"
     fi
+    if [ -n "$REMOTE_IO_EXEC" ]; then
+	echo "Unpacking preinstall image using REMOTE_IO_EXEC helper"
+    fi
     # pipe output through perl to print a dot every 1000 lines
-    if ! $TAR -z --exclude .build --exclude .init_b_cache -f "$BUILD_ROOT/.init_b_cache/rpms/$1" -v > >(tee "$BUILD_ROOT/.preinstallimage.unpack" | perl -e '$|=1; my $done=0; $done++ % 1000 or print "." while <STDIN>; print "\n";')  2>&1 ; then
+    { REMOTE_IO_EXEC $TAR -z --exclude .build --exclude .init_b_cache -f "$BUILD_ROOT/.init_b_cache/rpms/$1" -v ; RES_TAR=$?; } \
+    > >(tee "$BUILD_ROOT/.preinstallimage.unpack" | perl -e '$|=1; my $done=0; $done++ % 1000 or print "." while <STDIN>; print "\n";')  2>&1
+    if [ $? != 0 ] || [ $RES_TAR != 0 ] ; then
 	echo "unpack failed."
 	test -e "$BUILD_ROOT/.preinstallimage.unpack" && cat "$BUILD_ROOT/.preinstallimage.unpack"
 	cleanup_and_exit 1

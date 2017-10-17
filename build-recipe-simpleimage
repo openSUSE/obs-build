@@ -36,12 +36,7 @@ recipe_build_simpleimage() {
       echo "Integration script finished."
     fi
 
-    echo "Compresing the final image, this can take a while..."
-    echo
-    TAR="tar"
-    if test -x /usr/bin/bsdtar; then
-	TAR="/usr/bin/bsdtar --format gnutar --chroot"
-    fi
+    echo "Finalizing filesystem tree..."
     TOPDIRS=
     for DIR  in .* * ; do
       case "$DIR" in
@@ -58,16 +53,44 @@ recipe_build_simpleimage() {
       esac
       TOPDIRS="$TOPDIRS $DIR"
     done
-	rm -rf "$BUILD_ROOT$TOPDIR"
+    REMOTE_IO_EXEC rm -rf "$BUILD_ROOT$TOPDIR"
     mkdir -p .tmp/{proc,sys}
-    if ! $TAR -cvzf .simpleimage.tar.gz --one-file-system $TOPDIRS -C .tmp proc sys; then
+
+    if [ -n "$REMOTE_IO_EXEC" ]; then
+        echo "Compresing the final image using REMOTE_IO_EXEC, this can take a while..."
+    else
+        echo "Compresing the final image, this can take a while..."
+    fi
+    echo
+
+    TAR="tar"
+    TARGZIP_FLAG="-z"
+    TARGZIP_POST=""
+    if REMOTE_IO_EXEC test -x /usr/bin/bsdtar; then
+        TAR="/usr/bin/bsdtar --format gnutar --chroot"
+        if REMOTE_IO_EXEC test -x /usr/bin/pigz; then
+            TARGZIP_FLAG=""
+            TARGZIP_POST="| /usr/bin/pigz"
+        fi
+    else
+        if REMOTE_IO_EXEC test -x /usr/bin/pigz; then
+            TARGZIP_FLAG="-I/usr/bin/pigz"
+        fi
+    fi
+
+    if ! REMOTE_IO_EXEC "$TAR $TARGZIP_FLAG -cf - --one-file-system $TOPDIRS -C .tmp proc sys $TARGZIP_POST > $BUILD_ROOT/.simpleimage.tar.gz"; then
       cleanup_and_exit 1
     fi
+
     if [ -x "`which mksquashfs 2> /dev/null`" ]; then
       echo
       echo "Tarball done, creating squashfs image as well"
+      if [ -n "$REMOTE_IO_EXEC" ]; then
+        echo "Using REMOTE_IO_EXEC..."
+      fi
       echo
-      mksquashfs $TOPDIRS .tmp/proc .tmp/sys .simpleimage.squashfs -info -keep-as-directory -no-progress || cleanup_and_exit 1
+      # Note: no pigz magic here, mksquashfs already does parallel work by itself
+      REMOTE_IO_EXEC mksquashfs $TOPDIRS .tmp/proc .tmp/sys $BUILD_ROOT/.simpleimage.squashfs -info -keep-as-directory -no-progress || cleanup_and_exit 1
     fi
     echo "simple image created."
 
