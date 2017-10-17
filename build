@@ -1218,7 +1218,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $DLNOSIGNATURE $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
         start_time=`date +%s`
-	"$@" || cleanup_and_exit 1
+	( export BUILDTYPE INCARNATION ; "$@" ) || cleanup_and_exit 1
 	check_exit
         TIME_INSTALL=$(( `date +%s` - $start_time ))
         unset start_time
