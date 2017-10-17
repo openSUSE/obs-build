@@ -156,6 +156,7 @@ cleanup_and_exit() {
 	umount -n "$BUILD_ROOT/proc" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/dev/pts" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/mnt" 2> /dev/null || true
+	umount -n "$BUILD_ROOT/.ccache" 2> /dev/null || true
     fi
     exit $1
 }
@@ -167,6 +168,7 @@ clean_build_root() {
 	umount -n "$BUILD_ROOT/dev/pts" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/dev/shm" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/mnt" 2> /dev/null || true
+	umount -n "$BUILD_ROOT/.ccache" 2> /dev/null || true
 	rm -rf -- "$BUILD_ROOT"/* 2> /dev/null || true
 	chattr -a -A -i -R -- "$BUILD_ROOT" 2> /dev/null || true
 	rm -rf -- "$BUILD_ROOT"/*
@@ -486,6 +488,7 @@ if test -e "$BUILD_IS_RUNNING" ; then
     umount -n $BUILD_ROOT/proc 2> /dev/null
     umount -n $BUILD_ROOT/dev/pts 2> /dev/null
     umount -n $BUILD_ROOT/mnt 2> /dev/null
+    umount -n $BUILD_ROOT/.ccache 2> /dev/null || true
     echo "Your build system is broken!! Shall I execute"
     echo
     echo "    rm -rf -- $BUILD_ROOT/*"
