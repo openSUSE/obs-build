@@ -35,8 +35,18 @@ recipe_build_preinstallimage() {
     test -d "$BUILD_ROOT/.preinstall_image" || cleanup_and_exit 1
     cd $BUILD_ROOT || cleanup_and_exit 1
     TAR="tar"
-    if test -x /usr/bin/bsdtar; then
-	TAR="/usr/bin/bsdtar --format gnutar --chroot"
+    TARGZIP_FLAG="-z"
+    TARGZIP_POST=""
+    if REMOTE_IO_EXEC test -x /usr/bin/bsdtar; then
+        TAR="/usr/bin/bsdtar --format gnutar --chroot"
+        if REMOTE_IO_EXEC test -x /usr/bin/pigz; then
+            TARGZIP_FLAG=""
+            TARGZIP_POST="| /usr/bin/pigz"
+        fi
+    else
+        if REMOTE_IO_EXEC test -x /usr/bin/pigz; then
+            TARGZIP_FLAG="-I/usr/bin/pigz"
+        fi
     fi
     TOPDIRS=
     for DIR  in .* * ; do
@@ -45,6 +55,7 @@ recipe_build_preinstallimage() {
 	.build.kernel*) ;; # to be packaged
 	.build.initrd*) ;; # to be packaged
 	.build*) continue ;;
+	.nfs*) continue ;;
 	.preinstallimage*) continue ;;
 	.srcfiles*) continue ;;
 	.pkgs) continue ;;
@@ -54,10 +65,11 @@ recipe_build_preinstallimage() {
       esac
       TOPDIRS="$TOPDIRS $DIR"
     done
-    if ! $TAR -czf .preinstallimage.$$.tar.gz --one-file-system $TOPDIRS ; then
+    if ! REMOTE_IO_EXEC "$TAR $TARGZIP_FLAG -cf - --one-file-system $TOPDIRS $TARGZIP_POST > $BUILD_ROOT/.preinstallimage.$$.tar.gz" ; then
 	cleanup_and_exit 1
     fi
-    echo "image created."
+    echo "image created:"
+    ls -la $BUILD_ROOT/.preinstallimage.$$.tar.gz
     TOPDIR=/usr/src/packages
     mkdir -p $BUILD_ROOT$TOPDIR/OTHER
     rm -f $BUILD_ROOT$TOPDIR/OTHER/preinstallimage.info
@@ -70,6 +82,7 @@ recipe_build_preinstallimage() {
     mv $BUILD_ROOT/.preinstallimage.$$.tar.gz $BUILD_ROOT$TOPDIR/OTHER/preinstallimage.tar.gz
     rm -f $BUILD_ROOT/.build.packages
     ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
+    echo "`date -u`: recipe_build_preinstallimage() finished"
     test -d "$SRCDIR" && cd "$SRCDIR"
 }
 

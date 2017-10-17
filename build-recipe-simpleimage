@@ -39,7 +39,7 @@ recipe_prepare_simpleimage() {
 recipe_build_simpleimage() {
     TOPDIR=/usr/src/packages
 
-    echo "creating simple image..."
+    echo "`date -u`: creating simple image..."
     cd $BUILD_ROOT || cleanup_and_exit 1
     export SRCDIR="$TOPDIR/SOURCES"
 
@@ -51,54 +51,103 @@ recipe_build_simpleimage() {
     SHELL="/bin/sh"
     [ -x $BUILD_ROOT/bin/bash ] && SHELL="/bin/bash"
     if [ "`grep '^%build$' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage`" ]; then
-      echo "Running integration script..."
+      echo "`date -u`: Running integration script..."
       sed -n '/%build/,$ p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage | tail -n +2 | chroot $BUILD_ROOT $SHELL -x || cleanup_and_exit 1
-      echo "Integration script finished."
+      echo "`date -u`: Integration script finished."
     fi
 
-    echo "Compresing the final image, this can take a while..."
-    echo
-    TAR="tar"
-    if test -x /usr/bin/bsdtar; then
-	TAR="/usr/bin/bsdtar --format gnutar --chroot"
-    fi
+    echo "`date -u`: Finalizing filesystem tree..."
     TOPDIRS=
     for DIR  in .* * ; do
       case "$DIR" in
 	.|..) continue ;;
 	.build*) continue ;;
+	.nfs*) continue ;;
 	.simpleimage*) continue ;;
+	.preinstallimage*) continue ;;
+	.preinstall_image*) continue ;;
 	.srcfiles*) continue ;;
+	.oldroot*) continue ;;
 	.pkgs) continue ;;
 	.rpm-cache) continue ;;
 	.tmp) continue ;;
 	installed-pkg) continue ;;
+	debian-binary) continue ;;
 	proc|sys) continue ;;
       esac
       TOPDIRS="$TOPDIRS $DIR"
     done
-	rm -rf "$BUILD_ROOT$TOPDIR"
+    REMOTE_IO_EXEC rm -rf "$BUILD_ROOT$TOPDIR"
     mkdir -p .tmp/{proc,sys}
-    if ! $TAR -cvzf .simpleimage.tar.gz --one-file-system $TOPDIRS -C .tmp proc sys; then
+
+    if [ -n "$REMOTE_IO_EXEC" ]; then
+        echo "`date -u`: Compresing the final image using REMOTE_IO_EXEC, this can take a while..."
+    else
+        echo "`date -u`: Compresing the final image, this can take a while..."
+    fi
+    echo
+
+    TAR="tar"
+    TARGZIP_FLAG="-z"
+    TARGZIP_POST=""
+    if REMOTE_IO_EXEC test -x /usr/bin/bsdtar; then
+        TAR="/usr/bin/bsdtar --format gnutar --chroot"
+        if REMOTE_IO_EXEC test -x /usr/bin/pigz; then
+            TARGZIP_FLAG=""
+            TARGZIP_POST="| /usr/bin/pigz"
+        fi
+    else
+        if REMOTE_IO_EXEC test -x /usr/bin/pigz; then
+            TARGZIP_FLAG="-I/usr/bin/pigz"
+        fi
+    fi
+
+    if ! REMOTE_IO_EXEC "$TAR $TARGZIP_FLAG -cf - --one-file-system $TOPDIRS -C .tmp proc sys $TARGZIP_POST > $BUILD_ROOT/.simpleimage.tar.gz"; then
       cleanup_and_exit 1
     fi
+
     if [ -x "`which mksquashfs 2> /dev/null`" ]; then
       echo
       echo "Tarball done, creating squashfs image as well"
+      if [ -n "$REMOTE_IO_EXEC" ]; then
+        echo "Using REMOTE_IO_EXEC..."
+      fi
       echo
-      mksquashfs $TOPDIRS .tmp/proc .tmp/sys .simpleimage.squashfs -info -keep-as-directory -no-progress || cleanup_and_exit 1
+      # Note: no pigz magic here, mksquashfs already does parallel work by itself
+      REMOTE_IO_EXEC mksquashfs $TOPDIRS .tmp/proc .tmp/sys $BUILD_ROOT/.simpleimage.squashfs -info -keep-as-directory -no-progress || cleanup_and_exit 1
     fi
-    echo "simple image created."
+    echo "`date -u`: simple image created."
 
     DEST="$BUILD_ROOT$TOPDIR/OTHER"
     mkdir -p "$DEST"
+
+    echo
+    echo "Checksumming tarball..."
+    echo
     mv $BUILD_ROOT/.simpleimage.tar.gz $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz
+    REMOTE_IO_EXEC md5sum $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz | sed "s|$DEST/||" > $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz.md5
+    ls -la $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz.md5 $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz
+
     if [ -r .simpleimage.squashfs ]; then
+      echo
+      echo "Checksumming squashfs..."
+      echo
       mv $BUILD_ROOT/.simpleimage.squashfs $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs
+      REMOTE_IO_EXEC md5sum $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs | sed "s|$DEST/||" > $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs.md5
+      ls -la $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs.md5 $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs
     fi
+
+    echo "Almost done, cleaning up..."
     rm -f $BUILD_ROOT/.build.packages
     ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
-    test -d "$SRCDIR" && cd "$SRCDIR"
+
+    echo "`date -u`: recipe_build_simpleimage() finished"
+    test -d "$SRCDIR" && cd "$SRCDIR" || echo "NOTE: Could not test existance of SRCDIR='$SRCDIR'"
+
+    echo
+    echo "$HOST finished \"build $RECIPEFILE\" at `date --utc`."
+    echo
+
     cleanup_and_exit
 }
 

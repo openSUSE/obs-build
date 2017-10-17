@@ -251,6 +251,14 @@ Known Parameters:
               Copy overlay filesystem to buildroot after installing
               all RPMs. This must be a valid directory.
 
+  --remote-io-exec SSHCMD
+              When using shared (e.g. NFS) build roots, have the remote
+              system do (un)archiving operations faster than the wimpy
+              workers (e.g. small ARM boards) can do by themselves.
+              Note that the worker and remote system must have identical
+              paths to same build-root contents (/mnt/nas/workerX/root_Y).
+              Typical value would be like "ssh root@nfsserver".
+
   --rsync-src RSYNCSRC
               Copy overlay folder (RSYNCSRC) to a folder (RSYNCDEST)
               inside the buildroot using rsync.
@@ -368,6 +376,24 @@ EOT
 
 usage () {
     cleanup_and_exit 1 "Usage: `basename $0` [--no-init|--clean|--rpms path|--verify|--help] [dir-to-build|recipe-to-build]"
+}
+
+REMOTE_IO_EXEC() {
+    # This helper can offload intensive and dumb I/O operations like
+    # (un-)tarballing and (de-)compression from workers using shared
+    # media (e.g. NFS build roots) to a remote system with higher
+    # performance in this regard, by setting this option:
+    #   export REMOTE_IO_EXEC="ssh root@nfsserver"
+    # in the workers' /etc/sysconfig/obs-worker files. This also
+    # assumes that the apparent filesystem paths are the same on both
+    # the worker and remote helper - e.g. /mnt/nas/workerX/root_Y/
+    # and that appropriate ssh-key trusts have been set up.
+    if [ -n "$REMOTE_IO_EXEC" ]; then
+        $REMOTE_IO_EXEC "cd `pwd` && ( eval $* )" ; return $?
+    else
+        eval "$@" ; return $?
+    fi
+    return 22
 }
 
 #
@@ -942,6 +968,11 @@ while test -n "$1"; do
       -overlay)
 	needarg
 	OVERLAY=$ARG
+	shift
+      ;;
+      -remote-io-exec)
+	needarg
+	REMOTE_IO_EXEC="$ARG"
 	shift
       ;;
       -rsync-src)
