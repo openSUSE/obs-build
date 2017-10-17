@@ -153,6 +153,11 @@ clean_build_root() {
 	    mount -n -tproc none "$BUILD_ROOT/proc"
 	    mount -n -tdevpts -omode=0620,gid=5 none "$BUILD_ROOT/dev/pts"
 	fi
+
+	# These vars are exported from "build" master-script and corresponding
+	# files are expected on the filesystem... but we've just deleted it all!
+	test -n "$INCARNATION" && echo "BUILD_INCARNATION=$INCARNATION" > "$BUILD_ROOT/.buildenv"
+	test "$BUILDTYPE" = preinstallimage && mkdir -p "$BUILD_ROOT/.preinstall_image"
     fi
 }
 
