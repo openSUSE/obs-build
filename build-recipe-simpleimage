@@ -44,11 +44,15 @@ recipe_build_simpleimage() {
 	.build*) continue ;;
 	.nfs*) continue ;;
 	.simpleimage*) continue ;;
+	.preinstallimage*) continue ;;
+	.preinstall_image*) continue ;;
 	.srcfiles*) continue ;;
+	.oldroot*) continue ;;
 	.pkgs) continue ;;
 	.rpm-cache) continue ;;
 	.tmp) continue ;;
 	installed-pkg) continue ;;
+	debian-binary) continue ;;
 	proc|sys) continue ;;
       esac
       TOPDIRS="$TOPDIRS $DIR"
