@@ -107,6 +107,7 @@ recipe_set_buildtype() {
     if test "$BUILDENGINE" = debbuild -a "$BUILDTYPE" = spec ; then
 	BUILDTYPE=debbuild
     fi
+    echo "Processing the job as BUILDTYPE=${BUILDTYPE} ..."
 }
 
 # expands all directories into files
