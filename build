@@ -103,6 +103,7 @@ SIGNDUMMY=
 DO_STATISTICS=
 RUN_SHELL=
 CCACHE=
+#DO_CCACHE_STATISTICS=
 DLNOSIGNATURE=
 BUILD_FLAVOR=
 OBS_PACKAGE=
@@ -255,6 +256,10 @@ Known Parameters:
               Usually the runtime dependencies are minimal, so the same
               binary should work on any Linux distro from the same era.
               If PATH_TO_BINARY is "yes", copy host /usr/bin/ccache.
+
+  --ccache-statistics
+              optionally report ccache statistics and log of operations
+              done during this build job, in the end of usual build log.
 
   --icecream N
               Use N parallel build jobs with icecream
@@ -560,8 +565,11 @@ CCACHE_DIR="/.ccache"
 CCACHE_LOGFILE="/.build.log.ccache"
 PATH="/.ccache-bin:\$PATH"
 export PATH CCACHE_LOGFILE CCACHE_DIR
-echo "CCache state before build:"
-ccache -s
+if test -z "\$NO_CCACHE_STATS" || test x"\$NO_CCACHE_STATS" = xyes ; then
+    echo "CCache state before build:"
+    ccache -s
+fi
+true
 EOF
     else
         rm -f "$BUILD_ROOT"/.ccache-bin/{gcc,g++,cc,c++,clang,clang++}{,-*}
@@ -1017,6 +1025,9 @@ while test -n "$1"; do
 	CCACHE_HOST_BIN="$ARG"
 	shift
       ;;
+      -ccache-statistics)
+	DO_CCACHE_STATISTICS=1
+      ;;
       -statistics)
 	DO_STATISTICS=1
       ;;
@@ -1124,6 +1135,7 @@ test "$BUILD_ROOT" != /var/tmp/build-root && validate_param "--root" "$BUILD_ROO
 test "$CONFIG_DIR" != "$BUILD_DIR/configs" && validate_param "--configdir" "$CONFIG_DIR" CONFIG_DIR
 
 # Beside CLI, these can come from envvars (sourced by worker configs)
+# Note the env can also enforce DO_CCACHE_STATISTICS=1 to post the logs
 if test -n "$CCACHE_HOST_DIR" || test -n "$CCACHE_HOST_BIN" ; then
     CCACHE=true
 fi
@@ -1596,5 +1608,25 @@ fi
 echo
 echo "$HOST finished \"build $RECIPEFILE\" at `date --utc`."
 echo
+
+if [ "$DO_CCACHE_STATISTICS" = 1 ] ; then
+    if [ -s "$BUILD_ROOT/.build.log.ccache" ] ; then
+        echo "Dumping current run's CCACHE log:"
+        echo "======="
+        cat "$BUILD_ROOT/.build.log.ccache"
+        echo "======="
+    fi
+
+    if [ -x $BUILD_ROOT/.ccache-bin/ccache ] && [ -s "$BUILD_ROOT"/etc/profile.d/build_ccache.sh ] ; then
+        echo
+        echo "CCACHE stats after this run:"
+        echo
+        chroot "$BUILD_ROOT" /usr/bin/bash -c "NO_CCACHE_STATS=yes ; . /etc/profile.d/build_ccache.sh && /.ccache-bin/ccache -s"
+    fi
+
+    echo
+    echo "$HOST finished \"build $RECIPEFILE\" augmented by CCACHE at `date --utc`."
+    echo
+fi
 
 cleanup_and_exit "$exitcode"
