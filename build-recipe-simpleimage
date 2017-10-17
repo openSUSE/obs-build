@@ -118,6 +118,11 @@ recipe_build_simpleimage() {
     ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
     echo "`date -u`: recipe_build_simpleimage() finished"
     test -d "$SRCDIR" && cd "$SRCDIR" || echo "NOTE: Could not test existance of SRCDIR='$SRCDIR'"
+
+    echo
+    echo "$HOST finished \"build $RECIPEFILE\" at `date --utc`."
+    echo
+
     cleanup_and_exit 0
 }
 
