@@ -147,6 +147,28 @@ clean_build_root() {
 	rm -rf -- "$BUILD_ROOT/.init_b_cache"
 	rm -rf -- "$BUILD_ROOT"/.preinstall_image/*
 	rm -rf -- "$BUILD_ROOT"/.preinstallimage*
+
+	# Note: removals above do not impact "hidden" files starting with a dot.
+	# We do not always want to completely wipe an old root - since working data
+	# is prepared here by our caller, but sometimes we do. So there's a toggle.
+	# WIPE_BUILD_ROOT==false disables the clause below; other values including
+	# unset or empty enable the clause to move away the old build root and move
+	# back all reasonable .* objects except .n* (avoid stale nfs stuff), and
+	# a "true" value also removes the remnants of the old not-empty build root
+	# as an asynchronous call that does not block the running build (can hang
+	# though, e.g. until the NFS stale-handles expire and are killed off).
+	# Otherwise clean-up is up to volatile storage (ramdisk) or your cron jobs.
+	if test x"$WIPE_BUILD_ROOT" != xfalse && test "`find "$BUILD_ROOT" | wc -l`" -gt 1 ; then
+	    echo "Moving away old BUILD_ROOT='$BUILD_ROOT' to '$BUILD_ROOT.old.$$' ..." >&2
+	    mv -f "$BUILD_ROOT" "$BUILD_ROOT.old.$$" && \
+	    mkdir -p "$BUILD_ROOT" && \
+	    mv -f "$BUILD_ROOT.old.$$"/.[a-mo-zA-Z0-9_\-]* "$BUILD_ROOT/" || true
+	    if test x"$WIPE_BUILD_ROOT" = xtrue || test "`find "$BUILD_ROOT" | wc -l`" -le 1 ; then
+		echo "Asynchronously removing '$BUILD_ROOT.old.$$' ..." >&2
+		rm -rf -- "$BUILD_ROOT.old.$$" &
+	    fi
+	fi
+
 	mkdir -p "$BUILD_ROOT/proc"
 	mkdir -p "$BUILD_ROOT/dev/pts"
 	if test "$UID" = 0 ; then
