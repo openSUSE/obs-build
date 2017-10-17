@@ -94,7 +94,12 @@ dsc_build() {
     # this allows the build environment to be manipulated
     # and alternate build commands can be used
     DSC_BUILD_CMD="$(queryconfig --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" substitute dsc:build_cmd)"
-    test -z "$DSC_BUILD_CMD" && DSC_BUILD_CMD="dpkg-buildpackage -us -uc"
+    if test -z "$DSC_BUILD_CMD" ; then
+        DSC_BUILD_CMD="dpkg-buildpackage -us -uc"
+        if test -n "$BUILD_JOBS" ; then
+            DSC_BUILD_CMD="$DSC_BUILD_CMD -j$BUILD_JOBS"
+        fi
+    fi
     if test -e $buildroot/$TOPDIR/SOURCES/build.script ; then
 	echo "Sourcing build.script to build - it should normally run 'dpkg-buildpackage -us -uc'"
 	DSC_BUILD_CMD="source $TOPDIR/SOURCES/build.script"
