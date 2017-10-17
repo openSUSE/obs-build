@@ -39,7 +39,7 @@ pkg_initdb_deb() {
 	rm -f $BUILD_ROOT/.init_b_cache/dpkg.deb
 	cp $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb $BUILD_ROOT/.init_b_cache/dpkg.deb || cleanup_and_exit 1
     fi
-    chroot $BUILD_ROOT dpkg -i --force all .init_b_cache/dpkg.deb >/dev/null 2>&1
+    chroot $BUILD_ROOT dpkg --install --no-triggers --force all .init_b_cache/dpkg.deb >/dev/null 2>&1
 }
 
 pkg_prepare_deb() {
@@ -49,7 +49,7 @@ pkg_prepare_deb() {
 pkg_install_deb() {
     export DEBIAN_FRONTEND=noninteractive
     export DEBIAN_PRIORITY=critical
-    ( cd $BUILD_ROOT && chroot $BUILD_ROOT dpkg --install --force all .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
+    ( cd $BUILD_ROOT && chroot $BUILD_ROOT dpkg --install --no-triggers --force all .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
 	perl -ne '$|=1;/^(Configuration file|Installing new config file|Selecting previously deselected|Selecting previously unselected|\(Reading database|Unpacking |Setting up|Creating config file|Preparing to replace dpkg|Preparing to unpack )/||/^$/||print'
     # ugly workaround for upstart system. some packages (procps) try
     # to start a service in their configure phase. As we don't have
@@ -85,6 +85,11 @@ pkg_finalize_deb() {
     # configure all packages after complete installation, not for each package like rpm does
     # We need to run this twice, because of cyclic dependencies as it does not succeed on most
     # debian based distros in the first attempt.
+    if ! chroot $BUILD_ROOT dpkg --triggers-only --pending  2>&1; then
+         echo "first trigger-processing attempt failed, trying again..."
+         chroot $BUILD_ROOT dpkg --triggers-only --pending  2>&1 || cleanup_and_exit 1
+    fi
+
     if ! chroot $BUILD_ROOT dpkg --configure --pending  2>&1; then
          echo "first configure attempt failed, trying again..."
          chroot $BUILD_ROOT dpkg --configure --pending  2>&1 || cleanup_and_exit 1

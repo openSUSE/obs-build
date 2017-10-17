@@ -816,6 +816,21 @@ if test -n "$CREATE_BUILD_BINARIES" ; then
 fi
 
 #
+# defer Debian trigger processing
+#
+if test -d $BUILD_ROOT/etc/apt/apt.conf.d && ! test -f $BUILD_ROOT/etc/apt/apt.conf.d/triggers ; then
+    # https://raphaelhertzog.com/2011/05/30/trying-to-make-dpkg-triggers-more-useful-and-less-painful/
+    echo -n 'deferring Debian package trigger processing...'
+    cat > "$BUILD_ROOT/etc/apt/apt.conf.d/triggers" << EOF
+// Trigger deferred
+DPkg::NoTriggers "true";
+PackageManager::Configure "smart";
+DPkg::ConfigurePending "true";
+DPkg::TriggersPending "true";
+EOF
+fi
+
+#
 # reorder packages (already done in vm continuation)
 #
 if ! test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
