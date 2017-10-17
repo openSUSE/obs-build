@@ -217,6 +217,7 @@ preinstall_image() {
 	test -e "$BUILD_ROOT/.preinstallimage.unpack" && cat "$BUILD_ROOT/.preinstallimage.unpack"
 	cleanup_and_exit 1
     fi
+    echo "Preinstall image unpacked: '$1' '$2'"
     rm -f "$BUILD_ROOT/.preinstallimage.unpack"
 }
 

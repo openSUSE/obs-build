@@ -68,7 +68,8 @@ recipe_build_preinstallimage() {
     if ! REMOTE_IO_EXEC "$TAR $TARGZIP_FLAG -cf - --one-file-system $TOPDIRS $TARGZIP_POST > $BUILD_ROOT/.preinstallimage.$$.tar.gz" ; then
 	cleanup_and_exit 1
     fi
-    echo "image created."
+    echo "image created:"
+    ls -la $BUILD_ROOT/.preinstallimage.$$.tar.gz
     TOPDIR=/usr/src/packages
     mkdir -p $BUILD_ROOT$TOPDIR/OTHER
     rm -f $BUILD_ROOT$TOPDIR/OTHER/preinstallimage.info
@@ -81,6 +82,7 @@ recipe_build_preinstallimage() {
     mv $BUILD_ROOT/.preinstallimage.$$.tar.gz $BUILD_ROOT$TOPDIR/OTHER/preinstallimage.tar.gz
     rm -f $BUILD_ROOT/.build.packages
     ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
+    echo "`date -u`: recipe_build_preinstallimage() finished"
     test -d "$SRCDIR" && cd "$SRCDIR"
 }
 
