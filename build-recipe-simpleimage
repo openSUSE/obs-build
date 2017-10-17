@@ -72,6 +72,7 @@ recipe_build_simpleimage() {
 	.pkgs) continue ;;
 	.rpm-cache) continue ;;
 	.tmp) continue ;;
+	.ccache*) continue ;;
 	installed-pkg) continue ;;
 	proc|sys) continue ;;
       esac

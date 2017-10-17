@@ -49,6 +49,7 @@ recipe_build_preinstallimage() {
 	.srcfiles*) continue ;;
 	.pkgs) continue ;;
 	.rpm-cache) continue ;;
+	.ccache*) continue ;;
 	installed-pkg) continue ;;
 	proc|sys) continue ;;
       esac
