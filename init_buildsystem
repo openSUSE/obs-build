@@ -121,8 +121,10 @@ PKGS=("$@")
 cleanup_and_exit() {
     trap EXIT
     test "$BUILD_ROOT" = / -a -n "$browner" && chown "$browner" "$BUILD_ROOT"
+
     # umount so init_buildsystem can be used standalone
 # XXX: use stat -f /dev/pts/ -c %T  to check whether it's mounted and not suppress errors then?
+    echo "Unmounting subdirs from BUILD_ROOT='$BUILD_ROOT' ..." >&2
     umount -n "$BUILD_ROOT/proc/sys/fs/binfmt_misc" 2> /dev/null || true
     umount -n "$BUILD_ROOT/proc" 2> /dev/null || true
     umount -n "$BUILD_ROOT/dev/pts" 2> /dev/null || true
@@ -145,6 +147,7 @@ cleanup_and_exit() {
 
 clean_build_root() {
     if test -n "$BUILD_ROOT" ; then
+	echo "Unmounting subdirs from BUILD_ROOT='$BUILD_ROOT' ..." >&2
 	umount -n "$BUILD_ROOT/proc/sys/fs/binfmt_misc" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/proc" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/dev/pts" 2> /dev/null || true
@@ -161,6 +164,11 @@ clean_build_root() {
 	umount -n -f -l "$BUILD_ROOT/mnt" 2> /dev/null || true
 	umount -n -f -l "$BUILD_ROOT/.ccache" 2> /dev/null || true
 
+	if [ -n "$REMOTE_IO_EXEC" ]; then
+	    echo "Removing stuff from BUILD_ROOT='$BUILD_ROOT' using REMOTE_IO_EXEC helper ..." >&2
+	else
+	    echo "Removing stuff from BUILD_ROOT='$BUILD_ROOT' ..." >&2
+	fi
 	rm -rf -- "$BUILD_ROOT"/* 2> /dev/null || true
 	chattr -a -A -i -R -- "$BUILD_ROOT" 2> /dev/null || true
 	rm -rf -- "$BUILD_ROOT"/*
@@ -193,6 +201,7 @@ clean_build_root() {
 	    fi
 	fi
 
+	echo "(Re-)creating BUILD_ROOT='$BUILD_ROOT' structure..." >&2
 	mkdir -p "$BUILD_ROOT/proc"
 	mkdir -p "$BUILD_ROOT/dev/pts"
 	if test "$UID" = 0 ; then
@@ -204,6 +213,8 @@ clean_build_root() {
 	# files are expected on the filesystem... but we've just deleted it all!
 	test -n "$INCARNATION" && echo "BUILD_INCARNATION=$INCARNATION" > "$BUILD_ROOT/.buildenv"
 	test "$BUILDTYPE" = preinstallimage && mkdir -p "$BUILD_ROOT/.preinstall_image"
+
+	echo "Done preparing BUILD_ROOT='$BUILD_ROOT'" >&2
     fi
 }
 
@@ -506,6 +517,8 @@ fi
 if test -e "$BUILD_IS_RUNNING" ; then
     echo "It seems that there was an incomplete setup of $BUILD_ROOT."
     echo "To be sure, we will build it again completely..."
+
+    echo "Unmounting subdirs from BUILD_ROOT='$BUILD_ROOT' ..." >&2
     umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
     umount -n $BUILD_ROOT/proc 2> /dev/null
     umount -n $BUILD_ROOT/dev/pts 2> /dev/null
