@@ -111,10 +111,36 @@ dsc_build() {
 	chroot $buildroot su -
     else
 	chroot $buildroot su -c "export DEB_BUILD_OPTIONS=${DSC_BUILD_OPTIONS} ; cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
-	if test "$BUILD_SUCCEEDED" = true -a "$DO_CHECKS" != "false" && ( chroot $buildroot su -c "which lintian > /dev/null" - $BUILD_USER < /dev/null ); then
-	   DEB_CHANGESFILE=${DEB_DSCFILE%.dsc}$OBS_DCH_RELEASE"_"$(chroot $buildroot su -c 'dpkg-architecture -qDEB_BUILD_ARCH')".changes"
-	   chroot $buildroot su -c "cd $TOPDIR && echo Running lintian && (set -x && lintian -i $TOPDIR/$DEB_CHANGESFILE)" - $BUILD_USER < /dev/null || BUILD_SUCCEEDED=false
-	fi
+	# Toggle for lintian below: as in-house development of new software ramps
+	# up to prioritize delivery of a working piece, the quality of packaging,
+	# recipes and other non-functional aspects tends to suffer. As a result,
+	# `lintian` can block creation of early revisions of packages and so
+	# forbid progress on actual development. While this is no excuse for
+	# ultimately published projects and packages, on-premise OBS deployments
+	# in such cases can benefit from ability to skip lintian entirely, or
+	# to run the checks (consume time) and leave a warning in the build log.
+	# This can be configured per-worker, so e.g. faster x86 builds suffer
+	# the overhead while slower ARMs do not.
+	# Again: this toggle is only for experimental on-site deployments.
+	# It should not be enabled in production - widely published packages
+	# (and their recipes) should be lint-clean!
+	case "$OBS_DISABLE_DSC_LINTIAN" in
+	    yes|skip|true) # don't incur overhead of even probing for the tool
+	        if test "$BUILD_SUCCEEDED" = true -a "$DO_CHECKS" != "false" ; then
+	            echo "NOTE: Skipping lintian due to explicit worker configuration" >&2
+	        fi
+	        ;;
+	    *) # "no", empty/unset, or "warn" as a special case below
+	        if test "$BUILD_SUCCEEDED" = true -a "$DO_CHECKS" != "false" && ( chroot $buildroot su -c "which lintian > /dev/null" - $BUILD_USER < /dev/null ); then
+	           DEB_CHANGESFILE=${DEB_DSCFILE%.dsc}_"$(chroot $buildroot su -c 'dpkg-architecture -qDEB_BUILD_ARCH')".changes
+	           chroot $buildroot su -c "cd $TOPDIR && echo Running lintian && (set -x && lintian -i $TOPDIR/$DEB_CHANGESFILE)" - $BUILD_USER < /dev/null || BUILD_SUCCEEDED=false
+	            if test "$OBS_DISABLE_DSC_LINTIAN" = "warn" && test "$BUILD_SUCCEEDED" = false ; then
+	                echo "WARNING: lintian check just above has failed, but we only warn about this due to explicit worker configuration" >&2
+	                BUILD_SUCCEEDED=true
+	            fi
+	        fi
+	        ;;
+	esac
     fi
 }
 
