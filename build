@@ -539,7 +539,7 @@ setupccache() {
                 echo '#! /bin/sh' > $BUILD_ROOT/.ccache-bin/$i
                 echo "test -e /usr/bin/$i || exit 1" >> $BUILD_ROOT/.ccache-bin/$i
                 echo 'export PATH=/usr/lib/icecc/bin:/opt/icecream/bin:/usr/bin:$PATH' >> $BUILD_ROOT/.ccache-bin/$i
-                echo "/.ccache-bin/ccache $i \"\$@\"" >> $BUILD_ROOT/.ccache-bin/$i
+                echo "exec /.ccache-bin/ccache $i \"\$@\"" >> $BUILD_ROOT/.ccache-bin/$i
                 chmod 755 $BUILD_ROOT/.ccache-bin/$i
                 echo "Installed ccache wrapper as $BUILD_ROOT/.ccache-bin/$i"
             done
