@@ -551,6 +551,7 @@ setupccache() {
         fi
     fi
 
+    rm -f "$BUILD_ROOT/.build.log.ccache" || true
     if test "$WRAPPED_CCACHE" = 1 ; then
         mkdir -p "$BUILD_ROOT/.ccache"
         if test -n "$CCACHE_HOST_DIR" ; then
