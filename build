@@ -104,6 +104,7 @@ DO_STATISTICS=
 RUN_SHELL=
 CCACHE=
 #DO_CCACHE_STATISTICS=
+#DO_CCACHE_LOGGING=
 DLNOSIGNATURE=
 BUILD_FLAVOR=
 OBS_PACKAGE=
@@ -256,6 +257,10 @@ Known Parameters:
               Usually the runtime dependencies are minimal, so the same
               binary should work on any Linux distro from the same era.
               If PATH_TO_BINARY is "yes", copy host /usr/bin/ccache.
+
+  --ccache-logging
+              optionally enable saving a ccache log of operations done
+              during this build job, beware of overheads and slowdown.
 
   --ccache-statistics
               optionally report ccache statistics and log of operations
@@ -559,18 +564,28 @@ setupccache() {
         else
             chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.ccache"
         fi
+
         cat << EOF > "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
 echo 'Sourcing /etc/profile.d/build_ccache.sh...' >&2
 CCACHE_DIR="/.ccache"
-CCACHE_LOGFILE="/.build.log.ccache"
 PATH="/.ccache-bin:\$PATH"
-export PATH CCACHE_LOGFILE CCACHE_DIR
+export PATH CCACHE_DIR
 if test x"\$PROFILE_CCACHE_STATS" = xyes ; then
     echo "CCache stats before build:"
     ccache -s
 fi >&2
 true
 EOF
+
+        # Note: logging does incur considerable overhead and slowdown
+        # so do not enable it unless investigating your ccache setup.
+        if [ "$DO_CCACHE_LOGGING" = 1 ] ; then
+            touch "$BUILD_ROOT/.build.log.ccache"
+            chown "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.build.log.ccache"
+            chmod 664 "$BUILD_ROOT/.build.log.ccache"
+            echo 'CCACHE_LOGFILE="/.build.log.ccache" ; export CCACHE_LOGFILE' >> "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
+        fi
+
         if [ "$DO_CCACHE_STATISTICS" = 1 ] ; then
             chroot "$BUILD_ROOT" /bin/sh -c "PROFILE_CCACHE_STATS=yes ; . /etc/profile.d/build_ccache.sh"
         fi
@@ -1027,6 +1042,9 @@ while test -n "$1"; do
 	CCACHE=true
 	CCACHE_HOST_BIN="$ARG"
 	shift
+      ;;
+      -ccache-logging)
+	DO_CCACHE_LOGGING=1
       ;;
       -ccache-statistics)
 	DO_CCACHE_STATISTICS=1
