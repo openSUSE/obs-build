@@ -178,8 +178,9 @@ sub parse {
   return $ret;
 }
 
-sub ungzip {
+sub uncompress {
   my $data = shift;
+  my $tool = shift;
   local (*TMP, *TMP2);
   open(TMP, "+>", undef) or die("could not open tmpfile\n");
   syswrite TMP, $data;
@@ -188,13 +189,13 @@ sub ungzip {
   die("fork: $!\n") unless defined $pid;
   if (!$pid) {
     open(STDIN, "<&TMP");
-    exec 'gunzip';
-    die("gunzip: $!\n");
+    exec($tool);
+    die("$tool: $!\n");
   }
   close(TMP);
   $data = '';
   1 while sysread(TMP2, $data, 1024, length($data)) > 0;
-  close(TMP2) || die("gunzip error");
+  close(TMP2) || die("$tool error");
   return $data;
 }
 
@@ -229,6 +230,7 @@ sub debq {
     return ();
   }
   my $data = '';
+  my $decompressor = "gunzip";
   sysread(DEBF, $data, 4096);
   if (length($data) < 8+60) {
     warn("$fn: not a debian package - header too short\n");
@@ -270,10 +272,10 @@ sub debq {
   close DEBF unless ref($fn);
   $data = substr($data, 60, $len);
   my $controlmd5 = Digest::MD5::md5_hex($data);	# our header signature
-  if ($have_zlib) {
+  if ($have_zlib && $decompressor eq "gunzip") {
     $data = Compress::Zlib::memGunzip($data);
   } else {
-    $data = ungzip($data);
+    $data = uncompress($data, $decompressor);
   }
   if (!$data) {
     warn("$fn: corrupt control.tar.gz file\n");
