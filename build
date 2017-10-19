@@ -493,14 +493,15 @@ provide_ccache() {
     # Setup is indeed needed... do some sanity check first
     [ -n "$BUILD_ROOT" ] && [ -d "$BUILD_ROOT" ] || return
     mkdir -p $BUILD_ROOT/.ccache-bin
-    rm -f "$BUILD_ROOT/.ccache-bin/ccache" 2>dev/null || true
+    rm -f "$BUILD_ROOT/.ccache-bin/ccache" 2>/dev/null || true
 
     # First try using a binary that may already exist in the build root via
     # packaging as /usr/bin/ccache. Note that this path can be an absolute
     # symlink, so can be misleading in the host environment - so we must
     # chroot before evaluating it.
-    if chroot "$BUILD_ROOT" /usr/bin/test -x /usr/bin/ccache || \
-       chroot "$BUILD_ROOT" /bin/test -x /usr/bin/ccache ; then
+    if chroot "$BUILD_ROOT" /usr/bin/test -x /usr/bin/ccache 2>/dev/null || \
+       chroot "$BUILD_ROOT" /bin/test -x /usr/bin/ccache 2>/dev/null ; then
+        echo "Using preferred ccache binary provided in the build root"
         ln -s "../usr/bin/ccache" "$BUILD_ROOT/.ccache-bin/ccache"
     else
         case "$CCACHE_HOST_BIN" in
@@ -510,7 +511,8 @@ provide_ccache() {
         esac
 
         if [ -n "$CCACHE_HOST_BIN" ] && [ -x "$CCACHE_HOST_BIN" ] ; then
-            cp -pLf "$CCACHE_HOST_BIN" "$BUILD_ROOT/.ccache-bin/"
+            echo "Using fallback ccache binary provided by the build worker: $CCACHE_HOST_BIN"
+            cp -pLf "$CCACHE_HOST_BIN" "$BUILD_ROOT/.ccache-bin/ccache"
         fi
     fi
 
@@ -1639,7 +1641,7 @@ if [ "$DO_CCACHE_STATISTICS" = 1 ] ; then
         echo "======="
     fi
 
-    if [ -x $BUILD_ROOT/.ccache-bin/ccache ] && [ -s "$BUILD_ROOT"/etc/profile.d/build_ccache.sh ] ; then
+    if [ -x "$BUILD_ROOT"/.ccache-bin/ccache ] && [ -s "$BUILD_ROOT"/etc/profile.d/build_ccache.sh ] ; then
         echo
         echo "CCACHE stats after this run:"
         echo
