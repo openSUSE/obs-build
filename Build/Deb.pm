@@ -180,8 +180,9 @@ sub parse {
 }
 
 sub uncompress {
-  my $data = shift;
-  my $tool = shift;
+  my ($data, $tool) = @_;
+  return $data if $tool eq 'cat';
+  return Compress::Zlib::memGunzip($data) if $have_zlib && $tool eq 'gunzip';
   local (*TMP, *TMP2);
   open(TMP, "+>", undef) or die("could not open tmpfile\n");
   syswrite TMP, $data;
@@ -196,7 +197,7 @@ sub uncompress {
   close(TMP);
   $data = '';
   1 while sysread(TMP2, $data, 1024, length($data)) > 0;
-  close(TMP2) || die("$tool error");
+  close(TMP2) || die("$tool error\n");
   return $data;
 }
 
@@ -231,7 +232,6 @@ sub debq {
     return ();
   }
   my $data = '';
-  my $decompressor = "gunzip";
   sysread(DEBF, $data, 4096);
   if (length($data) < 8+60) {
     warn("$fn: not a debian package - header too short\n");
@@ -255,16 +255,18 @@ sub debq {
     }
   }
   $data = substr($data, 8 + 60 + $len);
-  if (substr($data, 0, 16) ne 'control.tar.gz  ' &&
-      substr($data, 0, 16) ne 'control.tar.gz/ ') {
-    if (substr($data, 0, 16) eq 'control.tar.xz  ' ||
-        substr($data, 0, 16) eq 'control.tar.xz/ ') {
-      $decompressor = "unxz";
-    } else  {
-      warn("$fn: control.tar is not second ar entry\n");
-      close DEBF unless ref $fn;
-      return ();
-    }
+  my $controlname = substr($data, 0, 16);
+  my $decompressor;
+  if ($controlname eq 'control.tar.gz  ' || $controlname eq 'control.tar.gz/ ') {
+    $decompressor = 'gunzip';
+  } elsif ($controlname eq 'control.tar.xz  ' || $controlname eq 'control.tar.xz/ ') {
+    $decompressor = 'unxz';
+  } elsif ($controlname eq 'control.tar     ' || $controlname eq 'control.tar/    ') {
+    $decompressor = 'cat';
+  } else {
+    warn("$fn: control.tar is not second ar entry\n");
+    close DEBF unless ref $fn;
+    return ();
   }
   $len = substr($data, 48, 10);
   if (length($data) < 60+$len) {
@@ -278,11 +280,7 @@ sub debq {
   close DEBF unless ref($fn);
   $data = substr($data, 60, $len);
   my $controlmd5 = Digest::MD5::md5_hex($data);	# our header signature
-  if ($have_zlib && $decompressor eq "gunzip") {
-    $data = Compress::Zlib::memGunzip($data);
-  } else {
-    $data = uncompress($data, $decompressor);
-  }
+  $data = uncompress($data, $decompressor);
   if (!$data) {
     warn("$fn: corrupt control.tar file\n");
     return ();
