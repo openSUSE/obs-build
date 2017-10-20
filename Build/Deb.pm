@@ -393,11 +393,10 @@ sub queryhdrmd5 {
     }
   }
   $data = substr($data, 8 + 60 + $len);
-  if (substr($data, 0, 16) ne 'control.tar.gz  ' &&
-      substr($data, 0, 16) ne 'control.tar.gz/ ' &&
-      substr($data, 0, 16) ne 'control.tar.xz  ' &&
-      substr($data, 0, 16) ne 'control.tar.xz/ ')
-   {
+  my $controlname = substr($data, 0, 16);
+  if ($controlname ne 'control.tar.gz  ' && $controlname ne 'control.tar.gz/ ' &&
+      $controlname ne 'control.tar.xz  ' && $controlname ne 'control.tar.xz/ ' &&
+      $controlname ne 'control.tar     ' && $controlname ne 'control.tar/    ') {
     warn("$bin: control.tar is not second ar entry\n");
     close F;
     return undef;
