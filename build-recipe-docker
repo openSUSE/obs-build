@@ -138,7 +138,9 @@ recipe_build_docker() {
     fi
     
     # Create containerinfo
-    perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$ALLTAGS" containers/annotation> "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
+    disturlarg=()
+    test -n "$DISTURL" && disturlarg=("--disturl" "$DISTURL")
+    perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo -- "${disturlarg[@]}" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$ALLTAGS" containers/annotation> "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
 
     # We're done. Clean up.
     recipe_cleanup_docker

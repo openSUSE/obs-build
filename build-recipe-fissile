@@ -117,7 +117,9 @@ recipe_build_fissile() {
 	    cleanup_and_exit 1 "Docker save command failed"
         fi
 	# Create containerinfo
-	perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo '' "$filename.tar" "$image" containers/annotation> "$BUILD_ROOT$TOPDIR/FISSILE/$filename.containerinfo"
+	disturlarg=()
+`	test -n "$DISTURL" && disturlarg=("--disturl" "$DISTURL")
+	perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo -- "${disturlarg[@]}" '' "$filename.tar" "$image" containers/annotation> "$BUILD_ROOT$TOPDIR/FISSILE/$filename.containerinfo"
     done
 
     recipe_cleanup_fissile

@@ -675,8 +675,10 @@ recipe_build_kiwi() {
 
     if test "$imagetype" = docker ; then
 	# get container info
+	disturlarg=()
+	test -n "$DISTURL" && disturlarg=("--disturl" "$DISTURL")
 	for r in $BUILD_ROOT/$TOPDIR/KIWI/*.tar.xz ; do
-	    test -e "$r" && perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::showcontainerinfo $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE "$r" > "${r%.tar.xz}.containerinfo"
+	    test -e "$r" && perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::showcontainerinfo -- "${disturlarg[@]}" $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE "$r" > "${r%.tar.xz}.containerinfo"
 	done
     fi
 }

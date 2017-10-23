@@ -385,6 +385,8 @@ sub show {
 }
 
 sub showcontainerinfo {
+  my $disturl;
+  (undef, $disturl) = splice(@ARGV, 0, 2) if @ARGV > 2 && $ARGV[0] eq '--disturl';
   my ($fn, $image) = @ARGV;
   local $urlmapper = sub { return $_[0] };
   my $d = parse({}, $fn);
@@ -405,6 +407,7 @@ sub showcontainerinfo {
   print ",\n  \"tags\": [ ".join(', ', @tags)." ]" if @tags;
   print ",\n  \"repos\": [ ".join(', ', @repos)." ]" if @repos;
   print ",\n  \"file\": \"$image\"" if defined $image;
+  print ",\n  \"disturl\": \"$disturl\"" if defined $disturl;
   print "\n}\n";
 }
 

@@ -204,6 +204,8 @@ sub parse {
 }
 
 sub showcontainerinfo {
+  my $disturl;
+  (undef, $disturl) = splice(@ARGV, 0, 2) if @ARGV > 2 && $ARGV[0] eq '--disturl';
   my ($fn, $image, $taglist, $annotationfile) = @ARGV;
   local $Build::Kiwi::urlmapper = sub { return $_[0] };
   my $d = {};
@@ -229,9 +231,10 @@ sub showcontainerinfo {
     }
   }
   print "{\n";
-  print ",\n  \"tags\": [ ".join(', ', @tags)." ]" if @tags;
+  print "  \"tags\": [ ".join(', ', @tags)." ]" if @tags;
   print ",\n  \"repos\": [ ".join(', ', @repos)." ]" if @repos;
   print ",\n  \"file\": \"$image\"" if defined $image;
+  print ",\n  \"disturl\": \"$disturl\"" if defined $disturl;
   print "\n}\n";
 }
 
