@@ -1,4 +1,20 @@
 -------------------------------------------------------------------
+Thu Oct 12 16:00:09 UTC 2017 - adrian@suse.de
+
+- proper fix for for liblua, for factory and leap 15.0
+
+-------------------------------------------------------------------
+Thu Sep 21 08:55:08 UTC 2017 - coolo@suse.com
+
+- Support getting the container tags from the Dockerfile
+- Put the disturl in the .buildenv file
+- Support rpm-buildroot-override buildflag
+- Support kvm builds on Debian
+- Support with/without/unless rich deps
+- Added obs-docker-support script for docker images
+- Initial SLE 15 config
+
+-------------------------------------------------------------------
 Wed Aug  2 14:59:15 UTC 2017 - lnussel@suse.de
 
 - Temporary hack to aid liblua5_3 -> liblua5_3-5 rename
