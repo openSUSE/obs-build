@@ -231,7 +231,7 @@ sub showcontainerinfo {
     }
   }
   print "{\n";
-  print "  \"tags\": [ ".join(', ', @tags)." ]" if @tags;
+  print "  \"tags\": [ ".join(', ', @tags)." ]";
   print ",\n  \"repos\": [ ".join(', ', @repos)." ]" if @repos;
   print ",\n  \"file\": \"$image\"" if defined $image;
   print ",\n  \"disturl\": \"$disturl\"" if defined $disturl;
