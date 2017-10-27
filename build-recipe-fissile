@@ -118,7 +118,7 @@ recipe_build_fissile() {
         fi
 	# Create containerinfo
 	disturlarg=()
-`	test -n "$DISTURL" && disturlarg=("--disturl" "$DISTURL")
+ 	test -n "$DISTURL" && disturlarg=("--disturl" "$DISTURL")
 	perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo -- "${disturlarg[@]}" '' "$filename.tar" "$image" containers/annotation> "$BUILD_ROOT$TOPDIR/FISSILE/$filename.containerinfo"
     done
 
