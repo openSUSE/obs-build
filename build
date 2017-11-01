@@ -535,7 +535,7 @@ setupccache() {
 
     if test -n "$CCACHE" || test -n "$CCACHE_HOST_DIR" ; then
         if mkdir -p $BUILD_ROOT/.ccache-bin; then
-            for i in $(ls $BUILD_ROOT/usr/bin | grep -E '^(cc|gcc|[cg][+][+]|clang|clang[+][+])([-]?[234][.]?[0-9])*$'); do
+            for i in $(ls $BUILD_ROOT/usr/bin | grep -E '^(.+\-)?(cc|gcc|[cg][+][+]|clang|clang[+][+])([-]?[234][.]?[0-9])*$'); do
                 rm -f $BUILD_ROOT/.ccache-bin/$i
                 # Note: a mediated absolute symlink may be used in the
                 # build-root, so the verbatim $BUILD_ROOT/usr/bin/$i
@@ -593,7 +593,7 @@ EOF
             chroot "$BUILD_ROOT" /bin/sh -c "PROFILE_CCACHE_STATS=yes ; . /etc/profile.d/build_ccache.sh"
         fi
     else
-        rm -f "$BUILD_ROOT"/.ccache-bin/{gcc,g++,cc,c++,clang,clang++}{,-*}
+        rm -f "$BUILD_ROOT"/.ccache-bin/{*-,}{gcc,g++,cc,c++,clang,clang++}{,-*}
     fi
 }
 
