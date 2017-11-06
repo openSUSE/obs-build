@@ -520,6 +520,12 @@ provide_ccache() {
     # Return exit-code of this test
 }
 
+undo_setupccache() {
+    rm -f "$BUILD_ROOT"/.ccache-bin/{*-,}{gcc,g++,cc,c++,clang,clang++}{,-*}
+    rm -f "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
+    rm -f "$BUILD_ROOT"/.build.log.ccache
+}
+
 setupccache() {
     # This routine sets up CCACHE wrappers for build roots, if enabled.
     # This involves a /.ccache-bin/ directory with ccache itself and wrapper
@@ -530,7 +536,7 @@ setupccache() {
     # the same cache directory can be shared between OBS workers.
     local WRAPPED_CCACHE=0
     case "$BUILDTYPE" in
-        *image*) return 0 ;;
+        *image*) undo_setupccache; return 0 ;;
     esac
 
     if test -n "$CCACHE" || test -n "$CCACHE_HOST_DIR" ; then
@@ -593,7 +599,7 @@ EOF
             chroot "$BUILD_ROOT" /bin/sh -c "PROFILE_CCACHE_STATS=yes ; . /etc/profile.d/build_ccache.sh"
         fi
     else
-        rm -f "$BUILD_ROOT"/.ccache-bin/{*-,}{gcc,g++,cc,c++,clang,clang++}{,-*}
+        undo_setupccache
     fi
 }
 
