@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Thu Nov  9 16:12:53 UTC 2017 - adrian@suse.de
+
+- fixes syntax error fissile support
+- various container handling improvements
+- support new debian control.tar.xz files
+
+-------------------------------------------------------------------
 Thu Oct 12 16:00:09 UTC 2017 - adrian@suse.de
 
 - proper fix for for liblua, for factory and leap 15.0
