@@ -951,7 +951,7 @@ for PKG in $MAIN_LIST ; do
 
     if test -f "$BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG" ; then
 	read OLDPKGID < "$BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG"
-	if test "$PKGID" != "$OLDPKGID" ; then
+	if test "$PKGID" != "$OLDPKGID" && ! test -e "$BUILD_ROOT/.init_b_cache/preinstalls/$PKG" ; then
 	    echo "deleting unwanted ${OLDPKGID%% *}"
 	    pkg_erase
 	else
