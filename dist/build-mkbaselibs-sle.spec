@@ -23,6 +23,7 @@ Group:          Development/Tools/Building
 Version:        20170720
 Release:        0
 #!BuildIgnore:  build-mkbaselibs
+#!BuildIgnore:  build-mkbaselibs-sle
 Provides:       build-mkbaselibs
 Conflicts:      otherproviders(build-mkbaselibs)
 Source:         obs-build-%{version}.tar.gz
