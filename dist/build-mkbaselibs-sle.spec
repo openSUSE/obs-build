@@ -28,6 +28,9 @@ Conflicts:      otherproviders(build-mkbaselibs)
 Source:         obs-build-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildArch:      noarch
+%if 0%{?is_opensuse}
+ExclusiveArch:  do-not-build
+%endif
 
 %description
 This package contains the parts which may be installed in the inner build system
