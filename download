@@ -20,7 +20,6 @@
 #
 ################################################################
 
-use Net::SSL ();
 BEGIN {
   $ENV{PERL_LWP_SSL_VERIFY_HOSTNAME} = 0,
   unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
