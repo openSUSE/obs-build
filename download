@@ -61,7 +61,7 @@ for my $url (@ARGV) {
   } else {
     $url = URI->new($url);
   }
-  $ua->env_proxy  if $url->scheme ne 'https';
+  $ua->env_proxy;
   my $dest = "$dir/".basename($url->path);
   unlink($dest);	# just in case
   my $retry = 3;
