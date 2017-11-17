@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri Nov 17 09:36:04 UTC 2017 - adrian@suse.de
+
+- prepare for suse_version 1550 in factory (by Dominique)
+
+-------------------------------------------------------------------
 Thu Nov  9 16:12:53 UTC 2017 - adrian@suse.de
 
 - fixes syntax error fissile support
