@@ -21,7 +21,6 @@
 ################################################################
 
 BEGIN {
-  $ENV{PERL_LWP_SSL_VERIFY_HOSTNAME} = 0,
   unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
 }
 
@@ -38,7 +37,10 @@ my $dir = shift @ARGV;
 
 my $ua = LWP::UserAgent->new(
   agent => "openSUSE build script",
-  timeout => 42);
+  timeout => 42,
+  ssl_opts => {
+    verify_hostname => 1
+  });
 
 for my $url (@ARGV) {
   if ($url =~ /^zypp:\/\/([^\/]*)\/?/) {
