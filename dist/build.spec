@@ -27,6 +27,8 @@ Release:        0
 Source:         obs-build-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildArch:      noarch
+# mkbaselibs is pulled in by prjconf, but since we only build it here, does not exist when bootstrapping
+#!BuildIgnore:  build-mkbaselibs
 %if 0%{?suse_version} > 1200
 # required for test suite
 #!BuildIgnore: build-mkbaselibs-sle

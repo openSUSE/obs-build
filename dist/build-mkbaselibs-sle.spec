@@ -23,11 +23,15 @@ Group:          Development/Tools/Building
 Version:        20170720
 Release:        0
 #!BuildIgnore:  build-mkbaselibs
+#!BuildIgnore:  build-mkbaselibs-sle
 Provides:       build-mkbaselibs
 Conflicts:      otherproviders(build-mkbaselibs)
 Source:         obs-build-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildArch:      noarch
+%if 0%{?is_opensuse}
+ExclusiveArch:  do-not-build
+%endif
 
 %description
 This package contains the parts which may be installed in the inner build system
