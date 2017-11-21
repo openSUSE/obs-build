@@ -29,6 +29,7 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildArch:      noarch
 %if 0%{?suse_version} > 1200
 # required for test suite
+#!BuildIgnore: build-mkbaselibs-sle
 BuildRequires:  build-mkbaselibs
 %endif
 # Keep the following dependencies in sync with obs-worker package

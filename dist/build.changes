@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue Nov 21 09:12:41 UTC 2017 - coolo@suse.com
+
+- buildignore the sle flavor of mkbaselibs for sle
+
+-------------------------------------------------------------------
 Fri Nov 17 09:36:04 UTC 2017 - adrian@suse.de
 
 - prepare for suse_version 1550 in factory (by Dominique)
