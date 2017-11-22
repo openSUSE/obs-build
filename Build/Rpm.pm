@@ -26,6 +26,7 @@ our $conflictdeps = 0;
 use strict;
 
 use Digest::MD5;
+use POSIX qw(INT_MAX);
 
 sub expr {
   my $expr = shift;
@@ -587,6 +588,12 @@ reexpand:
         push @{$ret->{$tag}}, $val;
       } else {
         $ret->{$tag} = $val;
+        if ($tag =~ /^(source|patch)(\d+)?$/) {
+          # define SOURCEURL<NUM>/PATCHURL<NUM> macro
+          my $num = defined($2) ? $2 : ($1 eq 'source' ? 0 : INT_MAX);
+          my $macname = uc($1) . "URL$num";
+          $macros{$macname} = $val;
+        }
       }
     }
 
