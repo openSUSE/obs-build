@@ -33,6 +33,18 @@ vm_startup_docker() {
     docker run \
         --rm --name "$name" --cap-add=sys_admin --cap-add=MKNOD --net=none \
         -v "$BUILD_ROOT:/mnt" busybox /bin/chroot /mnt "$vm_init_script"
+
+    toshellscript "docker" "run" \
+                  "-it" "--rm" \
+                  "--name" "$name" \
+                  "--cap-add=sys_admin" \
+                  "--cap-add=MKNOD" \
+                  "--net=none" \
+                  "-v" "$BUILD_ROOT:/mnt" "busybox" \
+                  "/bin/chroot" "/mnt" \
+                  "/bin/bash" \
+      > $BUILD_ROOT/.get_shell_docker
+
     BUILDSTATUS="$?"
     test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
     cleanup_and_exit "$BUILDSTATUS"

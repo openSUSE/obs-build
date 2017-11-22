@@ -279,6 +279,22 @@ vm_startup_kvm() {
 	${VM_MEMSIZE:+-m $VM_MEMSIZE} \
 	"${qemu_args[@]}"
 
+    toshellscript $qemu_bin \
+                  "-nodefaults" \
+                  "-no-reboot" \
+                  "-nographic" \
+                  "-vga" "none" \
+                  $kvm_options \
+                  "-kernel" \
+                  "$vm_kernel" \
+                  "-initrd" \
+                  "$vm_initrd" \
+                  "-append" \
+                  "${qemu_append/.build\/build/bin\/bash}" \
+                  ${VM_MEMSIZE:+-m $VM_MEMSIZE} \
+                  "${qemu_args[@]}" \
+        > $BUILD_ROOT/.get_shell_kvm
+
     if test "$PERSONALITY" != 0 ; then
 	# have to switch back to PER_LINUX to make qemu work
 	set -- linux64 "$@"
