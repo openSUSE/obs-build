@@ -243,10 +243,13 @@ while(defined($_)) {
   # silly rpm can't hande dates < 1997, so we fold everything to
   # Thu Jan 02 1997
   @gm = (0, 0, 0, 2, 0, 97, 4) if $gm[5] < 97 || ($gm[5] == 97 && $gm[4] == 0 && $gm[3] <= 1);
+  $gm[6] = $wday[$gm[6]];
+  $gm[5] += 1900;
+  $gm[4] = $mon[$gm[4]];
   if($fulltimestamps) {
-    printf("* %s %s %2d %02d:%02d:%02d UTC %4d %s\n", $wday[$gm[6]], $mon[$gm[4]], $gm[3], @gm[2,1,0], $gm[5] + 1900, $who);
+    printf("* %s %s %2d %02d:%02d:%02d UTC %4d %s\n", @gm[6,4,3,2,1,0,5], $who);
   } else {
-    printf("* %s %s %2d %4d %s\n", $wday[$gm[6]], $mon[$gm[4]], $gm[3], $gm[5] + 1900, $who);
+    printf("* %s %s %2d %4d %s\n", @gm[6,4,3,5], $who);
   }
   $changes =~ s/%/%%/g;
   $changes =~ s/^(\s*)%%(\S*)/$1\[%%$2\]/;
