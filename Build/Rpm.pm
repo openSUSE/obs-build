@@ -588,6 +588,10 @@ reexpand:
       } else {
         $ret->{$tag} = $val;
       }
+      if ($tag =~ /^(source|patch)(\d+)?$/) {
+	my $num = defined($2) ? $2 : ($1 eq 'source' ? 0 : -1);
+	$macros{uc($1) . "URL$num"} = $val if $num >= 0;
+      }
     }
 
     if ($line =~ /^\s*%package\s+(-n\s+)?(\S+)/) {
