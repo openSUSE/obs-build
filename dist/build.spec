@@ -22,18 +22,12 @@ Name:           build
 Summary:        A Script to Build SUSE Linux RPMs
 License:        GPL-2.0+ and GPL-2.0
 Group:          Development/Tools/Building
-Version:        20170802
+Version:        20171122
 Release:        0
 Source:         obs-build-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildArch:      noarch
-# mkbaselibs is pulled in by prjconf, but since we only build it here, does not exist when bootstrapping
-#!BuildIgnore:  build-mkbaselibs
-%if 0%{?suse_version} > 1200
-# required for test suite
-#!BuildIgnore: build-mkbaselibs-sle
-BuildRequires:  build-mkbaselibs
-%endif
+#!BuildIgnore:  build-mkbaselibs build-mkbaselibs-sle
 # Keep the following dependencies in sync with obs-worker package
 Requires:       bash
 Requires:       binutils
@@ -209,6 +203,8 @@ echo "test suite is not prepared to run using qemu linux user"
 echo "Skipping test case"
 exit 0
 %endif
+# we need to patch the not packaged configs, due to the buildignore
+sed -i 's,build-mkbaselibs,,' ../configs/*.conf
 ./testbuild.sh /.build.binaries/
 
 %files
