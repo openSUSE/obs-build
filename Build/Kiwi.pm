@@ -392,6 +392,8 @@ sub showcontainerinfo {
   my $d = parse({}, $fn);
   die("$d->{'error'}\n") if $d->{'error'};
   $image =~ s/.*\/// if defined $image;
+  my $release;
+  $release = $1 if $image =~ /.*-Build(\d+\.\d+).*/;
   my @tags = map {"\"$_\""} @{$d->{'container_tags'} || []};
   my @repos;
   for my $repo (@{$d->{'imagerepos'} || []}) {
@@ -404,6 +406,7 @@ sub showcontainerinfo {
   print "{\n";
   print "  \"name\": \"$d->{'name'}\"";
   print ",\n  \"version\": \"$d->{'version'}\"" if defined $d->{'version'};
+  print ",\n  \"release\": \"$release\"" if defined $release;
   print ",\n  \"tags\": [ ".join(', ', @tags)." ]" if @tags;
   print ",\n  \"repos\": [ ".join(', ', @repos)." ]" if @repos;
   print ",\n  \"file\": \"$image\"" if defined $image;
