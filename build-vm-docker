@@ -49,7 +49,7 @@ vm_fixup_docker() {
     if [ "$max_loop" = "0" ]; then
        max_loop=16
     fi
-    for $num in `seq 0 $max_loop`; do
+    for num in `seq 0 $max_loop`; do
         test -b /dev/loop$num || mknod -m660 /dev/loop$num b 7 $num
     done
 }
