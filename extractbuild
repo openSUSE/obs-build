@@ -154,5 +154,5 @@ while (<S>) {
   }
   close(O) || die("$file: close error: $!\n");
   # sanity check
-  die "$file: invalid file size ($filesize byes left)\n" if $filesize != 0;
+  die "$file: invalid file size ($filesize bytes left)\n" if $filesize != 0;
 }
