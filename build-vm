@@ -759,7 +759,7 @@ vm_first_stage() {
 	unset start_time
 	if test ! -w /root ; then
 	    # remove setuid bit if files belong to user to make e.g. mount work
-	    find $BUILD_ROOT/{bin,sbin,usr/bin,usr/sbin} -type f -uid $UID -perm +4000 -print0 | xargs -0 --no-run-if-empty chmod -s
+	    find $BUILD_ROOT/{bin,sbin,usr/bin,usr/sbin} -type f -uid $UID -perm /4000 -print0 | xargs -0 --no-run-if-empty chmod -s
 	fi
 	copy_oldpackages
     fi
