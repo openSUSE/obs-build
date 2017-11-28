@@ -54,14 +54,14 @@ sub addrepo {
       return undef;
     }
     my ($projid, $repoid) = split('/', $prp, 2);
-    unshift @{$ret->{'repos'}}, {'project' => $projid, 'repository' => $repoid};
+    unshift @{$ret->{'path'}}, {'project' => $projid, 'repository' => $repoid};
     return;
   } else {
     # this is just for testing purposes...
     $url =~ s/^\/+$//;
     $url =~ s/:\//:/g;
     my @url = split('/', $url);
-    unshift @{$ret->{'repos'}}, {'project' => $url[-2], 'repository' => $url[-1]} if @url >= 2;
+    unshift @{$ret->{'path'}}, {'project' => $url[-2], 'repository' => $url[-1]} if @url >= 2;
   }
   return 1;
 }
