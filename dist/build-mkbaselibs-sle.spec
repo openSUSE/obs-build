@@ -45,13 +45,13 @@ This is the SLE variant including IA64 binary generation.
 %build
 
 %install
-install -m 0755 -d $RPM_BUILD_ROOT/usr/lib/build
+install -m 0755 -d %{buildroot}/usr/lib/build
 install -m 0755 mkbaselibs \
-                $RPM_BUILD_ROOT/usr/lib/build/mkbaselibs
+                %{buildroot}/usr/lib/build/mkbaselibs
 install -m 0644 baselibs_configs/baselibs_global-deb.conf \
-                $RPM_BUILD_ROOT/usr/lib/build/baselibs_global-deb.conf
+                %{buildroot}/usr/lib/build/baselibs_global-deb.conf
 install -m 0644 baselibs_configs/baselibs_global.conf \
-                $RPM_BUILD_ROOT/usr/lib/build/baselibs_global.conf
+                %{buildroot}/usr/lib/build/baselibs_global.conf
 
 %files
 %defattr(-,root,root)

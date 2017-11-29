@@ -124,18 +124,18 @@ make CFLAGS="$RPM_BUILD_FLAGS" initvm-all
 %install
 # initvm
 %if 0%{?suse_version}
-make DESTDIR=$RPM_BUILD_ROOT initvm-install
-strip $RPM_BUILD_ROOT/usr/lib/build/initvm.*
+make DESTDIR=%{buildroot} initvm-install
+strip %{buildroot}/usr/lib/build/initvm.*
 export NO_BRP_STRIP_DEBUG="true"
-chmod 0644 $RPM_BUILD_ROOT/usr/lib/build/initvm.*
+chmod 0644 %{buildroot}/usr/lib/build/initvm.*
 %endif
 
 # main
-make DESTDIR=$RPM_BUILD_ROOT install
+make DESTDIR=%{buildroot} install
 
 # tweak default config on suse
 %if 0%{?suse_version}
-cd $RPM_BUILD_ROOT/usr/lib/build/configs/
+cd %{buildroot}/usr/lib/build/configs/
 SUSE_V=%{?suse_version}
 SLE_V=%{?sle_version}
 %if 0%{?sle_version} && 0%{?is_opensuse} && %suse_version == 1315
@@ -164,7 +164,7 @@ test -e default.conf || exit 1
 
 # tweak baselibs config on suse
 %if 0%{?suse_version}
-cd $RPM_BUILD_ROOT/usr/lib/build
+cd %{buildroot}/usr/lib/build
 %if %suse_version == 1500
 # SLE 15 / Leap 15
 ln -sf baselibs_configs/baselibs_global-sle15.conf baselibs_global.conf
@@ -181,12 +181,12 @@ if [ `whoami` != "root" ]; then
   echo "WARNING: Not building as root, tests did not run!"
   exit 0
 fi
-if [ ! -f "$RPM_BUILD_ROOT/usr/lib/build/configs/default.conf" ]; then
+if [ ! -f "%{buildroot}/usr/lib/build/configs/default.conf" ]; then
   echo "WARNING: No default config, tests did not run!"
   exit 0
 fi
 # get back the default.conf link
-cp -av $RPM_BUILD_ROOT/usr/lib/build/configs/default.conf configs/
+cp -av %{buildroot}/usr/lib/build/configs/default.conf configs/
 # do not get confused when building this already with build:
 export BUILD_IGNORE_2ND_STAGE=1
 # use our own build code
