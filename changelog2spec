@@ -83,7 +83,7 @@ if (@ARGV == 2 && $ARGV[0] eq '--file') {
   exit(1) unless @changes;	# nothing to do
   if (@changes > 1) {
     while ($file ne '') {
-      my @c = grep {/\Q$file\E/} @changes;
+      my @c = grep {/\Q${file}.changes\E/} @changes;
       if (@c) {
 	@changes = @c;
 	last;
