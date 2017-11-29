@@ -685,6 +685,11 @@ Tue Mar  1 15:35:21 UTC 2011 - adrian@suse.de
 - do not use loop device anymore when using block devices directly
 
 -------------------------------------------------------------------
+Thu Jan 20 10:18:09 UTC 2011 - lnussel@suse.de
+
+- force use of bsdtar for VMs (bnc#665768, CVE-2010-4226)
+
+-------------------------------------------------------------------
 Thu Nov 11 12:24:13 UTC 2010 - adrian@suse.de
 
 - workaround for distros with appstart like Ubuntu 10.10
