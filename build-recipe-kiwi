@@ -543,6 +543,34 @@ translate_kiwi_parameters() {
     fi
 }
 
+get_kiwi_version() {
+    # lookup version number of installed kiwi version and
+    # turn it into a reliable number
+    local version
+    local major
+    local minor
+    local patch
+    if is_legacy_kiwi; then
+        version=$(
+            chroot "$BUILD_ROOT" /usr/sbin/kiwi --version |\
+            sed -n 's,.*vnr: \(.*\),\1,p'
+        )
+    else
+        version=$(
+            chroot "$BUILD_ROOT" kiwi-ng --version |\
+            sed -n 's,.*version \(.*\),\1,p'
+        )
+    fi
+    major=$(printf %d $(echo $version | cut -f1 -d .))
+    minor=$(printf %d $(echo $version | cut -f2 -d .))
+    patch=$(printf %d $(echo $version | cut -f3 -d .))
+    echo "$major$minor$patch"
+}
+
+kiwi_has_zsync_support() {
+    test $(get_kiwi_version) -ge "980"
+}
+
 build_kiwi_appliance() {
     if test -z "$RUNNING_IN_VM" ; then
         # NOTE: this must be done with the outer system, because it loads
