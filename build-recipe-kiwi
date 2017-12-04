@@ -513,7 +513,7 @@ translate_kiwi_parameters() {
 	    -l=|--logfile=*) KIWI_MAIN_PARAMETERS="$KIWI_MAIN_PARAMETERS --logfile ${i#*=}" ;;
 	    -d=*|--dest-dir=*) KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS --target-dir ${i#*=}" ;;
 	    --root=*) echo "WARNING: ignored unsupported kiwi option $i" ;; # unsupported for system build...
-	    --ignore-repos) KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS --ignore-repos" ;;
+	    --ignore-repos) KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS --ignore-repos-used-for-build" ;;
 	    --recycle-root) KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS --allow-existing-root" ;;
 	    --add-repo=*) add_repo_url[${#add_repo_url[@]}]="${i#*=}" ;;
 	    --add-repotype=*) add_repo_type[${#add_repo_type[@]}]="${i#*=}" ;;
