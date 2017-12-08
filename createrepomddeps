@@ -114,7 +114,7 @@ for my $url (@ARGV) {
     if (-e $u) {
       $cached = 1;
       $cached = 0 if exists($f->{'size'}) && $f->{'size'} != (-s _);
-      $cached = 0 if !exists($f->{'size'}) && $u !~ /[0-9a-f]{32}-primary/;
+      $cached = 0 if !$opt_zypp && !exists($f->{'size'}) && $u !~ /[0-9a-f]{32}-primary/;
     }
     if (!$cached) {
       die("zypp repo $url is not up to date, please refresh first\n") if $opt_zypp;
