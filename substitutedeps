@@ -282,7 +282,7 @@ for my $line (@$xspec) {
     # all compat stuff done. we return to your scheduled program
   }
 
-  if (!$used || ($line !~ /^(?:Build)?Requires:/i)) {
+  if (!$used || ($line !~ /^(?:Requires|BuildRequires|PreReq)(?:\([^\)]+\))?:/i)) {
     print F "$line\n";
     next;
   }
@@ -293,7 +293,7 @@ for my $line (@$xspec) {
   }
 
   my $isbuildrequires = 0;
-  $isbuildrequires = 1 if $line =~ /^BuildRequires:/i;
+  $isbuildrequires = 1 if $line =~ /^BuildRequires/i;
   my $r = $line;
   $r =~ s/^[^:]*:\s*//;
   my @deps = $r =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?[\s,]*/g;
