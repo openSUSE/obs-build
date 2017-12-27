@@ -88,6 +88,10 @@ recipe_build_simpleimage() {
     done
     REMOTE_IO_EXEC rm -rf "$BUILD_ROOT$TOPDIR"
     mkdir -p $MKTOPDIRS_TMP
+    for DIR in $MKTOPDIRS ; do
+        chmod --reference="$DIR" ".tmp/$DIR" || true
+        chown --reference="$DIR" ".tmp/$DIR" || true
+    done
 
     if [ -n "$REMOTE_IO_EXEC" ]; then
         echo "`date -u`: Compresing the final image using REMOTE_IO_EXEC, this can take a while..."
