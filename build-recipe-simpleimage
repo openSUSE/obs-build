@@ -58,6 +58,8 @@ recipe_build_simpleimage() {
 
     echo "`date -u`: Finalizing filesystem tree..."
     TOPDIRS=
+    MKTOPDIRS=""
+    MKTOPDIRS_TMP=""
     for DIR  in .* * ; do
       case "$DIR" in
 	.|..) continue ;;
@@ -73,12 +75,19 @@ recipe_build_simpleimage() {
 	.tmp) continue ;;
 	installed-pkg) continue ;;
 	debian-binary) continue ;;
-	proc|sys) continue ;;
+	proc|sys|run|var/run|tmp|var/tmp)
+		if test -d "$DIR" && ! test -L "$DIR" ; then
+			MKTOPDIRS="$MKTOPDIRS $DIR"
+			MKTOPDIRS_TMP="$MKTOPDIRS_TMP .tmp/$DIR"
+			continue
+		fi
+		# non-directories or symlinks to whatever go "as is"
+		;;
       esac
       TOPDIRS="$TOPDIRS $DIR"
     done
     REMOTE_IO_EXEC rm -rf "$BUILD_ROOT$TOPDIR"
-    mkdir -p .tmp/{proc,sys}
+    mkdir -p $MKTOPDIRS_TMP
 
     if [ -n "$REMOTE_IO_EXEC" ]; then
         echo "`date -u`: Compresing the final image using REMOTE_IO_EXEC, this can take a while..."
@@ -102,7 +111,7 @@ recipe_build_simpleimage() {
         fi
     fi
 
-    if ! REMOTE_IO_EXEC "$TAR $TARGZIP_FLAG -cf - --one-file-system $TOPDIRS -C .tmp proc sys $TARGZIP_POST > $BUILD_ROOT/.simpleimage.tar.gz"; then
+    if ! REMOTE_IO_EXEC "$TAR $TARGZIP_FLAG -cf - --one-file-system $TOPDIRS -C .tmp $MKTOPDIRS $TARGZIP_POST > $BUILD_ROOT/.simpleimage.tar.gz"; then
       cleanup_and_exit 1
     fi
 
@@ -114,7 +123,7 @@ recipe_build_simpleimage() {
       fi
       echo
       # Note: no pigz magic here, mksquashfs already does parallel work by itself
-      REMOTE_IO_EXEC mksquashfs $TOPDIRS .tmp/proc .tmp/sys $BUILD_ROOT/.simpleimage.squashfs -info -keep-as-directory -no-progress || cleanup_and_exit 1
+      REMOTE_IO_EXEC mksquashfs $TOPDIRS $MKTOPDIRS_TMP $BUILD_ROOT/.simpleimage.squashfs -info -keep-as-directory -no-progress || cleanup_and_exit 1
     fi
     echo "`date -u`: simple image created."
 
