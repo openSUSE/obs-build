@@ -54,7 +54,7 @@ recipe_prepare_appimage() {
 
 recipe_build_appimage() {
     local ARCH DEB
-    if [ -x /bin/rpm ]; then
+    if [ -x "$BUILD_ROOT/bin/rpm" ]; then
         ARCH=$(chroot $BUILD_ROOT su -c "rpm --eval '%{_target_cpu}'")
     else
         ARCH=$(chroot $BUILD_ROOT su -c "dpkg-architecture -qDEB_BUILD_ARCH")
