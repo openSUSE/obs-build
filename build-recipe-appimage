@@ -54,7 +54,7 @@ recipe_prepare_appimage() {
 
 recipe_build_appimage() {
     local ARCH DEB
-    if [ -x /bin/rpm ]; then
+    if [ -x "$BUILD_ROOT/bin/rpm" ]; then
         ARCH=$(chroot $BUILD_ROOT su -c "rpm --eval '%{_target_cpu}'")
     else
         ARCH=$(chroot $BUILD_ROOT su -c "dpkg-architecture -qDEB_BUILD_ARCH")
@@ -76,10 +76,12 @@ recipe_build_appimage() {
         fi
         if test -z "$DEB" -a ! -d "$BUILD_ROOT/.build.binaries/repodata" ; then
   	    echo "creating repository metadata..."
-            if [ -x /usr/bin/createrepo_c ]; then 
-                createrepo_c $BUILD_ROOT/.build.binaries
+            if [ -x "$BUILD_ROOT/usr/bin/createrepo_c" ]; then 
+                chroot "$BUILD_ROOT" /usr/bin/createrepo_c /.build.binaries
+            elif [ -x "$BUILD_ROOT/usr/bin/createrepo" ]; then
+                chroot "$BUILD_ROOT" /usr/bin/createrepo /.build.binaries
             else
-                createrepo $BUILD_ROOT/.build.binaries
+                cleanup_and_exit 1 "No createrepo found in build root"
             fi
         fi
     fi
