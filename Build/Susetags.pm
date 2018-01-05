@@ -22,6 +22,8 @@ package Build::Susetags;
 
 use strict;
 
+use Build::Rpm;
+
 # compatibility to old OBS code
 sub parse_obs_compat {
   my ($file, undef, undef, @arches) = @_;
@@ -115,6 +117,7 @@ sub parse {
 	chomp;
 	last if /^-\Q$tag\E/;
 	next if $tag eq 'Req' && /^rpmlib\(/;
+	$_ = Build::Rpm::testcaseformat($_) if /^\(/ && $options{'testcaseformat'};
 	push @{$cur->{$tmap{$tag}}}, $_;
       }
     } elsif ($tag eq 'Pkg') {

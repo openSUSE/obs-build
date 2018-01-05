@@ -1262,6 +1262,31 @@ sub parse_rich_dep {
   return $r;
 }
 
+my @testcaseops = ('', '&', '|', '<IF>', '<UNLESS>', '<ELSE>', '+', '-');
+
+sub testcaseformat_rec {
+  my ($r, $addparens) = @_;
+  my $op = $r->[0];
+  return $r->[1] unless $op;
+  my $top = $testcaseops[$op];
+  my $r1 = testcaseformat_rec($r->[1], 1);
+  if (($op == 3 || $op == 4) && @$r == 4) {
+    $r1 = "$r1 $top " . testcaseformat_rec($r->[2], 1);
+    $top = 'ELSE';
+  }
+  my $addparens2 = 1;
+  $addparens2 = 0 if $r->[2]->[0] == $op && ($op == 1 || $op == 2 || $op == 6);
+  my $r2 = testcaseformat_rec($r->[-1], $addparens2);
+  return $addparens ? "($r1 $top $r2)" : "$r1 $top $r2";
+}
+
+sub testcaseformat {
+  my ($dep) = @_;
+  my $r = parse_rich_dep($dep);
+  return $dep unless $r;
+  return testcaseformat_rec($r);
+}
+
 sub shiftrich {
   my ($s) = @_;
   # FIXME: do this right!

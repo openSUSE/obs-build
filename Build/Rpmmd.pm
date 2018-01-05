@@ -22,6 +22,8 @@ package Build::Rpmmd;
 
 use strict;
 
+use Build::Rpm;
+
 use XML::Parser;
 
 sub generic_parse {
@@ -186,6 +188,7 @@ sub primary_handle_dep {
     $evr .= "-$attr{'rel'}" if defined $attr{'rel'};
     $dep .= " $flagmap{$attr{'flags'}} $evr";
   }
+  $dep = Build::Rpm::testcaseformat($dep) if ($dep =~ /^\(/) && ($c->[0]->[5] || {})->{'testcaseformat'};
   my $data = $c->[0]->[4];
   push @{$data->{$h->{'_tag'}}}, $dep;
 }
