@@ -27,11 +27,14 @@ use strict;
 # must not rely on external libraries
 #
 sub parse {
-  my ($xml) = @_;
+  my ($xml, %opts) = @_;
 
+  my $record = $opts{'record'};
+  my $order = $opts{'order'};
   my @nodestack;
   my $node = {};
   my $c = '';
+  my $xmllen = length($xml);
   $xml =~ s/^\s*\<\?.*?\?\>//s;
   while ($xml =~ /^(.*?)\</s) {
     if ($1 ne '') {
@@ -42,6 +45,7 @@ sub parse {
       die("bad xml, missing end of comment\n") unless $xml =~ s/.*?-->//s;
       next;
     }
+    my $elstart = length($xml);
     die("bad xml\n") unless $xml =~ /(.*?\>)/s;
     my $tag = $1;
     $xml = substr($xml, length($tag));
@@ -73,10 +77,16 @@ sub parse {
     }
     if ($mode == 0 || $mode == 2) {
       my $n = {};
-      push @{$node->{$tag}}, $n;
-      for (sort keys %atts) {
-	$n->{$_} = $atts{$_};
+      if ($record) {
+        $n->{'_start'} = $xmllen - $elstart;
+        $n->{'_end'} = $xmllen - length($xml) if $mode == 2;
       }
+      if ($order) {
+        push @{$node->{'_order'}}, $tag;
+        push @{$n->{'_order'}}, (splice(@tag, 0, 2))[0] while @tag;
+      }
+      push @{$node->{$tag}}, $n;
+      $n->{$_} = $atts{$_} for sort keys %atts;
       if ($mode == 0) {
 	push @nodestack, [ $tag, $node, $c ];
 	$c = '';
@@ -88,6 +98,7 @@ sub parse {
       $c =~ s/^\s*//s;
       $c =~ s/\s*$//s;
       $node->{'_content'} = $c if $c ne '';
+      $node->{'_end'} = $xmllen - length($xml) if $record;
       $node = $nodestack[-1]->[1];
       $c = $nodestack[-1]->[2];
       pop @nodestack;
@@ -98,6 +109,57 @@ sub parse {
   $c =~ s/\s*$//s;
   $node->{'_content'} = $c if $c ne '';
   return $node;
+}
+
+sub unparse_keys {
+  my ($d) = @_;
+  my @k = grep {$_ ne '_start' && $_ ne '_end' && $_ ne '_order' && $_ ne '_content'} sort keys %$d;
+  return @k unless $d->{'_order'};
+  my %k = map {$_ => 1} @k;
+  my @ko;
+  for (@{$d->{'_order'}}) {
+    push @ko, $_ if delete $k{$_};
+  }
+  return (@ko, grep {$k{$_}} @k);
+}
+
+sub unparse_escape {
+  my ($d) = @_;
+  $d =~ s/&/&amp;/sg;
+  $d =~ s/</&lt;/sg;
+  $d =~ s/>/&gt;/sg;
+  $d =~ s/"/&quot;/sg;
+  return $d;
+}
+
+sub unparse {
+  my ($d, %opts) = @_;
+
+  my $r = '';
+  my $indent = $opts{'ugly'} ? '' : $opts{'indent'} || '';
+  my $nl = $opts{'ugly'} ? '' : "\n";
+  my @k = unparse_keys($d);
+  my @e = grep {ref($d->{$_}) ne ''} @k;
+  for my $e (@e) {
+    my $en = unparse_escape($e);
+    my $de = $d->{$e};
+    $de = [ $de ] unless ref($de) eq 'ARRAY';
+    for my $se (@$de) {
+      my @sk = unparse_keys($se);
+      my @sa = grep {ref($se->{$_}) eq ''} @sk;
+      my @se = grep {ref($se->{$_}) ne ''} @sk;
+      $r .= "$indent<$en";
+      for my $sa (@sa) {
+	$r .= " ".unparse_escape($sa);
+	$r .= '="'.unparse_escape($se->{$sa}).'"' if defined $se->{$sa};
+      }
+      $r .= ">";
+      $r .= unparse_escape($se->{'_content'}) if defined $se->{'_content'};
+      $r .= $nl . unparse($se, %opts, 'indent' => "  $indent") . "$indent" if @se;
+      $r .= "</$en>$nl";
+    }
+  }
+  return $r;
 }
 
 1;
