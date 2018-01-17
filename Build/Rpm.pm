@@ -270,7 +270,7 @@ sub parse {
       my $optmacros = {};
       # newer perls: \{((?:(?>[^{}]+)|(?2))*)\}
 reexpand:
-      while ($line =~ /^(.*?)%(\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\*\*?|#|\()(.*?)$/) {
+      while ($line =~ /^(.*?)%[^%](\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\*\*?|#|\()(.*?)$/) {
 	if ($tries++ > 1000) {
 	  print STDERR "Warning: spec file parser ",($lineno?" line $lineno":''),": macro too deeply nested\n" if $config->{'warnings'};
 	  $line = 'MACRO';
