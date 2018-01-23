@@ -80,10 +80,21 @@ recipe_prepare_spec() {
 ' >> $BUILD_ROOT/root/$rawcfgmacros
     fi
 
-    if test -n "$BUILD_JOBS" ; then
+    if test "$icecream" -gt 0 ; then
+        # hardcode number of jobs, icecream workers can not be probed from the build environment
 	cat >> $BUILD_ROOT/root/$rawcfgmacros <<-EOF
 		%jobs $BUILD_JOBS
 		%_smp_mflags -j$BUILD_JOBS
+		EOF
+    elif test -n "$BUILD_JOBS" ; then
+        # provide a job default, but allow the spec file to further limit using _smp_ncpus_max
+	cat >> $BUILD_ROOT/root/$rawcfgmacros <<-EOF
+		%jobs $BUILD_JOBS
+		%_smp_mflags %( \\
+			ncpus_max=%{?_smp_ncpus_max}; \\
+			jobs=$BUILD_JOBS \\
+			if [ -n "\$ncpus_max" ] && [ "\$ncpus_max" -gt 0 ] && [ "\$jobs" -gt "\$ncpus_max" ]; then jobs="\$ncpus_max"; fi; \\
+			echo "-j\$jobs" )
 		EOF
     fi
     test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/$rawcfgmacros $BUILD_ROOT/home/abuild/$rawcfgmacros
