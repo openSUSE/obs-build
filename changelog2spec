@@ -45,6 +45,9 @@ my $input = '';
 my $target = 'rpm';
 
 while (@ARGV) {
+  if ($ARGV[0] eq '--selftest') {
+    exit selftest();
+  }
   if ($ARGV[0] eq '--test') {
     $test = 1;
     shift @ARGV;
@@ -75,12 +78,20 @@ if (@ARGV == 2 && $ARGV[0] eq '--file') {
   opendir(D, $dir) || die("$dir: $!\n");
   my @changes = grep {/\.changes$/} readdir(D);
   closedir(D);
+  my $changesfile=map_changes($file, @changes);
+  exit(1) unless $changesfile;
+  @ARGV = ("$dir/$changesfile");
+}
+
+sub map_changes
+{
+  my ($file, @changes) = @_;
   @changes = sort {length($a) <=> length($b) || $a cmp $b} @changes;
   # support _service: prefixes, they need to be stripped
   $file =~ s/^_service:.*://;
   my %changes = map {/^((?:_service:.*:)?(.*?))$/ ? ($2, $1) : ($_, $_)} @changes;
   @changes = keys %changes;
-  exit(1) unless @changes;	# nothing to do
+  return undef unless @changes;	# nothing to do
   if (@changes > 1) {
     while ($file ne '') {
       my @c = grep {/\Q${file}.changes\E/} @changes;
@@ -91,7 +102,36 @@ if (@ARGV == 2 && $ARGV[0] eq '--file') {
       last unless $file =~ s/[-.][^-.]*$//;
     }
   }
-  @ARGV = ("$dir/$changes{$changes[0]}");
+  return $changes{$changes[0]};
+}
+
+sub selftest
+{
+  my @tests=(
+    # format is 1:specfile 2:expected-changes 3++:list-of-changes-files
+    [qw"rpm rpm python-rpm rpm"],
+    [qw"python-rpm python-rpm python-rpm rpm"],
+    [qw"antlr antlr antlr antlr-bootstrap"],
+    [qw"antlr-bootstrap antlr-bootstrap antlr antlr-bootstrap"],
+    [qw"antlr-bootstrap antlr antlr"],
+    [qw"antlr-bootstrap antlr antlr antlr-other"],
+    [qw"foo _service:obs_scm:foo foo _service:obs_scm:foo"],
+    [qw"_service:obs_scm:foo _service:obs_scm:foo foo _service:obs_scm:foo"],
+    [qw"_service:obs_scm:foo foo foo foo-bar"],
+    [qw"_service:obs_scm:foo-bar foo foo foo-other"],
+  );
+  for my $c (@tests) {
+    my @tmp=@$c;
+    my $file=shift(@tmp);
+    foreach(0..$#tmp) {$tmp[$_].=".changes"}
+    my $expected=shift(@tmp);
+    print "file=$file : ", join(" ", @tmp),"\n => ";
+    my $actual=map_changes($file, @tmp);
+    print "$actual vs $expected\n";
+    return 1 if $actual ne $expected;
+  }
+  print "everything OK\n";
+  return 0;
 }
 
 sub parse_suse {
