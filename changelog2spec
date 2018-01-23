@@ -92,6 +92,7 @@ sub map_changes
   my %changes = map {/^((?:_service:.*:)?(.*?))$/ ? ($2, $1) : ($_, $_)} @changes;
   @changes = keys %changes;
   return undef unless @changes;	# nothing to do
+  @changes = sort {length($a) <=> length($b) || $a cmp $b} @changes;
   if (@changes > 1) {
     while ($file ne '') {
       my @c = grep {/\Q${file}.changes\E/} @changes;
