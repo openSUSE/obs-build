@@ -45,6 +45,11 @@ my $input = '';
 my $target = 'rpm';
 
 while (@ARGV) {
+  if ($ARGV[0] eq '--selftest') {
+    shift;
+    print map_changes(@ARGV);
+    exit 0;
+  }
   if ($ARGV[0] eq '--test') {
     $test = 1;
     shift @ARGV;
@@ -75,12 +80,21 @@ if (@ARGV == 2 && $ARGV[0] eq '--file') {
   opendir(D, $dir) || die("$dir: $!\n");
   my @changes = grep {/\.changes$/} readdir(D);
   closedir(D);
+  my $changesfile=map_changes($file, @changes);
+  exit(1) unless $changesfile;
+  @ARGV = ("$dir/$changesfile");
+}
+
+sub map_changes
+{
+  my ($file, @changes) = @_;
   @changes = sort {length($a) <=> length($b) || $a cmp $b} @changes;
   # support _service: prefixes, they need to be stripped
   $file =~ s/^_service:.*://;
   my %changes = map {/^((?:_service:.*:)?(.*?))$/ ? ($2, $1) : ($_, $_)} @changes;
   @changes = keys %changes;
-  exit(1) unless @changes;	# nothing to do
+  return undef unless @changes;	# nothing to do
+  @changes = sort {length($a) <=> length($b) || $a cmp $b} @changes;
   if (@changes > 1) {
     while ($file ne '') {
       my @c = grep {/\Q${file}.changes\E/} @changes;
@@ -91,7 +105,7 @@ if (@ARGV == 2 && $ARGV[0] eq '--file') {
       last unless $file =~ s/[-.][^-.]*$//;
     }
   }
-  @ARGV = ("$dir/$changes{$changes[0]}");
+  return $changes{$changes[0]};
 }
 
 sub parse_suse {
