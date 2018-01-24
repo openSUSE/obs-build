@@ -24,7 +24,7 @@ all:
 .PHONY:	test
 
 test:
-	prove -v
+	PERL5LIB=. prove -v
 
 install:
 	install -m755 -d \
