@@ -169,9 +169,13 @@ cd %{buildroot}/usr/lib/build
 # SLE 15 / Leap 15
 ln -sf baselibs_configs/baselibs_global-sle15.conf baselibs_global.conf
 %endif
-%if %suse_version <= 1315
-# SLE 12 / Leap 42 and older
+%if %suse_version == 1315
+# SLE 12 / Leap 42
 ln -sf baselibs_configs/baselibs_global-sle12.conf baselibs_global.conf
+%endif
+%if %suse_version <= 1110
+# SLE 11
+ln -sf baselibs_configs/baselibs_global-sle11.conf baselibs_global.conf
 %endif
 test -e baselibs_global.conf || exit 1
 %endif
