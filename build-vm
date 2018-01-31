@@ -464,7 +464,7 @@ vm_set_personality_syscall() {
 	alpha*) PERSONALITY_SYSCALL=324 ;;
 	sparc*) PERSONALITY_SYSCALL=191 ;;
 	ia64*) PERSONALITY_SYSCALL=1140 ;;
-	i?86*|ppc*|aarch64*|arm*|sh4|cris|m68k*|s390*|unicore32|microblaze)   PERSONALITY_SYSCALL=136 ;;
+	i?86*|ppc*|aarch64*|arm*|sh4|cris|m68k*|s390*|unicore32|microblaze|riscv*)   PERSONALITY_SYSCALL=136 ;;
 	*) cleanup_and_exit 1 "Unknown architecture personality: '$archname'" ;;
     esac
 }
