@@ -133,6 +133,10 @@ vm_cleanup_xen() {
     :
 }
 
+vm_sysrq_xen() {
+    :
+}
+
 vm_wipe_xen() {
     :
 }

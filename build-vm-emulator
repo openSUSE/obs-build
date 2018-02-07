@@ -88,6 +88,9 @@ vm_detach_swap_emulator() {
 vm_cleanup_emulator() {
     :
 }
+vm_sysrq_emulator() {
+    :
+}
 vm_wipe_emulator() {
     :
 }

@@ -164,6 +164,10 @@ vm_cleanup_ec2() {
     test -n "$EC2_EXTRACT_VOLUME_swap" && ec2-delete-volume --region "$BUILD_EC2_REGION" "$EC2_EXTRACT_VOLUME_swap"
 }
 
+vm_sysrq_ec2() {
+    :
+}
+
 vm_kill_ec2() {
     if ec2-describe-instance-status "$VM_BUILD_INSTANCE" --region "$BUILD_EC2_REGION" >/dev/null 2>&1 ; then
 	if ec2-terminate-instances "$VM_BUILD_INSTANCE" >/dev/null 2>&1 ; then

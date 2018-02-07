@@ -64,6 +64,10 @@ vm_cleanup_uml() {
     :
 }
 
+vm_sysrq_uml() {
+    :
+}
+
 vm_wipe_uml() {
     :
 }

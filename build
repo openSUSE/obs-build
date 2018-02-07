@@ -159,6 +159,9 @@ Known Parameters:
   --shell     Instead of starting a build start a root shell in
               the build root.
 
+  --sysrq $   Sends a single specifed char as sysrq to the running
+              kernel of the build.
+
   --clean     Delete old build root before initializing it
 
   --wipe      Completely removes build environment and exits.
@@ -727,6 +730,15 @@ wipe_build_environment() {
     fi  
 }
 
+sysrq_running_build() {
+    test -z "$SRCDIR" || usage
+    if test -n "$VM_TYPE" ; then
+	vm_sysrq "$1"
+    else
+	cleanup_and_exit 1 "can not send a sysrq to chroot builds"
+    fi
+}
+
 kill_running_build() {
     test -z "$SRCDIR" || usage
     (set -C; > "$BUILD_ROOT/exit" 2>/dev/null || true)
@@ -969,6 +981,11 @@ while test -n "$1"; do
 	BUILD_RPMS=
 	shift
       ;;  
+      -sysrq)
+	needarg
+	SEND_SYSRQ="${ARG:0:1}"
+	shift
+      ;;  
       -shell)
 	RUN_SHELL=1
 	shift
@@ -1052,6 +1069,11 @@ fi
 
 if test -n "$KILL" ; then
     kill_running_build
+    cleanup_and_exit
+fi
+
+if test -n "$SEND_SYSRQ" ; then
+    sysrq_running_build "$SEND_SYSRQ"
     cleanup_and_exit
 fi
 

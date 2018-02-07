@@ -371,6 +371,10 @@ vm_cleanup_zvm() {
     fi
 }
 
+vm_sysrq_zvm() {
+    :
+}
+
 vm_wipe_zvm() {
     :
 }

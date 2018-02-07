@@ -166,6 +166,10 @@ vm_cleanup_pvm(){
     pvm_deletelv $swaplv
 }
 
+vm_sysrq_pvm(){
+    :
+}
+
 vm_wipe_pvm(){
     :
 }

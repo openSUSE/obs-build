@@ -226,6 +226,10 @@ vm_fixup_openstack() {
     chmod 0755 "$BUILD_ROOT/sbin/init"
 }
 
+vm_sysrq_openstack() {
+    :
+}
+
 vm_wipe_openstack() {
     if test -n "$VM_WORKER" ; then
          $NOVACLIENT delete $VM_WORKER

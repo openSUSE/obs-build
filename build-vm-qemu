@@ -59,6 +59,10 @@ vm_cleanup_qemu() {
     vm_cleanup_kvm
 }
 
+vm_sysrq_qemu() {
+    :
+}
+
 vm_wipe_qemu() {
     :
 }

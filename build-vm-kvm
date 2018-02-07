@@ -243,7 +243,7 @@ vm_startup_kvm() {
     elif test -n "$VM_CONSOLE_INPUT" ; then
 	qemu_args=("${qemu_args[@]}" -serial mon:stdio)
     else
-	qemu_args=("${qemu_args[@]}" -serial stdio)
+	qemu_args=("${qemu_args[@]}" -serial stdio -chardev socket,id=monitor,server,nowait,path="${VM_ROOT}.monitor" -mon chardev=monitor,mode=readline)
     fi
 
     if test -n "$BUILD_JOBS" -a "$icecream" = 0 -a -z "$BUILD_THREADS" ; then
@@ -325,6 +325,10 @@ vm_detach_swap_kvm() {
 
 vm_cleanup_kvm() {
     :
+}
+
+vm_sysrq_kvm() {
+    echo "sendkey alt-print-$1" | socat - UNIX-CONNECT:"$VM_ROOT.monitor"
 }
 
 vm_wipe_kvm() {
