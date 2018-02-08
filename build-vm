@@ -685,7 +685,6 @@ vm_setup() {
     if test ! -e "$VM_ROOT" ; then
 	cleanup_and_exit 3 "you need to create $VM_ROOT first"
     fi
-    mkfifo "${VM_ROOT}.monitor"
     if test -n "$CLEAN_BUILD" ; then
 	vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" || cleanup_and_exit 3
     fi

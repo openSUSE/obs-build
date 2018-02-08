@@ -243,6 +243,7 @@ vm_startup_kvm() {
     elif test -n "$VM_CONSOLE_INPUT" ; then
 	qemu_args=("${qemu_args[@]}" -serial mon:stdio)
     else
+        mkfifo "${VM_ROOT}.monitor"
 	qemu_args=("${qemu_args[@]}" -serial stdio -chardev socket,id=monitor,server,nowait,path="${VM_ROOT}.monitor" -mon chardev=monitor,mode=readline)
     fi
 
