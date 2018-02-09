@@ -2,6 +2,7 @@
 Fri Feb  9 15:17:38 UTC 2018 - adrian@suse.de
 
 - add sysrq functionality for KVM builds
+- add initial SLES 15 config
 
 -------------------------------------------------------------------
 Wed Jan 31 13:37:35 UTC 2018 - adrian@suse.de
