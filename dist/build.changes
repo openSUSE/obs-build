@@ -1,7 +1,17 @@
 -------------------------------------------------------------------
-Wed Jan 31 13:37:35 UTC 2018 - adrian@suse.de
+Fri Feb  9 15:17:38 UTC 2018 - adrian@suse.de
 
+- add sysrq functionality for KVM builds
+
+-------------------------------------------------------------------
+Wed Jan 31 13:37:35 UTC 2018 - adrian@suse.de
+ 
 - add own baselibs config for SLE 11
+
+-------------------------------------------------------------------
+Wed Jan 24 16:04:35 UTC 2018 - adrian@suse.de
+
+- Fix picking of right changes file for changelog generation (boo#1077145)
 
 -------------------------------------------------------------------
 Tue Nov 28 13:33:11 UTC 2017 - adrian@suse.de
