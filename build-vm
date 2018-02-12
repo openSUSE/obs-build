@@ -517,6 +517,8 @@ vm_detect_2nd_stage() {
     BUILD_DIR=/.build
     echo "machine type: `uname -m`"
     echo "Linux version: `uname -rv`"
+    echo "Increasing log level from now on..."
+    echo 4 > /proc/sysrq-trigger
     if test "$PERSONALITY" != 0 -a -z "$PERSONALITY_SET" ; then
 	export PERSONALITY_SET=true
 	echo "switching personality to $PERSONALITY..."
