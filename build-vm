@@ -355,7 +355,10 @@ vm_img_wipe() {
     vm_wipe_$VM_TYPE "$@"
 
     if test -n "$VM_ROOT" -a "$VM_ROOT_TYPE" = file ; then
-       rm -f "$VM_ROOT" "${VM_ROOT}.monitor"
+       rm -f "$VM_ROOT"
+       if test -e "${VM_ROOT}.monitor"; then
+          rm -f "${VM_ROOT}.monitor"
+       fi
     fi
     if test -n "$VM_SWAP" -a "$VM_SWAP_TYPE" = file ; then
        rm -f "$VM_SWAP"
