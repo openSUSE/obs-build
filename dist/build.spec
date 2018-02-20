@@ -53,6 +53,7 @@ Recommends:     perl(YAML)
 Recommends:     perl(YAML::LibYAML)
 Recommends:     bsdtar
 Recommends:     qemu-linux-user
+Recommends:     /sbin/mkfs.ext3
 %endif
 
 %if 0%{?suse_version} > 1120 || ! 0%{?suse_version}
