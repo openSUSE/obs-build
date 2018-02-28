@@ -97,7 +97,7 @@ sub kiwiparse {
       if (defined $type->{'image'}) {
         # for kiwi 4.1 and 5.x
         push @types, $type->{'image'};
-        push @packages, "kiwi-image:$type->{'image'}" if $schemaversion >= $schemaversion56;
+        push @packages, "kiwi-image($type->{'image'})" if $schemaversion >= $schemaversion56;
       } else {
         # for kiwi 3.8 and before
         push @types, $type->{'_content'};
@@ -130,7 +130,7 @@ sub kiwiparse {
         push @containerrepos, $prp if $prp;
       }
 
-      push @packages, "kiwi-filesystem:$type->{'filesystem'}" if $type->{'filesystem'};
+      push @packages, "kiwi-filesystem($type->{'filesystem'})" if $type->{'filesystem'};
       if (defined $type->{'boot'}) {
         if ($type->{'boot'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
           next unless $bootcallback;
@@ -143,7 +143,7 @@ sub kiwiparse {
           push @extrasources, @{$bret->{'extrasource'} || []};
         } else {
           die("bad boot reference: $type->{'boot'}\n") unless $type->{'boot'} =~ /^([^\/]+)\/([^\/]+)$/;
-          push @packages, "kiwi-boot:$1";
+          push @packages, "kiwi-boot($1)";
         }
       }
     }
@@ -310,7 +310,7 @@ sub kiwiparse {
   @requiredarch = unify(@requiredarch, @fallbackarchs);
 
   if (!$instsource) {
-    push @packages, "kiwi-packagemanager:$packman";
+    push @packages, "kiwi-packagemanager($packman)";
     push @packages, "--dorecommends--", "--dosupplements--" if $patterntype && $patterntype eq 'plusRecommended';
   } else {
     push @packages, "kiwi-packagemanager:instsource";
