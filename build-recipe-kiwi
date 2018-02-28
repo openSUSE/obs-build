@@ -551,13 +551,22 @@ build_kiwi_appliance() {
         test -x /etc/init.d/boot.device-mapper && \
             /etc/init.d/boot.device-mapper start
     fi
-    local kiwi_profile=$(queryconfig \
-        --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" \
-        --archpath "$BUILD_ARCH" buildflags kiwiprofile
-    )
+    local kiwi_profile
+    kiwi_profile=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" profiles)
+    if test -z "$kiwi_profile"; then
+	kiwi_profile=$(queryconfig \
+	    --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" \
+	    --archpath "$BUILD_ARCH" buildflags kiwiprofile
+	)
+    fi
+    # special build flavor hack
+    if test "$kiwi_profile" = '@BUILD_FLAVOR@' ; then
+	kiwi_profile="$BUILD_FLAVOR"
+    fi
     if test -z "$kiwi_profile"; then
         kiwi_profile=__not__set
     fi
+
     local kiwi_path=/usr/bin/kiwi kiwi_legacy=false
     if ! test -L "$BUILD_ROOT/usr/bin/kiwi" ; then
 	kiwi_path=/usr/sbin/kiwi

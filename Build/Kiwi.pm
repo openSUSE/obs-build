@@ -73,8 +73,12 @@ sub kiwiparse {
   my $schemaversion56 = versionstring('5.6');
   my $obsexclusivearch;
   my $obsexcludearch;
+  my $obsprofiles;
   $obsexclusivearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExclusiveArch:\s+(.*)\s+-->\s*$/im;
   $obsexcludearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExcludeArch:\s+(.*)\s+-->\s*$/im;
+  $obsprofiles = $1 if $xml =~ /^\s*<!--\s+OBS-Profiles:\s+(.*)\s+-->\s*$/im;
+  my @obsprofiles;
+  @obsprofiles = split(' ', $obsprofiles) if $obsprofiles;
   my $kiwi = Build::SimpleXML::parse($xml);
   die("not a kiwi config\n") unless $kiwi && $kiwi->{'image'};
   $kiwi = $kiwi->{'image'}->[0];
@@ -349,6 +353,7 @@ sub kiwiparse {
     $containertags = [ "$containername:latest" ] if defined($containername) && !$containertags;
     $ret->{'container_tags'} = $containertags if $containertags;
   }
+  $ret->{'profiles'} = [ unify(@obsprofiles) ] if @obsprofiles;
   return $ret;
 }
 
