@@ -188,4 +188,4 @@ eval {
 };
 reply_error($@) if $@;
 close $sock;
-print "[$status $path]\n"
+print "[$status $path]";
