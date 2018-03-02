@@ -197,7 +197,10 @@ sub uncompress {
   close(TMP);
   $data = '';
   1 while sysread(TMP2, $data, 1024, length($data)) > 0;
-  close(TMP2) || die("$tool error\n");
+  if (!close(TMP2)) {
+    warn("$tool error: $?\n");
+    return undef;
+  }
   return $data;
 }
 
