@@ -55,7 +55,7 @@ sub versionstring {
 }
 
 sub kiwiparse {
-  my ($xml, $arch, $count) = @_;
+  my ($xml, $arch, $count, $buildflavor) = @_;
   $count ||= 0;
   die("kiwi config inclusion depth limit reached\n") if $count++ > 10;
 
@@ -77,8 +77,10 @@ sub kiwiparse {
   $obsexclusivearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExclusiveArch:\s+(.*)\s+-->\s*$/im;
   $obsexcludearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExcludeArch:\s+(.*)\s+-->\s*$/im;
   $obsprofiles = $1 if $xml =~ /^\s*<!--\s+OBS-Profiles:\s+(.*)\s+-->\s*$/im;
-  my @obsprofiles;
-  @obsprofiles = split(' ', $obsprofiles) if $obsprofiles;
+  if ($obsprofiles) {
+    $obsprofiles = [ grep {defined($_)} map {$_ eq '@BUILD_FLAVOR@' ? $buildflavor : $_} split(' ', $obsprofiles) ];
+    undef $obsprofiles unless @$obsprofiles;
+  }
   my $kiwi = Build::SimpleXML::parse($xml);
   die("not a kiwi config\n") unless $kiwi && $kiwi->{'image'};
   $kiwi = $kiwi->{'image'}->[0];
@@ -89,6 +91,32 @@ sub kiwiparse {
   if (!$ret->{'name'} && $description->{'specification'}) {
     $ret->{'name'} = $description->{'specification'}->[0]->{'_content'};
   }
+
+  # do obsprofiles arch filtering
+  if ($obsprofiles && $arch && $kiwi->{'profiles'} && $kiwi->{'profiles'}->[0]->{'profile'}) {
+    my %obsprofiles = map {$_ => 1} @$obsprofiles;
+    for my $prof (@{$kiwi->{'profiles'}[0]->{'profile'}}) {
+      next unless $prof->{'name'} && exists $obsprofiles{$prof->{'name'}};
+      my $valid;
+      if ($prof->{'arch'}) {
+        my $ma = $arch;
+        $ma =~ s/i[456]86/i386/;
+        for my $pa (split(",", $prof->{'arch'})) {
+          $pa =~ s/i[456]86/i386/;
+          $valid = 1 if $ma eq $pa;
+        }
+      } else {
+        $valid = 1;
+      }
+      if ($valid) {
+        $obsprofiles{$prof->{'name'}} = 2;
+      } elsif ($obsprofiles{$prof->{'name'}} == 1) {
+        $obsprofiles{$prof->{'name'}} = 0;
+      }
+    }
+    $obsprofiles = [ grep {$obsprofiles{$_}} @$obsprofiles ];
+  }
+
   # take default version setting
   my $preferences = ($kiwi->{'preferences'} || []);
   if ($preferences->[0]->{'version'}) {
@@ -141,7 +169,7 @@ sub kiwiparse {
           my ($bootxml, $xsrc) = $bootcallback->($1, $2);
           next unless $bootxml;
           push @extrasources, $xsrc if $xsrc;
-          my $bret = kiwiparse($bootxml, $arch, $count);
+          my $bret = kiwiparse($bootxml, $arch, $count, $buildflavor);
           push @bootrepos, map {"$_->{'project'}/$_->{'repository'}"} @{$bret->{'path'} || []};
           push @packages, @{$bret->{'deps'} || []};
           push @extrasources, @{$bret->{'extrasource'} || []};
@@ -353,7 +381,13 @@ sub kiwiparse {
     $containertags = [ "$containername:latest" ] if defined($containername) && !$containertags;
     $ret->{'container_tags'} = $containertags if $containertags;
   }
-  $ret->{'profiles'} = [ unify(@obsprofiles) ] if @obsprofiles;
+  if ($obsprofiles) {
+    if (@$obsprofiles) {
+      $ret->{'profiles'} = [ unify(@$obsprofiles) ];
+    } else {
+      $ret->{'exclarch'} = [];		# all profiles excluded
+    }
+  }
   return $ret;
 }
 
@@ -368,7 +402,7 @@ sub parse {
   $cf ||= {};
   my $d;
   eval {
-    $d = kiwiparse($xml, ($cf->{'arch'} || ''));
+    $d = kiwiparse($xml, ($cf->{'arch'} || ''), 0, $cf->{'buildflavor'});
   };
   if ($@) {
     my $err = $@;
@@ -379,11 +413,16 @@ sub parse {
 }
 
 sub show {
-  my ($fn, $field, $arch) = @ARGV;
+  my ($fn, $field, $arch, $buildflavor) = @ARGV;
   local $urlmapper = sub { return $_[0] };
   my $cf = {'arch' => $arch};
+  $cf->{'buildflavor'} = $buildflavor if defined $buildflavor;
   my $d = parse($cf, $fn);
   die("$d->{'error'}\n") if $d->{'error'};
+  if ($field eq 'profiles' && $d->{'exclarch'} && !@{$d->{'exclarch'}}) {
+    print "__excluded\n";
+    return;
+  }
   my $x = $d->{$field};
   $x = [ $x ] unless ref $x;
   print "@$x\n";
