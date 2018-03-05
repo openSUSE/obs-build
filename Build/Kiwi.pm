@@ -79,7 +79,6 @@ sub kiwiparse {
   $obsprofiles = $1 if $xml =~ /^\s*<!--\s+OBS-Profiles:\s+(.*)\s+-->\s*$/im;
   if ($obsprofiles) {
     $obsprofiles = [ grep {defined($_)} map {$_ eq '@BUILD_FLAVOR@' ? $buildflavor : $_} split(' ', $obsprofiles) ];
-    undef $obsprofiles unless @$obsprofiles;
   }
   my $kiwi = Build::SimpleXML::parse($xml);
   die("not a kiwi config\n") unless $kiwi && $kiwi->{'image'};
