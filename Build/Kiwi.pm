@@ -264,6 +264,13 @@ sub kiwiparse {
   my $patterntype;
   for my $packages (@{$kiwi->{'packages'}}) {
     next if $packages->{'type'} && $packages->{'type'} ne 'image' && $packages->{'type'} ne 'bootstrap';
+    if ($obsprofiles && $packages->{'profiles'}) {
+      my %obsprofiles = map {$_ => 1} @$obsprofiles;
+      my @section_profiles = split(",", $packages->{'profiles'});
+
+      next unless grep {$obsprofiles{$_}} @section_profiles;
+    }
+
     $patterntype ||= $packages->{'patternType'};
     push @pkgs, @{$packages->{'package'}} if $packages->{'package'};
     for my $pattern (@{$kiwi->{'namedCollection'} || []}) {
