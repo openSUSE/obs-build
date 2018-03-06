@@ -264,6 +264,8 @@ sub kiwiparse {
   my $patterntype;
   for my $packages (@{$kiwi->{'packages'}}) {
     next if $packages->{'type'} && $packages->{'type'} ne 'image' && $packages->{'type'} ne 'bootstrap';
+    # we could skip the sections also when no profile is used,
+    # but don't to stay backward compatible
     if ($obsprofiles && $packages->{'profiles'}) {
       my %obsprofiles = map {$_ => 1} @$obsprofiles;
       my @section_profiles = split(",", $packages->{'profiles'});
