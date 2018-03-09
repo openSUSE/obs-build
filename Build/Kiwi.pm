@@ -123,6 +123,10 @@ sub kiwiparse {
   }
   my $containerconfig;
   for my $pref (@{$preferences || []}) {
+    if ($obsprofiles && $pref->{'profiles'}) {
+      my %obsprofiles = map {$_ => 1} @$obsprofiles;
+      next unless grep {$obsprofiles{$_}} split(",", $pref->{'profiles'});
+    }
     for my $type (@{$pref->{'type'} || []}) {
       next unless @{$pref->{'type'}} == 1 || !$type->{'optional'};
       if (defined $type->{'image'}) {
