@@ -562,7 +562,7 @@ build_kiwi_appliance() {
     if test -z "$kiwi_profile"; then
         kiwi_profile=__not__set
     fi
-    if "$kiwi_profile" = __excluded ; then
+    if test "$kiwi_profile" = __excluded ; then
 	cleanup_and_exit 1 "none of the selected profiles can be built on this architecture"
     fi
 
