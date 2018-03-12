@@ -223,6 +223,9 @@ recipe_build_livebuild() {
 	    *.iso)
 		build_results="${build_results}\n${i%%.iso}"
 		;;
+	    *ONIE.bin)
+		build_results="${build_results}\n${i%%ONIE.bin}"
+		;;
 	    *.img)
 		build_results="${build_results}\n${i%%.img}"
 		;;
