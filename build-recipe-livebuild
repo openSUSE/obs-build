@@ -223,6 +223,9 @@ recipe_build_livebuild() {
 	    *.iso)
 		build_results="${build_results}\n${i%%.iso}"
 		;;
+	    *ONIE.bin)
+		build_results="${build_results}\n${i%%ONIE.bin}"
+		;;
 	    *.img)
 		build_results="${build_results}\n${i%%.img}"
 		;;
@@ -242,12 +245,18 @@ recipe_build_livebuild() {
 	cleanup_and_exit 1 "No live-build result found"
     fi
 
-    # move created products (and their metadata files) to destination
+    # move created products (and their metadata files) to destination and
+    # create sha256 hashsums
     local buildnum="${RELEASE:+-Build${RELEASE}}"
     for prefix in $(echo -e ${build_results} | sort | uniq) ; do
 	for f in ${prefix}.* ; do
 	    mv ${f} \
 		$BUILD_ROOT/$TOPDIR/OTHER/${prefix##*/}${buildnum}${f#${prefix}}
+	    # change directory to avoid having full path in hashsum file
+	    pushd $BUILD_ROOT/$TOPDIR/OTHER >/dev/null
+	    /usr/bin/sha256sum "${prefix##*/}${buildnum}${f#${prefix}}" > \
+		"${prefix##*/}${buildnum}${f#${prefix}}".sha256
+	    popd >/dev/null
 	    BUILD_SUCCEEDED=true
 	done
     done
