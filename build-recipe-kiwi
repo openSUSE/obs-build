@@ -484,7 +484,7 @@ perform_image_bundle() {
 }
 
 # translate kiwi8 parameters to kiwi9
-translate_kiwi_parameters() {
+kiwi_translate_parameters() {
     local i lasti
     local add_repo_url=() add_repo_type=() add_repo_alias=() add_repo_priority=()
     local set_repo_url set_repo_type set_repo_alias set_repo_priority
@@ -541,6 +541,10 @@ translate_kiwi_parameters() {
     fi
 }
 
+kiwi_query_recipe() {
+    perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$1" "${BUILD_ARCH%%:*}" "$BUILD_FLAVOR"
+}
+
 build_kiwi_appliance() {
     if test -z "$RUNNING_IN_VM" ; then
         # NOTE: this must be done with the outer system, because it loads
@@ -550,7 +554,7 @@ build_kiwi_appliance() {
             /etc/init.d/boot.device-mapper start
     fi
     local kiwi_profile
-    kiwi_profile=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" profiles "$BUILD_ARCH" "$BUILD_FLAVOR")
+    kiwi_profile=$(kiwi_query_recipe profiles)
     if test -z "$kiwi_profile"; then
 	kiwi_profile=$(queryconfig \
 	    --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" \
@@ -571,7 +575,7 @@ build_kiwi_appliance() {
     fi
 
     if test "$kiwi_legacy" != true ; then
-	translate_kiwi_parameters
+	kiwi_translate_parameters
     fi
 
     local run_bundle=true
@@ -594,11 +598,15 @@ build_kiwi_appliance() {
 }
 
 recipe_build_kiwi() {
-    imagetype=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE imagetype)
-    imagename=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE filename)
-    imageversion=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE version)
-    drop_repo=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE drop_repository)
+    imagetype=$(kiwi_query_recipe imagetype)
+    imagename=$(kiwi_query_recipe filename)
+    imageversion=$(kiwi_query_recipe version)
+    drop_repo=$(kiwi_query_recipe drop_repository)
 
+    if test -z "$imagetype" ; then
+	cleanup_and_exit 1 "no imagetype set for this architecture/profile"
+    fi
+   
     # prepare rpms as source and createrepo on the repositories
     ln -sf $TOPDIR/SOURCES/repos $BUILD_ROOT/repos
     test -d $BUILD_ROOT/$TOPDIR/SOURCES/containers && ln -sf $TOPDIR/SOURCES/containers $BUILD_ROOT/containers
