@@ -373,7 +373,6 @@ build_kiwi_product() {
     # XXX: again?
     chroot "$BUILD_ROOT" chown -R abuild.abuild "$TOPDIR"
     chroot "$BUILD_ROOT" rm -rf "$TOPDIR/KIWIROOT"
-set -x
     if test -x "$BUILD_ROOT/usr/bin/product-builder"; then
        # current implementation of product generation
        chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX /usr/bin/product-builder --root $TOPDIR/KIWIROOT $VERBOSE_OPTION --logfile terminal --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
@@ -392,7 +391,6 @@ set -x
           chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX /usr/sbin/kiwi --root $TOPDIR/KIWIROOT $VERBOSE_OPTION --logfile terminal -p $TOPDIR/SOURCES --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
       fi
     fi
-set +x
 
     # move created product to destination
     # NOTE: older kiwi versions exit also in error case with 0
