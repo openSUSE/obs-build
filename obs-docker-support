@@ -46,7 +46,7 @@ zypper() {
 	esac
     done
     case $cmd in
-    in|install|rm|remove|up|update)
+    in|install|rm|remove|up|update|if|info)
 	exec /usr/bin/zypper -D $LOCAL_REPOS_D "${globalopts[@]}" "$cmd" "$@"
 	;;
     ar|addrepo)
