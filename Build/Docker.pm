@@ -39,7 +39,7 @@ sub quote {
   if ($q ne "'" && $str =~ /\$/) {
     $str =~ s/\$([a-zA-Z0-9_]+|\{([^\}]+)\})/join(' ', @{$vars->{$2 || $1} || []})/ge;
   }
-  $str =~ s/([ \t\"\'\$])/sprintf("%%%02X", ord($1))/ge;
+  $str =~ s/([ \t\"\'\$\(\)])/sprintf("%%%02X", ord($1))/ge;
   return $str;
 }
 
@@ -180,7 +180,7 @@ sub parse {
       }
     } elsif ($cmd eq 'RUN') {
       $line =~ s/#.*//;	# get rid of comments
-      for my $l (split(/(?:\||\|\||\&|\&\&|;)/, $line)) {
+      for my $l (split(/(?:\||\|\||\&|\&\&|;|\)|\()/, $line)) {
 	$l =~ s/^\s+//;
 	$l =~ s/\s+$//;
         @args = split(/[ \t]+/, $l);
