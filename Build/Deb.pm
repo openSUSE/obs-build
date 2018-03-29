@@ -186,11 +186,12 @@ sub uncompress {
   local (*TMP, *TMP2);
   open(TMP, "+>", undef) or die("could not open tmpfile\n");
   syswrite TMP, $data;
-  sysseek(TMP, 0, 0);
   my $pid = open(TMP2, "-|");
   die("fork: $!\n") unless defined $pid;
   if (!$pid) {
     open(STDIN, "<&TMP");
+    seek(STDIN, 0, 0);
+    sysseek(STDIN, 0, 0);
     exec($tool);
     die("$tool: $!\n");
   }
