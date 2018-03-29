@@ -190,7 +190,7 @@ sub uncompress {
   die("fork: $!\n") unless defined $pid;
   if (!$pid) {
     open(STDIN, "<&TMP");
-    seek(STDIN, 0, 0);
+    seek(STDIN, 0, 0);    # these two lines are a workaround for a perl bug mixing up FD
     sysseek(STDIN, 0, 0);
     exec($tool);
     die("$tool: $!\n");
