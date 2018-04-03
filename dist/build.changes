@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Tue Apr  3 11:30:47 UTC 2018 - adrian@suse.de
+
+- KIWI: Support OBS-Profiles kiwi annotation
+        kiwi profile filtering
+- Switch to a little perl http server to get rid of the python2 dependency
+- Avoid Ubuntu 18.04 uncompress failure messages
+- Don't rely on AppImage's auto-detection for architecture
+- build-recipe-livebuild: count ONIE images as build results
+
+-------------------------------------------------------------------
 Fri Feb  9 15:17:38 UTC 2018 - adrian@suse.de
 
 - add sysrq functionality for KVM builds
