@@ -420,7 +420,7 @@ Build::readdeps($cf, undef, \%repo);
 
 #######################################################################
 
-my @sysdeps = Build::get_sysbuild($cf, $buildtype, $extrasysdeps);
+my ($rc, @sysdeps) = Build::get_sysbuild($cf, $buildtype, $extrasysdeps);
 
 if ($buildtype eq 'kiwi-image' || $buildtype eq 'kiwi-product') {
   # just use the sysdeps for now, ignore real deps
