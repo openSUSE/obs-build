@@ -43,6 +43,23 @@ recipe_build_simpleimage() {
     cd $BUILD_ROOT || cleanup_and_exit 1
     export SRCDIR="$TOPDIR/SOURCES"
 
+    # Allow setting custom values through simpleimage recipe
+    # (otherwise use e.g. config for the obsworker), valid
+    # values are "no" (to disable the archive type), and
+    # anything else to try building it.
+    # TODO: Enforce presence of rpmspec and use it to parse
+    # the recipe file (consider %if et al better than sed)!
+    # https://wiki.merproject.org/wiki/Packaging_guidelines/ParsingSpecFiles
+    PREFER_OBS_SIMPLEIMAGE_TARBALL="`sed -n 's|^#@#OBS_SIMPLEIMAGE_TARBALL=||p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage | tail -1`" || PREFER_OBS_SIMPLEIMAGE_TARBALL=""
+    [ -n "$OBS_SIMPLEIMAGE_TARBALL" ] || OBS_SIMPLEIMAGE_TARBALL="$PREFER_OBS_SIMPLEIMAGE_TARBALL"
+    PREFER_OBS_SIMPLEIMAGE_SQUASHFS="`sed -n 's|^#@#OBS_SIMPLEIMAGE_SQUASHFS=||p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage | tail -1`" || PREFER_OBS_SIMPLEIMAGE_SQUASHFS=""
+    [ -n "$OBS_SIMPLEIMAGE_SQUASHFS" ] || OBS_SIMPLEIMAGE_SQUASHFS="$PREFER_OBS_SIMPLEIMAGE_SQUASHFS"
+
+    if [ "$OBS_SIMPLEIMAGE_TARBALL" = no ] && [ "$OBS_SIMPLEIMAGE_SQUASHFS" = no ] ; then
+        echo "FATAL: Both tarball and squashfs outputs are disabled, nothing to do" >&2
+        cleanup_and_exit 1
+    fi
+
     NAME="`sed -n 's|Name:[[:blank:]]*||p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage | tail -1`"
     [ -n "$NAME" ] || NAME="simpleimage"
     VERSION="`sed -n 's|Version:[[:blank:]]*||p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage | tail -1`"
@@ -105,54 +122,74 @@ recipe_build_simpleimage() {
     fi
     echo
 
-    TAR="tar"
-    TARGZIP_FLAG="-z"
-    TARGZIP_POST=""
-    if REMOTE_IO_EXEC test -x /usr/bin/bsdtar; then
-        TAR="/usr/bin/bsdtar --format gnutar --chroot"
-        if REMOTE_IO_EXEC test -x /usr/bin/pigz; then
-            TARGZIP_FLAG=""
-            TARGZIP_POST="| /usr/bin/pigz"
+    if [ "$OBS_SIMPLEIMAGE_TARBALL" != no ] ; then
+        TAR="tar"
+        TARGZIP_FLAG="-z"
+        TARGZIP_POST=""
+        if REMOTE_IO_EXEC test -x /usr/bin/bsdtar; then
+            TAR="/usr/bin/bsdtar --format gnutar --chroot"
+            if REMOTE_IO_EXEC test -x /usr/bin/pigz; then
+                TARGZIP_FLAG=""
+                TARGZIP_POST="| /usr/bin/pigz"
+            fi
+        else
+            if REMOTE_IO_EXEC test -x /usr/bin/pigz; then
+                TARGZIP_FLAG="-I/usr/bin/pigz"
+            fi
         fi
-    else
-        if REMOTE_IO_EXEC test -x /usr/bin/pigz; then
-            TARGZIP_FLAG="-I/usr/bin/pigz"
+
+        echo "Creating tarball image..."
+        if ! REMOTE_IO_EXEC "$TAR $TARGZIP_FLAG -cf - --one-file-system $TOPDIRS -C .tmp $MKTOPDIRS $TARGZIP_POST > $BUILD_ROOT/.simpleimage.tar.gz"; then
+            cleanup_and_exit 1
         fi
     fi
 
-    if ! REMOTE_IO_EXEC "$TAR $TARGZIP_FLAG -cf - --one-file-system $TOPDIRS -C .tmp $MKTOPDIRS $TARGZIP_POST > $BUILD_ROOT/.simpleimage.tar.gz"; then
-      cleanup_and_exit 1
-    fi
-
-    if [ -x "`which mksquashfs 2> /dev/null`" ]; then
-      echo
-      echo "Tarball done, creating squashfs image as well"
-      if [ -n "$REMOTE_IO_EXEC" ]; then
-        echo "Using REMOTE_IO_EXEC..."
-      fi
-      echo
-      # Note: no pigz magic here, mksquashfs already does parallel work by itself
-      REMOTE_IO_EXEC mksquashfs $TOPDIRS $MKTOPDIRS_TMP $BUILD_ROOT/.simpleimage.squashfs -info -keep-as-directory -no-progress || cleanup_and_exit 1
+    if [ "$OBS_SIMPLEIMAGE_SQUASHFS" != no ] ; then
+        if [ -x "`REMOTE_IO_EXEC which mksquashfs 2> /dev/null`" ]; then
+            echo
+            if [ "$OBS_SIMPLEIMAGE_TARBALL" != no ] ; then
+                echo "Tarball done, creating squashfs image as well..."
+            else
+                echo "Creating squashfs image..."
+            fi
+            if [ -n "$REMOTE_IO_EXEC" ]; then
+                echo "Using REMOTE_IO_EXEC..."
+            fi
+            echo
+            # Note: no pigz magic here, mksquashfs already does parallel work by itself
+            REMOTE_IO_EXEC mksquashfs $TOPDIRS $MKTOPDIRS_TMP $BUILD_ROOT/.simpleimage.squashfs -info -keep-as-directory -no-progress || cleanup_and_exit 1
+        else
+            if [ "$OBS_SIMPLEIMAGE_TARBALL" = no ] ; then
+                echo "FATAL: Tarball output was disabled, and mksquashfs is not found, nothing to do" >&2
+                cleanup_and_exit 1
+            fi
+        fi
     fi
     echo "`date -u`: simple image created."
 
     DEST="$BUILD_ROOT$TOPDIR/OTHER"
     mkdir -p "$DEST"
 
-    echo
-    echo "Checksumming tarball..."
-    echo
-    mv $BUILD_ROOT/.simpleimage.tar.gz $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz
-    REMOTE_IO_EXEC md5sum $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz | sed "s|$DEST/||" > $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz.md5
-    ls -la $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz.md5 $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz
+    if [ "$OBS_SIMPLEIMAGE_TARBALL" != no ] ; then
+        if [ -r .simpleimage.tar.gz ]; then
+            echo
+            echo "Renaming to final unique name and checksumming the tarball image..."
+            echo
+            mv $BUILD_ROOT/.simpleimage.tar.gz $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz
+            REMOTE_IO_EXEC md5sum $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz | sed "s|$DEST/||" > $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz.md5
+            ls -la $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz.md5 $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz
+        fi
+    fi
 
-    if [ -r .simpleimage.squashfs ]; then
-      echo
-      echo "Checksumming squashfs..."
-      echo
-      mv $BUILD_ROOT/.simpleimage.squashfs $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs
-      REMOTE_IO_EXEC md5sum $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs | sed "s|$DEST/||" > $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs.md5
-      ls -la $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs.md5 $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs
+    if [ "$OBS_SIMPLEIMAGE_SQUASHFS" != no ] ; then
+        if [ -r .simpleimage.squashfs ]; then
+            echo
+            echo "Renaming to final unique name and checksumming the squashfs image..."
+            echo
+            mv $BUILD_ROOT/.simpleimage.squashfs $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs
+            REMOTE_IO_EXEC md5sum $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs | sed "s|$DEST/||" > $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs.md5
+            ls -la $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs.md5 $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs
+        fi
     fi
 
     echo "Almost done, cleaning up..."
