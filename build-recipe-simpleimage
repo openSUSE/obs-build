@@ -58,8 +58,8 @@ recipe_build_simpleimage() {
 
     echo "`date -u`: Finalizing filesystem tree..."
     TOPDIRS=
-    MKTOPDIRS=""
-    MKTOPDIRS_TMP=""
+    MKTOPDIRS="proc sys"
+    MKTOPDIRS_TMP=".tmp/proc .tmp/sys"
     for DIR  in .* * ; do
       case "$DIR" in
 	.|..) continue ;;
@@ -75,7 +75,8 @@ recipe_build_simpleimage() {
 	.tmp) continue ;;
 	installed-pkg) continue ;;
 	debian-binary) continue ;;
-	proc|sys|run|var/run|tmp|var/tmp)
+	proc|sys) continue ;;
+	run|var/run|tmp|var/tmp)
 		if test -d "$DIR" && ! test -L "$DIR" ; then
 			MKTOPDIRS="$MKTOPDIRS $DIR"
 			MKTOPDIRS_TMP="$MKTOPDIRS_TMP .tmp/$DIR"
@@ -89,9 +90,13 @@ recipe_build_simpleimage() {
     REMOTE_IO_EXEC rm -rf "$BUILD_ROOT$TOPDIR"
     mkdir -p $MKTOPDIRS_TMP
     for DIR in $MKTOPDIRS ; do
-        chmod --reference="$DIR" ".tmp/$DIR" || true
-        chown --reference="$DIR" ".tmp/$DIR" || true
+        if [ -e "$DIR" ] ; then
+            chmod --reference="$DIR" ".tmp/$DIR" || true
+            chown --reference="$DIR" ".tmp/$DIR" || true
+        fi
     done
+#    ( mkdir -p .tmp/ && cd .tmp/ && mkdir -p $MKTOPDIRS )
+#    mkdir -p .tmp/{proc,sys}
 
     if [ -n "$REMOTE_IO_EXEC" ]; then
         echo "`date -u`: Compresing the final image using REMOTE_IO_EXEC, this can take a while..."
