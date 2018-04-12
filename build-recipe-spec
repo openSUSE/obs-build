@@ -157,11 +157,23 @@ recipe_build_spec() {
 
     # su involves a shell which would require even more
     # complicated quoting to bypass than this
+    rm -f $BUILD_ROOT/.build.command
+    touch $BUILD_ROOT/.build.command
+    PKG_BUILDDIR="$(chroot $BUILD_ROOT su -c 'rpmspec -q --srpm --qf="`rpmspec -q --srpm --eval="'"$TOPDIR/BUILD"'/%{name}-%{version}" '"$TOPDIR/SOURCES/$RECIPEFILE"'`" '"$TOPDIR/SOURCES/$RECIPEFILE" - $BUILD_USER < /dev/null | head -1)" || PKG_BUILDDIR=""
+    if [ -n "$PKG_BUILDDIR" ]; then
+        if [ -s "$BUILD_ROOT"/etc/profile.d/build_ccache.sh ]; then
+            grep CCACHE_BASEDIR "$BUILD_ROOT"/etc/profile.d/build_ccache.sh > /dev/null || \
+            echo "CCACHE_BASEDIR='$PKG_BUILDDIR' ; export CCACHE_BASEDIR" >> "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
+            echo "=== Amended CCACHE config for SPEC build root:"
+            cat "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
+#            echo ". /etc/profile.d/build_ccache.sh ;" >> $BUILD_ROOT/.build.command
+        fi
+    fi
     toshellscript $rpmbuild \
 	    "${definesnstuff[@]}" \
 	    "${rpmbopts[@]}" \
 	    "$TOPDIR/SOURCES/$RECIPEFILE" \
-	    > $BUILD_ROOT/.build.command
+	    >> $BUILD_ROOT/.build.command
     chmod 755 $BUILD_ROOT/.build.command
     check_exit
     if test -n "$RUN_SHELL"; then
