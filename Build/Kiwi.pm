@@ -91,7 +91,9 @@ sub kiwiparse {
     $ret->{'name'} = $description->{'specification'}->[0]->{'_content'};
   }
 
-  # do obsprofiles arch filtering
+  # usedprofiles also include direct wanted profile targets and indirect required profiles
+  my %usedprofiles;
+  # obsprofiles arch filtering
   if ($obsprofiles && $arch && $kiwi->{'profiles'} && $kiwi->{'profiles'}->[0]->{'profile'}) {
     my %obsprofiles = map {$_ => 1} @$obsprofiles;
     for my $prof (@{$kiwi->{'profiles'}[0]->{'profile'}}) {
@@ -114,6 +116,13 @@ sub kiwiparse {
       }
     }
     $obsprofiles = [ grep {$obsprofiles{$_}} @$obsprofiles ];
+    for my $prof (@{$kiwi->{'profiles'}[0]->{'profile'}}) {
+      next unless $obsprofiles{$prof->{'name'}};
+      $usedprofiles{$prof->{'name'}} = 1;
+      for my $req (@{$prof->{'requires'}}) {
+        $usedprofiles{$req->{'profile'}} = 1;
+      };
+    }
   }
 
   # take default version setting
@@ -124,8 +133,7 @@ sub kiwiparse {
   my $containerconfig;
   for my $pref (@{$preferences || []}) {
     if ($obsprofiles && $pref->{'profiles'}) {
-      my %obsprofiles = map {$_ => 1} @$obsprofiles;
-      next unless grep {$obsprofiles{$_}} split(",", $pref->{'profiles'});
+      next unless grep {$usedprofiles{$_}} split(",", $pref->{'profiles'});
     }
     for my $type (@{$pref->{'type'} || []}) {
       next unless @{$pref->{'type'}} == 1 || !$type->{'optional'};
@@ -274,10 +282,9 @@ sub kiwiparse {
     # we could skip the sections also when no profile is used,
     # but don't to stay backward compatible
     if ($obsprofiles && $packages->{'profiles'}) {
-      my %obsprofiles = map {$_ => 1} @$obsprofiles;
       my @section_profiles = split(",", $packages->{'profiles'});
 
-      next unless grep {$obsprofiles{$_}} @section_profiles;
+      next unless grep {$usedprofiles{$_}} @section_profiles;
     }
 
     $patterntype ||= $packages->{'patternType'};
