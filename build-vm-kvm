@@ -243,8 +243,10 @@ vm_startup_kvm() {
     elif test -n "$VM_CONSOLE_INPUT" ; then
 	qemu_args=("${qemu_args[@]}" -serial mon:stdio)
     else
-        mkfifo "${VM_ROOT}.monitor"
-	qemu_args=("${qemu_args[@]}" -serial stdio -chardev socket,id=monitor,server,nowait,path="${VM_ROOT}.monitor" -mon chardev=monitor,mode=readline)
+        mkdir -p "${VM_ROOT}.qemu"
+        mkfifo "${VM_ROOT}.qemu/monitor"
+        chown "$VM_USER" "${VM_ROOT}.qemu"
+	qemu_args=("${qemu_args[@]}" -serial stdio -chardev socket,id=monitor,server,nowait,path="${VM_ROOT}.qemu/monitor" -mon chardev=monitor,mode=readline)
     fi
 
     if test -n "$BUILD_JOBS" -a "$icecream" = 0 -a -z "$BUILD_THREADS" ; then
@@ -330,7 +332,7 @@ vm_cleanup_kvm() {
 
 vm_sysrq_kvm() {
     perl -e 'use Socket; socket(SOCK, PF_UNIX, SOCK_STREAM, 0) || die("socket: $!\n"); 
-             connect(SOCK, sockaddr_un("'"$VM_ROOT.monitor"'")) || die("connect: $!\n");
+             connect(SOCK, sockaddr_un("'"$VM_ROOT.qemu/monitor"'")) || die("connect: $!\n");
              print SOCK "sendkey alt-print-'$1'\n";'
 }
 
