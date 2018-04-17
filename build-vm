@@ -429,7 +429,7 @@ background_watchdog() {
     WATCHDOG_TIMEOUT=300
     BUILD_OPTIONS_PARSED=
     while sleep 5 ; do
-	WATCH=`grep -a "### VM INTERACTION" "$LOGFILE" | tail -n 1`
+	WATCH=$(grep -a "### VM INTERACTION" "$LOGFILE" | tr '\0' a | tail -n 1)
 	case $WATCH in
 	    *VM\ INTERACTION\ START*) test -n "$WATCHDOG_START" || WATCHDOG_START=`date +%s` ;;
 	    *VM\ INTERACTION\ END*) WATCHDOG_START= ;;
@@ -917,7 +917,7 @@ vm_first_stage() {
     vm_attach_root
     if test -n "$VM_SWAP" ; then
 	vm_attach_swap
-	BUILDSTATUS=`dd if="$VM_SWAP" bs=12 count=1 2>/dev/null`
+	BUILDSTATUS=$(dd if="$VM_SWAP" bs=12 count=1 2>/dev/null)
 	case $BUILDSTATUS in
 	  BUILDSTATUS[02])
 	    mkdir -p $BUILD_ROOT/.build.packages
