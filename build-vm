@@ -917,7 +917,7 @@ vm_first_stage() {
     vm_attach_root
     if test -n "$VM_SWAP" ; then
 	vm_attach_swap
-	BUILDSTATUS=$(dd if="$VM_SWAP" bs=12 count=1 2>/dev/null)
+	BUILDSTATUS=$(dd if="$VM_SWAP" bs=12 count=1 2>/dev/null | tr '\0' a)
 	case $BUILDSTATUS in
 	  BUILDSTATUS[02])
 	    mkdir -p $BUILD_ROOT/.build.packages
