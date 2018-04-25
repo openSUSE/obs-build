@@ -289,6 +289,8 @@ vm_startup_kvm() {
     export QEMU_AUDIO_DRV=none		# we do not want to have sound inside the VMs
     echo "$@"
     "$@"
+    qemu_ret=$?
+    test "$qemu_ret" = "137" && cleanup_and_exit 3 "qemu got SIGKILL"
 }
 
 vm_kill_kvm() {
