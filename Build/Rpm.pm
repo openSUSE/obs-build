@@ -1189,14 +1189,18 @@ sub getnevr_rich {
   my ($d) = @_;
   my $n = '';
   my $bl = 0;
-  while ($d =~ /^([^ ,\)]+)/) {
+  while ($d =~ /^([^ ,\(\)]+)/) {
     $n .= $1;
-    $d = substr($d, length($n));
+    $d = substr($d, length($1));
     if ($d =~ /^\(/) {
       $n .= '(';
       $bl++;
       $d = substr($d, 1);
-    } elsif ($d =~ /\)/) {
+    } elsif ($d =~ /^\)/) {
+      if ($bl  > 0) {
+        $n .= ')';
+        $d = substr($d, 1);
+      }
       last if $bl-- <= 0;
     }
   }
