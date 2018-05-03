@@ -1189,20 +1189,14 @@ sub getnevr_rich {
   my ($d) = @_;
   my $n = '';
   my $bl = 0;
-  while ($d =~ /^([^ ,\(\)]+)/) {
+  while ($d =~ /^([^ ,\(\)]*)/) {
     $n .= $1;
     $d = substr($d, length($1));
-    if ($d =~ /^\(/) {
-      $n .= '(';
-      $bl++;
-      $d = substr($d, 1);
-    } elsif ($d =~ /^\)/) {
-      if ($bl  > 0) {
-        $n .= ')';
-        $d = substr($d, 1);
-      }
-      last if $bl-- <= 0;
-    }
+    last unless $d =~ /^([\(\)])/;
+    $bl += $1 eq '(' ? 1 : -1;
+    last if $bl < 0;
+    $n .= $1;
+    $d = substr($d, 1);
   }
   return $n;
 }
@@ -1276,7 +1270,7 @@ sub testcaseformat_rec {
   my $r1 = testcaseformat_rec($r->[1], 1);
   if (($op == 3 || $op == 4) && @$r == 4) {
     $r1 = "$r1 $top " . testcaseformat_rec($r->[2], 1);
-    $top = 'ELSE';
+    $top = '<ELSE>';
   }
   my $addparens2 = 1;
   $addparens2 = 0 if $r->[2]->[0] == $op && ($op == 1 || $op == 2 || $op == 6);
