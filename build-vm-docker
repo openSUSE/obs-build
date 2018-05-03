@@ -32,7 +32,7 @@ vm_startup_docker() {
     docker rm "$name" >/dev/null 2>&1 || true
     docker run \
         --rm --name "$name" --cap-add=sys_admin --cap-add=MKNOD --net=none \
-        --mount "type=volume,source=$BUILD_ROOT,destination=/mnt" busybox /bin/chroot /mnt "$vm_init_script"
+        --mount "type=bind,source=$BUILD_ROOT,destination=/mnt" busybox /bin/chroot /mnt "$vm_init_script"
     BUILDSTATUS="$?"
     test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
     cleanup_and_exit "$BUILDSTATUS"
