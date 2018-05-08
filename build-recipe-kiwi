@@ -597,6 +597,29 @@ build_kiwi_appliance() {
     fi
 }
 
+postprocess_kiwi_containers() {
+    local r
+
+    # uncompress containers, the compression is useless and just slows down further processing
+    for r in $BUILD_ROOT/$TOPDIR/KIWI/*.tar.xz ; do
+	test -e "$r" || continue
+	r="${r%.xz}"
+	xzdec <"$r.xz" >"$r" || cleanup_and_exit 1 "xzdec failed"
+	if test -e "$r.xz.sha256" ; then
+	    # also generate sha256sum
+	    (cd "$BUILD_ROOT/$TOPDIR/KIWI" && sha256sum "${r##*/}") > "$r.sha256"
+	fi
+	rm -f "$r.xz" "$r.xz.sha256"
+    done
+
+    # create container info
+    disturlarg=()
+    test -n "$DISTURL" && disturlarg=("--disturl" "$DISTURL")
+    for r in $BUILD_ROOT/$TOPDIR/KIWI/*.tar ; do
+	test -e "$r" && perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::showcontainerinfo -- "${disturlarg[@]}" $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE "$r" > "${r%.tar}.containerinfo"
+    done
+}
+
 recipe_build_kiwi() {
     imagetype=$(kiwi_query_recipe imagetype)
     imagename=$(kiwi_query_recipe filename)
@@ -681,19 +704,13 @@ recipe_build_kiwi() {
 
     # Hook for running post kiwi build scripts like QA scripts if installed
     if test -x $BUILD_ROOT/usr/lib/build/kiwi_post_run ; then
-      if ! chroot $BUILD_ROOT su -c /usr/lib/build/kiwi_post_run; then
-        echo "/usr/lib/build/kiwi_post_run script failed!"
-        cleanup_and_exit 1
-      fi
+        if ! chroot $BUILD_ROOT su -c /usr/lib/build/kiwi_post_run ; then
+	    cleanup_and_exit 1 "/usr/lib/build/kiwi_post_run script failed!"
+        fi
     fi
 
     if test "$imagetype" = docker ; then
-	# get container info
-	disturlarg=()
-	test -n "$DISTURL" && disturlarg=("--disturl" "$DISTURL")
-	for r in $BUILD_ROOT/$TOPDIR/KIWI/*.tar.xz ; do
-	    test -e "$r" && perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::showcontainerinfo -- "${disturlarg[@]}" $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE "$r" > "${r%.tar.xz}.containerinfo"
-	done
+	postprocess_kiwi_containers
     fi
 }
 
