@@ -332,7 +332,8 @@ Known Parameters:
   --vm-disk-size SIZEINMB
   --vm-swap-size SIZEINMB
   --vm-disk-filesystem TYPE
-              Defaults for automatic setup of VM root/swap files
+              Defaults for automatic setup of VM root/swap files.
+              May get overruled by build config vmfstype build flag.
 
   --vm-memory SIZEINMB
               Set amount of RAM for VMs
