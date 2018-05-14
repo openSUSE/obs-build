@@ -121,6 +121,7 @@ recipe_build_docker() {
     sed -i '/^[ 	]*[fF][rR][oO][mM]/a COPY .obs-docker-support /usr/local/sbin/obs-docker-support\nRUN obs-docker-support --install' $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE
     echo >> $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE
     echo 'RUN obs-docker-support --uninstall' >> $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE
+    test -n "$DISTURL" && echo "LABEL DISTURL=$DISTURL" >> $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE
 
     # now do the build
     echo "Building image $ALLTAGS"
