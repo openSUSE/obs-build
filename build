@@ -172,8 +172,6 @@ Known Parameters:
 
   --no-checks Do not run checks (postbuild and %check)
 
-  --lint      Run rpmlint after build.
-
   --logfile logfile
               Capture build output to logfile. Defaults to
               .build.log in the build root for non-VM builds.
@@ -852,6 +850,7 @@ while test -n "$1"; do
 	shift
       ;;
       -lint)
+        # OBSOLETE: just keeping it for compability
 	DO_LINT=true
 	;;
       -baselibs)
