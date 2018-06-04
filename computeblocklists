@@ -33,6 +33,20 @@
 
 use strict;
 
+# powerpc, mips, sparc, and alpha have 3 direction bits
+# and represent _IOC_NONE as 1 instead of 0.
+sub alt_ioctl($)
+{
+	my ($ioctl_nr) = @_;
+	my $size = ($ioctl_nr >> 16) & 0x3fff;
+	my $dir = ($ioctl_nr >> 30);
+	my $base = $ioctl_nr & 0x1fffffff;
+
+	die "invalid size $size" if ($size > (1 << 13));
+
+	return $base | ($dir + 1) << 29;
+}
+
 my ($opt_padstart, $opt_padend, $opt_verbose, $opt_manifest, $opt_mani0);
 $opt_verbose = 0;
 
@@ -142,7 +156,12 @@ while (1) {
   }
 
   my $bsize = 'xxxx';
-  ioctl(F, 2, $bsize) || ioctl(F, 536870914, $bsize) || die("FIGETBSZ: $!\n");
+  my $FIGETBSZ = 2;
+  if (not defined ioctl(F, $FIGETBSZ, $bsize)) {
+    if (not defined ioctl(F, alt_ioctl($FIGETBSZ), $bsize)) {
+      die("FIGETBSZ failed on $file: $!\n");
+    }
+  }
   $bsize = unpack("L", $bsize);
   die("$file: empty blocksize\n") unless $bsize != 0;
 
@@ -151,9 +170,10 @@ while (1) {
   my ($firstblock, $lastblock);
   for ($b = 0; $b < $blocks; ++$b) {
     my $block = pack('I', $b);
+    my $FIBMAP = 1;
     if (not defined ioctl(F, 1, $block)) {
-      if (not defined ioctl(F, 536870913, $block)) {
-	die "$file: $!\n";
+      if (not defined ioctl(F, alt_ioctl($FIBMAP), $block)) {
+	die "FIBMAP failed on $file: $!\n";
       }
     }
     $block = unpack('I', $block);
