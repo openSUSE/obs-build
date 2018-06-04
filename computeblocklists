@@ -47,6 +47,124 @@ sub alt_ioctl($)
 	return $base | ($dir + 1) << 29;
 }
 
+#
+# Use FIBMAP to gather block lists, block-by-block
+# This is the older, slower way to iterate over file extents but
+# will generally work on older kernels.
+#
+sub fibmap_blocklist($$$) {
+  my ($fd, $st_size, $bsize) = @_;
+
+  my $blocks = int(($st_size+$bsize-1)/$bsize);
+  my ($firstblock, $lastblock);
+  for ($b = 0; $b < $blocks; ++$b) {
+    my $block = pack('I', $b);
+    my $FIBMAP = 1;
+    if (not defined ioctl($fd, 1, $block)) {
+      if (not defined ioctl($fd, alt_ioctl($FIBMAP), $block)) {
+	return undef;
+      }
+    }
+    $block = unpack('I', $block);
+    if (!$firstblock && defined($firstblock)) {
+      # last block was hole
+      if (!$block) {
+	$lastblock++;	# count holes, 0-2 means three hole blocks
+      } else {
+	# switch back from 'hole mode' into normal mode
+	printf "-$lastblock" if defined($firstblock) && $firstblock != $lastblock;
+	print " $block";
+	$firstblock = $lastblock = $block;
+      }
+      next;
+    }
+    if (!$firstblock || $lastblock + 1 != $block) {
+      # start of a new run
+      printf "-$lastblock" if defined($firstblock) && $firstblock != $lastblock;
+      print " $block";
+      $firstblock = $block;
+    }
+    $lastblock = $block;
+  }
+  # finish last run
+  printf "-$lastblock" if defined($firstblock) && $firstblock != $lastblock;
+}
+
+sub bytes_in_blocks($$) {
+  my ($bytes, $bsize) = @_;
+  return int(($bytes + $bsize - 1) / $bsize);
+}
+
+#
+# Use the FIEMAP ioctl to gather block lists, defined extent at a time
+# This is the newer way to gather extent information.  We iterate the file
+# up to 50 extents at a time, each describing a contiguous, non-hole, range.
+#
+# see /usr/include/linux/fiemap.h for definitions of the flags used below
+#
+sub fiemap_blocklist($$$) {
+  my ($file, $size, $blocksize) = @_;
+
+  my $FIEMAP = 0xc020660b;
+  my $offset = 0;
+
+  while ($offset < $size) {
+    my $flags_in = 0x00000001; # FIEMAP_FLAG_SYNC
+    my $x = pack("QQIIIx4.", $offset, $size, $flags_in, 0, 50, 4096);
+
+    if (not defined ioctl($file, $FIEMAP, $x)) {
+      if (not defined ioctl($file, alt_ioctl($FIEMAP), $x)) {
+	return undef;
+      }
+    }
+
+    my ($flags, $count, @extents) = unpack("x16IIx8(QQQQQIIII)[50]", $x);
+
+    $count = int($count);
+
+    last if ($count == 0);
+
+    my $i = 0;
+    while ($i < $count) {
+      my $start = $i * 9;
+      my $hole;
+      my @record = @extents[$start..$start+9];
+      my ($logical, $physical, $length, $resv1, $resv2, $flags) = @record;
+      if ($offset != $logical) {
+	$hole = bytes_in_blocks($logical - $offset, $blocksize) - 1;
+	print " 0-$hole";
+      }
+      my $first = bytes_in_blocks($physical, $blocksize);
+      my $last = $first + bytes_in_blocks($length, $blocksize) - 1;
+      $flags = int($flags);
+
+      # Not a hole but for these purposes we should treat it as one
+      if ($flags & 0x00000800) { # UNWRITTEN
+	$hole = bytes_in_blocks($length, $blocksize) - 1;
+	print " 0-$hole";
+      } elsif ($flags & 0x00000008) { # ENCODED
+	die "extent mapped but is encoded";
+      # UNKNOWN|DELALLOC|DATA_ENCRYPTED|NOT_ALIGNED|DATA_INLINE|DATA_TAIL
+      } elsif ($flags & 0x00000786) {
+	die "extent cannot be block-mapped";
+      } else {
+	if ($first == $last) {
+	  print " $first";
+	} else {
+	  print " $first-$last";
+	}
+      }
+      $i += 1;
+      $offset = $logical + $length;
+    }
+  }
+
+  if ($offset < $size) {
+    my $hole = bytes_in_blocks($size - $offset, $blocksize) - 1;
+    print " 0-$hole";
+  }
+}
+
 my ($opt_padstart, $opt_padend, $opt_verbose, $opt_manifest, $opt_mani0);
 $opt_verbose = 0;
 
@@ -167,41 +285,15 @@ while (1) {
   die("$file: empty blocksize\n") unless $bsize != 0;
 
   print "f $n $st_size $bsize";
-  my $blocks = int(($st_size+$bsize-1)/$bsize);
-  my ($firstblock, $lastblock);
-  for ($b = 0; $b < $blocks; ++$b) {
-    my $block = pack('I', $b);
-    my $FIBMAP = 1;
-    if (not defined ioctl($fd, 1, $block)) {
-      if (not defined ioctl($fd, alt_ioctl($FIBMAP), $block)) {
-	die "FIBMAP failed on $file: $!\n";
-      }
+
+  if (not defined fiemap_blocklist($fd, $st_size, $bsize)) {
+    if (not defined fibmap_blocklist($fd, $st_size, $bsize)) {
+      die "Couldn't get block list for $n: $!\n";
     }
-    $block = unpack('I', $block);
-    if (!$firstblock && defined($firstblock)) {
-      # last block was hole
-      if (!$block) {
-	$lastblock++;	# count holes, 0-2 means three hole blocks
-      } else {
-	# switch back from 'hole mode' into normal mode
-	printf "-$lastblock" if defined($firstblock) && $firstblock != $lastblock;
-	print " $block";
-	$firstblock = $lastblock = $block;
-      }
-      next;
-    }
-    if (!$firstblock || $lastblock + 1 != $block) {
-      # start of a new run
-      printf "-$lastblock" if defined($firstblock) && $firstblock != $lastblock;
-      print " $block";
-      $firstblock = $block;
-    }
-    $lastblock = $block;
   }
-  # finish last run
-  printf "-$lastblock" if defined($firstblock) && $firstblock != $lastblock;
-  close($fd);
+
   print "\n";
+  close($fd);
 }
 
 print "\n"x$opt_padend if $opt_padend;
