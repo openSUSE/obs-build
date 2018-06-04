@@ -141,24 +141,25 @@ while (1) {
   }
   print STDERR "$file\n" if $opt_verbose && !($opt_verbose == 1 && $file =~ /^KIWI\/.*\//);
 
-  if (!open(F, '<', $file)) {
+  my $fd = undef;
+  if (!open($fd, '<', $file)) {
     print STDERR "$file: $!";
     next;
   }
 
-  my @stat = stat(F);
+  my @stat = stat($fd);
   die unless @stat;
   my $st_size = $stat[7];
   if ($st_size == 0) {
     print "f $n 0\n";
-    close F;
+    close($fd);
     next;
   }
 
   my $bsize = 'xxxx';
   my $FIGETBSZ = 2;
-  if (not defined ioctl(F, $FIGETBSZ, $bsize)) {
-    if (not defined ioctl(F, alt_ioctl($FIGETBSZ), $bsize)) {
+  if (not defined ioctl($fd, $FIGETBSZ, $bsize)) {
+    if (not defined ioctl($fd, alt_ioctl($FIGETBSZ), $bsize)) {
       die("FIGETBSZ failed on $file: $!\n");
     }
   }
@@ -171,8 +172,8 @@ while (1) {
   for ($b = 0; $b < $blocks; ++$b) {
     my $block = pack('I', $b);
     my $FIBMAP = 1;
-    if (not defined ioctl(F, 1, $block)) {
-      if (not defined ioctl(F, alt_ioctl($FIBMAP), $block)) {
+    if (not defined ioctl($fd, 1, $block)) {
+      if (not defined ioctl($fd, alt_ioctl($FIBMAP), $block)) {
 	die "FIBMAP failed on $file: $!\n";
       }
     }
@@ -199,7 +200,7 @@ while (1) {
   }
   # finish last run
   printf "-$lastblock" if defined($firstblock) && $firstblock != $lastblock;
-  close F;
+  close($fd);
   print "\n";
 }
 
