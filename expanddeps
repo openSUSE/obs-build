@@ -455,8 +455,18 @@ if (@sysdeps) {
   @bdeps = Build::unify(@sysdeps, @bdeps);
 }
 
-# make sure all preinstalls are in bdeps;
-@bdeps = Build::unify(@bdeps, Build::get_preinstalls($cf));
-@bdeps = Build::unify(@bdeps, Build::get_vminstalls($cf)) if $isvm;
+# get preinstalls/vminstalls and check if the packages exist
+my @xdeps = Build::get_preinstalls($cf);
+push @xdeps, Build::get_vminstalls($cf) if $isvm;
+my @missing = grep {!$packs{$_}} @xdeps;
+if (@missing) {
+  @missing = sort(Build::unify(@missing));
+  print STDERR "expansion error\n";
+  print STDERR "  missing pre/vminstalls: ".join(', ', @missing)."\n";
+  exit(1);
+}
+
+# make sure all preinstalls/vminstalls are in bdeps
+@bdeps = Build::unify(@bdeps, @xdeps);
 
 print_rpmlist(@bdeps);
