@@ -32,6 +32,7 @@
 ################################################################
 
 use strict;
+use Math::BigInt;
 
 # powerpc, mips, sparc, and alpha have 3 direction bits
 # and represent _IOC_NONE as 1 instead of 0.
@@ -109,8 +110,7 @@ sub fiemap_blocklist($$$) {
   my $offset = 0;
 
   while ($offset < $size) {
-    my $flags_in = 0x00000001; # FIEMAP_FLAG_SYNC
-    my $x = pack("QQIIIx4.", $offset, $size, $flags_in, 0, 50, 4096);
+    my $x = pack_fiemap($offset, $size);
 
     if (not defined ioctl($file, $FIEMAP, $x)) {
       if (not defined ioctl($file, alt_ioctl($FIEMAP), $x)) {
@@ -118,7 +118,7 @@ sub fiemap_blocklist($$$) {
       }
     }
 
-    my ($flags, $count, @extents) = unpack("x16IIx8(QQQQQIIII)[50]", $x);
+    my ($flags, $count, @extents) = unpack_fiemap($x);
 
     $count = int($count);
 
@@ -163,6 +163,70 @@ sub fiemap_blocklist($$$) {
     my $hole = bytes_in_blocks($size - $offset, $blocksize) - 1;
     print " 0-$hole";
   }
+}
+
+# little-endian? (if not, assume big-endian and ignore "weird" byte orders)
+my $is_little = unpack('C', pack('S', 1));
+
+# check if perl supports the "Q" type
+my $has_Q_type = eval { unpack('Q', pack('Q', 1)); };
+
+#
+# Convert an unsigned quad (64-bit) value to two unsigned long (32-bit) values.
+# Return (low order bits, high order bits) if little-endian byte order is
+# used. Otherwise, return (high order bits, low order bits).
+# Note: if the input is a Math::BigInt, the returned values are also
+# Math::BigInt objects, which is no problem because a Math::BigInt can also
+# passed to pack(...).
+#
+sub uquad_to_ulongs {
+  my ($uquad) = @_;
+  my $lows = $uquad & 0xffffffff;
+  my $highs = ($uquad >> 32) & 0xffffffff;
+  return ($highs, $lows) unless $is_little;
+  return ($lows, $highs);
+}
+
+#
+# Convert two unsigned long (32-bit) values to an unsigned quad (64-bit) value
+# If little-endian byte order is used, $first represents the low order bits
+# and $second represents the high order bits. Otherwise, $second represents
+# the low order bits and $first represents the high order bits.
+#
+sub ulongs_to_uquad {
+  my ($first, $second) = @_;
+  my ($lows, $highs) = $is_little ? ($first, $second) : ($second, $first);
+  my $uquad = Math::BigInt->new($highs);
+  return ($uquad << 32) | $lows;
+}
+
+sub pack_fiemap {
+  my ($offset, $size) = @_;
+  my $flags_in = 0x00000001; # FIEMAP_FLAG_SYNC
+  return pack("QQIIIx4.", $offset, $size, $flags_in, 0, 50, 4096)
+    if $has_Q_type;
+  my @uloffset = uquad_to_ulongs($offset);
+  my @ulsize = uquad_to_ulongs($size);
+  return pack("LLLLIIIx4.", @uloffset, @ulsize, $flags_in, 0, 50, 4096);
+}
+
+sub unpack_fiemap {
+  my ($data) = @_;
+  return unpack("x16IIx8(QQQQQIIII)[50]", $data) if $has_Q_type;
+  my ($flags, $count, @extents) = unpack("x16IIx8(LLLLLLLLLLIIII)[50]", $data);
+  my $i = 0;
+  my @nextents;
+  while ($i++ < $count) {
+    my ($log1, $log2, $phy1, $phy2, $len1, $len2,
+        $res0_1, $res0_2, $res1_1, $res1_2, @ints) = splice(@extents, 0, 14);
+    push @nextents, ulongs_to_uquad($log1, $log2);
+    push @nextents, ulongs_to_uquad($phy1, $phy2);
+    push @nextents, ulongs_to_uquad($len1, $len2);
+    push @nextents, ulongs_to_uquad($res0_1, $res0_2);
+    push @nextents, ulongs_to_uquad($res1_1, $res1_2);
+    push @nextents, @ints;
+  }
+  return ($flags, $count, @nextents);
 }
 
 my ($opt_padstart, $opt_padend, $opt_verbose, $opt_manifest, $opt_mani0);
