@@ -997,7 +997,7 @@ vm_wrapup_build() {
         echo "... saving built packages"
         swapoff "$VM_SWAP"
 	pushd "$BUILD_ROOT$TOPDIR" >/dev/null
-	find "$@" -print0 | computeblocklists --padstart 512 --padend 512 -v --manifest - -0 > "$VM_SWAP"
+	find "$@" -print0 | computeblocklists --padstart 512 --padend 512 -v --manifest - -0 > "$VM_SWAP" || cleanup_and_exit 1
 	popd >/dev/null
     fi
 }

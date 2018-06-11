@@ -62,7 +62,7 @@ sub fibmap_blocklist($$$) {
     my $FIBMAP = 1;
     if (not defined ioctl($fd, 1, $block)) {
       if (not defined ioctl($fd, alt_ioctl($FIBMAP), $block)) {
-	return undef;
+	die("fibmap ioctl: $!\n");
       }
     }
     $block = unpack('I', $block);
@@ -114,7 +114,7 @@ sub fiemap_blocklist($$$) {
 
     if (not defined ioctl($file, $FIEMAP, $x)) {
       if (not defined ioctl($file, alt_ioctl($FIEMAP), $x)) {
-	return undef;
+	die("fiemap ioctl: $!\n");
       }
     }
 
@@ -286,12 +286,15 @@ while (1) {
 
   print "f $n $st_size $bsize";
 
-  if (not defined fiemap_blocklist($fd, $st_size, $bsize)) {
-    if (not defined fibmap_blocklist($fd, $st_size, $bsize)) {
-      die "Couldn't get block list for $n: $!\n";
+  eval { fiemap_blocklist($fd, $st_size, $bsize) };
+  if ($@) {
+    warn($@);
+    eval { fibmap_blocklist($fd, $st_size, $bsize) };
+    if ($@) {
+      warn($@);
+      die "Could not get block list for $n\n";
     }
   }
-
   print "\n";
   close($fd);
 }
