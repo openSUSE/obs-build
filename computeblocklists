@@ -102,15 +102,43 @@ sub bytes_in_blocks($$) {
 #
 # see /usr/include/linux/fiemap.h for definitions of the flags used below
 #
+my $q_pack = 'Q';
+my $q_le = 0;
+
+sub encode_q {
+  my ($v) = @_;
+  return $v if $q_pack eq 'Q';
+  my $v1 = int($v / 4294967296);
+  my $v2 = int($v - 4294967296 * $v1);
+  ($v1, $v2) = ($v2, $v1) if $q_le;
+  return pack("LL", $v1, $v2);
+}
+
+sub decode_q {
+  return $_[0] if $q_pack eq 'Q';
+  my ($v1, $v2) = unpack("LL", $_[0]);
+  ($v1, $v2) = ($v2, $v1) if $q_le;
+  my $v = $v1 * 4294967296 + $v2;
+  die("decode_q: number too big\n") if int($v - 4294967296 * $v1) != $v2;
+  return $v;
+}
+
 sub fiemap_blocklist($$$) {
   my ($file, $size, $blocksize) = @_;
 
+  # check if pack/unpack supports the Q template
+  eval { die if unpack('Q', pack('Q', 1)) != 1 };
+  if ($@) {
+    # nope, fallback to encode/decode helpers
+    $q_pack = 'a8';
+    $q_le = unpack('C', pack('L', 1)) ? 1 : 0;
+  }
   my $FIEMAP = 0xc020660b;
   my $offset = 0;
 
   while ($offset < $size) {
     my $flags_in = 0x00000001; # FIEMAP_FLAG_SYNC
-    my $x = pack("QQIIIx4.", $offset, $size, $flags_in, 0, 50, 4096);
+    my $x = pack("${q_pack}${q_pack}IIIx4.", encode_q($offset), encode_q($size), $flags_in, 0, 50, 4096);
 
     if (not defined ioctl($file, $FIEMAP, $x)) {
       if (not defined ioctl($file, alt_ioctl($FIEMAP), $x)) {
@@ -118,7 +146,7 @@ sub fiemap_blocklist($$$) {
       }
     }
 
-    my ($flags, $count, @extents) = unpack("x16IIx8(QQQQQIIII)[50]", $x);
+    my ($flags, $count, @extents) = unpack("x16IIx8(${q_pack}${q_pack}${q_pack}${q_pack}${q_pack}IIII)[50]", $x);
 
     $count = int($count);
 
@@ -129,6 +157,7 @@ sub fiemap_blocklist($$$) {
       my $start = $i * 9;
       my $hole;
       my @record = @extents[$start..$start+9];
+      $record[$_] = decode_q($record[$_]) for 0, 1, 2;
       my ($logical, $physical, $length, $resv1, $resv2, $flags) = @record;
       if ($offset != $logical) {
 	$hole = bytes_in_blocks($logical - $offset, $blocksize) - 1;
