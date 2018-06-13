@@ -451,11 +451,16 @@ sub show {
 }
 
 sub showcontainerinfo {
-  my $disturl;
+  my ($disturl, $arch, $buildflavor);
   (undef, $disturl) = splice(@ARGV, 0, 2) if @ARGV > 2 && $ARGV[0] eq '--disturl';
+  (undef, $arch) = splice(@ARGV, 0, 2) if @ARGV > 2 && $ARGV[0] eq '--arch';
+  (undef, $buildflavor) = splice(@ARGV, 0, 2) if @ARGV > 2 && $ARGV[0] eq '--buildflavor';
   my ($fn, $image) = @ARGV;
   local $urlmapper = sub { return $_[0] };
-  my $d = parse({}, $fn);
+  my $cf = {};
+  $cf->{'arch'} = $arch if defined $arch;
+  $cf->{'buildflavor'} = $buildflavor if defined $buildflavor;
+  my $d = parse($cf, $fn);
   die("$d->{'error'}\n") if $d->{'error'};
   $image =~ s/.*\/// if defined $image;
   my $release;

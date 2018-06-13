@@ -616,7 +616,7 @@ postprocess_kiwi_containers() {
     disturlarg=()
     test -n "$DISTURL" && disturlarg=("--disturl" "$DISTURL")
     for r in $BUILD_ROOT/$TOPDIR/KIWI/*.tar ; do
-	test -e "$r" && perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::showcontainerinfo -- "${disturlarg[@]}" $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE "$r" > "${r%.tar}.containerinfo"
+	test -e "$r" && perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::showcontainerinfo -- "${disturlarg[@]}" --arch "${BUILD_ARCH%%:*}" --buildflavor "$BUILD_FLAVOR" $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE "$r" > "${r%.tar}.containerinfo"
     done
 }
 
