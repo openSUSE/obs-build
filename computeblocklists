@@ -13,7 +13,7 @@
 
 ################################################################
 #
-# Copyright (c) 1995-2014 SUSE Linux Products GmbH
+# Copyright (c) 1995-2018 SUSE Linux Products GmbH
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 or 3 as
@@ -33,66 +33,58 @@
 
 use strict;
 
+# the ioctls we use
+my $FIBMAP = 1;
+my $FIGETBSZ = 2;
+my $FIEMAP = 0xc020660b;
+
 # powerpc, mips, sparc, and alpha have 3 direction bits
 # and represent _IOC_NONE as 1 instead of 0.
-sub alt_ioctl($)
-{
-	my ($ioctl_nr) = @_;
-	my $size = ($ioctl_nr >> 16) & 0x3fff;
-	my $dir = ($ioctl_nr >> 30);
-	my $base = $ioctl_nr & 0x1fffffff;
-
-	die "invalid size $size" if ($size > (1 << 13));
-
-	return $base | ($dir + 1) << 29;
+sub alt_ioctl($) {
+  my ($ioctl_nr) = @_;
+  my $size = ($ioctl_nr >> 16) & 0x3fff;
+  my $dir = ($ioctl_nr >> 30);
+  my $base = $ioctl_nr & 0x1fffffff;
+  die "invalid size $size" if ($size > (1 << 13));
+  return $base | ($dir + 1) << 29;
 }
 
 #
 # Use FIBMAP to gather block lists, block-by-block
 # This is the older, slower way to iterate over file extents but
-# will generally work on older kernels.
+# will generally work on older kernels. The block number also
+# must fit into an integer limiting the size of the file system.
 #
 sub fibmap_blocklist($$$) {
   my ($fd, $st_size, $bsize) = @_;
 
+  my $exts = '';
   my $blocks = int(($st_size+$bsize-1)/$bsize);
   my ($firstblock, $lastblock);
   for ($b = 0; $b < $blocks; ++$b) {
     my $block = pack('I', $b);
-    my $FIBMAP = 1;
-    if (not defined ioctl($fd, 1, $block)) {
+    if (not defined ioctl($fd, $FIBMAP, $block)) {
       if (not defined ioctl($fd, alt_ioctl($FIBMAP), $block)) {
 	die("fibmap ioctl: $!\n");
       }
     }
     $block = unpack('I', $block);
-    if (!$firstblock && defined($firstblock)) {
-      # last block was hole
-      if (!$block) {
-	$lastblock++;	# count holes, 0-2 means three hole blocks
-      } else {
-	# switch back from 'hole mode' into normal mode
-	printf "-$lastblock" if defined($firstblock) && $firstblock != $lastblock;
-	print " $block";
-	$firstblock = $lastblock = $block;
-      }
+    if (!$firstblock && defined($firstblock) && !$block) {
+      $lastblock++;	# count holes, 0-2 means three hole blocks
+      next;
+    } elsif ($firstblock && $lastblock + 1 == $block) {
+      $lastblock = $block;
       next;
     }
-    if (!$firstblock || $lastblock + 1 != $block) {
-      # start of a new run
-      printf "-$lastblock" if defined($firstblock) && $firstblock != $lastblock;
-      print " $block";
-      $firstblock = $block;
-    }
-    $lastblock = $block;
+    # finish old run
+    $exts .= "-$lastblock" if defined($firstblock) && $firstblock != $lastblock;
+    # start new run
+    $exts .= " $block";
+    $firstblock = $lastblock = $block;
   }
   # finish last run
-  printf "-$lastblock" if defined($firstblock) && $firstblock != $lastblock;
-}
-
-sub bytes_in_blocks($$) {
-  my ($bytes, $bsize) = @_;
-  return int(($bytes + $bsize - 1) / $bsize);
+  $exts .= "-$lastblock" if defined($firstblock) && $firstblock != $lastblock;
+  return $exts;
 }
 
 #
@@ -102,43 +94,65 @@ sub bytes_in_blocks($$) {
 #
 # see /usr/include/linux/fiemap.h for definitions of the flags used below
 #
-my $q_pack = 'Q';
-my $q_le = 0;
+my $q_emu = 0;		# 0=no emu, 1=little endian, 2=big endian
 
-sub encode_q {
+sub pack_Q {
   my ($v) = @_;
-  return $v if $q_pack eq 'Q';
+  return pack('Q', $v) unless $q_emu;
   my $v1 = int($v / 4294967296);
   my $v2 = int($v - 4294967296 * $v1);
-  ($v1, $v2) = ($v2, $v1) if $q_le;
-  return pack("LL", $v1, $v2);
+  ($v1, $v2) = ($v2, $v1) if $q_emu == 1;
+  return pack('LL', $v1, $v2);
 }
 
-sub decode_q {
-  return $_[0] if $q_pack eq 'Q';
-  my ($v1, $v2) = unpack("LL", $_[0]);
-  ($v1, $v2) = ($v2, $v1) if $q_le;
+sub unpack_Q {
+  return unpack('Q', $_[0]) unless $q_emu;
+  my ($v1, $v2) = unpack('LL', $_[0]);
+  ($v1, $v2) = ($v2, $v1) if $q_emu == 1;
   my $v = $v1 * 4294967296 + $v2;
-  die("decode_q: number too big\n") if int($v - 4294967296 * $v1) != $v2;
+  die("unpack_Q: number too big\n") if int($v - 4294967296 * $v1) != $v2;
   return $v;
 }
 
+# Convert a size into a block nomber and an offset.
+sub bytes_in_blocks($$) {
+  my ($bytes, $bsize) = @_;
+  my $blk = int($bytes / ($bsize * 65536)) * 65536;	# work with 32bit int
+  $blk += int(($bytes - $blk * $bsize) / $bsize);
+  return ($blk, $bytes - $blk * $bsize);
+}
+
+# Create an extent descriptor
+sub createext($$$) {
+  my ($start, $end, $bsize) = @_;
+  die if $start > $end;
+  my ($startblk, $startoff) = bytes_in_blocks($start, $bsize);
+  my ($endblk, $endoff) = bytes_in_blocks($end, $bsize);
+  my $ext = " $startblk";
+  $ext .= ":$startoff" if $startoff != 0;
+  if ($startblk != $endblk || $endoff != $bsize - 1) {
+    $ext .= "-$endblk";
+    $ext .= ":$endoff" if $endoff != $bsize - 1;
+  }
+  return $ext;
+}
+
 sub fiemap_blocklist($$$) {
-  my ($file, $size, $blocksize) = @_;
+  my ($file, $size, $bsize) = @_;
 
   # check if pack/unpack supports the Q template
+  $q_emu = 0;
   eval { die if unpack('Q', pack('Q', 1)) != 1 };
   if ($@) {
     # nope, fallback to encode/decode helpers
-    $q_pack = 'a8';
-    $q_le = unpack('C', pack('L', 1)) ? 1 : 0;
+    $q_emu = unpack('C', pack('L', 1)) ? 1 : 2;
   }
-  my $FIEMAP = 0xc020660b;
-  my $offset = 0;
 
+  my $exts = '';
+  my $offset = 0;
   while ($offset < $size) {
     my $flags_in = 0x00000001; # FIEMAP_FLAG_SYNC
-    my $x = pack("${q_pack}${q_pack}IIIx4.", encode_q($offset), encode_q($size), $flags_in, 0, 50, 4096);
+    my $x = pack("a8a8IIIx4.", pack_Q($offset), pack_Q($size), $flags_in, 0, 50, 4096);
 
     if (not defined ioctl($file, $FIEMAP, $x)) {
       if (not defined ioctl($file, alt_ioctl($FIEMAP), $x)) {
@@ -146,55 +160,35 @@ sub fiemap_blocklist($$$) {
       }
     }
 
-    my ($flags, $count, @extents) = unpack("x16IIx8(${q_pack}${q_pack}${q_pack}${q_pack}${q_pack}IIII)[50]", $x);
+    my ($flags, $count, @extents) = unpack('x16IIx8(a8a8a8a8a8IIII)[50]', $x);
+    last if $count == 0;	# rest is a hole
 
-    $count = int($count);
-
-    last if ($count == 0);
-
-    my $i = 0;
-    while ($i < $count) {
-      my $start = $i * 9;
-      my $hole;
-      my @record = @extents[$start..$start+9];
-      $record[$_] = decode_q($record[$_]) for 0, 1, 2;
-      my ($logical, $physical, $length, $resv1, $resv2, $flags) = @record;
-      if ($offset != $logical) {
-	$hole = bytes_in_blocks($logical - $offset, $blocksize) - 1;
-	print " 0-$hole";
-      }
-      my $first = bytes_in_blocks($physical, $blocksize);
-      my $last = $first + bytes_in_blocks($length, $blocksize) - 1;
-      $flags = int($flags);
-
+    for (my $i = 0; $i < $count; $i++) {
+      $extents[$_] = unpack_Q($extents[$_]) for 0, 1, 2;
+      my ($logical, $physical, $length, $resv1, $resv2, $flags) = splice(@extents, 0, 9);
+      die("going back in file?\n") if $offset > $logical;
+      die("extent with bad size?\n") if $length <= 0;
+      # add a hole entry if needed
+      $exts .= createext(0, $logical - $offset - 1, $bsize) if $offset < $logical;
       # Not a hole but for these purposes we should treat it as one
       if ($flags & 0x00000800) { # UNWRITTEN
-	$hole = bytes_in_blocks($length, $blocksize) - 1;
-	print " 0-$hole";
+        $exts .= createext(0, $length - 1, $bsize);
       } elsif ($flags & 0x00000008) { # ENCODED
-	die "extent mapped but is encoded";
+	die("extent mapped but is encoded\n");
       # UNKNOWN|DELALLOC|DATA_ENCRYPTED|NOT_ALIGNED|DATA_INLINE|DATA_TAIL
       } elsif ($flags & 0x00000786) {
-	die "extent cannot be block-mapped";
+	die("extent cannot be block-mapped\n");
       } else {
-	if ($first == $last) {
-	  print " $first";
-	} else {
-	  print " $first-$last";
-	}
+        $exts .= createext($physical, $physical + $length - 1, $bsize);
       }
-      $i += 1;
       $offset = $logical + $length;
     }
   }
-
-  if ($offset < $size) {
-    my $hole = bytes_in_blocks($size - $offset, $blocksize) - 1;
-    print " 0-$hole";
-  }
+  $exts .= createext(0, $size - $offset - 1, $bsize) if $offset < $size;
+  return $exts;
 }
 
-my ($opt_padstart, $opt_padend, $opt_verbose, $opt_manifest, $opt_mani0);
+my ($opt_padstart, $opt_padend, $opt_verbose, $opt_manifest, $opt_mani0, $opt_fibmap);
 $opt_verbose = 0;
 
 while (@ARGV)  {
@@ -221,6 +215,11 @@ while (@ARGV)  {
   if ($ARGV[0] eq '--manifest') {
     shift @ARGV;
     $opt_manifest = shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--fibmap') {
+    shift @ARGV;
+    $opt_fibmap = 1;
     next;
   }
   last;
@@ -304,27 +303,25 @@ while (1) {
   }
 
   my $bsize = 'xxxx';
-  my $FIGETBSZ = 2;
   if (not defined ioctl($fd, $FIGETBSZ, $bsize)) {
     if (not defined ioctl($fd, alt_ioctl($FIGETBSZ), $bsize)) {
       die("FIGETBSZ failed on $file: $!\n");
     }
   }
-  $bsize = unpack("L", $bsize);
+  $bsize = unpack('L', $bsize);
   die("$file: empty blocksize\n") unless $bsize != 0;
 
-  print "f $n $st_size $bsize";
-
-  eval { fiemap_blocklist($fd, $st_size, $bsize) };
-  if ($@) {
-    warn($@);
-    eval { fibmap_blocklist($fd, $st_size, $bsize) };
-    if ($@) {
-      warn($@);
-      die "Could not get block list for $n\n";
-    }
+  my $exts;
+  if (!$opt_fibmap) {
+    eval { $exts = fiemap_blocklist($fd, $st_size, $bsize) };
+    warn($@) if $@;
   }
-  print "\n";
+  if (!defined($exts)) {
+    eval { $exts = fibmap_blocklist($fd, $st_size, $bsize) };
+    warn($@) if $@;
+  }
+  die "Could not get block list for $n\n" unless defined $exts;
+  print "f $n $st_size $bsize$exts\n";
   close($fd);
 }
 
