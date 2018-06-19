@@ -105,48 +105,41 @@ while (<S>) {
     next;
   }
   die("illegal file type: $filetype\n") unless $filetype eq 'f';
-  die "invalid input '$_'\n" if !@blocks && $filesize;
+  print "$file\n" if $opt_verbose && !($opt_verbose == 1 && $file =~ /^KIWI\/.*\//);
   $done{$file} = 'f';
+  open (O, '>', $file) or die "$file: $!\n";
   if ($filesize == 0) {
-    print "$file\n" if $opt_verbose && !($opt_verbose == 1 && $file =~ /^KIWI\/.*\//);
-    open (O, '>', $file) or die "$file: $!\n";
-    close O;
+    close(O) || die("$file: close error: $!\n");
     next;
   }
   $blksize = int($blksize);
   die "$file: invalid block size $blksize\n" unless $blksize > 0 && $blksize <= $bufsize;
-  print "$file\n" if $opt_verbose && !($opt_verbose == 1 && $file =~ /^KIWI\/.*\//);
   my $needtruncate;
   my $left = $filesize;
-  open (O, '>', $file) or die "$file: $!\n";
   for my $block (@blocks) {
-    my ($start, $end) = split(/-/, $block, 2);
-    die("bad extend '$start'\n") unless $start =~ /^(\d+)(?::(\d+))?/;
-    $start = $1 * $blksize + (defined($2) ? $2 : 0);
-    if (defined($end)) {
-      die("bad extend '$end'\n") unless $end =~ /^(\d+)(?::(\d+))?/;
-      $end = $1 * $blksize + (defined($2) ? $2 : $blksize - 1);
-    } else {
-      $end = $1 * $blksize + $blksize - 1;
-    }
-    my $len = $end - $start + 1;
+    die("bad extent '$block'\n") unless $block =~ /^(\d+)(?::(\d+))?(?:-(\d+)(?::(\d+))?)?$/;
+    my ($startblk, $startoff, $endblk, $endoff) = ($1, $2, $3, $4);
+    $startoff = 0 unless defined $startoff;
+    $endblk = $startblk unless defined $endblk;
+    $endoff = $blksize - 1 unless defined $endoff;
+    my $start = $startblk * $blksize + $startoff;
+    my $len = $endblk * $blksize + $endoff + 1 - $start;
     die "$file: bad length\n" if $len <= 0;
+    $len = $left if $len > $left;	# it's ok to overshoot
+    $left -= $len;
+    next if $len == 0;
     if ($start == 0) { # a hole!
-      $len = $left if $len > $left;
       seek(O, $len, 1);
-      $left -= $len;
       $needtruncate = 1;
       next;
     }
     $needtruncate = undef;
     seek(F, $start, 0) || die "$file: seek: $!\n";
-    while ($len > 0 && $left > 0) {
+    while ($len > 0) {
       my $size = $len > $bufsize ? $bufsize : $len;
-      $size = $left if $size > $left;
       my $buf;
       (sysread(F, $buf, $size) || 0) == $size || die("$file: read: $!\n");
       (syswrite(O, $buf) || 0) == length($buf) || die("$file: write error\n");
-      $left -= $size;
       $len -= $size;
     }
   }

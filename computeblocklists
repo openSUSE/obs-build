@@ -36,7 +36,7 @@ use strict;
 # the ioctls we use
 my $FIBMAP = 1;
 my $FIGETBSZ = 2;
-my $FIEMAP = 0xc020660b;
+my $FIEMAP = 0xc020660b;	# _IOWR('f', 11, struct fiemap)
 
 # powerpc, mips, sparc, and alpha have 3 direction bits
 # and represent _IOC_NONE as 1 instead of 0.
@@ -114,7 +114,7 @@ sub unpack_Q {
   return $v;
 }
 
-# Convert a size into a block nomber and an offset.
+# Convert a size into a block number and an offset.
 sub bytes_in_blocks($$) {
   my ($bytes, $bsize) = @_;
   my $blk = int($bytes / ($bsize * 65536)) * 65536;	# work with 32bit int
@@ -123,11 +123,12 @@ sub bytes_in_blocks($$) {
 }
 
 # Create an extent descriptor
-sub createext($$$) {
-  my ($start, $end, $bsize) = @_;
+sub createext($$$;$) {
+  my ($start, $end, $bsize, $islast) = @_;
   die if $start > $end;
   my ($startblk, $startoff) = bytes_in_blocks($start, $bsize);
   my ($endblk, $endoff) = bytes_in_blocks($end, $bsize);
+  $endoff = $bsize - 1 if $islast;
   my $ext = " $startblk";
   $ext .= ":$startoff" if $startoff != 0;
   if ($startblk != $endblk || $endoff != $bsize - 1) {
@@ -170,21 +171,22 @@ sub fiemap_blocklist($$$) {
       die("extent with bad size?\n") if $length <= 0;
       # add a hole entry if needed
       $exts .= createext(0, $logical - $offset - 1, $bsize) if $offset < $logical;
+      my $islast = $logical + $length >= $size ? 1 : 0;
       # Not a hole but for these purposes we should treat it as one
       if ($flags & 0x00000800) { # UNWRITTEN
-        $exts .= createext(0, $length - 1, $bsize);
+        $exts .= createext(0, $length - 1, $bsize, $islast);
       } elsif ($flags & 0x00000008) { # ENCODED
 	die("extent mapped but is encoded\n");
       # UNKNOWN|DELALLOC|DATA_ENCRYPTED|NOT_ALIGNED|DATA_INLINE|DATA_TAIL
       } elsif ($flags & 0x00000786) {
 	die("extent cannot be block-mapped\n");
       } else {
-        $exts .= createext($physical, $physical + $length - 1, $bsize);
+        $exts .= createext($physical, $physical + $length - 1, $bsize, $islast);
       }
       $offset = $logical + $length;
     }
   }
-  $exts .= createext(0, $size - $offset - 1, $bsize) if $offset < $size;
+  $exts .= createext(0, $size - $offset - 1, $bsize, 1) if $offset < $size;
   return $exts;
 }
 
@@ -282,7 +284,8 @@ while (1) {
     print STDERR "$file\n" if $opt_verbose && $opt_verbose > 1;
     print "d $n\n";
     next;
-  } elsif (!-f _) {
+  } elsif (! -f _) {
+    print STDERR "$file: unsupported file type ignored\n";
     next;
   }
   print STDERR "$file\n" if $opt_verbose && !($opt_verbose == 1 && $file =~ /^KIWI\/.*\//);
