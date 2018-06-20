@@ -125,9 +125,9 @@ while (<S>) {
     my $start = $startblk * $blksize + $startoff;
     my $len = $endblk * $blksize + $endoff + 1 - $start;
     die "$file: bad length\n" if $len <= 0;
-    $len = $left if $len > $left;	# it's ok to overshoot
+    die "$file: extent is outside of file\n" if $left <= 0;
+    $len = $left if $len > $left;	# it's ok to overshoot the last block
     $left -= $len;
-    next if $len == 0;
     if ($start == 0) { # a hole!
       seek(O, $len, 1);
       $needtruncate = 1;

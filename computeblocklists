@@ -56,24 +56,22 @@ sub alt_ioctl($) {
 # must fit into an integer limiting the size of the file system.
 #
 sub fibmap_blocklist($$$) {
-  my ($fd, $st_size, $bsize) = @_;
+  my ($fd, $filesize, $bsize) = @_;
 
   my $exts = '';
-  my $blocks = int(($st_size+$bsize-1)/$bsize);
+  my $blocks = int(($filesize + $bsize - 1) / $bsize);
+  die("file is too big for fibmap\n") if $blocks * $bsize < $filesize;
   my ($firstblock, $lastblock);
-  for ($b = 0; $b < $blocks; ++$b) {
-    my $block = pack('I', $b);
+  for (my $cnt = 0; $cnt < $blocks; ++$cnt) {
+    my $block = pack('I', $cnt);
     if (not defined ioctl($fd, $FIBMAP, $block)) {
       if (not defined ioctl($fd, alt_ioctl($FIBMAP), $block)) {
 	die("fibmap ioctl: $!\n");
       }
     }
     $block = unpack('I', $block);
-    if (!$firstblock && defined($firstblock) && !$block) {
-      $lastblock++;	# count holes, 0-2 means three hole blocks
-      next;
-    } elsif ($firstblock && $lastblock + 1 == $block) {
-      $lastblock = $block;
+    if (defined($firstblock) && $block == ($firstblock ? $lastblock + 1 : 0)) {
+      $lastblock++;	# continue run
       next;
     }
     # finish old run
@@ -139,7 +137,7 @@ sub createext($$$;$) {
 }
 
 sub fiemap_blocklist($$$) {
-  my ($file, $size, $bsize) = @_;
+  my ($file, $filesize, $bsize) = @_;
 
   # check if pack/unpack supports the Q template
   $q_emu = 0;
@@ -151,9 +149,9 @@ sub fiemap_blocklist($$$) {
 
   my $exts = '';
   my $offset = 0;
-  while ($offset < $size) {
+  while ($offset < $filesize) {
     my $flags_in = 0x00000001; # FIEMAP_FLAG_SYNC
-    my $x = pack("a8a8IIIx4.", pack_Q($offset), pack_Q($size), $flags_in, 0, 50, 4096);
+    my $x = pack("a8a8IIIx4.", pack_Q($offset), pack_Q($filesize), $flags_in, 0, 50, 4096);
 
     if (not defined ioctl($file, $FIEMAP, $x)) {
       if (not defined ioctl($file, alt_ioctl($FIEMAP), $x)) {
@@ -167,11 +165,12 @@ sub fiemap_blocklist($$$) {
     for (my $i = 0; $i < $count; $i++) {
       $extents[$_] = unpack_Q($extents[$_]) for 0, 1, 2;
       my ($logical, $physical, $length, $resv1, $resv2, $flags) = splice(@extents, 0, 9);
+      die("logical offset outside of file?\n") if $logical < 0 || $logical >= $filesize;
       die("going back in file?\n") if $offset > $logical;
       die("extent with bad size?\n") if $length <= 0;
       # add a hole entry if needed
       $exts .= createext(0, $logical - $offset - 1, $bsize) if $offset < $logical;
-      my $islast = $logical + $length >= $size ? 1 : 0;
+      my $islast = $logical + $length >= $filesize ? 1 : 0;
       # Not a hole but for these purposes we should treat it as one
       if ($flags & 0x00000800) { # UNWRITTEN
         $exts .= createext(0, $length - 1, $bsize, $islast);
@@ -186,7 +185,7 @@ sub fiemap_blocklist($$$) {
       $offset = $logical + $length;
     }
   }
-  $exts .= createext(0, $size - $offset - 1, $bsize, 1) if $offset < $size;
+  $exts .= createext(0, $filesize - $offset - 1, $bsize, 1) if $offset < $filesize;
   return $exts;
 }
 
@@ -262,18 +261,18 @@ while (1) {
     my $c = readlink($file);
     die("$file: readlink: $!\n") unless defined $c;
     if ("/$c/" =~ /\/\.?\//s) {
-      print STDERR "$file: bad symlink ($c) ignored\n";
+      print STDERR "$file: bad symlink ($c), ignored\n";
       next;
     }
     if ("/$c/" =~ /^((?:\/\.\.)+)\/(.*?)$/s) {
       my ($head, $tail) = ($1, $2);
       if (("/$tail/" =~ /\/\.\.\//s) || (($head =~ y!/!!) > ($file =~ y!/!!))) {
-        print STDERR "$file: bad symlink ($c) ignored\n";
+        print STDERR "$file: bad symlink ($c), ignored\n";
         next;
       }
     } else {
       if ("/$c/" =~ /\/\.\.\//s) {
-        print STDERR "$file: bad symlink ($c) ignored\n";
+        print STDERR "$file: bad symlink ($c), ignored\n";
         next;
       }
     }
@@ -285,46 +284,46 @@ while (1) {
     print "d $n\n";
     next;
   } elsif (! -f _) {
-    print STDERR "$file: unsupported file type ignored\n";
+    print STDERR "$file: unsupported file type, ignored\n";
     next;
   }
   print STDERR "$file\n" if $opt_verbose && !($opt_verbose == 1 && $file =~ /^KIWI\/.*\//);
 
   my $fd = undef;
   if (!open($fd, '<', $file)) {
-    print STDERR "$file: $!";
+    print STDERR "$file: $!\n";
     next;
   }
 
   my @stat = stat($fd);
   die unless @stat;
-  my $st_size = $stat[7];
-  if ($st_size == 0) {
+  my $filesize = $stat[7];
+  if ($filesize == 0) {
     print "f $n 0\n";
     close($fd);
     next;
   }
 
-  my $bsize = 'xxxx';
+  my $bsize = pack('I', 0);
   if (not defined ioctl($fd, $FIGETBSZ, $bsize)) {
     if (not defined ioctl($fd, alt_ioctl($FIGETBSZ), $bsize)) {
-      die("FIGETBSZ failed on $file: $!\n");
+      die("$file: FIGETBSZ failed: $!\n");
     }
   }
-  $bsize = unpack('L', $bsize);
-  die("$file: empty blocksize\n") unless $bsize != 0;
+  $bsize = unpack('I', $bsize);
+  die("$file: illegal blocksize $bsize\n") unless $bsize > 0;
 
   my $exts;
   if (!$opt_fibmap) {
-    eval { $exts = fiemap_blocklist($fd, $st_size, $bsize) };
+    eval { $exts = fiemap_blocklist($fd, $filesize, $bsize) };
     warn($@) if $@;
   }
   if (!defined($exts)) {
-    eval { $exts = fibmap_blocklist($fd, $st_size, $bsize) };
+    eval { $exts = fibmap_blocklist($fd, $filesize, $bsize) };
     warn($@) if $@;
   }
-  die "Could not get block list for $n\n" unless defined $exts;
-  print "f $n $st_size $bsize$exts\n";
+  die "$file: could not get extent list\n" unless defined $exts;
+  print "f $n $filesize $bsize$exts\n";
   close($fd);
 }
 
