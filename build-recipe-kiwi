@@ -523,6 +523,14 @@ kiwi_translate_parameters() {
 	    --set-repopriority=*|--set-repoprio=*) set_repo_priority="${i#*=}" ;;
 	    --main:*) KIWI_MAIN_PARAMETERS="$KIWI_MAIN_PARAMETERS --${i#--main:}" ;;
 	    --bundle:*) KIWI_BUNDLE_PARAMETERS="$KIWI_BUNDLE_PARAMETERS --${i#--bundle:}" ;;
+	    --set-container-derived-from=dir://./containers/*.tar)
+		# old kiwi 9 versions cannot handle uncompressed containers
+		if test -f "$BUILD_ROOT/$TOPDIR/SOURCES/containers/${i#*containers/}" ; then
+		    gzip -f -1 < "$BUILD_ROOT/$TOPDIR/SOURCES/containers/${i#*containers/}" > "$BUILD_ROOT/$TOPDIR/SOURCES/containers/${i#*containers/}.gz" || cleanup_and_exit 1 "container compression"
+		    i="$i.gz"
+		fi
+	        KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS $i"
+		;;
 	    # everything else just gues through to kiwi build
 	    *) KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS $i" ;;
 	esac
