@@ -232,11 +232,13 @@ sub showcontainerinfo {
       push @repos, "{ \"url\": \"$annorepo->{'url'}\" }";
     }
   }
+  my $buildtime = time();
   print "{\n";
   print "  \"tags\": [ ".join(', ', @tags)." ]";
   print ",\n  \"repos\": [ ".join(', ', @repos)." ]" if @repos;
   print ",\n  \"file\": \"$image\"" if defined $image;
   print ",\n  \"disturl\": \"$disturl\"" if defined $disturl;
+  print ",\n  \"buildtime\": $buildtime";
   print "\n}\n";
 }
 

@@ -474,6 +474,7 @@ sub showcontainerinfo {
       push @repos, "{ \"url\": \"$repo->{'url'}\" }";
     }
   }
+  my $buildtime = time();
   print "{\n";
   print "  \"name\": \"$d->{'name'}\"";
   print ",\n  \"version\": \"$d->{'version'}\"" if defined $d->{'version'};
@@ -482,6 +483,7 @@ sub showcontainerinfo {
   print ",\n  \"repos\": [ ".join(', ', @repos)." ]" if @repos;
   print ",\n  \"file\": \"$image\"" if defined $image;
   print ",\n  \"disturl\": \"$disturl\"" if defined $disturl;
+  print ",\n  \"buildtime\": $buildtime";
   print "\n}\n";
 }
 
