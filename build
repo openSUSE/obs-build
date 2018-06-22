@@ -1308,6 +1308,10 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	imagetype=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $RECIPEFILE imagetype)
 	test "$imagetype" = product || BUILD_USER=root
     fi
+    # same with docker and fissile builds
+    if test "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile ; then
+	BUILD_USER=root
+    fi
 
     # fixup passwd/group
     if test $BUILD_USER = abuild ; then
