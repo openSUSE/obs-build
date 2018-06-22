@@ -612,12 +612,10 @@ sub get_sysbuild {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:kiwi-image'} || []};
     @sysdeps = @{$config->{'substitute'}->{'kiwi-setup:image'} || []} unless @sysdeps;
     @sysdeps = @{$subst_defaults{'system-packages:kiwi-image'} || []} unless @sysdeps;
-    push @sysdeps, @$extradeps if $extradeps;
   } elsif ($buildtype eq 'kiwi-product') {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:kiwi-product'} || []};
     @sysdeps = @{$config->{'substitute'}->{'kiwi-setup:product'} || []} unless @sysdeps;
     @sysdeps = @{$subst_defaults{'system-packages:kiwi-product'} || []} unless @sysdeps;
-    push @sysdeps, @$extradeps if $extradeps;
   } elsif ($buildtype eq 'docker') {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:docker'} || []} unless @sysdeps;
     @sysdeps = @{$subst_defaults{'system-packages:docker'} || []} unless @sysdeps;
@@ -628,7 +626,8 @@ sub get_sysbuild {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:deltarpm'} || []};
     @sysdeps = @{$subst_defaults{'system-packages:deltarpm'} || []} unless @sysdeps;
   }
-  return () unless @sysdeps;
+  return () unless @sysdeps;	# no extra build environment used
+  push @sysdeps, @$extradeps if $extradeps;
   if ($config->{'expandflags:preinstallexpand'} && !$config->{'preinstallisexpanded'}) {
     my $err = expandpreinstalls($config);
     return (undef, $err) if $err;
