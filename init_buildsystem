@@ -356,7 +356,7 @@ create_cache_file() {
 		REPOTYPE=rpm-md ;;
 	    *.dsc)
 		REPOTYPE=debian ;;
-	    */PKGBUILD|PKGBUILD)
+	    */PKGBUILD|PKGBUILD|*/_service:*:PKGBUILD|_service:*:PKGBUILD)
 		REPOTYPE=arch ;;
 	esac
     fi
