@@ -32,17 +32,18 @@ sub unify {
   return grep(delete($h{$_}), @_);
 }
 
-sub findFallBackArchs {
-  my ($fallbackArchXML, $arch) = @_;
-  my @fa;
-
-  for my $a (@{$fallbackArchXML->{'arch'}||[]}) {
-    if ( $a->{'id'} eq $arch && $a->{'fallback'} ) {
-      @fa = unify( $a->{'fallback'}, findFallBackArchs($fallbackArchXML, $a->{'fallback'}));
-    }
+sub expandFallBackArchs {
+  my ($fallbackArchXML, @archs) = @_;
+  my %fallbacks;
+  for (@{$fallbackArchXML->{'arch'} || []}) {
+    $fallbacks{$_->{'id'}} = $_->{'fallback'} if $_->{id} && $_->{'fallback'};
   }
-
-  return @fa
+  my @out;
+  while (@archs) {
+    push @out, shift @archs;
+    push @archs, delete $fallbacks{$out[-1]} if $fallbacks{$out[-1]};
+  }
+  return unify(@out);
 }
 
 # sles10 perl does not have the version.pm
@@ -50,14 +51,165 @@ sub findFallBackArchs {
 sub versionstring {
   my ($str) = @_; 
   my $result = 0;
-  $result = $result * 100 + $_ for split (/\./, $str);
+  $result = $result * 100 + $_ for split (/\./, $str, 2);
   return $result;
 }
 
+my $schemaversion56 = versionstring('5.6');
+
+sub kiwiparse_product {
+  my ($kiwi, $xml, $arch, $buildflavor) = @_;
+
+  my $ret = {};
+  my @repos;
+  my %repoprio;		# XXX: unused
+  my @packages;
+  my @requiredarch;
+  my @badarch;
+  my $obsexclusivearch;
+  my $obsexcludearch;
+  $obsexclusivearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExclusiveArch:\s+(.*)\s+-->\s*$/im;
+  $obsexcludearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExcludeArch:\s+(.*)\s+-->\s*$/im;
+
+  $ret->{'name'} = $kiwi->{'name'} if $kiwi->{'name'};
+  $ret->{'filename'} = $kiwi->{'name'} if $kiwi->{'name'};
+  my $description = (($kiwi->{'description'} || [])->[0]) || {};
+  if (!$ret->{'name'} && $description->{'specification'}) {
+    $ret->{'name'} = $description->{'specification'}->[0]->{'_content'};
+  }
+
+  # parse the preferences section
+  my $preferences = $kiwi->{'preferences'} || [];
+  die("products must have exactly one preferences element\n") unless @$preferences == 1;
+  # take default version setting
+  if ($preferences->[0]->{'version'}) {
+    $ret->{'version'} = $preferences->[0]->{'version'}->[0]->{'_content'};
+  }
+  die("products must have exactly one type element in the preferences\n") unless @{$preferences->[0]->{'type'} || []} == 1;
+  my $preftype = $preferences->[0]->{'type'}->[0];
+  if (defined $preftype->{'image'}) {
+    # for kiwi 4.1 and 5.x
+    die("products must use type 'product'\n") unless $preftype->{'image'} eq 'product';
+  } else {
+    # for kiwi 3.8 and before
+    die("products must use type 'product'\n") unless $preftype->{'_content'} eq 'product';
+  }
+  push @packages, "kiwi-filesystem:$preftype->{'filesystem'}" if $preftype->{'filesystem'};
+  die("boot type not supported in products\n") if defined $preftype->{'boot'};
+
+  my $instsource = ($kiwi->{'instsource'} || [])->[0];
+  die("products must have an instsource element\n") unless $instsource;
+
+  # get repositories
+  for my $repository (sort {$a->{priority} <=> $b->{priority}} @{$instsource->{'instrepo'} || []}) {
+    my $kiwisource = ($repository->{'source'} || [])->[0];
+    if ($kiwisource->{'path'} eq 'obsrepositories:/') {
+      # special case, OBS will expand it.
+      push @repos, '_obsrepositories';
+      next;
+    }
+    if ($kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
+      push @repos, "$1/$2";
+    } else {
+      my $prp;
+      $prp = $urlmapper->($kiwisource->{'path'}) if $urlmapper;
+      die("instsource repo url not using obs:/ scheme: $kiwisource->{'path'}\n") unless $prp;
+      push @repos, $prp;
+    }
+  }
+
+  $ret->{'sourcemedium'} = -1;
+  $ret->{'debugmedium'} = -1;
+  if ($instsource->{'productoptions'}) {
+    my $productoptions = $instsource->{'productoptions'}->[0] || {};
+    for my $po (@{$productoptions->{'productvar'} || []}) {
+      $ret->{'drop_repository'} = $po->{'_content'} if $po->{'name'} eq 'DROP_REPOSITORY';
+      $ret->{'version'} = $po->{'_content'} if $po->{'name'} eq 'VERSION';
+    }
+    for my $po (@{$productoptions->{'productoption'} || []}) {
+      $ret->{'sourcemedium'} = $po->{'_content'} if $po->{'name'} eq 'SOURCEMEDIUM';
+      $ret->{'debugmedium'} = $po->{'_content'} if $po->{'name'} eq 'DEBUGMEDIUM';
+    }
+  }
+  if ($instsource->{'architectures'}) {
+    my $architectures = $instsource->{'architectures'}->[0] || {};
+    for my $ra (@{$architectures->{'requiredarch'} || []}) {
+      push @requiredarch, $ra->{'ref'} if defined $ra->{'ref'};
+    }
+  }
+
+  # Find packages and possible additional required architectures
+  my @additionalarchs;
+  my @pkgs;
+  push @pkgs, @{$instsource->{'metadata'}->[0]->{'repopackage'} || []} if $instsource->{'metadata'};
+  push @pkgs, @{$instsource->{'repopackages'}->[0]->{'repopackage'} || []} if $instsource->{'repopackages'};
+  @pkgs = unify(@pkgs);
+  for my $package (@pkgs) {
+    # filter packages, which are not targeted for the wanted plattform
+    if ($package->{'arch'}) {
+      my $valid;
+      for my $ma (@requiredarch) {
+        for my $pa (split(',', $package->{'arch'})) {
+          $valid = 1 if $ma eq $pa;
+        }
+      }
+      next unless $valid;
+    }
+
+    # not nice, but optimizes our build dependencies
+    # FIXME: design a real blacklist option in kiwi
+    if ($package->{'onlyarch'} && $package->{'onlyarch'} eq 'skipit') {
+      push @packages, "-$package->{'name'}";
+      next;
+    }
+    push @packages, "-$package->{'replaces'}" if $package->{'replaces'};
+
+    # we need this package
+    push @packages, $package->{'name'};
+
+    # find the maximal superset of possible required architectures
+    push @additionalarchs, split(',', $package->{'addarch'}) if $package->{'addarch'};
+    push @additionalarchs, split(',', $package->{'onlyarch'}) if $package->{'onlyarch'};
+  }
+  @requiredarch = unify(@requiredarch, @additionalarchs);
+
+  #### FIXME: kiwi files have no informations where to get -32bit packages from
+  push @requiredarch, "i586" if grep {/^ia64/} @requiredarch;
+  push @requiredarch, "i586" if grep {/^x86_64/} @requiredarch;
+  push @requiredarch, "ppc" if grep {/^ppc64/} @requiredarch;
+  push @requiredarch, "s390" if grep {/^s390x/} @requiredarch;
+  
+  @requiredarch = expandFallBackArchs($instsource->{'architectures'}->[0], @requiredarch);
+
+  push @packages, "kiwi-packagemanager:instsource";
+
+  push @requiredarch, split(' ', $obsexclusivearch) if $obsexclusivearch;
+  push @badarch , split(' ', $obsexcludearch) if $obsexcludearch;
+
+  $ret->{'exclarch'} = [ unify(@requiredarch) ] if @requiredarch;
+  $ret->{'badarch'} = [ unify(@badarch) ] if @badarch;
+  $ret->{'deps'} = [ unify(@packages) ];
+  $ret->{'path'} = [ unify(@repos) ];
+  $ret->{'imagetype'} = [ 'product' ];
+  for (@{$ret->{'path'} || []}) {
+    my @s = split('/', $_, 2);
+    $_ = {'project' => $s[0], 'repository' => $s[1]};
+    $_->{'priority'} = $repoprio{"$s[0]/$s[1]"} if $repoextras && defined $repoprio{"$s[0]/$s[1]"};
+  }
+  return $ret;
+}
+
 sub kiwiparse {
-  my ($xml, $arch, $count, $buildflavor) = @_;
+  my ($xml, $arch, $buildflavor, $count) = @_;
   $count ||= 0;
   die("kiwi config inclusion depth limit reached\n") if $count++ > 10;
+
+  my $kiwi = Build::SimpleXML::parse($xml);
+  die("not a kiwi config\n") unless $kiwi && $kiwi->{'image'};
+  $kiwi = $kiwi->{'image'}->[0];
+
+  # check if this is a product, we currently test for the 'instsource' element
+  return kiwiparse_product($kiwi, $xml, $arch, $buildflavor) if $kiwi->{'instsource'};
 
   my $ret = {};
   my @types;
@@ -67,10 +219,6 @@ sub kiwiparse {
   my @containerrepos;
   my @packages;
   my @extrasources;
-  my @requiredarch;
-  my @badarch;
-  my $schemaversion = 0;
-  my $schemaversion56 = versionstring('5.6');
   my $obsexclusivearch;
   my $obsexcludearch;
   my $obsprofiles;
@@ -80,10 +228,7 @@ sub kiwiparse {
   if ($obsprofiles) {
     $obsprofiles = [ grep {defined($_)} map {$_ eq '@BUILD_FLAVOR@' ? $buildflavor : $_} split(' ', $obsprofiles) ];
   }
-  my $kiwi = Build::SimpleXML::parse($xml);
-  die("not a kiwi config\n") unless $kiwi && $kiwi->{'image'};
-  $kiwi = $kiwi->{'image'}->[0];
-  $schemaversion = versionstring($kiwi->{'schemaversion'}) if $kiwi->{'schemaversion'}; 
+  my $schemaversion = $kiwi->{'schemaversion'} ? versionstring($kiwi->{'schemaversion'}) : 0;
   $ret->{'name'} = $kiwi->{'name'} if $kiwi->{'name'};
   $ret->{'filename'} = $kiwi->{'name'} if $kiwi->{'name'};
   my $description = (($kiwi->{'description'} || [])->[0]) || {};
@@ -121,7 +266,7 @@ sub kiwiparse {
       $usedprofiles{$prof->{'name'}} = 1;
       for my $req (@{$prof->{'requires'}}) {
         $usedprofiles{$req->{'profile'}} = 1;
-      };
+      }
     }
   }
 
@@ -183,7 +328,7 @@ sub kiwiparse {
           my ($bootxml, $xsrc) = $bootcallback->($1, $2);
           next unless $bootxml;
           push @extrasources, $xsrc if $xsrc;
-          my $bret = kiwiparse($bootxml, $arch, $count, $buildflavor);
+          my $bret = kiwiparse($bootxml, $arch, $buildflavor, $count);
           push @bootrepos, map {"$_->{'project'}/$_->{'repository'}"} @{$bret->{'path'} || []};
           push @packages, @{$bret->{'deps'} || []};
           push @extrasources, @{$bret->{'extrasource'} || []};
@@ -195,44 +340,7 @@ sub kiwiparse {
     }
   }
 
-  my $instsource = ($kiwi->{'instsource'} || [])->[0];
-  if ($instsource) {
-    for my $repository(sort {$a->{priority} <=> $b->{priority}} @{$instsource->{'instrepo'} || []}) {
-      my $kiwisource = ($repository->{'source'} || [])->[0];
-      if ($kiwisource->{'path'} eq 'obsrepositories:/') {
-         # special case, OBS will expand it.
-         push @repos, '_obsrepositories';
-         next;
-      }
-      if ($kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
-        push @repos, "$1/$2";
-      } else {
-	my $prp;
-	$prp = $urlmapper->($kiwisource->{'path'}) if $urlmapper;
-	die("instsource repo url not using obs:/ scheme: $kiwisource->{'path'}\n") unless $prp;
-	push @repos, $prp;
-      }
-    }
-    $ret->{'sourcemedium'} = -1;
-    $ret->{'debugmedium'} = -1;
-    if ($instsource->{'productoptions'}) {
-      my $productoptions = $instsource->{'productoptions'}->[0] || {};
-      for my $po (@{$productoptions->{'productvar'} || []}) {
-	$ret->{'drop_repository'} = $po->{'_content'} if $po->{'name'} eq 'DROP_REPOSITORY';
-	$ret->{'version'} = $po->{'_content'} if $po->{'name'} eq 'VERSION';
-      }
-      for my $po (@{$productoptions->{'productoption'} || []}) {
-	$ret->{'sourcemedium'} = $po->{'_content'} if $po->{'name'} eq 'SOURCEMEDIUM';
-	$ret->{'debugmedium'} = $po->{'_content'} if $po->{'name'} eq 'DEBUGMEDIUM';
-      }
-    }
-    if ($instsource->{'architectures'}) {
-      my $a = $instsource->{'architectures'}->[0] || {};
-      for my $ra (@{$a->{'requiredarch'} || []}) {
-	push @requiredarch, $ra->{'ref'} if defined $ra->{'ref'};
-      }
-    }
-  }
+  die("image contains 'product' type\n") if grep {$_ eq 'product'} @types;
 
   my $packman = $preferences->[0]->{'packagemanager'}->[0]->{'_content'} || '';
 
@@ -273,8 +381,7 @@ sub kiwiparse {
     $repoprio{$prp} = $repository->{'sortprio'} if defined $repository->{'priority'};
   }
 
-  # Find packages and possible additional required architectures
-  my @additionalarchs;
+  # Find packages for the image
   my @pkgs;
   my $patterntype;
   for my $packages (@{$kiwi->{'packages'}}) {
@@ -303,78 +410,30 @@ sub kiwiparse {
     }
   }
   $patterntype ||= 'onlyRequired';
-  if ($instsource) {
-    push @pkgs, @{$instsource->{'metadata'}->[0]->{'repopackage'} || []} if $instsource->{'metadata'};
-    push @pkgs, @{$instsource->{'repopackages'}->[0]->{'repopackage'} || []} if $instsource->{'repopackages'};
-  }
   @pkgs = unify(@pkgs);
   for my $package (@pkgs) {
-    # filter packages, which are not targeted for the wanted plattform
+    # filter packages which are not targeted for the wanted plattform
     if ($package->{'arch'}) {
       my $valid;
-      if (@requiredarch) {
-        # this is a product
-        for my $ma (@requiredarch) {
-          for my $pa (split(",", $package->{'arch'})) {
-            $valid = 1 if $ma eq $pa;
-          }
-        }
-      } else {
-        # live appliance
-        my $ma = $arch;
-        $ma =~ s/i[456]86/i386/;
-        for my $pa (split(",", $package->{'arch'})) {
-          $pa =~ s/i[456]86/i386/;
-          $valid = 1 if $ma eq $pa;
-        }
+      my $ma = $arch;
+      $ma =~ s/i[456]86/i386/;
+      for my $pa (split(",", $package->{'arch'})) {
+        $pa =~ s/i[456]86/i386/;
+        $valid = 1 if $ma eq $pa;
       }
       next unless $valid;
     }
-
-    # not nice, but optimizes our build dependencies
-    # FIXME: design a real blacklist option in kiwi
-    if ($package->{'onlyarch'} && $package->{'onlyarch'} eq "skipit") {
-       push @packages, "-".$package->{'name'};
-       next;
-    }
     # handle replaces as buildignore
-    if ($package->{'replaces'}) {
-       push @packages, "-".$package->{'replaces'};
-    }
+    push @packages, "-$package->{'replaces'}" if $package->{'replaces'};
 
     # we need this package
     push @packages, $package->{'name'};
-
-    # find the maximal superset of possible required architectures
-    push @additionalarchs, split(',', $package->{'addarch'}) if $package->{'addarch'};
-    push @additionalarchs, split(',', $package->{'onlyarch'}) if $package->{'onlyarch'};
   }
-  @requiredarch = unify(@requiredarch, @additionalarchs);
+  push @packages, "kiwi-packagemanager:$packman";
+  push @packages, "--dorecommends--", "--dosupplements--" if $patterntype && $patterntype eq 'plusRecommended';
 
-  #### FIXME: kiwi files have no informations where to get -32bit packages from
-  push @requiredarch, "i586" if grep {/^ia64/} @requiredarch;
-  push @requiredarch, "i586" if grep {/^x86_64/} @requiredarch;
-  push @requiredarch, "ppc" if grep {/^ppc64/} @requiredarch;
-  push @requiredarch, "s390" if grep {/^s390x/} @requiredarch;
-  
-  my @fallbackarchs;
-  for my $arch (@requiredarch) {
-    push @fallbackarchs, findFallBackArchs($instsource->{'architectures'}[0], $arch) if $instsource->{'architectures'}[0];
-  }
-  @requiredarch = unify(@requiredarch, @fallbackarchs);
-
-  if (!$instsource) {
-    push @packages, "kiwi-packagemanager:$packman";
-    push @packages, "--dorecommends--", "--dosupplements--" if $patterntype && $patterntype eq 'plusRecommended';
-  } else {
-    push @packages, "kiwi-packagemanager:instsource";
-  }
-
-  push @requiredarch, split(' ', $obsexclusivearch) if $obsexclusivearch;
-  push @badarch , split(' ', $obsexcludearch) if $obsexcludearch;
-
-  $ret->{'exclarch'} = [ unify(@requiredarch) ] if @requiredarch;
-  $ret->{'badarch'} = [ unify(@badarch) ] if @badarch;
+  $ret->{'exclarch'} = [ unify(split(' ', $obsexclusivearch)) ] if $obsexclusivearch;
+  $ret->{'badarch'} = [ unify(split(' ', $obsexcludearch)) ] if $obsexcludearch;
   $ret->{'deps'} = [ unify(@packages) ];
   $ret->{'path'} = [ unify(@repos, @bootrepos) ];
   $ret->{'containerpath'} = [ unify(@containerrepos) ] if @containerrepos;
@@ -390,7 +449,7 @@ sub kiwiparse {
     $_ = {'project' => $s[0], 'repository' => $s[1]};
   }
   $ret->{'imagerepos'} = \@imagerepos if @imagerepos;
-  if (!$instsource && $containerconfig) {
+  if ($containerconfig) {
     my $containername = $containerconfig->{'name'};
     my $containertags = $containerconfig->{'tag'};
     $containertags = [ $containertags ] if defined($containertags) && !ref($containertags);
@@ -423,12 +482,10 @@ sub parse {
   close F;
   $cf ||= {};
   my $d;
-  eval {
-    $d = kiwiparse($xml, ($cf->{'arch'} || ''), 0, $cf->{'buildflavor'});
-  };
+  eval { $d = kiwiparse($xml, ($cf->{'arch'} || ''), $cf->{'buildflavor'}, 0) };
   if ($@) {
     my $err = $@;
-    $err =~ s/^\n$//s;
+    chomp $err;
     return {'error' => $err};
   }
   return $d;
@@ -492,7 +549,6 @@ sub queryiso {
   my ($handle, %opts) = @_;
   return {};
 }
-
 
 sub queryhdrmd5 {
   my ($bin) = @_;
