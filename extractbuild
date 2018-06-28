@@ -81,7 +81,7 @@ while (<S>) {
     die("file without directory: $file\n") unless $done{$1} && $done{$1} eq 'd';
   }
   if ($filetype eq 'd') {	# dir
-    print "$file\n" if $opt_verbose && !($opt_verbose == 1 && $file =~ /^KIWI\/.*\//);
+    print "$file\n" if $opt_verbose && ($opt_verbose > 1 || $file =~ /^KIWI\/[^\/]*$/);
     mkdir($file) || die("mkdir $file: $!\n");
     $done{$file} = 'd';
     next;
