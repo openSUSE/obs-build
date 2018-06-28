@@ -621,7 +621,7 @@ postprocess_kiwi_containers() {
     done
 
     # create container info
-    disturlarg=()
+    local disturlarg=()
     test -n "$DISTURL" && disturlarg=("--disturl" "$DISTURL")
     for r in $BUILD_ROOT/$TOPDIR/KIWI/*.tar ; do
 	test -e "$r" && perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::showcontainerinfo -- "${disturlarg[@]}" --arch "${BUILD_ARCH%%:*}" --buildflavor "$BUILD_FLAVOR" $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE "$r" > "${r%.tar}.containerinfo"
@@ -717,9 +717,12 @@ recipe_build_kiwi() {
         fi
     fi
 
-    if test "$imagetype" = docker ; then
-	postprocess_kiwi_containers
-    fi
+    for imgtype in $imagetype ; do
+	if test "$imgtype" = docker ; then
+	    postprocess_kiwi_containers
+	    break
+	fi
+    done
 }
 
 recipe_resultdirs_kiwi() {
