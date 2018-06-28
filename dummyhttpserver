@@ -108,8 +108,8 @@ sub readrequest {
   while (1) {
     next if $path =~ s!//!/!;
     next if $path =~ s!/\.(?:/|$)!/!;
-    next if $path =~ s!/[^/]+/..(?:/|$)!/!;
-    next if $path =~ s!/..(?:/|$)!/!;
+    next if $path =~ s!/[^/]+/\.\.(?:/|$)!/!;
+    next if $path =~ s!/\.\.(?:/|$)!/!;
     last;
   }
   return ($path, $query_string, $qu);
