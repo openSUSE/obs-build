@@ -127,7 +127,7 @@ recipe_build_docker() {
     else
 	echo 'RUN obs-docker-support --uninstall' >> "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
     fi
-    test -n "$DISTURL" && echo "LABEL DISTURL=$DISTURL" >> "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
+    test -n "$DISTURL" && echo "LABEL org.openbuildservice.disturl=$DISTURL" >> "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
 
     # now do the build
     echo "Building image $ALLTAGS"
