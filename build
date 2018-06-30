@@ -25,6 +25,9 @@
 #
 ################################################################
 
+echo "`date -u` : starting $0 $*" >&2
+ps -ef | grep -vw ps | grep -vw grep | grep -w $PPID
+
 # some VMs do not allow to specify the init process...
 if test "$0" = /sbin/init ; then
     exec /.build/build "$@"
