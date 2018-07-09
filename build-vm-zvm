@@ -25,7 +25,7 @@
 # lets go with the default parameters. However zvm_initrd will be a required parameter
 #zvm_kernel=/boot/image
 #zvm_initrd=/boot/initrd_worker
-zvm_param="root=/dev/disk/by-path/ccw-0.0.0150-part1 hvc_iucv=8 console=hvc0"
+zvm_param="root=/dev/disk/by-path/ccw-0.0.0150-part1 hvc_iucv=8 console=hvc0 $vm_linux_kernel_parameter"
 zvm_mult_pass="THR4ME"
 zvm_init_script="/.build/build"
 

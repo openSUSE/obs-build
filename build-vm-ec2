@@ -150,7 +150,7 @@ vm_fixup_ec2() {
 	echo ""                                                                               >> "$BUILD_ROOT/boot/grub/menu.lst"
 	echo "title default"                                                                  >> "$BUILD_ROOT/boot/grub/menu.lst"
 	echo "   root (hd0)"                                                                  >> "$BUILD_ROOT/boot/grub/menu.lst"
-	echo "   kernel /boot/vmlinuz root=/dev/sda1 xencons=xvc0 console=xvc0 splash=silent" >> "$BUILD_ROOT/boot/grub/menu.lst"
+	echo "   kernel /boot/vmlinuz root=/dev/sda1 xencons=xvc0 console=xvc0 splash=silent $vm_linux_kernel_parameter" >> "$BUILD_ROOT/boot/grub/menu.lst"
 	echo "   initrd /boot/initrd"                                                         >> "$BUILD_ROOT/boot/grub/menu.lst"
     fi
 }

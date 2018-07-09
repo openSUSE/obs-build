@@ -187,7 +187,7 @@ insmod linux
 insmod disk
 insmod elf
 set root='ieee1275//vdevice/v-scsi@30000002/disk@8100000000000000,msdos2'
-linux /.build.kernel.kvm init=/.build/build console=hvc0 root=/dev/sda2 rw elevator=noop
+linux /.build.kernel.kvm init=/.build/build console=hvc0 root=/dev/sda2 rw elevator=noop $vm_linux_kernel_parameter
 initrd /.build.initrd.kvm
 boot
 EOF

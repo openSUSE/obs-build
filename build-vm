@@ -33,6 +33,8 @@ vm_img_tunefs_ext2='tune2fs -c 0'
 vm_img_mkfs_reiserfs='mkreiserfs -q -f'
 vm_img_mkfs_btrfs='mkfs.btrfs'
 vm_img_mkfs_xfs='mkfs.xfs -f'
+# ignore not backward compatible ext fs options like metadata_csum
+vm_linux_kernel_parameter="ext4.allow_unsupported=1"
 
 # guest visible devices
 VM_ROOTDEV=/dev/hda1
