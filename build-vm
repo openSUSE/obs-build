@@ -603,6 +603,9 @@ vm_detect_2nd_stage() {
         date -s `cat /.build/.date`
     fi
 
+    # Enable Core dump generation
+    echo "core.%p" > /proc/sys/kernel/core_pattern
+
     return 0
 }
 
