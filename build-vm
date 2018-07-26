@@ -34,7 +34,9 @@ vm_img_mkfs_reiserfs='mkreiserfs -q -f'
 vm_img_mkfs_btrfs='mkfs.btrfs'
 vm_img_mkfs_xfs='mkfs.xfs -f'
 # ignore not backward compatible ext fs options like metadata_csum
-vm_linux_kernel_parameter="ext4.allow_unsupported=1"
+# Only protecting nonroot from root inside guest -> but anyone can be root inside guest
+# so disabling spectre/meltdown mitigations doesn't hurt security and gains performance
+vm_linux_kernel_parameter="ext4.allow_unsupported=1 kpti=off pti=off spectre_v2=off"
 
 # guest visible devices
 VM_ROOTDEV=/dev/hda1

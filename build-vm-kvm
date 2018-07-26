@@ -265,12 +265,9 @@ vm_startup_kvm() {
     if test -n "$VMDISK_MOUNT_OPTIONS" ; then
         qemu_append="$qemu_append rootflags=${VMDISK_MOUNT_OPTIONS#-o }"
     fi
-    qemu_append="$qemu_append panic=1 quiet no-kvmclock "
-    # Only protecting nonroot from root inside guest -> but anyone can be root inside guest
-    # so disabling spectre/meltdown mitigations doesn't hurt security and gains performance
-    qemu_append="$qemu_append kpti=off pti=off spectre_v2=off"
+    qemu_append="$qemu_append $vm_linux_kernel_parameter"
+    qemu_append="$qemu_append panic=1 quiet no-kvmclock elevator=noop"
     qemu_append="$qemu_append nmi_watchdog=0 rw rd.driver.pre=binfmt_misc"
-    qemu_append="$qemu_append $vm_linux_kernel_parameter elevator=noop"
     qemu_append="$qemu_append console=$kvm_console init=$vm_init_script"
     if test -z "$VM_NETOPT" -a -z "$VM_NETDEVOPT"; then
         kvm_options="$kvm_options -net none"
