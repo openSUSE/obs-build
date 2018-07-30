@@ -37,7 +37,7 @@ my @wday = qw{Sun Mon Tue Wed Thu Fri Sat};
 my @mon = qw{Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec};
 
 my $ok;
-my $zone;
+my $zone = 0;
 my $test;
 my $fulltimestamps;
 my $printtype;
