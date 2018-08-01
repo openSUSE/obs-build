@@ -580,6 +580,7 @@ reexpand:
       next;
     } elsif ($preamble && $line =~ /^(Source\d*|Patch\d*|Url|Icon)\s*:\s*(\S+)/i) {
       my ($tag, $val) = (lc($1), $2);
+      $macros{$tag} = $val if $tag eq 'url';
       # associate url and icon tags with the corresponding subpackage
       $tag .= scalar @subpacks if ($tag eq 'url' || $tag eq 'icon') && @subpacks;
       if ($tag =~ /icon/) {
