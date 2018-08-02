@@ -28,6 +28,14 @@ if [ -z "$mailaddr" ]; then
 	mailaddr="$USER@$domain"
 fi
 
+if [ -n "$VC_REALNAME" ]; then
+	packager="$VC_REALNAME <$VC_MAILADDR>"
+elif [ -x /usr/bin/rpmdev-packager ]; then
+	packager=`rpmdev-packager`
+else
+	packager="`getent passwd $UID | cut -d: -f5 | cut -d ',' -f 1` <$mailaddr>"
+fi
+
 EDITOR=${EDITOR:-vim}
 date=`LC_ALL=POSIX TZ=UTC date`
 
@@ -57,7 +65,7 @@ while [ -n "$1" ]; do
 		--help)
 			echo "Usage: $0 [-m MESSAGE|-e] [filename[.changes]|path [file_with_comment]]"
 			echo
-			echo "Will use '$mailaddr' for changelog entries"
+			echo "Will use '$packager' for changelog entries"
 			echo
 			echo "Options:"
 			echo "    -m MESSAGE    add MESSAGE to changes (not open an editor)"
@@ -122,7 +130,7 @@ set +e
 {
 	if [ ! $just_edit ]; then
 		echo "-------------------------------------------------------------------"
-		echo "$date - $mailaddr"
+		echo "$date - $packager"
 		echo
 	fi
 	if [ -n "$message" ]; then
