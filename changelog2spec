@@ -40,6 +40,7 @@ my $ok;
 my $zone;
 my $test;
 my $fulltimestamps;
+my $emailonly;
 my $printtype;
 my $input = '';
 my $target = 'rpm';
@@ -68,6 +69,11 @@ while (@ARGV) {
   if (@ARGV > 1 && $ARGV[0] eq '--target') {
     shift @ARGV;
     $target = shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--emailonly') {
+    $emailonly = 1;
+    shift @ARGV;
     next;
   }
   last;
@@ -118,6 +124,7 @@ sub parse_suse {
   $dt = lc($dt);
   $who =~ s/^\s+//;
   $who =~ s/^-\s*//;
+  $who = $1 if $emailonly && $who =~ /\<(.*)\>/;
   $dt =~ /([0-9][0-9][0-9][0-9])/;
   $dline = $_;
   my $year = $1;

@@ -161,6 +161,13 @@ recipe_create_changelog() {
 	*.dsc) CFFORMAT=debian ;;
 	*) CFFORMAT=rpm ;;
     esac
+    # add --emailonly option for sles builds
+    if test "$CFFORMAT" = rpm ; then
+	case `queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" eval '%{?is_opensuse}/%{?!fullname_in_changelog:%{?suse_version}}'` in
+	  *[1-9]*/*) ;;
+	  */*[1-9]*) CFFORMAT="$CFFORMAT --emailonly" ;;
+	esac
+    fi
     echo "running changelog2spec --target $CFFORMAT --file $1"
     if ! $BUILD_DIR/changelog2spec --target $CFFORMAT --file "$1" > $BUILD_ROOT/.build-changelog ; then 
 	rm -f $BUILD_ROOT/.build-changelog
