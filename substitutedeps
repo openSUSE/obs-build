@@ -296,6 +296,11 @@ for my $line (@$xspec) {
   $isbuildrequires = 1 if $line =~ /^BuildRequires/i;
   my $r = $line;
   $r =~ s/^[^:]*:\s*//;
+  if ($r =~ /^\(/) {
+    # no rich dependency support for now
+    print F "$line\n";
+    next;
+  }
   my @deps = $r =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?[\s,]*/g;
   my @ndeps = ();
   my $replace = 0;
