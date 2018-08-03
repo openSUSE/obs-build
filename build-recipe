@@ -163,10 +163,10 @@ recipe_create_changelog() {
     esac
     # add --emailonly option for sles builds
     if test "$CFFORMAT" = rpm ; then
-	case `queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" eval '%{?is_opensuse}/%{?!fullname_in_changelog:%{?suse_version}}'` in
-	  *[1-9]*/*) ;;
-	  */*[1-9]*) CFFORMAT="$CFFORMAT --emailonly" ;;
-	esac
+        CFFORMAT_EMAILONLY=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" eval '%{!?fullname_in_changelog:%{?suse_version:%{!?is_opensuse:1}%{?is_opensuse}}%{!?suse_version:0}}%{?fullname_in_changelog:0}'`
+        if [ -n $CFFORMAT_EMAILONLY ]; then
+	    CFFORMAT="$CFFORMAT --emailonly"
+        fi
     fi
     echo "running changelog2spec --target $CFFORMAT --file $1"
     if ! $BUILD_DIR/changelog2spec --target $CFFORMAT --file "$1" > $BUILD_ROOT/.build-changelog ; then 
