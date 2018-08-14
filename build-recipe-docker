@@ -57,11 +57,15 @@ recipe_build_docker() {
 
     base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
     test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
-
-    if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver "$TOPDIR/SOURCES/repos" ; then
-	cleanup_and_exit 1
+    if test "$BUILDENGINE" = "podman"; then
+        DOCKER_TOOL="podman"
+    else
+        DOCKER_TOOL="docker"
+        if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver "$TOPDIR/SOURCES/repos" ; then
+             cleanup_and_exit 1
+        fi
+        DOCKERD_STARTED=true
     fi
-    DOCKERD_STARTED=true
 
     cp $BUILD_DIR/obs-docker-support "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
     chmod 755 "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
@@ -78,11 +82,11 @@ recipe_build_docker() {
     # "docker import" it.
     if tar -tf $base_image_path | grep "^manifest.json" -q; then
         echo "Layered image found"
-        chroot $BUILD_ROOT docker load --input $TOPDIR/SOURCES/$base_image_path
+        chroot $BUILD_ROOT $DOCKER_TOOL load --input $TOPDIR/SOURCES/$base_image_path
     else
         echo "Filesystem image found"
         desired_tag=$(grep "^\s*FROM" "$RECIPEFILE" | cut -d" " -f2)
-        chroot $BUILD_ROOT docker import $TOPDIR/SOURCES/$base_image_path "$desired_tag"
+        chroot $BUILD_ROOT $DOCKER_TOOL import $TOPDIR/SOURCES/$base_image_path "$desired_tag"
     fi
 
     # Prepare the package repository
@@ -131,7 +135,7 @@ recipe_build_docker() {
 
     # now do the build
     echo "Building image $ALLTAGS"
-    if ! chroot $BUILD_ROOT docker build --network=host "${tagargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
+    if ! chroot $BUILD_ROOT $DOCKER_TOOL build --network=host "${tagargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
         cleanup_and_exit 1 "Docker build command failed"
     fi
 
@@ -140,7 +144,7 @@ recipe_build_docker() {
     mkdir -p $BUILD_ROOT$TOPDIR/DOCKER
     FILENAME="$FIRSTTAG"
     FILENAME="${FILENAME//[\/:]/-}"
-    if ! chroot $BUILD_ROOT docker save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$FIRSTTAG" ; then
+    if ! chroot $BUILD_ROOT $DOCKER_TOOL save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$FIRSTTAG" ; then
         cleanup_and_exit 1 "Docker save command failed"
     fi
     

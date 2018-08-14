@@ -504,6 +504,9 @@ my %subst_defaults = (
   'system-packages:docker' => [
     'docker',
   ],
+  'system-packages:podman' => [
+    'podman', 'buildah'
+  ],
   'system-packages:fissile' => [
     'docker', # TODO: Add fissile here as soon as it is packaged
   ],
@@ -616,6 +619,9 @@ sub get_sysbuild {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:kiwi-product'} || []};
     @sysdeps = @{$config->{'substitute'}->{'kiwi-setup:product'} || []} unless @sysdeps;
     @sysdeps = @{$subst_defaults{'system-packages:kiwi-product'} || []} unless @sysdeps;
+  } elsif ($engine eq 'podman' && $buildtype eq 'docker') {
+    @sysdeps = @{$config->{'substitute'}->{'system-packages:podman'} || []} unless @sysdeps;
+    @sysdeps = @{$subst_defaults{'system-packages:podman'} || []} unless @sysdeps;
   } elsif ($buildtype eq 'docker') {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:docker'} || []} unless @sysdeps;
     @sysdeps = @{$subst_defaults{'system-packages:docker'} || []} unless @sysdeps;

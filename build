@@ -1309,7 +1309,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	test "$imagetype" = product || BUILD_USER=root
     fi
     # same with docker and fissile builds
-    if test "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile ; then
+    if test "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman ; then
 	BUILD_USER=root
     fi
 
