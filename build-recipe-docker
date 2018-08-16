@@ -57,8 +57,12 @@ recipe_build_docker() {
 
     base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
     test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
+
     if test "$BUILDENGINE" = "podman"; then
         DOCKER_TOOL="podman"
+        if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver-only "$TOPDIR/SOURCES/repos" ; then
+             cleanup_and_exit 1
+        fi
     else
         DOCKER_TOOL="docker"
         if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver "$TOPDIR/SOURCES/repos" ; then
@@ -80,6 +84,7 @@ recipe_build_docker() {
     # Inspect the content of the image to decide if this is a layered image
     # or a filesystem one. We need to know if we will "docker load" it or
     # "docker import" it.
+set -x
     if tar -tf $base_image_path | grep "^manifest.json" -q; then
         echo "Layered image found"
         chroot $BUILD_ROOT $DOCKER_TOOL load --input $TOPDIR/SOURCES/$base_image_path

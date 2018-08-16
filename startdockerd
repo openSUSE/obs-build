@@ -28,6 +28,7 @@ BUILD_ROOT=
 IS_UNSHARED=
 KILL=
 WEBSERVER=
+WEBSERVER_ONLY=
 
 while test -n "$1" ; do
     case "$1" in
@@ -36,6 +37,11 @@ while test -n "$1" ; do
 	    shift 2
 	    ;;
 	--webserver)
+	    WEBSERVER="$2"
+	    shift 2
+	    ;;
+	--webserver-only)
+	    WEBSERVER_ONLY="1"
 	    WEBSERVER="$2"
 	    shift 2
 	    ;;
@@ -80,7 +86,7 @@ fi
 
 rm -f $BUILD_ROOT/.startdockerd.pids
 
-if test -z "$IS_UNSHARED" ; then
+if test -z "$IS_UNSHARED" -a -z "$WEBSERVER_ONLY" ; then
     echo "Unsharing environment"
     # unshare mounts and network
     exec unshare -m -n $BUILD_DIR/startdockerd --isunshared --root "$BUILD_ROOT" --webserver "$WEBSERVER" "$@"
@@ -130,6 +136,18 @@ fi
 # setup mounts
 test -e "$BUILD_ROOT/proc/self" || mount -n -tproc none $BUILD_ROOT/proc
 
+if test -n "$WEBSERVER" ; then
+    echo "Starting local repository server"
+    $BUILD_DIR/dummyhttpserver "$BUILD_ROOT" "$WEBSERVER" &
+    WEBSERVER_PID=$!
+    echo "$CONTAINERD_PID $DOCKERD_PID $WEBSERVER_PID" > $BUILD_ROOT/.startdockerd.pids
+fi
+
+if test -n "$WEBSERVER_ONLY" ; then
+    echo "SKIPPING DOCKERD"
+    exit 0
+fi
+
 echo "Starting container daemon"
 CONTAINERD_BIN=/usr/sbin/containerd
 test -x $BUILD_ROOT/usr/bin/containerd && CONTAINERD_BIN=/usr/bin/containerd
@@ -149,13 +167,6 @@ for i in 1 2 3 4 5 6 7 8 9 10 ; do
 done
 if ! chroot $BUILD_ROOT docker version >/dev/null 2>&1 ; then
     cleanup_and_exit 1 "Docker is dead"
-fi
-
-if test -n "$WEBSERVER" ; then
-    echo "Starting local repository server"
-    $BUILD_DIR/dummyhttpserver "$BUILD_ROOT" "$WEBSERVER" &
-    WEBSERVER_PID=$!
-    echo "$CONTAINERD_PID $DOCKERD_PID $WEBSERVER_PID" > $BUILD_ROOT/.startdockerd.pids
 fi
 
 echo "Docker is running"
