@@ -31,7 +31,7 @@ recipe_prepare_podman() {
 
 recipe_build_podman() {
     # podman refuses : in filenames
-    for i in containers/*; do
+    find containers -name '*:*' | while read i; do
       mv "$i" "${i//:/_}"
     done
     recipe_build_docker "$@"
