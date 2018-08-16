@@ -30,8 +30,12 @@ recipe_prepare_podman() {
 }
 
 recipe_build_podman() {
-    # podman refuses : in filenames
-    find containers -name '*:*' | while read i; do
+    # podman refuses : in directories
+    find containers -type d -a -name '*:*' | while read i; do
+      mv "$i" "${i//:/_}"
+    done
+    # and filenames
+    find containers -type f -a -name '*:*' | while read i; do
       mv "$i" "${i//:/_}"
     done
     recipe_build_docker "$@"
