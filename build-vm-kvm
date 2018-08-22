@@ -242,7 +242,7 @@ vm_startup_kvm() {
 	fi
     elif test -n "$VM_CONSOLE_INPUT" ; then
 	qemu_args=("${qemu_args[@]}" -serial mon:stdio)
-    else
+    elif ! test -e "${VM_ROOT}.qemu/monitor"; then
         mkdir -p "${VM_ROOT}.qemu"
         mkfifo "${VM_ROOT}.qemu/monitor"
         chown "$VM_USER" "${VM_ROOT}.qemu"
