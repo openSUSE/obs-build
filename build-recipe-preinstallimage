@@ -42,8 +42,9 @@ recipe_build_preinstallimage() {
     for DIR  in .* * ; do
       case "$DIR" in
 	.|..) continue ;;
-	.build.kernel*) ;; # to be packaged
-	.build.initrd*) ;; # to be packaged
+	.build.kernel.*) ;; # to be packaged
+	.build.hostarch.*) ;; # to be packaged
+	.build.initrd.*) ;; # to be packaged
 	.build*) continue ;;
 	.preinstallimage*) continue ;;
 	.srcfiles*) continue ;;
