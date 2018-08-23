@@ -86,7 +86,11 @@ sub cmd_zypper {
       shift @args if $args[0] =~ /^--(?:repo|type)$/ || $args[0] =~ /^-[rt]$/;
       shift @args;
     }
-    addrepo($ret, $args[0]) if @args;
+    if (@args) {
+      my $path = $args[0];
+      $path =~ s/\/[^\/]*\.repo$//;
+      addrepo($ret, $path);
+    }
   }
 }
 
