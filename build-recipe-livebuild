@@ -260,6 +260,10 @@ recipe_build_livebuild() {
 	    BUILD_SUCCEEDED=true
 	done
     done
+
+    # copy recipe source tarball so that it can be published
+    cp "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" \
+        "$BUILD_ROOT/$TOPDIR/OTHER/${RECIPEFILE%.livebuild}${buildnum}".livebuild.tar
 }
 
 recipe_resultdirs_livebuild() {
