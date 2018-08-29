@@ -58,6 +58,7 @@ recipe_build_debootstrap() {
     # adapt passwd
     if test $BUILD_USER = abuild ; then
 	echo "abuild:x:${ABUILD_UID}:${ABUILD_GID}:Autobuild:/home/abuild:/bin/bash" >>$BUILD_ROOT/$myroot/etc/passwd
+	echo 'abuild:*:::::::' >>$BUILD_ROOT/$myroot/etc/shadow
 	echo 'abuild:*::' >>$BUILD_ROOT/$myroot/etc/gshadow
 	echo "abuild:x:${ABUILD_GID}:" >>$BUILD_ROOT/$myroot/etc/group
 	mkdir -p $BUILD_ROOT/$myroot/home/abuild
