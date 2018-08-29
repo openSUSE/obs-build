@@ -594,7 +594,7 @@ reexpand:
 	$macros{uc($1) . "URL$num"} = $val if $num >= 0;
       }
     } elsif (!$preamble && ($line =~ /^(Source\d*|Patch\d*|Url|Icon|BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore)\s*:\s*(\S.*)$/i)) {
-      print STDERR "Warning: spec file parser ",($lineno?" line $lineno":''),": Ignoring "$1" used beyond the preamble.\n" if $config->{'warnings'};
+      print STDERR "Warning: spec file parser ".($lineno ? " line $lineno" : '').": Ignoring $1 used beyond the preamble.\n" if $config->{'warnings'};
     }
 
     if ($line =~ /^\s*%package\s+(-n\s+)?(\S+)/) {
