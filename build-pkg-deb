@@ -48,7 +48,6 @@ deb_setup() {
     :>> $BUILD_ROOT/var/lib/dpkg/available
     :>> $BUILD_ROOT/var/log/dpkg.log
     :>> $BUILD_ROOT/etc/ld.so.conf
-    :>> $BUILD_ROOT/etc/default/rcS
 }
 
 pkg_initdb_deb() {
