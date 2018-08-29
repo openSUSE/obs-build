@@ -218,7 +218,7 @@ sub parse {
     $ret->{'error'} = "open $specfile: $!";
     return $ret;
   }
-  my @macros = @{$config->{'macros'}};
+  my @macros = @{$config->{'macros'} || []};
   my $skip = 0;
   my $main_preamble = 1;
   my $preamble = 1;
