@@ -1,4 +1,19 @@
 -------------------------------------------------------------------
+Wed Aug 29 13:57:07 UTC 2018 - Adrian Schröter <adrian@suse.de>
+
+- Fall back to $mailaddr if $VC_MAILADDR is unset/null
+- don't crash with no rpm macros defined
+- Kiwi: support parsing of repos where the .repo file got used
+- package hostarch definition in preinstallimages
+- avoid double creation of monitor fifo
+- Debian:
+  - debootstrap: ensure /etc/hosts exists
+  - debootstrap: Add abuild shadow password entry
+  - livebuild: publish source tarball
+  - Adds Debian configurations for jessie and unstable
+  - collect *.ddeb, *.udeb files
+
+-------------------------------------------------------------------
 Thu Aug 16 14:55:53 UTC 2018 - adrian@suse.de
 
 - docker format: New podman/buildah build engine support
