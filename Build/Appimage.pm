@@ -44,16 +44,16 @@ sub parse {
       push @packdeps, $pkg;
     }
   }
-  if ($yml->{'build'}) {
-    for my $pkg (@{$yml->{'build'}->{'packages'} || {}}) {
+  if ($yml->{'build'} && $yml->{'build'}->{'packages'}) {
+    for my $pkg (@{$yml->{'build'}->{'packages'}}) {
       push @packdeps, $pkg;
     }
   }
   $ret->{'deps'} = \@packdeps;
 
   my @sources;
-  if ($yml->{'build'}) {
-    for my $source (@{$yml->{'build'}->{'files'} || {}}) {
+  if ($yml->{'build'} && $yml->{'build'}->{'files'}) {
+    for my $source (@{$yml->{'build'}->{'files'}}) {
       push @sources, $source;
     }
   }
