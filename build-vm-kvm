@@ -233,7 +233,11 @@ vm_startup_kvm() {
 	qemu_args=("${qemu_args[@]}" -drive file="$VM_SWAP",format=raw,if=none,id=swap,serial=1,cache=unsafe -device "$kvm_device",drive=swap)
     fi
     # the serial console device needs to be compiled into the target kernel
-    # which is why we can not use virtio-serial on other platforms
+    # which is why we can not use virtio-serial on older platforms
+    if strings $vm_kernel | grep -q '^[4-9]\..*(geeko@buildhost)' ; then
+        kvm_serial_device=virtio-serial,max_ports=2
+        kvm_console=hvc0
+    fi
     if test -n "$kvm_serial_device" ; then
 	if test -n "$VM_CONSOLE_INPUT" ; then
 	    qemu_args=("${qemu_args[@]}" -device "$kvm_serial_device" -device virtconsole,chardev=virtiocon0 -chardev stdio,mux=on,id=virtiocon0 -mon chardev=virtiocon0)
