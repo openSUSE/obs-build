@@ -228,6 +228,14 @@ sub kiwiparse {
   if ($obsprofiles) {
     $obsprofiles = [ grep {defined($_)} map {$_ eq '@BUILD_FLAVOR@' ? $buildflavor : $_} split(' ', $obsprofiles) ];
   }
+  my @extratags;
+  if ($xml =~ /^\s*<!--\s+OBS-AddTag:\s+(.*)\s+-->\s*$/im) {
+    for (split(' ', $1)) {
+      $_ = "$_:latest" unless /:[^\/]+$/;
+      push @extratags, $_;
+    }
+  }
+
   my $schemaversion = $kiwi->{'schemaversion'} ? versionstring($kiwi->{'schemaversion'}) : 0;
   $ret->{'name'} = $kiwi->{'name'} if $kiwi->{'name'};
   $ret->{'filename'} = $kiwi->{'name'} if $kiwi->{'name'};
@@ -290,7 +298,7 @@ sub kiwiparse {
         # for kiwi 3.8 and before
         push @types, $type->{'_content'};
       }
-      # save containerconfig so that we can retrievethe tag
+      # save containerconfig so that we can retrieve the tag
       $containerconfig = $type->{'containerconfig'}->[0] if $type->{'containerconfig'};
 
       # add derived container dependency
@@ -460,6 +468,7 @@ sub kiwiparse {
     }
     $containertags = undef if $containertags && !@$containertags;
     $containertags = [ "$containername:latest" ] if defined($containername) && !$containertags;
+    $containertags = [ unify(@{$containertags || []}, @extratags) ] if @extratags;
     $ret->{'container_tags'} = $containertags if $containertags;
   }
   if ($obsprofiles) {
