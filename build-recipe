@@ -191,7 +191,7 @@ recipe_needs_build_binaries() {
 }
 
 recipe_build_time_statistics() {
-    if test "$DO_STATISTICS" = 1 -a -n "$RECIPE_BUILD_START_TIME" -a -n "$TOPDIR" ; then
+    if test "$DO_STATISTICS" = 1 -a -n "$RECIPE_BUILD_START_TIME" -a -n "$TOPDIR" -a -n "$RUNNING_IN_VM" ; then
 	mkdir -p "$TOPDIR/OTHER"
 	echo "TIME_main_build: $(( `date +%s` - $RECIPE_BUILD_START_TIME))"  >> "$TOPDIR/OTHER/_statistics"
 	RECIPE_BUILD_START_TIME=
