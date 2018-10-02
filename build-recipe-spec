@@ -82,6 +82,7 @@ recipe_prepare_spec() {
 
     if test -n "$BUILD_JOBS" ; then
 	cat >> $BUILD_ROOT/root/$rawcfgmacros <<-EOF
+		### from obs-build
 		%jobs $BUILD_JOBS
 		%_smp_mflags -j$BUILD_JOBS
 		EOF
