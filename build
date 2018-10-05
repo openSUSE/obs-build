@@ -332,6 +332,9 @@ Known Parameters:
   --vm-disk-filesystem TYPE
               Defaults for automatic setup of VM root/swap files.
               May get overruled by build config vmfstype build flag.
+  --vm-disk-dirindex
+              On ext2/3/4 enable the dir_index feature.
+              Makes readdir order indeterministic.
 
   --vm-memory SIZEINMB
               Set amount of RAM for VMs
