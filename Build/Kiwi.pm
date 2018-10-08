@@ -200,7 +200,7 @@ sub kiwiparse_product {
 }
 
 sub kiwiparse {
-  my ($xml, $arch, $buildflavor, $count) = @_;
+  my ($xml, $arch, $buildflavor, $release, $count) = @_;
   $count ||= 0;
   die("kiwi config inclusion depth limit reached\n") if $count++ > 10;
 
@@ -227,13 +227,6 @@ sub kiwiparse {
   $obsprofiles = $1 if $xml =~ /^\s*<!--\s+OBS-Profiles:\s+(.*)\s+-->\s*$/im;
   if ($obsprofiles) {
     $obsprofiles = [ grep {defined($_)} map {$_ eq '@BUILD_FLAVOR@' ? $buildflavor : $_} split(' ', $obsprofiles) ];
-  }
-  my @extratags;
-  if ($xml =~ /^\s*<!--\s+OBS-AddTag:\s+(.*)\s+-->\s*$/im) {
-    for (split(' ', $1)) {
-      $_ = "$_:latest" unless /:[^\/]+$/;
-      push @extratags, $_;
-    }
   }
 
   my $schemaversion = $kiwi->{'schemaversion'} ? versionstring($kiwi->{'schemaversion'}) : 0;
@@ -283,6 +276,18 @@ sub kiwiparse {
   if ($preferences->[0]->{'version'}) {
     $ret->{'version'} = $preferences->[0]->{'version'}->[0]->{'_content'};
   }
+
+  # add extra tags
+  my @extratags;
+  if ($xml =~ /^\s*<!--\s+OBS-AddTag:\s+(.*)\s+-->\s*$/im) {
+    for (split(' ', $1)) {
+      s/<VERSION>/$ret->{'version'}/g if $ret->{'version'};
+      s/<RELEASE>/$release/g if $release;
+      $_ = "$_:latest" unless /:[^\/]+$/;
+      push @extratags, $_;
+    }
+  }
+
   my $containerconfig;
   for my $pref (@{$preferences || []}) {
     if ($obsprofiles && $pref->{'profiles'}) {
@@ -336,7 +341,7 @@ sub kiwiparse {
           my ($bootxml, $xsrc) = $bootcallback->($1, $2);
           next unless $bootxml;
           push @extrasources, $xsrc if $xsrc;
-          my $bret = kiwiparse($bootxml, $arch, $buildflavor, $count);
+          my $bret = kiwiparse($bootxml, $arch, $buildflavor, $release, $count);
           push @bootrepos, map {"$_->{'project'}/$_->{'repository'}"} @{$bret->{'path'} || []};
           push @packages, @{$bret->{'deps'} || []};
           push @extrasources, @{$bret->{'extrasource'} || []};
@@ -491,7 +496,7 @@ sub parse {
   close F;
   $cf ||= {};
   my $d;
-  eval { $d = kiwiparse($xml, ($cf->{'arch'} || ''), $cf->{'buildflavor'}, 0) };
+  eval { $d = kiwiparse($xml, ($cf->{'arch'} || ''), $cf->{'buildflavor'}, $cf->{'buildrelease'}, 0) };
   if ($@) {
     my $err = $@;
     chomp $err;
@@ -523,14 +528,15 @@ sub showcontainerinfo {
   (undef, $buildflavor) = splice(@ARGV, 0, 2) if @ARGV > 2 && $ARGV[0] eq '--buildflavor';
   my ($fn, $image) = @ARGV;
   local $urlmapper = sub { return $_[0] };
+  my $release;
+  $release = $1 if $image =~ /.*-Build(\d+\.\d+).*/;
   my $cf = {};
   $cf->{'arch'} = $arch if defined $arch;
   $cf->{'buildflavor'} = $buildflavor if defined $buildflavor;
+  $cf->{'buildrelease'} = $release if $release;
   my $d = parse($cf, $fn);
   die("$d->{'error'}\n") if $d->{'error'};
   $image =~ s/.*\/// if defined $image;
-  my $release;
-  $release = $1 if $image =~ /.*-Build(\d+\.\d+).*/;
   my @tags = map {"\"$_\""} @{$d->{'container_tags'} || []};
   my @repos;
   for my $repo (@{$d->{'imagerepos'} || []}) {
