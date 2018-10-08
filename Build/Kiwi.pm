@@ -464,17 +464,17 @@ sub kiwiparse {
   $ret->{'imagerepos'} = \@imagerepos if @imagerepos;
   if ($containerconfig) {
     my $containername = $containerconfig->{'name'};
-    my $containertags = $containerconfig->{'tag'};
-    $containertags = [ $containertags ] if defined($containertags) && !ref($containertags);
-    if ($containertags && defined($containername)) {
-      for (@$containertags) {
-	$_ = "$containername:$_" unless /:/;
+    my @containertags;
+    if (defined $containername) {
+      push @containertags, $containerconfig->{'tag'} if defined $containerconfig->{'tag'};
+      push @containertags, 'latest' unless @containertags;
+      if (defined($containerconfig->{'additionaltags'})) {
+	push @containertags, split(',', $containerconfig->{'additionaltags'});
       }
+      @containertags = map {"$containername:$_"} @containertags;
     }
-    $containertags = undef if $containertags && !@$containertags;
-    $containertags = [ "$containername:latest" ] if defined($containername) && !$containertags;
-    $containertags = [ unify(@{$containertags || []}, @extratags) ] if @extratags;
-    $ret->{'container_tags'} = $containertags if $containertags;
+    push @containertags, @extratags if @extratags;
+    $ret->{'container_tags'} = [ unify(@containertags) ] if @containertags;
   }
   if ($obsprofiles) {
     if (@$obsprofiles) {
