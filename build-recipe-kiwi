@@ -493,6 +493,7 @@ kiwi_translate_parameters() {
     KIWI_MAIN_PARAMETERS=
     KIWI_BUILD_PARAMETERS=
     KIWI_BUNDLE_PARAMETERS=
+    KIWI_DERIVED_CONTAINER=
     for i in $KIWI_PARAMETERS ; do
 	if test -n "$lasti" ; then
 	    i="$lasti=$i"
@@ -528,6 +529,13 @@ kiwi_translate_parameters() {
 		if test -f "$BUILD_ROOT/$TOPDIR/SOURCES/containers/${i#*containers/}" ; then
 		    gzip -f -1 < "$BUILD_ROOT/$TOPDIR/SOURCES/containers/${i#*containers/}" > "$BUILD_ROOT/$TOPDIR/SOURCES/containers/${i#*containers/}.gz" || cleanup_and_exit 1 "container compression"
 		    i="$i.gz"
+		    KIWI_DERIVED_CONTAINER="$BUILD_ROOT/$TOPDIR/SOURCES/containers/${i#*containers/}"
+		fi
+	        KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS $i"
+		;;
+	    --set-container-derived-from=dir://./containers/*.tar*)
+		if test -f "$BUILD_ROOT/$TOPDIR/SOURCES/containers/${i#*containers/}" ; then
+		    KIWI_DERIVED_CONTAINER="$BUILD_ROOT/$TOPDIR/SOURCES/containers/${i#*containers/}"
 		fi
 	        KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS $i"
 		;;
@@ -627,6 +635,21 @@ postprocess_kiwi_containers() {
 	test -e "$r" && perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::showcontainerinfo -- "${disturlarg[@]}" --arch "${BUILD_ARCH%%:*}" --buildflavor "$BUILD_FLAVOR" $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE "$r" > "${r%.tar}.containerinfo"
 	test -s "${r%.tar}.containerinfo" || rm -f "${r%.tar}.containerinfo"
     done
+    if test -n "$KIWI_DERIVED_CONTAINER" ; then
+	for r in $BUILD_ROOT/$TOPDIR/KIWI/*.packages ; do
+	    test -e "$r" || continue
+	    r="${r%.packages}"
+	    for rr in $r*.containerinfo ; do
+		test -e "$rr" || continue
+		echo "creating base package information"
+		rm -f "$BUILD_ROOT/tmp/create_derived_package_list"
+		cp "$BUILD_DIR/create_container_package_list" "$BUILD_ROOT/tmp/create_container_package_list"
+		chroot "$BUILD_ROOT" /bin/bash /tmp/create_container_package_list "${KIWI_DERIVED_CONTAINER#$BUILD_ROOT}" > "$r.basepackages"
+		rm -f "$BUILD_ROOT/tmp/create_derived_package_list"
+		break
+	    done
+	done
+    fi
 }
 
 recipe_build_kiwi() {

@@ -75,6 +75,7 @@ install:
 	    startdockerd \
 	    dummyhttpserver \
 	    obs-docker-support \
+	    create_container_package_list \
 	    $(DESTDIR)$(pkglibdir)
 	install -m755 emulator/emulator.sh $(DESTDIR)$(pkglibdir)/emulator/
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build
