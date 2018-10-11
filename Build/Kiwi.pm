@@ -22,6 +22,7 @@ package Build::Kiwi;
 
 use strict;
 use Build::SimpleXML;
+use Build::SimpleJSON;
 
 our $bootcallback;
 our $urlmapper;
@@ -537,26 +538,24 @@ sub showcontainerinfo {
   my $d = parse($cf, $fn);
   die("$d->{'error'}\n") if $d->{'error'};
   $image =~ s/.*\/// if defined $image;
-  my @tags = map {"\"$_\""} @{$d->{'container_tags'} || []};
   my @repos;
   for my $repo (@{$d->{'imagerepos'} || []}) {
-    if (defined $repo->{'priority'}) {
-      push @repos, "{ \"url\": \"$repo->{'url'}\", \"priority\": $repo->{'priority'} }";
-    } else {
-      push @repos, "{ \"url\": \"$repo->{'url'}\" }";
-    }
+    push @repos, { 'url' => $repo->{'url'}, '_type' => {'priority' => 'number'} };
+    $repos[-1]->{'priority'} = $repo->{'priority'} if defined $repo->{'priority'};
   }
   my $buildtime = time();
-  print "{\n";
-  print "  \"name\": \"$d->{'name'}\"";
-  print ",\n  \"version\": \"$d->{'version'}\"" if defined $d->{'version'};
-  print ",\n  \"release\": \"$release\"" if defined $release;
-  print ",\n  \"tags\": [ ".join(', ', @tags)." ]" if @tags;
-  print ",\n  \"repos\": [ ".join(', ', @repos)." ]" if @repos;
-  print ",\n  \"file\": \"$image\"" if defined $image;
-  print ",\n  \"disturl\": \"$disturl\"" if defined $disturl;
-  print ",\n  \"buildtime\": $buildtime";
-  print "\n}\n";
+  my $containerinfo = {
+    'name' => $d->{'name'},
+    'buildtime' => $buildtime,
+    '_type' => {'buildtime' => 'number'},
+  };
+  $containerinfo->{'version'} = $d->{'version'} if defined $d->{'version'};
+  $containerinfo->{'release'} = $release if defined $d->{'version'};
+  $containerinfo->{'tags'} = $d->{'container_tags'} if @{$d->{'container_tags'} || []};
+  $containerinfo->{'repos'} = \@repos if @repos;
+  $containerinfo->{'file'} = $image if defined $image;
+  $containerinfo->{'disturl'} = $disturl if defined $disturl;
+  print Build::SimpleJSON::unparse($containerinfo)."\n";
 }
 
 # not implemented yet.

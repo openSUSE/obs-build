@@ -20,7 +20,8 @@
 
 package Build::Docker;
 
-use Build::SimpleXML;
+use Build::SimpleXML;	# to parse the annotation
+use Build::SimpleJSON;
 
 use strict;
 
@@ -44,9 +45,10 @@ sub quote {
 }
 
 sub addrepo {
-  my ($ret, $url) = @_;
+  my ($ret, $url, $prio) = @_;
 
-  unshift @{$ret->{'repo_urls'}}, $url;
+  unshift @{$ret->{'imagerepos'}}, { 'url' => $url };
+  $ret->{'imagerepos'}->[0]->{'priority'} = $prio if defined $prio;
   if ($Build::Kiwi::urlmapper) {
     my $prp = $Build::Kiwi::urlmapper->($url);
     if (!$prp) {
@@ -55,15 +57,17 @@ sub addrepo {
     }
     my ($projid, $repoid) = split('/', $prp, 2);
     unshift @{$ret->{'path'}}, {'project' => $projid, 'repository' => $repoid};
-    return;
+    $ret->{'path'}->[0]->{'priority'} = $prio if defined $prio;
+    return 1;
   } else {
     # this is just for testing purposes...
     $url =~ s/^\/+$//;
     $url =~ s/:\//:/g;
     my @url = split('/', $url);
     unshift @{$ret->{'path'}}, {'project' => $url[-2], 'repository' => $url[-1]} if @url >= 2;
+    $ret->{'path'}->[0]->{'priority'} = $prio if defined $prio;
+    return 1;
   }
-  return 1;
 }
 
 sub cmd_zypper {
@@ -142,7 +146,7 @@ sub parse {
     'name' => 'docker',
     'deps' => [],
     'path' => [],
-    'repo_urls' => [],
+    'imagerepos' => [],
   };
 
   while (@lines) {
@@ -222,8 +226,7 @@ sub showcontainerinfo {
   for (@tags) {
     $_ .= ':latest' unless /:[^:\/]+$/;
   }
-  @tags = map {"\"$_\""} @tags;
-  my @repos = map {"{ \"url\": \"$_\" }"} @{$d->{'repo_urls'} || []};
+  my @repos = @{$d->{'imagerepos'} || []};
   if ($annotationfile) {
     my $annotation = slurp($annotationfile);
     $annotation = Build::SimpleXML::parse($annotation) if $annotation;
@@ -233,17 +236,20 @@ sub showcontainerinfo {
     $annorepos = undef unless $annorepos && ref($annorepos) eq 'ARRAY';
     for my $annorepo (@{$annorepos || []}) {
       next unless $annorepo && ref($annorepo) eq 'HASH' && $annorepo->{'url'};
-      push @repos, "{ \"url\": \"$annorepo->{'url'}\" }";
+      push @repos, { 'url' => $annorepo->{'url'}, '_type' => {'priority' => 'number'} };
+      $repos[-1]->{'priority'} = $annorepo->{'priority'} if defined $annorepo->{'priority'};
     }
   }
   my $buildtime = time();
-  print "{\n";
-  print "  \"tags\": [ ".join(', ', @tags)." ]";
-  print ",\n  \"repos\": [ ".join(', ', @repos)." ]" if @repos;
-  print ",\n  \"file\": \"$image\"" if defined $image;
-  print ",\n  \"disturl\": \"$disturl\"" if defined $disturl;
-  print ",\n  \"buildtime\": $buildtime";
-  print "\n}\n";
+  my $containerinfo = {
+    'buildtime' => $buildtime,
+    '_type' => {'buildtime' => 'number'},
+  };
+  $containerinfo->{'tags'} = \@tags if @tags;
+  $containerinfo->{'repos'} = \@repos if @repos;
+  $containerinfo->{'file'} = $image if defined $image;
+  $containerinfo->{'disturl'} = $disturl if defined $disturl;
+  print Build::SimpleJSON::unparse($containerinfo)."\n";
 }
 
 sub showtags {
