@@ -223,12 +223,14 @@ sub kiwiparse {
   my $obsexclusivearch;
   my $obsexcludearch;
   my $obsprofiles;
+  my $unorderedrepos;
   $obsexclusivearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExclusiveArch:\s+(.*)\s+-->\s*$/im;
   $obsexcludearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExcludeArch:\s+(.*)\s+-->\s*$/im;
   $obsprofiles = $1 if $xml =~ /^\s*<!--\s+OBS-Profiles:\s+(.*)\s+-->\s*$/im;
   if ($obsprofiles) {
     $obsprofiles = [ grep {defined($_)} map {$_ eq '@BUILD_FLAVOR@' ? $buildflavor : $_} split(' ', $obsprofiles) ];
   }
+  $unorderedrepos = 1 if $xml =~ /^\s*<!--\s+OBS-UnorderedRepos\s+-->\s*$/im;
 
   my $schemaversion = $kiwi->{'schemaversion'} ? versionstring($kiwi->{'schemaversion'}) : 0;
   $ret->{'name'} = $kiwi->{'name'} if $kiwi->{'name'};
@@ -445,6 +447,7 @@ sub kiwiparse {
   }
   push @packages, "kiwi-packagemanager:$packman";
   push @packages, "--dorecommends--", "--dosupplements--" if $patterntype && $patterntype eq 'plusRecommended';
+  push @packages, '--unorderedimagerepos', if $unorderedrepos;
 
   $ret->{'exclarch'} = [ unify(split(' ', $obsexclusivearch)) ] if $obsexclusivearch;
   $ret->{'badarch'} = [ unify(split(' ', $obsexcludearch)) ] if $obsexcludearch;

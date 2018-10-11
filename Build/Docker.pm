@@ -138,6 +138,7 @@ sub parse {
   my ($cf, $fn) = @_;
 
   my $basecontainer;
+  my $unorderedrepos;
   my $dockerfile_data = slurp($fn);
   return { 'error' => 'could not open Dockerfile' } unless defined $dockerfile_data;
 
@@ -156,6 +157,9 @@ sub parse {
       if ($line =~ /^#!BuildTag:\s*(.*?)$/) {
 	my @tags = split(' ', $1);
 	push @{$ret->{'containertags'}}, @tags if @tags;
+      }
+      if ($line =~ /^#!UnorderedRepos\s*$/) {
+        $unorderedrepos = 1;
       }
       next;
     }
@@ -210,6 +214,7 @@ sub parse {
     }
   }
   push @{$ret->{'deps'}}, "container:$basecontainer" if $basecontainer;
+  push @{$ret->{'deps'}}, '--unorderedimagerepos' if $unorderedrepos;
   return $ret;
 }
 
