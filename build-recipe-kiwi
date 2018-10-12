@@ -652,6 +652,67 @@ postprocess_kiwi_containers() {
     fi
 }
 
+createrepo_debian_kiwi() {
+    local dir=$1
+    local prp=$2
+    local arch=$(chroot $BUILD_ROOT su -c "dpkg-architecture -qDEB_BUILD_ARCH")
+    cat >"${BUILD_ROOT}/.createrepo_debian.tmp.sh" <<-EOF
+	cd "$dir" || exit 1
+	dpkg-scanpackages -m . > Packages
+	gzip -c9 < Packages > Packages.gz
+	dpkg-scansources . > Sources
+	gzip -c9 < Sources > Sources.gz
+	EOF
+    chroot $BUILD_ROOT su -c "sh /.createrepo_debian.tmp.sh" - root
+    cat > "${BUILD_ROOT}/$dir/Release" <<-EOF
+	Origin: obs:/$prp
+	Label: ${prp%/*}
+	Codename: ${prp#*/}
+	Architectures: $arch
+	Description: obs repository for $prp
+	EOF
+    echo "SHA256:" >> "${BUILD_ROOT}/$dir/Release"
+    for file in "${BUILD_ROOT}/$dir/Packages"* "${BUILD_ROOT}/$dir/Sources"*; do
+	local SUM=( $(sha256sum ${file}) )
+	local SIZE=$(stat -c '%s' ${file})
+	echo " ${SUM} ${SIZE} ${file#${BUILD_ROOT}/$dir/}" >> "${BUILD_ROOT}/$dir/Release"
+    done
+}
+
+createrepo_debian_dist_kiwi() {
+    local dir=$1
+    local prp=$2
+    local dist=$3
+    local arch=$(chroot $BUILD_ROOT su -c "dpkg-architecture -qDEB_BUILD_ARCH")
+    mkdir -p "${BUILD_ROOT}/$dir/dists/${dist}/main/binary-$arch"
+    mkdir -p "${BUILD_ROOT}/$dir/dists/${dist}/main/source"
+    cat >"${BUILD_ROOT}/.createrepo_debian.tmp.sh" <<-EOF
+	cd "$dir" || exit 1
+	dpkg-scanpackages -m . > dists/${dist}/main/binary-$arch/Packages
+	gzip -c9 < dists/${dist}/main/binary-$arch/Packages > dists/${dist}/main/binary-$arch/Packages.gz
+	dpkg-scansources . > dists/${dist}/main/source/Sources
+	gzip -c9 < dists/${dist}/main/source/Sources > dists/${dist}/main/source/Sources.gz
+	EOF
+    chroot $BUILD_ROOT su -c "sh /.createrepo_debian.tmp.sh" - root
+    ln -s ${dist} ${BUILD_ROOT}/$dir/dists/stable
+
+    cat > "${BUILD_ROOT}/$dir/dists/${dist}/Release" <<-EOF
+	Origin: obs:/$prp
+	Label: ${prp%/*}
+	Suite: stable
+	Codename: $dist
+	Architectures: $arch
+	Description: obs repository for $prp
+	Components: main
+	EOF
+    echo "SHA256:" >> "${BUILD_ROOT}/$dir/dists/${dist}/Release"
+    for file in "${BUILD_ROOT}/$dir/dists/${dist}/main"/*/Packages* "${BUILD_ROOT}/$dir/$dists/main/source"/Sources*; do
+	local SUM=( $(sha256sum ${file}) )
+	local SIZE=$(stat -c '%s' ${file})
+	echo " ${SUM} ${SIZE} ${file#${BUILD_ROOT}/$dir/dists/${dist}/}" >> "${BUILD_ROOT}/$dir/dists/${dist}/Release"
+    done
+}
+
 recipe_build_kiwi() {
     imagetype=$(kiwi_query_recipe imagetype)
     imagename=$(kiwi_query_recipe filename)
@@ -666,6 +727,11 @@ recipe_build_kiwi() {
     ln -sf $TOPDIR/SOURCES/repos $BUILD_ROOT/repos
     test -d $BUILD_ROOT/$TOPDIR/SOURCES/containers && ln -sf $TOPDIR/SOURCES/containers $BUILD_ROOT/containers
     cd $BUILD_ROOT/$TOPDIR/SOURCES/repos
+    DEBDIST=
+    if test -x "$BUILD_ROOT/usr/sbin/debootstrap" ; then
+	DEBDIST=$(sed -ne 's/.*<repository.*distribution="\([^"]*\)".*/\1/p' <"$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" | head -n 1)
+	echo "using distribution '$DEBDIST'"
+    fi
     for r in *[^:]/* ; do
         test -L $r && continue
         test -d $r || continue
@@ -680,11 +746,18 @@ recipe_build_kiwi() {
 	    repo="$TOPDIR/SOURCES/repos/${rc%/*}/${rc##*/}/"
         fi
         if test "$imagetype" != product -a "$DO_INIT" != "false" ; then
-	    echo "creating repodata for $repo"
-	    if chroot $BUILD_ROOT createrepo --no-database --simple-md-filenames --help >/dev/null 2>&1 ; then
-		chroot $BUILD_ROOT createrepo --no-database --simple-md-filenames "$repo"
+	    if ! test -x "$BUILD_ROOT/usr/sbin/debootstrap" ; then
+		
+		echo "creating repodata for $r"
+		if chroot $BUILD_ROOT createrepo --no-database --simple-md-filenames --help >/dev/null 2>&1 ; then
+		    chroot $BUILD_ROOT createrepo --no-database --simple-md-filenames "$repo"
+		else
+		    chroot $BUILD_ROOT createrepo "$repo"
+		fi
 	    else
-		chroot $BUILD_ROOT createrepo "$repo"
+		echo "creating debian repodata for $r"
+		createrepo_debian_kiwi "$repo" "$r"
+		test -n "$DEBDIST" && createrepo_debian_dist_kiwi "$repo" "$r" "$DEBDIST"
 	    fi
         fi
     done
