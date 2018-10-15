@@ -33,7 +33,8 @@ install:
 	    $(DESTDIR)$(pkglibdir)/Build \
 	    $(DESTDIR)$(pkglibdir)/emulator \
 	    $(DESTDIR)$(bindir) \
-	    $(DESTDIR)$(man1dir)
+	    $(DESTDIR)$(man1dir) \
+	    $(DESTDIR)$(sysconfdir)/rpm
 	install -m755 \
 	    build \
 	    vc \
@@ -79,6 +80,7 @@ install:
 	    $(DESTDIR)$(pkglibdir)
 	install -m755 emulator/emulator.sh $(DESTDIR)$(pkglibdir)/emulator/
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build
+	install -m644 macros.build $(DESTDIR)$(sysconfdir)/rpm
 	install -m644 qemu-reg $(DESTDIR)$(pkglibdir)
 	install -m644 build-vm build-vm-* $(DESTDIR)$(pkglibdir)
 	install -m644 build-recipe build-recipe-* $(DESTDIR)$(pkglibdir)

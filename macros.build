@@ -1,0 +1,9 @@
+# obs build related macros
+#
+
+# Called from <HOME>/.rpmmacros to add a debug package depending on obs project settings.
+# We place this here to allow projects to override this
+%_build_insert_debug_package \
+%global __debug_package 1 \
+%undefine _enable_debug_packages \
+%debug_package
