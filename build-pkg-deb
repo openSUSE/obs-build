@@ -21,6 +21,8 @@
 #
 ################################################################
 
+DEB_UNSAFE_IO=
+
 #
 # A wrapper around chroot to set the environment correctly for dpkg and
 # pre/postinst scripts.
@@ -57,15 +59,19 @@ pkg_initdb_deb() {
 	rm -f $BUILD_ROOT/.init_b_cache/dpkg.deb
 	cp $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb $BUILD_ROOT/.init_b_cache/dpkg.deb || cleanup_and_exit 1
     fi
-    deb_chroot $BUILD_ROOT dpkg --install --force-unsafe-io --force-depends .init_b_cache/dpkg.deb >/dev/null 2>&1
+    DEB_UNSAFE_IO=
+    chroot $BUILD_ROOT dpkg --force-unsafe-io --version >/dev/null 2>&1 && DEB_UNSAFE_IO="--force-unsafe-io"
+    deb_chroot $BUILD_ROOT dpkg --install $DEB_UNSAFE_IO --force-depends .init_b_cache/dpkg.deb >/dev/null 2>&1
 }
 
 pkg_prepare_deb() {
-    :
+    # test if dpkg knows --force-unsafe-io
+    DEB_UNSAFE_IO=
+    chroot $BUILD_ROOT dpkg --force-unsafe-io --version >/dev/null 2>&1 && DEB_UNSAFE_IO="--force-unsafe-io"
 }
 
 pkg_install_deb() {
-    ( deb_chroot $BUILD_ROOT dpkg --install --force-unsafe-io --force-depends .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
+    ( deb_chroot $BUILD_ROOT dpkg --install $DEB_UNSAFE_IO --force-depends .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
 	perl -ne '$|=1;/^(Configuration file|Installing new config file|Selecting previously deselected|Selecting previously unselected|\(Reading database|Unpacking |Setting up|Creating config file|Preparing to replace dpkg|Preparing to unpack )/||/^$/||print'
     # ugly workaround for upstart system. some packages (procps) try
     # to start a service in their configure phase. As we don't have
