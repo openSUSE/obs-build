@@ -1,4 +1,18 @@
 -------------------------------------------------------------------
+Mon Oct 22 09:43:20 UTC 2018 - Adrian Schröter <adrian@suse.de>
+
+- require psmisc util for fuser
+- Start debian support for kiwi images/containers
+- Support building with unordered repositories for kiwi/docker builds
+- Write the package list of the base container in kiwi container builds
+- Support kiwi's "additionaltags" attribute (added in kiwi 9.15.3)
+- Add some substitutes for the extra container tags
+- Support "OBS-AddTag" directive to set multiple container tags in kiwi builds
+- Archlinux updates
+- SLE 12 SP4 config
+- Appimage: support source file parsing
+
+-------------------------------------------------------------------
 Wed Aug 29 13:57:07 UTC 2018 - Adrian Schröter <adrian@suse.de>
 
 - Fall back to $mailaddr if $VC_MAILADDR is unset/null
