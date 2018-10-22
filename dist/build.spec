@@ -33,6 +33,8 @@ Requires:       bash
 Requires:       binutils
 Requires:       perl
 Requires:       tar
+# needed for fuser
+Requires:       psmisc
 %if 0%{?fedora}
 Requires:       perl-MD5
 Requires:       perl-TimeDate
