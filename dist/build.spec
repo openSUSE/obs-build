@@ -35,6 +35,8 @@ Requires:       perl
 Requires:       tar
 # needed for fuser
 Requires:       psmisc
+# just to verify existence of packages
+BuildRequires:       psmisc bash binutiles perl tar
 %if 0%{?fedora}
 Requires:       perl-MD5
 Requires:       perl-TimeDate
