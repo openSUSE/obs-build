@@ -526,18 +526,26 @@ sub show {
 }
 
 sub showcontainerinfo {
-  my ($disturl, $arch, $buildflavor);
-  (undef, $disturl) = splice(@ARGV, 0, 2) if @ARGV > 2 && $ARGV[0] eq '--disturl';
-  (undef, $arch) = splice(@ARGV, 0, 2) if @ARGV > 2 && $ARGV[0] eq '--arch';
-  (undef, $buildflavor) = splice(@ARGV, 0, 2) if @ARGV > 2 && $ARGV[0] eq '--buildflavor';
+  my ($disturl, $arch, $buildflavor, $release);
+  while (@ARGV) {
+    if (@ARGV > 2 && $ARGV[0] eq '--disturl') {
+      (undef, $disturl) = splice(@ARGV, 0, 2);
+    } elsif (@ARGV > 2 && $ARGV[0] eq '--arch') {
+      (undef, $arch) = splice(@ARGV, 0, 2);
+    } elsif (@ARGV > 2 && $ARGV[0] eq '--buildflavor') {
+      (undef, $buildflavor) = splice(@ARGV, 0, 2);
+    } elsif (@ARGV > 2 && $ARGV[0] eq '--release') {
+      (undef, $release) = splice(@ARGV, 0, 2);
+    } else {
+      last;
+    }
+  }
   my ($fn, $image) = @ARGV;
   local $urlmapper = sub { return $_[0] };
-  my $release;
-  $release = $1 if $image =~ /.*-Build(\d+\.\d+).*/;
   my $cf = {};
   $cf->{'arch'} = $arch if defined $arch;
   $cf->{'buildflavor'} = $buildflavor if defined $buildflavor;
-  $cf->{'buildrelease'} = $release if $release;
+  $cf->{'buildrelease'} = $release if defined $release;
   my $d = parse($cf, $fn);
   die("$d->{'error'}\n") if $d->{'error'};
   $image =~ s/.*\/// if defined $image;
@@ -553,7 +561,7 @@ sub showcontainerinfo {
     '_type' => {'buildtime' => 'number'},
   };
   $containerinfo->{'version'} = $d->{'version'} if defined $d->{'version'};
-  $containerinfo->{'release'} = $release if defined $d->{'version'};
+  $containerinfo->{'release'} = $release if defined $release;
   $containerinfo->{'tags'} = $d->{'container_tags'} if @{$d->{'container_tags'} || []};
   $containerinfo->{'repos'} = \@repos if @repos;
   $containerinfo->{'file'} = $image if defined $image;

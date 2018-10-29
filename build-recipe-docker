@@ -101,13 +101,16 @@ recipe_build_docker() {
 	chroot $BUILD_ROOT bash -c "cd $TOPDIR/SOURCES/repos && dpkg-scanpackages -m . | gzip > Packages.gz"
     fi
 
-    # Find tags
+    # find tags, first look into recipe file
     FIRSTTAG=
     ALLTAGS=
+    args=()
+    test -n "$RELEASE" && args=("${args[@]}" --release "$RELEASE")
     for t in $(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showtags "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE") ; do
 	test -n "$FIRSTTAG" || FIRSTTAG="$t"
         ALLTAGS="$ALLTAGS $t"
     done
+    # if we did not find a tag, look info a file called TAG
     if test -z "$FIRSTTAG" -a -f TAG ; then
 	for t in $(egrep -v '^#' TAG) ; do
 	    test -n "$FIRSTTAG" || FIRSTTAG="$t"
@@ -143,19 +146,22 @@ recipe_build_docker() {
         cleanup_and_exit 1 "Docker build command failed"
     fi
 
-    # Save the resulting image to a tarball. Use tag for generating the file name.
-    echo "Saving image $FIRSTTAG"
+    # Save the resulting image to a tarball. Use first tag for generating the file name.
     mkdir -p $BUILD_ROOT$TOPDIR/DOCKER
     FILENAME="$FIRSTTAG"
     FILENAME="${FILENAME//[\/:]/-}"
+    FILENAME="$FILENAME.${BUILD_ARCH%%:*}"
+    test -n "$RELEASE" && FILENAME="$FILENAME-$RELEASE"
+    echo "Saving image $FIRSTTAG to $FILENAME.tar"
     if ! chroot $BUILD_ROOT $DOCKER_TOOL save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$FIRSTTAG" ; then
         cleanup_and_exit 1 "Docker save command failed"
     fi
     
     # Create containerinfo
-    disturlarg=()
-    test -n "$DISTURL" && disturlarg=("--disturl" "$DISTURL")
-    perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo -- "${disturlarg[@]}" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$ALLTAGS" containers/annotation> "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
+    args=()
+    test -n "$DISTURL" && args=("${args[@]}" --disturl "$DISTURL")
+    test -n "$RELEASE" && args=("${args[@]}" --release "$RELEASE")
+    perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo -- "${args[@]}" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$ALLTAGS" containers/annotation > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
 
     # We're done. Clean up.
     recipe_cleanup_docker

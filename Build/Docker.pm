@@ -156,6 +156,10 @@ sub parse {
     if ($line =~ /^#/) {
       if ($line =~ /^#!BuildTag:\s*(.*?)$/) {
 	my @tags = split(' ', $1);
+	my $release = $cf->{'buildrelease'};
+	for (@tags) {
+	  s/<RELEASE>/$release/g if $release;
+	}
 	push @{$ret->{'containertags'}}, @tags if @tags;
       }
       if ($line =~ /^#!UnorderedRepos\s*$/) {
@@ -219,17 +223,30 @@ sub parse {
 }
 
 sub showcontainerinfo {
-  my $disturl;
-  (undef, $disturl) = splice(@ARGV, 0, 2) if @ARGV > 2 && $ARGV[0] eq '--disturl';
+  my ($disturl, $release);
+  while (@ARGV) {
+    if (@ARGV > 2 && $ARGV[0] eq '--disturl') {
+      (undef, $disturl) = splice(@ARGV, 0, 2); 
+    } elsif (@ARGV > 2 && $ARGV[0] eq '--release') {
+      (undef, $release) = splice(@ARGV, 0, 2); 
+    } else {
+      last;
+    }   
+  }
   my ($fn, $image, $taglist, $annotationfile) = @ARGV;
   local $Build::Kiwi::urlmapper = sub { return $_[0] };
+  my $cf = {};
+  $cf->{'buildrelease'} = $release if defined $release;
   my $d = {};
-  $d = parse({}, $fn) if $fn;
+  $d = parse($cf, $fn) if $fn;
   die("$d->{'error'}\n") if $d->{'error'};
   $image =~ s/.*\/// if defined $image;
   my @tags = split(' ', $taglist);
   for (@tags) {
     $_ .= ':latest' unless /:[^:\/]+$/;
+    if (/:([0-9][^:]*)$/) {
+      $d->{'version'} = $1 unless defined $d->{'version'};
+    }
   }
   my @repos = @{$d->{'imagerepos'} || []};
   if ($annotationfile) {
@@ -254,14 +271,26 @@ sub showcontainerinfo {
   $containerinfo->{'repos'} = \@repos if @repos;
   $containerinfo->{'file'} = $image if defined $image;
   $containerinfo->{'disturl'} = $disturl if defined $disturl;
+  $containerinfo->{'version'} = $d->{'version'} if defined $d->{'version'};
+  $containerinfo->{'release'} = $release if defined $release;
   print Build::SimpleJSON::unparse($containerinfo)."\n";
 }
 
 sub showtags {
+  my ($release);
+  while (@ARGV) {
+    if (@ARGV > 2 && $ARGV[0] eq '--release') {
+      (undef, $release) = splice(@ARGV, 0, 2); 
+    } else {
+      last;
+    }   
+  }
   my ($fn) = @ARGV;
   local $Build::Kiwi::urlmapper = sub { return $_[0] };
+  my $cf = {};
+  $cf->{'buildrelease'} = $release if defined $release;
   my $d = {};
-  $d = parse({}, $fn) if $fn;
+  $d = parse($cf, $fn) if $fn;
   die("$d->{'error'}\n") if $d->{'error'};
   print "$_\n" for @{$d->{'containertags'} || []};
 }
