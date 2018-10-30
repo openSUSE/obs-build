@@ -68,8 +68,8 @@ recipe_build_docker() {
         if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver "$TOPDIR/SOURCES/repos" ; then
              cleanup_and_exit 1
         fi
-        DOCKERD_STARTED=true
     fi
+    DOCKERD_STARTED=true
 
     cp $BUILD_DIR/obs-docker-support "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
     chmod 755 "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
