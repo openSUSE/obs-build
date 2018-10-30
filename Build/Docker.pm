@@ -156,11 +156,10 @@ sub parse {
     if ($line =~ /^#/) {
       if ($line =~ /^#!BuildTag:\s*(.*?)$/) {
 	my @tags = split(' ', $1);
-	my $release = $cf->{'buildrelease'};
-	for (@tags) {
-	  s/<RELEASE>/$release/g if $release;
-	}
 	push @{$ret->{'containertags'}}, @tags if @tags;
+      }
+      if ($line =~ /^#!BuildVersion:\s*(\S+)\s*$/) {
+	$ret->{'version'} = $1;
       }
       if ($line =~ /^#!UnorderedRepos\s*$/) {
         $unorderedrepos = 1;
@@ -219,6 +218,12 @@ sub parse {
   }
   push @{$ret->{'deps'}}, "container:$basecontainer" if $basecontainer;
   push @{$ret->{'deps'}}, '--unorderedimagerepos' if $unorderedrepos;
+  my $version = $ret->{'version'};
+  my $release = $cf->{'buildrelease'};
+  for (@{$ret->{'containertags'} || []}) {
+    s/<VERSION>/$version/g if defined $version;
+    s/<RELEASE>/$release/g if defined $release;
+  }
   return $ret;
 }
 
