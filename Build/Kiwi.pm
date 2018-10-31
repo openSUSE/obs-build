@@ -231,6 +231,9 @@ sub kiwiparse {
     $obsprofiles = [ grep {defined($_)} map {$_ eq '@BUILD_FLAVOR@' ? $buildflavor : $_} split(' ', $obsprofiles) ];
   }
   $unorderedrepos = 1 if $xml =~ /^\s*<!--\s+OBS-UnorderedRepos\s+-->\s*$/im;
+  for ($xml =~ /^\s*<!--\s+OBS-Imagerepo:\s+(.*)\s+-->\s*$/img) {
+    push @imagerepos, { 'url' => $_ };
+  }
 
   my $schemaversion = $kiwi->{'schemaversion'} ? versionstring($kiwi->{'schemaversion'}) : 0;
   $ret->{'name'} = $kiwi->{'name'} if $kiwi->{'name'};
