@@ -30,6 +30,7 @@ kvm_device=virtio-blk-pci
 kvm_serial_device=
 kvm_rng_device=virtio-rng-pci
 kvm_options=
+kvm_cpu="-cpu host"
 
 kvm_check_ppc970() {
     if ! grep -q -E '(kvm_rma_count.*kvm_hpt_count)|(kvm_hpt_count.*kvm_rma_count)' /proc/cmdline ; then 
@@ -73,7 +74,7 @@ vm_verify_options_kvm() {
 	armv7l)
 	    kvm_bin="/usr/bin/qemu-system-arm"
 	    kvm_console=ttyAMA0
-	    kvm_options="-enable-kvm -M virt -cpu host"
+	    kvm_options="-enable-kvm -M virt"
 	    vm_kernel=/boot/zImage
 	    vm_initrd=/boot/initrd
 	    # prefer the guest kernel/initrd
@@ -88,12 +89,13 @@ vm_verify_options_kvm() {
 	    vm_kernel=/boot/Image
 	    vm_initrd=/boot/initrd
             if test "${BUILD_ARCH#aarch}" != "$BUILD_ARCH" -o "${BUILD_ARCH#armv8}" != "$BUILD_ARCH"; then
-		kvm_options="-enable-kvm -cpu host"
+		kvm_options="-enable-kvm"
 		test -e /boot/Image.guest && vm_kernel=/boot/Image.guest
 		test -e /boot/initrd.guest && vm_initrd=/boot/initrd.guest
 	    else
 		# Running an armv7 kernel on aarch64
-		kvm_options="-enable-kvm -cpu host,aarch64=off"
+		kvm_options="-enable-kvm"
+		kvm_cpu="-cpu host,aarch64=off"
 		# prefer the guest kernel/initrd
 		test -e /boot/Image.guest32 && vm_kernel=/boot/Image.guest32
 		test -e /boot/initrd.guest32 && vm_initrd=/boot/initrd.guest32
@@ -129,6 +131,7 @@ vm_verify_options_kvm() {
 	    fi
 	    grep -q "pSeries" /proc/cpuinfo && kvm_device=scsi-hd	# no virtio on pSeries
 	    grep -q "PowerNV" /proc/cpuinfo || kvm_device=scsi-hd	# no virtio on ppc != power7 yet
+	    grep -q "POWER9" /proc/cpuinfo && kvm_cpu="-cpu host,compat=power8"
 	    ;;
 	s390|s390x)
 	    kvm_bin="/usr/bin/qemu-system-s390x"
@@ -257,7 +260,6 @@ vm_startup_kvm() {
 	qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS,threads=$BUILD_THREADS")
     fi
     if test "$VM_TYPE" = kvm ; then
-	test "$kvm_console" != ttyAMA0 && kvm_options="$kvm_options -cpu host"
 	test -n "$HUGETLBFSPATH" && kvm_options="$kvm_options -mem-prealloc -mem-path $HUGETLBFSPATH"
     fi
     qemu_append="root=$VM_ROOTDEV"
@@ -280,7 +282,7 @@ vm_startup_kvm() {
     if test -n "$VM_CUSTOMOPT"; then
         kvm_options="$kvm_options $VM_CUSTOMOPT"
     fi
-    set -- $qemu_bin -nodefaults -no-reboot -nographic -vga none $kvm_options \
+    set -- $qemu_bin -nodefaults -no-reboot -nographic -vga none $kvm_cpu $kvm_options \
 	-kernel $vm_kernel \
 	-initrd $vm_initrd \
 	-append "$qemu_append" \
