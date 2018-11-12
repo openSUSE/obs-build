@@ -20,13 +20,22 @@ sysconfdir=/etc
 DESTDIR=
 
 all:
+ifeq ($(SCM),svn)
+	echo $(VERSION)$(SVNVER) > version
+else
+ifeq ($(SCM),git)
+	echo $(VERSION)_git$(DATE) > version
+else
+	echo $(VERSION) > version
+endif
+endif
 
 .PHONY:	test
 
 test:
 	PERL5LIB=. prove -v
 
-install:
+install: all
 	install -m755 -d \
 	    $(DESTDIR)$(pkglibdir)/configs \
 	    $(DESTDIR)$(pkglibdir)/baselibs_configs \
@@ -85,6 +94,7 @@ install:
 	install -m644 build-recipe build-recipe-* $(DESTDIR)$(pkglibdir)
 	install -m644 build-pkg build-pkg-* $(DESTDIR)$(pkglibdir)
 	install -m644 *.pm lxc.conf $(DESTDIR)$(pkglibdir)
+	install -m644 version $(DESTDIR)$(pkglibdir)
 	install -m644 configs/* $(DESTDIR)$(pkglibdir)/configs
 	install -m644 baselibs_configs/* $(DESTDIR)$(pkglibdir)/baselibs_configs
 	install -m644 build.1 $(DESTDIR)$(man1dir)

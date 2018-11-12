@@ -461,6 +461,8 @@ getcachedir() {
     done
 }
 
+echo "init_buildsystem version: $BUILD_VERSION"
+
 set_build_arch
 
 trap fail_exit EXIT
