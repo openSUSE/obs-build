@@ -51,7 +51,7 @@ recipe_build_debootstrap() {
     fi
 
     set -- chroot $BUILD_ROOT debootstrap --keep-debootstrap-dir --no-check-gpg --variant=buildd --arch="${arch}" --include="$FULL_PKG_LIST" "$dist" "$myroot" file:///.build.binaries
-    echo "running debootstrap..."
+    echo "running debootstrap:$(printf ' %q' "$@")..."
     if ! "$@" || ! chroot $BUILD_ROOT dpkg --configure -a; then
         cat $BUILD_ROOT/$myroot/debootstrap/debootstrap.log
         cleanup_and_exit 1 "Failed to setup debootstrap chroot"
