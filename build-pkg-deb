@@ -143,6 +143,7 @@ pkg_preinstall_deb() {
     elif test -f "control.tar.xz" ; then
     $TAR -C .init_b_cache/scripts/control -J -f control.tar.xz
     fi
+    grep '^Version:' .init_b_cache/scripts/control/control || echo 'Version: unknown'
     if test -f "data.tar.gz" ; then
 	$TAR -z -f data.tar.gz
     elif test -f "data.tar.xz" ; then
