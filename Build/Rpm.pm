@@ -898,13 +898,18 @@ sub verscmp_part {
   return 1 if !defined $s2;
   return 0 if $s1 eq $s2;
   while (1) {
-    $s1 =~ s/^[^a-zA-Z0-9~]+//;
-    $s2 =~ s/^[^a-zA-Z0-9~]+//;
+    $s1 =~ s/^[^a-zA-Z0-9~\^]+//;
+    $s2 =~ s/^[^a-zA-Z0-9~\^]+//;
     if ($s1 =~ s/^~//) {
       next if $s2 =~ s/^~//;
       return -1;
     }
     return 1 if $s2 =~ /^~/;
+    if ($s1 =~ s/^\^//) {
+      next if $s2 =~ s/^\^//;
+      return $s2 eq '' ? 1 : -1;
+    }
+    return $s1 eq '' ? -1 : 1 if $s2 =~ /^\^/;
     if ($s1 eq '') {
       return $s2 eq '' ? 0 : -1;
     }
