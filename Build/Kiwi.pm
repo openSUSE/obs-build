@@ -130,6 +130,7 @@ sub kiwiparse_product {
     for my $po (@{$productoptions->{'productoption'} || []}) {
       $ret->{'sourcemedium'} = $po->{'_content'} if $po->{'name'} eq 'SOURCEMEDIUM';
       $ret->{'debugmedium'} = $po->{'_content'} if $po->{'name'} eq 'DEBUGMEDIUM';
+      $ret->{'milestone'} = $po->{'_content'} if $po->{'name'} eq 'BETA_VERSION';
     }
   }
   if ($instsource->{'architectures'}) {

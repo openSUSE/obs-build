@@ -347,6 +347,7 @@ run_suse_isolinux() {
 }
 
 perform_product_bundle() {
+    local milestone=$(kiwi_query_recipe milestone)
     pushd $BUILD_ROOT/$TOPDIR/KIWIROOT/main
     for i in * ; do
 	test -e "$i" || continue
@@ -357,7 +358,10 @@ perform_product_bundle() {
                    fi
                    mv "$i" $BUILD_ROOT/$TOPDIR/KIWI/. ;;
 	    *.packages) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
-	    *.report) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
+	    *.report)
+		mv $i $BUILD_ROOT/$TOPDIR/OTHER/.
+		test -n "$milestone" && echo "$milestone" > $BUILD_ROOT/$TOPDIR/OTHER/${i%.report}.milestone
+		;;
 	    scripts) ;;
 	    *0) ;;
 	    *) test -d $i -a "$drop_repo" != true  && mv $i $BUILD_ROOT/$TOPDIR/KIWI/. ;;
