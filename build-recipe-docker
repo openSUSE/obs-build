@@ -84,12 +84,12 @@ recipe_build_docker() {
     # Inspect the content of the image to decide if this is a layered image
     # or a filesystem one. We need to know if we will "docker load" it or
     # "docker import" it.
-    if tar -tf $base_image_path | grep "^manifest.json" -q; then
+    if tar -tf $base_image_path | grep -q "^manifest.json" ; then
         echo "Layered image found"
         chroot $BUILD_ROOT $DOCKER_TOOL load --input $TOPDIR/SOURCES/$base_image_path
     else
         echo "Filesystem image found"
-        desired_tag=$(grep "^\s*FROM" "$RECIPEFILE" | cut -d" " -f2)
+        desired_tag=$(grep "^\s*FROM" "$RECIPEFILE" | head -n 1 | cut -d" " -f2)
         chroot $BUILD_ROOT $DOCKER_TOOL import $TOPDIR/SOURCES/$base_image_path "$desired_tag"
     fi
 
