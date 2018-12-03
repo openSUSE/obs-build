@@ -105,11 +105,8 @@ sub kiwiparse_product {
   for my $repository (sort {$a->{priority} <=> $b->{priority}} @{$instsource->{'instrepo'} || []}) {
     my $kiwisource = ($repository->{'source'} || [])->[0];
     if ($kiwisource->{'path'} eq 'obsrepositories:/') {
-      # special case, OBS will expand it.
-      push @repos, '_obsrepositories';
-      next;
-    }
-    if ($kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
+      push @repos, '_obsrepositories/';		# special case, OBS will expand it.
+    } elsif ($kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
       push @repos, "$1/$2";
     } else {
       my $prp;
@@ -386,12 +383,10 @@ sub kiwiparse {
       push @imagerepos, $imagerepo;
     }
     next if $repository->{'imageonly'};
-    if ($kiwisource->{'path'} eq 'obsrepositories:/') {
-      push @repos, '_obsrepositories/';
-      next;
-    }
     my $prp;
-    if ($kiwisource->{'path'} =~ /^obs:\/{1,3}([^\/]+)\/([^\/]+)\/?$/) {
+    if ($kiwisource->{'path'} eq 'obsrepositories:/') {
+      $prp = '_obsrepositories/';
+    } elsif ($kiwisource->{'path'} =~ /^obs:\/{1,3}([^\/]+)\/([^\/]+)\/?$/) {
       $prp = "$1/$2";
     } else {
       $prp = $urlmapper->($kiwisource->{'path'}) if $urlmapper;
