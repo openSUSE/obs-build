@@ -55,11 +55,21 @@ vm_startup_lxc_standalone() {
     LXCDIR="`lxc-config lxc.lxcpath`/$LXCID"
     LXCROOTFS="$LXCDIR/rootfs"
     LXCHOOK="$LXCDIR/pre-mount.hook"
+    LXCVERSION="$(lxc-create --version)"
     cat $BUILD_DIR/lxc.conf > "$LXCCONF"
     cat >> "$LXCCONF" <<-EOF
 	lxc.rootfs = $LXCROOTFS
 	lxc.hook.pre-mount = $LXCHOOK
 	EOF
+    case "$LXCVERSION" in
+        3.*)
+            sed -i \
+                -e 's/lxc\.aa_profile = /lxc.apparmor.profile = /' \
+                -e 's/lxc\.console = /lxc.console.path = /' \
+                -e 's/lxc\.rootfs = /lxc.rootfs.path = dir:/' \
+                "$LXCCONF"
+            ;;
+    esac
     # XXX: do this always instead of leaking the hosts' one?
     echo "rootfs / rootfs rw 0 0" > $BUILD_ROOT/etc/mtab
     lxc-destroy -n "$LXCID" >/dev/null 2>&1 || true
@@ -69,8 +79,8 @@ vm_startup_lxc_standalone() {
 	mount --bind "$BUILD_ROOT" "$LXCROOTFS"
 	EOF
     chmod a+x "$LXCHOOK"
-    case "$(lxc-create --version)" in
-        1.0.8|1.1.*|2.*)
+    case "$LXCVERSION" in
+        1.0.8|1.1.*|[23].*)
            lxc-create -n "$LXCID" -f "$LXCCONF" -t none || cleanup_and_exit 1
            lxc-start -n "$LXCID" -F "$vm_init_script"
            ;;
