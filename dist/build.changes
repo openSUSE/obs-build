@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Mon Nov 26 09:24:17 UTC 2018 - Max Lin <mlin@suse.com>
+
+- Add Leap 15.1 config
+
+-------------------------------------------------------------------
 Mon Oct 22 09:43:20 UTC 2018 - Adrian Schröter <adrian@suse.de>
 
 - require psmisc util for fuser
