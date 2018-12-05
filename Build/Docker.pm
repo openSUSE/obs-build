@@ -139,6 +139,7 @@ sub parse {
 
   my $basecontainer;
   my $unorderedrepos;
+  my $useobsrepositories;
   my $dockerfile_data = slurp($fn);
   return { 'error' => 'could not open Dockerfile' } unless defined $dockerfile_data;
 
@@ -163,6 +164,9 @@ sub parse {
       }
       if ($line =~ /^#!UnorderedRepos\s*$/) {
         $unorderedrepos = 1;
+      }
+      if ($line =~ /^#!UseOBSRepositories\s*$/) {
+        $useobsrepositories = 1;
       }
       next;
     }
@@ -224,6 +228,7 @@ sub parse {
     s/<VERSION>/$version/g if defined $version;
     s/<RELEASE>/$release/g if defined $release;
   }
+  $ret->{'path'} = [ { 'project' => '_obsrepositories', 'repository' => '' } ] if $useobsrepositories;
   return $ret;
 }
 
