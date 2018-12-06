@@ -877,6 +877,9 @@ vm_first_stage() {
     umount -n $BUILD_ROOT/mnt 2> /dev/null || true
 
     vm_init_script="/.build/build"
+    if test -n "$RUN_SHELL"; then
+        vm_init_script="/bin/bash"
+    fi
     if check_use_emulator ; then
 	vm_init_script="/.build/$INITVM_NAME"
     fi
