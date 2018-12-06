@@ -154,8 +154,15 @@ fi
 echo "Starting container daemon"
 CONTAINERD_BIN=/usr/sbin/containerd
 test -x $BUILD_ROOT/usr/bin/containerd && CONTAINERD_BIN=/usr/bin/containerd
-chroot $BUILD_ROOT $CONTAINERD_BIN --listen unix:///run/containerd/containerd.sock &
-CONTAINERD_PID=$!
+chroot $BUILD_ROOT $CONTAINERD_BIN --help --address /run/containerd/containerd.sock >& /dev/null
+if test "$?" = "0" ; then
+    # newer version knows --address option
+    chroot $BUILD_ROOT $CONTAINERD_BIN --address /run/containerd/containerd.sock &
+    CONTAINERD_PID=$!
+else
+    chroot $BUILD_ROOT $CONTAINERD_BIN --listen unix:///run/containerd/containerd.sock &
+    CONTAINERD_PID=$!
+fi
 echo "$CONTAINERD_PID $DOCKERD_PID $WEBSERVER_PID" > $BUILD_ROOT/.startdockerd.pids
 
 echo "Starting docker daemon"
