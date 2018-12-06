@@ -137,7 +137,7 @@ expand_recipe_directories() {
 			snapcraft) types="snapcraft.yaml" ;;
 		    esac
 		fi
-		types="$types .spec .dsc PKGBUILD build.collax .kiwi .src.rpm .nosrc.rpm simpleimage snapcraft.yaml"
+		types="$types .spec .dsc PKGBUILD Dockerfile build.collax .kiwi .src.rpm .nosrc.rpm simpleimage snapcraft.yaml"
 	    fi
 	    for t in $types ; do
 		found=
