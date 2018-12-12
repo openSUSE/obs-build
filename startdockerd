@@ -166,7 +166,7 @@ fi
 echo "$CONTAINERD_PID $DOCKERD_PID $WEBSERVER_PID" > $BUILD_ROOT/.startdockerd.pids
 
 echo "Starting docker daemon"
-chroot $BUILD_ROOT /usr/bin/dockerd --containerd /run/containerd/containerd.sock --bridge=none --add-runtime oci=/usr/bin/docker-runc &
+chroot $BUILD_ROOT /usr/bin/dockerd --experimental --containerd /run/containerd/containerd.sock --bridge=none --add-runtime oci=/usr/bin/docker-runc &
 DOCKERD_PID=$!
 echo "$CONTAINERD_PID $DOCKERD_PID $WEBSERVER_PID" > $BUILD_ROOT/.startdockerd.pids
 
