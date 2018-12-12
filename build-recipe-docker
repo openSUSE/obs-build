@@ -55,16 +55,21 @@ recipe_prepare_docker() {
 recipe_build_docker() {
     touch $BUILD_ROOT/etc/resolv.conf
 
-    base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
-    test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
+    base_image_path=
+    base_image_tag=$(grep "^\s*FROM" "$RECIPEFILE" | head -n 1 | cut -d" " -f2)
 
-    if test "$BUILDENGINE" = "podman"; then
-        DOCKER_TOOL="podman"
+    if test "$base_image_tag" != scratch ; then
+	base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
+	test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
+    fi
+
+    if test "$BUILDENGINE" = podman; then
+        DOCKER_TOOL=podman
         if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver-only "$TOPDIR/SOURCES/repos" ; then
              cleanup_and_exit 1
         fi
     else
-        DOCKER_TOOL="docker"
+        DOCKER_TOOL=docker
         if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver "$TOPDIR/SOURCES/repos" ; then
              cleanup_and_exit 1
         fi
@@ -74,23 +79,24 @@ recipe_build_docker() {
     cp $BUILD_DIR/obs-docker-support "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
     chmod 755 "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
 
-    echo "Loading base image"
-    if test -L "$base_image_path" ; then
-	# copy into build root
-	cp -L "$base_image_path" "$base_image_path.lnk"
-	mv "$base_image_path.lnk" "$base_image_path"
-    fi
+    if test -n "$base_image_path"; then
+	echo "Loading base image"
+	if test -L "$base_image_path" ; then
+	    # copy into build root
+	    cp -L "$base_image_path" "$base_image_path.lnk"
+	    mv "$base_image_path.lnk" "$base_image_path"
+	fi
 
-    # Inspect the content of the image to decide if this is a layered image
-    # or a filesystem one. We need to know if we will "docker load" it or
-    # "docker import" it.
-    if tar -tf $base_image_path | grep -q "^manifest.json" ; then
-        echo "Layered image found"
-        chroot $BUILD_ROOT $DOCKER_TOOL load --input $TOPDIR/SOURCES/$base_image_path
-    else
-        echo "Filesystem image found"
-        desired_tag=$(grep "^\s*FROM" "$RECIPEFILE" | head -n 1 | cut -d" " -f2)
-        chroot $BUILD_ROOT $DOCKER_TOOL import $TOPDIR/SOURCES/$base_image_path "$desired_tag"
+	# Inspect the content of the image to decide if this is a layered image
+	# or a filesystem one. We need to know if we will "docker load" it or
+	# "docker import" it.
+	if tar -tf $base_image_path | grep -q "^manifest.json" ; then
+	    echo "Layered image found"
+	    chroot $BUILD_ROOT $DOCKER_TOOL load --input $TOPDIR/SOURCES/$base_image_path
+	else
+	    echo "Filesystem image found"
+	    chroot $BUILD_ROOT $DOCKER_TOOL import $TOPDIR/SOURCES/$base_image_path "$base_image_tag"
+	fi
     fi
 
     # Prepare the package repository
