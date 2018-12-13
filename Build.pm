@@ -1282,6 +1282,7 @@ sub expand {
   my $requires = $config->{'requiresh'};
 
   my $xignore = { map {substr($_, 1) => 1} grep {/^-/} @p };
+  $ignoreconflicts = 1 if $xignore->{'-ignoreconflicts--'};
   $ignore = {} if $xignore->{'-ignoreignore--'};
   if ($ignoreignore) {
     $xignore = {};
