@@ -27,6 +27,7 @@
 
 LOCAL_REPOS_D="/etc/repos_obs_dockersupport.d/"
 LOCAL_APTREPOS_D="/etc/aptrepos_obs_dockersupport.d/"
+DATA_DIR=
 
 zypper() {
     cmd=
@@ -164,6 +165,8 @@ yum() {
 obs_docker_support() {
     case "$1" in
     --install|-i)
+	data_url=http://localhost:80
+	test -n "$DATA_DIR" && data_url="file:$DATA_DIR"
 	test -e /usr/bin/zypper && ln -s obs-docker-support /usr/local/sbin/zypper
 	test -e /usr/bin/yum && ln -s obs-docker-support /usr/local/sbin/yum
 	test -e /usr/bin/dnf && ln -s obs-docker-support /usr/local/sbin/dnf
@@ -171,12 +174,12 @@ obs_docker_support() {
 	ln -s obs-docker-support /usr/local/sbin/obs_pkg_mgr
 	if test -e /usr/bin/zypper -o -e /usr/bin/yum -o -e /usr/bin/dnf ; then
 	    mkdir -p "$LOCAL_REPOS_D"
-	    cat >$LOCAL_REPOS_D/obs_repository.repo <<'EOF'
+	    cat >$LOCAL_REPOS_D/obs_repository.repo <<EOF
 [obs_repository]
 name=obs_repository
 enabled=1
 autorefresh=0
-baseurl=http://localhost:80/
+baseurl=$data_url
 type=rpm-md
 gpgcheck=0
 EOF
@@ -184,7 +187,7 @@ EOF
 	fi
 	if test -e /usr/bin/apt-get ; then
 	    mkdir -p "$LOCAL_APTREPOS_D"
-	    echo "deb http://localhost:80 ./" > $LOCAL_APTREPOS_D/obssource
+	    echo "deb $data_url ./" > $LOCAL_APTREPOS_D/obssource
 	    test -e /var/lib/apt && mv /var/lib/apt /var/lib/apt.obssave
 	    /usr/bin/apt-get -o Dir::Etc::SourceList=$LOCAL_APTREPOS_D/obssource -o Dir::Etc::SourceParts=$LOCAL_APTREPOS_D update
 	fi

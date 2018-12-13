@@ -76,6 +76,7 @@ install:
 	    dummyhttpserver \
 	    obs-docker-support \
 	    create_container_package_list \
+	    call-podman \
 	    $(DESTDIR)$(pkglibdir)
 	install -m755 emulator/emulator.sh $(DESTDIR)$(pkglibdir)/emulator/
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build

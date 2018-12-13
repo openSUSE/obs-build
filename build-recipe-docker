@@ -65,9 +65,6 @@ recipe_build_docker() {
 
     if test "$BUILDENGINE" = podman; then
         DOCKER_TOOL=podman
-        if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver-only "$TOPDIR/SOURCES/repos" ; then
-             cleanup_and_exit 1
-        fi
     else
         DOCKER_TOOL=docker
         if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver "$TOPDIR/SOURCES/repos" ; then
@@ -76,7 +73,11 @@ recipe_build_docker() {
     fi
     DOCKERD_STARTED=true
 
-    cp $BUILD_DIR/obs-docker-support "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
+    if test "$DOCKER_TOOL" = podman; then
+	sed -e "s!^DATA_DIR=!DATA_DIR=$TOPDIR/SOURCES/repos!" <"$BUILD_DIR/obs-docker-support" >"$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
+    else
+	cp $BUILD_DIR/obs-docker-support "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
+    fi
     chmod 755 "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
 
     if test -n "$base_image_path"; then
@@ -148,14 +149,22 @@ recipe_build_docker() {
 
     # now do the build
     squashopt=--squash
-    if test -n "$(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::show -- "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" nosquash)" ; then
+    if test "$DOCKER_TOOL" = podman -o -n "$(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::show -- "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" nosquash)" ; then
       squashopt=
       echo "Building image $ALLTAGS (nosquash)"
     else
       echo "Building image $ALLTAGS"
     fi
-    if ! chroot $BUILD_ROOT $DOCKER_TOOL build $squashopt --network=host "${tagargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
-        cleanup_and_exit 1 "Docker build command failed"
+
+
+    if test "$DOCKER_TOOL" = podman ; then
+        if ! $BUILD_DIR/call-podman --root "$BUILD_ROOT" build $squashopt -v "$TOPDIR/SOURCES/repos:$TOPDIR/SOURCES/repos" --network=host "${tagargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
+	    cleanup_and_exit 1 "podman build command failed"
+	fi
+    else
+	if ! chroot $BUILD_ROOT $DOCKER_TOOL build $squashopt --network=host "${tagargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
+	    cleanup_and_exit 1 "docker build command failed"
+	fi
     fi
 
     # Save the resulting image to a tarball. Use first tag for generating the file name.

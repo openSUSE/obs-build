@@ -1,0 +1,83 @@
+#!/bin/bash
+
+export BUILD_DIR=${BUILD_DIR:-/usr/lib/build}
+
+BUILD_ROOT=
+IS_UNSHARED=
+
+cleanup_and_exit() {
+    test -z "$1" && set 0
+    if test -n "$2" ; then 
+	if test "$1" -ne 0 ; then 
+	    echo "$2" >&2
+	else
+	    echo "$2"
+	fi
+    fi   
+    exit $1
+}
+
+while test -n "$1" ; do
+    case "$1" in
+	--root)
+	    BUILD_ROOT="$2"
+	    shift 2
+	    ;;
+	--isunshared)
+	    IS_UNSHARED=true
+	    shift
+	    ;;
+	*)
+	    break
+	    ;;
+    esac
+done
+
+if test -z "$IS_UNSHARED" ; then
+    echo "Unsharing environment"
+    # unshare mounts and network
+    exec unshare -m -n $BUILD_DIR/call-podman --isunshared --root "$BUILD_ROOT" "$@"
+    cleanup_and_exit 1 "exec unshare returned"
+fi
+
+if test -n "$IS_UNSHARED" ; then
+    # make mounts private
+    mount --make-rprivate /
+
+    # create loopback interface
+    if test -x /sbin/ip ; then 
+	ip addr add 127.0.0.1/8 dev lo
+	ip addr add ::1/128 dev lo
+	ip link set lo up
+    else 
+	ifconfig lo 127.0.0.1 up
+	ifconfig lo add ::1/128
+    fi   
+fi
+
+# setup cgroups
+if test "$BUILD_ROOT" != '/' ; then
+    test -d /sys/fs/cgroup || cleanup_and_exit 1 "/sys/fs/cgroup does not exist"
+
+    # make build root a mount point
+    mount --rbind --make-private "$BUILD_ROOT" "$BUILD_ROOT"
+    mount --make-rprivate "$BUILD_ROOT"
+
+    # mount /sys
+    if ! test -e $BUILD_ROOT/sys/block; then
+	mkdir -p $BUILD_ROOT/sys
+	mount -n -tsysfs sys $BUILD_ROOT/sys
+    fi
+    # bind mount cgroups
+    mount --rbind /sys/fs/cgroup "$BUILD_ROOT/sys/fs/cgroup"
+    mount --make-rslave "$BUILD_ROOT/sys/fs/cgroup"
+    export DOCKER_RAMDISK=true
+fi
+
+# setup mounts
+test -e "$BUILD_ROOT/proc/self" || mount -n -tproc none $BUILD_ROOT/proc
+
+# run the command
+exec chroot "$BUILD_ROOT" podman "$@"
+
+
