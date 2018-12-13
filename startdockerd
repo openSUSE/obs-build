@@ -29,6 +29,7 @@ IS_UNSHARED=
 KILL=
 WEBSERVER=
 WEBSERVER_ONLY=
+DOCKERD_EXPERIMANTAL=--experimental
 
 while test -n "$1" ; do
     case "$1" in
@@ -166,7 +167,7 @@ fi
 echo "$CONTAINERD_PID $DOCKERD_PID $WEBSERVER_PID" > $BUILD_ROOT/.startdockerd.pids
 
 echo "Starting docker daemon"
-chroot $BUILD_ROOT /usr/bin/dockerd --containerd /run/containerd/containerd.sock --bridge=none --add-runtime oci=/usr/bin/docker-runc &
+chroot $BUILD_ROOT /usr/bin/dockerd $DOCKERD_EXPERIMANTAL --containerd /run/containerd/containerd.sock --bridge=none --add-runtime oci=/usr/bin/docker-runc &
 DOCKERD_PID=$!
 echo "$CONTAINERD_PID $DOCKERD_PID $WEBSERVER_PID" > $BUILD_ROOT/.startdockerd.pids
 

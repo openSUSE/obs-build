@@ -140,6 +140,7 @@ sub parse {
   my $basecontainer;
   my $unorderedrepos;
   my $useobsrepositories;
+  my $nosquash;
   my $dockerfile_data = slurp($fn);
   return { 'error' => 'could not open Dockerfile' } unless defined $dockerfile_data;
 
@@ -167,6 +168,9 @@ sub parse {
       }
       if ($line =~ /^#!UseOBSRepositories\s*$/) {
         $useobsrepositories = 1;
+      }
+      if ($line =~ /^#!NoSquash\s*$/) {
+        $nosquash = 1;
       }
       next;
     }
@@ -229,6 +233,8 @@ sub parse {
     s/<RELEASE>/$release/g if defined $release;
   }
   $ret->{'path'} = [ { 'project' => '_obsrepositories', 'repository' => '' } ] if $useobsrepositories;
+  $ret->{'basecontainer'} = $basecontainer if $basecontainer;
+  $ret->{'nosquash'} = 1 if $nosquash;
   return $ret;
 }
 
@@ -286,7 +292,7 @@ sub showcontainerinfo {
   print Build::SimpleJSON::unparse($containerinfo)."\n";
 }
 
-sub showtags {
+sub show {
   my ($release);
   while (@ARGV) {
     if (@ARGV > 2 && $ARGV[0] eq '--release') {
@@ -295,14 +301,16 @@ sub showtags {
       last;
     }   
   }
-  my ($fn) = @ARGV;
+  my ($fn, $field) = @ARGV;
   local $Build::Kiwi::urlmapper = sub { return $_[0] };
   my $cf = {};
   $cf->{'buildrelease'} = $release if defined $release;
   my $d = {};
   $d = parse($cf, $fn) if $fn;
   die("$d->{'error'}\n") if $d->{'error'};
-  print "$_\n" for @{$d->{'containertags'} || []};
+  my $x = $d->{$field};
+  $x = [ $x ] unless ref $x;
+  print "@$x\n";
 }
 
 1;

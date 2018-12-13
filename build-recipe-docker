@@ -112,7 +112,7 @@ recipe_build_docker() {
     ALLTAGS=
     args=()
     test -n "$RELEASE" && args=("${args[@]}" --release "$RELEASE")
-    for t in $(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showtags "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE") ; do
+    for t in $(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::show -- "${args[@]}" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" containertags) ; do
 	test -n "$FIRSTTAG" || FIRSTTAG="$t"
         ALLTAGS="$ALLTAGS $t"
     done
@@ -147,8 +147,14 @@ recipe_build_docker() {
     test -n "$DISTURL" && echo "LABEL org.openbuildservice.disturl=$DISTURL" >> "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
 
     # now do the build
-    echo "Building image $ALLTAGS"
-    if ! chroot $BUILD_ROOT $DOCKER_TOOL build --network=host "${tagargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
+    squashopt=--squash
+    if test -n "$(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::show -- "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" nosquash)" ; then
+      squashopt=
+      echo "Building image $ALLTAGS (nosquash)"
+    else
+      echo "Building image $ALLTAGS"
+    fi
+    if ! chroot $BUILD_ROOT $DOCKER_TOOL build $squashopt --network=host "${tagargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
         cleanup_and_exit 1 "Docker build command failed"
     fi
 
