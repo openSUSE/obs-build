@@ -159,11 +159,11 @@ recipe_build_docker() {
 
     if test "$DOCKER_TOOL" = podman ; then
         if ! $BUILD_DIR/call-podman --root "$BUILD_ROOT" build $squashopt -v "$TOPDIR/SOURCES/repos:$TOPDIR/SOURCES/repos" --network=host "${tagargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
-	    cleanup_and_exit 1 "podman build command failed"
+	    cleanup_and_exit 1 "$DOCKER_TOOL build command failed"
 	fi
     else
 	if ! chroot $BUILD_ROOT $DOCKER_TOOL build $squashopt --network=host "${tagargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
-	    cleanup_and_exit 1 "docker build command failed"
+	    cleanup_and_exit 1 "$DOCKER_TOOL build command failed"
 	fi
     fi
 
@@ -175,7 +175,7 @@ recipe_build_docker() {
     test -n "$RELEASE" && FILENAME="$FILENAME-$RELEASE"
     echo "Saving image $FIRSTTAG to $FILENAME.tar"
     if ! chroot $BUILD_ROOT $DOCKER_TOOL save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$FIRSTTAG" ; then
-        cleanup_and_exit 1 "Docker save command failed"
+        cleanup_and_exit 1 "$DOCKER_TOOL save command failed"
     fi
     
     # Create containerinfo
