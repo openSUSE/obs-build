@@ -186,6 +186,7 @@ test -e baselibs_global.conf || exit 1
 %endif
 
 %check
+for i in build build-* ; do bash -n $i || exit 1 ; done
 if [ `whoami` != "root" ]; then
   echo "WARNING: Not building as root, tests did not run!"
   exit 0
