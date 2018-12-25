@@ -227,7 +227,7 @@ sed -i 's,build-mkbaselibs,,' ../configs/*.conf
 %config(noreplace) /usr/lib/build/emulator/emulator.sh
 %{_mandir}/man1/build.1*
 %{_mandir}/man1/unrpm.1*
-%{_mandir}/man1/vc.1*
+%{_mandir}/man1/buildvc.1*
 %if 0%{?suse_version}
 %exclude /usr/lib/build/initvm.*
 %endif
