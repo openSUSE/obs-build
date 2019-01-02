@@ -57,6 +57,7 @@ Recommends:     perl(YAML)
 Recommends:     perl(YAML::LibYAML)
 Recommends:     bsdtar
 Recommends:     qemu-linux-user
+Recommends:     /usr/bin/qemu-kvm
 Recommends:     /sbin/mkfs.ext3
 %endif
 
