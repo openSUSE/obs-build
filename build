@@ -1268,11 +1268,6 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	mount -n -ttmpfs none $BUILD_ROOT/dev/shm
     fi
 
-    if test -n "$RUN_SHELL" ; then
-	chroot $BUILD_ROOT
-	exit
-    fi
-
     # hack to process preinstallimages early
     if test "$BUILDTYPE" = preinstallimage ; then
 	recipe_build
@@ -1368,6 +1363,13 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 
     setupicecream
     setupccache
+
+    if test -n "$RUN_SHELL" ; then
+	echo "You may want to initialize environment via:"
+	echo " su - $BUILD_USER"
+	chroot $BUILD_ROOT
+	cleanup_and_exit 0
+    fi
 
     # fill build directories with sources. Also sets TOPDIR
     recipe_setup
