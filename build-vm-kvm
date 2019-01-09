@@ -224,7 +224,7 @@ vm_verify_options_kvm() {
 
 vm_startup_kvm() {
     qemu_bin="$kvm_bin"
-    qemu_args=(-drive file="$VM_ROOT",format=raw,if=none,id=disk,serial=0,cache=unsafe -device "$kvm_device",drive=disk)
+    qemu_args=(-drive file="$VM_ROOT",format=raw,if=none,id=disk,cache=unsafe -device "$kvm_device",drive=disk,serial=0)
     if [ -n "$VM_USER" ] ; then
 	getent passwd "$VM_USER" > /dev/null || cleanup_and_exit 3 "cannot find KVM user '$VM_USER'"
     else
@@ -233,7 +233,7 @@ vm_startup_kvm() {
     fi
     [ -n "$VM_USER" ] && kvm_options="$kvm_options -runas $VM_USER"
     if test -n "$VM_SWAP" ; then
-	qemu_args=("${qemu_args[@]}" -drive file="$VM_SWAP",format=raw,if=none,id=swap,serial=1,cache=unsafe -device "$kvm_device",drive=swap)
+	qemu_args=("${qemu_args[@]}" -drive file="$VM_SWAP",format=raw,if=none,id=swap,cache=unsafe -device "$kvm_device",drive=swap,serial=1)
     fi
     # the serial console device needs to be compiled into the target kernel
     # which is why we can not use virtio-serial on other platforms
