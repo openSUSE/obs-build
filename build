@@ -1268,6 +1268,11 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	mount -n -ttmpfs none $BUILD_ROOT/dev/shm
     fi
 
+    if test -n "$RUN_SHELL" ; then
+	chroot $BUILD_ROOT
+	exit
+    fi
+
     # hack to process preinstallimages early
     if test "$BUILDTYPE" = preinstallimage ; then
 	recipe_build
