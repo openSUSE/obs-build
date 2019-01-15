@@ -121,6 +121,7 @@ sub escape {
   $d =~ s/</&lt;/sg;
   $d =~ s/>/&gt;/sg;
   $d =~ s/"/&quot;/sg;
+  $d =~ s/'/&#39;/sg;
   return $d; 
 }
 
