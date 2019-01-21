@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Mon Jan 21 12:00:48 UTC 2019 - Adrian Schröter <adrian@suse.de>
+
+- update factory config for libreadline8 switch
+- cleanup 15.1 config with OBS specific stuff
+  * should not be used for plain build usage
+  * workarounds for kiwi should be fixed in packages
+
+-------------------------------------------------------------------
 Mon Nov 26 09:24:17 UTC 2018 - Max Lin <mlin@suse.com>
 
 - Add Leap 15.1 config
