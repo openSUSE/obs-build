@@ -133,7 +133,7 @@ Wed Jan 24 16:04:35 UTC 2018 - adrian@suse.de
 Tue Nov 28 13:33:11 UTC 2017 - adrian@suse.de
 
 - Fixed Dockerfile repository parsing
-- Improve file name check extractbuild
+- Improve file name check extractbuild (CVE-2017-14804, bsc#1069904)
 - track release number of containers
 - Define SOURCEURL and PATCHURL macros
 - Keep preinstalled packages
