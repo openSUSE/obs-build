@@ -83,7 +83,7 @@ install:
 	    openstack-console \
 	    $(DESTDIR)$(pkglibdir)
 	install -m755 emulator/emulator.sh $(DESTDIR)$(pkglibdir)/emulator/
-	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build
+	install -m644 lib/Build/*.pm $(DESTDIR)$(pkglibdir)/Build
 	install -m644 build-vm build-vm-* $(DESTDIR)$(pkglibdir)
 	install -m644 build-recipe build-recipe-* $(DESTDIR)$(pkglibdir)
 	install -m644 build-pkg build-pkg-* $(DESTDIR)$(pkglibdir)
