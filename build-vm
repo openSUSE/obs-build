@@ -443,6 +443,7 @@ background_watchdog() {
 	    ELAPSED=$((NOW-WATCHDOG_START))
 	    if test $ELAPSED -gt $WATCHDOG_TIMEOUT ; then
 		# kill the VM
+		echo
 		echo "### WATCHDOG TRIGGERED, KILLING VM ###"
 		vm_kill
 	        exit 0
