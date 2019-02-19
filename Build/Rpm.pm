@@ -218,7 +218,7 @@ sub parse {
     $ret->{'error'} = "open $specfile: $!";
     return $ret;
   }
-  my @macros = @{$config->{'macros'}};
+  my @macros = @{$config->{'macros'} || []};
   my $skip = 0;
   my $main_preamble = 1;
   my $preamble = 1;
@@ -422,7 +422,7 @@ reexpand:
 
     if ($skip) {
       $xspec->[-1] = [ $xspec->[-1], undef ] if $xspec;
-      $ifdeps = 1 if $line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts)\s*:\s*(\S.*)$/i;
+      $ifdeps = 1 if $line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires)\s*:\s*(\S.*)$/i;
       next;
     }
 
@@ -495,7 +495,7 @@ reexpand:
       }
       next;
     }
-    if ($preamble && ($line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts)\s*:\s*(\S.*)$/i)) {
+    if ($preamble && ($line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires)\s*:\s*(\S.*)$/i)) {
       my $what = $1;
       my $deps = $2;
       $ifdeps = 1 if $hasif;
@@ -552,7 +552,8 @@ reexpand:
       }
 
       $replace = 1 if grep {/^-/} @ndeps;
-      if (lc($what) ne 'buildrequires' && lc($what) ne 'buildprereq') {
+      my $lcwhat = lc($what);
+      if ($lcwhat ne 'buildrequires' && $lcwhat ne 'buildprereq' && $lcwhat ne '#!buildrequires') {
         if ($conflictdeps && $what =~ /conflict/i) {
 	  push @packdeps, map {"!$_"} @ndeps;
 	  next;
@@ -593,8 +594,8 @@ reexpand:
 	my $num = defined($2) ? $2 : ($1 eq 'source' ? 0 : -1);
 	$macros{uc($1) . "URL$num"} = $val if $num >= 0;
       }
-    } elsif (!$preamble && ($line =~ /^(Source\d*|Patch\d*|Url|Icon|BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore)\s*:\s*(\S.*)$/i)) {
-      print STDERR "Warning: spec file parser ",($lineno?" line $lineno":''),": Ignoring "$1" used beyond the preamble.\n" if $config->{'warnings'};
+    } elsif (!$preamble && ($line =~ /^(Source\d*|Patch\d*|Url|Icon|BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires)\s*:\s*(\S.*)$/i)) {
+      print STDERR "Warning: spec file parser ".($lineno ? " line $lineno" : '').": Ignoring $1 used beyond the preamble.\n" if $config->{'warnings'};
     }
 
     if ($line =~ /^\s*%package\s+(-n\s+)?(\S+)/) {
@@ -898,13 +899,18 @@ sub verscmp_part {
   return 1 if !defined $s2;
   return 0 if $s1 eq $s2;
   while (1) {
-    $s1 =~ s/^[^a-zA-Z0-9~]+//;
-    $s2 =~ s/^[^a-zA-Z0-9~]+//;
+    $s1 =~ s/^[^a-zA-Z0-9~\^]+//;
+    $s2 =~ s/^[^a-zA-Z0-9~\^]+//;
     if ($s1 =~ s/^~//) {
       next if $s2 =~ s/^~//;
       return -1;
     }
     return 1 if $s2 =~ /^~/;
+    if ($s1 =~ s/^\^//) {
+      next if $s2 =~ s/^\^//;
+      return $s2 eq '' ? 1 : -1;
+    }
+    return $s1 eq '' ? -1 : 1 if $s2 =~ /^\^/;
     if ($s1 eq '') {
       return $s2 eq '' ? 0 : -1;
     }

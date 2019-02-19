@@ -29,7 +29,7 @@ if [ -z "$mailaddr" ]; then
 fi
 
 if [ -n "$VC_REALNAME" ]; then
-	packager="$VC_REALNAME <$VC_MAILADDR>"
+	packager="$VC_REALNAME <${VC_MAILADDR:-$mailaddr}>"
 elif [ -x /usr/bin/rpmdev-packager ]; then
 	packager=`rpmdev-packager`
 else

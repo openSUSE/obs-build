@@ -75,6 +75,8 @@ install:
 	    startdockerd \
 	    dummyhttpserver \
 	    obs-docker-support \
+	    create_container_package_list \
+	    call-podman \
 	    $(DESTDIR)$(pkglibdir)
 	install -m755 emulator/emulator.sh $(DESTDIR)$(pkglibdir)/emulator/
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build
@@ -86,7 +88,7 @@ install:
 	install -m644 configs/* $(DESTDIR)$(pkglibdir)/configs
 	install -m644 baselibs_configs/* $(DESTDIR)$(pkglibdir)/baselibs_configs
 	install -m644 build.1 $(DESTDIR)$(man1dir)
-	install -m644 vc.1 $(DESTDIR)$(man1dir)
+	install -m644 buildvc.1 $(DESTDIR)$(man1dir)
 	install -m644 unrpm.1 $(DESTDIR)$(man1dir)
 	ln -sf $(pkglibdir)/build $(DESTDIR)$(bindir)/build
 	ln -sf $(pkglibdir)/vc    $(DESTDIR)$(bindir)/buildvc

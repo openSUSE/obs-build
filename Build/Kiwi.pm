@@ -22,6 +22,7 @@ package Build::Kiwi;
 
 use strict;
 use Build::SimpleXML;
+use Build::SimpleJSON;
 
 our $bootcallback;
 our $urlmapper;
@@ -104,11 +105,8 @@ sub kiwiparse_product {
   for my $repository (sort {$a->{priority} <=> $b->{priority}} @{$instsource->{'instrepo'} || []}) {
     my $kiwisource = ($repository->{'source'} || [])->[0];
     if ($kiwisource->{'path'} eq 'obsrepositories:/') {
-      # special case, OBS will expand it.
-      push @repos, '_obsrepositories';
-      next;
-    }
-    if ($kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
+      push @repos, '_obsrepositories/';		# special case, OBS will expand it.
+    } elsif ($kiwisource->{'path'} =~ /^obs:\/\/\/?([^\/]+)\/([^\/]+)\/?$/) {
       push @repos, "$1/$2";
     } else {
       my $prp;
@@ -129,6 +127,7 @@ sub kiwiparse_product {
     for my $po (@{$productoptions->{'productoption'} || []}) {
       $ret->{'sourcemedium'} = $po->{'_content'} if $po->{'name'} eq 'SOURCEMEDIUM';
       $ret->{'debugmedium'} = $po->{'_content'} if $po->{'name'} eq 'DEBUGMEDIUM';
+      $ret->{'milestone'} = $po->{'_content'} if $po->{'name'} eq 'BETA_VERSION';
     }
   }
   if ($instsource->{'architectures'}) {
@@ -200,7 +199,7 @@ sub kiwiparse_product {
 }
 
 sub kiwiparse {
-  my ($xml, $arch, $buildflavor, $count) = @_;
+  my ($xml, $arch, $buildflavor, $release, $count) = @_;
   $count ||= 0;
   die("kiwi config inclusion depth limit reached\n") if $count++ > 10;
 
@@ -222,12 +221,18 @@ sub kiwiparse {
   my $obsexclusivearch;
   my $obsexcludearch;
   my $obsprofiles;
+  my $unorderedrepos;
   $obsexclusivearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExclusiveArch:\s+(.*)\s+-->\s*$/im;
   $obsexcludearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExcludeArch:\s+(.*)\s+-->\s*$/im;
   $obsprofiles = $1 if $xml =~ /^\s*<!--\s+OBS-Profiles:\s+(.*)\s+-->\s*$/im;
   if ($obsprofiles) {
     $obsprofiles = [ grep {defined($_)} map {$_ eq '@BUILD_FLAVOR@' ? $buildflavor : $_} split(' ', $obsprofiles) ];
   }
+  $unorderedrepos = 1 if $xml =~ /^\s*<!--\s+OBS-UnorderedRepos\s+-->\s*$/im;
+  for ($xml =~ /^\s*<!--\s+OBS-Imagerepo:\s+(.*)\s+-->\s*$/img) {
+    push @imagerepos, { 'url' => $_ };
+  }
+
   my $schemaversion = $kiwi->{'schemaversion'} ? versionstring($kiwi->{'schemaversion'}) : 0;
   $ret->{'name'} = $kiwi->{'name'} if $kiwi->{'name'};
   $ret->{'filename'} = $kiwi->{'name'} if $kiwi->{'name'};
@@ -275,6 +280,18 @@ sub kiwiparse {
   if ($preferences->[0]->{'version'}) {
     $ret->{'version'} = $preferences->[0]->{'version'}->[0]->{'_content'};
   }
+
+  # add extra tags
+  my @extratags;
+  if ($xml =~ /^\s*<!--\s+OBS-AddTag:\s+(.*)\s+-->\s*$/im) {
+    for (split(' ', $1)) {
+      s/<VERSION>/$ret->{'version'}/g if $ret->{'version'};
+      s/<RELEASE>/$release/g if $release;
+      $_ = "$_:latest" unless /:[^\/]+$/;
+      push @extratags, $_;
+    }
+  }
+
   my $containerconfig;
   for my $pref (@{$preferences || []}) {
     if ($obsprofiles && $pref->{'profiles'}) {
@@ -290,7 +307,7 @@ sub kiwiparse {
         # for kiwi 3.8 and before
         push @types, $type->{'_content'};
       }
-      # save containerconfig so that we can retrievethe tag
+      # save containerconfig so that we can retrieve the tag
       $containerconfig = $type->{'containerconfig'}->[0] if $type->{'containerconfig'};
 
       # add derived container dependency
@@ -328,7 +345,7 @@ sub kiwiparse {
           my ($bootxml, $xsrc) = $bootcallback->($1, $2);
           next unless $bootxml;
           push @extrasources, $xsrc if $xsrc;
-          my $bret = kiwiparse($bootxml, $arch, $buildflavor, $count);
+          my $bret = kiwiparse($bootxml, $arch, $buildflavor, $release, $count);
           push @bootrepos, map {"$_->{'project'}/$_->{'repository'}"} @{$bret->{'path'} || []};
           push @packages, @{$bret->{'deps'} || []};
           push @extrasources, @{$bret->{'extrasource'} || []};
@@ -366,12 +383,10 @@ sub kiwiparse {
       push @imagerepos, $imagerepo;
     }
     next if $repository->{'imageonly'};
-    if ($kiwisource->{'path'} eq 'obsrepositories:/') {
-      push @repos, '_obsrepositories/';
-      next;
-    }
     my $prp;
-    if ($kiwisource->{'path'} =~ /^obs:\/{1,3}([^\/]+)\/([^\/]+)\/?$/) {
+    if ($kiwisource->{'path'} eq 'obsrepositories:/') {
+      $prp = '_obsrepositories/';
+    } elsif ($kiwisource->{'path'} =~ /^obs:\/{1,3}([^\/]+)\/([^\/]+)\/?$/) {
       $prp = "$1/$2";
     } else {
       $prp = $urlmapper->($kiwisource->{'path'}) if $urlmapper;
@@ -431,6 +446,7 @@ sub kiwiparse {
   }
   push @packages, "kiwi-packagemanager:$packman";
   push @packages, "--dorecommends--", "--dosupplements--" if $patterntype && $patterntype eq 'plusRecommended';
+  push @packages, '--unorderedimagerepos', if $unorderedrepos;
 
   $ret->{'exclarch'} = [ unify(split(' ', $obsexclusivearch)) ] if $obsexclusivearch;
   $ret->{'badarch'} = [ unify(split(' ', $obsexcludearch)) ] if $obsexcludearch;
@@ -451,16 +467,17 @@ sub kiwiparse {
   $ret->{'imagerepos'} = \@imagerepos if @imagerepos;
   if ($containerconfig) {
     my $containername = $containerconfig->{'name'};
-    my $containertags = $containerconfig->{'tag'};
-    $containertags = [ $containertags ] if defined($containertags) && !ref($containertags);
-    if ($containertags && defined($containername)) {
-      for (@$containertags) {
-	$_ = "$containername:$_" unless /:/;
+    my @containertags;
+    if (defined $containername) {
+      push @containertags, $containerconfig->{'tag'} if defined $containerconfig->{'tag'};
+      push @containertags, 'latest' unless @containertags;
+      if (defined($containerconfig->{'additionaltags'})) {
+	push @containertags, split(',', $containerconfig->{'additionaltags'});
       }
+      @containertags = map {"$containername:$_"} @containertags;
     }
-    $containertags = undef if $containertags && !@$containertags;
-    $containertags = [ "$containername:latest" ] if defined($containername) && !$containertags;
-    $ret->{'container_tags'} = $containertags if $containertags;
+    push @containertags, @extratags if @extratags;
+    $ret->{'container_tags'} = [ unify(@containertags) ] if @containertags;
   }
   if ($obsprofiles) {
     if (@$obsprofiles) {
@@ -482,7 +499,7 @@ sub parse {
   close F;
   $cf ||= {};
   my $d;
-  eval { $d = kiwiparse($xml, ($cf->{'arch'} || ''), $cf->{'buildflavor'}, 0) };
+  eval { $d = kiwiparse($xml, ($cf->{'arch'} || ''), $cf->{'buildflavor'}, $cf->{'buildrelease'}, 0) };
   if ($@) {
     my $err = $@;
     chomp $err;
@@ -508,40 +525,47 @@ sub show {
 }
 
 sub showcontainerinfo {
-  my ($disturl, $arch, $buildflavor);
-  (undef, $disturl) = splice(@ARGV, 0, 2) if @ARGV > 2 && $ARGV[0] eq '--disturl';
-  (undef, $arch) = splice(@ARGV, 0, 2) if @ARGV > 2 && $ARGV[0] eq '--arch';
-  (undef, $buildflavor) = splice(@ARGV, 0, 2) if @ARGV > 2 && $ARGV[0] eq '--buildflavor';
+  my ($disturl, $arch, $buildflavor, $release);
+  while (@ARGV) {
+    if (@ARGV > 2 && $ARGV[0] eq '--disturl') {
+      (undef, $disturl) = splice(@ARGV, 0, 2);
+    } elsif (@ARGV > 2 && $ARGV[0] eq '--arch') {
+      (undef, $arch) = splice(@ARGV, 0, 2);
+    } elsif (@ARGV > 2 && $ARGV[0] eq '--buildflavor') {
+      (undef, $buildflavor) = splice(@ARGV, 0, 2);
+    } elsif (@ARGV > 2 && $ARGV[0] eq '--release') {
+      (undef, $release) = splice(@ARGV, 0, 2);
+    } else {
+      last;
+    }
+  }
   my ($fn, $image) = @ARGV;
   local $urlmapper = sub { return $_[0] };
   my $cf = {};
   $cf->{'arch'} = $arch if defined $arch;
   $cf->{'buildflavor'} = $buildflavor if defined $buildflavor;
+  $cf->{'buildrelease'} = $release if defined $release;
   my $d = parse($cf, $fn);
   die("$d->{'error'}\n") if $d->{'error'};
   $image =~ s/.*\/// if defined $image;
-  my $release;
-  $release = $1 if $image =~ /.*-Build(\d+\.\d+).*/;
-  my @tags = map {"\"$_\""} @{$d->{'container_tags'} || []};
   my @repos;
   for my $repo (@{$d->{'imagerepos'} || []}) {
-    if (defined $repo->{'priority'}) {
-      push @repos, "{ \"url\": \"$repo->{'url'}\", \"priority\": $repo->{'priority'} }";
-    } else {
-      push @repos, "{ \"url\": \"$repo->{'url'}\" }";
-    }
+    push @repos, { 'url' => $repo->{'url'}, '_type' => {'priority' => 'number'} };
+    $repos[-1]->{'priority'} = $repo->{'priority'} if defined $repo->{'priority'};
   }
   my $buildtime = time();
-  print "{\n";
-  print "  \"name\": \"$d->{'name'}\"";
-  print ",\n  \"version\": \"$d->{'version'}\"" if defined $d->{'version'};
-  print ",\n  \"release\": \"$release\"" if defined $release;
-  print ",\n  \"tags\": [ ".join(', ', @tags)." ]" if @tags;
-  print ",\n  \"repos\": [ ".join(', ', @repos)." ]" if @repos;
-  print ",\n  \"file\": \"$image\"" if defined $image;
-  print ",\n  \"disturl\": \"$disturl\"" if defined $disturl;
-  print ",\n  \"buildtime\": $buildtime";
-  print "\n}\n";
+  my $containerinfo = {
+    'name' => $d->{'name'},
+    'buildtime' => $buildtime,
+    '_type' => {'buildtime' => 'number'},
+  };
+  $containerinfo->{'version'} = $d->{'version'} if defined $d->{'version'};
+  $containerinfo->{'release'} = $release if defined $release;
+  $containerinfo->{'tags'} = $d->{'container_tags'} if @{$d->{'container_tags'} || []};
+  $containerinfo->{'repos'} = \@repos if @repos;
+  $containerinfo->{'file'} = $image if defined $image;
+  $containerinfo->{'disturl'} = $disturl if defined $disturl;
+  print Build::SimpleJSON::unparse($containerinfo)."\n";
 }
 
 # not implemented yet.

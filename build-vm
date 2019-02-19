@@ -443,6 +443,7 @@ background_watchdog() {
 	    ELAPSED=$((NOW-WATCHDOG_START))
 	    if test $ELAPSED -gt $WATCHDOG_TIMEOUT ; then
 		# kill the VM
+		echo
 		echo "### WATCHDOG TRIGGERED, KILLING VM ###"
 		vm_kill
 	        exit 0
@@ -877,6 +878,9 @@ vm_first_stage() {
     umount -n $BUILD_ROOT/mnt 2> /dev/null || true
 
     vm_init_script="/.build/build"
+    if test -n "$RUN_SHELL"; then
+        vm_init_script="/bin/bash"
+    fi
     if check_use_emulator ; then
 	vm_init_script="/.build/$INITVM_NAME"
     fi
@@ -962,6 +966,10 @@ vm_save_statistics() {
     otherdir="$BUILD_ROOT$TOPDIR/OTHER"
     test -n "$TIME_PREINSTALL" && echo "TIME_preinstall: $TIME_PREINSTALL"  >> $otherdir/_statistics
     test -n "$TIME_INSTALL" && echo "TIME_install: $TIME_INSTALL"  >> $otherdir/_statistics
+    test -n "$TIME_POSTCHECKS" && echo "TIME_postchecks: $TIME_POSTCHECKS"  >> $otherdir/_statistics
+    test -n "$TIME_RPMLINT" && echo "TIME_rpmlint: $TIME_RPMLINT"  >> $otherdir/_statistics
+    test -n "$TIME_BUILDCMP" && echo "TIME_buildcmp: $TIME_BUILDCMP"  >> $otherdir/_statistics
+    test -n "$TIME_DELTARPMS" && echo "TIME_deltarpms: $TIME_DELTARPMS"  >> $otherdir/_statistics
     if test -e /.build/_statistics.df ; then
 	echo -n "MAX_mb_used_on_disk: " >> $otherdir/_statistics
 	cat /.build/_statistics.df >> $otherdir/_statistics

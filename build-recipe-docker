@@ -55,42 +55,49 @@ recipe_prepare_docker() {
 recipe_build_docker() {
     touch $BUILD_ROOT/etc/resolv.conf
 
-    base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
-    test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
+    base_image_path=
+    base_image_tag=$(grep "^\s*FROM" "$RECIPEFILE" | head -n 1 | cut -d" " -f2)
 
-    if test "$BUILDENGINE" = "podman"; then
-        DOCKER_TOOL="podman"
-        if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver-only "$TOPDIR/SOURCES/repos" ; then
-             cleanup_and_exit 1
-        fi
+    if test "$base_image_tag" != scratch ; then
+	base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
+	test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
+    fi
+
+    if test "$BUILDENGINE" = podman; then
+        DOCKER_TOOL=podman
     else
-        DOCKER_TOOL="docker"
+        DOCKER_TOOL=docker
         if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver "$TOPDIR/SOURCES/repos" ; then
              cleanup_and_exit 1
         fi
-        DOCKERD_STARTED=true
     fi
+    DOCKERD_STARTED=true
 
-    cp $BUILD_DIR/obs-docker-support "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
+    if test "$DOCKER_TOOL" = podman; then
+	sed -e "s!^DATA_DIR=!DATA_DIR=$TOPDIR/SOURCES/repos!" <"$BUILD_DIR/obs-docker-support" >"$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
+    else
+	cp $BUILD_DIR/obs-docker-support "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
+    fi
     chmod 755 "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
 
-    echo "Loading base image"
-    if test -L "$base_image_path" ; then
-	# copy into build root
-	cp -L "$base_image_path" "$base_image_path.lnk"
-	mv "$base_image_path.lnk" "$base_image_path"
-    fi
+    if test -n "$base_image_path"; then
+	echo "Loading base image"
+	if test -L "$base_image_path" ; then
+	    # copy into build root
+	    cp -L "$base_image_path" "$base_image_path.lnk"
+	    mv "$base_image_path.lnk" "$base_image_path"
+	fi
 
-    # Inspect the content of the image to decide if this is a layered image
-    # or a filesystem one. We need to know if we will "docker load" it or
-    # "docker import" it.
-    if tar -tf $base_image_path | grep "^manifest.json" -q; then
-        echo "Layered image found"
-        chroot $BUILD_ROOT $DOCKER_TOOL load --input $TOPDIR/SOURCES/$base_image_path
-    else
-        echo "Filesystem image found"
-        desired_tag=$(grep "^\s*FROM" "$RECIPEFILE" | cut -d" " -f2)
-        chroot $BUILD_ROOT $DOCKER_TOOL import $TOPDIR/SOURCES/$base_image_path "$desired_tag"
+	# Inspect the content of the image to decide if this is a layered image
+	# or a filesystem one. We need to know if we will "docker load" it or
+	# "docker import" it.
+	if tar -tf $base_image_path | grep -q "^manifest.json" ; then
+	    echo "Layered image found"
+	    chroot $BUILD_ROOT $DOCKER_TOOL load --input $TOPDIR/SOURCES/$base_image_path
+	else
+	    echo "Filesystem image found"
+	    chroot $BUILD_ROOT $DOCKER_TOOL import $TOPDIR/SOURCES/$base_image_path "$base_image_tag"
+	fi
     fi
 
     # Prepare the package repository
@@ -101,13 +108,16 @@ recipe_build_docker() {
 	chroot $BUILD_ROOT bash -c "cd $TOPDIR/SOURCES/repos && dpkg-scanpackages -m . | gzip > Packages.gz"
     fi
 
-    # Find tags
+    # find tags, first look into recipe file
     FIRSTTAG=
     ALLTAGS=
-    for t in $(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showtags "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE") ; do
+    args=()
+    test -n "$RELEASE" && args=("${args[@]}" --release "$RELEASE")
+    for t in $(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::show -- "${args[@]}" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" containertags) ; do
 	test -n "$FIRSTTAG" || FIRSTTAG="$t"
         ALLTAGS="$ALLTAGS $t"
     done
+    # if we did not find a tag, look info a file called TAG
     if test -z "$FIRSTTAG" -a -f TAG ; then
 	for t in $(egrep -v '^#' TAG) ; do
 	    test -n "$FIRSTTAG" || FIRSTTAG="$t"
@@ -138,24 +148,41 @@ recipe_build_docker() {
     test -n "$DISTURL" && echo "LABEL org.openbuildservice.disturl=$DISTURL" >> "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
 
     # now do the build
-    echo "Building image $ALLTAGS"
-    if ! chroot $BUILD_ROOT $DOCKER_TOOL build --network=host "${tagargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
-        cleanup_and_exit 1 "Docker build command failed"
+    squashopt=--squash
+    if test "$DOCKER_TOOL" = podman -o -n "$(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::show -- "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" nosquash)" ; then
+      squashopt=
+      echo "Building image $ALLTAGS (nosquash)"
+    else
+      echo "Building image $ALLTAGS"
     fi
 
-    # Save the resulting image to a tarball. Use tag for generating the file name.
-    echo "Saving image $FIRSTTAG"
+
+    if test "$DOCKER_TOOL" = podman ; then
+        if ! $BUILD_DIR/call-podman --root "$BUILD_ROOT" build $squashopt -v "$TOPDIR/SOURCES/repos:$TOPDIR/SOURCES/repos" --network=host "${tagargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
+	    cleanup_and_exit 1 "$DOCKER_TOOL build command failed"
+	fi
+    else
+	if ! chroot $BUILD_ROOT $DOCKER_TOOL build $squashopt --network=host "${tagargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
+	    cleanup_and_exit 1 "$DOCKER_TOOL build command failed"
+	fi
+    fi
+
+    # Save the resulting image to a tarball. Use first tag for generating the file name.
     mkdir -p $BUILD_ROOT$TOPDIR/DOCKER
     FILENAME="$FIRSTTAG"
     FILENAME="${FILENAME//[\/:]/-}"
+    FILENAME="$FILENAME.${BUILD_ARCH%%:*}"
+    test -n "$RELEASE" && FILENAME="$FILENAME-$RELEASE"
+    echo "Saving image $FIRSTTAG to $FILENAME.tar"
     if ! chroot $BUILD_ROOT $DOCKER_TOOL save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$FIRSTTAG" ; then
-        cleanup_and_exit 1 "Docker save command failed"
+        cleanup_and_exit 1 "$DOCKER_TOOL save command failed"
     fi
     
     # Create containerinfo
-    disturlarg=()
-    test -n "$DISTURL" && disturlarg=("--disturl" "$DISTURL")
-    perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo -- "${disturlarg[@]}" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$ALLTAGS" containers/annotation> "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
+    args=()
+    test -n "$DISTURL" && args=("${args[@]}" --disturl "$DISTURL")
+    test -n "$RELEASE" && args=("${args[@]}" --release "$RELEASE")
+    perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo -- "${args[@]}" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$ALLTAGS" containers/annotation > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
 
     # We're done. Clean up.
     recipe_cleanup_docker

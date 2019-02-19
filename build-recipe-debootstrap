@@ -45,8 +45,10 @@ recipe_build_debootstrap() {
     done
     FULL_PKG_LIST="${FULL_PKG_LIST#,}"
     rm -rf "$BUILD_ROOT/$myroot"
-    mkdir -p "$BUILD_ROOT/$myroot/etc/dpkg/dpkg.cfg.d"
-    echo force-unsafe-io > "$BUILD_ROOT/$myroot/etc/dpkg/dpkg.cfg.d/force-unsafe-io"
+    if chroot $BUILD_ROOT dpkg --force-unsafe-io --version >/dev/null 2>&1 ; then
+	mkdir -p "$BUILD_ROOT/$myroot/etc/dpkg/dpkg.cfg.d"
+	echo force-unsafe-io > "$BUILD_ROOT/$myroot/etc/dpkg/dpkg.cfg.d/force-unsafe-io"
+    fi
 
     set -- chroot $BUILD_ROOT debootstrap --keep-debootstrap-dir --no-check-gpg --variant=buildd --arch="${arch}" --include="$FULL_PKG_LIST" "$dist" "$myroot" file:///.build.binaries
     echo "running debootstrap..."
@@ -77,6 +79,10 @@ recipe_build_debootstrap() {
     mount -n -ttmpfs none $BUILD_ROOT/$myroot/dev/shm
 
     chroot $BUILD_ROOT/$myroot apt-cache gencaches
+
+    if ! test -e $BUILD_ROOT/$myroot/etc/hosts ; then
+        cp $BUILD_ROOT/etc/hosts $BUILD_ROOT/$myroot/etc/hosts
+    fi
 
     # move topdir over
     mv "$BUILD_ROOT/$TOPDIR" "$BUILD_ROOT/$myroot/${TOPDIR%/*}"

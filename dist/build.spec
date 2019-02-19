@@ -1,7 +1,7 @@
 #
 # spec file for package build
 #
-# Copyright (c) 2017 SUSE LINUX GmbH, Nuernberg, Germany.
+# Copyright (c) 2019 SUSE LINUX GmbH, Nuernberg, Germany.
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -12,7 +12,7 @@
 # license that conforms to the Open Source Definition (Version 1.9)
 # published by the Open Source Initiative.
 
-# Please submit bugfixes or comments via http://bugs.opensuse.org/
+# Please submit bugfixes or comments via https://bugs.opensuse.org/
 #
 # needsrootforbuild
 # needsbinariesforbuild
@@ -20,9 +20,9 @@
 
 Name:           build
 Summary:        A Script to Build SUSE Linux RPMs
-License:        GPL-2.0+ and GPL-2.0
+License:        GPL-2.0-or-later AND GPL-2.0-only
 Group:          Development/Tools/Building
-Version:        20171122
+Version:        20190123
 Release:        0
 Source:         obs-build-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
@@ -33,6 +33,14 @@ Requires:       bash
 Requires:       binutils
 Requires:       perl
 Requires:       tar
+# needed for fuser
+Requires:       psmisc
+# just to verify existence of packages
+BuildRequires:  bash
+BuildRequires:  binutils
+BuildRequires:  perl
+BuildRequires:  psmisc
+BuildRequires:  tar
 %if 0%{?fedora}
 Requires:       perl-MD5
 Requires:       perl-TimeDate
@@ -53,6 +61,7 @@ Recommends:     perl(YAML)
 Recommends:     perl(YAML::LibYAML)
 Recommends:     bsdtar
 Recommends:     qemu-linux-user
+Recommends:     /usr/bin/qemu-kvm
 Recommends:     /sbin/mkfs.ext3
 %endif
 
@@ -182,6 +191,7 @@ test -e baselibs_global.conf || exit 1
 %endif
 
 %check
+for i in build build-* ; do bash -n $i || exit 1 ; done
 if [ `whoami` != "root" ]; then
   echo "WARNING: Not building as root, tests did not run!"
   exit 0
@@ -222,7 +232,7 @@ sed -i 's,build-mkbaselibs,,' ../configs/*.conf
 %config(noreplace) /usr/lib/build/emulator/emulator.sh
 %{_mandir}/man1/build.1*
 %{_mandir}/man1/unrpm.1*
-%{_mandir}/man1/vc.1*
+%{_mandir}/man1/buildvc.1*
 %if 0%{?suse_version}
 %exclude /usr/lib/build/initvm.*
 %endif

@@ -29,6 +29,7 @@ IS_UNSHARED=
 KILL=
 WEBSERVER=
 WEBSERVER_ONLY=
+DOCKERD_EXPERIMANTAL=--experimental
 
 while test -n "$1" ; do
     case "$1" in
@@ -41,7 +42,7 @@ while test -n "$1" ; do
 	    shift 2
 	    ;;
 	--webserver-only)
-	    WEBSERVER_ONLY="1"
+	    WEBSERVER_ONLY=1
 	    WEBSERVER="$2"
 	    shift 2
 	    ;;
@@ -86,7 +87,15 @@ fi
 
 rm -f $BUILD_ROOT/.startdockerd.pids
 
-if test -z "$IS_UNSHARED" -a -z "$WEBSERVER_ONLY" ; then
+if test -n "$WEBSERVER_ONLY" ; then
+    echo "Starting local repository server"
+    $BUILD_DIR/dummyhttpserver "$BUILD_ROOT" "$WEBSERVER" &
+    WEBSERVER_PID=$!
+    echo "$CONTAINERD_PID $DOCKERD_PID $WEBSERVER_PID" > $BUILD_ROOT/.startdockerd.pids
+    exit 0
+fi
+
+if test -z "$IS_UNSHARED" ; then
     echo "Unsharing environment"
     # unshare mounts and network
     exec unshare -m -n $BUILD_DIR/startdockerd --isunshared --root "$BUILD_ROOT" --webserver "$WEBSERVER" "$@"
@@ -143,20 +152,22 @@ if test -n "$WEBSERVER" ; then
     echo "$CONTAINERD_PID $DOCKERD_PID $WEBSERVER_PID" > $BUILD_ROOT/.startdockerd.pids
 fi
 
-if test -n "$WEBSERVER_ONLY" ; then
-    echo "SKIPPING DOCKERD"
-    exit 0
-fi
-
 echo "Starting container daemon"
 CONTAINERD_BIN=/usr/sbin/containerd
 test -x $BUILD_ROOT/usr/bin/containerd && CONTAINERD_BIN=/usr/bin/containerd
-chroot $BUILD_ROOT $CONTAINERD_BIN --listen unix:///run/containerd/containerd.sock &
-CONTAINERD_PID=$!
+chroot $BUILD_ROOT $CONTAINERD_BIN --help --address /run/containerd/containerd.sock >& /dev/null
+if test "$?" = "0" ; then
+    # newer version knows --address option
+    chroot $BUILD_ROOT $CONTAINERD_BIN --address /run/containerd/containerd.sock &
+    CONTAINERD_PID=$!
+else
+    chroot $BUILD_ROOT $CONTAINERD_BIN --listen unix:///run/containerd/containerd.sock &
+    CONTAINERD_PID=$!
+fi
 echo "$CONTAINERD_PID $DOCKERD_PID $WEBSERVER_PID" > $BUILD_ROOT/.startdockerd.pids
 
 echo "Starting docker daemon"
-chroot $BUILD_ROOT /usr/bin/dockerd --containerd /run/containerd/containerd.sock --bridge=none --add-runtime oci=/usr/bin/docker-runc &
+chroot $BUILD_ROOT /usr/bin/dockerd $DOCKERD_EXPERIMANTAL --containerd /run/containerd/containerd.sock --bridge=none --add-runtime oci=/usr/bin/docker-runc &
 DOCKERD_PID=$!
 echo "$CONTAINERD_PID $DOCKERD_PID $WEBSERVER_PID" > $BUILD_ROOT/.startdockerd.pids
 

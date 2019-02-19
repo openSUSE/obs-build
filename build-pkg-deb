@@ -21,6 +21,8 @@
 #
 ################################################################
 
+DEB_UNSAFE_IO=
+
 #
 # A wrapper around chroot to set the environment correctly for dpkg and
 # pre/postinst scripts.
@@ -49,12 +51,15 @@ deb_setup() {
     :>> $BUILD_ROOT/var/lib/dpkg/available
     :>> $BUILD_ROOT/var/log/dpkg.log
     :>> $BUILD_ROOT/etc/ld.so.conf
-    cat > "$BUILD_ROOT/usr/sbin/policy-rc.d" <<'EOF'
+    # Install a policy so that services are not started. See
+    # https://manpages.debian.org/unstable/init-system-helpers/invoke-rc.d.8.en.html
+    # for details.
+    mkdir -p $BUILD_ROOT/usr/sbin
+    cat > $BUILD_ROOT/usr/sbin/policy-rc.d <<EOF
 #!/bin/sh
-echo "policy-rc.d from obs-build build-pkg-deb: disallowing rc.d action: $*" >&2
 exit 101
 EOF
-    chmod 755 "$BUILD_ROOT/usr/sbin/policy-rc.d"
+    chmod 755 $BUILD_ROOT/usr/sbin/policy-rc.d
 }
 
 pkg_initdb_deb() {
@@ -64,15 +69,19 @@ pkg_initdb_deb() {
 	rm -f $BUILD_ROOT/.init_b_cache/dpkg.deb
 	cp $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb $BUILD_ROOT/.init_b_cache/dpkg.deb || cleanup_and_exit 1
     fi
-    deb_chroot $BUILD_ROOT dpkg --install --force-unsafe-io --force-depends .init_b_cache/dpkg.deb >/dev/null 2>&1
+    DEB_UNSAFE_IO=
+    chroot $BUILD_ROOT dpkg --force-unsafe-io --version >/dev/null 2>&1 && DEB_UNSAFE_IO="--force-unsafe-io"
+    deb_chroot $BUILD_ROOT dpkg --install $DEB_UNSAFE_IO --force-depends .init_b_cache/dpkg.deb >/dev/null 2>&1
 }
 
 pkg_prepare_deb() {
-    :
+    # test if dpkg knows --force-unsafe-io
+    DEB_UNSAFE_IO=
+    chroot $BUILD_ROOT dpkg --force-unsafe-io --version >/dev/null 2>&1 && DEB_UNSAFE_IO="--force-unsafe-io"
 }
 
 pkg_install_deb() {
-    ( deb_chroot $BUILD_ROOT dpkg --install --force-unsafe-io --force-depends .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
+    ( deb_chroot $BUILD_ROOT dpkg --install $DEB_UNSAFE_IO --force-depends .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
 	perl -ne '$|=1;/^(Configuration file|Installing new config file|Selecting previously deselected|Selecting previously unselected|\(Reading database|Unpacking |Setting up|Creating config file|Preparing to replace dpkg|Preparing to unpack )/||/^$/||print'
     # ugly workaround for upstart system. some packages (procps) try
     # to start a service in their configure phase. As we don't have

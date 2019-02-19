@@ -347,6 +347,7 @@ run_suse_isolinux() {
 }
 
 perform_product_bundle() {
+    local milestone=$(kiwi_query_recipe milestone)
     pushd $BUILD_ROOT/$TOPDIR/KIWIROOT/main
     for i in * ; do
 	test -e "$i" || continue
@@ -357,7 +358,10 @@ perform_product_bundle() {
                    fi
                    mv "$i" $BUILD_ROOT/$TOPDIR/KIWI/. ;;
 	    *.packages) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
-	    *.report) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
+	    *.report)
+		mv $i $BUILD_ROOT/$TOPDIR/OTHER/.
+		test -n "$milestone" && echo "$milestone" > $BUILD_ROOT/$TOPDIR/OTHER/${i%.report}.milestone
+		;;
 	    scripts) ;;
 	    *0) ;;
 	    *) test -d $i -a "$drop_repo" != true  && mv $i $BUILD_ROOT/$TOPDIR/KIWI/. ;;
@@ -375,7 +379,7 @@ build_kiwi_product() {
     chroot "$BUILD_ROOT" rm -rf "$TOPDIR/KIWIROOT"
     if test -x "$BUILD_ROOT/usr/bin/product-builder"; then
        # current implementation of product generation
-       chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX /usr/bin/product-builder --root $TOPDIR/KIWIROOT $VERBOSE_OPTION --logfile terminal --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
+       chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX BUILD_FLAVOR=$BUILD_FLAVOR /usr/bin/product-builder --root $TOPDIR/KIWIROOT $VERBOSE_OPTION --logfile terminal --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
     else
       # before openSUSE Leap 43 and SLE 13
       ver=`chroot "$BUILD_ROOT" su -c "/usr/sbin/kiwi --version | sed -n 's,.*kiwi version v\(.*\),\1,p'"`
@@ -493,6 +497,7 @@ kiwi_translate_parameters() {
     KIWI_MAIN_PARAMETERS=
     KIWI_BUILD_PARAMETERS=
     KIWI_BUNDLE_PARAMETERS=
+    KIWI_DERIVED_CONTAINER=
     for i in $KIWI_PARAMETERS ; do
 	if test -n "$lasti" ; then
 	    i="$lasti=$i"
@@ -528,6 +533,13 @@ kiwi_translate_parameters() {
 		if test -f "$BUILD_ROOT/$TOPDIR/SOURCES/containers/${i#*containers/}" ; then
 		    gzip -f -1 < "$BUILD_ROOT/$TOPDIR/SOURCES/containers/${i#*containers/}" > "$BUILD_ROOT/$TOPDIR/SOURCES/containers/${i#*containers/}.gz" || cleanup_and_exit 1 "container compression"
 		    i="$i.gz"
+		    KIWI_DERIVED_CONTAINER="$BUILD_ROOT/$TOPDIR/SOURCES/containers/${i#*containers/}"
+		fi
+	        KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS $i"
+		;;
+	    --set-container-derived-from=dir://./containers/*.tar*)
+		if test -f "$BUILD_ROOT/$TOPDIR/SOURCES/containers/${i#*containers/}" ; then
+		    KIWI_DERIVED_CONTAINER="$BUILD_ROOT/$TOPDIR/SOURCES/containers/${i#*containers/}"
 		fi
 	        KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS $i"
 		;;
@@ -621,11 +633,88 @@ postprocess_kiwi_containers() {
     done
 
     # create container info
-    local disturlarg=()
-    test -n "$DISTURL" && disturlarg=("--disturl" "$DISTURL")
+    local args=(--arch "${BUILD_ARCH%%:*}" --buildflavor "$BUILD_FLAVOR")
+    test -n "$DISTURL" && args=("${args[@]}" --disturl "$DISTURL")
+    test -n "$RELEASE" && args=("${args[@]}" --release "$RELEASE")
     for r in $BUILD_ROOT/$TOPDIR/KIWI/*.tar ; do
-	test -e "$r" && perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::showcontainerinfo -- "${disturlarg[@]}" --arch "${BUILD_ARCH%%:*}" --buildflavor "$BUILD_FLAVOR" $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE "$r" > "${r%.tar}.containerinfo"
+	test -e "$r" && perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::showcontainerinfo -- "${args[@]}" $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE "$r" > "${r%.tar}.containerinfo"
 	test -s "${r%.tar}.containerinfo" || rm -f "${r%.tar}.containerinfo"
+    done
+    if test -n "$KIWI_DERIVED_CONTAINER" ; then
+	for r in $BUILD_ROOT/$TOPDIR/KIWI/*.packages ; do
+	    test -e "$r" || continue
+	    r="${r%.packages}"
+	    for rr in $r*.containerinfo ; do
+		test -e "$rr" || continue
+		echo "creating base package information"
+		rm -f "$BUILD_ROOT/tmp/create_derived_package_list"
+		cp "$BUILD_DIR/create_container_package_list" "$BUILD_ROOT/tmp/create_container_package_list"
+		chroot "$BUILD_ROOT" /bin/bash /tmp/create_container_package_list "${KIWI_DERIVED_CONTAINER#$BUILD_ROOT}" > "$r.basepackages"
+		rm -f "$BUILD_ROOT/tmp/create_derived_package_list"
+		break
+	    done
+	done
+    fi
+}
+
+createrepo_debian_kiwi() {
+    local dir=$1
+    local prp=$2
+    local arch=$(chroot $BUILD_ROOT su -c "dpkg-architecture -qDEB_BUILD_ARCH")
+    cat >"${BUILD_ROOT}/.createrepo_debian.tmp.sh" <<-EOF
+	cd "$dir" || exit 1
+	dpkg-scanpackages -m . > Packages
+	gzip -c9 < Packages > Packages.gz
+	dpkg-scansources . > Sources
+	gzip -c9 < Sources > Sources.gz
+	EOF
+    chroot $BUILD_ROOT su -c "sh /.createrepo_debian.tmp.sh" - root
+    cat > "${BUILD_ROOT}/$dir/Release" <<-EOF
+	Origin: obs:/$prp
+	Label: ${prp%/*}
+	Codename: ${prp#*/}
+	Architectures: $arch
+	Description: obs repository for $prp
+	EOF
+    echo "SHA256:" >> "${BUILD_ROOT}/$dir/Release"
+    for file in "${BUILD_ROOT}/$dir/Packages"* "${BUILD_ROOT}/$dir/Sources"*; do
+	local SUM=( $(sha256sum ${file}) )
+	local SIZE=$(stat -c '%s' ${file})
+	echo " ${SUM} ${SIZE} ${file#${BUILD_ROOT}/$dir/}" >> "${BUILD_ROOT}/$dir/Release"
+    done
+}
+
+createrepo_debian_dist_kiwi() {
+    local dir=$1
+    local prp=$2
+    local dist=$3
+    local arch=$(chroot $BUILD_ROOT su -c "dpkg-architecture -qDEB_BUILD_ARCH")
+    mkdir -p "${BUILD_ROOT}/$dir/dists/${dist}/main/binary-$arch"
+    mkdir -p "${BUILD_ROOT}/$dir/dists/${dist}/main/source"
+    cat >"${BUILD_ROOT}/.createrepo_debian.tmp.sh" <<-EOF
+	cd "$dir" || exit 1
+	dpkg-scanpackages -m . > dists/${dist}/main/binary-$arch/Packages
+	gzip -c9 < dists/${dist}/main/binary-$arch/Packages > dists/${dist}/main/binary-$arch/Packages.gz
+	dpkg-scansources . > dists/${dist}/main/source/Sources
+	gzip -c9 < dists/${dist}/main/source/Sources > dists/${dist}/main/source/Sources.gz
+	EOF
+    chroot $BUILD_ROOT su -c "sh /.createrepo_debian.tmp.sh" - root
+    ln -s ${dist} ${BUILD_ROOT}/$dir/dists/stable
+
+    cat > "${BUILD_ROOT}/$dir/dists/${dist}/Release" <<-EOF
+	Origin: obs:/$prp
+	Label: ${prp%/*}
+	Suite: stable
+	Codename: $dist
+	Architectures: $arch
+	Description: obs repository for $prp
+	Components: main
+	EOF
+    echo "SHA256:" >> "${BUILD_ROOT}/$dir/dists/${dist}/Release"
+    for file in "${BUILD_ROOT}/$dir/dists/${dist}/main"/*/Packages* "${BUILD_ROOT}/$dir/$dists/main/source"/Sources*; do
+	local SUM=( $(sha256sum ${file}) )
+	local SIZE=$(stat -c '%s' ${file})
+	echo " ${SUM} ${SIZE} ${file#${BUILD_ROOT}/$dir/dists/${dist}/}" >> "${BUILD_ROOT}/$dir/dists/${dist}/Release"
     done
 }
 
@@ -643,6 +732,11 @@ recipe_build_kiwi() {
     ln -sf $TOPDIR/SOURCES/repos $BUILD_ROOT/repos
     test -d $BUILD_ROOT/$TOPDIR/SOURCES/containers && ln -sf $TOPDIR/SOURCES/containers $BUILD_ROOT/containers
     cd $BUILD_ROOT/$TOPDIR/SOURCES/repos
+    DEBDIST=
+    if test -x "$BUILD_ROOT/usr/sbin/debootstrap" ; then
+	DEBDIST=$(sed -ne 's/.*<repository.*distribution="\([^"]*\)".*/\1/p' <"$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" | head -n 1)
+	echo "using distribution '$DEBDIST'"
+    fi
     for r in *[^:]/* ; do
         test -L $r && continue
         test -d $r || continue
@@ -657,11 +751,18 @@ recipe_build_kiwi() {
 	    repo="$TOPDIR/SOURCES/repos/${rc%/*}/${rc##*/}/"
         fi
         if test "$imagetype" != product -a "$DO_INIT" != "false" ; then
-	    echo "creating repodata for $repo"
-	    if chroot $BUILD_ROOT createrepo --no-database --simple-md-filenames --help >/dev/null 2>&1 ; then
-		chroot $BUILD_ROOT createrepo --no-database --simple-md-filenames "$repo"
+	    if ! test -x "$BUILD_ROOT/usr/sbin/debootstrap" ; then
+		
+		echo "creating repodata for $r"
+		if chroot $BUILD_ROOT createrepo --no-database --simple-md-filenames --help >/dev/null 2>&1 ; then
+		    chroot $BUILD_ROOT createrepo --no-database --simple-md-filenames "$repo"
+		else
+		    chroot $BUILD_ROOT createrepo "$repo"
+		fi
 	    else
-		chroot $BUILD_ROOT createrepo "$repo"
+		echo "creating debian repodata for $r"
+		createrepo_debian_kiwi "$repo" "$r"
+		test -n "$DEBDIST" && createrepo_debian_dist_kiwi "$repo" "$r" "$DEBDIST"
 	    fi
         fi
     done

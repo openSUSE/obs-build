@@ -20,7 +20,8 @@
 
 package Build::Docker;
 
-use Build::SimpleXML;
+use Build::SimpleXML;	# to parse the annotation
+use Build::SimpleJSON;
 
 use strict;
 
@@ -44,9 +45,10 @@ sub quote {
 }
 
 sub addrepo {
-  my ($ret, $url) = @_;
+  my ($ret, $url, $prio) = @_;
 
-  unshift @{$ret->{'repo_urls'}}, $url;
+  unshift @{$ret->{'imagerepos'}}, { 'url' => $url };
+  $ret->{'imagerepos'}->[0]->{'priority'} = $prio if defined $prio;
   if ($Build::Kiwi::urlmapper) {
     my $prp = $Build::Kiwi::urlmapper->($url);
     if (!$prp) {
@@ -55,15 +57,17 @@ sub addrepo {
     }
     my ($projid, $repoid) = split('/', $prp, 2);
     unshift @{$ret->{'path'}}, {'project' => $projid, 'repository' => $repoid};
-    return;
+    $ret->{'path'}->[0]->{'priority'} = $prio if defined $prio;
+    return 1;
   } else {
     # this is just for testing purposes...
     $url =~ s/^\/+$//;
     $url =~ s/:\//:/g;
     my @url = split('/', $url);
     unshift @{$ret->{'path'}}, {'project' => $url[-2], 'repository' => $url[-1]} if @url >= 2;
+    $ret->{'path'}->[0]->{'priority'} = $prio if defined $prio;
+    return 1;
   }
-  return 1;
 }
 
 sub cmd_zypper {
@@ -134,6 +138,9 @@ sub parse {
   my ($cf, $fn) = @_;
 
   my $basecontainer;
+  my $unorderedrepos;
+  my $useobsrepositories;
+  my $nosquash;
   my $dockerfile_data = slurp($fn);
   return { 'error' => 'could not open Dockerfile' } unless defined $dockerfile_data;
 
@@ -142,7 +149,7 @@ sub parse {
     'name' => 'docker',
     'deps' => [],
     'path' => [],
-    'repo_urls' => [],
+    'imagerepos' => [],
   };
 
   while (@lines) {
@@ -152,6 +159,18 @@ sub parse {
       if ($line =~ /^#!BuildTag:\s*(.*?)$/) {
 	my @tags = split(' ', $1);
 	push @{$ret->{'containertags'}}, @tags if @tags;
+      }
+      if ($line =~ /^#!BuildVersion:\s*(\S+)\s*$/) {
+	$ret->{'version'} = $1;
+      }
+      if ($line =~ /^#!UnorderedRepos\s*$/) {
+        $unorderedrepos = 1;
+      }
+      if ($line =~ /^#!UseOBSRepositories\s*$/) {
+        $useobsrepositories = 1;
+      }
+      if ($line =~ /^#!NoSquash\s*$/) {
+        $nosquash = 1;
       }
       next;
     }
@@ -180,7 +199,7 @@ sub parse {
     @args = split(/[ \t]+/, $line);
     s/%([a-fA-F0-9]{2})/chr(hex($1))/ge for @args;
     if ($cmd eq 'FROM') {
-      if (@args && !$basecontainer) {
+      if (@args && !$basecontainer && $args[0] ne 'scratch') {
         $basecontainer = $args[0];
         $basecontainer .= ':latest' unless $basecontainer =~ /:[^:\/]+$/;
       }
@@ -206,24 +225,46 @@ sub parse {
     }
   }
   push @{$ret->{'deps'}}, "container:$basecontainer" if $basecontainer;
+  push @{$ret->{'deps'}}, '--unorderedimagerepos' if $unorderedrepos;
+  my $version = $ret->{'version'};
+  my $release = $cf->{'buildrelease'};
+  for (@{$ret->{'containertags'} || []}) {
+    s/<VERSION>/$version/g if defined $version;
+    s/<RELEASE>/$release/g if defined $release;
+  }
+  $ret->{'path'} = [ { 'project' => '_obsrepositories', 'repository' => '' } ] if $useobsrepositories;
+  $ret->{'basecontainer'} = $basecontainer if $basecontainer;
+  $ret->{'nosquash'} = 1 if $nosquash;
   return $ret;
 }
 
 sub showcontainerinfo {
-  my $disturl;
-  (undef, $disturl) = splice(@ARGV, 0, 2) if @ARGV > 2 && $ARGV[0] eq '--disturl';
+  my ($disturl, $release);
+  while (@ARGV) {
+    if (@ARGV > 2 && $ARGV[0] eq '--disturl') {
+      (undef, $disturl) = splice(@ARGV, 0, 2); 
+    } elsif (@ARGV > 2 && $ARGV[0] eq '--release') {
+      (undef, $release) = splice(@ARGV, 0, 2); 
+    } else {
+      last;
+    }   
+  }
   my ($fn, $image, $taglist, $annotationfile) = @ARGV;
   local $Build::Kiwi::urlmapper = sub { return $_[0] };
+  my $cf = {};
+  $cf->{'buildrelease'} = $release if defined $release;
   my $d = {};
-  $d = parse({}, $fn) if $fn;
+  $d = parse($cf, $fn) if $fn;
   die("$d->{'error'}\n") if $d->{'error'};
   $image =~ s/.*\/// if defined $image;
   my @tags = split(' ', $taglist);
   for (@tags) {
     $_ .= ':latest' unless /:[^:\/]+$/;
+    if (/:([0-9][^:]*)$/) {
+      $d->{'version'} = $1 unless defined $d->{'version'};
+    }
   }
-  @tags = map {"\"$_\""} @tags;
-  my @repos = map {"{ \"url\": \"$_\" }"} @{$d->{'repo_urls'} || []};
+  my @repos = @{$d->{'imagerepos'} || []};
   if ($annotationfile) {
     my $annotation = slurp($annotationfile);
     $annotation = Build::SimpleXML::parse($annotation) if $annotation;
@@ -233,26 +274,43 @@ sub showcontainerinfo {
     $annorepos = undef unless $annorepos && ref($annorepos) eq 'ARRAY';
     for my $annorepo (@{$annorepos || []}) {
       next unless $annorepo && ref($annorepo) eq 'HASH' && $annorepo->{'url'};
-      push @repos, "{ \"url\": \"$annorepo->{'url'}\" }";
+      push @repos, { 'url' => $annorepo->{'url'}, '_type' => {'priority' => 'number'} };
+      $repos[-1]->{'priority'} = $annorepo->{'priority'} if defined $annorepo->{'priority'};
     }
   }
   my $buildtime = time();
-  print "{\n";
-  print "  \"tags\": [ ".join(', ', @tags)." ]";
-  print ",\n  \"repos\": [ ".join(', ', @repos)." ]" if @repos;
-  print ",\n  \"file\": \"$image\"" if defined $image;
-  print ",\n  \"disturl\": \"$disturl\"" if defined $disturl;
-  print ",\n  \"buildtime\": $buildtime";
-  print "\n}\n";
+  my $containerinfo = {
+    'buildtime' => $buildtime,
+    '_type' => {'buildtime' => 'number'},
+  };
+  $containerinfo->{'tags'} = \@tags if @tags;
+  $containerinfo->{'repos'} = \@repos if @repos;
+  $containerinfo->{'file'} = $image if defined $image;
+  $containerinfo->{'disturl'} = $disturl if defined $disturl;
+  $containerinfo->{'version'} = $d->{'version'} if defined $d->{'version'};
+  $containerinfo->{'release'} = $release if defined $release;
+  print Build::SimpleJSON::unparse($containerinfo)."\n";
 }
 
-sub showtags {
-  my ($fn) = @ARGV;
+sub show {
+  my ($release);
+  while (@ARGV) {
+    if (@ARGV > 2 && $ARGV[0] eq '--release') {
+      (undef, $release) = splice(@ARGV, 0, 2); 
+    } else {
+      last;
+    }   
+  }
+  my ($fn, $field) = @ARGV;
   local $Build::Kiwi::urlmapper = sub { return $_[0] };
+  my $cf = {};
+  $cf->{'buildrelease'} = $release if defined $release;
   my $d = {};
-  $d = parse({}, $fn) if $fn;
+  $d = parse($cf, $fn) if $fn;
   die("$d->{'error'}\n") if $d->{'error'};
-  print "$_\n" for @{$d->{'containertags'} || []};
+  my $x = $d->{$field};
+  $x = [ $x ] unless ref $x;
+  print "@$x\n";
 }
 
 1;

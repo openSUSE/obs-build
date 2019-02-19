@@ -248,7 +248,7 @@ recipe_build_livebuild() {
     # move created products (and their metadata files) to destination and
     # create sha256 hashsums
     local buildnum="${RELEASE:+-Build${RELEASE}}"
-    for prefix in $(echo -e ${build_results} | sort | uniq) ; do
+    for prefix in $(echo -e "${build_results}" | sort | uniq) ; do
 	for f in ${prefix}.* ; do
 	    mv ${f} \
 		$BUILD_ROOT/$TOPDIR/OTHER/${prefix##*/}${buildnum}${f#${prefix}}

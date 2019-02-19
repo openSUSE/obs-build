@@ -1,4 +1,64 @@
 -------------------------------------------------------------------
+Wed Jan 23 14:42:17 UTC 2019 - Adrian Schröter <adrian@suse.de>
+
+- add initial SLE 15 SP1 config (bsc#1122895)
+
+-------------------------------------------------------------------
+Mon Jan 21 12:00:48 UTC 2019 - Adrian Schröter <adrian@suse.de>
+
+- update factory config for libreadline8 switch
+- cleanup 15.1 config with OBS specific stuff
+  * should not be used for plain build usage
+  * workarounds for kiwi should be fixed in packages
+
+-------------------------------------------------------------------
+Thu Dec  6 15:23:11 UTC 2018 - Adrian Schröter <adrian@suse.de>
+
+- support jumping into KVM debug shells using "--vm-type=kvm --shell"
+- adapt to new containerd CLI syntax
+- Support a new 'UseOBSRepositories' flag
+- lxc 3 support
+- power9 fixes
+- Generate a .milestone artifact for kiwi product builds
+- Support rpm's new '^' separator in version comparison
+- Allow to specify extra image repos with <!-- OBS-Imagerepo: -->
+- Rework release handling of containers
+
+-------------------------------------------------------------------
+Mon Nov 26 09:24:17 UTC 2018 - Max Lin <mlin@suse.com>
+
+- Add Leap 15.1 config
+
+-------------------------------------------------------------------
+Mon Oct 22 09:43:20 UTC 2018 - Adrian Schröter <adrian@suse.de>
+
+- require psmisc util for fuser
+- Start debian support for kiwi images/containers
+- Support building with unordered repositories for kiwi/docker builds
+- Write the package list of the base container in kiwi container builds
+- Support kiwi's "additionaltags" attribute (added in kiwi 9.15.3)
+- Add some substitutes for the extra container tags
+- Support "OBS-AddTag" directive to set multiple container tags in kiwi builds
+- Archlinux updates
+- SLE 12 SP4 config
+- Appimage: support source file parsing
+
+-------------------------------------------------------------------
+Wed Aug 29 13:57:07 UTC 2018 - Adrian Schröter <adrian@suse.de>
+
+- Fall back to $mailaddr if $VC_MAILADDR is unset/null
+- don't crash with no rpm macros defined
+- Kiwi: support parsing of repos where the .repo file got used
+- package hostarch definition in preinstallimages
+- avoid double creation of monitor fifo
+- Debian:
+  - debootstrap: ensure /etc/hosts exists
+  - debootstrap: Add abuild shadow password entry
+  - livebuild: publish source tarball
+  - Adds Debian configurations for jessie and unstable
+  - collect *.ddeb, *.udeb files
+
+-------------------------------------------------------------------
 Thu Aug 16 14:55:53 UTC 2018 - adrian@suse.de
 
 - docker format: New podman/buildah build engine support
@@ -73,7 +133,7 @@ Wed Jan 24 16:04:35 UTC 2018 - adrian@suse.de
 Tue Nov 28 13:33:11 UTC 2017 - adrian@suse.de
 
 - Fixed Dockerfile repository parsing
-- Improve file name check extractbuild
+- Improve file name check extractbuild (CVE-2017-14804, bsc#1069904)
 - track release number of containers
 - Define SOURCEURL and PATCHURL macros
 - Keep preinstalled packages
