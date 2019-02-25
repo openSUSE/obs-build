@@ -346,6 +346,7 @@ sub read_config {
       $config->{'patterntype'} = [ @l ];
     } elsif ($l0 eq 'release:') {
       $config->{'release'} = $l[0];
+      $config->{'release@'} = [ @l ];
     } elsif ($l0 eq 'cicntstart:') {
       $config->{'cicntstart'} = $l[0];
     } elsif ($l0 eq 'releaseprg:') {
