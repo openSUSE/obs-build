@@ -261,7 +261,7 @@ sub parse {
       next;
     }
     if ($line =~ /^\s*#/) {
-      next unless $line =~ /^#!Build(?:Ignore|Conflicts)\s*:/i;
+      next unless $line =~ /^#!Build(?:Ignore|Conflicts|Requires)\s*:/i;
     }
     my $expandedline = '';
     if (!$skip && ($line =~ /%/)) {
