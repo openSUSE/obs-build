@@ -114,8 +114,13 @@ dsc_build() {
 }
 
 dsc_move_build_result() {
-    for DEB in $BUILD_ROOT/$TOPDIR/*.{deb,changes} ; do
-	test -e "$DEB" && mv "$DEB" "$BUILD_ROOT/$TOPDIR/DEBS"
+    local changes
+
+    for changes in $BUILD_ROOT/$TOPDIR/*.changes ; do
+	while read f ; do
+	    mv "$BUILD_ROOT/$TOPDIR/$f" "$BUILD_ROOT/$TOPDIR/DEBS/"
+	done < <(sed -ne '/Files:/,$s/^ ................................ [0-9][0-9]* [^ ]* [^ ]* //p' "$changes")
+	mv "$changes" "$BUILD_ROOT/$TOPDIR/DEBS"
     done
 
     # link used sources over to DEB directory
