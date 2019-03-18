@@ -89,6 +89,31 @@ dsc_build() {
     local changes
     local f
 
+    echo "==== Kernel ===="
+    echo
+    uname -a || true
+    echo
+
+    echo "==== Filesystems in build chroot ===="
+    echo
+    chroot "$buildroot" su -c "cat /proc/self/mountinfo" - "$BUILD_USER" < /dev/null || true
+    echo
+
+    echo "==== User identity in build chroot ===="
+    echo
+    chroot "$buildroot" su -c "id" - "$BUILD_USER" < /dev/null || true
+    echo
+
+    echo "==== Environment variables in build chroot ===="
+    echo
+    chroot "$buildroot" su -c "env | LC_ALL=C sort -u" - "$BUILD_USER" < /dev/null || true
+    echo
+
+    echo "==== Packages installed in build chroot ===="
+    echo
+    chroot "$buildroot" su -c "dpkg-query -W" - "$BUILD_USER" < /dev/null || true
+    echo
+
     DSC_BUILD_OPTIONS=
     if test -n "$BUILD_JOBS" ; then
 	DSC_BUILD_OPTIONS="parallel=${BUILD_JOBS}"
