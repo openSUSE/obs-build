@@ -411,17 +411,17 @@ sub kiwiparse {
 
     $patterntype ||= $packages->{'patternType'};
     push @pkgs, @{$packages->{'package'}} if $packages->{'package'};
-    for my $pattern (@{$kiwi->{'namedCollection'} || []}) {
-      push @pkgs, { %$pattern, 'name' => "pattern()=$pattern->{'name'}" } if $pattern->{'name'};
+    for my $pattern (@{$packages->{'namedCollection'} || []}) {
+      push @pkgs, { %$pattern, 'name' => "pattern() = $pattern->{'name'}" } if $pattern->{'name'};
     }
-    for my $product (@{$kiwi->{'product'} || []}) {
-      push @pkgs, { %$product, 'name' => "product()=$product->{'name'}" } if $product->{'name'};
+    for my $product (@{$packages->{'product'} || []}) {
+      push @pkgs, { %$product, 'name' => "product() = $product->{'name'}" } if $product->{'name'};
     }
-    for my $pattern (@{$kiwi->{'opensusePatterns'} || []}) {
-      push @pkgs, { %$pattern, 'name' => "pattern()=$pattern->{'name'}" } if $pattern->{'name'};
+    for my $pattern (@{$packages->{'opensusePatterns'} || []}) {
+      push @pkgs, { %$pattern, 'name' => "pattern() = $pattern->{'name'}" } if $pattern->{'name'};
     }
-    for my $product (@{$kiwi->{'opensuseProduct'} || []}) {
-      push @pkgs, { %$product, 'name' => "product()=$product->{'name'}" } if $product->{'name'};
+    for my $product (@{$packages->{'opensuseProduct'} || []}) {
+      push @pkgs, { %$product, 'name' => "product() = $product->{'name'}" } if $product->{'name'};
     }
   }
   $patterntype ||= 'onlyRequired';
