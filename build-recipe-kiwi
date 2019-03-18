@@ -377,9 +377,13 @@ build_kiwi_product() {
     # XXX: again?
     chroot "$BUILD_ROOT" chown -R abuild.abuild "$TOPDIR"
     chroot "$BUILD_ROOT" rm -rf "$TOPDIR/KIWIROOT"
+    local checksums
+    if test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/.createrepo_checksums" ; then
+	checksums="CREATEREPO_CHECKSUMS=$TOPDIR/SOURCES/repos/.createrepo_checksums"
+    fi
     if test -x "$BUILD_ROOT/usr/bin/product-builder"; then
        # current implementation of product generation
-       chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX BUILD_FLAVOR=$BUILD_FLAVOR /usr/bin/product-builder --root $TOPDIR/KIWIROOT $VERBOSE_OPTION --logfile terminal --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
+       chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX BUILD_FLAVOR=$BUILD_FLAVOR $checksums /usr/bin/product-builder --root $TOPDIR/KIWIROOT $VERBOSE_OPTION --logfile terminal --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
     else
       # before openSUSE Leap 43 and SLE 13
       ver=`chroot "$BUILD_ROOT" su -c "/usr/sbin/kiwi --version | sed -n 's,.*kiwi version v\(.*\),\1,p'"`
