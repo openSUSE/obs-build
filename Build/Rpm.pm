@@ -487,6 +487,7 @@ reexpand:
       my @deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
       while (@deps) {
 	my ($pack, $vers, $qual) = splice(@deps, 0, 3);
+	next if $pack eq 'MACRO';	# hope for the best...
 	if (!$unfilteredprereqs && $pack =~ /^\//) {
 	  $ifdeps = 1;
 	  next unless $config->{'fileprovides'}->{$pack};
