@@ -39,66 +39,170 @@ recipe_prepare_simpleimage() {
 recipe_build_simpleimage() {
     TOPDIR=/usr/src/packages
 
-    echo "creating simple image..."
+    echo "`date -u`: creating simple image..."
     cd $BUILD_ROOT || cleanup_and_exit 1
     export SRCDIR="$TOPDIR/SOURCES"
 
-    NAME="`sed -n 's|Name:[[:blank:]]*||p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage`"
+    # Allow setting custom values through simpleimage recipe
+    # (otherwise use e.g. config for the obsworker), valid
+    # values are "no" (to disable the archive type), and
+    # anything else to try building it.
+    # TODO: Enforce presence of rpmspec and use it to parse
+    # the recipe file (consider %if et al better than sed)!
+    # https://wiki.merproject.org/wiki/Packaging_guidelines/ParsingSpecFiles
+    PREFER_OBS_SIMPLEIMAGE_TARBALL="`sed -n 's|^#@#OBS_SIMPLEIMAGE_TARBALL=||p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage | tail -1`" || PREFER_OBS_SIMPLEIMAGE_TARBALL=""
+    [ -n "$OBS_SIMPLEIMAGE_TARBALL" ] || OBS_SIMPLEIMAGE_TARBALL="$PREFER_OBS_SIMPLEIMAGE_TARBALL"
+    PREFER_OBS_SIMPLEIMAGE_SQUASHFS="`sed -n 's|^#@#OBS_SIMPLEIMAGE_SQUASHFS=||p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage | tail -1`" || PREFER_OBS_SIMPLEIMAGE_SQUASHFS=""
+    [ -n "$OBS_SIMPLEIMAGE_SQUASHFS" ] || OBS_SIMPLEIMAGE_SQUASHFS="$PREFER_OBS_SIMPLEIMAGE_SQUASHFS"
+
+    if [ "$OBS_SIMPLEIMAGE_TARBALL" = no ] && [ "$OBS_SIMPLEIMAGE_SQUASHFS" = no ] ; then
+        echo "FATAL: Both tarball and squashfs outputs are disabled, nothing to do" >&2
+        cleanup_and_exit 1
+    fi
+
+    NAME="`sed -n 's|Name:[[:blank:]]*||p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage | tail -1`"
     [ -n "$NAME" ] || NAME="simpleimage"
-    VERSION="`sed -n 's|Version:[[:blank:]]*||p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage`"
+    VERSION="`sed -n 's|Version:[[:blank:]]*||p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage | tail -1`"
     [ -n "$VERSION" ] || VERSION="`date -u +%y.%m.%d-%H.%M.%S`"
 
     SHELL="/bin/sh"
     [ -x $BUILD_ROOT/bin/bash ] && SHELL="/bin/bash"
     if [ "`grep '^%build$' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage`" ]; then
-      echo "Running integration script..."
+      echo "`date -u`: Running integration script..."
       sed -n '/%build/,$ p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage | tail -n +2 | chroot $BUILD_ROOT $SHELL -x || cleanup_and_exit 1
-      echo "Integration script finished."
+      echo "`date -u`: Integration script finished."
     fi
 
-    echo "Compresing the final image, this can take a while..."
-    echo
-    TAR="tar"
-    if test -x /usr/bin/bsdtar; then
-	TAR="/usr/bin/bsdtar --format gnutar --chroot"
-    fi
+    echo "`date -u`: Finalizing filesystem tree..."
     TOPDIRS=
+    MKTOPDIRS="proc sys"
+    MKTOPDIRS_TMP=".tmp/proc .tmp/sys"
     for DIR  in .* * ; do
       case "$DIR" in
 	.|..) continue ;;
 	.build*) continue ;;
+	.nfs*) continue ;;
 	.simpleimage*) continue ;;
+	.preinstallimage*) continue ;;
+	.preinstall_image*) continue ;;
 	.srcfiles*) continue ;;
+	.oldroot*) continue ;;
 	.pkgs) continue ;;
 	.rpm-cache) continue ;;
 	.tmp) continue ;;
 	installed-pkg) continue ;;
+	debian-binary) continue ;;
 	proc|sys) continue ;;
+	run|var/run|tmp|var/tmp)
+		if test -d "$DIR" && ! test -L "$DIR" ; then
+			MKTOPDIRS="$MKTOPDIRS $DIR"
+			MKTOPDIRS_TMP="$MKTOPDIRS_TMP .tmp/$DIR"
+			continue
+		fi
+		# non-directories or symlinks to whatever go "as is"
+		;;
       esac
       TOPDIRS="$TOPDIRS $DIR"
     done
-	rm -rf "$BUILD_ROOT$TOPDIR"
-    mkdir -p .tmp/{proc,sys}
-    if ! $TAR -cvzf .simpleimage.tar.gz --one-file-system $TOPDIRS -C .tmp proc sys; then
-      cleanup_and_exit 1
+    REMOTE_IO_EXEC rm -rf "$BUILD_ROOT$TOPDIR"
+    mkdir -p $MKTOPDIRS_TMP
+    for DIR in $MKTOPDIRS ; do
+        if [ -e "$DIR" ] ; then
+            chmod --reference="$DIR" ".tmp/$DIR" || true
+            chown --reference="$DIR" ".tmp/$DIR" || true
+        fi
+    done
+#    ( mkdir -p .tmp/ && cd .tmp/ && mkdir -p $MKTOPDIRS )
+#    mkdir -p .tmp/{proc,sys}
+
+    if [ -n "$REMOTE_IO_EXEC" ]; then
+        echo "`date -u`: Compresing the final image using REMOTE_IO_EXEC, this can take a while..."
+    else
+        echo "`date -u`: Compresing the final image, this can take a while..."
     fi
-    if [ -x "`which mksquashfs 2> /dev/null`" ]; then
-      echo
-      echo "Tarball done, creating squashfs image as well"
-      echo
-      mksquashfs $TOPDIRS .tmp/proc .tmp/sys .simpleimage.squashfs -info -keep-as-directory -no-progress || cleanup_and_exit 1
+    echo
+
+    if [ "$OBS_SIMPLEIMAGE_TARBALL" != no ] ; then
+        TAR="tar"
+        TARGZIP_FLAG="-z"
+        TARGZIP_POST=""
+        if REMOTE_IO_EXEC test -x /usr/bin/bsdtar; then
+            TAR="/usr/bin/bsdtar --format gnutar --chroot"
+            if REMOTE_IO_EXEC test -x /usr/bin/pigz; then
+                TARGZIP_FLAG=""
+                TARGZIP_POST="| /usr/bin/pigz"
+            fi
+        else
+            if REMOTE_IO_EXEC test -x /usr/bin/pigz; then
+                TARGZIP_FLAG="-I/usr/bin/pigz"
+            fi
+        fi
+
+        echo "Creating tarball image..."
+        if ! REMOTE_IO_EXEC "$TAR $TARGZIP_FLAG -cf - --one-file-system $TOPDIRS -C .tmp $MKTOPDIRS $TARGZIP_POST > $BUILD_ROOT/.simpleimage.tar.gz"; then
+            cleanup_and_exit 1
+        fi
     fi
-    echo "simple image created."
+
+    if [ "$OBS_SIMPLEIMAGE_SQUASHFS" != no ] ; then
+        if [ -x "`REMOTE_IO_EXEC which mksquashfs 2> /dev/null`" ]; then
+            echo
+            if [ "$OBS_SIMPLEIMAGE_TARBALL" != no ] ; then
+                echo "Tarball done, creating squashfs image as well..."
+            else
+                echo "Creating squashfs image..."
+            fi
+            if [ -n "$REMOTE_IO_EXEC" ]; then
+                echo "Using REMOTE_IO_EXEC..."
+            fi
+            echo
+            # Note: no pigz magic here, mksquashfs already does parallel work by itself
+            REMOTE_IO_EXEC mksquashfs $TOPDIRS $MKTOPDIRS_TMP $BUILD_ROOT/.simpleimage.squashfs -info -keep-as-directory -no-progress || cleanup_and_exit 1
+        else
+            if [ "$OBS_SIMPLEIMAGE_TARBALL" = no ] ; then
+                echo "FATAL: Tarball output was disabled, and mksquashfs is not found, nothing to do" >&2
+                cleanup_and_exit 1
+            fi
+        fi
+    fi
+    echo "`date -u`: simple image created."
 
     DEST="$BUILD_ROOT$TOPDIR/OTHER"
     mkdir -p "$DEST"
-    mv $BUILD_ROOT/.simpleimage.tar.gz $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz
-    if [ -r .simpleimage.squashfs ]; then
-      mv $BUILD_ROOT/.simpleimage.squashfs $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs
+
+    if [ "$OBS_SIMPLEIMAGE_TARBALL" != no ] ; then
+        if [ -r .simpleimage.tar.gz ]; then
+            echo
+            echo "Renaming to final unique name and checksumming the tarball image..."
+            echo
+            mv $BUILD_ROOT/.simpleimage.tar.gz $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz
+            REMOTE_IO_EXEC md5sum $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz | sed "s|$DEST/||" > $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz.md5
+            ls -la $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz.md5 $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz
+        fi
     fi
+
+    if [ "$OBS_SIMPLEIMAGE_SQUASHFS" != no ] ; then
+        if [ -r .simpleimage.squashfs ]; then
+            echo
+            echo "Renaming to final unique name and checksumming the squashfs image..."
+            echo
+            mv $BUILD_ROOT/.simpleimage.squashfs $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs
+            REMOTE_IO_EXEC md5sum $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs | sed "s|$DEST/||" > $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs.md5
+            ls -la $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs.md5 $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs
+        fi
+    fi
+
+    echo "Almost done, cleaning up..."
     rm -f $BUILD_ROOT/.build.packages
     ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
-    test -d "$SRCDIR" && cd "$SRCDIR"
+
+    echo "`date -u`: recipe_build_simpleimage() finished"
+    test -d "$SRCDIR" && cd "$SRCDIR" || echo "NOTE: Could not test existance of SRCDIR='$SRCDIR'"
+
+    echo
+    echo "$HOST finished \"build $RECIPEFILE\" at `date --utc`."
+    echo
+
     cleanup_and_exit
 }
 
