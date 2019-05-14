@@ -130,6 +130,9 @@ recipe_build_spec() {
 	    echo "warning: --nocheck is not supported by this $rpmbuild version"
 	fi
     fi
+    if test "$rpmbuild" == "debbuild" ; then
+	rpmbopts[${#rpmbopts[@]}]="-vv"
+    fi
     if test "$rpmbuild" == "rpmbuild" ; then
 	    # use only --nosignature for rpm v4
 	rpmbopts[${#rpmbopts[@]}]="--nosignature"
