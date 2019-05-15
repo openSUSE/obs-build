@@ -60,6 +60,17 @@ vm_verify_options_kvm() {
     if test -n "$KILL" -o -n "$DO_WIPE" ; then
 	return
     fi  
+    local QEMU_NO_KVM=false
+    # Check if we have 'nokvm' option
+    if test -n "$1" -a "$1" = "nokvm"; then
+        QEMU_NO_KVM=true
+    fi
+
+    if $QEMU_NO_KVM; then
+        echo "Using qemu without KVM"
+    elif test "$BUILD_ARCH" != $(uname -m); then
+         cleanup_and_exit 3 "Unable to build for $BUILD_ARCH on $(uname -m) with KVM"
+    fi
 
     vm_kernel=
     vm_initrd=
@@ -69,12 +80,16 @@ vm_verify_options_kvm() {
 	kvm_bin="/usr/bin/kvm"
     fi
 
-    # overwrite some options for specific host architectures
-    case `uname -m` in
-	armv7l)
+    # overwrite some options for specific build architectures
+    case $BUILD_ARCH in
+	armv6l|armv7l)
 	    kvm_bin="/usr/bin/qemu-system-arm"
 	    kvm_console=ttyAMA0
-	    kvm_options="-enable-kvm -M virt"
+	    if $QEMU_NO_KVM; then
+	        kvm_options="-M virt"
+	    else
+	        kvm_options="-enable-kvm -M virt"
+	    fi
 	    vm_kernel=/boot/zImage
 	    vm_initrd=/boot/initrd
 	    # prefer the guest kernel/initrd
@@ -82,26 +97,36 @@ vm_verify_options_kvm() {
 	    test -e /boot/initrd.guest && vm_initrd=/boot/initrd.guest
 	    kvm_device=virtio-blk-device
 	    kvm_rng_device=virtio-rng-device
+	    if $QEMU_NO_KVM; then
+		kvm_cpu="-cpu cortex-a15"
+	    fi
+	    if test `uname -m` = "aarch64" -o `uname -m` = "armv8l"; then
+		    # Running an armv7 kernel on aarch64
+		    if ! $QEMU_NO_KVM; then
+			kvm_options="-enable-kvm"
+			kvm_cpu="-cpu host,aarch64=off"
+		    fi
+		    # prefer the guest32 kernel/initrd
+		    test -e /boot/Image.guest32 && vm_kernel=/boot/Image.guest32
+		    test -e /boot/initrd.guest32 && vm_initrd=/boot/initrd.guest32
+	    fi
 	    ;;
 	armv8l|aarch64)
 	    kvm_bin="/usr/bin/qemu-system-aarch64"
 	    kvm_console=ttyAMA0
 	    vm_kernel=/boot/Image
 	    vm_initrd=/boot/initrd
-            if test "${BUILD_ARCH#aarch}" != "$BUILD_ARCH" -o "${BUILD_ARCH#armv8}" != "$BUILD_ARCH"; then
-		kvm_options="-enable-kvm"
-		test -e /boot/Image.guest && vm_kernel=/boot/Image.guest
-		test -e /boot/initrd.guest && vm_initrd=/boot/initrd.guest
+	    if $QEMU_NO_KVM; then
+		kvm_cpu="-cpu cortex-a72"
 	    else
-		# Running an armv7 kernel on aarch64
-		kvm_options="-enable-kvm"
-		kvm_cpu="-cpu host,aarch64=off"
-		# prefer the guest kernel/initrd
-		test -e /boot/Image.guest32 && vm_kernel=/boot/Image.guest32
-		test -e /boot/initrd.guest32 && vm_initrd=/boot/initrd.guest32
+	        kvm_options="-enable-kvm"
 	    fi
+	    test -e /boot/Image.guest && vm_kernel=/boot/Image.guest
+	    test -e /boot/Image.aarch64 && vm_kernel=/boot/Image.aarch64
+	    test -e /boot/initrd.guest && vm_initrd=/boot/initrd.guest
+	    test -e /boot/initrd.aarch64 && vm_initrd=/boot/initrd.aarch64
 	    # This option only exists with QEMU 2.5 or newer
-	    if $kvm_bin -machine 'virt,?' 2>&1 | grep -q gic-version ; then
+	    if ! $QEMU_NO_KVM && $kvm_bin -machine 'virt,?' 2>&1 | grep -q gic-version ; then
 		# We want to use the host gic version in order to make use
 		# of all available features (e.g. more than 8 CPUs) and avoid
 		# the emulation overhead of vGICv2 on a GICv3 host.
@@ -115,10 +140,20 @@ vm_verify_options_kvm() {
 	ppc|ppcle|ppc64|ppc64le)
 	    kvm_bin="/usr/bin/qemu-system-ppc64"
 	    kvm_console=hvc0
-	    kvm_options="-enable-kvm -M pseries"
+	    if $QEMU_NO_KVM; then
+	        kvm_options="-M pseries"
+	        kvm_cpu="-cpu ppc64"
+	    else
+	        kvm_options="-enable-kvm -M pseries"
+	        grep -q "pSeries" /proc/cpuinfo && kvm_device=scsi-hd	# no virtio on pSeries
+	        grep -q "PowerNV" /proc/cpuinfo || kvm_device=scsi-hd	# no virtio on ppc != power7 yet
+	        grep -q "POWER9" /proc/cpuinfo && kvm_cpu="-cpu host,compat=power8"
+	    fi
 	    grep -q PPC970MP /proc/cpuinfo && kvm_check_ppc970
 	    vm_kernel=/boot/vmlinux
 	    vm_initrd=/boot/initrd
+	    test -e /boot/vmlinux.ppc && vm_kernel=/boot/vmlinux.ppc
+	    test -e /boot/initrd.ppc && vm_kernel=/boot/initrd.ppc
 	    if test "$BUILD_ARCH" = ppc64le -a -e /boot/vmlinuxle ; then
 		vm_kernel=/boot/vmlinuxle
 		vm_initrd=/boot/initrdle
@@ -129,24 +164,38 @@ vm_verify_options_kvm() {
 		    vm_initrd=/boot/initrdbe
 	        fi
 	    fi
-	    grep -q "pSeries" /proc/cpuinfo && kvm_device=scsi-hd	# no virtio on pSeries
-	    grep -q "PowerNV" /proc/cpuinfo || kvm_device=scsi-hd	# no virtio on ppc != power7 yet
-	    grep -q "POWER9" /proc/cpuinfo && kvm_cpu="-cpu host,compat=power8"
 	    ;;
 	s390|s390x)
 	    kvm_bin="/usr/bin/qemu-system-s390x"
-	    kvm_options="-enable-kvm"
+	    if $QEMU_NO_KVM; then
+	        kvm_cpu="qemu"
+	    else
+	        kvm_options="-enable-kvm"
+	    fi
 	    kvm_console=hvc0
 	    vm_kernel=/boot/image
 	    vm_initrd=/boot/initrd
+	    test -e /boot/image.s390 && vm_kernel=/boot/image.s390
+	    test -e /boot/initrd.s390 && vm_kernel=/boot/initrd.s390
 	    kvm_device=virtio-blk-ccw
 	    kvm_serial_device=virtio-serial-ccw
 	    kvm_rng_device=virtio-rng-ccw
 	    ;;
+	x86_64)
+	    kvm_bin="/usr/bin/qemu-system-x86_64"
+	    if $QEMU_NO_KVM; then
+		kvm_cpu="-cpu qemu64"
+	    else
+	        kvm_options="-enable-kvm"
+	    fi
+	    test -e /boot/vmlinuz.x86_64 && vm_kernel=/boot/vmlinuz.x86_64
+	    test -e /boot/initrd.x86_64 && vm_initrd=/boot/initrd.x86_64
+	    # Use defaults and fallbacks for other values
+	    ;;
     esac
 
     # check if we can run kvm
-    if ! test -r /dev/kvm -a -x "$kvm_bin" ; then
+    if ! $QEMU_NO_KVM && ! test -r /dev/kvm -a -x "$kvm_bin" ; then
 	echo "host does not support kvm"
 	echo "either the kvm kernel-module is not loaded or kvm is not installed or hardware virtualization is deactivated in the BIOS."
 	cleanup_and_exit 3
