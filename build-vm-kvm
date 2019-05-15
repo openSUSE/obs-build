@@ -72,6 +72,20 @@ vm_verify_options_kvm() {
          cleanup_and_exit 3 "Unable to build for $BUILD_ARCH on $(uname -m) with KVM"
     fi
 
+    # Check if we have local kernel and initrd (from build-vm)
+    # For qemu, use kvm extension for kernel/initrd
+    if test "$VM_TYPE" = "qemu"; then
+        local_vm_type="kvm"
+    else
+        local_vm_type="$VM_TYPE"
+    fi
+    if test -z "$VM_KERNEL" -a -e "$BUILD_ROOT/boot/kernel" -a \
+	-z "$VM_INITRD" -a -e "$BUILD_ROOT/boot/initrd"; then
+	# Use kernel/initrd from '.build.*.$VM_TYPE', if any
+	VM_KERNEL=$BUILD_ROOT/boot/kernel
+	VM_INITRD=$BUILD_ROOT/boot/initrd
+    fi
+
     vm_kernel=
     vm_initrd=
     
