@@ -36,7 +36,7 @@ vm_kill_qemu() {
 }
 
 vm_fixup_qemu() {
-    vm_setup_kvm
+    vm_fixup_kvm
 }
 
 vm_attach_root_qemu() {
