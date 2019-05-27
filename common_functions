@@ -20,6 +20,8 @@
 #
 ################################################################
 
+BUILD_VERSION="$(cat "$BUILD_DIR/version")"
+
 build_host_arch() {
     : ${BUILD_HOST_ARCH:=`uname -m`}
     # the linux kernel only knows armv7l, armv7hl is a userland definition

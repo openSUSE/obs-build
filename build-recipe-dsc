@@ -86,6 +86,33 @@ EOF
 
 dsc_build() {
     local buildroot=$1
+    local changes
+    local f
+
+    echo "==== Kernel ===="
+    echo
+    uname -a || true
+    echo
+
+    echo "==== Filesystems in build chroot ===="
+    echo
+    chroot "$buildroot" su -c "cat /proc/self/mountinfo" - "$BUILD_USER" < /dev/null || true
+    echo
+
+    echo "==== User identity in build chroot ===="
+    echo
+    chroot "$buildroot" su -c "id" - "$BUILD_USER" < /dev/null || true
+    echo
+
+    echo "==== Environment variables in build chroot ===="
+    echo
+    chroot "$buildroot" su -c "env | LC_ALL=C sort -u" - "$BUILD_USER" < /dev/null || true
+    echo
+
+    echo "==== Packages installed in build chroot ===="
+    echo
+    chroot "$buildroot" su -c "dpkg-query -W" - "$BUILD_USER" < /dev/null || true
+    echo
 
     DSC_BUILD_OPTIONS=
     if test -n "$BUILD_JOBS" ; then
@@ -106,6 +133,37 @@ dsc_build() {
 	chroot $buildroot su -
     else
 	chroot $buildroot su -c "export DEB_BUILD_OPTIONS=${DSC_BUILD_OPTIONS} ; cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+
+	for changes in "$buildroot/$TOPDIR"/*.changes ; do
+	    echo
+	    echo "==== $(basename "$changes") ===="
+	    echo
+	    cat "$changes"
+	    echo
+
+	    while read f ; do
+		case "$f" in
+		    (*.buildinfo)
+			echo "==== $f ===="
+			echo
+			cat "$buildroot/$TOPDIR/$f"
+			echo
+		esac
+	    done < <(sed -ne '/Files:/,$s/^ ................................ [0-9][0-9]* [^ ]* [^ ]* //p' "$changes")
+
+	    while read f ; do
+		case "$f" in
+		    (*.deb|*.ddeb|*.udeb)
+			echo "==== $f ===="
+			echo
+			chroot "$buildroot" su -c "dpkg-deb --info $(printf '%q' "$TOPDIR/$f")" - "$BUILD_USER" < /dev/null || true
+			echo
+			chroot "$buildroot" su -c "dpkg-deb --contents $(printf '%q' "$TOPDIR/$f")" - "$BUILD_USER" < /dev/null || true
+			echo
+		esac
+	    done < <(sed -ne '/Files:/,$s/^ ................................ [0-9][0-9]* [^ ]* [^ ]* //p' "$changes")
+	done
+
 	if test "$BUILD_SUCCEEDED" = true -a "$DO_CHECKS" != "false" && ( chroot $buildroot su -c "which lintian > /dev/null" - $BUILD_USER < /dev/null ); then
 	   DEB_CHANGESFILE=${DEB_DSCFILE%.dsc}$OBS_DCH_RELEASE"_"$(chroot $buildroot su -c 'dpkg-architecture -qDEB_BUILD_ARCH')".changes"
 	   chroot $buildroot su -c "cd $TOPDIR && echo Running lintian && (set -x && lintian -i $TOPDIR/$DEB_CHANGESFILE)" - $BUILD_USER < /dev/null || BUILD_SUCCEEDED=false

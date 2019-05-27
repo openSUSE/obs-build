@@ -121,6 +121,7 @@ umask 022
 
 echo_help () {
     cat << EOT
+build version: $BUILD_VERSION
 
 Some comments for build
 -----------------------
@@ -1185,6 +1186,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     if test -z "$RUNNING_IN_VM" ; then
 	echo
 	echo "$HOST started \"build $RECIPEFILE\" at `date --utc`."
+	echo "build version: $BUILD_VERSION"
 	echo
 	test -n "$REASON" && echo "$REASON"
 	echo
