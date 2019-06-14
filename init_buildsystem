@@ -517,6 +517,7 @@ mkdir -p $BUILD_ROOT/proc
 mkdir -p $BUILD_ROOT/dev/pts
 if test "$UID" = 0 -a -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
     mount -n -tproc none "$BUILD_ROOT/proc"
+    test -e "$BUILD_ROOT/proc/self" || cleanup_and_exit 1 "Could not mount /proc, is this a container with missing capabilities?"
     mount -n -tdevpts -omode=0620,gid=5 none "$BUILD_ROOT/dev/pts"
 fi
 
