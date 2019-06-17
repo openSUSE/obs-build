@@ -20,7 +20,7 @@
 
 Name:           build
 Summary:        A Script to Build SUSE Linux RPMs
-License:        GPL-2.0-or-later AND GPL-2.0-only
+License:        GPL-2.0-only OR GPL-3.0-only
 Group:          Development/Tools/Building
 Version:        20190123
 Release:        0
