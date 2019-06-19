@@ -156,6 +156,7 @@ pkg_preinstall_rpm() {
     case `rpm -qp --nodigest --nosignature --qf "%{PAYLOADCOMPRESSOR}\n" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm"` in
 	lzma) rpm --showrc | egrep 'PayloadIsLzma|_lzma' > /dev/null || PAYLOADDECOMPRESS="lzma -d" ;;
 	xz) rpm --showrc | egrep 'PayloadIsXz|_xz' > /dev/null || PAYLOADDECOMPRESS="xz -d" ;;
+	zstd) rpm --showrc | egrep 'PayloadIsZstd' > /dev/null || PAYLOADDECOMPRESS="zstd -d" ;;
     esac
     if test "$PAYLOADDECOMPRESS" = "lzma -d" ; then
 	if ! lzma </dev/null >/dev/null 2>&1 ; then
@@ -165,6 +166,11 @@ pkg_preinstall_rpm() {
     if test "$PAYLOADDECOMPRESS" = "xz -d" ; then
 	if ! xz </dev/null >/dev/null 2>&1 ; then
 	    test -f "$BUILD_DIR/xzdec.sh" && PAYLOADDECOMPRESS="bash $BUILD_DIR/xzdec.sh"
+	fi
+    fi
+    if test "$PAYLOADDECOMPRESS" = "zstd -d" ; then
+	if ! zstd </dev/null >/dev/null 2>&1 ; then
+	    test -f "$BUILD_DIR/zstddec.sh" && PAYLOADDECOMPRESS="bash $BUILD_DIR/zstddec.sh"
 	fi
     fi
     if test "$PAYLOADDECOMPRESS" = cat ; then
