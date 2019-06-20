@@ -52,6 +52,9 @@ pkg_install_arch() {
     # -d -d disables deps checking
     ( cd $BUILD_ROOT && chroot $BUILD_ROOT pacman -U --overwrite '*' -d -d --noconfirm .init_b_cache/$PKG.$PSUF 2>&1 || touch $BUILD_ROOT/exit ) | \
 	perl -ne '$|=1;/^(warning: could not get filesystem information for |loading packages|looking for inter-conflicts|looking for conflicting packages|Targets |Total Installed Size: |Net Upgrade Size: |Proceed with installation|checking package integrity|loading package files|checking for file conflicts|checking keyring|Packages \(\d+\)|:: Proceed with installation|:: Processing package changes|checking available disk space|installing |upgrading |warning:.*is up to date -- reinstalling|Optional dependencies for|    )/||/^$/||print'
+    # Set up a minimum amount of locales...
+    ( cd $BUILD_ROOT && test -f etc/locale.gen && grep -q '^#en_US.UTF-8' etc/locale.gen &&
+      sed -i "s/^#\(en_US.UTF-8 UTF-8\)/\1/" etc/locale.gen && chroot $BUILD_ROOT locale-gen )
 }
 
 pkg_finalize_arch() {
