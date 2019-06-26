@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Wed Jun 26 10:41:38 UTC 2019 - Dominique Leuenberger <dimstar@opensuse.org>
+
+- configs/15.5.conf: add libzstd1 to preinstall list: RPM is being
+  extended to support zstd compression, which results in an
+  additionaly library being linked in.
+
+-------------------------------------------------------------------
 Tue Jun  4 08:24:31 UTC 2019 - Adrian Schröter <adrian@suse.de>
 
 - configs/15.5.conf: remove brp-extract-appdata from support package
