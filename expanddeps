@@ -245,103 +245,41 @@ $cf->{'obspackage'} = $obspackage if defined $obspackage;
 my $dofileprovides = %{$cf->{'fileprovides'}};
 $dofileprovides = 1 if ($binarytype || 'rpm') ne 'rpm';
 
+sub parsedepline {
+  return [] unless defined $_[0];
+  my @s = split(' ', $_[0]);
+  my @r;
+  while (@s) {
+    my $s = shift @s;
+    next if !$dofileprovides && $s =~ /^\//;
+    if ($s =~ /^rpmlib\(/) {
+      splice(@s, 0, 2);
+      next;
+    }
+    if ($s =~ /^\(/) {
+      unshift @s, $s;
+      push @r, Build::Rpm::shiftrich(\@s);
+      next;
+    }
+    push @r, $s;
+    while (@s && $s[0] =~ /^[\(<=>|]/) {
+      $r[-1] .= " $s[0] $s[1]";
+      $r[-1] =~ s/ \((.*)\)/ $1/;
+      $r[-1] =~ s/(<|>){2}/$1/;
+      splice(@s, 0, 2);
+    }
+  }
+  return \@r;
+}
+
 for my $pack (keys %packs) {
   my $r = {};
-  my (@s, $s, @pr, @re, @co, @ob, @rc, @su);
-  @s = split(' ', $prov{$packs{$pack}} || '');
-  while (@s) {
-    $s = shift @s;
-    next if !$dofileprovides && $s =~ /^\//;
-    if ($s =~ /^rpmlib\(/) {
-      splice(@s, 0, 2);
-      next;
-    }
-    push @pr, $s;
-    while (@s && $s[0] =~ /^[\(<=>|]/) {
-      $pr[-1] .= " $s[0] $s[1]";
-      $pr[-1] =~ s/ \((.*)\)/ $1/;
-      $pr[-1] =~ s/(<|>){2}/$1/;
-      splice(@s, 0, 2);
-    }
-  }
-  @s = split(' ', $req{$packs{$pack}} || '');
-  while (@s) {
-    $s = shift @s;
-    next if !$dofileprovides && $s =~ /^\//;
-    if ($s =~ /^rpmlib\(/) {
-      splice(@s, 0, 2);
-      next;
-    }
-    push @re, $s;
-    while (@s && $s[0] =~ /^[\(<=>|]/) {
-      $re[-1] .= " $s[0] $s[1]";
-      $re[-1] =~ s/ \((.*)\)/ $1/;
-      $re[-1] =~ s/(<|>){2}/$1/;
-      splice(@s, 0, 2);
-    }
-  }
-  @s = split(' ', $con{$packs{$pack}} || '');
-  while (@s) {
-    $s = shift @s;
-    next if !$dofileprovides && $s =~ /^\//;
-    push @co, $s;
-    while (@s && $s[0] =~ /^[\(<=>|]/) {
-      $co[-1] .= " $s[0] $s[1]";
-      $co[-1] =~ s/ \((.*)\)/ $1/;
-      $co[-1] =~ s/(<|>){2}/$1/;
-      splice(@s, 0, 2);
-    }
-  }
-  @s = split(' ', $obs{$packs{$pack}} || '');
-  while (@s) {
-    $s = shift @s;
-    next if !$dofileprovides && $s =~ /^\//;
-    push @ob, $s;
-    while (@s && $s[0] =~ /^[\(<=>|]/) {
-      $ob[-1] .= " $s[0] $s[1]";
-      $ob[-1] =~ s/ \((.*)\)/ $1/;
-      $ob[-1] =~ s/(<|>){2}/$1/;
-      splice(@s, 0, 2);
-    }
-  }
-  @s = split(' ', $rec{$packs{$pack}} || '');
-  while (@s) {
-    $s = shift @s;
-    next if !$dofileprovides && $s =~ /^\//;
-    if ($s =~ /^rpmlib\(/) {
-      splice(@s, 0, 2);
-      next;
-    }
-    push @rc, $s;
-    while (@s && $s[0] =~ /^[\(<=>|]/) {
-      $rc[-1] .= " $s[0] $s[1]";
-      $rc[-1] =~ s/ \((.*)\)/ $1/;
-      $rc[-1] =~ s/(<|>){2}/$1/;
-      splice(@s, 0, 2);
-    }
-  }
-  @s = split(' ', $sup{$packs{$pack}} || '');
-  while (@s) {
-    $s = shift @s;
-    next if !$dofileprovides && $s =~ /^\//;
-    if ($s =~ /^rpmlib\(/) {
-      splice(@s, 0, 2);
-      next;
-    }
-    push @su, $s;
-    while (@s && $s[0] =~ /^[\(<=>|]/) {
-      $su[-1] .= " $s[0] $s[1]";
-      $su[-1] =~ s/ \((.*)\)/ $1/;
-      $su[-1] =~ s/(<|>){2}/$1/;
-      splice(@s, 0, 2);
-    }
-  }
-  $r->{'provides'} = \@pr;
-  $r->{'requires'} = \@re;
-  $r->{'conflicts'} = \@co;
-  $r->{'obsoletes'} = \@ob;
-  $r->{'recommends'} = \@rc;
-  $r->{'supplements'} = \@su;
+  $r->{'provides'} = parsedepline($prov{$packs{$pack}});
+  $r->{'requires'} = parsedepline($req{$packs{$pack}});
+  $r->{'conflicts'} = parsedepline($con{$packs{$pack}});
+  $r->{'obsoletes'} = parsedepline($obs{$packs{$pack}});
+  $r->{'recommends'} = parsedepline($rec{$packs{$pack}});
+  $r->{'supplements'} = parsedepline($sup{$packs{$pack}});
   $repo{$pack} = $r;
 }
 
