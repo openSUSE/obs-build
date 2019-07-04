@@ -121,6 +121,11 @@ recipe_build_spec() {
     test -x $BUILD_ROOT/usr/bin/rpmbuild || rpmbuild=rpm
     test "$BUILDTYPE" = debbuild && rpmbuild=debbuild
 
+    HAVE_DYNAMIC_BUILDREQUIRES=
+    if egrep '^%generate_buildrequires' "$BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE" >/dev/null ; then
+	HAVE_DYNAMIC_BUILDREQUIRES=true
+    fi
+
     # XXX: move _srcdefattr to macro file?
     rpmbopts=("$BUILD_RPM_BUILD_STAGE" "--define" "_srcdefattr (-,root,root)")
     if test "$DO_CHECKS" != true ; then
@@ -159,6 +164,41 @@ recipe_build_spec() {
 	rpmbopts[${#rpmbopts[@]}]="$buildrootoverride"
     fi
 
+    GEN_BUILDREQS_PACKS=()
+    if test -n "$HAVE_DYNAMIC_BUILDREQUIRES" -a -z "$RUN_SHELL" ; then
+	# query dynamic build requires
+	rm -f "$BUILD_ROOT$TOPDIR/SRPMS/"*.buildreqs.nosrc.rpm
+	rpmdynbropts=("${rpmbopts[@]}")
+	rpmdynbropts[0]=-br
+	toshellscript $rpmbuild \
+		--nodeps \
+		"${definesnstuff[@]}" \
+		"${rpmdynbropts[@]}" \
+		"$TOPDIR/SOURCES/$RECIPEFILE" \
+		> $BUILD_ROOT/.build.command
+	chmod 755 $BUILD_ROOT/.build.command
+	chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null
+	st=$?
+	if test "$st" != 0 -a "$st" != 11 ; then
+	    return
+	fi
+	: > $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs
+	if test "$st" = 11 ; then
+	    reqsfile=
+	    for i in "$BUILD_ROOT$TOPDIR/SRPMS/"*.buildreqs.nosrc.rpm ; do
+		test -f "$i" && reqsfile=${i##*/}
+	    done
+	    test -n "$reqsfile" || cleanup_and_exit 1 "no buildreqs.nosrc.rpm file?"
+	    chroot $BUILD_ROOT rpm -qp --requires "$TOPDIR/SRPMS/$reqsfile" | grep -v '^rpmlib(' | sort -u > $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp
+	    chroot $BUILD_ROOT rpmspec -q --srpm --requires "$TOPDIR/SOURCES/$RECIPEFILE" >> $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp || cleanup_and_exit 1 "rpm -q --spec failed"
+	    sort < $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp | uniq -u > $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs
+	    rm -f $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp
+	    while read db ; do
+		GEN_BUILDREQS_PACKS[${#GEN_BUILDREQS_PACKS[@]}]="$db"
+	    done < $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs
+	fi
+    fi
+
     # su involves a shell which would require even more
     # complicated quoting to bypass than this
     toshellscript $rpmbuild \
@@ -171,7 +211,10 @@ recipe_build_spec() {
     if test -n "$RUN_SHELL"; then
 	chroot $BUILD_ROOT su -
     else
-	chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+	chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null
+	st=$?
+	test "$st" = 0 && BUILD_SUCCEEDED=true
+	test "$st" = 11 -a -n "$HAVE_DYNAMIC_BUILDREQUIRES" && BUILD_SUCCEEDED=genbuildreqs
     fi
 }
 

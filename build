@@ -73,6 +73,7 @@ DO_INIT_TOPDIR=true
 DO_LINT=
 DO_CHECKS=true
 CLEAN_BUILD=
+GENBUILDREQS_CLEAN_BUILD=
 RECIPEFILES=()
 SRCDIR=
 BUILD_JOBS=
@@ -753,6 +754,29 @@ kill_running_build() {
     fi
 }
 
+mount_stuff() {
+    if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
+	test -d $BUILD_ROOT/dev/shm || rm -f $BUILD_ROOT/dev/shm
+	mkdir -p $BUILD_ROOT/proc
+	mkdir -p $BUILD_ROOT/sys
+	mkdir -p $BUILD_ROOT/dev/pts
+	mkdir -p $BUILD_ROOT/dev/shm
+	mount -n -tproc none $BUILD_ROOT/proc
+	mount -n -tdevpts -omode=0620,gid=5 none $BUILD_ROOT/dev/pts
+	mount -n -ttmpfs none $BUILD_ROOT/dev/shm
+    fi
+}
+
+umount_stuff() {
+    if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
+	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2>/dev/null || true
+	umount -n $BUILD_ROOT/proc 2>/dev/null || true
+	umount -n $BUILD_ROOT/dev/pts 2>/dev/null || true
+	umount -n $BUILD_ROOT/dev/shm 2>/dev/null || true
+	umount -n $BUILD_ROOT/sys 2>/dev/null || true
+    fi
+}
+
 #### main ####
 
 trap fail_exit EXIT
@@ -803,6 +827,7 @@ while test -n "$1"; do
 	DO_CHECKS=false
       ;;
       -clean)
+	test "$CLEAN_BUILD" = '--clean' && GENBUILDREQS_CLEAN_BUILD='--clean'
 	CLEAN_BUILD='--clean'
       ;;
       -wipe)
@@ -1256,17 +1281,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	copy_oldpackages
     fi
 
-    # mount stuff (/dev/shm needed for POSIX semaphores)
-    if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
-	test -d $BUILD_ROOT/dev/shm || rm -f $BUILD_ROOT/dev/shm
-	mkdir -p $BUILD_ROOT/proc
-	mkdir -p $BUILD_ROOT/sys
-	mkdir -p $BUILD_ROOT/dev/pts
-	mkdir -p $BUILD_ROOT/dev/shm
-	mount -n -tproc none $BUILD_ROOT/proc
-	mount -n -tdevpts -omode=0620,gid=5 none $BUILD_ROOT/dev/pts
-	mount -n -ttmpfs none $BUILD_ROOT/dev/shm
-    fi
+    mount_stuff
 
     # hack to process preinstallimages early
     if test "$BUILDTYPE" = preinstallimage ; then
@@ -1441,7 +1456,30 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     fi
 
     RECIPE_BUILD_START_TIME=`date +%s`
+    GEN_BUILDREQS_PACKS=()
     recipe_build
+
+    if test "$BUILD_SUCCEEDED" = genbuildreqs -a "$DO_INIT" = true -a -z "$RPMLIST" -a -z "$RUNNING_IN_VM" -a -n "${GEN_BUILDREQS_PACKS[*]}" ; then
+	# re-expand deps with GEN_BUILDREQS_PACKS extra packages
+	umount_stuff
+	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $DLNOSIGNATURE $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS "${GEN_BUILDREQS_PACKS[@]}"
+	echo "$* ..."
+	"$@" || cleanup_and_exit 1
+	check_exit
+	mount_stuff
+	BUILD_SUCCEEDED=false
+	recipe_build
+    fi
+
+    if test "$BUILD_SUCCEEDED" = genbuildreqs ; then
+	recipe_cleanup
+	if test -n "$RUNNING_IN_VM" ; then
+	    vm_exit_statistics
+	    vm_wrapup_build OTHER
+	fi
+	cleanup_and_exit 1
+    fi
+
     test "$BUILD_SUCCEEDED" = true || cleanup_and_exit 1
 
     recipe_build_time_statistics
@@ -1449,14 +1487,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 
     test -d "$SRCDIR" && cd "$SRCDIR"
 
-    # unmount stuff
-    if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
-	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2>/dev/null || true
-	umount -n $BUILD_ROOT/proc 2>/dev/null || true
-	umount -n $BUILD_ROOT/dev/pts 2>/dev/null || true
-	umount -n $BUILD_ROOT/dev/shm 2>/dev/null || true
-	umount -n $BUILD_ROOT/sys 2>/dev/null || true
-    fi
+    umount_stuff
 done
 
 if test -n "$RUNNING_IN_VM" ; then
