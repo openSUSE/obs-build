@@ -271,7 +271,7 @@ vm_startup_openstack() {
         sleep 1
     done
 
-    if ! $BUILD_DIR/openstack-console "${WS_URL}" ; then
+    if ! python $BUILD_DIR/openstack-console "${WS_URL}" ; then
         $NOVACLIENT delete $OPENSTACK_BUILD_ID
         cleanup_and_exit 3
     else
