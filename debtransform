@@ -462,7 +462,7 @@ close(DIFF);
 if (! -s "$out/${name}_$version.diff") {
   unlink("$out/${name}_$version.diff");
 } else {
-  system('gzip', '-9', "$out/${name}_$version.diff");
+  system('gzip', '-n9', "$out/${name}_$version.diff");
   if (-f "$out/${name}_$version.diff.gz") {
     push @files, addfile("$out/${name}_$version.diff.gz", "MD5");
     push @checksums_sha1, addfile("$out/${name}_$version.diff.gz", "SHA1");
