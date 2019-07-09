@@ -174,9 +174,9 @@ pkg_preinstall_rpm() {
 	fi
     fi
     if test "$PAYLOADDECOMPRESS" = cat ; then
-	rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" | $CPIO
+	rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" | $CPIO || cleanup_and_exit 1
     else
-	rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" | $PAYLOADDECOMPRESS | $CPIO
+	rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" | $PAYLOADDECOMPRESS | $CPIO || cleanup_and_exit 1
     fi
     if test -e ".init_b_cache/scripts/$PKG.run" ; then
 	rpm -qp --nodigest --nosignature --qf "%{PREIN}" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" > ".init_b_cache/scripts/$PKG.pre"
