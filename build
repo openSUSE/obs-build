@@ -1477,7 +1477,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	    vm_exit_statistics
 	    vm_wrapup_build OTHER
 	fi
-	cleanup_and_exit 1
+	cleanup_and_exit 9
     fi
 
     test "$BUILD_SUCCEEDED" = true || cleanup_and_exit 1

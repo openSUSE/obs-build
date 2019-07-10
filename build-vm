@@ -935,7 +935,7 @@ vm_first_stage() {
 	vm_attach_swap
 	BUILDSTATUS=$(dd if="$VM_SWAP" bs=12 count=1 2>/dev/null | tr '\0' a)
 	case $BUILDSTATUS in
-	  BUILDSTATUS[02])
+	  BUILDSTATUS[029])
 	    mkdir -p $BUILD_ROOT/.build.packages
 	    cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
 	    echo "build: extracting built packages..."
