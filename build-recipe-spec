@@ -197,6 +197,7 @@ recipe_build_spec() {
 		GEN_BUILDREQS_PACKS[${#GEN_BUILDREQS_PACKS[@]}]="$db"
 	    done < $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs
 	fi
+	rm -f "$BUILD_ROOT$TOPDIR/SRPMS/"*.buildreqs.nosrc.rpm
     fi
 
     # su involves a shell which would require even more
