@@ -70,21 +70,24 @@ install:
 	    signdummy \
 	    unrpm \
 	    telnet_login_wrapper \
-	    build-validate-params \
-	    openstack-console \
 	    startdockerd \
 	    dummyhttpserver \
 	    obs-docker-support \
 	    create_container_package_list \
 	    call-podman \
 	    $(DESTDIR)$(pkglibdir)
+	install -m644 \
+	    qemu-reg \
+	    lxc.conf \
+	    build-validate-params \
+	    openstack-console \
+	    $(DESTDIR)$(pkglibdir)
 	install -m755 emulator/emulator.sh $(DESTDIR)$(pkglibdir)/emulator/
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build
-	install -m644 qemu-reg $(DESTDIR)$(pkglibdir)
 	install -m644 build-vm build-vm-* $(DESTDIR)$(pkglibdir)
 	install -m644 build-recipe build-recipe-* $(DESTDIR)$(pkglibdir)
 	install -m644 build-pkg build-pkg-* $(DESTDIR)$(pkglibdir)
-	install -m644 *.pm lxc.conf $(DESTDIR)$(pkglibdir)
+	install -m644 *.pm $(DESTDIR)$(pkglibdir)
 	install -m644 configs/* $(DESTDIR)$(pkglibdir)/configs
 	install -m644 baselibs_configs/* $(DESTDIR)$(pkglibdir)/baselibs_configs
 	install -m644 build.1 $(DESTDIR)$(man1dir)
