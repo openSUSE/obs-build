@@ -36,6 +36,8 @@ export BUILD_DIR=${BUILD_DIR:-/usr/lib/build}
 PATH="$BUILD_DIR:$PATH"
 
 export YAST_IS_RUNNING=instsys
+# https://github.com/systemd/systemd/blob/master/docs/ENVIRONMENT.md
+export SYSTEMD_OFFLINE=1
 
 # slurp in package binary support
 . "$BUILD_DIR/build-pkg"
