@@ -114,6 +114,8 @@ RECIPE_BUILD_START_TIME=
 
 # This is for insserv
 export YAST_IS_RUNNING=instsys
+# https://github.com/systemd/systemd/blob/master/docs/ENVIRONMENT.md
+export SYSTEMD_OFFLINE=1
 
 unset LANGUAGE
 unset LANG
