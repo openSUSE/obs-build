@@ -148,7 +148,7 @@ set +e
 	cat $changelog
 } >> "$tmpfile"
 
-if [ -z "$message" ]; then
+if [ -z "$message" -a -z "$content" ]; then
 	set -- `md5sum "$tmpfile"`
 	chksum="$1"
 	$EDITOR +4 "$tmpfile"
