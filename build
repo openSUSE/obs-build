@@ -133,7 +133,7 @@ system.  This chroot system will be setup automatically.  Normally you can
 simply call build with a spec file as parameter - nothing else has to be
 set.
 
-If you want to set the directory were the chroot system will be setup
+If you want to set the directory where the chroot system will be setup
 (at the moment it uses $BUILD_ROOT),
 simply set the the environment variable BUILD_ROOT.
 
@@ -143,7 +143,7 @@ Example:
 
 
 Normally build builds the complete package including src.rpm (rpmbuild -ba).
-If you want let build only make the binary package, simply set
+If you want to let build only make the binary package, simply set
 
    export BUILD_RPM_BUILD_STAGE=-bb
 
