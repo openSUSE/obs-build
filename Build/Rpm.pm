@@ -41,7 +41,7 @@ sub expr {
   } elsif ($t eq '!') {
     ($v, $expr) = expr(substr($expr, 1), 6);
     return undef unless defined $v;
-    $v = 0 if $v && $v eq '\"\"';
+    $v = 0 if $v && $v eq '"';
     $v =~ s/^0+/0/ if $v;
     $v = !$v;
   } elsif ($t eq '-') {
@@ -52,9 +52,9 @@ sub expr {
     $v = $1;
     $expr = $2;
   } elsif ($expr =~ /^([a-zA-Z][a-zA-Z_0-9]*)(.*)$/) {
-    $v = "\"$1\"";
+    $v = "\"$1";
     $expr = $2;
-  } elsif ($expr =~ /^(\".*?\")(.*)$/) {
+  } elsif ($expr =~ /^(\".*?)\"(.*)$/) {
     $v = $1;
     $expr = $2;
   } else {
@@ -67,20 +67,20 @@ sub expr {
       return ($v, $expr) if $lev > 2;
       ($v2, $expr) = expr(substr($expr, 2), 2);
       return undef unless defined $v2;
-      $v = 0 if $v && $v eq '\"\"';
+      $v = 0 if $v && $v eq '"';
       $v =~ s/^0+/0/;
-      $v2 = 0 if $v2 && $v2 eq '\"\"';
+      $v2 = 0 if $v2 && $v2 eq '"';
       $v2 =~ s/^0+/0/;
-      $v &&= $v2;
+      $v = $v && $v2 ? 1 : 0;
     } elsif ($expr =~ /^\|\|/) {
       return ($v, $expr) if $lev > 2;
       ($v2, $expr) = expr(substr($expr, 2), 2);
       return undef unless defined $v2;
-      $v = 0 if $v && $v eq '\"\"';
+      $v = 0 if $v && $v eq '"';
       $v =~ s/^0+/0/;
-      $v2 = 0 if $v2 && $v2 eq '\"\"';
+      $v2 = 0 if $v2 && $v2 eq '"';
       $v2 =~ s/^0+/0/;
-      $v ||= $v2;
+      $v = $v || $v2 ? 1 : 0;
     } elsif ($expr =~ /^>=/) {
       return ($v, $expr) if $lev > 3;
       ($v2, $expr) = expr(substr($expr, 2), 3);
@@ -115,9 +115,8 @@ sub expr {
       return ($v, $expr) if $lev > 4;
       ($v2, $expr) = expr(substr($expr, 1), 4);
       return undef unless defined $v2;
-      if ("$v$v2" =~ /^\"(.*)\"$/ && $v ne '' && $v2 ne '') {
+      if ($v =~ /^\"/ && $v2 =~ s/^\"//) {
 	$v .= $v2;
-	substr($v, -length($v2)-1, 2, '');
       } else {
         $v += $v2;
       }
@@ -136,7 +135,7 @@ sub expr {
       $v /= $v2;
     } elsif ($expr =~ /^\?/) {
       return ($v, $expr) if $lev > 1;
-      $v = 0 if $v && $v eq '\"\"';
+      $v = 0 if $v && $v eq '"';
       $v =~ s/^0+/0/;
       $v2 = $v;
       ($v, $expr) = expr(substr($expr, 1), 1);
@@ -300,7 +299,9 @@ reexpand:
       $macalt = $macros->{$macname} unless defined $macalt;
       $macalt = '' if $mactest == -1;
       $macalt = expandmacros($config, $macalt, $lineno, $macros, $macros_args);
-      $expandedline .= (expr($macalt))[0];
+      $macalt = (expr($macalt))[0];
+      $macalt =~ s/^\"//;
+      $expandedline .= $macalt;
     } elsif (exists($macros->{$macname})) {
       if (!defined($macros->{$macname})) {
 	print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand '$macname'\n" if $config->{'warnings'};
