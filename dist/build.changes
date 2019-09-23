@@ -1,4 +1,15 @@
 -------------------------------------------------------------------
+Mon Sep 23 11:57:05 UTC 2019 - Adrian Schröter <adrian@suse.de>
+
+- build-recipe-dsc: Move all build results, not just *.deb and *.changes
+- Mount /sys in chroot build
+- vc: Do not open the editor if content is set
+- adding leap 15.2 and SLE 15 SP2 configs
+- Fix some rpmlint warnings
+- return exit status 9 in the genbuildreqs case
+- Export SYSTEMD_OFFLINE=1 to avoid failures from systemctl
+
+-------------------------------------------------------------------
 Tue Jul  9 13:33:36 UTC 2019 - Adrian Schröter <adrian@suse.de>
 
 - fail build on preinstall failure
