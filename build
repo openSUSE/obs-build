@@ -764,6 +764,7 @@ mount_stuff() {
 	mkdir -p $BUILD_ROOT/dev/pts
 	mkdir -p $BUILD_ROOT/dev/shm
 	mount -n -tproc none $BUILD_ROOT/proc
+	mount -n -tsysfs none $BUILD_ROOT/sys
 	mount -n -tdevpts -omode=0620,gid=5 none $BUILD_ROOT/dev/pts
 	mount -n -ttmpfs none $BUILD_ROOT/dev/shm
     fi
