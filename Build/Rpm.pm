@@ -210,7 +210,7 @@ sub expandmacros {
   my $optmacros = {};
   # newer perls: \{((?:(?>[^{}]+)|(?2))*)\}
 reexpand:
-  while ($line =~ /^(.*?)%(\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\*\*?|#|\()(.*?)$/) {
+  while ($line =~ /^(.*?)%(\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\*\*?|#|\(|\[)(.*?)$/) {
     if ($tries++ > 1000) {
       print STDERR "Warning: spec file parser ",($lineno?" line $lineno":''),": macro too deeply nested\n" if $config->{'warnings'};
       $line = 'MACRO';
@@ -255,6 +255,20 @@ reexpand:
       print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand %(...)\n" if $config->{'warnings'};
       $line = 'MACRO';
       last;
+    } elsif ($macname eq '[') {
+      # find matching ']'
+      $macalt = '[';
+      while (($macalt =~ y/\[/\[/) > ($macalt =~ y/\]/\]/) && $line =~ /^(.*?\])(.*)$/) {
+	$macalt .= $1;
+        $line = $2;
+      }
+      $macalt =~ s/^\[//;
+      $macalt =~ s/\]$//;
+      # this is wrong, should expand in expr
+      $macalt = expandmacros($config, $macalt, $lineno, $macros, $macros_args);
+      $macalt = (expr($macalt))[0];
+      $macalt =~ s/^\"//;
+      $expandedline .= $macalt;
     } elsif ($macname eq 'define' || $macname eq 'global') {
       if ($line =~ /^\s*([0-9a-zA-Z_]+)(?:\(([^\)]*)\))?\s*(.*?)$/) {
 	my $macname = $1;
