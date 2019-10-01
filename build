@@ -117,6 +117,10 @@ export YAST_IS_RUNNING=instsys
 # https://github.com/systemd/systemd/blob/master/docs/ENVIRONMENT.md
 export SYSTEMD_OFFLINE=1
 
+# make sure HOME is set in case systemd decided to unset it in initrd
+# https://github.com/systemd/systemd/commit/9d48671c62de133a2b9fe7c31e70c0ff8e68f2db
+: ${HOME:=/}
+
 unset LANGUAGE
 unset LANG
 export LC_ALL=POSIX
