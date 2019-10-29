@@ -52,6 +52,7 @@ sub generic_parse {
       my ($p, $text) = @_;
       $cursor[-1]->[2] .= $text if defined $cursor[-1]->[2];
     },
+    ExternEnt => sub { undef },
   }, ErrorContext => 2);
   if (ref($in)) {
     $p->parse($in);
