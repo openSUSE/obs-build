@@ -266,6 +266,7 @@ sub read_config {
   $config->{'constraint'} = [];
   $config->{'expandflags'} = [];
   $config->{'buildflags'} = [];
+  $config->{'publishflags'} = [];
   $config->{'singleexport'} = '';
   for my $l (@spec) {
     $l = $l->[1] if ref $l;
@@ -283,7 +284,7 @@ sub read_config {
       }
       next;
     }
-    if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:' || $l0 eq 'expandflags:' || $l0 eq 'buildflags:') {
+    if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:' || $l0 eq 'expandflags:' || $l0 eq 'buildflags:' || $l0 eq 'publishflags:') {
       my $t = substr($l0, 0, -1);
       for my $l (@l) {
 	if ($l eq '!*') {
@@ -422,9 +423,11 @@ sub read_config {
       }
     }
   }
+  my %modules;
   for (@{$config->{'expandflags'} || []}) {
     if (/^([^:]+):(.*)$/s) {
       $config->{"expandflags:$1"} = $2;
+      $modules{$2} = 1 if $1 eq 'module';
     } else {
       $config->{"expandflags:$_"} = 1;
     }
@@ -436,6 +439,14 @@ sub read_config {
       $config->{"buildflags:$_"} = 1;
     }
   }
+  for (@{$config->{'publishflags'} || []}) {
+    if (/^([^:]+):(.*)$/s) {
+      $config->{"publishflags:$1"} = $2;
+    } else {
+      $config->{"publishflags:$_"} = 1;
+    }
+  }
+  $config->{'modules'} = [ sort keys %modules ] if %modules;
   return $config;
 }
 
