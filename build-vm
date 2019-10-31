@@ -865,6 +865,8 @@ vm_first_stage() {
     echo "VM_WATCHDOG='$VM_WATCHDOG'" >> $BUILD_ROOT/.build/build.data
     echo "BUILDENGINE='$BUILDENGINE'" >> $BUILD_ROOT/.build/build.data
     echo "CCACHE='$CCACHE'" >> $BUILD_ROOT/.build/build.data
+    echo "CCACHE_HOST_DIR='$CCACHE_HOST_DIR'" >> $BUILD_ROOT/.build/build.data
+    echo "CCACHE_HOST_BIN='$CCACHE_HOST_BIN'" >> $BUILD_ROOT/.build/build.data
     echo "ABUILD_TARGET='$ABUILD_TARGET'" >> $BUILD_ROOT/.build/build.data
     echo "BUILD_FLAVOR='$BUILD_FLAVOR'" >> $BUILD_ROOT/.build/build.data
     echo "OBS_PACKAGE='$OBS_PACKAGE'" >> $BUILD_ROOT/.build/build.data

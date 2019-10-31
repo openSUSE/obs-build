@@ -41,6 +41,10 @@ recipe_prepare_dsc() {
     rm -rf "$BUILD_ROOT$TOPDIR/BUILD"
     mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES.DEB"
     chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+    if [ -s "$BUILD_ROOT"/etc/profile.d/build_ccache.sh ]; then
+	grep CCACHE_BASEDIR "$BUILD_ROOT"/etc/profile.d/build_ccache.sh > /dev/null || \
+	echo "CCACHE_BASEDIR='$TOPDIR/BUILD' ; export CCACHE_BASEDIR" >> "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
+    fi
     DEB_TRANSFORM=
     DEB_SOURCEDIR="$TOPDIR/SOURCES"
     DEB_DSCFILE="$RECIPEFILE"
