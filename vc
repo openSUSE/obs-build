@@ -136,7 +136,10 @@ set +e
 	if [ -n "$message" ]; then
 		echo -e "- $message"
 	elif [ -n "$content" ]; then
-		cat "$content"
+	        cat "$content" > format_tmp
+                sed -i '1s;^;- ;' format_tmp
+                cat format_tmp
+                rm format_tmp
 	elif [ ! $just_edit ]; then
 		echo "- "
 	fi
