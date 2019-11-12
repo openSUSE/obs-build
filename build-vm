@@ -78,7 +78,7 @@ EMULATOR_SCRIPT=
 # openstack specific
 VM_OPENSTACK_FLAVOR=
 
-for i in ec2 emulator kvm lxc openstack qemu uml xen zvm docker pvm; do
+for i in ec2 emulator kvm lxc openstack qemu uml xen zvm docker pvm nspawn; do
     . "$BUILD_DIR/build-vm-$i"
 done
 
@@ -150,7 +150,7 @@ vm_parse_options() {
 	needarg
 	VM_TYPE="$ARG"
 	case "$VM_TYPE" in
-	    lxc|docker) ;;
+	    lxc|docker|nspawn) ;;
 	    ec2|xen|kvm|uml|qemu|emulator|openstack|zvm|pvm)
 		test -z "$VM_ROOT" && VM_ROOT=1
 	    ;;
@@ -303,7 +303,7 @@ vm_shutdown() {
     fi
     exec >&0 2>&0	# so that the logging tee finishes
     sleep 1		# wait till tee terminates
-    test "$VM_TYPE" = lxc -o "$VM_TYPE" = docker && exit $1
+    test "$VM_TYPE" = lxc -o "$VM_TYPE" = docker -o "$VM_TYPE" = nspawn && exit $1
     kill -9 -1        # goodbye cruel world
     if ! test -x /sbin/halt ; then
 	test -e /proc/sysrq-trigger || mount -n -tproc none /proc
@@ -532,7 +532,7 @@ vm_detect_2nd_stage() {
     fi
     RUNNING_IN_VM=true
     test -e /proc/version || mount -orw -n -tproc none /proc
-    if test "$VM_TYPE" != lxc -a "$VM_TYPE" != docker ; then
+    if test "$VM_TYPE" != lxc -a "$VM_TYPE" != docker -a "$VM_TYPE" != nspawn ; then
 	mount -n ${VMDISK_MOUNT_OPTIONS},remount,rw /
     fi
     umount /run >/dev/null 2>&1
@@ -849,7 +849,7 @@ vm_first_stage() {
 	ppc|ppcle|s390) PERSONALITY=8 ;;	# ppc/s390 kernel never tells us if a 32bit personality is active, assume we run on 64bit
 	aarch64) test "$BUILD_ARCH" != "${BUILD_ARCH#armv[567]}" && PERSONALITY=8 ;; # workaround, to be removed
     esac
-    test "$VM_TYPE" = lxc -o "$VM_TYPE" = docker && PERSONALITY=0
+    test "$VM_TYPE" = lxc -o "$VM_TYPE" = docker -o "$VM_TYPE" = nspawn && PERSONALITY=0
     echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
     echo "VM_HOSTNAME='$HOST'" >> $BUILD_ROOT/.build/build.data
     echo -n "definesnstuff=(" >> $BUILD_ROOT/.build/build.data

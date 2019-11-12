@@ -305,7 +305,7 @@ Known Parameters:
 
   --vm-type TYPE
               Use virtual machine instead of chroot
-              TYPE is one of xen|kvm|uml|qemu|lxc|zvm|openstack|ec2|docker|pvm
+              TYPE is one of xen|kvm|uml|qemu|lxc|zvm|openstack|ec2|docker|pvm|nspawn
 
   --vm-worker GUEST
               GUEST is a z/VM build worker controlled by the controlling
@@ -1155,9 +1155,9 @@ if test -z "$VM_ROOT" -a -z "$LOGFILE" ; then
     if test -z "$RUNNING_IN_VM"; then
         LOGFILE="$BUILD_ROOT/.build.log"
     else
-        # lxc and docker are special cases: vm shares logfile with host
+        # lxc, docker and nspawn are special cases: vm shares logfile with host
         case "$VM_TYPE" in
-        lxc|docker)
+        lxc|docker|nspawn)
             ;;
         *)
             LOGFILE="$BUILD_ROOT/.build.log"
