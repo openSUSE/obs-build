@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Thu Nov 14 13:18:14 UTC 2019 - Adrian Schröter <adrian@suse.de>
+
+- Add Fedora module parser
+- Rpmmd parser: set up a dummy ExternEnt handler
+- Add support for modules and publish flags
+- add zstd to recommends
+- Support rpm's new expression expansion syntax
+
+-------------------------------------------------------------------
 Mon Sep 23 11:57:05 UTC 2019 - Adrian Schröter <adrian@suse.de>
 
 - build-recipe-dsc: Move all build results, not just *.deb and *.changes
