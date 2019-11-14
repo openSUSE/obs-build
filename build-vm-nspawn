@@ -1,0 +1,73 @@
+#
+# systemd-nspawn specific functions
+#
+################################################################
+#
+# Copyright (c) 2019 Oleg Girko
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+vm_verify_options_nspawn() {
+    VM_ROOT=
+    VM_SWAP=
+}
+
+vm_startup_nspawn() {
+    local name="${BUILD_ROOT##*/}"
+    name="obsbuild.${name//_/-}"
+    systemd-nspawn -D "$BUILD_ROOT" -M "$name" --private-network --pipe "$vm_init_script"
+    return "$?"
+}
+
+vm_kill_nspawn() {
+    local name="${BUILD_ROOT##*/}"
+    name="obsbuild.${name//_/-}"
+    machinectl terminate "$name"
+}
+
+vm_fixup_nspawn() {
+    :
+}
+
+vm_attach_root_nspawn() {
+    :
+}
+
+vm_attach_swap_nspawn() {
+    :
+}
+
+vm_detach_root_nspawn() {
+    :
+}
+
+vm_detach_swap_nspawn() {
+    :
+}
+
+vm_sysrq_nspawn() {
+    :
+}
+
+vm_wipe_nspawn() {
+    :
+}
+
+vm_cleanup_nspawn() {
+    :
+}
+
