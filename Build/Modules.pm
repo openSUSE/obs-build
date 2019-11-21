@@ -52,7 +52,11 @@ sub parse {
     next unless $data->{'artifacts'};
     my $rpms = $data->{'artifacts'}->{'rpms'};
     next unless $rpms && ref($rpms) eq 'ARRAY';
-    push @{$res->{$_}}, $module for @$rpms;
+    for my $rpm (@$rpms) {
+      my $nrpm = $rpm;
+      $nrpm =~ s/-0:([^-]*-[^-]*\.[^\.]*)$/-$1/;
+      push @{$res->{$nrpm}}, $module;
+    }
   }
   # unify
   for (values %$res) {
