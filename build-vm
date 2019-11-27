@@ -737,9 +737,11 @@ vm_update_hostarch() {
     local kernel="$vm_kernel"
     local hostarchfile
     local newhostarch
-    if test -z "$VM_KERNEL" -a -e "$BUILD_ROOT/.build.kernel.$VM_TYPE" ; then
-	kernel="$BUILD_ROOT/.build.kernel.$VM_TYPE"
-	hostarchfile="$BUILD_ROOT/.build.hostarch.$VM_TYPE"
+    local vm_type="$VM_TYPE"
+    test "$vm_type" = "qemu" && vm_type=kvm
+    if test -z "$VM_KERNEL" -a -e "$BUILD_ROOT/.build.kernel.$vm_type" ; then
+	kernel="$BUILD_ROOT/.build.kernel.$vm_type"
+	hostarchfile="$BUILD_ROOT/.build.hostarch.$vm_type"
     elif test -n "$kernel" -a -e "$kernel" -a -e "$kernel.hostarch" ; then
 	hostarchfile="$kernel.hostarch"
     fi
@@ -887,11 +889,13 @@ vm_first_stage() {
     if test -n "$VM_ROOT" ; then
 	# copy out kernel & initrd (if they exist) during unmounting VM image
 	KERNEL_TEMP_DIR=
-	if test -z "$VM_KERNEL" -a -e "$BUILD_ROOT/.build.kernel.$VM_TYPE" ; then
+        local vm_type="$VM_TYPE"
+        test "$vm_type" = "qemu" && vm_type=kvm
+	if test -z "$VM_KERNEL" -a -e "$BUILD_ROOT/.build.kernel.$vm_type" ; then
 	    KERNEL_TEMP_DIR=`mktemp -d`
-	    cp "$BUILD_ROOT/.build.kernel.$VM_TYPE" "$KERNEL_TEMP_DIR/kernel"
-	    if test -e  "$BUILD_ROOT/.build.initrd.$VM_TYPE" ; then
-	        cp "$BUILD_ROOT/.build.initrd.$VM_TYPE" "$KERNEL_TEMP_DIR/initrd"
+	    cp "$BUILD_ROOT/.build.kernel.$vm_type" "$KERNEL_TEMP_DIR/kernel"
+	    if test -e  "$BUILD_ROOT/.build.initrd.$vm_type" ; then
+	        cp "$BUILD_ROOT/.build.initrd.$vm_type" "$KERNEL_TEMP_DIR/initrd"
 	    fi
 	fi
 	check_exit

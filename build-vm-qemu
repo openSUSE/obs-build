@@ -21,14 +21,172 @@
 #
 ################################################################
 
-# just forward everything to kvm...
+# This used to be just an alias for kvm.
+# Now it is used to emulate foreign architectures via qemu system emulator.
+# Note: this is not for the faster qemu user land emulator, this is is still
+# handled in chroot or kvm mode
 
 vm_verify_options_qemu() {
-    vm_verify_options_kvm
+    if test -n "$KILL" -o -n "$DO_WIPE" ; then
+        return
+    fi
+
+    vm_kernel=/.build.kernel.kvm
+    vm_initrd=/.build.initrd.kvm
+
+    # overwrite some options for specific build architectures
+    case $BUILD_ARCH in
+        armv6l|armv7l)
+            qemu_bin="/usr/bin/qemu-system-arm"
+            qemu_console=ttyAMA0
+            qemu_options="-M virt"
+            qemu_device=virtio-blk-device
+            qemu_rng_device=virtio-rng-device
+            qemu_cpu="-cpu cortex-a15"
+            ;;
+        armv8l|aarch64)
+            qemu_bin="/usr/bin/qemu-system-aarch64"
+            qemu_console=ttyAMA0
+            qemu_cpu="-cpu cortex-a72"
+            qemu_options="$qemu_options -M virt"
+            qemu_device=virtio-blk-device
+            qemu_rng_device=virtio-rng-device
+            ;;
+        ppc|ppcle|ppc64|ppc64le)
+            qemu_bin="/usr/bin/qemu-system-ppc64"
+            qemu_console=hvc0
+            qemu_options="-M pseries"
+            qemu_cpu="-cpu ppc64"
+            grep -q PPC970MP /proc/cpuinfo && qemu_check_ppc970
+            ;;
+        s390|s390x)
+            qemu_bin="/usr/bin/qemu-system-s390x"
+            qemu_cpu="qemu"
+            qemu_console=hvc0
+            qemu_device=virtio-blk-ccw
+            qemu_serial_device=virtio-serial-ccw
+            qemu_rng_device=virtio-rng-ccw
+            ;;
+        x86_64)
+            qemu_bin="/usr/bin/qemu-system-x86_64"
+            qemu_cpu="-cpu qemu64"
+            # Use defaults and fallbacks for other values
+            ;;
+    esac
+
+    case $qemu_device in
+        virtio*)
+            VM_ROOTDEV=/dev/disk/by-id/virtio-0
+            VM_SWAPDEV=/dev/disk/by-id/virtio-1
+            ;;
+        *)
+            VM_ROOTDEV=/dev/sda
+            VM_SWAPDEV=/dev/sdb
+            ;;
+    esac
+
+    if test -n "$VM_NETOPT" -o -n "$VM_NETDEVOPT" ; then
+        if test -n "$VM_NETOPT" ; then
+           for item in "${VM_NETOPT[@]}" ; do
+              qemu_options="$qemu_options -net $item"
+           done
+        fi
+        if test -n "$VM_NETDEVOPT" ; then
+           for item in "${VM_NETDEVOPT[@]}" ; do
+              qemu_options="$qemu_options -netdev $item"
+           done
+        fi
+    fi
+    if test -n "$VM_DEVICEOPT" ; then
+        for item in "${VM_DEVICEOPT[@]}" ; do
+            qemu_options="$qemu_options -device $item"
+        done
+    fi
+
+    if test -n "$qemu_rng_device" ; then
+        if test -c /dev/hwrng &&
+            test -f /sys/class/misc/hw_random/rng_current &&
+            test "$(cat /sys/class/misc/hw_random/rng_current)" != none; then
+            rng_dev="/dev/hwrng"
+        else
+            rng_dev="/dev/random"
+        fi
+        qemu_options="$qemu_options -object rng-random,filename=$rng_dev,id=rng0 -device $qemu_rng_device,rng=rng0"
+    fi
 }
 
 vm_startup_qemu() {
-    vm_startup_kvm
+    qemu_args=(-drive file="$VM_ROOT",format=raw,if=none,id=disk,cache=unsafe -device "$qemu_device",drive=disk,serial=0)
+    if [ -n "$VM_USER" ] ; then
+        getent passwd "$VM_USER" > /dev/null || cleanup_and_exit 3 "cannot find KVM user '$VM_USER'"
+    else
+        # use qemu user by default if available
+        getent passwd qemu >/dev/null && VM_USER=qemu
+    fi
+    [ -n "$VM_USER" ] && qemu_options="$qemu_options -runas $VM_USER"
+    if test -n "$VM_SWAP" ; then
+        qemu_args=("${qemu_args[@]}" -drive file="$VM_SWAP",format=raw,if=none,id=swap,cache=unsafe -device "$qemu_device",drive=swap,serial=1)
+    fi
+    # the serial console device needs to be compiled into the target kernel
+    # which is why we can not use virtio-serial on other platforms
+    if test -n "$qemu_serial_device" ; then
+        if test -n "$VM_CONSOLE_INPUT" ; then
+            qemu_args=("${qemu_args[@]}" -device "$qemu_serial_device" -device virtconsole,chardev=virtiocon0 -chardev stdio,mux=on,id=virtiocon0 -mon chardev=virtiocon0)
+        else
+            qemu_args=("${qemu_args[@]}" -device "$qemu_serial_device" -device virtconsole,chardev=virtiocon0 -chardev stdio,id=virtiocon0)
+        fi
+    elif test -n "$VM_CONSOLE_INPUT" ; then
+        qemu_args=("${qemu_args[@]}" -serial mon:stdio)
+    else
+        if ! test -e "${VM_ROOT}.qemu/monitor"; then
+          mkdir -p "${VM_ROOT}.qemu"
+          mkfifo "${VM_ROOT}.qemu/monitor"
+          chown "$VM_USER" "${VM_ROOT}.qemu"
+        fi
+        qemu_args=("${qemu_args[@]}" -serial stdio -chardev socket,id=monitor,server,nowait,path="${VM_ROOT}.qemu/monitor" -mon chardev=monitor,mode=readline)
+    fi
+
+    if test -n "$BUILD_JOBS" -a "$icecream" = 0 -a -z "$BUILD_THREADS" ; then
+        qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS")
+    elif test -n "$BUILD_JOBS" -a -n "$BUILD_THREADS" ; then
+        qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS,threads=$BUILD_THREADS")
+    fi
+    qemu_append="root=$VM_ROOTDEV"
+    if test -n "$VMDISK_FILESYSTEM" ; then
+        qemu_append="$qemu_append rootfstype=$VMDISK_FILESYSTEM"
+    fi
+    if test -n "$VMDISK_MOUNT_OPTIONS" ; then
+        qemu_append="$qemu_append rootflags=${VMDISK_MOUNT_OPTIONS#-o }"
+    fi
+    qemu_append="$qemu_append $vm_linux_kernel_parameter"
+    qemu_append="$qemu_append panic=1 quiet no-kvmclock elevator=noop"
+    qemu_append="$qemu_append nmi_watchdog=0 rw rd.driver.pre=binfmt_misc"
+    qemu_append="$qemu_append console=$qemu_console init=$vm_init_script"
+    if test -z "$VM_NETOPT" -a -z "$VM_NETDEVOPT"; then
+        qemu_options="$qemu_options -net none"
+    fi
+    if test -n "$VM_TELNET"; then
+        qemu_options="$qemu_options -netdev user,id=telnet,hostfwd=tcp:127.0.0.1:$VM_TELNET-:23 -device e1000,netdev=telnet"
+    fi
+    if test -n "$VM_CUSTOMOPT"; then
+        qemu_options="$qemu_options $VM_CUSTOMOPT"
+    fi
+    set -- $qemu_bin -nodefaults -no-reboot -nographic -vga none $qemu_cpu $qemu_options \
+        -kernel $vm_kernel \
+        -initrd $vm_initrd \
+        -append "$qemu_append" \
+        ${VM_MEMSIZE:+-m $VM_MEMSIZE} \
+        "${qemu_args[@]}"
+
+    if test "$PERSONALITY" != 0 ; then
+        # have to switch back to PER_LINUX to make qemu work
+        set -- linux64 "$@"
+    fi
+    export QEMU_AUDIO_DRV=none          # we do not want to have sound inside the VMs
+    echo "$@"
+    "$@"
+    qemu_ret=$?
+    test "$qemu_ret" = "137" && cleanup_and_exit 3 "qemu got SIGKILL"
 }
 
 vm_kill_qemu() {
@@ -60,10 +218,10 @@ vm_cleanup_qemu() {
 }
 
 vm_sysrq_qemu() {
-    :
+    vm_sysrq_kvm
 }
 
 vm_wipe_qemu() {
-    :
+    vm_wipe_kvm
 }
 
