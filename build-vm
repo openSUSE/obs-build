@@ -51,7 +51,8 @@ VM_KERNEL=
 VM_INITRD=
 VM_WORKER=
 VM_SERVER=
-VM_MEMSIZE=
+# the qemu default size is not able to run our default kernel anymore
+VM_MEMSIZE=512
 VM_NETOPT=()
 VM_NETDEVOPT=()
 VM_DEVICEOPT=()
