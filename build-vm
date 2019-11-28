@@ -863,6 +863,7 @@ vm_first_stage() {
     echo ")" >> $BUILD_ROOT/.build/build.data
     echo "VM_TYPE='$VM_TYPE'" >> $BUILD_ROOT/.build/build.data
     echo "RUN_SHELL='$RUN_SHELL'" >> $BUILD_ROOT/.build/build.data
+    echo "RUN_SHELL_CMD='$RUN_SHELL_CMD'" >> $BUILD_ROOT/.build/build.data
     echo "DO_STATISTICS='$DO_STATISTICS'" >> $BUILD_ROOT/.build/build.data
     echo "TIME_PREINSTALL='$TIME_PREINSTALL'" >> $BUILD_ROOT/.build/build.data
     echo "VM_WATCHDOG='$VM_WATCHDOG'" >> $BUILD_ROOT/.build/build.data
@@ -881,11 +882,8 @@ vm_first_stage() {
     umount -n $BUILD_ROOT/mnt 2> /dev/null || true
 
     vm_init_script="/.build/build"
-    if test -n "$RUN_SHELL"; then
-        vm_init_script="/bin/bash"
-    fi
     if check_use_emulator ; then
-	vm_init_script="/.build/$INITVM_NAME"
+        vm_init_script="/.build/$INITVM_NAME"
     fi
     if test -n "$VM_ROOT" ; then
 	# copy out kernel & initrd (if they exist) during unmounting VM image
@@ -936,7 +934,7 @@ vm_first_stage() {
     fi
 
     vm_attach_root
-    if test -n "$VM_SWAP" ; then
+    if test -n "$VM_SWAP" -a -z "$RUN_SHELL" ; then
 	vm_attach_swap
 	BUILDSTATUS=$(dd if="$VM_SWAP" bs=12 count=1 2>/dev/null | tr '\0' a)
 	case $BUILDSTATUS in

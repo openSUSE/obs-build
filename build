@@ -104,6 +104,7 @@ RSYNCDONE=
 SIGNDUMMY=
 DO_STATISTICS=
 RUN_SHELL=
+RUN_SHELL_CMD=
 CCACHE=
 DLNOSIGNATURE=
 BUILD_FLAVOR=
@@ -162,6 +163,10 @@ Known Parameters:
 
   --shell     Instead of starting a build start a root shell in
               the build root.
+
+  --shell-cmd CMD
+              Run the command CMD instead of giving a root shell
+              --shell option is implicit set.
 
   --sysrq $   Sends a single specifed char as sysrq to the running
               kernel of the build.
@@ -1019,6 +1024,12 @@ while test -n "$1"; do
 	RUN_SHELL=1
 	shift
       ;;
+      -shell-cmd)
+	needarg
+	RUN_SHELL=1
+	RUN_SHELL_CMD="$ARG"
+	shift
+      ;;
       -signdummy)
 	SIGNDUMMY=1
       ;;
@@ -1383,10 +1394,14 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     setupccache
 
     if test -n "$RUN_SHELL" ; then
-	echo "You may want to initialize environment via:"
-	echo " su - $BUILD_USER"
-	chroot $BUILD_ROOT
-	cleanup_and_exit 0
+        if test -z "$RUN_SHELL_CMD" ; then
+            echo ""
+            echo "You may want to initialize environment via:"
+            echo "  su - $BUILD_USER"
+            echo ""
+        fi
+	chroot $BUILD_ROOT "${RUN_SHELL_CMD:=/bin/bash}"
+        cleanup_and_exit $?
     fi
 
     # fill build directories with sources. Also sets TOPDIR
