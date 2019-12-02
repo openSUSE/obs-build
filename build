@@ -1022,7 +1022,6 @@ while test -n "$1"; do
       ;;  
       -shell)
 	RUN_SHELL=1
-	shift
       ;;
       -shell-cmd)
 	needarg
