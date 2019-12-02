@@ -1254,7 +1254,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     test "$VM_TYPE" = zvm && ADDITIONAL_PACKS="$ADDITIONAL_PACKS udev libcap2"
 
     # we need to do this before the vm is started
-    if test -n "$CHANGELOG" -a -z "$RUNNING_IN_VM" ; then
+    if test -n "$CHANGELOG" -a -z "$RUNNING_IN_VM" -a -z "$RUN_SHELL" ; then
         recipe_create_changelog "$MYSRCDIR/$RECIPEFILE"
     fi
 
