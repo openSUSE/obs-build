@@ -1394,14 +1394,13 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     setupccache
 
     if test -n "$RUN_SHELL" ; then
-        if test -z "$RUN_SHELL_CMD" ; then
-            echo ""
-            echo "You may want to initialize environment via:"
-            echo "  su - $BUILD_USER"
-            echo ""
+	if test -n "$RUN_SHELL_CMD"; then
+	  chroot $BUILD_ROOT "${RUN_SHELL_CMD:=/bin/bash}"
+          cleanup_and_exit $?
+	else
+	  chroot $BUILD_ROOT su - $BUILD_USER
+          cleanup_and_exit $?
         fi
-	chroot $BUILD_ROOT "${RUN_SHELL_CMD:=/bin/bash}"
-        cleanup_and_exit $?
     fi
 
     # fill build directories with sources. Also sets TOPDIR
