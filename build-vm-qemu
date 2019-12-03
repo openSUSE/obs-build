@@ -56,8 +56,10 @@ vm_verify_options_qemu() {
             qemu_bin="/usr/bin/qemu-system-ppc64"
             qemu_console=hvc0
             qemu_options="-M pseries"
-            qemu_cpu="-cpu ppc64"
+            qemu_cpu=""
             grep -q PPC970MP /proc/cpuinfo && qemu_check_ppc970
+            qemu_device=virtio-blk
+            qemu_rng_device=virtio-rng
             ;;
         riscv64)
             qemu_bin="/usr/bin/qemu-system-riscv64"
@@ -69,7 +71,7 @@ vm_verify_options_qemu() {
             ;;
         s390|s390x)
             qemu_bin="/usr/bin/qemu-system-s390x"
-            qemu_cpu="qemu"
+            qemu_cpu="-cpu qemu"
             qemu_console=hvc0
             qemu_device=virtio-blk-ccw
             qemu_serial_device=virtio-serial-ccw
