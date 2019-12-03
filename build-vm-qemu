@@ -44,7 +44,7 @@ vm_verify_options_qemu() {
             qemu_rng_device=virtio-rng-device
             qemu_cpu="-cpu cortex-a15"
             ;;
-        armv8l|aarch64)
+        armv8l|aarch32|aarch64|aarch64_ilp32)
             qemu_bin="/usr/bin/qemu-system-aarch64"
             qemu_console=ttyAMA0
             qemu_cpu="-cpu cortex-a72"
