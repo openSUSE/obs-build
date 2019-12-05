@@ -1,4 +1,22 @@
 -------------------------------------------------------------------
+Thu Dec  5 08:57:27 UTC 2019 - Adrian Schröter <adrian@suse.de>
+
+- qemu vm_type is running qemu system emulator now. Works for:
+  * aarch64
+  * armv7l
+  * ppc64/ppc64le
+  * s390/s390x
+  * riscv64
+  Note: this requires a kernel and initrd in build target via
+        kernel-obs-build mechanic
+- various --shell improvements
+- new --shell-cmd to run commands in chroot/KVM/Qemu/... directly
+- raising minimal required memory in qemu mode to 512MB to be able
+  to run Linux kernel at least
+- Normalize epoch 0 away when reading the module info
+- Add systemd-nspawn backend (by Oleg Girko)
+
+-------------------------------------------------------------------
 Thu Nov 14 13:18:14 UTC 2019 - Adrian Schröter <adrian@suse.de>
 
 - Add Fedora module parser
