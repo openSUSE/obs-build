@@ -356,7 +356,8 @@ perform_product_bundle() {
                        /usr/bin/sha256sum "$i" > "$i.sha256"
                        mv "$i.sha256" $BUILD_ROOT/$TOPDIR/KIWI/.
                    fi
-                   mv "$i" $BUILD_ROOT/$TOPDIR/KIWI/. ;;
+                   mv "$i" $BUILD_ROOT/$TOPDIR/KIWI/.
+                   test -n "$milestone" && echo "$milestone" > $BUILD_ROOT/$TOPDIR/OTHER/${i%.iso}.milestone ;;
 	    *.packages) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
 	    *.report)
 		mv $i $BUILD_ROOT/$TOPDIR/OTHER/.
@@ -364,8 +365,11 @@ perform_product_bundle() {
 		;;
 	    scripts) ;;
 	    *0) ;;
-	    *) test -d $i -a "$drop_repo" != true  && mv $i $BUILD_ROOT/$TOPDIR/KIWI/. ;;
-	esac
+            *) if test -d $i -a "$drop_repo" != true; then
+                  mv $i $BUILD_ROOT/$TOPDIR/KIWI/.
+                  test -n "$milestone" && echo "$milestone" > $BUILD_ROOT/$TOPDIR/OTHER/${i}.milestone
+               fi ;;
+        esac
     done
     popd
 }
