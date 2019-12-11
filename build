@@ -471,7 +471,7 @@ toshellscript() {
 setupccache() {
     if test -n "$CCACHE" ; then
 	if mkdir -p $BUILD_ROOT/var/lib/build/ccache/bin; then
-	    for i in $(ls $BUILD_ROOT/usr/bin | grep -E '^(cc|gcc|[cg][+][+]|clang|clang[+][+])([-]?[234][.]?[0-9])*$'); do
+	    for i in $(ls $BUILD_ROOT/usr/bin | grep -E '^(cc|gcc|[cg][+][+]|clang|clang[+][+])([-]?[.0-9])*$'); do
 		rm -f $BUILD_ROOT/var/lib/build/ccache/bin/$i
 		test -e $BUILD_ROOT/usr/bin/$i || continue
 		echo '#! /bin/sh' > $BUILD_ROOT/var/lib/build/ccache/bin/$i
