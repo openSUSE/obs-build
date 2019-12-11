@@ -47,7 +47,13 @@ recipe_prepare_arch() {
 }
 
 recipe_build_arch() {
-    _arch_recipe_makepkg -ef < /dev/null && BUILD_SUCCEEDED=true
+    # Build binary package
+    _arch_recipe_makepkg -ef < /dev/null && B1=true
+    # Build source package
+    _arch_recipe_makepkg -ef --allsource < /dev/null && B2=true
+    if [ "$B1" = "true" ] && [ "$B2" = "true" ]; then
+        BUILD_SUCCEEDED=true
+    fi
 }
 
 recipe_resultdirs_arch() {
