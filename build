@@ -1131,6 +1131,12 @@ fi
 
 set_build_arch
 
+if test "$DO_INIT" = false -a -n "$RUN_SHELL"; then
+    mount_stuff
+    chroot $BUILD_ROOT su - $BUILD_USER
+    cleanup_and_exit $?
+fi
+
 expand_recipe_directories
 
 if test -n "$LIST_STATE" ; then
