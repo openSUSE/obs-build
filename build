@@ -408,23 +408,24 @@ cleanup_and_exit () {
     # add build time statistics
     recipe_build_time_statistics
 
-    # check for disk full
-    if test "$1" -eq 1 -a -x /bin/df ; then
-        echo
-        echo "$HOST failed \"build $RECIPEFILE\" at `date --utc`."
-        echo
-        # okay, it failed, but maybe because disk space?
-	if df $BUILD_ROOT 2>/dev/null | grep -q "100%"; then
-            df $BUILD_ROOT 2>/dev/null
-            echo
-            echo "$HOST ran out of disk space. Please try again."
-            echo
-	    set 3
-        fi
-    fi
-
-    # run recipe cleanup code
+    # chroot environment only
     if test -z "$VM_TYPE" -o -n "$RUNNING_IN_VM" ; then
+        # check for disk full for an automatic build retry
+        if test "$1" -eq 1 -a -x /bin/df ; then
+            echo
+            echo "$HOST failed \"build $RECIPEFILE\" at `date --utc`."
+            echo
+            # okay, it failed, but maybe because disk space?
+            if df $BUILD_ROOT 2>/dev/null | grep -q "100%"; then
+                df $BUILD_ROOT 2>/dev/null
+                echo
+                echo "$HOST ran out of disk space. Please try again."
+                echo
+                set 3
+            fi
+        fi
+
+        # run recipe cleanup code
 	test -n "$BUILDTYPE" && recipe_cleanup
     fi
 
