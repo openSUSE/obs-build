@@ -425,6 +425,7 @@ downloadpkg() {
 
     local cachedir="$(getcachedir "$url")"
     local name="$(basename "$url")"
+    name=${name/%.pkg.tar.zst/.arch}
     name=${name/%.pkg.tar.?z/.arch}
     SRC="$cachedir/$name"
     local destdir="$cachedir/tmp"
@@ -670,7 +671,8 @@ else
 		    ;;
 	    esac
 	fi
-	SRCSUF=${SRC/%.pkg.tar.?z/.arch}
+	SRCSUF=${SRC/%.pkg.tar.zst/.arch}
+	SRCSUF=${SRCSUF/%.pkg.tar.?z/.arch}
 	ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
     done < $RPMLIST
 
@@ -698,7 +700,8 @@ else
     if test -s $BUILD_ROOT/.init_b_cache/rpmlist.download ; then
 	echo "calculating packages to download..."
         while read PKG SRC ; do
-	    SRCSUF=${SRC/%.pkg.tar.?z/.arch}
+	    SRCSUF=${SRC/%.pkg.tar.zst/.arch}
+	    SRCSUF=${SRCSUF/%.pkg.tar.?z/.arch}
 	    if test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.id" ; then
 		read cachepkgid < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
 		echo "PKG $PKG $cachepkgid"
@@ -717,7 +720,8 @@ else
         # remove found packages from download list
         rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download2
         while read PKG SRC ; do
-	    SRCSUF=${SRC/%.pkg.tar.?z/.arch}
+	    SRCSUF=${SRC/%.pkg.tar.zst/.arch}
+	    SRCSUF=${SRCSUF/%.pkg.tar.?z/.arch}
 	    test -L "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}" || echo "$PKG $SRC" >>$BUILD_ROOT/.init_b_cache/rpmlist.download2
 	done < $BUILD_ROOT/.init_b_cache/rpmlist.download
         rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download
@@ -732,7 +736,8 @@ else
             progress_step PACKAGES_TO_DOWNLOAD
             downloadpkg "$SRC"
 	    # downloadpkg modified $SRC, so it has a right name for use
-	    SRCSUF=${SRC/%.pkg.tar.?z/.arch}
+	    SRCSUF=${SRC/%.pkg.tar.zst/.arch}
+	    SRCSUF=${SRCSUF/%.pkg.tar.?z/.arch}
 	    ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
         done < $BUILD_ROOT/.init_b_cache/rpmlist.download
         rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download

@@ -156,13 +156,28 @@ sub lzmadec {
   return $nh;
 }
 
+sub zstddec {
+  my ($fn) = @_;
+  my $nh;
+  my $pid = open($nh, '-|');
+  return undef unless defined $pid;
+  if (!$pid) {
+    $SIG{'PIPE'} = 'DEFAULT';
+    exec('zstd', '-dc', $fn);
+    die("zstd $!\n");
+  }
+  return $nh;
+}
+
 sub queryvars {
   my ($handle) = @_;
 
   if (ref($handle)) {
     die("arch pkg query not implemented for file handles\n");
   }
-  if ($handle =~ /\.xz$/ || islzma($handle)) {
+  if ($handle =~ /\.zst$/) {
+    $handle = zstddec($handle);
+  } elsif ($handle =~ /\.xz$/ || islzma($handle)) {
     $handle = lzmadec($handle);
   }
   my $tar = Archive::Tar->new;
@@ -184,7 +199,9 @@ sub queryfiles {
   if (ref($handle)) {
     die("arch pkg query not implemented for file handles\n");
   }
-  if ($handle =~ /\.xz$/ || islzma($handle)) {
+  if ($handle =~ /\.zst$/) {
+    $handle = zstddec($handle);
+  } elsif ($handle =~ /\.xz$/ || islzma($handle)) {
     $handle = lzmadec($handle);
   }
   my @files;
@@ -251,7 +268,9 @@ sub queryhdrmd5 {
   if (ref($handle)) {
     die("arch pkg query not implemented for file handles\n");
   }
-  if ($handle =~ /\.xz$/ || islzma($handle)) {
+  if ($handle =~ /\.zst$/) {
+    $handle = zstddec($handle);
+  } elsif ($handle =~ /\.xz$/ || islzma($handle)) {
     $handle = lzmadec($handle);
   }
   my $tar = Archive::Tar->new;
