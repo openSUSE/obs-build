@@ -143,6 +143,16 @@ sub islzma {
   return $h eq "\3757zXZ";
 }
 
+sub iszstd {
+  my ($fn) = @_;
+  local *F;
+  return 0 unless open(F, '<', $fn);
+  my $h;
+  return 0 unless read(F, $h, 3) == 3;
+  close F;
+  return $h eq "\x{FD}\x{2F}\x{B5}";
+}
+
 sub lzmadec {
   my ($fn) = @_;
   my $nh;
@@ -175,7 +185,7 @@ sub queryvars {
   if (ref($handle)) {
     die("arch pkg query not implemented for file handles\n");
   }
-  if ($handle =~ /\.zst$/) {
+  if ($handle =~ /\.zst$/ || iszstd($handle)) {
     $handle = zstddec($handle);
   } elsif ($handle =~ /\.xz$/ || islzma($handle)) {
     $handle = lzmadec($handle);
@@ -199,7 +209,7 @@ sub queryfiles {
   if (ref($handle)) {
     die("arch pkg query not implemented for file handles\n");
   }
-  if ($handle =~ /\.zst$/) {
+  if ($handle =~ /\.zst$/ || iszstd($handle)) {
     $handle = zstddec($handle);
   } elsif ($handle =~ /\.xz$/ || islzma($handle)) {
     $handle = lzmadec($handle);
@@ -268,7 +278,7 @@ sub queryhdrmd5 {
   if (ref($handle)) {
     die("arch pkg query not implemented for file handles\n");
   }
-  if ($handle =~ /\.zst$/) {
+  if ($handle =~ /\.zst$/ || iszstd($handle)) {
     $handle = zstddec($handle);
   } elsif ($handle =~ /\.xz$/ || islzma($handle)) {
     $handle = lzmadec($handle);
