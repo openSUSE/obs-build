@@ -148,9 +148,9 @@ sub iszstd {
   local *F;
   return 0 unless open(F, '<', $fn);
   my $h;
-  return 0 unless read(F, $h, 3) == 3;
+  return 0 unless read(F, $h, 4) == 4;
   close F;
-  return $h eq "\x{FD}\x{2F}\x{B5}";
+  return $h eq "(\265\057\375";
 }
 
 sub lzmadec {
@@ -173,8 +173,8 @@ sub zstddec {
   return undef unless defined $pid;
   if (!$pid) {
     $SIG{'PIPE'} = 'DEFAULT';
-    exec('zstd', '-dc', $fn);
-    die("zstd $!\n");
+    exec('zstdcat', $fn);
+    die("zstdcat $!\n");
   }
   return $nh;
 }
