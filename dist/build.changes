@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Fri Jan 10 09:28:39 UTC 2020 - Adrian Schröter <adrian@suse.de>
+
+- Arch Linux zstd format support
+- fix testbuild fail with latest rpm in SP2 and Leap 15.2
+- do not retry automatically on disk full error
+
+-------------------------------------------------------------------
 Tue Jan  7 12:54:44 UTC 2020 - Adrian Schröter <adrian@suse.de>
 
 - allow to enter an existing buildroot w/o recipe
