@@ -718,7 +718,7 @@ vm_setup() {
     # so nothing is needed to do part from creating appropriate folders
     # and calling virt-make-fs accordingly
     if test -n "$VM_USE_VIRT_FS" ; then
-        echo "Using virt-make-fs to create $VM_ROOT"
+        echo "Using virt-make-fs to create root image"
         return 0
     fi
     if test "$VM_ROOT_TYPE" = file ; then
