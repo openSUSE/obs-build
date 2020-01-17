@@ -65,6 +65,7 @@ VMDISK_FILESYSTEM=
 VMDISK_MOUNT_OPTIONS=__default
 VMDISK_CLEAN=
 VM_HOSTNAME=
+VM_USE_VIRT_FS=
 
 # zvm specific?
 VM_WORKER_NO=
@@ -668,7 +669,7 @@ vm_setup_swap() {
     if test -n "$VMDISK_CLEAN" ; then
 	# delete old swap to get rid of the old blocks
 	if test -n "$VM_SWAP" -a "$VM_SWAP_TYPE" = file -a -f "$VM_SWAP" ; then
-		echo "Deleting old $VM_SWAP"
+	    echo "Deleting old $VM_SWAP"
         rm -f "$VM_SWAP"
 	fi
     fi
@@ -695,10 +696,10 @@ vm_setup() {
     vm_set_mount_options
     echo "VM_ROOT: $VM_ROOT, VM_SWAP: $VM_SWAP"
 
-    USE_VIRT_FS=
+    VM_USE_VIRT_FS=
     if test -z "$RUNNING_IN_VM" -a -n "$VM_TYPE" -a -n "$VM_ROOT" ; then
-        if test -x /usr/bin/virt-make-fs -a "$VMDISK_FILESYSTEM" == 'ext3' ; then
-            USE_VIRT_FS=yes
+        if test -x /usr/bin/virt-make-fs -a "$VMDISK_FILESYSTEM" = ext3 ; then
+            VM_USE_VIRT_FS=true
         fi
     fi
 
@@ -716,8 +717,8 @@ vm_setup() {
     # using virt-make-fs for ext3 file VMDISK_FILESYSTEM
     # so nothing is needed to do part from creating appropriate folders
     # and calling virt-make-fs accordingly
-    if test -n "$USE_VIRT_FS" ; then
-        echo "Using virt-make-fs to create VM_ROOT"
+    if test -n "$VM_USE_VIRT_FS" ; then
+        echo "Using virt-make-fs to create $VM_ROOT"
         return 0
     fi
     if test "$VM_ROOT_TYPE" = file ; then
@@ -731,7 +732,7 @@ vm_setup() {
 		vm_img_create "$VM_ROOT" "$VMDISK_ROOTSIZE"
 		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" || cleanup_and_exit 3
 	    fi
-    fi
+	fi
     fi
     if test ! -e "$VM_ROOT" ; then
 	cleanup_and_exit 3 "you need to create $VM_ROOT first"
@@ -754,7 +755,7 @@ vm_setup() {
 	    echo "/etc/fstab should contain an entry like this:"
 	    echo "$VM_ROOT $BUILD_ROOT auto noauto,user,loop 0 0"
 	    cleanup_and_exit 3
-    fi
+	fi
     fi
 }
 
@@ -923,11 +924,11 @@ vm_first_stage() {
 	fi
 	check_exit
 	# needs to work otherwise we have a corrupted file system
-	if test -z "$USE_VIRT_FS"; then
-	if ! umount $BUILD_ROOT; then
-	    rm -rf "$KERNEL_TEMP_DIR"
-	    cleanup_and_exit 3
-	fi
+	if test -z "$VM_USE_VIRT_FS" ; then
+	    if ! umount $BUILD_ROOT; then
+		rm -rf "$KERNEL_TEMP_DIR"
+		cleanup_and_exit 3
+	    fi
 	fi
 	# copy back the kernel and set it for VM
 	if test -n "$KERNEL_TEMP_DIR" ; then
@@ -941,8 +942,8 @@ vm_first_stage() {
 	    rmdir "$KERNEL_TEMP_DIR"
 	fi
     fi
-    if test -n "$USE_VIRT_FS" ; then
-        /usr/bin/virt-make-fs --format=raw -t ext3 --size="$VMDISK_ROOTSIZE"M $BUILD_ROOT $VM_ROOT
+    if test -n "$VM_USE_VIRT_FS" ; then
+        /usr/bin/virt-make-fs --format=raw -t ext3 --size="$VMDISK_ROOTSIZE"M $BUILD_ROOT $VM_ROOT || cleanup_and_exit 1
     fi
     vm_detach_root
 
