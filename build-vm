@@ -662,26 +662,63 @@ vm_set_defaults() {
 }
 
 #
-# create file system and swap space, mount file system to $BUILD_ROOT
+# create swap space
+#
+vm_setup_swap() {
+    if test -n "$VMDISK_CLEAN" ; then
+	# delete old swap to get rid of the old blocks
+	if test -n "$VM_SWAP" -a "$VM_SWAP_TYPE" = file -a -f "$VM_SWAP" ; then
+		echo "Deleting old $VM_SWAP"
+        rm -f "$VM_SWAP"
+	fi
+    fi
+    if test -n "$VM_SWAP" -a "$VM_SWAP_TYPE" = file ; then
+	vm_img_create "$VM_SWAP" "$VMDISK_SWAPSIZE"
+    fi
+    if test -n "$VM_SWAP" ; then
+	vm_attach_swap
+	dd if=/dev/zero of="$VM_SWAP" bs=1024 count=1 conv=notrunc 2>/dev/null
+	if test "$VM_SWAPDEV" != "${VM_SWAPDEV#LABEL=}"; then
+	    # call mkswap to set a label
+	    mkswap -L "${VM_SWAPDEV#LABEL=}" "$VM_SWAP"
+	fi
+	vm_detach_swap
+        # mkswap happens inside of the vm
+    fi
+}
+
+#
+# create file system, mount file system to $BUILD_ROOT
 #
 vm_setup() {
     vm_set_filesystem_type
     vm_set_mount_options
     echo "VM_ROOT: $VM_ROOT, VM_SWAP: $VM_SWAP"
 
+    USE_VIRT_FS=
+    if test -z "$RUNNING_IN_VM" -a -n "$VM_TYPE" -a -n "$VM_ROOT" ; then
+        if test -x /usr/bin/virt-make-fs -a "$VMDISK_FILESYSTEM" == 'ext3' ; then
+            USE_VIRT_FS=yes
+        fi
+    fi
+
     vm_attach_root
+    vm_setup_swap
     # this should not be needed, but sometimes a xen instance got lost
     test "$VM_TYPE" = xen && vm_purge_xen
     if test -n "$VMDISK_CLEAN" ; then
-	# delete old root/swap to get rid of the old blocks
+	# delete old root to get rid of the old blocks
 	if test -n "$VM_ROOT" -a "$VM_ROOT_TYPE" = file -a -f "$VM_ROOT" ; then
 	    echo "Deleting old $VM_ROOT"
 	    rm -f "$VM_ROOT"
 	fi
-	if test -n "$VM_SWAP" -a "$VM_SWAP_TYPE" = file -a -f "$VM_SWAP" ; then
-	    echo "Deleting old $VM_SWAP"
-	    rm -f "$VM_SWAP"
-	fi
+    fi
+    # using virt-make-fs for ext3 file VMDISK_FILESYSTEM
+    # so nothing is needed to do part from creating appropriate folders
+    # and calling virt-make-fs accordingly
+    if test -n "$USE_VIRT_FS" ; then
+        echo "Using virt-make-fs to create VM_ROOT"
+        return 0
     fi
     if test "$VM_ROOT_TYPE" = file ; then
 	if test -n "$CLEAN_BUILD" ; then
@@ -694,10 +731,7 @@ vm_setup() {
 		vm_img_create "$VM_ROOT" "$VMDISK_ROOTSIZE"
 		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" || cleanup_and_exit 3
 	    fi
-	fi
     fi
-    if test -n "$VM_SWAP" -a "$VM_SWAP_TYPE" = file ; then
-	vm_img_create "$VM_SWAP" "$VMDISK_SWAPSIZE"
     fi
     if test ! -e "$VM_ROOT" ; then
 	cleanup_and_exit 3 "you need to create $VM_ROOT first"
@@ -720,17 +754,7 @@ vm_setup() {
 	    echo "/etc/fstab should contain an entry like this:"
 	    echo "$VM_ROOT $BUILD_ROOT auto noauto,user,loop 0 0"
 	    cleanup_and_exit 3
-	fi
     fi
-    if test -n "$VM_SWAP" ; then
-	vm_attach_swap
-	dd if=/dev/zero of="$VM_SWAP" bs=1024 count=1 conv=notrunc 2>/dev/null
-	if test "$VM_SWAPDEV" != "${VM_SWAPDEV#LABEL=}"; then
-	    # call mkswap to set a label
-	    mkswap -L "${VM_SWAPDEV#LABEL=}" "$VM_SWAP"
-	fi
-	vm_detach_swap
-        # mkswap happens inside of the vm
     fi
 }
 
@@ -899,9 +923,11 @@ vm_first_stage() {
 	fi
 	check_exit
 	# needs to work otherwise we have a corrupted file system
+	if test -z "$USE_VIRT_FS"; then
 	if ! umount $BUILD_ROOT; then
 	    rm -rf "$KERNEL_TEMP_DIR"
 	    cleanup_and_exit 3
+	fi
 	fi
 	# copy back the kernel and set it for VM
 	if test -n "$KERNEL_TEMP_DIR" ; then
@@ -914,6 +940,9 @@ vm_first_stage() {
 	    fi
 	    rmdir "$KERNEL_TEMP_DIR"
 	fi
+    fi
+    if test -n "$USE_VIRT_FS" ; then
+        /usr/bin/virt-make-fs --format=raw -t ext3 --size="$VMDISK_ROOTSIZE"M $BUILD_ROOT $VM_ROOT
     fi
     vm_detach_root
 
