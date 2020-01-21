@@ -697,7 +697,7 @@ vm_setup() {
     echo "VM_ROOT: $VM_ROOT, VM_SWAP: $VM_SWAP"
 
     VM_USE_VIRT_FS=
-    if test -z "$RUNNING_IN_VM" -a -n "$VM_TYPE" -a -n "$VM_ROOT" ; then
+    if test -z "$RUNNING_IN_VM" -a -n "$VM_TYPE" -a -n "$VM_ROOT" -a -n "$CLEAN_BUILD" ; then
         if test -x /usr/bin/virt-make-fs -a "$VMDISK_FILESYSTEM" = ext3 ; then
             VM_USE_VIRT_FS=true
         fi
