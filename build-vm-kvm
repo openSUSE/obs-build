@@ -77,6 +77,8 @@ vm_verify_options_kvm() {
 	    kvm_options="-enable-kvm -M virt"
 	    vm_kernel=/boot/zImage
 	    vm_initrd=/boot/initrd
+	    test -e /boot/kernel.obs.guest && vm_kernel=/boot/kernel.obs.guest
+	    test -e /boot/initrd.obs.guest && vm_initrd=/boot/initrd.obs.guest
 	    # prefer the guest kernel/initrd
 	    test -e /boot/zImage.guest && vm_kernel=/boot/zImage.guest
 	    test -e /boot/initrd.guest && vm_initrd=/boot/initrd.guest
@@ -88,7 +90,9 @@ vm_verify_options_kvm() {
 	    kvm_console=ttyAMA0
 	    vm_kernel=/boot/Image
 	    vm_initrd=/boot/initrd
-            if test "${BUILD_ARCH#aarch}" != "$BUILD_ARCH" -o "${BUILD_ARCH#armv8}" != "$BUILD_ARCH"; then
+	    test -e /boot/kernel.obs.guest && vm_kernel=/boot/kernel.obs.guest
+	    test -e /boot/initrd.obs.guest && vm_initrd=/boot/initrd.obs.guest
+	    if test "${BUILD_ARCH#aarch}" != "$BUILD_ARCH" -o "${BUILD_ARCH#armv8}" != "$BUILD_ARCH"; then
 		kvm_options="-enable-kvm"
 		test -e /boot/Image.guest && vm_kernel=/boot/Image.guest
 		test -e /boot/initrd.guest && vm_initrd=/boot/initrd.guest
@@ -119,15 +123,17 @@ vm_verify_options_kvm() {
 	    grep -q PPC970MP /proc/cpuinfo && kvm_check_ppc970
 	    vm_kernel=/boot/vmlinux
 	    vm_initrd=/boot/initrd
+	    test -e /boot/kernel.obs.guest && vm_kernel=/boot/kernel.obs.guest
+	    test -e /boot/initrd.obs.guest && vm_initrd=/boot/initrd.obs.guest
 	    if test "$BUILD_ARCH" = ppc64le -a -e /boot/vmlinuxle ; then
 		vm_kernel=/boot/vmlinuxle
 		vm_initrd=/boot/initrdle
 	    fi
 	    if test -e /boot/vmlinuxbe -a -e /boot/initrdbe ; then
-	        if test "$BUILD_ARCH" = ppc -o "$BUILD_ARCH" = ppc64 ; then
+		if test "$BUILD_ARCH" = ppc -o "$BUILD_ARCH" = ppc64 ; then
 		    vm_kernel=/boot/vmlinuxbe
 		    vm_initrd=/boot/initrdbe
-	        fi
+		fi
 	    fi
 	    grep -q "pSeries" /proc/cpuinfo && kvm_device=scsi-hd	# no virtio on pSeries
 	    grep -q "PowerNV" /proc/cpuinfo || kvm_device=scsi-hd	# no virtio on ppc != power7 yet
@@ -139,6 +145,8 @@ vm_verify_options_kvm() {
 	    kvm_console=hvc0
 	    vm_kernel=/boot/image
 	    vm_initrd=/boot/initrd
+	    test -e /boot/kernel.obs.guest && vm_kernel=/boot/kernel.obs.guest
+	    test -e /boot/initrd.obs.guest && vm_initrd=/boot/initrd.obs.guest
 	    kvm_device=virtio-blk-ccw
 	    kvm_serial_device=virtio-serial-ccw
 	    kvm_rng_device=virtio-rng-ccw
@@ -157,13 +165,18 @@ vm_verify_options_kvm() {
 
     # set kernel
     test -n "$VM_KERNEL" && vm_kernel="$VM_KERNEL"
-    test -z "$vm_kernel" && vm_kernel=/boot/vmlinuz
+    if test -z "$vm_kernel" ; then
+	vm_kernel=/boot/vmlinuz
+	test -e /boot/kernel.obs.guest && vm_kernel=/boot/kernel.obs.guest
+    fi
 
     # set initrd
     test -n "$VM_INITRD" && vm_initrd="$VM_INITRD"
     if test -z "$vm_initrd" ; then
 	# find a nice default
-	if test -e "/boot/initrd-build" ; then
+	if test -e /boot/initrd.obs.guest ; then
+	    vm_initrd=/boot/initrd.obs.guest
+	elif test -e "/boot/initrd-build" ; then
 	    vm_initrd="/boot/initrd-build"
 	elif test -e "/boot/initrd-virtio" ; then
 	    vm_initrd="/boot/initrd-virtio"
