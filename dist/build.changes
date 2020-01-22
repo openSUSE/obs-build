@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Wed Jan 22 12:30:41 UTC 2020 - Adrian Schröter <adrian@suse.de>
+
+- fix createrepo existens check for appimager and docker builds
+  in chroot
+- support to use virt-make-fs for ext3 VM builds
+
+-------------------------------------------------------------------
 Fri Jan 10 09:28:39 UTC 2020 - Adrian Schröter <adrian@suse.de>
 
 - Arch Linux zstd format support
