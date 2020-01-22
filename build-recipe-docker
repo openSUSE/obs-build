@@ -101,10 +101,10 @@ recipe_build_docker() {
     fi
 
     # Prepare the package repository
-    if test -x $BUILD_ROOT/usr/bin/createrepo ; then
+    if chroot $BUILD_ROOT test -x /usr/bin/createrepo ; then
 	chroot $BUILD_ROOT createrepo "$TOPDIR/SOURCES/repos" >/dev/null
     fi
-    if test -x $BUILD_ROOT/usr/bin/dpkg-scanpackages ; then
+    if chroot $BUILD_ROOT test -x /usr/bin/dpkg-scanpackages ; then
 	chroot $BUILD_ROOT bash -c "cd $TOPDIR/SOURCES/repos && dpkg-scanpackages -m . | gzip > Packages.gz"
     fi
 

@@ -76,9 +76,9 @@ recipe_build_appimage() {
         fi
         if test -z "$DEB" -a ! -d "$BUILD_ROOT/.build.binaries/repodata" ; then
   	    echo "creating repository metadata..."
-            if [ -x "$BUILD_ROOT/usr/bin/createrepo_c" ]; then 
+            if chroot "$BUILD_ROOT" test -x /usr/bin/createrepo_c; then
                 chroot "$BUILD_ROOT" /usr/bin/createrepo_c /.build.binaries
-            elif [ -x "$BUILD_ROOT/usr/bin/createrepo" ]; then
+            elif chroot "$BUILD_ROOT" test -x /usr/bin/createrepo; then
                 chroot "$BUILD_ROOT" /usr/bin/createrepo /.build.binaries
             else
                 cleanup_and_exit 1 "No createrepo found in build root"
