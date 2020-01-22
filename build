@@ -1134,6 +1134,9 @@ set_build_arch
 
 if test "$DO_INIT" = false -a -n "$RUN_SHELL"; then
     mount_stuff
+    if test -n $NOROOTFORBUILD; then
+	BUILD_USER=abuild
+    fi
     chroot $BUILD_ROOT su - $BUILD_USER
     cleanup_and_exit $?
 fi
