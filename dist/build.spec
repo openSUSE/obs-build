@@ -17,8 +17,13 @@
 # needsrootforbuild
 # needsbinariesforbuild
 
+%if 0%{?fedora} || 0%{?rhel}
+%define __pkg_name obs-build
+%else
+%define __pkg_name build
+%endif
 
-Name:           build
+Name:           %{__pkg_name}
 Summary:        A Script to Build SUSE Linux RPMs
 License:        GPL-2.0-only OR GPL-3.0-only
 Group:          Development/Tools/Building
@@ -67,11 +72,11 @@ Recommends:     /sbin/mkfs.ext3
 %endif
 
 %if 0%{?suse_version} > 1120 || ! 0%{?suse_version}
-Requires:       build-mkbaselibs
+Requires:       %{__pkg_name}-mkbaselibs
 %endif
 
 %if 0%{?suse_version} > 1120 || 0%{?mdkversion}
-Recommends:     build-mkdrpms
+Recommends:     %{__pkg_name}-mkdrpms
 %endif
 
 %description
@@ -95,7 +100,7 @@ Summary:        Tools to generate delta rpms
 Group:          Development/Tools/Building
 Requires:       deltarpm
 # XXX: we wanted to avoid that but mkdrpms needs Build::Rpm::rpmq
-Requires:       build
+Requires:       %{__pkg_name}
 
 %description mkdrpms
 This package contains the parts which may be installed in the inner build system
@@ -110,11 +115,11 @@ for generating delta rpm packages.
 %package initvm-%{initvm_arch}
 Summary:        Virtualization initializer for emulated cross architecture builds
 Group:          Development/Tools/Building
-Requires:       build
+Requires:       %{__pkg_name}
 BuildRequires:  gcc
 BuildRequires:  glibc-devel
-Provides:       build-initvm
-Obsoletes:      build-initvm
+Provides:       %{__pkg_name}-initvm
+Obsoletes:      %{__pkg_name}-initvm
 %if 0%{?suse_version} > 1200
 BuildRequires:  glibc-devel-static
 %endif
@@ -166,7 +171,7 @@ ln -s sl${SUSE_V:0:2}.${SUSE_V:2:1}.conf default.conf
 ln -s sle${SLE_V:0:2}.${SLE_V:3:1}.conf default.conf
 %endif
 %if 0%{?sles_version} == 1110
-# this is SUSE SLE 11 
+# this is SUSE SLE 11
 ln -s sles11sp2.conf default.conf
 %endif
 # make sure that we have a config
