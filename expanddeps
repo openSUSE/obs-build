@@ -228,10 +228,14 @@ if (!defined($dist) || $dist eq '') {
       $rpmdist = $res{1010}->[0] || '';
     }
     $dist = Build::dist_canon($rpmdist, $archs[0]);
-    # need some extra work for sles11 :(
+    # need some extra work for sles11 and sles15 :(
     if ($dist =~ /^sles11-/) {
       my %res = Build::Rpm::rpmq($rpmfn, 1049);
       $dist =~ s/^sles11-/sles11sp2-/ if grep {/^liblzma/} @{$res{1049} || []};
+    }
+    if ($dist =~ /^sles15-/) {
+      my %res = Build::Rpm::rpmq($rpmfn, 1049);
+      $dist =~ s/^sles15-/sles15sp2-/ if grep {/^libgcrypt/} @{$res{1049} || []};
     }
   }
   print STDERR "Warning: distribution not specified, assuming '$dist' (see $configdir).\n";
