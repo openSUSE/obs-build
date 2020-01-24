@@ -1,4 +1,15 @@
 -------------------------------------------------------------------
+Fri Jan 24 14:38:29 UTC 2020 - Adrian Schröter <adrian@suse.de>
+
+- Fix crash when using preinstall dependency expansion in OBS
+- build-vm-kvm: use /boot/kernel.obs.build and /boot/initrd.obs.build
+  as fallback regardless of the platform to have a global fallback
+  kernel to use for distros that do not use the "kernel-obs-build"
+  package to provide the guests kernel and initrd as the system
+  binaries are not reliable for use in a guest system
+- use abuild user if $NOROOTFORBUILD is set.
+
+-------------------------------------------------------------------
 Wed Jan 22 12:30:41 UTC 2020 - Adrian Schröter <adrian@suse.de>
 
 - fix createrepo existens check for appimager and docker builds
