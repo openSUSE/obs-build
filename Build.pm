@@ -533,7 +533,8 @@ sub expandpreinstalls {
   return if !$config->{'expandflags:preinstallexpand'} || $config->{'preinstallisexpanded'};
   my (@pre, @vm);
   if (@{$config->{'preinstall'} || []}) {
-    @pre = expand($config, @{$config->{'preinstall'} || []});
+    my $c = $config;
+    @pre = expand($c, @{$config->{'preinstall'} || []});
     return "preinstalls: $pre[0]" unless shift @pre;
     @pre = sort(@pre);
   }
@@ -541,7 +542,8 @@ sub expandpreinstalls {
     my %pre = map {$_ => 1} @pre;
     my %vmx = map {+"-$_" => 1} @{$config->{'vminstall'} || []};
     my @pren = grep {/^-/ && !$vmx{$_}} @{$config->{'preinstall'} || []};
-    @vm = expand($config, @pre, @pren, @{$config->{'vminstall'} || []});
+    my $c = $config;
+    @vm = expand($c, @pre, @pren, @{$config->{'vminstall'} || []});
     return "vminstalls: $vm[0]" unless shift @vm;
     @vm = sort(grep {!$pre{$_}} @vm);
   }
