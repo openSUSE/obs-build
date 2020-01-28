@@ -623,6 +623,14 @@ build_kiwi_appliance() {
 	# results are not bundled yet
 	legacy_image_bundle
     fi
+
+    local milestone=$(kiwi_query_recipe milestone)
+    if test -n "$milestone"; then
+        for i in $BUILD_ROOT/$TOPDIR/KIWI/*.packages; do
+            test -e "$i" || continue
+            echo "$milestone" > "${i%.packages}.milestone"
+        done
+    fi
 }
 
 postprocess_kiwi_containers() {
