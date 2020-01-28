@@ -45,6 +45,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
+#include <unistd.h>
 
 /* to enable debugging, compile with -DDEBUG */
 #ifdef DEBUG
