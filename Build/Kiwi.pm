@@ -71,6 +71,7 @@ sub kiwiparse_product {
   my $obsexcludearch;
   $obsexclusivearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExclusiveArch:\s+(.*)\s+-->\s*$/im;
   $obsexcludearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExcludeArch:\s+(.*)\s+-->\s*$/im;
+  $ret->{'milestone'} = $1 if $xml =~ /^\s*<!--\s+OBS-Milestone:\s+(.*)\s+-->\s*$/im;
 
   $ret->{'name'} = $kiwi->{'name'} if $kiwi->{'name'};
   $ret->{'filename'} = $kiwi->{'name'} if $kiwi->{'name'};
@@ -225,6 +226,7 @@ sub kiwiparse {
   $obsexclusivearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExclusiveArch:\s+(.*)\s+-->\s*$/im;
   $obsexcludearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExcludeArch:\s+(.*)\s+-->\s*$/im;
   $obsprofiles = $1 if $xml =~ /^\s*<!--\s+OBS-Profiles:\s+(.*)\s+-->\s*$/im;
+  $ret->{'milestone'} = $1 if $xml =~ /^\s*<!--\s+OBS-Milestone:\s+(.*)\s+-->\s*$/im;
   if ($obsprofiles) {
     $obsprofiles = [ grep {defined($_)} map {$_ eq '@BUILD_FLAVOR@' ? $buildflavor : $_} split(' ', $obsprofiles) ];
   }
