@@ -236,6 +236,7 @@ sub read_config {
       last if $l =~ /^\s*:macros\s*$/si;
       $newconfig[-1] .= "$l\n";
     }
+    $newconfig[-1] = [ $newconfig[-1] ];	# verbatim quote, see Rpm.pm
   }
   my @spec;
   $config->{'save_expanded'} = 1;

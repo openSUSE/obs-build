@@ -210,7 +210,7 @@ sub expandmacros {
   my $optmacros = {};
   # newer perls: \{((?:(?>[^{}]+)|(?2))*)\}
 reexpand:
-  while ($line =~ /^(.*?)%(\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\*\*?|#|\(|\[)(.*?)$/) {
+  while ($line =~ /^(.*?)%(\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\*\*?|#|\(|\[)(.*?)$/s) {
     if ($tries++ > 1000) {
       print STDERR "Warning: spec file parser ",($lineno?" line $lineno":''),": macro too deeply nested\n" if $config->{'warnings'};
       $line = 'MACRO';
@@ -409,46 +409,43 @@ sub parse {
     $ret->{'error'} = "open $specfile: $!";
     return $ret;
   }
-  my @macros = @{$config->{'macros'} || []};
+  
+  for my $line (@{$config->{'macros'} || []}) {
+    expandmacros($config, $line, undef, \%macros, \%macros_args);
+  }
   my $skip = 0;
   my $main_preamble = 1;
   my $preamble = 1;
-  my $inspec = 0;
   my $hasif = 0;
   my $lineno = 0;
   my $obspackage = defined($config->{'obspackage'}) ? $config->{'obspackage'} : '@OBS_PACKAGE@';
   my $buildflavor = defined($config->{'buildflavor'}) ? $config->{'buildflavor'} : '';
   while (1) {
     my $line;
-    if (@macros) {
-      $line = shift @macros;
-      $hasif = 0 unless @macros;
-    } elsif ($specdata) {
-      $inspec = 1;
+    if ($specdata) {
       last unless @$specdata;
       $line = shift @$specdata;
       ++$lineno;
       if (ref $line) {
-	$line = $line->[0]; # verbatim line
+	$line = $line->[0]; # verbatim line, used for macro collection
 	push @$xspec, $line if $xspec;
 	$xspec->[-1] = [ $line, undef ] if $xspec && $skip;
 	next;
       }
     } else {
-      $inspec = 1;
       $line = <SPEC>;
       last unless defined $line;
       chomp $line;
       ++$lineno;
     }
-    push @$xspec, $line if $inspec && $xspec;
+    push @$xspec, $line if $xspec;
     if ($line =~ /^#\s*neededforbuild\s*(\S.*)$/) {
       if (defined $hasnfb) {
-	$xspec->[-1] = [ $xspec->[-1], undef ] if $inspec && $xspec;
+	$xspec->[-1] = [ $xspec->[-1], undef ] if $xspec;
 	next;
       }
       $hasnfb = $1;
-      $nfbline = \$xspec->[-1] if $inspec && $xspec;
+      $nfbline = \$xspec->[-1] if $xspec;
       next;
     }
     if ($line =~ /^\s*#/) {
@@ -617,7 +614,7 @@ sub parse {
 	}
       }
       push @packdeps, @ndeps;
-      next unless $xspec && $inspec;
+      next unless $xspec;
       if ($replace) {
 	my @cndeps = grep {!/^-/} @ndeps;
 	if (@cndeps) {
