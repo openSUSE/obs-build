@@ -27,6 +27,11 @@ use strict;
 
 use Digest::MD5;
 
+sub expr_boolify {
+  my ($v) = @_;
+  return !defined($v) || $v eq '"' || $v =~ /^0*$/ ? 0 : 1;
+}
+
 sub expr {
   my ($expr, $lev) = @_;
 
@@ -41,9 +46,7 @@ sub expr {
   } elsif ($t eq '!') {
     ($v, $expr) = expr(substr($expr, 1), 6);
     return undef unless defined $v;
-    $v = 0 if $v && $v eq '"';
-    $v =~ s/^0+/0/ if $v;
-    $v = !$v;
+    $v = expr_boolify($v) ? 0 : 1;
   } elsif ($t eq '-') {
     ($v, $expr) = expr(substr($expr, 1), 6);
     return undef unless defined $v;
@@ -67,20 +70,12 @@ sub expr {
       return ($v, $expr) if $lev > 2;
       ($v2, $expr) = expr(substr($expr, 2), 2);
       return undef unless defined $v2;
-      $v = 0 if $v && $v eq '"';
-      $v =~ s/^0+/0/;
-      $v2 = 0 if $v2 && $v2 eq '"';
-      $v2 =~ s/^0+/0/;
-      $v = $v && $v2 ? 1 : 0;
+      $v = $v2 if expr_boolify($v2);
     } elsif ($expr =~ /^\|\|/) {
       return ($v, $expr) if $lev > 2;
       ($v2, $expr) = expr(substr($expr, 2), 2);
       return undef unless defined $v2;
-      $v = 0 if $v && $v eq '"';
-      $v =~ s/^0+/0/;
-      $v2 = 0 if $v2 && $v2 eq '"';
-      $v2 =~ s/^0+/0/;
-      $v = $v || $v2 ? 1 : 0;
+      $v = $v2 unless expr_boolify($v);
     } elsif ($expr =~ /^>=/) {
       return ($v, $expr) if $lev > 3;
       ($v2, $expr) = expr(substr($expr, 2), 3);
@@ -135,9 +130,7 @@ sub expr {
       $v /= $v2;
     } elsif ($expr =~ /^\?/) {
       return ($v, $expr) if $lev > 1;
-      $v = 0 if $v && $v eq '"';
-      $v =~ s/^0+/0/;
-      $v2 = $v;
+      $v2 = expr_boolify($v);
       ($v, $expr) = expr(substr($expr, 1), 1);
       warn("syntax error while parsing ternary in $_[0]\n") unless $expr =~ s/^://;
       ($v, $expr) = expr($expr, 1) unless $v2;
