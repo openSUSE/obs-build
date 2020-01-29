@@ -204,7 +204,7 @@ sub initmacros {
 }
 
 sub expandmacros {
-  my ($config, $line, $lineno, $macros, $macros_args) = @_;
+  my ($config, $line, $lineno, $macros, $macros_args, $tries) = @_;
 
   if (!$macros) {
     $macros = {};
@@ -212,7 +212,7 @@ sub expandmacros {
     initmacros($config, $macros, $macros_args);
   }
   my $expandedline = '';
-  my $tries = 0;
+  $tries ||= 0;
   my @expandstack;
   my $optmacros = {};
   # newer perls: \{((?:(?>[^{}]+)|(?2))*)\}
@@ -225,6 +225,10 @@ reexpand:
     }
     $expandedline .= $1;
     $line = $4;
+    if ($2 eq '%') {
+      $expandedline .= '%';
+      next;
+    }
     my $macname = defined($3) ? $3 : $2;
     my $macorig = $2;
     my $macdata;
@@ -255,10 +259,7 @@ reexpand:
       $mactest = 1;
     }
     $macname =~ s/^[\!\?]+//;
-    if ($macname eq '%') {
-      $expandedline .= '%';
-      next;
-    } elsif ($macname eq '(') {
+    if ($macname eq '(') {
       print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand %(...)\n" if $config->{'warnings'};
       $line = 'MACRO';
       last;
@@ -272,15 +273,17 @@ reexpand:
       $macalt =~ s/^\[//;
       $macalt =~ s/\]$//;
       # this is wrong, should expand in expr
-      $macalt = expandmacros($config, $macalt, $lineno, $macros, $macros_args);
+      $macalt = expandmacros($config, $macalt, $lineno, $macros, $macros_args, $tries);
       $macalt = (expr($macalt))[0];
       $macalt =~ s/^\"//;
       $expandedline .= $macalt;
     } elsif ($macname eq 'define' || $macname eq 'global') {
+      my $isglobal = $macname eq 'global' ? 1 : 0;
       if ($line =~ /^\s*([0-9a-zA-Z_]+)(?:\(([^\)]*)\))?\s*(.*?)$/) {
 	my $macname = $1;
 	my $macargs = $2;
 	my $macbody = $3;
+	$macbody = expandmacros($config, $macbody, $lineno, $macros, $macros_args, $tries) if $isglobal;
 	if (defined $macargs) {
 	  $macros_args->{$macname} = $macargs;
 	} else {
@@ -319,7 +322,7 @@ reexpand:
     } elsif ($macname eq 'expr') {
       $macalt = $macros->{$macname} unless defined $macalt;
       $macalt = '' if $mactest == -1;
-      $macalt = expandmacros($config, $macalt, $lineno, $macros, $macros_args);
+      $macalt = expandmacros($config, $macalt, $lineno, $macros, $macros_args, $tries);
       $macalt = (expr($macalt))[0];
       $macalt =~ s/^\"//;
       $expandedline .= $macalt;
