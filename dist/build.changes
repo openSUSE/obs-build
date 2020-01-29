@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Wed Jan 29 12:57:22 UTC 2020 - Adrian Schröter <adrian@suse.de>
+
+- 15.2 config: temporary revert gcrypt preinstall until distro has changed
+- factory config: ignore libxtables for iproute2, not needed for ip tool
+- Follow upstream rpm changes in regard to logical ops
+- Fix macro expansion of lines containing newlines
+- add missing header file to avoid compile warnings
+
+-------------------------------------------------------------------
 Tue Jan 28 15:20:28 UTC 2020 - Adrian Schröter <adrian@suse.de>
 
 - support OBS-Milestone comment for kiwi
