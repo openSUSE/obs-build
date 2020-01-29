@@ -187,15 +187,29 @@ sub grabargs {
   return \%m;
 }
 
+sub initmacros {
+  my ($config, $macros, $macros_args) = @_;
+  for my $line (@{$config->{'macros'} || []}) {
+    next unless $line =~ /^%define\s*([0-9a-zA-Z_]+)(?:\(([^\)]*)\))?\s*(.*?)$/;
+    my $macname = $1;
+    my $macargs = $2;
+    my $macbody = $3;
+    if (defined $macargs) {
+      $macros_args->{$macname} = $macargs;
+    } else {
+      delete $macros_args->{$macname};
+    }
+    $macros->{$macname} = $macbody;
+  }
+}
+
 sub expandmacros {
   my ($config, $line, $lineno, $macros, $macros_args) = @_;
 
   if (!$macros) {
     $macros = {};
     $macros_args = {};
-    for my $macline (@{$config->{'macros'} || []}) {
-      expandmacros($config, $macline, undef, $macros, $macros_args);
-    }
+    initmacros($config, $macros, $macros_args);
   }
   my $expandedline = '';
   my $tries = 0;
@@ -403,9 +417,7 @@ sub parse {
     return $ret;
   }
   
-  for my $line (@{$config->{'macros'} || []}) {
-    expandmacros($config, $line, undef, \%macros, \%macros_args);
-  }
+  initmacros($config, \%macros, \%macros_args);
   my $skip = 0;
   my $main_preamble = 1;
   my $preamble = 1;

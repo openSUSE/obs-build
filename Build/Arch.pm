@@ -119,10 +119,7 @@ sub parse {
   $ret->{'deps'} = [];
   push @{$ret->{'deps'}}, @{$vars{$_} || []} for qw{makedepends checkdepends depends};
   # get arch from macros
-  my $arch;
-  for (@{$config->{'macros'} || []}) {
-    $arch = $1 if /^%define _target_cpu (\S+)/;
-  }
+  my ($arch) = Build::gettargetarchos($config);
   # map to arch linux name and add arch dependent
   $arch = 'i686' if $arch =~ /^i[345]86$/;
   push @{$ret->{'deps'}}, @{$vars{"${_}_$arch"} || []} for qw{makedepends checkdepends depends};

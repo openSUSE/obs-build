@@ -111,10 +111,9 @@ sub unify {
   return grep(delete($h{$_}), @_);
 }
 
-sub define($)
-{
-  my $def = shift;
-  $extra_macros .= '%define '.$def."\n";
+sub define {
+  my ($def) = @_;
+  $extra_macros .= "%define $def\n";
 }
 
 sub init_helper_hashes {
@@ -449,6 +448,16 @@ sub read_config {
   }
   $config->{'modules'} = [ sort keys %modules ] if %modules;
   return $config;
+}
+
+sub gettargetarchos {
+  my ($config) = @_;
+  my ($arch, $os);
+  for (@{$config->{'macros'} || []}) {
+    $arch = $1 if /^%define _target_cpu (\S+)/;
+    $os = $1 if /^%define _target_os (\S+)/;
+  }
+  return ($arch, $os);
 }
 
 sub do_subst {

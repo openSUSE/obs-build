@@ -62,13 +62,9 @@ sub parse {
   my @control;
 
   # get arch and os from macros
-  my ($arch, $os);
-  for (@{$bconf->{'macros'} || []}) {
-    $arch = $1 if /^%define _target_cpu (\S+)/;
-    $os = $1 if /^%define _target_os (\S+)/;
-  }
+  my ($arch, $os) = Build::gettargetarchos($bconf);
   # map to debian names
-  $os = 'linux' if !defined($os);
+  $os = 'linux' unless defined $os;
   $arch = basearch($arch);
 
   if (ref($fn) eq 'ARRAY') {
