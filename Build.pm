@@ -794,12 +794,12 @@ sub readdeps {
 	  next;
 	}
 	if ($s[0] =~ /^rpmlib\(/) {
-	    splice(@s, 0, 3);
-	    next;
+	  splice(@s, 0, 3);
+	  next;
 	}
 	if ($s[0] =~ /^\(/) {
-	    push @ss, Build::Rpm::shiftrich(\@s);
-	    next;
+	  push @ss, Build::Rpm::shiftrich(\@s);
+	  next;
 	}
 	push @ss, shift @s;
 	while (@s && $s[0] =~ /^[\(<=>|]/) {
