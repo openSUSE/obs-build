@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 35;
+use Test::More tests => 36;
 
 use Build::Rpm;
 
@@ -41,6 +41,7 @@ my @tests = (
   '2 * -2'			=> '-4',
   '7 == 1 + 2 * 3'		=> '1',
   '5 || 2 ? 3 : 4'		=> '3',
+  '"foo" + "bar"'		=> '"foobar',
 );
 
 while (@tests) {
