@@ -70,7 +70,7 @@ sub expr {
       return ($v, $expr) if $lev > 2;
       ($v2, $expr) = expr(substr($expr, 2), 2);
       return undef unless defined $v2;
-      $v = $v2 if expr_boolify($v2);
+      $v = $v2 if expr_boolify($v);
     } elsif ($expr =~ /^\|\|/) {
       return ($v, $expr) if $lev > 2;
       ($v2, $expr) = expr(substr($expr, 2), 2);
