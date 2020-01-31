@@ -67,47 +67,47 @@ sub expr {
   while (1) {
     $expr =~ s/^\s+//;
     if ($expr =~ /^&&/) {
-      return ($v, $expr) if $lev > 2;
+      return ($v, $expr) if $lev >= 2;
       ($v2, $expr) = expr(substr($expr, 2), 2);
       return undef unless defined $v2;
       $v = $v2 if expr_boolify($v);
     } elsif ($expr =~ /^\|\|/) {
-      return ($v, $expr) if $lev > 2;
+      return ($v, $expr) if $lev >= 2;
       ($v2, $expr) = expr(substr($expr, 2), 2);
       return undef unless defined $v2;
       $v = $v2 unless expr_boolify($v);
     } elsif ($expr =~ /^>=/) {
-      return ($v, $expr) if $lev > 3;
+      return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 2), 3);
       return undef unless defined $v2;
       $v = (($v =~ /^\"/) ? $v ge $v2 : $v >= $v2) ? 1 : 0;
     } elsif ($expr =~ /^>/) {
-      return ($v, $expr) if $lev > 3;
+      return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 1), 3);
       return undef unless defined $v2;
       $v = (($v =~ /^\"/) ? $v gt $v2 : $v > $v2) ? 1 : 0;
     } elsif ($expr =~ /^<=/) {
-      return ($v, $expr) if $lev > 3;
+      return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 2), 3);
       return undef unless defined $v2;
       $v = (($v =~ /^\"/) ? $v le $v2 : $v <= $v2) ? 1 : 0;
     } elsif ($expr =~ /^</) {
-      return ($v, $expr) if $lev > 3;
+      return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 1), 3);
       return undef unless defined $v2;
       $v = (($v =~ /^\"/) ? $v lt $v2 : $v < $v2) ? 1 : 0;
     } elsif ($expr =~ /^==/) {
-      return ($v, $expr) if $lev > 3;
+      return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 2), 3);
       return undef unless defined $v2;
       $v = (($v =~ /^\"/) ? $v eq $v2 : $v == $v2) ? 1 : 0;
     } elsif ($expr =~ /^!=/) {
-      return ($v, $expr) if $lev > 3;
+      return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 2), 3);
       return undef unless defined $v2;
       $v = (($v =~ /^\"/) ? $v ne $v2 : $v != $v2) ? 1 : 0;
     } elsif ($expr =~ /^\+/) {
-      return ($v, $expr) if $lev > 4;
+      return ($v, $expr) if $lev >= 4;
       ($v2, $expr) = expr(substr($expr, 1), 4);
       return undef unless defined $v2;
       if ($v =~ /^\"/ && $v2 =~ s/^\"//) {
@@ -116,7 +116,7 @@ sub expr {
         $v += $v2;
       }
     } elsif ($expr =~ /^-/) {
-      return ($v, $expr) if $lev > 4;
+      return ($v, $expr) if $lev >= 4;
       ($v2, $expr) = expr(substr($expr, 1), 4);
       return undef unless defined $v2;
       $v -= $v2;
