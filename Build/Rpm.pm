@@ -29,7 +29,7 @@ use Digest::MD5;
 
 sub expr_boolify {
   my ($v) = @_;
-  return !defined($v) || $v eq '"' || $v =~ /^0*$/ ? 0 : 1;
+  return !defined($v) || $v eq '"' || $v =~ /^0*$/s ? 0 : 1;
 }
 
 sub expr {
@@ -513,8 +513,7 @@ sub parse {
     }
     if ($line =~ /^\s*%if(.*)$/) {
       my ($v, $r) = expr($1);
-      $v = 0 if $v && $v eq '\"\"';
-      $v =~ s/^0+/0/ if $v;
+      $v = expr_boolify($v);
       $skip = 1 unless $v;
       $hasif = 1;
       next;
