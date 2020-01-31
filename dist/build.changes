@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Jan 31 11:49:34 UTC 2020 - Adrian Schröter <adrian@suse.de>
+
+- fix regression in && operator handling of rpm spec file parser
+- Correctly expand macros defined with %global
+
+-------------------------------------------------------------------
 Wed Jan 29 12:57:22 UTC 2020 - Adrian Schröter <adrian@suse.de>
 
 - 15.2 config: temporary revert gcrypt preinstall until distro has changed
