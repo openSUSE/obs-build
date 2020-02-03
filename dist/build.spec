@@ -205,8 +205,8 @@ test -e baselibs_global.conf || exit 1
 %check
 for i in build build-* ; do bash -n $i || exit 1 ; done
 
-# expect unit tests
-LANG=C prove -I. -v t/*.t || exit 1
+# run perl module unit tests
+LANG=C make test || exit 1
 
 if [ `whoami` != "root" ]; then
   echo "WARNING: Not building as root, build test did not run!"
