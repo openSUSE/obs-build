@@ -29,14 +29,9 @@ recipe_prepare_collax() {
 collax_build() {
 	local buildroot="$1"
 
-	if test -n "$RUN_SHELL"; then
-		chroot "$buildroot" su -
-		ret=$?
-	else
-		chroot "$buildroot" su - $BUILD_USER -c \
-			"cd $TOPDIR/SOURCES && ./build"
-		ret=$?
-	fi
+	chroot "$buildroot" su - $BUILD_USER -c \
+		"cd $TOPDIR/SOURCES && ./build"
+	ret=$?
 	if test "$ret" = 0; then
 		BUILD_SUCCEEDED=true
 	fi

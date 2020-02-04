@@ -102,14 +102,10 @@ dsc_build() {
 	chmod +x $buildroot/$TOPDIR/SOURCES/build.script
     fi
 
-    if test -n "$RUN_SHELL"; then
-	chroot $buildroot su -
-    else
-	chroot $buildroot su -c "export DEB_BUILD_OPTIONS=${DSC_BUILD_OPTIONS} ; cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
-	if test "$BUILD_SUCCEEDED" = true -a "$DO_CHECKS" != "false" && ( chroot $buildroot su -c "which lintian > /dev/null" - $BUILD_USER < /dev/null ); then
-	   DEB_CHANGESFILE=${DEB_DSCFILE%.dsc}$OBS_DCH_RELEASE"_"$(chroot $buildroot su -c 'dpkg-architecture -qDEB_BUILD_ARCH')".changes"
-	   chroot $buildroot su -c "cd $TOPDIR && echo Running lintian && (set -x && lintian -i $TOPDIR/$DEB_CHANGESFILE)" - $BUILD_USER < /dev/null || BUILD_SUCCEEDED=false
-	fi
+    chroot $buildroot su -c "export DEB_BUILD_OPTIONS=${DSC_BUILD_OPTIONS} ; cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+    if test "$BUILD_SUCCEEDED" = true -a "$DO_CHECKS" != "false" && ( chroot $buildroot su -c "which lintian > /dev/null" - $BUILD_USER < /dev/null ); then
+	DEB_CHANGESFILE=${DEB_DSCFILE%.dsc}$OBS_DCH_RELEASE"_"$(chroot $buildroot su -c 'dpkg-architecture -qDEB_BUILD_ARCH')".changes"
+	chroot $buildroot su -c "cd $TOPDIR && echo Running lintian && (set -x && lintian -i $TOPDIR/$DEB_CHANGESFILE)" - $BUILD_USER < /dev/null || BUILD_SUCCEEDED=false
     fi
 }
 
