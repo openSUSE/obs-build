@@ -1508,6 +1508,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     test "$BUILD_SUCCEEDED" = true || cleanup_and_exit 1
 
     recipe_build_time_statistics
+    recipe_gendiff
     recipe_cleanup
 
     test -d "$SRCDIR" && cd "$SRCDIR"
