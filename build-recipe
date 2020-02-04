@@ -41,6 +41,7 @@ recipe_build() {
     recipe_build_$BUILDTYPE "$@"
 }
 
+
 recipe_resultdirs () {
     recipe_resultdirs_$BUILDTYPE "$@"
 }
@@ -197,3 +198,17 @@ recipe_build_time_statistics() {
 	RECIPE_BUILD_START_TIME=
     fi
 }
+
+recipe_gendiff() {
+    local obsgendiff=$(queryconfig \
+            --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" \
+            --archpath "$BUILD_ARCH" buildflags obsgendiff
+        )
+
+    if test -n "$obsgendiff"; then
+         if ! chroot $BUILD_ROOT /usr/lib/build/obsgendiff ; then
+             cleanup_and_exit 1 "/usr/lib/build/obsgendiff script failed!"
+         fi
+    fi
+}
+
