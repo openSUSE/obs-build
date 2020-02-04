@@ -165,7 +165,7 @@ recipe_build_spec() {
     fi
 
     GEN_BUILDREQS_PACKS=()
-    if test -n "$HAVE_DYNAMIC_BUILDREQUIRES" -a -z "$RUN_SHELL" ; then
+    if test -n "$HAVE_DYNAMIC_BUILDREQUIRES" ; then
 	# query dynamic build requires
 	rm -f "$BUILD_ROOT$TOPDIR/SRPMS/"*.buildreqs.nosrc.rpm
 	rpmdynbropts=("${rpmbopts[@]}")
@@ -209,14 +209,10 @@ recipe_build_spec() {
 	    > $BUILD_ROOT/.build.command
     chmod 755 $BUILD_ROOT/.build.command
     check_exit
-    if test -n "$RUN_SHELL"; then
-	chroot $BUILD_ROOT su -
-    else
-	chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null
-	st=$?
-	test "$st" = 0 && BUILD_SUCCEEDED=true
-	test "$st" = 11 -a -n "$HAVE_DYNAMIC_BUILDREQUIRES" && BUILD_SUCCEEDED=genbuildreqs
-    fi
+    chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null
+    st=$?
+    test "$st" = 0 && BUILD_SUCCEEDED=true
+    test "$st" = 11 -a -n "$HAVE_DYNAMIC_BUILDREQUIRES" && BUILD_SUCCEEDED=genbuildreqs
 }
 
 recipe_resultdirs_spec() {
