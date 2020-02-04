@@ -1013,13 +1013,12 @@ cp /proc/mounts $BUILD_ROOT/etc/mtab
 chmod 644 $BUILD_ROOT/etc/mtab
 
 #
-# make sure, that our nis is not present in the chroot system
+# make sure that our nis is not present in the chroot system
 #
-test -e $BUILD_ROOT/etc/nsswitch.conf && {
-    echo "removing nis flags from $BUILD_ROOT/etc/nsswitch.conf..."
-    cat $BUILD_ROOT/etc/nsswitch.conf | sed -e"s:nis::g" > $BUILD_ROOT/etc/nsswitch.conf.tmp
+if test -e $BUILD_ROOT/etc/nsswitch.conf ; then
+    sed -e "s:nis::g" < $BUILD_ROOT/etc/nsswitch.conf > $BUILD_ROOT/etc/nsswitch.conf.tmp
     mv $BUILD_ROOT/etc/nsswitch.conf.tmp $BUILD_ROOT/etc/nsswitch.conf
-}
+fi
 
 #
 # create some default directories and files
