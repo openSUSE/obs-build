@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Wed Feb  5 08:23:06 UTC 2020 - Adrian Schröter <adrian@suse.de>
+
+- 15.2 config: preinstall gcrypt deps again
+- Recommends for Fedora based distros
+- support obsgendiff funcationality
+- various smaller code cleanups
+- additional test cases for spec file parsing
+- various fixes for cornercases during spec file parsing
+
+-------------------------------------------------------------------
 Fri Jan 31 11:49:34 UTC 2020 - Adrian Schröter <adrian@suse.de>
 
 - fix regression in && operator handling of rpm spec file parser
