@@ -18,10 +18,10 @@
 # needsbinariesforbuild
 
 
-%if 0%{?fedora} || 0%{?rhel}
-%define __pkg_name obs-build
-%else
+%if 0%{?suse_version}
 %define __pkg_name build
+%else
+%define __pkg_name obs-build
 %endif
 
 Name:           %{__pkg_name}
@@ -57,7 +57,10 @@ Requires:       perl-TimeDate
 BuildRequires:  perl-TimeDate
 %endif
 Conflicts:      bsdtar < 2.5.5
-%if 0%{?suse_version} > 1000
+BuildRequires:  perl(Date::Parse)
+BuildRequires:  perl(Test::Harness)
+BuildRequires:  perl(Test::More)
+%if 0%{?suse_version} > 1000 || 0%{?centos_version} >= 800 || 0%{?rhel_version} >= 800 || 0%{?fedora_version} >= 21
 # None of them are actually required for core features.
 # Perl helper scripts use them.
 Recommends:     perl(Date::Language)
