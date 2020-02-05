@@ -245,6 +245,7 @@ $cf ||= Build::read_config_dist($dist, $archs[0], $configdir);
 $cf->{'warnings'} = 1;
 $cf->{'buildflavor'} = $buildflavor if defined $buildflavor;
 $cf->{'obspackage'} = $obspackage if defined $obspackage;
+$cf->{'no_vminstall_expand'} = 1 unless $isvm;
 
 my $dofileprovides = %{$cf->{'fileprovides'}};
 $dofileprovides = 1 if ($binarytype || 'rpm') ne 'rpm';

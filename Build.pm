@@ -548,7 +548,9 @@ sub expandpreinstalls {
     return "preinstalls: $pre[0]" unless shift @pre;
     @pre = sort(@pre);
   }
-  if (@{$config->{'vminstall'} || []}) {
+  if ($config->{'no_vminstall_expand'}) {
+    @vm = ('expandpreinstalls_error');
+  } elsif (@{$config->{'vminstall'} || []}) {
     my %pre = map {$_ => 1} @pre;
     my %vmx = map {+"-$_" => 1} @{$config->{'vminstall'} || []};
     my @pren = grep {/^-/ && !$vmx{$_}} @{$config->{'preinstall'} || []};
