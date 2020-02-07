@@ -470,17 +470,24 @@ sub parse {
     if (!$skip && ($line =~ /%/)) {
       $line = expandmacros($config, $line, $lineno, \%macros, \%macros_args);
     }
+    if ($line =~ /^\s*%(?:elif|elifarch|elifos)\b/) {
+      $skip = 1 if !$skip;
+      $skip = 2 - $skip if $skip <= 2;
+      next if $skip;
+      $line =~ s/^(\s*%)el/$1/;
+      $line = expandmacros($config, $line, $lineno, \%macros, \%macros_args);
+    }
     if ($line =~ /^\s*%else\b/) {
-      $skip = 1 - $skip if $skip < 2;
+      $skip = 2 - $skip if $skip <= 2;
       next;
     }
     if ($line =~ /^\s*%endif\b/) {
-      $skip-- if $skip;
+      $skip = $skip > 2 ? $skip - 2 : 0;
       next;
     }
-    $skip++ if $skip && $line =~ /^\s*%if/;
 
     if ($skip) {
+      $skip += 2 if $line =~ /^\s*%if/;
       $xspec->[-1] = [ $xspec->[-1], undef ] if $doxspec;
       $ifdeps = 1 if $line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires)\s*:\s*(\S.*)$/i;
       next;
@@ -494,35 +501,35 @@ sub parse {
     if ($line =~ /^\s*%ifarch(.*)$/) {
       my $arch = $macros{'_target_cpu'} || 'unknown';
       my @archs = grep {$_ eq $arch} split(/\s+/, $1);
-      $skip = 1 if !@archs;
+      $skip = 2 if !@archs;
       $hasif = 1;
       next;
     }
     if ($line =~ /^\s*%ifnarch(.*)$/) {
       my $arch = $macros{'_target_cpu'} || 'unknown';
       my @archs = grep {$_ eq $arch} split(/\s+/, $1);
-      $skip = 1 if @archs;
+      $skip = 2 if @archs;
       $hasif = 1;
       next;
     }
     if ($line =~ /^\s*%ifos(.*)$/) {
       my $os = $macros{'_target_os'} || 'unknown';
       my @oss = grep {$_ eq $os} split(/\s+/, $1);
-      $skip = 1 if !@oss;
+      $skip = 2 if !@oss;
       $hasif = 1;
       next;
     }
     if ($line =~ /^\s*%ifnos(.*)$/) {
       my $os = $macros{'_target_os'} || 'unknown';
       my @oss = grep {$_ eq $os} split(/\s+/, $1);
-      $skip = 1 if @oss;
+      $skip = 2 if @oss;
       $hasif = 1;
       next;
     }
     if ($line =~ /^\s*%if(.*)$/) {
       my ($v, $r) = expr($1);
       $v = expr_boolify($v);
-      $skip = 1 unless $v;
+      $skip = 2 unless $v;
       $hasif = 1;
       next;
     }

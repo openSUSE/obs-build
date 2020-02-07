@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 8;
+use Test::More tests => 9;
 
 use Build;
 use Build::Rpm;
@@ -229,4 +229,121 @@ $expected = {
 $Build::Rpm::includecallback = sub { $_[0] eq 'spec2' ? $spec2 : undef };
 $result = Build::Rpm::parse($conf, [ split("\n", $spec) ]);
 is_deeply($result, $expected, "include statement");
+
+$spec = q{
+%if 0
+BuildRequires: foo1_1
+%elif 0
+BuildRequires: foo2_1
+%if 1
+%elif 1
+%else
+%endif
+%elif 0
+BuildRequires: foo3_1
+%else
+BuildRequires: foo4_1
+%endif
+
+%if 1
+BuildRequires: foo1_2
+%if 1
+%elif 1
+%else
+%endif
+%elif 0
+BuildRequires: foo2_2
+%elif 0
+BuildRequires: foo3_2
+%else
+BuildRequires: foo4_2
+%endif
+
+%if 0
+BuildRequires: foo1_3
+%elif 1
+BuildRequires: foo2_3
+%elif 0
+BuildRequires: foo3_3
+%if 1
+%elif 1
+%else
+%endif
+%else
+BuildRequires: foo4_3
+%endif
+
+%if 1
+BuildRequires: foo1_4
+%if 1
+%elif 1
+%else
+%endif
+%elif 1
+BuildRequires: foo2_4
+%elif 0
+BuildRequires: foo3_4
+%else
+BuildRequires: foo4_4
+%endif
+
+%if 0
+BuildRequires: foo1_5
+%elif 0
+%if 1
+%elif 1
+%else
+%endif
+BuildRequires: foo2_5
+%elif 1
+BuildRequires: foo3_5
+%else
+BuildRequires: foo4_5
+%endif
+
+%if 1
+BuildRequires: foo1_6
+%elif 0
+BuildRequires: foo2_6
+%elif 1
+BuildRequires: foo3_6
+%else
+BuildRequires: foo4_6
+%endif
+
+%if 0
+BuildRequires: foo1_7
+%if 1
+%elif 1
+%else
+%endif
+%elif 1
+BuildRequires: foo2_7
+%elif 1
+BuildRequires: foo3_7
+%if 1
+%elif 1
+%else
+%endif
+%else
+BuildRequires: foo4_7
+%endif
+
+%if 1
+BuildRequires: foo1_8
+%elif 1
+BuildRequires: foo2_8
+%elif 1
+BuildRequires: foo3_8
+%else
+BuildRequires: foo4_8
+%endif
+};
+$expected = {
+  'deps' => [ 'foo4_1', 'foo1_2', 'foo2_3', 'foo1_4', 'foo3_5', 'foo1_6', 'foo2_7', 'foo1_8' ],
+  'subpacks' => [],
+  'configdependent' => 1,
+};
+$result = Build::Rpm::parse($conf, [ split("\n", $spec) ]);
+is_deeply($result, $expected, "elif statements");
 
