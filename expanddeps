@@ -342,7 +342,23 @@ my $subpacks = [];
 my $buildtype = '';
 my $extrasysdeps;
 
+sub includecallback {
+  my ($recipe, $file) = @_;
+  $file =~ s/.*\///;
+  $recipe =~ s/[^\/]+$//;
+  $file = "$recipe$file";
+  my $fd;
+  my $str;
+  if (open($fd, '<', $file)) {
+    local $/;
+    $str = <$fd>;
+    close($fd);
+  }
+  return $str;
+}
+
 if ($recipe) {
+  local $Build::Rpm::includecallback = sub { includecallback($recipe, @_) };
   my $d = Build::parse($cf, $recipe) || {};
   $buildtype = Build::recipe2buildtype($recipe) || '';
   $cf->{'type'} = $buildtype if $buildtype;

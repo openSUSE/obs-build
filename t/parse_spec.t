@@ -1,13 +1,13 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 7;
+use Test::More tests => 8;
 
 use Build;
 use Build::Rpm;
 use Data::Dumper;
 
-my $spec;
+my ($spec, $spec2);
 my $result;
 my $expected;
 
@@ -214,4 +214,19 @@ $expected = {
 };
 $result = Build::Rpm::parse($conf, [ split("\n", $spec) ]);
 is_deeply($result, $expected, "ifarch statements");
+
+$spec = q{
+BuildRequires: foo
+%include spec2
+};
+$spec2 = q{
+BuildRequires: bar
+};
+$expected = {
+  'deps' => [ 'foo', 'bar' ],
+  'subpacks' => [],
+};
+$Build::Rpm::includecallback = sub { $_[0] eq 'spec2' ? $spec2 : undef };
+$result = Build::Rpm::parse($conf, [ split("\n", $spec) ]);
+is_deeply($result, $expected, "include statement");
 

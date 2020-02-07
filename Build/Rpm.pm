@@ -22,6 +22,7 @@ package Build::Rpm;
 
 our $unfilteredprereqs = 0;
 our $conflictdeps = 0;
+our $includecallback;
 
 use strict;
 
@@ -426,18 +427,25 @@ sub parse {
   my $preamble = 1;
   my $hasif = 0;
   my $lineno = 0;
+  my @includelines;
+  my $includenum = 0;
   my $obspackage = defined($config->{'obspackage'}) ? $config->{'obspackage'} : '@OBS_PACKAGE@';
   my $buildflavor = defined($config->{'buildflavor'}) ? $config->{'buildflavor'} : '';
   while (1) {
     my $line;
-    if ($specdata) {
+    my $doxspec = $xspec ? 1 : 0;
+    if (@includelines) {
+      $line = pop(@includelines);
+      $includenum = 0 unless @includelines;
+      $doxspec = 0;	# only record lines from main file
+    } elsif ($specdata) {
       last unless @$specdata;
       $line = shift @$specdata;
       ++$lineno;
       if (ref $line) {
 	$line = $line->[0]; # verbatim line, used for macro collection
-	push @$xspec, $line if $xspec;
-	$xspec->[-1] = [ $line, undef ] if $xspec && $skip;
+	push @$xspec, $line if $doxspec;
+	$xspec->[-1] = [ $line, undef ] if $doxspec && $skip;
 	next;
       }
     } else {
@@ -446,14 +454,14 @@ sub parse {
       chomp $line;
       ++$lineno;
     }
-    push @$xspec, $line if $xspec;
+    push @$xspec, $line if $doxspec;
     if ($line =~ /^#\s*neededforbuild\s*(\S.*)$/) {
       if (defined $hasnfb) {
-	$xspec->[-1] = [ $xspec->[-1], undef ] if $xspec;
+	$xspec->[-1] = [ $xspec->[-1], undef ] if $doxspec;
 	next;
       }
       $hasnfb = $1;
-      $nfbline = \$xspec->[-1] if $xspec;
+      $nfbline = \$xspec->[-1] if $doxspec;
       next;
     }
     if ($line =~ /^\s*#/) {
@@ -473,7 +481,7 @@ sub parse {
     $skip++ if $skip && $line =~ /^\s*%if/;
 
     if ($skip) {
-      $xspec->[-1] = [ $xspec->[-1], undef ] if $xspec;
+      $xspec->[-1] = [ $xspec->[-1], undef ] if $doxspec;
       $ifdeps = 1 if $line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires)\s*:\s*(\S.*)$/i;
       next;
     }
@@ -517,6 +525,14 @@ sub parse {
       $skip = 1 unless $v;
       $hasif = 1;
       next;
+    }
+    if ($includecallback && $line =~ /^\s*%include\s+(.*)\s*$/) {
+      if ($includenum++ < 10) {
+	my $data = $includecallback->($1);
+	unshift @includelines, split("\n", $data) if $data;
+      } else {
+	warn("%include statment level too high, ignored\n") if $config->{'warnings'};
+      }
     }
     if ($main_preamble) {
       if ($line =~ /^(Name|Version|Disttag|Release)\s*:\s*(\S+)/i) {
@@ -616,12 +632,12 @@ sub parse {
       if (defined($hasnfb)) {
 	if ((grep {$_ eq 'glibc' || $_ eq 'rpm' || $_ eq 'gcc' || $_ eq 'bash'} @ndeps) > 2) {
 	  # ignore old generated BuildRequire lines.
-	  $xspec->[-1] = [ $xspec->[-1], undef ] if $xspec;
+	  $xspec->[-1] = [ $xspec->[-1], undef ] if $doxspec;
 	  next;
 	}
       }
       push @packdeps, @ndeps;
-      next unless $xspec;
+      next unless $doxspec;
       if ($replace) {
 	my @cndeps = grep {!/^-/} @ndeps;
 	if (@cndeps) {
@@ -666,7 +682,7 @@ sub parse {
     }
 
     # do this always?
-    if ($xspec && @$xspec && $config->{'save_expanded'}) {
+    if ($doxspec && $config->{'save_expanded'}) {
       $xspec->[-1] = [ $xspec->[-1], $line ];
     }
   }
