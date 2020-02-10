@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Mon Feb 10 08:25:12 UTC 2020 - Adrian Schröter <adrian@suse.de>
+
+- Spec parser: add support for %elif, %elifarch, %elifos
+- Support rpm's %include statement (EXPERIMENTAL, known limitations)
+- Do not do vminstall expansion in expanddeps unless --vm is used
+
+-------------------------------------------------------------------
 Wed Feb  5 08:23:06 UTC 2020 - Adrian Schröter <adrian@suse.de>
 
 - 15.2 config: preinstall gcrypt deps again
