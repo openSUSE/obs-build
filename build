@@ -408,8 +408,9 @@ cleanup_and_exit () {
     # add build time statistics
     recipe_build_time_statistics
 
-    # chroot environment only
-    if test -z "$VM_TYPE"; then
+    # Never inside of VM
+    # but for chroot or the filesystem hosting the root file
+    if test -z "$RUNNING_IN_VM" ; then
         # check for disk full for an automatic build retry
         if test "$1" -eq 1 -a -x /bin/df ; then
             echo
