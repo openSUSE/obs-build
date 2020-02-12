@@ -409,7 +409,7 @@ cleanup_and_exit () {
     recipe_build_time_statistics
 
     # chroot environment only
-    if test -z "$VM_TYPE" -o -n "$RUNNING_IN_VM" ; then
+    if test -z "$VM_TYPE"; then
         # check for disk full for an automatic build retry
         if test "$1" -eq 1 -a -x /bin/df ; then
             echo
@@ -424,7 +424,9 @@ cleanup_and_exit () {
                 set 3
             fi
         fi
-
+    fi
+ 
+    if test -z "$VM_TYPE" -o -n "$RUNNING_IN_VM" ; then
         # run recipe cleanup code
 	test -n "$BUILDTYPE" && recipe_cleanup
     fi
