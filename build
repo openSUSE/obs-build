@@ -1447,8 +1447,10 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	shellquote rm -f "$i" >> $BUILD_ROOT/.unpack.command
 	echo >> $BUILD_ROOT/.unpack.command
 	chmod 0755 $BUILD_ROOT/.unpack.command
-	chroot $BUILD_ROOT su -c /.unpack.command - $BUILD_USER
+	chroot $BUILD_ROOT su -c /.unpack.command - $BUILD_USER || cleanup_and_exit 1
 	rm -f $BUILD_ROOT/.unpack.command
+	# free disk space
+	rm "$i"
     done
 
     if  test -e _service; then
