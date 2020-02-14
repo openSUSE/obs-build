@@ -435,7 +435,7 @@ sub parse {
     my $line;
     my $doxspec = $xspec ? 1 : 0;
     if (@includelines) {
-      $line = pop(@includelines);
+      $line = shift(@includelines);
       $includenum = 0 unless @includelines;
       $doxspec = 0;	# only record lines from main file
     } elsif ($specdata) {
