@@ -30,7 +30,8 @@ vm_startup_nspawn() {
     local name="${BUILD_ROOT##*/}"
     name="obsbuild.${name//_/-}"
     systemd-nspawn -D "$BUILD_ROOT" -M "$name" --private-network --pipe "$vm_init_script"
-    return "$?"
+    BUILDSTATUS="$?"
+    cleanup_and_exit "$BUILDSTATUS"
 }
 
 vm_kill_nspawn() {
