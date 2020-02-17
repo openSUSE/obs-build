@@ -221,9 +221,10 @@ BuildRequires: foo
 };
 $spec2 = q{
 BuildRequires: bar
+BuildRequires: baz%%%%
 };
 $expected = {
-  'deps' => [ 'foo', 'bar' ],
+  'deps' => [ 'foo', 'bar', 'baz%%' ],
   'subpacks' => [],
 };
 $Build::Rpm::includecallback = sub { $_[0] eq 'spec2' ? $spec2 : undef };
