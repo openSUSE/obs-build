@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Fri Mar 13 13:41:20 UTC 2020 - Adrian Schröter <adrian@suse.de>
+
+- Leap 15.2 config update (libzstd1 for rpm)
+- handle obscpio extraction error as fatal
+- Return correct exit code from systemd-nspawn build
+- Spec parser: do not parse included files from end to start
+- running disk full check also outside of VM
+- run disk full check only for chroot
+
+-------------------------------------------------------------------
 Mon Feb 10 08:25:12 UTC 2020 - Adrian Schröter <adrian@suse.de>
 
 - Spec parser: add support for %elif, %elifarch, %elifos
