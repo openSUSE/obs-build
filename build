@@ -108,6 +108,7 @@ RUN_SHELL=
 RUN_SHELL_CMD=
 CCACHE=
 PKG_CCACHE=
+NETWORK=
 DLNOSIGNATURE=
 BUILD_FLAVOR=
 OBS_PACKAGE=
@@ -263,6 +264,9 @@ Known Parameters:
 
   --icecream N
               Use N parallel build jobs with icecream
+
+  --network
+              Allow network access inside chroot
 
   --overlay OVERLAY
               Copy overlay filesystem to buildroot after installing
@@ -994,6 +998,9 @@ while test -n "$1"; do
 	shift
 	CCACHE=true
       ;;
+      -network)
+        NETWORK=true
+      ;;
       -statistics)
 	DO_STATISTICS=1
       ;;
@@ -1130,6 +1137,9 @@ fi
 if test -n "$OBS_PACKAGE" ; then
     initbuildsysstuff[${#initbuildsysstuff[@]}]="--obspackage"
     initbuildsysstuff[${#initbuildsysstuff[@]}]="$OBS_PACKAGE"
+fi
+if test -n "$NETWORK" ; then
+    initbuildsysstuff[${#initbuildsysstuff[@]}]="--network"
 fi
 
 if test -n "$DO_WIPE" ; then

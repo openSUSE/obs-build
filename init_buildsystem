@@ -58,6 +58,7 @@ RPMLIST=
 CLEAN_BUILD=
 CREATE_BUILD_BINARIES=
 DLNOSIGNATURE=
+NETWORK=
 CACHE_DIR=/var/cache/build
 test -z "$CONFIG_DIR" && CONFIG_DIR="$BUILD_DIR/configs"
 
@@ -108,6 +109,10 @@ while test -n "$1" ; do
 	--nosignature)
 	    shift
 	    DLNOSIGNATURE="--nosignature"
+	    ;;
+	--network)
+	    shift
+	    NETWORK=true
 	    ;;
 	--root)
 	    BUILD_ROOT="$2"
@@ -818,6 +823,9 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
     mkdir -p $BUILD_ROOT/etc || cleanup_and_exit 1
     mkdir -p $BUILD_ROOT/proc || cleanup_and_exit 1
     test -f $BUILD_ROOT/etc/HOSTNAME || hostname -f > $BUILD_ROOT/etc/HOSTNAME
+    if test -n "$NETWORK" ; then
+	test ! -f $BUILD_ROOT/etc/resolv.conf -a -f /etc/resolv.conf && cp /etc/resolv.conf $BUILD_ROOT/etc/resolv.conf
+    fi
     for PKG in $PACKAGES_TO_RUNSCRIPTS ; do
 	: > $BUILD_ROOT/.init_b_cache/scripts/$PKG.run
     done
