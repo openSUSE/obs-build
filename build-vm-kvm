@@ -142,7 +142,7 @@ vm_verify_options_kvm() {
 	s390|s390x)
 	    kvm_bin="/usr/bin/qemu-system-s390x"
 	    kvm_options="-enable-kvm"
-	    kvm_console=hvc0
+	    kvm_console="hvc0 transparent_hugepage=never"
 	    vm_kernel=/boot/image
 	    vm_initrd=/boot/initrd
 	    test -e /boot/kernel.obs.guest && vm_kernel=/boot/kernel.obs.guest
