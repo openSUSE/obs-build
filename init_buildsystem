@@ -815,6 +815,8 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
 	run_pkg_scripts
 	pkg_initdb
 	touch $BUILD_ROOT/.init_b_cache/preinstall_finished
+    elif test -x $BUILD_ROOT/sbin/ldconfig ; then
+        chroot $BUILD_ROOT /sbin/ldconfig 2>&1
     fi
     # mark as preinstalled no longer needed
     rm -rf "$BUILD_ROOT/installed-pkg"
