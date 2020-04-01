@@ -106,6 +106,7 @@ DO_STATISTICS=
 RUN_SHELL=
 RUN_SHELL_CMD=
 CCACHE=
+PKG_CCACHE=
 DLNOSIGNATURE=
 BUILD_FLAVOR=
 OBS_PACKAGE=
@@ -253,6 +254,10 @@ Known Parameters:
 
   --ccache
               Use ccache to speed up rebuilds
+
+  --pkg-ccache /path/to/ccache.tar.gz
+              path to archive of ccache directory content.
+              Its contents will be extracted to /.ccache
 
   --icecream N
               Use N parallel build jobs with icecream
@@ -473,7 +478,7 @@ toshellscript() {
 }
 
 setupccache() {
-    if test -n "$CCACHE" ; then
+    if test -n "$CCACHE" -o -n "$PKG_CCACHE"; then
 	if mkdir -p $BUILD_ROOT/var/lib/build/ccache/bin; then
 	    for i in $(ls $BUILD_ROOT/usr/bin | grep -E '^(cc|gcc|[cg][+][+]|clang|clang[+][+])([-]?[.0-9])*$'); do
 		rm -f $BUILD_ROOT/var/lib/build/ccache/bin/$i
@@ -490,6 +495,13 @@ setupccache() {
 	chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.ccache"
 	echo "export CCACHE_DIR=/.ccache" > "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
 	echo 'export PATH=/var/lib/build/ccache/bin:$PATH' >> "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
+        case $PKG_CCACHE in
+            *.tar.gz)
+                tar -zxf "$BUILD_ROOT/`basename $PKG_CCACHE`" -C /.ccache/
+                ;;
+            *)
+                ;;
+        esac
     else
 	rm -f "$BUILD_ROOT"/var/lib/build/ccache/bin/{gcc,g++,cc,c++,clang,clang++}
     fi
@@ -967,6 +979,11 @@ while test -n "$1"; do
       -ccache)
 	CCACHE=true
       ;;
+      -pkg-ccache)
+	needarg
+	PKG_CCACHE="$ARG"
+	shift
+      ;;
       -statistics)
 	DO_STATISTICS=1
       ;;
@@ -1258,7 +1275,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     ADDITIONAL_PACKS=
     test -z "$BUILD_EXTRA_PACKS" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS $BUILD_EXTRA_PACKS"
     test -z "$CREATE_BASELIBS" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS build"
-    test -z "$CCACHE" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
+    test -z "$CCACHE" -a -z "$PKG_CCACHE" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
     test "$icecream" = 0 || ADDITIONAL_PACKS="$ADDITIONAL_PACKS icecream gcc-c++"
     test -z "$DO_LINT" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS rpmlint-Factory"
     test "$VMDISK_FILESYSTEM" = xfs && ADDITIONAL_PACKS="$ADDITIONAL_PACKS libblkid1"

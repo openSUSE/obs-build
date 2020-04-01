@@ -894,6 +894,7 @@ vm_first_stage() {
     echo "VM_WATCHDOG='$VM_WATCHDOG'" >> $BUILD_ROOT/.build/build.data
     echo "BUILDENGINE='$BUILDENGINE'" >> $BUILD_ROOT/.build/build.data
     echo "CCACHE='$CCACHE'" >> $BUILD_ROOT/.build/build.data
+    echo "PKG_CCACHE='$PKG_CCACHE'" >> $BUILD_ROOT/.build/build.data
     echo "ABUILD_TARGET='$ABUILD_TARGET'" >> $BUILD_ROOT/.build/build.data
     echo "BUILD_FLAVOR='$BUILD_FLAVOR'" >> $BUILD_ROOT/.build/build.data
     echo "OBS_PACKAGE='$OBS_PACKAGE'" >> $BUILD_ROOT/.build/build.data
@@ -910,6 +911,7 @@ vm_first_stage() {
     if check_use_emulator ; then
         vm_init_script="/.build/$INITVM_NAME"
     fi
+    test -n "$PKG_CCACHE" && cp $PKG_CCACHE $BUILD_ROOT
     if test -n "$VM_ROOT" ; then
 	# copy out kernel & initrd (if they exist) during unmounting VM image
 	KERNEL_TEMP_DIR=
@@ -1039,9 +1041,17 @@ vm_save_statistics() {
     test -n "$sys_mounted" && umount /sys
 }
 
+vm_save_ccache() {
+    echo "... saving ccache"
+    local tarfile
+    tarfile="$BUILD_ROOT$TOPDIR/OTHER/.ccache.tar.gz"
+    tar -zcf "$tarfile" -C /.ccache/ .
+}
+
 # args: resultdirs
 vm_wrapup_build() {
     test "$DO_STATISTICS" = 1 && vm_save_statistics
+    test -n "$PKG_CCACHE" && vm_save_ccache
     if test -n "$VM_SWAP"; then
         echo "... saving built packages"
         swapoff "$VM_SWAP"
