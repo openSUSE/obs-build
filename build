@@ -106,6 +106,7 @@ DO_STATISTICS=
 RUN_SHELL=
 RUN_SHELL_CMD=
 CCACHE=
+PKG_CCACHE=
 DLNOSIGNATURE=
 BUILD_FLAVOR=
 OBS_PACKAGE=
@@ -253,6 +254,10 @@ Known Parameters:
 
   --ccache
               Use ccache to speed up rebuilds
+
+  --pkg-ccache /path/to/ccache.tar.gz
+              path to archive of ccache directory content.
+              Its contents will be extracted to /.ccache
 
   --icecream N
               Use N parallel build jobs with icecream
@@ -490,6 +495,8 @@ setupccache() {
 	chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.ccache"
 	echo "export CCACHE_DIR=/.ccache" > "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
 	echo 'export PATH=/var/lib/build/ccache/bin:$PATH' >> "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
+    local ccachetar="$BUILD_ROOT/.build.oldpackages/_ccache.tar.gz"
+    test -e $ccachetar && tar -zxf $ccachetar -C "$BUILD_ROOT/.ccache/"
     else
 	rm -f "$BUILD_ROOT"/var/lib/build/ccache/bin/{gcc,g++,cc,c++,clang,clang++}
     fi
@@ -964,7 +971,13 @@ while test -n "$1"; do
 	test "$icecream" -gt 0 && BUILD_JOBS="$ARG"
 	shift
       ;;
-      -ccache)
+      -ccache) # this is initialized after all the parsing is done
+	CCACHE=true
+      ;;
+      -pkg-ccache)
+	needarg
+	PKG_CCACHE="$ARG"
+	shift
 	CCACHE=true
       ;;
       -statistics)
@@ -1304,6 +1317,9 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	    fi
 	fi
 	copy_oldpackages
+        # chroot based builds
+        # rsync as source and dest could be same
+        test -n "$PKG_CCACHE" -a -e "$PKG_CCACHE" && rsync -v "$PKG_CCACHE" "$BUILD_ROOT/.build.oldpackages/_ccache.tar.gz"
     fi
 
     mount_stuff
@@ -1571,6 +1587,11 @@ if test -n "$RPMS" -a "$DO_CHECKS" != false ; then
     TIME_RPMLINT=`date +%s`
     recipe_run_rpmlint
     TIME_RPMLINT=$(( `date +%s` - $TIME_RPMLINT ))
+fi
+
+if test -n "$CCACHE" ; then
+    echo "... saving ccache"
+    tar -zcf "$BUILD_ROOT/$TOPDIR/OTHER/_ccache.tar.gz" -C "$BUILD_ROOT/.ccache/" .
 fi
 
 if test \( -n "$RPMS" -o -n "$DEBS" \) -a -n "$CREATE_BASELIBS"; then
