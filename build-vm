@@ -910,6 +910,10 @@ vm_first_stage() {
     if check_use_emulator ; then
         vm_init_script="/.build/$INITVM_NAME"
     fi
+
+    # rsync as source and dest could be same
+    test -n "$PKG_CCACHE" && rsync -av "$PKG_CCACHE" "$BUILD_ROOT/.build.oldpackages/_ccache.tar.gz"
+
     if test -n "$VM_ROOT" ; then
 	# copy out kernel & initrd (if they exist) during unmounting VM image
 	KERNEL_TEMP_DIR=
