@@ -495,6 +495,16 @@ setupccache() {
 	chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.ccache"
 	echo "export CCACHE_DIR=/.ccache" > "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
 	echo 'export PATH=/var/lib/build/ccache/bin:$PATH' >> "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
+
+        local cconf="$BUILD_ROOT"/etc/ccache.conf
+        if test -e $cconf; then
+            # setting compression value
+            # if grep returns false, change it using sed(create backup), else append setting
+            (grep "^compression\s*=\s*true\s*$" $cconf || sed -i`date +%s` "s:compression\s*=\s*.*$:compression = true:g" $cconf ) \
+                || echo "compression = true" >> $cconf
+        else
+            echo "compression = true" >> $cconf
+        fi
     local ccachetar="$BUILD_ROOT/.build.oldpackages/_ccache.tar.gz"
     test -e $ccachetar && tar -zxf $ccachetar -C "$BUILD_ROOT/.ccache/"
     else
