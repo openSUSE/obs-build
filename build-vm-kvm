@@ -142,6 +142,7 @@ vm_verify_options_kvm() {
 	s390|s390x)
 	    kvm_bin="/usr/bin/qemu-system-s390x"
 	    kvm_options="-enable-kvm"
+            # transparent_hugepage=never until bsc#1163684 and bsc#1130544 is solved
 	    kvm_console="hvc0 transparent_hugepage=never"
 	    vm_kernel=/boot/image
 	    vm_initrd=/boot/initrd
