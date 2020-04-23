@@ -767,18 +767,21 @@ recipe_build_kiwi() {
 	    repo="$TOPDIR/SOURCES/repos/${rc%/*}/${rc##*/}/"
         fi
         if test "$imagetype" != product -a "$DO_INIT" != "false" ; then
-	    if ! test -x "$BUILD_ROOT/usr/sbin/debootstrap" ; then
-		
+	    if test -x "$BUILD_ROOT/usr/sbin/debootstrap" ; then
+		echo "creating debian repodata for $r"
+		createrepo_debian_kiwi "$repo" "$r"
+		test -n "$DEBDIST" && createrepo_debian_dist_kiwi "$repo" "$r" "$DEBDIST"
+	    elif test -x "$BUILD_ROOT/usr/bin/repo-add" ; then
+		echo "creating Arch Linux repodata for $r"
+		r_db="${repo}/${r//[:|\/]/_}.db.tar.gz"
+		chroot $BUILD_ROOT su -c "repo-add ${r_db} ${repo}*"
+	    else
 		echo "creating repodata for $r"
 		if chroot $BUILD_ROOT createrepo --no-database --simple-md-filenames --help >/dev/null 2>&1 ; then
 		    chroot $BUILD_ROOT createrepo --no-database --simple-md-filenames "$repo"
 		else
 		    chroot $BUILD_ROOT createrepo "$repo"
 		fi
-	    else
-		echo "creating debian repodata for $r"
-		createrepo_debian_kiwi "$repo" "$r"
-		test -n "$DEBDIST" && createrepo_debian_dist_kiwi "$repo" "$r" "$DEBDIST"
 	    fi
         fi
     done
