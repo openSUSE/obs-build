@@ -744,6 +744,118 @@ sub get_cbinstalls { return (); }
 
 ###########################################################################
 
+
+sub parse_depfile {
+  my ($in, $res, %options) = @_;
+
+  my $nofiledeps = $options{'nofiledeps'};
+  my $testcaseformat = $options{'testcaseformat'};
+  if (ref($in)) {
+    *F = $in;
+  } else {
+    open(F, '<', $in) || die("$in: $!\n");
+  }
+  $res ||= [];
+  my $pkginfo = ref($res) eq 'HASH' ? $res : {};
+  while (<F>) {
+    my @s = split(' ', $_);
+    my $s = shift @s;
+    if ($s =~ /^I:(.*)\.(.*)-\d+\/\d+\/\d+:$/) {
+      my $pkgid = $1;
+      my $arch = $2; 
+      my $evr = $s[0];
+      $pkginfo->{$pkgid}->{'arch'} = $1 if $s[1] && $s[1] =~ s/-(.*)$//;
+      $pkginfo->{$pkgid}->{'buildtime'} = $s[1] if $s[1];
+      if ($evr =~ s/^\Q$pkgid-//) {
+	$pkginfo->{$pkgid}->{'epoch'} = $1 if $evr =~ s/^(\d+)://;
+	$pkginfo->{$pkgid}->{'release'} = $1 if $evr =~ s/-([^-]*)$//;
+	$pkginfo->{$pkgid}->{'version'} = $evr;
+      }
+      next;
+    }
+    my @ss;
+    while (@s) {
+      if ($nofiledeps && $s[0] =~ /^\//) {
+	shift @s;
+	next;
+      }
+      if ($s[0] =~ /^rpmlib\(/) {
+	splice(@s, 0, 3);
+	next;
+      }
+      if ($s[0] =~ /^\(/) {
+	push @ss, Build::Rpm::shiftrich(\@s);
+	$ss[-1] = Build::Rpm::testcaseformat($ss[-1]) if $testcaseformat;
+	next;
+      }
+      push @ss, shift @s;
+      while (@s && $s[0] =~ /^[\(<=>|]/) {
+	$ss[-1] .= " $s[0] $s[1]";
+	$ss[-1] =~ s/ \((.*)\)/ $1/;
+	$ss[-1] =~ s/(<|>){2}/$1/;
+	splice(@s, 0, 2);
+      }
+    }
+    my %ss;
+    @ss = grep {!$ss{$_}++} @ss;	# unify
+    if ($s =~ /^(P|R|C|O|r|s):(.*)\.(.*)-\d+\/\d+\/\d+:$/) {
+      my $pkgid = $2;
+      my $arch = $3;
+      if ($1 eq "P") {
+	$pkginfo->{$pkgid}->{'name'} = $pkgid;
+	$pkginfo->{$pkgid}->{'arch'} = $arch;
+	$pkginfo->{$pkgid}->{'provides'} = \@ss;
+	next;
+      }
+      if ($1 eq "R") {
+	$pkginfo->{$pkgid}->{'requires'} = \@ss;
+	next;
+      }
+      if ($1 eq "C") {
+	$pkginfo->{$pkgid}->{'conflicts'} = \@ss;
+	next;
+      }
+      if ($1 eq "O") {
+	$pkginfo->{$pkgid}->{'obsoletes'} = \@ss;
+	next;
+      }
+      if ($1 eq "r") {
+	$pkginfo->{$pkgid}->{'recommends'} = \@ss;
+	next;
+      }
+      if ($1 eq "s") {
+	$pkginfo->{$pkgid}->{'supplements'} = \@ss;
+	next;
+      }
+    }
+  }
+  close F unless ref($in);
+
+  # extract evr from self provides if there was no 'I' line
+  for my $pkg (grep {!defined($_->{'version'})} values %$pkginfo) {
+    my $n = $pkg->{'name'};
+    next unless defined $n;
+    my @sp = grep {/^\Q$n\E\s*=\s*/} @{$pkg->{'provides'} || []};
+    next unless @sp;
+    my $evr = $sp[-1];
+    $evr =~ s/^\Q$n\E\s*=\s*//;
+    $pkg->{'epoch'} = $1 if $evr =~ s/^(\d+)://;
+    $pkg->{'release'} = $1 if $evr =~ s/-([^-]*)$//;
+    $pkg->{'version'} = $evr;
+  }
+
+  if (ref($res) ne 'HASH') {
+    for my $pkgid (sort keys %$pkginfo) {
+      if (ref($res) eq 'CODE') {
+	$res->($pkginfo->{$pkgid});
+      } else {
+	push @$res, $pkginfo->{$pkgid}
+      }
+    }
+  }
+  return $res;
+}
+
 sub readdeps {
   my ($config, $pkginfo, @depfiles) = @_;
 
@@ -754,7 +866,8 @@ sub readdeps {
   my %pkgobsoletes;
   my %recommends;
   my %supplements;
-  my $dofileprovides = %{$config->{'fileprovides'} || {}};
+  my $nofiledeps = %{$config->{'fileprovides'} || {}} ? 0 : 1;
+  $pkginfo ||= {};
   for my $depfile (@depfiles) {
     if (ref($depfile) eq 'HASH') {
       for my $rr (keys %$depfile) {
@@ -767,106 +880,16 @@ sub readdeps {
       }
       next;
     }
-    # XXX: we don't support different architectures per file
-    if (ref($depfile)) {
-      *F = $depfile;
-    } else {
-      open(F, '<', $depfile) || die("$depfile: $!\n");
-    }
-    while(<F>) {
-      my @s = split(' ', $_);
-      my $s = shift @s;
-      if ($pkginfo && ($s =~ /^I:(.*)\.(.*)-\d+\/\d+\/\d+:$/)) {
-	my $pkgid = $1;
-	my $arch = $2; 
-	my $evr = $s[0];
-	$pkginfo->{$pkgid}->{'arch'} = $1 if $s[1] && $s[1] =~ s/-(.*)$//;
-	$pkginfo->{$pkgid}->{'buildtime'} = $s[1] if $s[1];
-	if ($evr =~ s/^\Q$pkgid-//) {
-	  $pkginfo->{$pkgid}->{'epoch'} = $1 if $evr =~ s/^(\d+)://;
-	  $pkginfo->{$pkgid}->{'release'} = $1 if $evr =~ s/-([^-]*)$//;
-	  $pkginfo->{$pkgid}->{'version'} = $evr;
-	}
-	next;
-      }
-      my @ss;
-      while (@s) {
-	if (!$dofileprovides && $s[0] =~ /^\//) {
-	  shift @s;
-	  next;
-	}
-	if ($s[0] =~ /^rpmlib\(/) {
-	  splice(@s, 0, 3);
-	  next;
-	}
-	if ($s[0] =~ /^\(/) {
-	  push @ss, Build::Rpm::shiftrich(\@s);
-	  next;
-	}
-	push @ss, shift @s;
-	while (@s && $s[0] =~ /^[\(<=>|]/) {
-	  $ss[-1] .= " $s[0] $s[1]";
-	  $ss[-1] =~ s/ \((.*)\)/ $1/;
-	  $ss[-1] =~ s/(<|>){2}/$1/;
-	  splice(@s, 0, 2);
-	}
-      }
-      my %ss;
-      @ss = grep {!$ss{$_}++} @ss;
-      if ($s =~ /^(P|R|C|O|r|s):(.*)\.(.*)-\d+\/\d+\/\d+:$/) {
-	my $pkgid = $2;
-	my $arch = $3;
-	if ($1 eq "P") {
-	  $provides{$pkgid} = \@ss;
-	  if ($pkginfo) {
-	    $pkginfo->{$pkgid}->{'name'} = $pkgid;
-	    $pkginfo->{$pkgid}->{'arch'} = $arch;
-	    $pkginfo->{$pkgid}->{'provides'} = \@ss;
-	  }
-	}
-	if ($1 eq "R") {
-	  $requires{$pkgid} = \@ss;
-	  $pkginfo->{$pkgid}->{'requires'} = \@ss if $pkginfo;
-	  next;
-	}
-	if ($1 eq "C") {
-	  $pkgconflicts{$pkgid} = \@ss;
-	  $pkginfo->{$pkgid}->{'conflicts'} = \@ss if $pkginfo;
-	  next;
-	}
-	if ($1 eq "O") {
-	  $pkgobsoletes{$pkgid} = \@ss;
-	  $pkginfo->{$pkgid}->{'obsoletes'} = \@ss if $pkginfo;
-	  next;
-	}
-	if ($1 eq "r") {
-	  $recommends{$pkgid} = \@ss;
-	  $pkginfo->{$pkgid}->{'recommends'} = \@ss if $pkginfo;
-	  next;
-	}
-	if ($1 eq "s") {
-	  $supplements{$pkgid} = \@ss;
-	  $pkginfo->{$pkgid}->{'supplements'} = \@ss if $pkginfo;
-	  next;
-	}
-      }
-    }
-    close F unless ref($depfile);
+    parse_depfile($depfile, $pkginfo, 'nofiledeps' => $nofiledeps);
   }
-  if ($pkginfo) {
-    # extract evr from self provides if there is no 'I' line
-    for my $pkg (values %$pkginfo) {
-      next if defined $pkg->{'version'};
-      my $n = $pkg->{'name'};
-      next unless defined $n;
-      my @sp = grep {/^\Q$n\E\s*=\s*/} @{$pkg->{'provides'} || []};
-      next unless @sp;
-      my $evr = $sp[-1];
-      $evr =~ s/^\Q$n\E\s*=\s*//;
-      $pkg->{'epoch'} = $1 if $evr =~ s/^(\d+)://;
-      $pkg->{'release'} = $1 if $evr =~ s/-([^-]*)$//;
-      $pkg->{'version'} = $evr;
-    }
+  for my $pkgid (sort keys %$pkginfo) {
+    my $pkg = $pkginfo->{$pkgid};
+    $provides{$pkgid} = $pkg->{'provides'} if $pkg->{'provides'};
+    $requires{$pkgid} = $pkg->{'requires'} if $pkg->{'requires'};
+    $pkgconflicts{$pkgid} = $pkg->{'conflicts'} if $pkg->{'conflicts'};
+    $pkgobsoletes{$pkgid} = $pkg->{'obsoletes'} if $pkg->{'obsoletes'};
+    $recommends{$pkgid} = $pkg->{'recommends'} if $pkg->{'recommends'};
+    $supplements{$pkgid} = $pkg->{'supplements'} if $pkg->{'supplements'};
   }
   $config->{'providesh'} = \%provides;
   $config->{'requiresh'} = \%requires;
