@@ -505,8 +505,8 @@ setupccache() {
         else
             echo "compression = true" >> $cconf
         fi
-    local ccachetar="$BUILD_ROOT/.build.oldpackages/_ccache.tar.gz"
-    test -e $ccachetar && tar -zxf $ccachetar -C "$BUILD_ROOT/.ccache/"
+    local ccachetar="$BUILD_ROOT/.build.oldpackages/_ccache.tar"
+    test -e $ccachetar && tar -xf $ccachetar -C "$BUILD_ROOT/.ccache/"
     else
 	rm -f "$BUILD_ROOT"/var/lib/build/ccache/bin/{gcc,g++,cc,c++,clang,clang++}
     fi
@@ -1329,7 +1329,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	copy_oldpackages
         # chroot based builds
         # rsync as source and dest could be same
-        test -n "$PKG_CCACHE" -a -e "$PKG_CCACHE" && rsync -v "$PKG_CCACHE" "$BUILD_ROOT/.build.oldpackages/_ccache.tar.gz"
+        test -n "$PKG_CCACHE" -a -e "$PKG_CCACHE" && rsync -v "$PKG_CCACHE" "$BUILD_ROOT/.build.oldpackages/_ccache.tar"
     fi
 
     mount_stuff
@@ -1601,7 +1601,7 @@ fi
 
 if test -n "$CCACHE" ; then
     echo "... saving ccache"
-    tar -zcf "$BUILD_ROOT/$TOPDIR/OTHER/_ccache.tar.gz" -C "$BUILD_ROOT/.ccache/" .
+    tar -cf "$BUILD_ROOT/$TOPDIR/OTHER/_ccache.tar" -C "$BUILD_ROOT/.ccache/" .
 fi
 
 if test \( -n "$RPMS" -o -n "$DEBS" \) -a -n "$CREATE_BASELIBS"; then
