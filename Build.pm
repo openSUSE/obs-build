@@ -23,6 +23,7 @@ package Build;
 use strict;
 use Digest::MD5;
 use Build::Rpm;
+use Build::Intrepo;
 use POSIX qw(strftime);
 #use Data::Dumper;
 
@@ -744,144 +745,31 @@ sub get_cbinstalls { return (); }
 
 ###########################################################################
 
-
 sub parse_depfile {
-  my ($in, $res, %options) = @_;
-
-  my $nofiledeps = $options{'nofiledeps'};
-  my $testcaseformat = $options{'testcaseformat'};
-  if (ref($in)) {
-    *F = $in;
-  } else {
-    open(F, '<', $in) || die("$in: $!\n");
-  }
-  $res ||= [];
-  my $pkginfo = ref($res) eq 'HASH' ? $res : {};
-  while (<F>) {
-    my @s = split(' ', $_);
-    my $s = shift @s;
-    if ($s =~ /^I:(.*)\.(.*)-\d+\/\d+\/\d+:$/) {
-      my $pkgid = $1;
-      my $arch = $2; 
-      my $evr = $s[0];
-      $pkginfo->{$pkgid}->{'arch'} = $1 if $s[1] && $s[1] =~ s/-(.*)$//;
-      $pkginfo->{$pkgid}->{'buildtime'} = $s[1] if $s[1];
-      if ($evr =~ s/^\Q$pkgid-//) {
-	$pkginfo->{$pkgid}->{'epoch'} = $1 if $evr =~ s/^(\d+)://;
-	$pkginfo->{$pkgid}->{'release'} = $1 if $evr =~ s/-([^-]*)$//;
-	$pkginfo->{$pkgid}->{'version'} = $evr;
-      }
-      next;
-    }
-    my @ss;
-    while (@s) {
-      if ($nofiledeps && $s[0] =~ /^\//) {
-	shift @s;
-	next;
-      }
-      if ($s[0] =~ /^rpmlib\(/) {
-	splice(@s, 0, 3);
-	next;
-      }
-      if ($s[0] =~ /^\(/) {
-	push @ss, Build::Rpm::shiftrich(\@s);
-	$ss[-1] = Build::Rpm::testcaseformat($ss[-1]) if $testcaseformat;
-	next;
-      }
-      push @ss, shift @s;
-      while (@s && $s[0] =~ /^[\(<=>|]/) {
-	$ss[-1] .= " $s[0] $s[1]";
-	$ss[-1] =~ s/ \((.*)\)/ $1/;
-	$ss[-1] =~ s/(<|>){2}/$1/;
-	splice(@s, 0, 2);
-      }
-    }
-    my %ss;
-    @ss = grep {!$ss{$_}++} @ss;	# unify
-    if ($s =~ /^(P|R|C|O|r|s):(.*)\.(.*)-\d+\/\d+\/\d+:$/) {
-      my $pkgid = $2;
-      my $arch = $3;
-      if ($1 eq "P") {
-	$pkginfo->{$pkgid}->{'name'} = $pkgid;
-	$pkginfo->{$pkgid}->{'arch'} = $arch;
-	$pkginfo->{$pkgid}->{'provides'} = \@ss;
-	next;
-      }
-      if ($1 eq "R") {
-	$pkginfo->{$pkgid}->{'requires'} = \@ss;
-	next;
-      }
-      if ($1 eq "C") {
-	$pkginfo->{$pkgid}->{'conflicts'} = \@ss;
-	next;
-      }
-      if ($1 eq "O") {
-	$pkginfo->{$pkgid}->{'obsoletes'} = \@ss;
-	next;
-      }
-      if ($1 eq "r") {
-	$pkginfo->{$pkgid}->{'recommends'} = \@ss;
-	next;
-      }
-      if ($1 eq "s") {
-	$pkginfo->{$pkgid}->{'supplements'} = \@ss;
-	next;
-      }
-    }
-  }
-  close F unless ref($in);
-
-  # extract evr from self provides if there was no 'I' line
-  for my $pkg (grep {!defined($_->{'version'})} values %$pkginfo) {
-    my $n = $pkg->{'name'};
-    next unless defined $n;
-    my @sp = grep {/^\Q$n\E\s*=\s*/} @{$pkg->{'provides'} || []};
-    next unless @sp;
-    my $evr = $sp[-1];
-    $evr =~ s/^\Q$n\E\s*=\s*//;
-    $pkg->{'epoch'} = $1 if $evr =~ s/^(\d+)://;
-    $pkg->{'release'} = $1 if $evr =~ s/-([^-]*)$//;
-    $pkg->{'version'} = $evr;
-  }
-
-  if (ref($res) ne 'HASH') {
-    for my $pkgid (sort keys %$pkginfo) {
-      if (ref($res) eq 'CODE') {
-	$res->($pkginfo->{$pkgid});
-      } else {
-	push @$res, $pkginfo->{$pkgid}
-      }
-    }
-  }
-  return $res;
+  return Build::Intrepo::parse(@_);
 }
 
 sub readdeps {
   my ($config, $pkginfo, @depfiles) = @_;
 
-  local *F;
+  my $nofiledeps = %{$config->{'fileprovides'} || {}} ? 0 : 1;
+  $pkginfo ||= {};
+  for my $depfile (@depfiles) {
+    if (ref($depfile) eq 'HASH') {
+      $pkginfo->{$_} = $depfile->{$_} for keys %$depfile;
+    } else {
+      my $pkgs = Build::Intrepo::parse($depfile, [], 'nofiledeps' => $nofiledeps);
+      $pkginfo->{$_->{'name'}} = $_ for @$pkgs;
+    }
+  }
+
+  # put repository data into the build config
   my %requires;
   my %provides;
   my %pkgconflicts;
   my %pkgobsoletes;
   my %recommends;
   my %supplements;
-  my $nofiledeps = %{$config->{'fileprovides'} || {}} ? 0 : 1;
-  $pkginfo ||= {};
-  for my $depfile (@depfiles) {
-    if (ref($depfile) eq 'HASH') {
-      for my $rr (keys %$depfile) {
-	$provides{$rr} = $depfile->{$rr}->{'provides'};
-	$requires{$rr} = $depfile->{$rr}->{'requires'};
-	$pkgconflicts{$rr} = $depfile->{$rr}->{'conflicts'};
-	$pkgobsoletes{$rr} = $depfile->{$rr}->{'obsoletes'};
-	$recommends{$rr} = $depfile->{$rr}->{'recommends'};
-	$supplements{$rr} = $depfile->{$rr}->{'supplements'};
-      }
-      next;
-    }
-    parse_depfile($depfile, $pkginfo, 'nofiledeps' => $nofiledeps);
-  }
   for my $pkgid (sort keys %$pkginfo) {
     my $pkg = $pkginfo->{$pkgid};
     $provides{$pkgid} = $pkg->{'provides'} if $pkg->{'provides'};
@@ -900,33 +788,12 @@ sub readdeps {
   makewhatprovidesh($config);
 }
 
-sub getbuildid {
-  my ($q) = @_;
-  my $evr = $q->{'version'};
-  $evr = "$q->{'epoch'}:$evr" if $q->{'epoch'};
-  $evr .= "-$q->{'release'}" if defined $q->{'release'};;
-  my $buildtime = $q->{'buildtime'} || 0;
-  $evr .= " $buildtime";
-  $evr .= "-$q->{'arch'}" if defined $q->{'arch'};
-  return "$q->{'name'}-$evr";
+sub writedeps {
+  Build::Intrepo::writepkg(@_);
 }
 
-sub writedeps {
-  my ($fh, $pkg, $url) = @_;
-  $url = '' unless defined $url;
-  return unless defined($pkg->{'name'}) && defined($pkg->{'arch'});
-  return if $pkg->{'arch'} eq 'src' || $pkg->{'arch'} eq 'nosrc';
-  my $id = $pkg->{'id'};
-  $id = ($pkg->{'buildtime'} || 0)."/".($pkg->{'filetime'} || 0)."/0" unless $id;
-  $id = "$pkg->{'name'}.$pkg->{'arch'}-$id: ";
-  print $fh "F:$id$url$pkg->{'location'}\n";
-  print $fh "P:$id".join(' ', @{$pkg->{'provides'} || []})."\n";
-  print $fh "R:$id".join(' ', @{$pkg->{'requires'}})."\n" if $pkg->{'requires'};
-  print $fh "C:$id".join(' ', @{$pkg->{'conflicts'}})."\n" if $pkg->{'conflicts'};
-  print $fh "O:$id".join(' ', @{$pkg->{'obsoletes'}})."\n" if $pkg->{'obsoletes'};
-  print $fh "r:$id".join(' ', @{$pkg->{'recommends'}})."\n" if $pkg->{'recommends'};
-  print $fh "s:$id".join(' ', @{$pkg->{'supplements'}})."\n" if $pkg->{'supplements'};
-  print $fh "I:$id".getbuildid($pkg)."\n";
+sub getbuildid {
+  return Build::Intrepo::getbuildid(@_);
 }
 
 sub makewhatprovidesh {
