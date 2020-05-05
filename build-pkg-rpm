@@ -180,7 +180,9 @@ pkg_preinstall_rpm() {
     fi
     if test -e ".init_b_cache/scripts/$PKG.run" ; then
 	rpm -qp --nodigest --nosignature --qf "%{PREIN}" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" > ".init_b_cache/scripts/$PKG.pre"
+	rpm -qp --nodigest --nosignature --qf "%{PREINPROG}" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" > ".init_b_cache/scripts/$PKG.preprog"
 	rpm -qp --nodigest --nosignature --qf "%{POSTIN}" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" > ".init_b_cache/scripts/$PKG.post"
+	rpm -qp --nodigest --nosignature --qf "%{POSTINPROG}" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" > ".init_b_cache/scripts/$PKG.postprog"
 	echo -n '(none)' > .init_b_cache/scripts/.none
 	cmp -s ".init_b_cache/scripts/$PKG.pre" .init_b_cache/scripts/.none && rm -f ".init_b_cache/scripts/$PKG.pre"
 	cmp -s ".init_b_cache/scripts/$PKG.post" .init_b_cache/scripts/.none && rm -f ".init_b_cache/scripts/$PKG.post"
@@ -198,12 +200,16 @@ pkg_preinstall_rpm() {
 pkg_runscripts_rpm() {
     if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre" ; then
 	echo "running $PKG preinstall script"
-	(cd $BUILD_ROOT && chroot $BUILD_ROOT sh ".init_b_cache/scripts/$PKG.pre" 0)
-	rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre"
+	local prog
+	read prog < "$BUILD_ROOT/.init_b_cache/scripts/$PKG.preprog"
+	(cd $BUILD_ROOT && chroot $BUILD_ROOT "${prog:-sh}" ".init_b_cache/scripts/$PKG.pre" 0)
+	rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.pre" "$BUILD_ROOT/.init_b_cache/scripts/$PKG.preprog"
     fi
     if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post" ; then
 	echo "running $PKG postinstall script"
-	(cd $BUILD_ROOT && chroot $BUILD_ROOT sh ".init_b_cache/scripts/$PKG.post" 1)
-	rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post"
+	local prog
+	read prog < "$BUILD_ROOT/.init_b_cache/scripts/$PKG.postprog"
+	(cd $BUILD_ROOT && chroot $BUILD_ROOT "${prog:-sh}" ".init_b_cache/scripts/$PKG.post" 1)
+	rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post" "$BUILD_ROOT/.init_b_cache/scripts/$PKG.postprog"
     fi
 }
