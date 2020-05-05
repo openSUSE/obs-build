@@ -187,7 +187,7 @@ recipe_needs_build_binaries() {
     test "$BUILDTYPE" = docker && return 0
     test "$BUILDTYPE" = fissile && return 0
     test "$BUILDTYPE" = podman && return 0
-    egrep '^#[[:blank:]]*needsbinariesforbuild[[:blank:]]*$' >/dev/null <"$1" && return 0
+    grep -E '^#[[:blank:]]*needsbinariesforbuild[[:blank:]]*$' >/dev/null <"$1" && return 0
     return 1
 }
 
