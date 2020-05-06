@@ -1083,7 +1083,11 @@ vm_setup_network() {
 	fi
     fi
     if test -n "$VM_HOSTNAME" ; then 
-	hostname "$VM_HOSTNAME"
+	if test -e /bin/hostname -o -e /usr/bin/hostname -o -e /sbin/hostname -o -e /usr/sbin/hostname ; then
+	    hostname "$VM_HOSTNAME"
+	elif test -e /proc/sys/kernel/hostname ; then
+	    echo "$VM_HOSTNAME" > /proc/sys/kernel/hostname
+	fi
     fi
     if test -n "$VM_TELNET"; then 
 	echo WARNING: telnet option used, setting up telnet server ${VM_TELNET_DEVICE}
