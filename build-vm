@@ -912,7 +912,7 @@ vm_first_stage() {
     fi
 
     # rsync as source and dest could be same
-    test -n "$PKG_CCACHE" && rsync -av "$PKG_CCACHE" "$BUILD_ROOT/.build.oldpackages/_ccache.tar.gz"
+    test -n "$PKG_CCACHE" && rsync -av "$PKG_CCACHE" "$BUILD_ROOT/.build.oldpackages/_ccache.tar"
 
     if test -n "$VM_ROOT" ; then
 	# copy out kernel & initrd (if they exist) during unmounting VM image
