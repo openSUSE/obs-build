@@ -78,6 +78,6 @@ fi
 test -e "$BUILD_ROOT/proc/self" || mount -n -tproc none $BUILD_ROOT/proc
 
 # run the command
-exec chroot "$BUILD_ROOT" podman "$@"
+exec chroot "$BUILD_ROOT" podman --cgroup-manager=cgroupfs "$@"
 
 
