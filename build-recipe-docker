@@ -149,16 +149,17 @@ recipe_build_docker() {
 
     # now do the build
     squashopt=--squash
-    if test "$DOCKER_TOOL" = podman -o -n "$(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::show -- "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" nosquash)" ; then
-      squashopt=
-      echo "Building image $ALLTAGS (nosquash)"
+    if test -n "$(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::show -- "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" nosquash)" ; then
+	squashopt=
+	echo "Building image $ALLTAGS (nosquash)"
     else
-      echo "Building image $ALLTAGS"
+	echo "Building image $ALLTAGS"
     fi
 
 
     if test "$DOCKER_TOOL" = podman ; then
-        if ! $BUILD_DIR/call-podman --root "$BUILD_ROOT" build $squashopt -v "$TOPDIR/SOURCES/repos:$TOPDIR/SOURCES/repos" --network=host "${tagargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
+	test -n "$squashopt" && squashopt="--layers=false"
+	if ! $BUILD_DIR/call-podman --root "$BUILD_ROOT" build $squashopt -v "$TOPDIR/SOURCES/repos:$TOPDIR/SOURCES/repos" --network=host "${tagargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
 	    cleanup_and_exit 1 "$DOCKER_TOOL build command failed"
 	fi
     else
