@@ -29,7 +29,11 @@ vm_verify_options_nspawn() {
 vm_startup_nspawn() {
     local name="${BUILD_ROOT##*/}"
     name="obsbuild.${name//_/-}"
-    systemd-nspawn -D "$BUILD_ROOT" -M "$name" --private-network --pipe "$vm_init_script"
+    local pipe_opt=
+    if test -z "$RUN_SHELL" && systemd-nspawn --help | fgrep -q -e --pipe; then
+        pipe_opt=--pipe
+    fi
+    systemd-nspawn -D "$BUILD_ROOT" -M "$name" --private-network $pipe_opt "$vm_init_script"
     BUILDSTATUS="$?"
     cleanup_and_exit "$BUILDSTATUS"
 }
