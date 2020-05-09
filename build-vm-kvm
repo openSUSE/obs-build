@@ -23,11 +23,13 @@
 
 kvm_bin=/usr/bin/qemu-kvm
 test ! -x $kvm_bin  -a -x /usr/bin/kvm && kvm_bin=/usr/bin/kvm
-kvm_console=ttyS0
+
+# common settings for kvm and qemu system emulator
+qemu_serial_device=
+qemu_console=ttyS0
 
 # assume virtio support by default
 kvm_device=virtio-blk-pci
-kvm_serial_device=
 kvm_rng_device=virtio-rng-pci
 kvm_options=
 kvm_cpu="-cpu host"
@@ -73,7 +75,7 @@ vm_verify_options_kvm() {
     case `uname -m` in
 	armv7l)
 	    kvm_bin="/usr/bin/qemu-system-arm"
-	    kvm_console=ttyAMA0
+	    qemu_console=ttyAMA0
 	    kvm_options="-enable-kvm -M virt"
 	    vm_kernel=/boot/zImage
 	    vm_initrd=/boot/initrd
@@ -87,7 +89,7 @@ vm_verify_options_kvm() {
 	    ;;
 	armv8l|aarch64)
 	    kvm_bin="/usr/bin/qemu-system-aarch64"
-	    kvm_console=ttyAMA0
+	    qemu_console=ttyAMA0
 	    vm_kernel=/boot/Image
 	    vm_initrd=/boot/initrd
 	    test -e /boot/kernel.obs.guest && vm_kernel=/boot/kernel.obs.guest
@@ -118,7 +120,7 @@ vm_verify_options_kvm() {
 	    ;;
 	ppc|ppcle|ppc64|ppc64le)
 	    kvm_bin="/usr/bin/qemu-system-ppc64"
-	    kvm_console=hvc0
+	    qemu_console=hvc0
 	    kvm_options="-enable-kvm -M pseries"
 	    grep -q PPC970MP /proc/cpuinfo && kvm_check_ppc970
 	    vm_kernel=/boot/vmlinux
@@ -143,13 +145,13 @@ vm_verify_options_kvm() {
 	    kvm_bin="/usr/bin/qemu-system-s390x"
 	    kvm_options="-enable-kvm"
             # transparent_hugepage=never until bsc#1163684 and bsc#1130544 is solved
-	    kvm_console="hvc0 transparent_hugepage=never"
+	    qemu_console="hvc0 transparent_hugepage=never"
 	    vm_kernel=/boot/image
 	    vm_initrd=/boot/initrd
 	    test -e /boot/kernel.obs.guest && vm_kernel=/boot/kernel.obs.guest
 	    test -e /boot/initrd.obs.guest && vm_initrd=/boot/initrd.obs.guest
 	    kvm_device=virtio-blk-ccw
-	    kvm_serial_device=virtio-serial-ccw
+	    qemu_serial_device=virtio-serial-ccw
 	    kvm_rng_device=virtio-rng-ccw
 	    ;;
     esac
@@ -236,9 +238,9 @@ vm_verify_options_kvm() {
     fi
 }
 
-vm_startup_kvm() {
-    qemu_bin="$kvm_bin"
-    qemu_args=(-drive file="$VM_ROOT",format=raw,if=none,id=disk,cache=unsafe -device "$kvm_device",drive=disk,serial=0)
+vm_startup_qemu_params() {
+    # generic part for KVM and Qemu mode
+
     if [ -n "$VM_USER" ] ; then
 	getent passwd "$VM_USER" > /dev/null || cleanup_and_exit 3 "cannot find KVM user '$VM_USER'"
     else
@@ -249,24 +251,38 @@ vm_startup_kvm() {
     if test -n "$VM_SWAP" ; then
 	qemu_args=("${qemu_args[@]}" -drive file="$VM_SWAP",format=raw,if=none,id=swap,cache=unsafe -device "$kvm_device",drive=swap,serial=1)
     fi
+
+    # prepare monitor devices
+    if ! test -e "${VM_ROOT}.qemu/monitor"; then
+      mkdir -p "${VM_ROOT}.qemu"
+      rm -f "${VM_ROOT}.qemu/monitor"
+      mkfifo "${VM_ROOT}.qemu/monitor"
+      chown "$VM_USER" "${VM_ROOT}.qemu"
+    fi
+
     # the serial console device needs to be compiled into the target kernel
-    # which is why we can not use virtio-serial on other platforms
-    if test -n "$kvm_serial_device" ; then
+    if test -n "$qemu_serial_device" ; then
 	if test -n "$VM_CONSOLE_INPUT" ; then
-	    qemu_args=("${qemu_args[@]}" -device "$kvm_serial_device" -device virtconsole,chardev=virtiocon0 -chardev stdio,mux=on,id=virtiocon0 -mon chardev=virtiocon0)
+            echo "Using virtio-serial support and enable console input"
+	    qemu_args=("${qemu_args[@]}" -device "$qemu_serial_device" -device virtconsole,chardev=virtiocon0 -chardev stdio,mux=on,id=virtiocon0 -mon chardev=virtiocon0)
 	else
-	    qemu_args=("${qemu_args[@]}" -device "$kvm_serial_device" -device virtconsole,chardev=virtiocon0 -chardev stdio,id=virtiocon0)
+            echo "Using virtio-serial support"
+	    qemu_args=("${qemu_args[@]}" -device "$qemu_serial_device" -device virtconsole,chardev=virtiocon0 -chardev stdio,id=virtiocon0 -chardev socket,id=monitor,server,nowait,path="${VM_ROOT}.qemu/monitor" -mon chardev=monitor,mode=readline)
 	fi
     elif test -n "$VM_CONSOLE_INPUT" ; then
+        echo "Enable console input"
 	qemu_args=("${qemu_args[@]}" -serial mon:stdio)
     else
-        if ! test -e "${VM_ROOT}.qemu/monitor"; then
-          mkdir -p "${VM_ROOT}.qemu"
-          mkfifo "${VM_ROOT}.qemu/monitor"
-          chown "$VM_USER" "${VM_ROOT}.qemu"
-        fi
-	qemu_args=("${qemu_args[@]}" -serial stdio -chardev socket,id=monitor,server,nowait,path="${VM_ROOT}.qemu/monitor" -mon chardev=monitor,mode=readline)
+        echo "Using UART console"
+	qemu_args=("${qemu_args[@]}" -serial stdio -chardev socket,id=monitor,server,nowait,path="${VM_ROOT}.qemu/monitor" -mon monitor,mode=readline)
     fi
+}
+
+vm_startup_kvm() {
+    qemu_bin="$kvm_bin"
+    qemu_args=(-drive file="$VM_ROOT",format=raw,if=none,id=disk,cache=unsafe -device "$kvm_device",drive=disk,serial=0)
+
+    vm_startup_qemu_params
 
     if test -n "$BUILD_JOBS" -a "$icecream" = 0 -a -z "$BUILD_THREADS" ; then
 	qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS")
@@ -286,7 +302,7 @@ vm_startup_kvm() {
     qemu_append="$qemu_append $vm_linux_kernel_parameter"
     qemu_append="$qemu_append panic=1 quiet no-kvmclock elevator=noop"
     qemu_append="$qemu_append nmi_watchdog=0 rw rd.driver.pre=binfmt_misc"
-    qemu_append="$qemu_append console=$kvm_console init=$vm_init_script"
+    qemu_append="$qemu_append console=$qemu_console init=$vm_init_script"
     if test -z "$VM_NETOPT" -a -z "$VM_NETDEVOPT"; then
         kvm_options="$kvm_options -net none"
     fi
@@ -322,14 +338,20 @@ vm_kill_kvm() {
 
 vm_fixup_kvm() {
     # check if we will use a kernel from the build root, in this case
-    # we assume the kernel does virtio
-    if test -z "$VM_KERNEL" -a -e "$BUILD_ROOT/.build.kernel.$VM_TYPE" ; then
+    # we assume the kernel has virtio support
+    if test -z "$VM_KERNEL" -a -e "$BUILD_ROOT/.build.kernel.kvm" ; then
 	# ide-hd is the non-virtio default
 	if test "$kvm_device" = ide-hd ; then
 	    kvm_device=virtio-blk-pci
 	    VM_ROOTDEV=/dev/disk/by-id/virtio-0
 	    VM_SWAPDEV=/dev/disk/by-id/virtio-1
 	fi
+    fi
+
+    if test -e "$BUILD_ROOT/.build.console.kvm" && grep ^virtio$ "$BUILD_ROOT/.build.console.kvm"; then
+        echo "Detecting virtio-serial support"
+        qemu_serial_device=virtio-serial,max_ports=2
+        qemu_console=hvc0
     fi
 }
 
@@ -354,7 +376,9 @@ vm_cleanup_kvm() {
 }
 
 vm_sysrq_kvm() {
-    perl -e 'use Socket; socket(SOCK, PF_UNIX, SOCK_STREAM, 0) || die("socket: $!\n"); 
+    # alternative implementation which requires socat
+    # echo "sendkey alt-print-$1" | socat - UNIX-CONNECT:"$VM_ROOT.qemu/monitor"
+    perl -e 'use Socket; socket(SOCK, PF_UNIX, SOCK_STREAM, 0) || die("socket: $!\n");
              connect(SOCK, sockaddr_un("'"$VM_ROOT.qemu/monitor"'")) || die("connect: $!\n");
              print SOCK "sendkey alt-print-'$1'\n";'
 }
