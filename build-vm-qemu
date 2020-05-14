@@ -160,24 +160,8 @@ vm_startup_qemu() {
     if test -n "$VM_SWAP" ; then
         qemu_args=("${qemu_args[@]}" -drive file="$VM_SWAP",format=raw,if=none,id=swap,cache=unsafe -device "$qemu_device",drive=swap,serial=1)
     fi
-    # the serial console device needs to be compiled into the target kernel
-    # which is why we can not use virtio-serial on other platforms
-    if test -n "$qemu_serial_device" ; then
-        if test -n "$VM_CONSOLE_INPUT" ; then
-            qemu_args=("${qemu_args[@]}" -device "$qemu_serial_device" -device virtconsole,chardev=virtiocon0 -chardev stdio,mux=on,id=virtiocon0 -mon chardev=virtiocon0)
-        else
-            qemu_args=("${qemu_args[@]}" -device "$qemu_serial_device" -device virtconsole,chardev=virtiocon0 -chardev stdio,id=virtiocon0)
-        fi
-    elif test -n "$VM_CONSOLE_INPUT" ; then
-        qemu_args=("${qemu_args[@]}" -serial mon:stdio)
-    else
-        if ! test -e "${VM_ROOT}.qemu/monitor"; then
-          mkdir -p "${VM_ROOT}.qemu"
-          mkfifo "${VM_ROOT}.qemu/monitor"
-          chown "$VM_USER" "${VM_ROOT}.qemu"
-        fi
-        qemu_args=("${qemu_args[@]}" -serial stdio -chardev socket,id=monitor,server,nowait,path="${VM_ROOT}.qemu/monitor" -mon chardev=monitor,mode=readline)
-    fi
+
+    kvm_add_console_args "$qemu_serial_device"
 
     if test -n "$BUILD_JOBS" -a "$icecream" = 0 -a -z "$BUILD_THREADS" ; then
         qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS")
