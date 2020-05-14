@@ -341,6 +341,13 @@ vm_fixup_kvm() {
 	    VM_SWAPDEV=/dev/disk/by-id/virtio-1
 	fi
     fi
+    if test "$VM_TYPE" = kvm -a -z "$kvm_serial_device" ; then
+	if test -e "$BUILD_ROOT/.build.console.$VM_TYPE" && grep -q '^virtio$' "$BUILD_ROOT/.build.console.$VM_TYPE" ; then
+	    echo "Detected virtio-serial support"
+	    kvm_serial_device=virtio-serial,max_ports=2
+	    kvm_console=hvc0
+	fi
+    fi
 }
 
 vm_attach_root_kvm() {
