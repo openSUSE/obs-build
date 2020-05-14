@@ -526,6 +526,8 @@ vm_detect_2nd_stage() {
     echo "Linux version: `uname -rv`"
     echo "Increasing log level from now on..."
     echo 4 > /proc/sysrq-trigger
+    echo "Enable sysrq operations"
+    echo 1 > /proc/sys/kernel/sysrq
     if test "$PERSONALITY" != 0 -a -z "$PERSONALITY_SET" ; then
 	export PERSONALITY_SET=true
 	echo "switching personality to $PERSONALITY..."
