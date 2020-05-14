@@ -135,8 +135,9 @@ pkg_finalize_rpm() {
 	    rm -f $BUILD_ROOT/${CUMULATED_LIST[$num]}
 	    cp $BUILD_ROOT/.init_b_cache/rpms/$PKG $BUILD_ROOT/${CUMULATED_LIST[$num]} || cleanup_and_exit 1
 	done > $BUILD_ROOT/.init_b_cache/manifest
-	( cd $BUILD_ROOT && chroot $BUILD_ROOT rpm --ignorearch --nodeps -Uh --oldpackage --ignoresize --verbose $RPMCHECKOPTS \
-		$ADDITIONAL_PARAMS .init_b_cache/manifest 2>&1 || touch $BUILD_ROOT/exit )
+	( cd $BUILD_ROOT && chroot $BUILD_ROOT rpm --ignorearch --noorder --nodeps -Uh --oldpackage --ignoresize --verbose \
+                $RPMCHECKOPTS $ADDITIONAL_PARAMS .init_b_cache/manifest 2>&1 || touch $BUILD_ROOT/exit )
+
 	for ((num=0; num<=cumulate; num++)) ; do
 	    rm -f $BUILD_ROOT/${CUMULATED_LIST[$num]}
 	done
