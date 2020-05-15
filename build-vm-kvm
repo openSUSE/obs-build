@@ -252,14 +252,17 @@ kvm_add_console_args() {
 	echo "Enabling console input"
 	qemu_args=("${qemu_args[@]}" -serial mon:stdio)
     else
-        if ! test -e "${VM_ROOT}.qemu/monitor"; then
-          mkdir -p "${VM_ROOT}.qemu"
-          mkfifo "${VM_ROOT}.qemu/monitor"
-          chown "$VM_USER" "${VM_ROOT}.qemu"
-        fi
 	echo "Using UART console"
-	qemu_args=("${qemu_args[@]}" -serial stdio -chardev socket,id=monitor,server,nowait,path="${VM_ROOT}.qemu/monitor" -mon chardev=monitor,mode=readline)
+	qemu_args=("${qemu_args[@]}" -serial stdio)
     fi
+
+    # setup the monitor
+    if ! test -e "${VM_ROOT}.qemu/monitor"; then
+      mkdir -p "${VM_ROOT}.qemu"
+      mkfifo "${VM_ROOT}.qemu/monitor"
+      chown "$VM_USER" "${VM_ROOT}.qemu"
+    fi
+    qemu_args=("${qemu_args[@]}" -chardev socket,id=monitor,server,nowait,path="${VM_ROOT}.qemu/monitor" -mon chardev=monitor,mode=readline)
 }
 
 vm_startup_kvm() {
