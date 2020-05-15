@@ -21,17 +21,18 @@
 #
 ################################################################
 
+ZVM_CLEANUP=
+ZVM_VOLUME_ROOT=${ZVM_VOLUME_ROOT:-0100}
+ZVM_VOLUME_SWAP=${ZVM_VOLUME_SWAP:-0200}
+
 # z/VM: use default kernel image from local machine
 # lets go with the default parameters. However zvm_initrd will be a required parameter
-#zvm_kernel=/boot/image
+# zvm_kernel=/boot/image
 #zvm_initrd=/boot/initrd_worker
-zvm_param="root=/dev/disk/by-path/ccw-0.0.0150-part1 hvc_iucv=8 console=hvc0 $vm_linux_kernel_parameter"
+zvm_param="root=/dev/disk/by-path/ccw-0.0.${ZVM_VOLUME_ROOT}-part1 hvc_iucv=8 console=hvc0 hardened_usercopy=off $vm_linux_kernel_parameter"
 zvm_mult_pass="THR4ME"
 zvm_init_script="/.build/build"
 
-ZVM_CLEANUP=
-ZVM_VOLUME_ROOT=
-ZVM_VOLUME_SWAP=
 
 #######################################################################################
 
@@ -55,7 +56,7 @@ zvm_memset() {
     # $2: amount in MB
     # Note, that this is also limited by the worker definition in the user directory
     if test -n "$2"; then
-        if ! vmcp send $1 define storage ${2}M ; then
+        if ! vmcp send $1 cp define storage ${2}M ; then
             zvm_fatal "Could not redefine storage of $1 to ${2}M"
         fi
     fi
@@ -89,7 +90,7 @@ zvm_ipl() {
         if ! $(vmcp q "$1" >& /dev/null); then
             zvm_fatal "User $1 not logged on."
         else
-            if ! $(vmcp send $1 ipl $2); then
+            if ! $(vmcp send $1 cp ipl $2); then
                  zvm_fatal "Could not send command to $1"
             fi
         fi
@@ -110,20 +111,19 @@ zvm_destroy() {
 }
 
 zvm_get_local_devnr() {
-    # $1 is base address, either 150 or 250
+    # $1 is base address as defined in ZVM_VOLUME_ROOT and ZVM_VOLUME_SWAP (top of file)
     # $2 is worker number
     # there is room for up to 100 workers for this controlling guest, however in our setup I expect only up to 10 workers.
-    #echo "Debug: zvm_get_local_devnr: arg1: $1 arg2: $2"
     if test "$2" -ge 100 ; then
         zvm_fatal "Not more than 100 workers supported by one controlling guest."
     fi
-    if test "$1" = "0150" -o "$1" = "150" ; then 
+    if test "$1" = "${ZVM_VOLUME_ROOT}" ; then 
         DEVNR=$((300+$2))
     else
-        if test "$1" = "0250" -o "$1" = "250" ; then 
+        if test "$1" = "${ZVM_VOLUME_SWAP}" ; then 
             DEVNR=$((400+$2))
         else
-            zvm_fatal "The disk devices for root and swap must be 150 and 250 respectively."
+            zvm_fatal "The disk devices for root and swap must be ${ZVM_VOLUME_ROOT} and ${ZVM_VOLUME_SWAP} respectively."
         fi
     fi
     echo $DEVNR
@@ -141,7 +141,7 @@ zvm_volume_link_local() {
     # 4. Worker number to generate a uniq local device number
     if test -n "$4"; then
         DEVNR=$(zvm_get_local_devnr $2 $4)
-        if ! vmcp link $1 $2 $DEVNR MW pass=THR4ME >& /dev/null ; then
+        if ! vmcp link $1 $2 $DEVNR MW >& /dev/null ; then
             zvm_fatal "Could not link disk $2 from user $1 to local device $DEVNR."
         fi
         dasd_configure 0.0.0$DEVNR 1 0 >& /dev/null
@@ -162,7 +162,9 @@ zvm_volume_detach_local() {
     # 2. worker number
     DEVNR=$(zvm_get_local_devnr $1 $2)
     zvm_prevent_detach $DEVNR
+    sync
     dasd_configure 0.0.0$DEVNR 0 0
+    udevadm settle
     if ! vmcp detach $DEVNR >& /dev/null ; then
         zvm_fatal "Could not locally detach disk number $1 from worker $2"
     fi
@@ -173,8 +175,10 @@ zvm_volume_attach() {
     # $1: user name
     # $2: disk device number
     # send link * nr nr
-    if ! vmcp send $1 link \* $2 $2 ; then
-        zvm_fatal "Could not link remote worker disk number $2 from user $1"
+    # guest might not yet be ready to receive commands
+    sleep 1
+    if ! vmcp send $1 cp link \* $2 $2 ; then
+        zvm_fatal "Could not link worker disk number $2 for user $1"
     fi 
 }
 
@@ -182,7 +186,7 @@ zvm_volume_detach() {
     # send machine detach nr
     # $1: user name
     # $2: disk
-    if ! vmcp send $1 detach $2 ; then
+    if ! vmcp send $1 cp detach $2 ; then
         zvm_fatal "Could not detach disk $2 on worker $1"
     fi
 }
@@ -223,7 +227,6 @@ zvm_worker_init() {
 }
 
 zvm_cp() {
-    modprobe vmcp || zvm_fatal "Cannod load vmcp module"
     if test -n "$1" ; then
         case "$1" in 
             start)                shift ; zvm_logon "$@"         ;;
@@ -242,8 +245,11 @@ zvm_cp() {
 #######################################################################################
 
 vm_verify_options_zvm() {
-    VM_SWAPDEV=/dev/dasdb1	# in the vm
+    # find the real device in the VM, includeing partition number
+    VM_SWAPDEV="$(ls /sys/bus/ccw/devices/0.0.${ZVM_VOLUME_SWAP}/block/)1"
 
+    VM_ROOT=${ZVM_VOLUME_ROOT}
+    VM_SWAP=${ZVM_VOLUME_SWAP}
     if test -z "$VM_ROOT" ; then
 	if test -n "$BUILD_ROOT" -a ${#BUILD_ROOT} -le 4 ; then
 	    VM_ROOT="$BUILD_ROOT"
@@ -251,15 +257,6 @@ vm_verify_options_zvm() {
 	    VM_ROOT="0150"
 	fi
     fi
-    # In z/VM, this is a 4 digit hex number instead of a linux device.
-    # This is the swap disk defined in user direct
-    # This number can be given with the parameter --swap NR.
-    if test -z "$VM_SWAP" ; then
-	VM_SWAP="0250"
-    fi
-
-    ZVM_VOLUME_ROOT="$VM_ROOT"
-    ZVM_VOLUME_SWAP="$VM_SWAP"
     VM_ROOT_TYPE=unattached
     VM_SWAP_TYPE=unattached
 
@@ -301,7 +298,7 @@ vm_startup_zvm() {
     zvm_cp ipl $VM_WORKER $ZVM_VOLUME_ROOT
     # start IUCV Console
     # IPL needs some time until IPL really starts...
-    sleep 2
+    sleep 5
     # start iucv console. This blocks until build process is finished.
     iucvconn $VM_WORKER lnxhvc0
     # sleep some time before taking root and swap devices from worker
@@ -319,6 +316,46 @@ vm_kill_zvm() {
     fi
 }
 
+vm_initrd_obs_modules_zvm() {
+    # This function is needed to add the required kernel modules that are
+    # installed to the build system to the initrd that starts the worker.
+    # Note, that calling mkinitrd directly for the initrd within the worker
+    # currently causes segfaults, which might be a result from not having 
+    # all needed binaries within the build system.
+    # In order to keep the initrd small, only those kernel modules are
+    # copied that already exist in the initrd created by obsworker.
+    # 1. build root mounted to local system
+    # 2. initrd created on administrative worker
+    # 3. kernel_version to add modules
+    # initrd is to be created at $2-$3
+    # first, test if initrd has already been created
+    test -f ${2}-${3} && return
+    TEMPDIR=$(mktemp -d /tmp/initrd.XXX)
+    pushd $TEMPDIR
+    # unpack initrd to add the kernel modules
+    xzcat $2 | cpio -i
+    # detect currently installed kernel version
+    current_kernel_version=$(ls lib/modules)
+    # copy modules from kernel that is installed to the buildsystem:
+    mkdir -p $TEMPDIR/lib/modules/$3
+    while read module; do
+        (cd ${BUILD_ROOT}/lib/modules/${3}; \
+            rsync -a --relative $module ${TEMPDIR}/lib/modules/$3)
+    done < <(cd $TEMPDIR/lib/modules/${current_kernel_version}; \
+            find . -name "*.xz")
+    # remove old kernel modules
+    if [ "${current_kernel_version}" != ${3} ]; then
+       rm -rf $TEMPDIR/lib/modules/${current_kernel_version}
+    fi
+    # create module dependencies:
+    depmod -b ${TEMPDIR} ${3}
+    # create new initrd:
+    find . | cpio -H newc -o | xz -9 --format=lzma > ${2}-${3}
+    sync
+    popd
+    rm -rf $TEMPDIR
+}
+
 vm_fixup_zvm() {
     # initrd is created in obsstoragesetup.
     # If it is desired to use a project dependent kernel, use make_guestinitrd from zvm_functions.
@@ -326,11 +363,21 @@ vm_fixup_zvm() {
     # have to set init_script before unmounting, thus doing it statically for now.
     zvm_init_script="/.build/build"
     mkdir -p $BUILD_ROOT/boot
-    cp $vm_kernel $vm_initrd $BUILD_ROOT/boot
     mkdir -p $BUILD_ROOT/boot/zipl
+    vm_kernel="/.build.kernel.kvm"
+    kernel_version=$(get_kernel_version ${BUILD_ROOT}${vm_kernel})
+    # add kernel modules to existing initrd
+    vm_initrd_obs_modules_zvm ${BUILD_ROOT} ${vm_initrd} ${kernel_version}
+    vm_initrd=${vm_initrd}-${kernel_version}
+    # copy initrd to build worker:
+    echo "copy $vm_initrd to $BUILD_ROOT"
+    cp -a ${vm_initrd} ${BUILD_ROOT}/boot
     # finally, install bootloader to the worker disk
-    zipl -t $BUILD_ROOT/boot/zipl -i ${BUILD_ROOT}${vm_kernel} -r ${BUILD_ROOT}${vm_initrd} \
-	--parameters "${zvm_param} init=$zvm_init_script rootfsopts=noatime"
+    zipl -t $BUILD_ROOT/boot/zipl -i ${BUILD_ROOT}${vm_kernel} \
+         -r ${BUILD_ROOT}${vm_initrd} \
+	 --parameters "${zvm_param} init=$zvm_init_script rootfsopts=noatime"
+    sync
+    udevadm settle
 }
 
 vm_attach_root_zvm() {
@@ -343,15 +390,17 @@ vm_attach_root_zvm() {
 }
 
 vm_attach_swap_zvm() {
-    VM_SWAP=$(ZVM_CLEANUP=1 zvm_cp volume_link_local $VM_WORKER $ZVM_VOLUME_SWAP $zvm_mult_pass $VM_WORKER_NO )
-    if test "${VM_SWAP}" = "${VM_SWAP#dasd}" ; then
-	cleanup_and_exit 3 "did not get a real device for VM_SWAP: $VM_SWAP"
+    VM_SWAPDEV=$(ZVM_CLEANUP=1 zvm_cp volume_link_local $VM_WORKER $ZVM_VOLUME_SWAP $zvm_mult_pass $VM_WORKER_NO )
+    if test "${VM_SWAPDEV}" = "${VM_SWAP#dasd}" ; then
+	cleanup_and_exit 3 "did not get a real device for VM_SWAPDEV: $VM_SWAPDEV"
     fi
-    VM_SWAP="/dev/$VM_SWAP"
+    VM_SWAP="/dev/$VM_SWAPDEV"
+    VM_SWAPDEV="/dev/$VM_SWAPDEV"
     VM_SWAP_TYPE=device
 }
 
 vm_detach_root_zvm () {
+    sync
     zvm_cp volume_detach_local $ZVM_VOLUME_ROOT $VM_WORKER_NO
     VM_ROOT_TYPE=unattached
 }
