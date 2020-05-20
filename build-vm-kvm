@@ -345,7 +345,7 @@ vm_fixup_kvm() {
 	fi
     fi
     if test "$VM_TYPE" = kvm -a -z "$kvm_serial_device" ; then
-	if test -e "$BUILD_ROOT/.build.console.$VM_TYPE" && grep -q '^virtio$' "$BUILD_ROOT/.build.console.$VM_TYPE" ; then
+	if test -e "$BUILD_ROOT/.build.console.kvm" && grep -q '^virtio$' "$BUILD_ROOT/.build.console.kvm" ; then
 	    echo "Detected virtio-serial support"
 	    kvm_serial_device=virtio-serial,max_ports=2
 	    kvm_console=hvc0
