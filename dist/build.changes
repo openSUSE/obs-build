@@ -1,4 +1,28 @@
 -------------------------------------------------------------------
+Sun May 17 14:32:52 UTC 2020 - coolo@suse.com
+
+- enable sysrq operations on boot
+- Set kvm_serial_device to virtio-serial in the fixup
+- Split console arg setting code into kvm_add_console_args
+- Update for zVM to make container builds work.
+- Write to /proc/sys/kernel/hostname if the hostname command is not available
+- Use --cgroup-manager=cgroupfs when calling podman
+- Also squash by default in podman builds
+- Support different interpreters in prein/postin scriptlets
+- Use grep -E instead of egrep to check for the needsbinariesforbuild flag
+- Use new Build::Intrepo module
+- Add new Intrepo module to read/write build's internal repo format
+- remove .gz from _ccache archive as it is no longer compressed
+- Add support for Arch in build-recipe-kiwi
+- Autodetect whether to use --pipe option of systemd-nspawn.
+- Split parse_depfile() from readdeps()
+- enable compression on ccache
+- add bugzilla numbers for s390 workaround
+- extend --ccache to generate _ccache.tar.gz and implement --pkg-ccache
+- disable transparent_hugepage on s390x guests for now, causes hangs
+- set buildflavor also for Build::parse
+
+-------------------------------------------------------------------
 Fri Mar 13 13:41:20 UTC 2020 - Adrian Schröter <adrian@suse.de>
 
 - Leap 15.2 config update (libzstd1 for rpm)
