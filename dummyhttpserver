@@ -11,7 +11,7 @@ use strict;
 
 $| = 1;
 
-my ($build_root, $dir) = @ARGV;
+my ($build_root, $dir, $uploaddir) = @ARGV;
 
 if (defined($build_root)) {
   chroot($build_root) || die("chroot $build_root: $!\n");
@@ -30,6 +30,16 @@ listen($acceptsock , 512) || die "listen: $!\n";
 
 my $sock;
 my $status;
+
+sub replyraw {
+  my ($data) = @_;
+  my $l;
+  while (length($data)) {
+    $l = syswrite($sock, $data, length($data));
+    die("write error: $!\n") unless $l;
+    $data = substr($data, $l);
+  }
+}
 
 sub reply {
   my ($str, @hdrs) = @_;
@@ -50,12 +60,7 @@ sub reply {
   my $dummy = ''; 
   1 while sysread($sock, $dummy, 1024, 0);
   fcntl($sock, F_SETFL,0);
-  my $l;
-  while (length($data)) {
-    $l = syswrite($sock, $data, length($data));
-    die("write error: $!\n") unless $l;
-    $data = substr($data, $l);
-  }
+  replyraw($data);
 }
 
 sub reply_error {
@@ -73,7 +78,7 @@ sub reply_error {
 
 sub readrequest {
   my $qu = '';
-  my $request;
+  my ($request, $rawhdrs);
 
   while (1) {
     if ($qu =~ /^(.*?)\r?\n/s) {
@@ -85,15 +90,17 @@ sub readrequest {
   my ($act, $path, $vers, undef) = split(' ', $request, 4);
   die("400 No method name\n") if !$act;
   if ($vers) {
-    die("501 Unsupported method: $act\n") if $act ne 'GET' && $act ne 'HEAD';
+    die("501 Unsupported method: $act\n") if $act ne 'GET' && $act ne 'HEAD' && $act ne 'PUT';
     # read in all headers
     while ($qu !~ /^(.*?)\r?\n\r?\n(.*)$/s) {
       die("501 received truncated query\n") if !sysread($sock, $qu, 1024, length($qu));
     }
     $qu =~ /^(.*?)\r?\n\r?\n(.*)$/s;    # redo regexp to work around perl bug
     $qu = $2;
+    $rawhdrs = "Request: $1";
   } else {
     die("501 Bad method, must be GET\n") if $act ne 'GET';
+    $rawhdrs = 'Request: GET';
     $qu = '';
   }
   my $query_string = '';
@@ -112,7 +119,7 @@ sub readrequest {
     next if $path =~ s!/\.\.(?:/|$)!/!;
     last;
   }
-  return ($path, $query_string, $qu);
+  return ($act, $path, $query_string, $rawhdrs, $qu);
 }
 
 sub escape {
@@ -134,9 +141,39 @@ while (1) {
 }
 close($acceptsock);
 
+my $action;
+my $rawheaders;
+my $content;
 my $path = '?';
 eval {
-  ($path) = readrequest();
+  ($action, $path, undef, $rawheaders, $content) = readrequest();
+  if ($action eq 'PUT') {
+    die("no upload configured\n") unless defined($uploaddir) && $uploaddir ne '';
+    die("bad upload path\n") unless $path =~ /^\/[a-zA-Z0-9_][a-zA-Z0-9_\.]*$/s;
+    die("no content length\n") unless $rawheaders =~ /^content-length:\s*(\d+)/im;
+    my $cl = $1;
+    die("bad content length $cl\n") if $cl > 100000000;
+    my $lpath = "$uploaddir$path";
+    replyraw("HTTP/1.1 100 continue\r\n\r\n") if $rawheaders =~ /^expect:\s*100-continue/im;
+    $content = substr($content, 0, $cl) if length($content) > $cl;
+    my $fd;
+    open($fd, '>', $lpath) || die("$lpath: $!\n");
+    if ($content ne '') {
+      syswrite($fd, $content) == length($content) || die("syswrite: $!\n");
+      $cl -= length($content);
+    }
+    while ($cl > 0) {
+      $content = '';
+      die("501 received truncated body\n") if !sysread($sock, $content, $cl > 8192 ? 8192 : $cl);
+      syswrite($fd, $content) == length($content) || die("syswrite: $!\n");
+      $cl -= length($content);
+    }
+    close($fd) || die("close: $!\n");
+    reply("Thank you.\n", 'Content-type: text/plain');
+    close $sock;
+    print "[$status PUT:$path]";
+    exit(0);
+  }
   my $lpath = ".$path";
   if (-d $lpath) {
     if ($path !~ /\/$/) {

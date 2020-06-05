@@ -29,6 +29,7 @@ IS_UNSHARED=
 KILL=
 WEBSERVER=
 WEBSERVER_ONLY=
+WEBSERVER_UPLOAD=
 DOCKERD_EXPERIMANTAL=--experimental
 
 while test -n "$1" ; do
@@ -44,6 +45,10 @@ while test -n "$1" ; do
 	--webserver-only)
 	    WEBSERVER_ONLY=1
 	    WEBSERVER="$2"
+	    shift 2
+	    ;;
+	--webserver-upload)
+	    WEBSERVER_UPLOAD="$2"
 	    shift 2
 	    ;;
 	--isunshared)
@@ -89,7 +94,7 @@ rm -f $BUILD_ROOT/.startdockerd.pids
 
 if test -n "$WEBSERVER_ONLY" ; then
     echo "Starting local repository server"
-    $BUILD_DIR/dummyhttpserver "$BUILD_ROOT" "$WEBSERVER" &
+    $BUILD_DIR/dummyhttpserver "$BUILD_ROOT" "$WEBSERVER" "$WEBSERVER_UPLOAD" &
     WEBSERVER_PID=$!
     echo "$CONTAINERD_PID $DOCKERD_PID $WEBSERVER_PID" > $BUILD_ROOT/.startdockerd.pids
     exit 0
@@ -98,7 +103,7 @@ fi
 if test -z "$IS_UNSHARED" ; then
     echo "Unsharing environment"
     # unshare mounts and network
-    exec unshare -m -n $BUILD_DIR/startdockerd --isunshared --root "$BUILD_ROOT" --webserver "$WEBSERVER" "$@"
+    exec unshare -m -n $BUILD_DIR/startdockerd --isunshared --root "$BUILD_ROOT" --webserver "$WEBSERVER" --webserver-upload "$WEBSERVER_UPLOAD" "$@"
     cleanup_and_exit 1 "exec unshare returned"
 fi
 
@@ -147,7 +152,7 @@ test -e "$BUILD_ROOT/proc/self" || mount -n -tproc none $BUILD_ROOT/proc
 
 if test -n "$WEBSERVER" ; then
     echo "Starting local repository server"
-    $BUILD_DIR/dummyhttpserver "$BUILD_ROOT" "$WEBSERVER" &
+    $BUILD_DIR/dummyhttpserver "$BUILD_ROOT" "$WEBSERVER" "$WEBSERVER_UPLOAD" &
     WEBSERVER_PID=$!
     echo "$CONTAINERD_PID $DOCKERD_PID $WEBSERVER_PID" > $BUILD_ROOT/.startdockerd.pids
 fi

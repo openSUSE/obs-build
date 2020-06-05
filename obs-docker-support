@@ -162,6 +162,38 @@ yum() {
     esac
 }
 
+upload_with_perl='
+use Socket;
+$/ = undef;
+my $data = <STDIN>;
+my ($size, $ans) = length($data);
+socket(S, PF_INET, SOCK_STREAM, getprotobyname("tcp")) || die;
+connect(S, sockaddr_in(80, inet_aton("127.0.0.1"))) || die("connect: $!\n");
+select(S);
+$| = 1;
+print S "PUT $ARGV[0] HTTP/1.1\r\nContent-Length: ".length($data)."\r\n\r\n$data";
+read(S, $ans, 1024);
+die($ans) unless $ans =~ /^200/;
+'
+
+upload_packages() {
+    local n=$1
+    local ans
+    if test -x /usr/bin/rpm -o -x /bin/rpm ; then
+	rpm -qa --qf '%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}|%{DISTURL}|%{LICENSE}\n' > /tmp/packages
+	if test -n "$DATA_DIR" ; then
+	    cp /tmp/packages "$DATA_DIR/UPLOAD/$n"
+	elif test -x /usr/bin/curl ; then
+	    curl "http://localhost:80/$n" -T /tmp/packages
+	elif test -x /usr/bin/perl ; then
+	    perl -e "$upload_with_perl" "/$n" < /tmp/packages
+        else
+	    (echo -n -e "PUT /$n HTTP/1.1\r\nContent-Length: $(wc -c < /tmp/packages)\r\n\r\n" | cat - /tmp/packages && read -t 600 ans ; case "$ans" in *\ 200\ *) ;; *) echo "$ans" >&2 ;; esac) <>/dev/tcp/localhost/80 1>&0
+	fi
+	rm -f /tmp/packages
+    fi
+}
+
 obs_docker_support() {
     case "$1" in
     --install|-i)
@@ -191,6 +223,7 @@ EOF
 	    test -e /var/lib/apt && mv /var/lib/apt /var/lib/apt.obssave
 	    /usr/bin/apt-get -o Dir::Etc::SourceList=$LOCAL_APTREPOS_D/obssource -o Dir::Etc::SourceParts=$LOCAL_APTREPOS_D update
 	fi
+	upload_packages basepackages
     ;;
     --uninstall|-u)
 	rm -rf "$LOCAL_REPOS_D"
@@ -204,6 +237,7 @@ EOF
 	    rm -rf /var/lib/apt
 	    mv /var/lib/apt.obssave /var/lib/apt
 	fi
+	upload_packages packages
 	rm -f /usr/local/sbin/obs-docker-support
     ;;
     esac

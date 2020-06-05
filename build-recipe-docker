@@ -67,7 +67,7 @@ recipe_build_docker() {
         DOCKER_TOOL=podman
     else
         DOCKER_TOOL=docker
-        if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver "$TOPDIR/SOURCES/repos" ; then
+        if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver "$TOPDIR/SOURCES/repos" --webserver-upload "$TOPDIR/SOURCES/repos/UPLOAD" ; then
              cleanup_and_exit 1
         fi
     fi
@@ -101,12 +101,14 @@ recipe_build_docker() {
     fi
 
     # Prepare the package repository
+    rm -rf "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD"
     if chroot $BUILD_ROOT test -x /usr/bin/createrepo ; then
 	chroot $BUILD_ROOT createrepo "$TOPDIR/SOURCES/repos" >/dev/null
     fi
     if chroot $BUILD_ROOT test -x /usr/bin/dpkg-scanpackages ; then
 	chroot $BUILD_ROOT bash -c "cd $TOPDIR/SOURCES/repos && dpkg-scanpackages -m . | gzip > Packages.gz"
     fi
+    mkdir -p "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD"
 
     # find tags, first look into recipe file
     FIRSTTAG=
@@ -184,6 +186,15 @@ recipe_build_docker() {
     test -n "$DISTURL" && args=("${args[@]}" --disturl "$DISTURL")
     test -n "$RELEASE" && args=("${args[@]}" --release "$RELEASE")
     perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo -- "${args[@]}" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$ALLTAGS" containers/annotation > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
+
+    # copy over .packages files
+    if test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/basepackages" ; then
+	cp "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/basepackages" "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.basepackages"
+    fi
+    if test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/packages" ; then
+	cp "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/packages" "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.packages"
+    fi
+    rm -rf "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD"
 
     # We're done. Clean up.
     recipe_cleanup_docker
