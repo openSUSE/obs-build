@@ -1602,6 +1602,8 @@ if test -n "$RPMS" -a "$DO_CHECKS" != false ; then
 fi
 
 if test -n "$CCACHE" ; then
+    echo "... cleaning ccache"
+    test "$(ccache -h | grep -c evict-older-than)" != 0 && ccache --evict-older-than $((`date "+%s"` - $RECIPE_BUILD_START_TIME))
     echo "... saving ccache"
     tar -cf "$BUILD_ROOT/$TOPDIR/OTHER/_ccache.tar" -C "$BUILD_ROOT/.ccache/" .
 fi
