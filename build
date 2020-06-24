@@ -1605,7 +1605,7 @@ if test -n "$CCACHE" ; then
     echo "... cleaning ccache"
     test "$(ccache -h | grep -c evict-older-than)" != 0 && ccache --evict-older-than $((`date "+%s"` - $RECIPE_BUILD_START_TIME))
     echo "... saving ccache"
-    tar -cf "$BUILD_ROOT/$TOPDIR/OTHER/_ccache.tar" -C "$BUILD_ROOT/.ccache/" .
+    tar --remove-files -cf "$BUILD_ROOT/$TOPDIR/OTHER/_ccache.tar" -C "$BUILD_ROOT/.ccache/" .
 fi
 
 if test \( -n "$RPMS" -o -n "$DEBS" \) -a -n "$CREATE_BASELIBS"; then
