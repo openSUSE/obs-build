@@ -304,6 +304,10 @@ vm_startup_zvm() {
     # sleep some time before taking root and swap devices from worker
     # This might be critical regarding timing (IUCV_CONSOLE down, but machine still running)
     sleep 5
+    # Build jobs might change the shutdown behavior, so just return if machine is powered off.
+    if ! (vmcp q $VM_WORKER >& /dev/null); then
+        return
+    fi
     zvm_cp volume_detach $VM_WORKER $ZVM_VOLUME_ROOT
     zvm_cp volume_detach $VM_WORKER $ZVM_VOLUME_SWAP
 }
