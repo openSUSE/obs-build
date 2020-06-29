@@ -113,6 +113,7 @@ OBS_PACKAGE=
 CACHE_DIR=/var/cache/build
 
 RECIPE_BUILD_START_TIME=
+CCACHE_SETUP_START_TIME=
 
 # This is for insserv
 export YAST_IS_RUNNING=instsys
@@ -479,6 +480,7 @@ toshellscript() {
 
 setupccache() {
     if test -n "$CCACHE" ; then
+        CCACHE_SETUP_START_TIME=`date +%s`
 	if mkdir -p $BUILD_ROOT/var/lib/build/ccache/bin; then
 	    for i in $(ls $BUILD_ROOT/usr/bin | grep -E '^(cc|gcc|[cg][+][+]|clang|clang[+][+])([-]?[.0-9])*$'); do
 		rm -f $BUILD_ROOT/var/lib/build/ccache/bin/$i
@@ -508,6 +510,7 @@ setupccache() {
     local ccachetar="$BUILD_ROOT/.build.oldpackages/_ccache.tar"
     test -e $ccachetar && tar -xf $ccachetar -C "$BUILD_ROOT/.ccache/"
     else
+        CCACHE_SETUP_START_TIME=
 	rm -f "$BUILD_ROOT"/var/lib/build/ccache/bin/{gcc,g++,cc,c++,clang,clang++}
     fi
 }
@@ -1603,7 +1606,7 @@ fi
 
 if test -n "$CCACHE" ; then
     echo "... cleaning ccache"
-    test "$(ccache -h | grep -c evict-older-than)" != 0 && ccache --evict-older-than $((`date "+%s"` - $RECIPE_BUILD_START_TIME))
+    test "$(ccache -h | grep -c evict-older-than)" != 0 && ccache --evict-older-than $((`date +%s` - $CCACHE_SETUP_START_TIME))
     echo "... saving ccache"
     tar --remove-files -cf "$BUILD_ROOT/$TOPDIR/OTHER/_ccache.tar" -C "$BUILD_ROOT/.ccache/" .
 fi
