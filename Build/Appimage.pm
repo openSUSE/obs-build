@@ -24,7 +24,7 @@ use strict;
 use Build::Deb;
 use Build::Rpm;
 
-eval { require YAML::XS; };
+eval { require YAML::XS; $YAML::XS::LoadBlessed = 0; };
 *YAML::XS::LoadFile = sub {die("YAML::XS is not available\n")} unless defined &YAML::XS::LoadFile;
 
 sub parse {
