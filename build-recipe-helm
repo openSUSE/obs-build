@@ -50,8 +50,9 @@ recipe_prepare_helm() {
 # $RECIPEFILE the name of the helmfile
 
 recipe_build_helm() {
-    mkdir -p "$BUILD_ROOT$TOPDIR/HELM/"
-    cp -r chart.tar "$BUILD_ROOT$TOPDIR/HELM/"
+    mkdir -p "$BUILD_ROOT$TOPDIR/HELM"
+    sha=`cat chart.tar | sha256sum | cut -d' ' -f1`
+    cp chart.tar "$BUILD_ROOT$TOPDIR/HELM/$sha.tar"
     BUILD_SUCCEEDED=true
 }
 
