@@ -1619,6 +1619,7 @@ sub recipe2buildtype {
   return 'fissile' if $recipe eq 'fissile.yml';
   return 'preinstallimage' if $recipe eq '_preinstallimage';
   return 'simpleimage' if $recipe eq 'simpleimage';
+  return 'helm' if $recipe eq 'Helmfile';
   return undef;
 }
 
@@ -1652,6 +1653,17 @@ sub parse_simpleimage {
   }
   return $d;
 }
+
+sub parse_helmfile {
+  my $d = {};
+  $d->{'name'} ||= 'helmfile';
+  if (!defined($d->{'version'})) {
+    my @s = stat($_[1]);
+    $d->{'version'} = strftime "%Y.%m.%d-%H.%M.%S", gmtime($s[9] || time);
+  }
+  return $d;
+}
+
 
 sub parse {
   my ($cf, $fn, @args) = @_;
@@ -1690,6 +1702,7 @@ sub parse_typed {
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $buildtype eq 'arch';
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $buildtype eq 'collax';
   return parse_preinstallimage($cf, $fn, @args) if $buildtype eq 'preinstallimage';
+  return parse_helmfile($cf, $fn, @args) if $buildtype eq 'helm';
   return undef;
 }
 
