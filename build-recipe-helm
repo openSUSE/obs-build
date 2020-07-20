@@ -53,6 +53,8 @@ recipe_build_helm() {
     mkdir -p "$BUILD_ROOT$TOPDIR/HELM"
     sha=`cat chart.tar | sha256sum | cut -d' ' -f1`
     cp chart.tar "$BUILD_ROOT$TOPDIR/HELM/$sha.tar"
+    tar -xf chart.tar -C "$BUILD_ROOT$TOPDIR/SOURCES" .
+    perl -I$BUILD_DIR -MBuild::Helm -e Build::Helm::makechartjson "$BUILD_ROOT$TOPDIR/SOURCES/Chart.yaml"  > "$BUILD_ROOT$TOPDIR/HELM/$FILENAME.containerinfo"
     BUILD_SUCCEEDED=true
 }
 
