@@ -88,6 +88,12 @@ Requires:       %{__pkg_name}-mkbaselibs
 Recommends:     %{__pkg_name}-mkdrpms
 %endif
 
+# With fedora 33 the POSIX module was split out of the perl
+# package
+BuildRequires: perl(POSIX)
+Requires: perl(POSIX)
+
+
 %description
 This package provides a script for building RPMs for SUSE Linux in a
 chroot environment.
@@ -118,7 +124,7 @@ for generating delta rpm packages.
 %endif
 
 %define initvm_arch %{_host_cpu}
-%if %{_host_cpu} == "i686"
+%if "%{_host_cpu}" == "i686"
 %define initvm_arch i586
 %endif
 %package initvm-%{initvm_arch}
