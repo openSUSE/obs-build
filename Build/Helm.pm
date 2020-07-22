@@ -22,14 +22,91 @@ package Build::Helm;
 
 use strict;
 
+use Build::SimpleJSON;
+use Data::Dumper;
 eval { require YAML::XS; };
 *YAML::XS::LoadFile = sub {die("YAML::XS is not available\n")} unless defined &YAML::XS::LoadFile;
 
-sub makechartjson {
+sub makeconfigjson {
   my ($fn) = @ARGV;
 
-  my $chartinfo;
-  eval { $chartinfo = YAML::XS::LoadFile($fn); };
+  my $configjson;
+  eval {$configjson = YAML::XS::LoadFile($fn);};
 
-  print JSON::XS->new->utf8->canonical->encode($chartinfo)."\n";
+  #$chartinfo->{'file'} = "$sha.tar";
+
+  print Build::SimpleJSON::unparse($configjson)."\n";
+}
+
+sub makemanifestjson {
+  my ($configsha, $repotags, $layers) = @ARGV;
+  my @repotags = split(',', $repotags);
+  my @layers = split(',', $layers);
+
+  my %manifest;
+  $manifest{Config} = $configsha;
+  $manifest{Repotags} = \@repotags;
+  $manifest{Layers} = \@layers;
+
+  # this is small c(config), we are (ab)using json's case sensitive keys.
+  my @s = stat($configsha) if -e $configsha;
+  $manifest{config} = {
+      "mediaType" => "application/vnd.cncf.helm.config.v1+json",
+      "digest" => $configsha,
+      "size" => @s[7],
+  };
+
+  # this is small l(layers), we are (ab)using json's case sensitive keys.
+  my @digestedlayers;
+  for my $lay (@layers) {
+      #next unless -e $lay;
+      #@s = stat($lay);
+      my $layer_data =  {
+          "mediaType" => "application/tar+gzip",
+          "digest" => $lay,
+          #"size" => \@s[7],
+      };
+      push @digestedlayers, $layer_data;
+  }
+
+  $manifest{layers} = \@digestedlayers;
+
+  print Build::SimpleJSON::unparse([\%manifest])."\n";
+
+}
+
+sub makecontainerinfo {
+  my ($file, $repotags, $version) = @ARGV;
+
+  my $buildtime = time();
+  my $containerinfo = {
+    'buildtime' => $buildtime,
+    '_type' => {'buildtime' => 'number'},
+  };
+
+  my @repotags = split(',', $repotags);
+  $containerinfo->{'tags'} = \@repotags;
+  #$containerinfo->{'repos'} = \@repos if @repos;
+  $containerinfo->{'file'} = $file;
+  #$containerinfo->{'disturl'} = $disturl if defined $disturl;
+  $containerinfo->{'version'} = $version;
+  $containerinfo->{'release'} = $version;
+  print Build::SimpleJSON::unparse($containerinfo)."\n";
+}
+
+
+
+sub chartdetails {
+  my ($fn) = @ARGV;
+  my $chartinfo;
+  eval {$chartinfo = YAML::XS::LoadFile($fn);};
+
+  #print Dumper($chartinfo);
+  print "name:";
+  print $chartinfo->{"name"};
+  print "\n";
+
+  print "version:";
+  print $chartinfo->{"version"};
+  print "\n";
 }

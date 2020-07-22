@@ -26,18 +26,18 @@ helm_STARTED=
 
 recipe_setup_helm() {
     mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
-    if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then 
+    if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
         mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
     else
-        if test -z "$LINKSOURCES" ; then 
+        if test -z "$LINKSOURCES" ; then
             cp -dLR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
         else
             cp -lR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
         fi
-        if test "$?" != 0 ; then 
+        if test "$?" != 0 ; then
             cleanup_and_exit 1 "source copy failed"
         fi
-    fi  
+    fi
 }
 
 recipe_prepare_helm() {
@@ -52,9 +52,25 @@ recipe_prepare_helm() {
 recipe_build_helm() {
     mkdir -p "$BUILD_ROOT$TOPDIR/HELM"
     sha=`cat chart.tar | sha256sum | cut -d' ' -f1`
-    cp chart.tar "$BUILD_ROOT$TOPDIR/HELM/$sha.tar"
+    cp chart.tar "$BUILD_ROOT$TOPDIR/HELM/sha256:$sha"
     tar -xf chart.tar -C "$BUILD_ROOT$TOPDIR/SOURCES" .
-    perl -I$BUILD_DIR -MBuild::Helm -e Build::Helm::makechartjson "$BUILD_ROOT$TOPDIR/SOURCES/Chart.yaml"  > "$BUILD_ROOT$TOPDIR/HELM/$FILENAME.containerinfo"
+    #chartname=`grep "^name: " "$BUILD_ROOT$TOPDIR/SOURCES/Chart.yaml"   | cut -d' ' -f2`
+    #
+    perl -I$BUILD_DIR -MBuild::Helm -e Build::Helm::makeconfigjson "$BUILD_ROOT$TOPDIR/SOURCES/Chart.yaml" > config.json
+    configsha=`cat config.json | sha256sum | cut -d' ' -f1`
+    cp config.json "$BUILD_ROOT$TOPDIR/HELM/sha256:$configsha.json"
+
+    chartname=`perl -I$BUILD_DIR -MBuild::Helm -e Build::Helm::chartdetails "$BUILD_ROOT$TOPDIR/SOURCES/Chart.yaml" | grep name | cut -d ':' -f2`
+    chartversion=`perl -I$BUILD_DIR -MBuild::Helm -e Build::Helm::chartdetails "$BUILD_ROOT$TOPDIR/SOURCES/Chart.yaml" | grep version | cut -d ':' -f2`
+
+    perl -I$BUILD_DIR -MBuild::Helm -e Build::Helm::makemanifestjson "sha256:$configsha.json" "$chartname:$chartversion" "sha256:$sha"
+    perl -I$BUILD_DIR -MBuild::Helm -e Build::Helm::makemanifestjson "sha256:$configsha.json" "$chartname:$chartversion" "sha256:$sha"  > "$BUILD_ROOT$TOPDIR/HELM/manifest.json"
+
+    tar -cf "$BUILD_ROOT$TOPDIR/HELM/$chartname.tar" -C "$BUILD_ROOT$TOPDIR/HELM/" "sha256:$sha" "sha256:$configsha.json" manifest.json
+
+    perl -I$BUILD_DIR -MBuild::Helm -e Build::Helm::makecontainerinfo "$chartname.tar" "$chartname:$chartversion" "$chartversion"
+    perl -I$BUILD_DIR -MBuild::Helm -e Build::Helm::makecontainerinfo "$chartname.tar" "$chartname:$chartversion" "$chartversion" > "$BUILD_ROOT$TOPDIR/HELM/$chartname.containerinfo"
+
     BUILD_SUCCEEDED=true
 }
 
