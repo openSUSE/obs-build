@@ -1654,17 +1654,6 @@ sub parse_simpleimage {
   return $d;
 }
 
-sub parse_helmfile {
-  my $d = {};
-  $d->{'name'} ||= 'helmfile';
-  if (!defined($d->{'version'})) {
-    my @s = stat($_[1]);
-    $d->{'version'} = strftime "%Y.%m.%d-%H.%M.%S", gmtime($s[9] || time);
-  }
-  return $d;
-}
-
-
 sub parse {
   my ($cf, $fn, @args) = @_;
   return Build::Rpm::parse($cf, $fn, @args) if $do_rpm && $fn =~ /\.spec$/;
@@ -1684,6 +1673,7 @@ sub parse {
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $fnx eq 'PKGBUILD';
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $fnx eq 'build.collax';
   return parse_preinstallimage($cf, $fn, @args) if $fnx eq '_preinstallimage';
+  return Build::Helm::parse($fn) if  if $fnx eq 'Helmfile';
   return undef;
 }
 
@@ -1702,7 +1692,7 @@ sub parse_typed {
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $buildtype eq 'arch';
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $buildtype eq 'collax';
   return parse_preinstallimage($cf, $fn, @args) if $buildtype eq 'preinstallimage';
-  return parse_helmfile($cf, $fn, @args) if $buildtype eq 'helm';
+  return Build::Helm::parse($fn) if $buildtype eq 'helm';
   return undef;
 }
 

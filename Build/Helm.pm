@@ -27,15 +27,18 @@ use Data::Dumper;
 eval { require YAML::XS; };
 *YAML::XS::LoadFile = sub {die("YAML::XS is not available\n")} unless defined &YAML::XS::LoadFile;
 
+sub parse {
+  my ($fn) = @_;
+  my $chartinfo;
+  eval {$chartinfo = YAML::XS::LoadFile($fn);};
+  return $chartinfo;
+
+}
+
 sub makeconfigjson {
   my ($fn) = @ARGV;
-
-  my $configjson;
-  eval {$configjson = YAML::XS::LoadFile($fn);};
-
-  #$chartinfo->{'file'} = "$sha.tar";
-
-  print Build::SimpleJSON::unparse($configjson)."\n";
+  my $chartinfo = parse($fn);
+  print Build::SimpleJSON::unparse($chartinfo)."\n";
 }
 
 sub makemanifestjson {
@@ -98,9 +101,7 @@ sub makecontainerinfo {
 
 sub chartdetails {
   my ($fn) = @ARGV;
-  my $chartinfo;
-  eval {$chartinfo = YAML::XS::LoadFile($fn);};
-
+  my $chartinfo = parse($fn);
   #print Dumper($chartinfo);
   print "name:";
   print $chartinfo->{"name"};
