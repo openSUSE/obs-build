@@ -495,20 +495,18 @@ setupccache() {
 	fi
 	mkdir -p "$BUILD_ROOT/.ccache"
 	chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.ccache"
-	echo "export CCACHE_DIR=/.ccache" > "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
 	echo 'export PATH=/var/lib/build/ccache/bin:$PATH' >> "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
 
         local cconf="$BUILD_ROOT"/etc/ccache.conf
         if test -e $cconf; then
-            # setting compression value
-            # if grep returns false, change it using sed(create backup), else append setting
-            (grep "^compression\s*=\s*true\s*$" $cconf || sed -i`date +%s` "s:compression\s*=\s*.*$:compression = true:g" $cconf ) \
-                || echo "compression = true" >> $cconf
+            grep -q "^compression*" $cconf && sed -i "s:compression.*:compression = true:g" $cconf || echo "compression = true"   >> $cconf
+            grep -q "^cache_dir*"   $cconf && sed -i "s:cache_dir.*:cache_dir = /.ccache:g" $cconf || echo "cache_dir = /.ccache" >> $cconf
         else
-            echo "compression = true" >> $cconf
+            echo "compression = true"    >> $cconf
+            echo "cache_dir = /.ccache" >> $cconf
         fi
-    local ccachetar="$BUILD_ROOT/.build.oldpackages/_ccache.tar"
-    test -e $ccachetar && tar -xf $ccachetar -C "$BUILD_ROOT/.ccache/"
+        local ccachetar="$BUILD_ROOT/.build.oldpackages/_ccache.tar"
+        test -e $ccachetar && tar -xf $ccachetar -C "$BUILD_ROOT/.ccache/"
     else
         CCACHE_SETUP_START_TIME=
 	rm -f "$BUILD_ROOT"/var/lib/build/ccache/bin/{gcc,g++,cc,c++,clang,clang++}
