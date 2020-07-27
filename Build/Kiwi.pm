@@ -199,6 +199,24 @@ sub kiwiparse_product {
   return $ret;
 }
 
+# recursive profile lookup, loop safe
+sub expand_profile {
+  my ($name, $profiles, $usedprofiles) = @_;
+
+  my $profile;
+  for my $prof (@{$profiles}) {
+    $profile = $prof if $prof->{'name'} eq $name;
+  }
+
+  return unless $profile;
+  return if $usedprofiles->{$name};
+
+  $usedprofiles->{$name} = 1;
+  for my $req (@{$profile->{'requires'}}) {
+    expand_profile($req->{'profile'}, $profiles, $usedprofiles);
+  }
+}
+
 sub kiwiparse {
   my ($xml, $arch, $buildflavor, $release, $count) = @_;
   $count ||= 0;
@@ -267,13 +285,10 @@ sub kiwiparse {
         $obsprofiles{$prof->{'name'}} = 0;
       }
     }
+
     $obsprofiles = [ grep {$obsprofiles{$_}} @$obsprofiles ];
-    for my $prof (@{$kiwi->{'profiles'}[0]->{'profile'}}) {
-      next unless $obsprofiles{$prof->{'name'}};
-      $usedprofiles{$prof->{'name'}} = 1;
-      for my $req (@{$prof->{'requires'}}) {
-        $usedprofiles{$req->{'profile'}} = 1;
-      }
+    for my $prof (@$obsprofiles) {
+      expand_profile($prof, $kiwi->{'profiles'}[0]->{'profile'}, \%usedprofiles)
     }
   }
 
