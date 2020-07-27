@@ -247,32 +247,33 @@ sub kiwiparse {
   my %usedprofiles;
   # obsprofiles arch filtering
   if ($obsprofiles && $arch && $kiwi->{'profiles'} && $kiwi->{'profiles'}->[0]->{'profile'}) {
-    my %obsprofiles = map {$_ => 1} @$obsprofiles;
+    # reduce set of profiles to the ones matching our architecture
+    my @validprofiles;
     for my $prof (@{$kiwi->{'profiles'}[0]->{'profile'}}) {
-      next unless $prof->{'name'} && exists $obsprofiles{$prof->{'name'}};
-      my $valid;
-      if ($prof->{'arch'}) {
-        my $ma = $arch;
-        $ma =~ s/i[456]86/i386/;
-        for my $pa (split(",", $prof->{'arch'})) {
-          $pa =~ s/i[456]86/i386/;
-          $valid = 1 if $ma eq $pa;
-        }
+      next unless $prof->{'name'};
+      if (!$prof->{'arch'}) {
+	push @validprofiles, $prof;
       } else {
-        $valid = 1;
-      }
-      if ($valid) {
-        $obsprofiles{$prof->{'name'}} = 2;
-      } elsif ($obsprofiles{$prof->{'name'}} == 1) {
-        $obsprofiles{$prof->{'name'}} = 0;
+	my $ma = $arch;
+	$ma =~ s/i[456]86/i386/;
+	for my $pa (split(",", $prof->{'arch'})) {
+	  $pa =~ s/i[456]86/i386/;
+	  next unless $ma eq $pa;
+	  push @validprofiles, $prof;
+	  last;
+	}
       }
     }
-    $obsprofiles = [ grep {$obsprofiles{$_}} @$obsprofiles ];
-    for my $prof (@{$kiwi->{'profiles'}[0]->{'profile'}}) {
-      next unless $obsprofiles{$prof->{'name'}};
+    my %validprofiles = map {$_->{'name'} => 1} @validprofiles;
+    $obsprofiles = [ grep {$validprofiles{$_}} @$obsprofiles ];
+    my %obsprofiles = map {$_ => 1} @$obsprofiles;
+    my @todo = grep {$obsprofiles{$_->{'name'}}} @validprofiles;
+    while (@todo) {
+      my $prof = shift @todo;
+      next if $usedprofiles{$prof->{'name'}};	# already done
       $usedprofiles{$prof->{'name'}} = 1;
-      for my $req (@{$prof->{'requires'}}) {
-        $usedprofiles{$req->{'profile'}} = 1;
+      for my $req (@{$prof->{'requires'} || []}) {
+	push @todo, grep {$_->{'name'} eq $req->{'profile'}} @validprofiles;
       }
     }
   }
