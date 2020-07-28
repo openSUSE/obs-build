@@ -107,6 +107,52 @@ my $std_macros = q{
 };
 my $extra_macros = '';
 
+my %subst_defaults = (
+  # defaults live-build package dependencies base on 4.0~a26 gathered with:
+  # grep Check_package -r /usr/lib/live/build
+  'build-packages:livebuild' => [
+    'apt-utils', 'dctrl-tools', 'debconf', 'dosfstools', 'e2fsprogs', 'grub',
+    'librsvg2-bin', 'live-boot', 'live-config', 'mtd-tools', 'parted',
+    'squashfs-tools', 'syslinux', 'syslinux-common', 'wget', 'xorriso', 'zsync',
+  ],
+  'system-packages:livebuild' => [
+    'apt-utils', 'cpio', 'dpkg-dev', 'live-build', 'lsb-release', 'tar',
+  ],
+  'system-packages:mock' => [
+    'mock', 'system-packages:repo-creation',
+  ],
+  'system-packages:debootstrap' => [
+    'debootstrap', 'lsb-release',
+  ],
+  'system-packages:kiwi-image' => [
+    'kiwi', 'tar', 'system-packages:repo-creation',
+  ],
+  'system-packages:kiwi-product' => [
+    'kiwi',
+  ],
+  'system-packages:docker' => [
+    'docker', 'system-packages:repo-creation',
+  ],
+  'system-packages:podman' => [
+    'podman', 'buildah', 'system-packages:repo-creation',
+  ],
+  'system-packages:fissile' => [
+    'docker', # TODO: Add fissile here as soon as it is packaged
+  ],
+  'system-packages:deltarpm' => [
+    'deltarpm',
+  ],
+  'system-packages:repo-creation:rpm' => [
+    'createrepo',
+  ],
+  'system-packages:repo-creation:deb' => [
+    'dpkg-dev',
+  ],
+  'system-packages:repo-creation:arch' => [
+    'pacman',
+  ],
+);
+
 sub unify {
   my %h = map {$_ => 1} @_;
   return grep(delete($h{$_}), @_);
@@ -376,12 +422,8 @@ sub read_config {
   for my $l (qw{preinstall vminstall required support keep runscripts repotype patterntype}) {
     $config->{$l} = [ unify(@{$config->{$l}}) ];
   }
-  for my $l (keys %{$config->{'substitute'}}) {
-    $config->{'substitute_vers'}->{$l} = [ map {/^(.*?)(=)?$/g} unify(@{$config->{'substitute'}->{$l}}) ];
-    $config->{'substitute'}->{$l} = [ unify(@{$config->{'substitute'}->{$l}}) ];
-    s/=$// for @{$config->{'substitute'}->{$l}};
-  }
   init_helper_hashes($config);
+  # calculate type and binarytype
   if (!$config->{'type'}) {
     # Fallback to old guessing method if no type (spec, dsc or kiwi) is defined
     if (grep {$_ eq 'rpm'} @{$config->{'preinstall'} || []}) {
@@ -408,6 +450,16 @@ sub read_config {
     }
     $config->{'binarytype'} ||= 'UNDEFINED';
   }
+  # add default substitutes
+  if (!$config->{'substitute'}->{'system-packages:repo-creation'}) {
+    $config->{'substitute'}->{'system-packages:repo-creation'} = $subst_defaults{"system-packages:repo-creation:$config->{'binarytype'}"} if $subst_defaults{"system-packages:repo-creation:$config->{'binarytype'}"};
+  }
+  # create substitute_vers hash from substitute entries
+  for my $l (keys %{$config->{'substitute'}}) {
+    $config->{'substitute_vers'}->{$l} = [ map {/^(.*?)(=)?$/g} unify(@{$config->{'substitute'}->{$l}}) ];
+    $config->{'substitute'}->{$l} = [ unify(@{$config->{'substitute'}->{$l}}) ];
+    s/=$// for @{$config->{'substitute'}->{$l}};
+  }
   # add rawmacros to our macro list
   if ($config->{'rawmacros'} ne '') {
     for my $rm (split("\n", $config->{'rawmacros'})) {
@@ -424,6 +476,7 @@ sub read_config {
       }
     }
   }
+  # extract some helper hashes for the flags
   my %modules;
   for (@{$config->{'expandflags'} || []}) {
     if (/^([^:]+):(.*)$/s) {
@@ -500,43 +553,6 @@ sub do_subst_vers {
   }
   return @res;
 }
-
-my %subst_defaults = (
-  # defaults live-build package dependencies base on 4.0~a26 gathered with:
-  # grep Check_package -r /usr/lib/live/build
-  'build-packages:livebuild' => [
-    'apt-utils', 'dctrl-tools', 'debconf', 'dosfstools', 'e2fsprogs', 'grub',
-    'librsvg2-bin', 'live-boot', 'live-config', 'mtd-tools', 'parted',
-    'squashfs-tools', 'syslinux', 'syslinux-common', 'wget', 'xorriso', 'zsync',
-  ],
-  'system-packages:livebuild' => [
-    'apt-utils', 'cpio', 'dpkg-dev', 'live-build', 'lsb-release', 'tar',
-  ],
-  'system-packages:mock' => [
-    'mock', 'createrepo',
-  ],
-  'system-packages:debootstrap' => [
-    'debootstrap', 'lsb-release',
-  ],
-  'system-packages:kiwi-image' => [
-    'kiwi', 'createrepo', 'tar',
-  ],
-  'system-packages:kiwi-product' => [
-    'kiwi',
-  ],
-  'system-packages:docker' => [
-    'docker',
-  ],
-  'system-packages:podman' => [
-    'podman', 'buildah'
-  ],
-  'system-packages:fissile' => [
-    'docker', # TODO: Add fissile here as soon as it is packaged
-  ],
-  'system-packages:deltarpm' => [
-    'deltarpm',
-  ],
-);
 
 # expand the preinstalls/vminstalls
 sub expandpreinstalls {
