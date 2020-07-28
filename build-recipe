@@ -25,7 +25,7 @@
 BUILDTYPE=
 KIWI_PARAMETERS=
 
-for i in spec dsc kiwi arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild appimage docker podman fissile; do
+for i in spec dsc kiwi arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild appimage docker podman fissile helm; do
     . "$BUILD_DIR/build-recipe-$i"
 done
 
@@ -86,6 +86,7 @@ recipe_set_buildtype() {
         _preinstallimage) BUILDTYPE=preinstallimage ;;
         simpleimage) BUILDTYPE=simpleimage ;;
         *.livebuild) BUILDTYPE=livebuild ;;
+        Helmfile) BUILDTYPE=helm ;;
     esac
     if test -z "$BUILDTYPE" ; then
        cleanup_and_exit 1 "I don't know how to build $RECIPEFILE"
@@ -138,7 +139,7 @@ expand_recipe_directories() {
 			snapcraft) types="snapcraft.yaml" ;;
 		    esac
 		fi
-		types="$types .spec .dsc PKGBUILD Dockerfile build.collax .kiwi .src.rpm .nosrc.rpm simpleimage snapcraft.yaml"
+		types="$types .spec .dsc PKGBUILD Dockerfile build.collax .kiwi .src.rpm .nosrc.rpm simpleimage snapcraft.yaml Helmfile"
 	    fi
 	    for t in $types ; do
 		found=

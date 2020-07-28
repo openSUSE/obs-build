@@ -1,0 +1,90 @@
+################################################################
+#
+# Copyright (c) 2020 SUSE Linux LLC
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+recipe_setup_helm() {
+    TOPDIR="/usr/src/packages"
+    test "$DO_INIT_TOPDIR" != false && rm -Rf "$BUILD_ROOT/$TOPDIR"
+    mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
+    if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
+	mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+    else
+	if test -z "$LINKSOURCES" ; then
+	    cp -dLR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+	else
+	    cp -lR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+	fi
+	if test "$?" != 0 ; then
+	    cleanup_and_exit 1 "source copy failed"
+	fi
+    fi
+}
+
+recipe_prepare_helm() {
+    : 
+}
+
+recipe_build_helm() {
+    TOPDIR=/usr/src/packages
+    mkdir -p "$BUILD_ROOT$TOPDIR/HELM"
+    local chartfile
+    chartfile=$(perl -I$BUILD_DIR -MBuild::Helm -e Build::Helm::show -- "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" chartfile)
+    test -z "$chartfile" -a -e "$BUILD_ROOT$TOPDIR/SOURCES/chart.tar" && chartfile=chart.tar
+    test -z "$chartfile" -a -e "$BUILD_ROOT$TOPDIR/SOURCES/chart.tgz" && chartfile=chart.tgz
+    test -z "$chartfile" -a -e "$BUILD_ROOT$TOPDIR/SOURCES/chart.tar.gz" && chartfile=chart.tgz
+    test -e "$BUILD_ROOT$TOPDIR/SOURCES/$chartfile" || cleanup_and_exit 1 "$chartfile does not exist"
+    tar -xOf "$BUILD_ROOT$TOPDIR/SOURCES/$chartfile" Chart.yaml > "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml"
+    test -s "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" || cleanup_and_exit 1 "chart does not include Chart.yaml"
+    # extract data from chart file
+    args=()
+    test -n "$RELEASE" && args=("${args[@]}" --release "$RELEASE")
+    perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" --chartconfig "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" config > "$BUILD_ROOT$TOPDIR/HELM/config.json"
+    perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" --chartconfig "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" manifest > "$BUILD_ROOT$TOPDIR/HELM/manifest.json"
+    local nameversion=$(perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" --chartconfig "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" nameversion)
+    test -n "$nameversion" || cleanup_and_exit 1 "no nameversion";
+    # copy (and compress) chart
+    case $chartfile in
+      *.tar.gz | *.tgz)
+	cp "$BUILD_ROOT$TOPDIR/SOURCES/$chartfile" "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz"
+	;;
+      *.tar)
+	gzip < "$BUILD_ROOT$TOPDIR/SOURCES/$chartfile" > "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz"
+	;;
+      *)
+	cleanup_and_exit 1
+	;;
+    esac
+    # now create our helm.tar result
+    (cd "$BUILD_ROOT$TOPDIR/HELM" && tar -cf "$nameversion.helm.tar" manifest.json config.json "$nameversion.tgz")
+    # get rid of everything else
+    rm -rf "$BUILD_ROOT$TOPDIR/HELM/manifest.json"
+    rm -rf "$BUILD_ROOT$TOPDIR/HELM/config.json"
+    rm -rf "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz"
+    rm -rf "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml"
+    BUILD_SUCCEEDED=true
+}
+
+recipe_resultdirs_helm() {
+    echo HELM
+}
+
+recipe_cleanup_helm() {
+    :
+}
+

@@ -39,6 +39,7 @@ our $do_snapcraft;
 our $do_appimage;
 our $do_docker;
 our $do_fissile;
+our $do_helm;
 
 sub import {
   for (@_) {
@@ -52,8 +53,9 @@ sub import {
     $do_appimage = 1 if $_ eq ':appimage';
     $do_docker = 1 if $_ eq ':docker';
     $do_fissile = 1 if $_ eq ':fissile';
+    $do_helm = 1 if $_ eq ':helm';
   }
-  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = $do_fissile = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker && !$do_fissile;
+  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = $do_fissile = $do_helm = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker && !$do_fissile && !$do_helm;
 
   if ($do_deb) {
     require Build::Deb;
@@ -81,6 +83,9 @@ sub import {
   }
   if ($do_fissile) {
     require Build::Fissile;
+  }
+  if ($do_helm) {
+    require Build::Helm;
   }
 }
 
@@ -1635,6 +1640,7 @@ sub recipe2buildtype {
   return 'fissile' if $recipe eq 'fissile.yml';
   return 'preinstallimage' if $recipe eq '_preinstallimage';
   return 'simpleimage' if $recipe eq 'simpleimage';
+  return 'helm' if $recipe eq 'Helmfile';
   return undef;
 }
 
@@ -1688,6 +1694,7 @@ sub parse {
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $fnx eq 'PKGBUILD';
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $fnx eq 'build.collax';
   return parse_preinstallimage($cf, $fn, @args) if $fnx eq '_preinstallimage';
+  return Build::Helm::parse($cf, $fn, @args) if $fnx eq 'Helmfile';
   return undef;
 }
 
@@ -1706,6 +1713,7 @@ sub parse_typed {
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $buildtype eq 'arch';
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $buildtype eq 'collax';
   return parse_preinstallimage($cf, $fn, @args) if $buildtype eq 'preinstallimage';
+  return Build::Helm::parse($cf, $fn, @args) if $buildtype eq 'helm';
   return undef;
 }
 
