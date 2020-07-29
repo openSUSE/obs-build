@@ -120,6 +120,12 @@ vm_verify_options_kvm() {
 	    kvm_bin="/usr/bin/qemu-system-ppc64"
 	    kvm_console=hvc0
 	    kvm_options="-enable-kvm -M pseries"
+	    if grep -q POWER8 /proc/cpuinfo ; then
+	        # This option only exists with QEMU 5.0 or newer
+		if $kvm_bin -machine 'pseries,?' 2>&1 | grep -q cap-ccf-assist ; then
+		kvm_options="-enable-kvm -M pseries,cap-ccf-assist=off"
+		fi
+	    fi
 	    grep -q PPC970MP /proc/cpuinfo && kvm_check_ppc970
 	    vm_kernel=/boot/vmlinux
 	    vm_initrd=/boot/initrd

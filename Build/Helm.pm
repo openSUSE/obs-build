@@ -77,7 +77,7 @@ sub show {
     die("bad name '$name'\n") if $name =~ /^[-\.]/;
     die("bad name '$name'\n") if $name =~ /[\/\000-\037]/;
     die("no version\n") unless defined $version;
-    die("bad version '$version'\n") if $versioneq '';
+    die("bad version '$version'\n") if $version eq '';
     die("bad version '$version'\n") if $version =~ /\//;
     die("bad version '$version'\n") if $version =~ /[\/\000-\037]/;
     if ($field eq 'manifest') {
