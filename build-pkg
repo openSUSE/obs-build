@@ -67,6 +67,7 @@ pkg_autodetect_type() {
     fi
     PSUF=
     test -e $BUILD_ROOT/.init_b_cache/rpms/rpm.rpm && PSUF=rpm
+    test -e $BUILD_ROOT/.init_b_cache/rpms/rpm-ndb.rpm && PSUF=rpm
     test -e $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb && PSUF=deb
     test -e $BUILD_ROOT/.init_b_cache/rpms/pacman.arch && PSUF=arch
     if test -z "$PSUF" ; then
