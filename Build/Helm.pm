@@ -49,10 +49,12 @@ sub parse {
 }
 
 sub show {
-  my ($release, $chartconfig);
+  my ($release, $disturl, $chartconfig);
   while (@ARGV) {
     if (@ARGV > 2 && $ARGV[0] eq '--release') {
       (undef, $release) = splice(@ARGV, 0, 2); 
+    } elsif (@ARGV > 2 && $ARGV[0] eq '--disturl') {
+      (undef, $disturl) = splice(@ARGV, 0, 2);
     } elsif (@ARGV > 2 && $ARGV[0] eq '--chartconfig') {
       (undef, $chartconfig) = splice(@ARGV, 0, 2); 
     } else {
@@ -90,9 +92,13 @@ sub show {
       my $manifest = {};
       $manifest->{'name'} = $name;
       $manifest->{'version'} = $version;
+      $manifest->{'release'} = $release if $release;
       $manifest->{'tags'} = \@tags if @tags;
+      $manifest->{'disturl'} = $disturl if $disturl;
+      $manifest->{'buildtime'} = time();
       $manifest->{'chart'} = "$name-$version.tgz";
-      $manifest->{'_order'} = [ qw{name version tags chart} ];
+      $manifest->{'_order'} = [ qw{name version release tags disturl buildtime chart} ];
+      $manifest->{'_type'} = {'buildtime' => 'number'};
       print Build::SimpleJSON::unparse($manifest)."\n";
       exit(0);
     }

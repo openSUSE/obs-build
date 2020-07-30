@@ -53,6 +53,7 @@ recipe_build_helm() {
     test -s "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" || cleanup_and_exit 1 "chart does not include Chart.yaml"
     # extract data from chart file
     args=()
+    test -n "$DISTURL" && args=("${args[@]}" --disturl "$DISTURL")
     test -n "$RELEASE" && args=("${args[@]}" --release "$RELEASE")
     perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" --chartconfig "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" config > "$BUILD_ROOT$TOPDIR/HELM/config.json"
     perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" --chartconfig "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" manifest > "$BUILD_ROOT$TOPDIR/HELM/manifest.json"
