@@ -52,13 +52,12 @@ my $url = $ARGV[0];
 die("createzyppdeps argument must start with 'zypp://'\n") unless $url =~ /^zypp:\/\/([^\/]*)/;
 my $repo = Build::Zypp::parserepo($1);
 
-my $type = $repo->{'type'};
 my $zyppcachedir = "/var/cache/zypp/raw/$repo->{'name'}";
 
-if($type eq 'rpm-md') {
+if(!defined($repo->{'type'}) || $repo->{'type'} eq 'rpm-md') {
   exec ("$INC[0]/createrepomddeps", '--cachedir', $cachedir, '--zypp', $zyppcachedir, $url);
-} elsif ($type eq 'yast2') {
+} elsif ($repo->{'type'} eq 'yast2') {
   exec ("$INC[0]/createyastdeps", '--cachedir', $cachedir, '--zypp', $zyppcachedir, $url);
 } else {
-  die "unsupported repo type: $type\n";
+  die "unsupported repo type: $repo->{'type'}\n";
 }
