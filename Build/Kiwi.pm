@@ -568,6 +568,7 @@ sub showcontainerinfo {
   $containerinfo->{'repos'} = \@repos if @repos;
   $containerinfo->{'file'} = $image if defined $image;
   $containerinfo->{'disturl'} = $disturl if defined $disturl;
+  $containerinfo->{'milestone'} = $d->{'milestone'} if defined $d->{'milestone'};
   print Build::SimpleJSON::unparse($containerinfo)."\n";
 }
 

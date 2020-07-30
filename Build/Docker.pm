@@ -172,6 +172,9 @@ sub parse {
       if ($line =~ /^#!NoSquash\s*$/) {
         $nosquash = 1;
       }
+      if ($line =~ /^#!Milestone:\s*(\S+)\s*$/) {
+	$ret->{'milestone'} = $1;
+      }
       next;
     }
     # add continuation lines
@@ -289,6 +292,7 @@ sub showcontainerinfo {
   $containerinfo->{'disturl'} = $disturl if defined $disturl;
   $containerinfo->{'version'} = $d->{'version'} if defined $d->{'version'};
   $containerinfo->{'release'} = $release if defined $release;
+  $containerinfo->{'milestone'} = $d->{'milestone'} if defined $d->{'milestone'};
   print Build::SimpleJSON::unparse($containerinfo)."\n";
 }
 
