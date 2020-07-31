@@ -55,10 +55,16 @@ my $repo = Build::Zypp::parserepo($1);
 my $type = $repo->{'type'};
 my $zyppcachedir = "/var/cache/zypp/raw/$repo->{'name'}";
 
+if (!$type) {
+  $type = 'yast2' if -e "$zyppcachedir/suse/setup/descr";
+  $type = 'rpm-md' if -e "$zyppcachedir/repodata";
+}
+die("could not determine repo type for '$repo->{'name'}'\n") unless $type;
+
 if($type eq 'rpm-md') {
   exec ("$INC[0]/createrepomddeps", '--cachedir', $cachedir, '--zypp', $zyppcachedir, $url);
 } elsif ($type eq 'yast2') {
   exec ("$INC[0]/createyastdeps", '--cachedir', $cachedir, '--zypp', $zyppcachedir, $url);
 } else {
-  die "unsupported repo type: $type\n";
+  die "unsupported repo type '$type' for '$repo->{'name'}'\n";
 }
