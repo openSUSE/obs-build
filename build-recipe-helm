@@ -55,8 +55,6 @@ recipe_build_helm() {
     args=()
     test -n "$DISTURL" && args=("${args[@]}" --disturl "$DISTURL")
     test -n "$RELEASE" && args=("${args[@]}" --release "$RELEASE")
-    perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" --chartconfig "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" config > "$BUILD_ROOT$TOPDIR/HELM/config.json"
-    perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" --chartconfig "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" manifest > "$BUILD_ROOT$TOPDIR/HELM/manifest.json"
     local nameversion=$(perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" --chartconfig "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" nameversion)
     test -n "$nameversion" || cleanup_and_exit 1 "no nameversion";
     # copy (and compress) chart
@@ -71,12 +69,8 @@ recipe_build_helm() {
 	cleanup_and_exit 1
 	;;
     esac
-    # now create our helm.tar result
-    (cd "$BUILD_ROOT$TOPDIR/HELM" && tar -cf "$nameversion.helm.tar" manifest.json config.json "$nameversion.tgz")
-    # get rid of everything else
-    rm -rf "$BUILD_ROOT$TOPDIR/HELM/manifest.json"
-    rm -rf "$BUILD_ROOT$TOPDIR/HELM/config.json"
-    rm -rf "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz"
+    perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" --chartconfig "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" helminfo > "$BUILD_ROOT$TOPDIR/HELM/$nameversion.helminfo"
+    # get rid of the chart
     rm -rf "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml"
     BUILD_SUCCEEDED=true
 }

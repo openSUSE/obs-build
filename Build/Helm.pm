@@ -82,13 +82,15 @@ sub show {
     die("bad version '$version'\n") if $version eq '';
     die("bad version '$version'\n") if $version =~ /\//;
     die("bad version '$version'\n") if $version =~ /[\/\000-\037]/;
-    if ($field eq 'manifest') {
+    if ($field eq 'helminfo') {
       my @tags = @{$d->{'containertags'} || []};
       for (@tags) {
 	s/<NAME>/$name/g;
 	s/<VERSION>/$version/g;
 	s/<RELEASE>/$release/g;
       }
+      $d2->{'_order'} = [ qw{apiVersion name version kubeVersion description type keywords home sources dependencies maintainers icon appVersion deprecated annotations} ];
+      my $config_json = Build::SimpleJSON::unparse($d2)."\n";
       my $manifest = {};
       $manifest->{'name'} = $name;
       $manifest->{'version'} = $version;
@@ -97,14 +99,10 @@ sub show {
       $manifest->{'disturl'} = $disturl if $disturl;
       $manifest->{'buildtime'} = time();
       $manifest->{'chart'} = "$name-$version.tgz";
-      $manifest->{'_order'} = [ qw{name version release tags disturl buildtime chart} ];
+      $manifest->{'config_json'} = $config_json;
+      $manifest->{'_order'} = [ qw{name version release tags disturl buildtime chart config_json} ];
       $manifest->{'_type'} = {'buildtime' => 'number'};
       print Build::SimpleJSON::unparse($manifest)."\n";
-      exit(0);
-    }
-    if ($field eq 'config') {
-      $d2->{'_order'} = [ qw{apiVersion name version kubeVersion description type keywords home sources dependencies maintainers icon appVersion deprecated annotations} ];
-      print Build::SimpleJSON::unparse($d2)."\n";
       exit(0);
     }
     $d = $d2;
