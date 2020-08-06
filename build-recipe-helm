@@ -34,44 +34,48 @@ recipe_setup_helm() {
 	    cleanup_and_exit 1 "source copy failed"
 	fi
     fi
+    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
 }
 
 recipe_prepare_helm() {
-    : 
+    rm -rf "$BUILD_ROOT$TOPDIR/BUILD"
+    mkdir -p "$BUILD_ROOT$TOPDIR/BUILD"
+    cp -dLR "$BUILD_ROOT$TOPDIR/SOURCES/"* "$BUILD_ROOT$TOPDIR/BUILD"
+    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR/BUILD"
+    cd "$BUILD_ROOT$TOPDIR/BUILD"
+    for i in *.tar *.tgz *.tar.gz *.tar.xz ; do
+	test -e "$i" || continue
+	echo "Unpacking $i ..."
+	echo "#!/bin/sh -e" > $BUILD_ROOT/.unpack.command
+	shellquote cd "$TOPDIR/BUILD" >> $BUILD_ROOT/.unpack.command
+	echo >> $BUILD_ROOT/.unpack.command
+	echo -n 'tar -x --owner="'$BUILD_USER'" -f ' >> $BUILD_ROOT/.unpack.command
+	shellquote "$i" >> $BUILD_ROOT/.unpack.command
+	echo >> $BUILD_ROOT/.unpack.command
+	shellquote rm -f "$i" >> $BUILD_ROOT/.unpack.command
+	echo >> $BUILD_ROOT/.unpack.command
+	chmod 0755 $BUILD_ROOT/.unpack.command
+	chroot $BUILD_ROOT su -c /.unpack.command - $BUILD_USER || cleanup_and_exit 1
+	rm -f $BUILD_ROOT/.unpack.command
+	rm -f "$i"
+	ls -l
+    done
 }
 
 recipe_build_helm() {
-    TOPDIR=/usr/src/packages
+    cd "$BUILD_ROOT$TOPDIR/BUILD"
     mkdir -p "$BUILD_ROOT$TOPDIR/HELM"
-    local chartfile
-    chartfile=$(perl -I$BUILD_DIR -MBuild::Helm -e Build::Helm::show -- "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" chartfile)
-    test -z "$chartfile" -a -e "$BUILD_ROOT$TOPDIR/SOURCES/chart.tar" && chartfile=chart.tar
-    test -z "$chartfile" -a -e "$BUILD_ROOT$TOPDIR/SOURCES/chart.tgz" && chartfile=chart.tgz
-    test -z "$chartfile" -a -e "$BUILD_ROOT$TOPDIR/SOURCES/chart.tar.gz" && chartfile=chart.tgz
-    test -e "$BUILD_ROOT$TOPDIR/SOURCES/$chartfile" || cleanup_and_exit 1 "$chartfile does not exist"
-    tar -xOf "$BUILD_ROOT$TOPDIR/SOURCES/$chartfile" Chart.yaml > "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml"
-    test -s "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" || cleanup_and_exit 1 "chart does not include Chart.yaml"
+    chown "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR/HELM"
     # extract data from chart file
-    args=()
+    args=() 
     test -n "$DISTURL" && args=("${args[@]}" --disturl "$DISTURL")
     test -n "$RELEASE" && args=("${args[@]}" --release "$RELEASE")
-    local nameversion=$(perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" --chartconfig "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" nameversion)
-    test -n "$nameversion" || cleanup_and_exit 1 "no nameversion";
-    # copy (and compress) chart
-    case $chartfile in
-      *.tar.gz | *.tgz)
-	cp "$BUILD_ROOT$TOPDIR/SOURCES/$chartfile" "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz"
-	;;
-      *.tar)
-	gzip < "$BUILD_ROOT$TOPDIR/SOURCES/$chartfile" > "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz"
-	;;
-      *)
-	cleanup_and_exit 1
-	;;
-    esac
-    perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" --chartconfig "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" helminfo > "$BUILD_ROOT$TOPDIR/HELM/$nameversion.helminfo"
-    # get rid of the chart
-    rm -rf "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml"
+    local nameversion=$(perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" nameversion)
+    # create chart
+    chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && helm package -d $TOPDIR/HELM ."  - $BUILD_USER || cleanup_and_exit 1
+    test -f "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz" || cleanup_and_exit 1 "helm package command did not create $nameversion.tgz"
+    # generate helminfo
+    perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" --chart "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" helminfo > "$BUILD_ROOT$TOPDIR/HELM/$nameversion.helminfo"
     BUILD_SUCCEEDED=true
 }
 

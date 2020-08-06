@@ -120,6 +120,9 @@ my %subst_defaults = (
     'librsvg2-bin', 'live-boot', 'live-config', 'mtd-tools', 'parted',
     'squashfs-tools', 'syslinux', 'syslinux-common', 'wget', 'xorriso', 'zsync',
   ],
+  'build-packages:helm' => [
+    'helm',
+  ],
   'system-packages:livebuild' => [
     'apt-utils', 'cpio', 'dpkg-dev', 'live-build', 'lsb-release', 'tar',
   ],
@@ -598,7 +601,7 @@ sub get_build {
     return (undef, $err) if $err;
   }
   my $buildtype = $config->{'type'} || '';
-  if (grep {$_ eq $buildtype} qw{livebuild docker kiwi fissile}) {
+  if (grep {$_ eq $buildtype} qw{livebuild docker kiwi fissile helm}) {
     push @deps, @{$config->{'substitute'}->{"build-packages:$buildtype"}
 		  || $subst_defaults{"build-packages:$buildtype"} || []};
   }
@@ -1640,7 +1643,7 @@ sub recipe2buildtype {
   return 'fissile' if $recipe eq 'fissile.yml';
   return 'preinstallimage' if $recipe eq '_preinstallimage';
   return 'simpleimage' if $recipe eq 'simpleimage';
-  return 'helm' if $recipe eq 'Helmfile';
+  return 'helm' if $recipe eq 'Chart.yaml';
   return undef;
 }
 
@@ -1694,7 +1697,7 @@ sub parse {
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $fnx eq 'PKGBUILD';
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $fnx eq 'build.collax';
   return parse_preinstallimage($cf, $fn, @args) if $fnx eq '_preinstallimage';
-  return Build::Helm::parse($cf, $fn, @args) if $fnx eq 'Helmfile';
+  return Build::Helm::parse($cf, $fn, @args) if $fnx eq 'Chart.yaml';
   return undef;
 }
 

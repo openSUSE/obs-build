@@ -23,91 +23,114 @@ package Build::Helm;
 use strict;
 
 use Build::SimpleJSON;
+use Digest;
 
-# we do not want to parse the yaml file from the tar here, so just return some
-# dummy result
+eval { require YAML::XS; $YAML::XS::LoadBlessed = 0; };
+*YAML::XS::LoadFile = sub {die("YAML::XS is not available\n")} unless defined &YAML::XS::LoadFile;
+
+sub verify_config {
+  my ($d) = @_;
+  die("bad config\n") unless ref($d) eq 'HASH';
+  for my $k ('name', 'version') {
+    die("missing element '$k'\n") unless defined $d->{$k};
+    die("bad element '$k'\n") unless ref($d->{$k}) eq '';
+    die("empty element '$k'\n") if $d->{$k} eq '';
+    die("bad element '$k'\n\n") if $d->{$k} =~ /[\/\000-\037]/;
+  }
+  die("bad name\n") if $d->{'name'} =~ /^[-\.]/;
+}
+
 sub parse {
   my ($cf, $fn) = @_;
+  my $d;
   my $fd;
   return {'error' => "$fn: $!"} unless open($fd, '<', $fn);
-  my $ret = { 'name' => 'helmchart', 'deps' => []};
+  my @tags;
   while (<$fd>) {
     chomp;
-    my @s = split(' ', $_);
-    next unless @s;
-    my $k = lc(shift(@s));
-    $ret->{'chartfile'} = $s[0] if @s && $k eq 'chart:';
-    push @{$ret->{'containertags'}}, @s if @s && $k eq 'tags:';
+    next if /^\s*$/;
+    last unless /^\s*#/;
+    push @tags, split(' ', $1) if /^#!BuildTag:\s*(.*?)$/;
   }
-  close $fd;
-  if (defined($ret->{'chartfile'})) {
-    return {'error' => "illegal chartfile"} unless $ret->{'chartfile'} ne '';
-    return {'error' => "illegal chartfile"} if $ret->{'chartfile'} =~ /[\/\000-\037]/;
-    return {'error' => "illegal chartfile"} if $ret->{'chartfile'} =~ /^\./;
+  close($fd);
+  eval {
+    $d = YAML::XS::LoadFile($fn);
+    verify_config($d);
+  };
+  if ($@) {
+    my $err = $@;
+    chomp $@;
+    return {'error' => "Failed to parse yml file: $err"};
   }
-  return $ret;
+  
+  my $res = {};
+  $res->{'name'} = $d->{'name'};
+  $res->{'version'} = $d->{'version'};
+  my $release = $cf->{'buildrelease'};
+  for (@tags) {
+    s/<NAME>/$d->{'name'}/g;
+    s/<VERSION>/$d->{'version'}/g;
+    s/<RELEASE>/$release/g;
+  }
+  $res->{'containertags'} = \@tags if @tags;
+  return $res;
 }
 
 sub show {
-  my ($release, $disturl, $chartconfig);
+  my ($release, $disturl, $chart);
   while (@ARGV) {
     if (@ARGV > 2 && $ARGV[0] eq '--release') {
       (undef, $release) = splice(@ARGV, 0, 2); 
     } elsif (@ARGV > 2 && $ARGV[0] eq '--disturl') {
       (undef, $disturl) = splice(@ARGV, 0, 2);
-    } elsif (@ARGV > 2 && $ARGV[0] eq '--chartconfig') {
-      (undef, $chartconfig) = splice(@ARGV, 0, 2); 
+    } elsif (@ARGV > 2 && $ARGV[0] eq '--chart') {
+      (undef, $chart) = splice(@ARGV, 0, 2); 
     } else {
       last;
     }   
   }
   my ($fn, $field) = @ARGV;
-  require YAML::XS;
-  $YAML::XS::LoadBlessed = 0;
   my $d = {};
+  $d->{'buildrelease'} = $release if defined $release;
   $d = parse({}, $fn) if $fn;
   die("$d->{'error'}\n") if $d->{'error'};
-  my $d2 = {};
-  if ($chartconfig) {
-    $d2 = YAML::XS::LoadFile($chartconfig);
-    die unless $d2;
-    my $name = $d2->{'name'};
-    my $version = $d2->{'version'};
-    die("no name\n") unless defined $name;
-    die("bad name '$name'\n") if $name eq '';
-    die("bad name '$name'\n") if $name =~ /\//;
-    die("bad name '$name'\n") if $name =~ /^[-\.]/;
-    die("bad name '$name'\n") if $name =~ /[\/\000-\037]/;
-    die("no version\n") unless defined $version;
-    die("bad version '$version'\n") if $version eq '';
-    die("bad version '$version'\n") if $version =~ /\//;
-    die("bad version '$version'\n") if $version =~ /[\/\000-\037]/;
-    if ($field eq 'helminfo') {
-      my @tags = @{$d->{'containertags'} || []};
-      for (@tags) {
-	s/<NAME>/$name/g;
-	s/<VERSION>/$version/g;
-	s/<RELEASE>/$release/g;
-      }
-      $d2->{'_order'} = [ qw{apiVersion name version kubeVersion description type keywords home sources dependencies maintainers icon appVersion deprecated annotations} ];
-      my $config_json = Build::SimpleJSON::unparse($d2)."\n";
-      my $manifest = {};
-      $manifest->{'name'} = $name;
-      $manifest->{'version'} = $version;
-      $manifest->{'release'} = $release if $release;
-      $manifest->{'tags'} = \@tags if @tags;
-      $manifest->{'disturl'} = $disturl if $disturl;
-      $manifest->{'buildtime'} = time();
-      $manifest->{'chart'} = "$name-$version.tgz";
-      $manifest->{'config_json'} = $config_json;
-      $manifest->{'_order'} = [ qw{name version release tags disturl buildtime chart config_json} ];
-      $manifest->{'_type'} = {'buildtime' => 'number'};
-      print Build::SimpleJSON::unparse($manifest)."\n";
-      exit(0);
+
+  if ($field eq 'helminfo') {
+    my $config_yaml = '';
+    my $fd;
+    die("$fn: $!\n") unless open($fd, '<', $fn);
+    1 while sysread($fd, $config_yaml, 8192, length($config_yaml));
+    close($fd);
+    my $config = YAML::XS::Load($config_yaml);
+    verify_config($config);
+    my $config_json = Build::SimpleJSON::unparse($config)."\n";
+    my $helminfo = {};
+    $helminfo->{'name'} = $d->{'name'};
+    $helminfo->{'version'} = $d->{'version'};
+    $helminfo->{'release'} = $release if $release;
+    $helminfo->{'tags'} = $d->{'containertags'} if $d->{'containertags'};
+    $helminfo->{'disturl'} = $disturl if $disturl;
+    $helminfo->{'buildtime'} = time();
+    if ($chart) {
+      $helminfo->{'chart'} = $chart;
+      $helminfo->{'chart'} =~ s/.*\///;
+      my $ctx = Digest->new("SHA-256");
+      my $cfd;
+      die("$chart: $!\n") unless open($cfd, '<', $chart);
+      my @s = stat($cfd);
+      $ctx->addfile($cfd);
+      close($cfd);
+      $helminfo->{'chart_sha256'} = $ctx->hexdigest;
+      $helminfo->{'chart_size'} = $s[7];
     }
-    $d = $d2;
-    $d->{'nameversion'} = "$name-$version";
+    $helminfo->{'config_json'} = $config_json;
+    $helminfo->{'config_yaml'} = $config_yaml;
+    $helminfo->{'_order'} = [ qw{name version release tags disturl buildtime chart config_json config_yaml chart_sha256 chart_size} ];
+    $helminfo->{'_type'} = {'buildtime' => 'number', 'chart_size' => 'number' };
+    print Build::SimpleJSON::unparse($helminfo)."\n";
+    exit(0);
   }
+  $d->{'nameversion'} = "$d->{'name'}-$d->{'version'}";		# convenience
   my $x = $d->{$field};
   $x = [ $x ] unless ref $x;
   print "@$x\n";

@@ -86,7 +86,7 @@ recipe_set_buildtype() {
         _preinstallimage) BUILDTYPE=preinstallimage ;;
         simpleimage) BUILDTYPE=simpleimage ;;
         *.livebuild) BUILDTYPE=livebuild ;;
-        Helmfile) BUILDTYPE=helm ;;
+        Chart.yaml) BUILDTYPE=helm ;;
     esac
     if test -z "$BUILDTYPE" ; then
        cleanup_and_exit 1 "I don't know how to build $RECIPEFILE"
@@ -139,7 +139,7 @@ expand_recipe_directories() {
 			snapcraft) types="snapcraft.yaml" ;;
 		    esac
 		fi
-		types="$types .spec .dsc PKGBUILD Dockerfile build.collax .kiwi .src.rpm .nosrc.rpm simpleimage snapcraft.yaml Helmfile"
+		types="$types .spec .dsc PKGBUILD Dockerfile build.collax .kiwi .src.rpm .nosrc.rpm simpleimage snapcraft.yaml Chart.yaml"
 	    fi
 	    for t in $types ; do
 		found=
