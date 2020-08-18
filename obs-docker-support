@@ -243,6 +243,11 @@ EOF
     esac
 }
 
+if test `id -u` != "0"; then
+    echo "obs-docker-support: not executed as root user!"
+    exit 1
+fi
+
 case ${0##*/} in
 obs-docker-support)
     obs_docker_support "$@"
