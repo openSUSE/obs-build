@@ -138,9 +138,15 @@ recipe_build_docker() {
     done
 
     # patch in obs-docker-support helper
-    sed -i '/^[ 	]*[fF][rR][oO][mM]/a COPY .obs-docker-support /usr/local/sbin/obs-docker-support\nRUN obs-docker-support --install' "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
+    sed -i '/^[ 	]*[rR][uU][nN][	 ]/i COPY .obs-docker-support /usr/local/sbin/obs-docker-support\nRUN obs-docker-support --install' "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
     echo >> $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE
-    if test -n "$(sed -ne '/^[ 	]*[uU][sS][eE][rR][ 	]/p' "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE")" ; then
+    # USER root must be ignored, we look for the last RUN line executed as root
+    if test -n "$(sed -e '/^[      ]*[uU][sS][eE][rR][     ]root/d' -ne '/^[ 	]*[uU][sS][eE][rR][ 	]/p' "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE")" ; then
+    	sed -i '1,/^[ 	]*[uU][sS][eE][rR][ 	]/b; {
+/^[ 	]*[uU][sS][eE][rR][ 	]/i RUN obs-docker-support --uninstall
+}' "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
+    elsif test -n "$(sed -e '/^[      ]*[uU][sS][eE][rR][     ]/d' -ne '/^[ 	]*[uU][sS][eE][rR][ 	]/p' "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE")" ; then
+        # No "USER root" line case
     	sed -i '1,/^[ 	]*[uU][sS][eE][rR][ 	]/{
 /^[ 	]*[uU][sS][eE][rR][ 	]/i RUN obs-docker-support --uninstall
 }' "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
