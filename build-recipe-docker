@@ -138,11 +138,13 @@ recipe_build_docker() {
     done
 
     # patch in obs-docker-support helper
-    sed -i '/^[ 	]*[rR][uU][nN][	 ]/i COPY .obs-docker-support /usr/local/sbin/obs-docker-support\nRUN obs-docker-support --install' "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
+    sed -i '1,/^[ 	]*[rR][uU][nN][	 ]/{
+/^[ 	]*[rR][uU][nN][	 ]/i COPY .obs-docker-support /usr/local/sbin/obs-docker-support\nRUN obs-docker-support --install
+}' "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
     echo >> $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE
     if test -n "$(sed -ne '/^[         ]*[uU][sS][eE][rR][     ]/p' "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE")" ; then
-    	tac "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" | sed '1,/^RUN/{
-/^RUN /i RUN obs-docker-support --uninstall
+    	tac "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" | sed '1,/^[         ]*[uU][sS][eE][rR][     ]/{
+/^[         ]*[uU][sS][eE][rR][     ]/a RUN obs-docker-support --uninstall
 }' | tac > "$BUILD_ROOT/$TOPDIR/SOURCES/.$RECIPEFILE" && mv "$BUILD_ROOT/$TOPDIR/SOURCES/.$RECIPEFILE" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
     else
 	echo 'RUN obs-docker-support --uninstall' >> "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
