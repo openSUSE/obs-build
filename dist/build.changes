@@ -28,7 +28,7 @@ Thu Jul 23 05:38:24 UTC 2020 - Frank Schreiner <FSchreiner@suse.com>
 - Control disk-space consumption while creating ccache archive
 - cleaning ccache
 - create folders before trying to copy ccache.tar
-- Genreadte .packages and .basepackages files for docker builds
+- Generate .packages and .basepackages files for docker builds
 
 -------------------------------------------------------------------
 Sun May 17 14:32:52 UTC 2020 - coolo@suse.com
