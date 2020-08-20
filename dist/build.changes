@@ -1,4 +1,36 @@
 -------------------------------------------------------------------
+Thu Aug 20 08:07:30 UTC 2020 - Adrian Schröter <adrian@suse.de>
+
+- fix factory version in config file bsc#1170956
+- add missing ignores for Leap 15.2 bsc#1174854
+- fix sysrq handling for KVM builds
+- avoid double removal of obscpio files
+- docker:
+  * support builds using USER root statements
+  * proper error handling when obs-docker-support gets called as 
+    non-root
+  * helm build target support
+  * support milestone handling
+- support repo files without types set (SLE 15 SP2 zypp)
+- add default substitute for system-packages:repo-creation
+- Support recursive kiwi profile usage
+
+-------------------------------------------------------------------
+Thu Jul 23 05:38:24 UTC 2020 - Frank Schreiner <FSchreiner@suse.com>
+
+- fix dependencies for Fedora 33
+- Set $YAML::XS::LoadBlessed = 0 for Appimage/Snapcraft
+- add a new variable to track build time needed for ccache eviction
+- create folder for ccache archive to be copied before rsync
+- also package pkg-config files by default into baselibs. (bsc#1172563 etc)
+- Use shorter kernel flag for mitigations
+- Ignore, if shutdown behavior changed by build in z/VM
+- Control disk-space consumption while creating ccache archive
+- cleaning ccache
+- create folders before trying to copy ccache.tar
+- Genreadte .packages and .basepackages files for docker builds
+
+-------------------------------------------------------------------
 Sun May 17 14:32:52 UTC 2020 - coolo@suse.com
 
 - enable sysrq operations on boot
