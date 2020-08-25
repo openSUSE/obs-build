@@ -70,12 +70,18 @@ recipe_build_helm() {
     args=() 
     test -n "$DISTURL" && args=("${args[@]}" --disturl "$DISTURL")
     test -n "$RELEASE" && args=("${args[@]}" --release "$RELEASE")
-    local nameversion=$(perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" nameversion)
+    local name=$(perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" name)
+    local version=$(perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" version)
+    local nameversion="$name-$version"
     # create chart
     chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && helm package -d $TOPDIR/HELM ."  - $BUILD_USER || cleanup_and_exit 1
     test -f "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz" || cleanup_and_exit 1 "helm package command did not create $nameversion.tgz"
+    # extract generated Chart.yaml file
+    tar -xOf "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz" -- "$name/Chart.yaml" > "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml"
+    test -s "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" || cleanup_and_exit 1 "helm chart does not contain $name/Chart.yaml"
     # generate helminfo
-    perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" --chart "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" helminfo > "$BUILD_ROOT$TOPDIR/HELM/$nameversion.helminfo"
+    perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" --chart "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz" "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" helminfo > "$BUILD_ROOT$TOPDIR/HELM/$nameversion.helminfo" || cleanup_and_exit 1
+    rm -f "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml"
     BUILD_SUCCEEDED=true
 }
 
