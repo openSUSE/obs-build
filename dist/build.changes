@@ -2,6 +2,7 @@
 Fri Aug 28 13:48:06 UTC 2020 - Adrian Schröter <adrian@suse.de>
 
 - support rpmlint installed in /usr/bin/ as well
+- fix local build for armv6hl
 - Extract generated chart from the tarball instead of using the recipe
 
 -------------------------------------------------------------------

@@ -24,6 +24,7 @@ build_host_arch() {
     : ${BUILD_HOST_ARCH:=`uname -m`}
     # the linux kernel only knows armv7l, armv7hl is a userland definition
     test armv7l == "$BUILD_HOST_ARCH" && BUILD_HOST_ARCH=armv7hl
+    test armv6l == "$BUILD_HOST_ARCH" && BUILD_HOST_ARCH=armv6hl
 
     BUILD_INITVM_ARCH="$BUILD_HOST_ARCH"
     # avoid multiple initvm.* helpers for i586 and i686
