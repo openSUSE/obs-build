@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Aug 28 13:48:06 UTC 2020 - Adrian Schröter <adrian@suse.de>
+
+- support rpmlint installed in /usr/bin/ as well
+- Extract generated chart from the tarball instead of using the recipe
+
+-------------------------------------------------------------------
 Thu Aug 20 08:07:30 UTC 2020 - Adrian Schröter <adrian@suse.de>
 
 - fix factory version in config file bsc#1170956
