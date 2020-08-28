@@ -252,7 +252,14 @@ recipe_check_file_owners() {
 }
 
 recipe_run_rpmlint() {
-    if ! test -x "$BUILD_ROOT/opt/testing/bin/rpmlint" ; then 
+    # SUSE builds are using a special rpmlint binary which is not
+    # pulling in additional dependencies
+    local rpmlint="/opt/testing/bin/rpmlint"
+    if ! test -x "$BUILD_ROOT$rpmlint" ; then
+        # default rpmlint place as fallback
+        rpmlint="/usr/bin/rpmlint"
+    fi
+    if ! test -x "$BUILD_ROOT$rpmlint" ; then
 	return
     fi
     LINT_RPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/RPMS \
@@ -267,7 +274,7 @@ recipe_run_rpmlint() {
     rpmlint_logfile=$TOPDIR/OTHER/rpmlint.log
     rm -f "$BUILD_ROOT$rpmlint_logfile"
     ret=0
-    chroot $BUILD_ROOT su -s /opt/testing/bin/rpmlint "$BUILD_USER" -- \
+    chroot $BUILD_ROOT su -s $rpmlint "$BUILD_USER" -- \
 	    --info ${LINT_RPM_FILE_LIST[*]#$BUILD_ROOT} \
 	    ${SRPM_FILE_LIST[*]#$BUILD_ROOT} > >(tee "$BUILD_ROOT$rpmlint_logfile") 2>&1 || ret=1
     echo
