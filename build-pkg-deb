@@ -136,12 +136,13 @@ pkg_finalize_deb() {
 }
 
 pkg_preinstall_deb() {
-    ar x "$BUILD_ROOT/.init_b_cache/rpms/$PKG.deb"
+    ar x "$BUILD_ROOT/.init_b_cache/rpms/$PKG.deb" control.tar.gz control.tar.xz data.tar.gz data.tar.xz 2>/dev/null
+    rm -rf .init_b_cache/scripts/control
     mkdir -p .init_b_cache/scripts/control
     if test -f "control.tar.gz" ; then
-    $TAR -C .init_b_cache/scripts/control -z -f control.tar.gz
+	$TAR -C .init_b_cache/scripts/control -z -f control.tar.gz
     elif test -f "control.tar.xz" ; then
-    $TAR -C .init_b_cache/scripts/control -J -f control.tar.xz
+	$TAR -C .init_b_cache/scripts/control -J -f control.tar.xz
     fi
     if test -f "data.tar.gz" ; then
 	$TAR -z -f data.tar.gz

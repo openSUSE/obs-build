@@ -173,16 +173,19 @@ pkg_preinstall_rpm() {
 	    test -f "$BUILD_DIR/zstddec.sh" && PAYLOADDECOMPRESS="bash $BUILD_DIR/zstddec.sh"
 	fi
     fi
+    mkdir -p ".init_b_cache/scripts"
     if test "$PAYLOADDECOMPRESS" = cat ; then
 	rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" | $CPIO || cleanup_and_exit 1
     else
 	rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" | $PAYLOADDECOMPRESS | $CPIO || cleanup_and_exit 1
     fi
     if test -e ".init_b_cache/scripts/$PKG.run" ; then
+	rm -f ".init_b_cache/scripts/$PKG.pre" ".init_b_cache/scripts/$PKG.preprog" ".init_b_cache/scripts/$PKG.post" ".init_b_cache/scripts/$PKG.postprog"
 	rpm -qp --nodigest --nosignature --qf "%{PREIN}" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" > ".init_b_cache/scripts/$PKG.pre"
 	rpm -qp --nodigest --nosignature --qf "%{PREINPROG}" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" > ".init_b_cache/scripts/$PKG.preprog"
 	rpm -qp --nodigest --nosignature --qf "%{POSTIN}" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" > ".init_b_cache/scripts/$PKG.post"
 	rpm -qp --nodigest --nosignature --qf "%{POSTINPROG}" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" > ".init_b_cache/scripts/$PKG.postprog"
+	rm -f .init_b_cache/scripts/.none
 	echo -n '(none)' > .init_b_cache/scripts/.none
 	cmp -s ".init_b_cache/scripts/$PKG.pre" .init_b_cache/scripts/.none && rm -f ".init_b_cache/scripts/$PKG.pre"
 	cmp -s ".init_b_cache/scripts/$PKG.post" .init_b_cache/scripts/.none && rm -f ".init_b_cache/scripts/$PKG.post"
