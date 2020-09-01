@@ -77,7 +77,7 @@ sub parse {
 }
 
 sub show {
-  my ($release, $disturl, $chart);
+  my ($release, $disturl, $chart, $origrecipe);
   while (@ARGV) {
     if (@ARGV > 2 && $ARGV[0] eq '--release') {
       (undef, $release) = splice(@ARGV, 0, 2); 
@@ -85,6 +85,8 @@ sub show {
       (undef, $disturl) = splice(@ARGV, 0, 2);
     } elsif (@ARGV > 2 && $ARGV[0] eq '--chart') {
       (undef, $chart) = splice(@ARGV, 0, 2); 
+    } elsif (@ARGV > 2 && $ARGV[0] eq '--origrecipe') {
+      (undef, $origrecipe) = splice(@ARGV, 0, 2); 
     } else {
       last;
     }   
@@ -96,6 +98,12 @@ sub show {
   die("$d->{'error'}\n") if $d->{'error'};
 
   if ($field eq 'helminfo') {
+    my $containertags = $d->{'containertags'};
+    if ($origrecipe) {
+      # we need to parse the original recipe to get the tags
+      my $origd = parse({}, $origrecipe);
+      $containertags = $origd->{'containertags'};
+    }
     my $config_yaml = '';
     my $fd;
     die("$fn: $!\n") unless open($fd, '<', $fn);
@@ -108,7 +116,7 @@ sub show {
     $helminfo->{'name'} = $d->{'name'};
     $helminfo->{'version'} = $d->{'version'};
     $helminfo->{'release'} = $release if $release;
-    $helminfo->{'tags'} = $d->{'containertags'} if $d->{'containertags'};
+    $helminfo->{'tags'} = $containertags if $containertags;
     $helminfo->{'disturl'} = $disturl if $disturl;
     $helminfo->{'buildtime'} = time();
     if ($chart) {

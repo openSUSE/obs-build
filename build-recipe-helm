@@ -80,7 +80,7 @@ recipe_build_helm() {
     tar -xOf "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz" -- "$name/Chart.yaml" > "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml"
     test -s "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" || cleanup_and_exit 1 "helm chart does not contain $name/Chart.yaml"
     # generate helminfo
-    perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" --chart "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz" "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" helminfo > "$BUILD_ROOT$TOPDIR/HELM/$nameversion.helminfo" || cleanup_and_exit 1
+    perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" --origrecipe "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" --chart "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz" "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml" helminfo > "$BUILD_ROOT$TOPDIR/HELM/$nameversion.helminfo" || cleanup_and_exit 1
     rm -f "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml"
     BUILD_SUCCEEDED=true
 }
