@@ -730,7 +730,7 @@ else
 
     # now do the download of missing packages
     if test -s $BUILD_ROOT/.init_b_cache/rpmlist.download ; then
-        PACKAGES_TO_DOWNLOAD=`cat ${RPMLIST}.download|awk '{print $2}'`
+        PACKAGES_TO_DOWNLOAD=`awk '{print $2}' < "$BUILD_ROOT/.init_b_cache/rpmlist.download"`
         progress_setup PACKAGES_TO_DOWNLOAD
         while read PKG SRC ; do
             progress_step PACKAGES_TO_DOWNLOAD
