@@ -699,7 +699,7 @@ vm_setup() {
     echo "VM_ROOT: $VM_ROOT, VM_SWAP: $VM_SWAP"
 
     VM_USE_VIRT_FS=
-    if test -z "$RUNNING_IN_VM" -a -n "$VM_TYPE" -a -n "$VM_ROOT" -a -n "$CLEAN_BUILD" ; then
+    if test -z "$RUNNING_IN_VM" -a -n "$VM_TYPE" -a -n "$VM_ROOT" ; then
         if test -x /usr/bin/virt-make-fs -a "$VMDISK_FILESYSTEM" = ext3 ; then
             VM_USE_VIRT_FS=true
         fi
@@ -721,6 +721,11 @@ vm_setup() {
     # and calling virt-make-fs accordingly
     if test -n "$VM_USE_VIRT_FS" ; then
         echo "Using virt-make-fs to create root image"
+        if test -z "$CLEAN_BUILD" ; then
+	    echo "Recovering former build root"
+	    rm -rf "$BUILD_ROOT"
+	    debugfs -f <(echo rdump / $BUILD_ROOT) "$VM_ROOT"
+        fi
         return 0
     fi
     if test "$VM_ROOT_TYPE" = file ; then
@@ -937,6 +942,9 @@ vm_first_stage() {
 		rm -rf "$KERNEL_TEMP_DIR"
 		cleanup_and_exit 3
 	    fi
+        else
+            /usr/bin/virt-make-fs --format=raw -t ext3 --size="$VMDISK_ROOTSIZE"M $BUILD_ROOT $VM_ROOT || cleanup_and_exit 1
+￼           #rm -rf -- "$BUILD_ROOT"/*
 	fi
 	# copy back the kernel and set it for VM
 	if test -n "$KERNEL_TEMP_DIR" ; then
@@ -949,9 +957,6 @@ vm_first_stage() {
 	    fi
 	    rmdir "$KERNEL_TEMP_DIR"
 	fi
-    fi
-    if test -n "$VM_USE_VIRT_FS" ; then
-        /usr/bin/virt-make-fs --format=raw -t ext3 --size="$VMDISK_ROOTSIZE"M $BUILD_ROOT $VM_ROOT || cleanup_and_exit 1
     fi
     vm_detach_root
 
