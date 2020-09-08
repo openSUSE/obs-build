@@ -151,24 +151,61 @@ cleanup_and_exit() {
 	fi
     fi
     test "$BUILD_ROOT" = / -a -n "$browner" && chown "$browner" "$BUILD_ROOT"
+
+    echo "Halting runtime env under BUILD_ROOT='$BUILD_ROOT' ..." >&2
+    chroot "$BUILD_ROOT" /sbin/init 0 2> /dev/null || true
+
     # umount so init_buildsystem can be used standalone
     if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
 # XXX: use stat -f /dev/pts/ -c %T  to check whether it's mounted and not suppress errors then?
+	echo "Unmounting subdirs from BUILD_ROOT='$BUILD_ROOT' ..." >&2
 	umount -n "$BUILD_ROOT/proc/sys/fs/binfmt_misc" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/proc" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/dev/pts" 2> /dev/null || true
+	umount -n "$BUILD_ROOT/dev/shm" 2> /dev/null || true
+	umount -n "$BUILD_ROOT/dev" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/mnt" 2> /dev/null || true
+	umount -n "$BUILD_ROOT/.ccache" 2> /dev/null || true
+
+	umount -n -f -l "$BUILD_ROOT/proc/sys/fs/binfmt_misc" 2> /dev/null || true
+	umount -n -f -l "$BUILD_ROOT/proc" 2> /dev/null || true
+	umount -n -f -l "$BUILD_ROOT/dev/pts" 2> /dev/null || true
+	umount -n -f -l "$BUILD_ROOT/dev/shm" 2> /dev/null || true
+	umount -n -f -l "$BUILD_ROOT/dev" 2> /dev/null || true
+	umount -n -f -l "$BUILD_ROOT/mnt" 2> /dev/null || true
+	umount -n -f -l "$BUILD_ROOT/.ccache" 2> /dev/null || true
+	echo "Unmounting completed." >&2
     fi
     exit $1
 }
 
 clean_build_root() {
     if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
+	echo "Halting runtime env under BUILD_ROOT='$BUILD_ROOT' ..." >&2
+	chroot "$BUILD_ROOT" /sbin/init 0 2> /dev/null || true
+
+	echo "Unmounting subdirs from BUILD_ROOT='$BUILD_ROOT' ..." >&2
 	umount -n "$BUILD_ROOT/proc/sys/fs/binfmt_misc" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/proc" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/dev/pts" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/dev/shm" 2> /dev/null || true
+	umount -n "$BUILD_ROOT/dev" 2> /dev/null || true
 	umount -n "$BUILD_ROOT/mnt" 2> /dev/null || true
+	umount -n "$BUILD_ROOT/.ccache" 2> /dev/null || true
+
+	umount -n -f -l "$BUILD_ROOT/proc/sys/fs/binfmt_misc" 2> /dev/null || true
+	umount -n -f -l "$BUILD_ROOT/proc" 2> /dev/null || true
+	umount -n -f -l "$BUILD_ROOT/dev/pts" 2> /dev/null || true
+	umount -n -f -l "$BUILD_ROOT/dev/shm" 2> /dev/null || true
+	umount -n -f -l "$BUILD_ROOT/dev" 2> /dev/null || true
+	umount -n -f -l "$BUILD_ROOT/mnt" 2> /dev/null || true
+	umount -n -f -l "$BUILD_ROOT/.ccache" 2> /dev/null || true
+
+	if [ -n "$REMOTE_IO_EXEC" ]; then
+	    echo "Removing stuff from BUILD_ROOT='$BUILD_ROOT' using REMOTE_IO_EXEC helper ..." >&2
+	else
+	    echo "Removing stuff from BUILD_ROOT='$BUILD_ROOT' ..." >&2
+	fi
 	rm -rf -- "$BUILD_ROOT"/* 2> /dev/null || true
 	chattr -a -A -i -R -- "$BUILD_ROOT" 2> /dev/null || true
 	rm -rf -- "$BUILD_ROOT"/*
@@ -179,6 +216,45 @@ clean_build_root() {
 	rm -rf -- "$BUILD_ROOT/.init_b_cache"
 	rm -rf -- "$BUILD_ROOT"/.preinstall_image/*
 	rm -rf -- "$BUILD_ROOT"/.preinstallimage*
+	rm -rf -- "$BUILD_ROOT/.ccache-bin"
+# The actual cache can come in handy in the next life...
+#	rm -rf -- "$BUILD_ROOT/.ccache"
+
+	# Note: removals above do not impact "hidden" files starting with a dot.
+	# We do not always want to completely wipe an old root - since working data
+	# is prepared here by our caller, but sometimes we do. So there's a toggle.
+	# WIPE_BUILD_ROOT==false disables the clause below; other values including
+	# unset or empty enable the clause to move away the old build root and move
+	# back all reasonable .* objects except .n* (avoid stale nfs stuff), and
+	# a "true" value also removes the remnants of the old not-empty build root
+	# as an asynchronous call that does not block the running build (can hang
+	# though, e.g. until the NFS stale-handles expire and are killed off).
+	# Otherwise clean-up is up to volatile storage (ramdisk) or your cron jobs.
+	if test x"$WIPE_BUILD_ROOT" != xfalse && test "`find "$BUILD_ROOT" | wc -l`" -gt 1 ; then
+	    echo "Moving away old BUILD_ROOT='$BUILD_ROOT' to '$BUILD_ROOT.old.$$' ..." >&2
+	    mv -f "$BUILD_ROOT" "$BUILD_ROOT.old.$$" && \
+	    mkdir -p "$BUILD_ROOT" && \
+	    mv -f "$BUILD_ROOT.old.$$"/.[a-mo-zA-Z0-9_\-]* "$BUILD_ROOT/" || true
+	    if test x"$WIPE_BUILD_ROOT" = xtrue || test "`find "$BUILD_ROOT" | wc -l`" -le 1 ; then
+		echo "Asynchronously removing '$BUILD_ROOT.old.$$' ..." >&2
+		rm -rf -- "$BUILD_ROOT.old.$$" &
+	    fi
+	fi
+
+	echo "(Re-)creating BUILD_ROOT='$BUILD_ROOT' structure..." >&2
+	mkdir -p "$BUILD_ROOT/proc"
+	mkdir -p "$BUILD_ROOT/dev/pts"
+	if test "$UID" = 0 ; then
+	    mount -n -tproc none "$BUILD_ROOT/proc"
+	    mount -n -tdevpts -omode=0620,gid=5 none "$BUILD_ROOT/dev/pts"
+	fi
+
+	# These vars are exported from "build" master-script and corresponding
+	# files are expected on the filesystem... but we've just deleted it all!
+	test -n "$INCARNATION" && echo "BUILD_INCARNATION=$INCARNATION" > "$BUILD_ROOT/.buildenv"
+	test "$BUILDTYPE" = preinstallimage && mkdir -p "$BUILD_ROOT/.preinstall_image"
+
+	echo "Done preparing BUILD_ROOT='$BUILD_ROOT'" >&2
     fi
 }
 
@@ -485,10 +561,27 @@ if test -e "$BUILD_IS_RUNNING" ; then
 	    cleanup_and_exit 1
     fi
     echo "To be sure, we will build it again completely..."
+
+    echo "Halting runtime env under BUILD_ROOT='$BUILD_ROOT' ..." >&2
+    chroot "$BUILD_ROOT" /sbin/init 0 2> /dev/null || true
+
+    echo "Unmounting subdirs from BUILD_ROOT='$BUILD_ROOT' ..." >&2
     umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
     umount -n $BUILD_ROOT/proc 2> /dev/null
     umount -n $BUILD_ROOT/dev/pts 2> /dev/null
+    umount -n $BUILD_ROOT/dev/shm 2> /dev/null
+    umount -n $BUILD_ROOT/dev 2> /dev/null
     umount -n $BUILD_ROOT/mnt 2> /dev/null
+    umount -n $BUILD_ROOT/.ccache 2> /dev/null || true
+
+    umount -n -l -f $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
+    umount -n -l -f $BUILD_ROOT/proc 2> /dev/null
+    umount -n -l -f $BUILD_ROOT/dev/pts 2> /dev/null
+    umount -n -l -f $BUILD_ROOT/dev/shm 2> /dev/null
+    umount -n -l -f $BUILD_ROOT/dev 2> /dev/null
+    umount -n -l -f $BUILD_ROOT/mnt 2> /dev/null
+    umount -n -l -f $BUILD_ROOT/.ccache 2> /dev/null || true
+
     echo "Your build system is broken!! Shall I execute"
     echo
     echo "    rm -rf -- $BUILD_ROOT/*"
