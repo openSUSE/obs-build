@@ -1,0 +1,65 @@
+#!/usr/bin/perl -w
+
+################################################################
+#
+# Copyright (c) 2020 SUSE Linux Products GmbH
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+use strict;
+use warnings;
+
+my $install_docker_support = "COPY .obs-docker-support /usr/local/sbin/obs-docker-support\nRUN obs-docker-support --install\n";
+my $uninstall_docker_support = "RUN obs-docker-support --uninstall\n";
+
+my @sections = ( [] );
+while (<STDIN>) {
+  push @sections, [] if /^FROM /i;
+  push @{$sections[-1]}, $_;
+}
+
+# write out header unmodified
+print join('', @{shift @sections});
+
+for my $s (@sections) {
+  # analyze section (first line is always FROM)
+  my @user_root;
+  my @user_nonroot;
+  my $idx = 0;
+  for my $line (@$s) {
+    if ($line =~ /^[uU][sS][eE][rR]\s+root[ \n]/) {
+      push @user_root, $idx;
+    } elsif ($line =~ /^[uU][sS][eE][rR]\s+/) {
+      push @user_nonroot, $idx;
+    }
+    $idx++;
+  }
+  # patch in commands
+  if (@user_root && (!@user_nonroot || $user_root[0] < $user_nonroot[0])) {
+    $s->[$user_root[0]] .= $install_docker_support;
+  } else {
+    $s->[0] .= $install_docker_support;
+  }
+  if (@user_nonroot && (!@user_root || $user_root[-1] < $user_nonroot[-1])) {
+    my @ok = @user_nonroot;
+    @ok = grep {$_ > $user_root[-1]} @user_nonroot if @user_root;
+    $s->[$ok[0]] = $uninstall_docker_support . $s->[$ok[0]];
+  } else {
+    $s->[-1] .= $uninstall_docker_support;
+  }
+  print join('', @$s);
+}
