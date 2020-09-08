@@ -864,6 +864,17 @@ if test -n "$CREATE_BUILD_BINARIES" ; then
 fi
 
 #
+# Save some package build environment preparation time on Debian-like systems
+# Note: for OS image builds we probably want the man-db constructed properly
+#
+if test -x "$BUILD_ROOT/usr/bin/debconf-set-selections" && test "$BUILDTYPE" = dsc ; then
+    echo "Preseed man-db/auto-update to false for a DSC package build..."
+    chroot "$BUILD_ROOT" /usr/bin/debconf-set-selections <<EOF
+man-db man-db/auto-update boolean false
+EOF
+fi
+
+#
 # reorder packages (already done in vm continuation)
 #
 if ! test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
