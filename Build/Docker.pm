@@ -202,6 +202,7 @@ sub parse {
     @args = split(/[ \t]+/, $line);
     s/%([a-fA-F0-9]{2})/chr(hex($1))/ge for @args;
     if ($cmd eq 'FROM') {
+      shift @args if @args && $args[0] =~ /^--platform=/;
       if (@args && !$basecontainer && $args[0] ne 'scratch') {
         $basecontainer = $args[0];
         $basecontainer .= ':latest' unless $basecontainer =~ /:[^:\/]+$/;

@@ -72,6 +72,7 @@ install:
 	    telnet_login_wrapper \
 	    startdockerd \
 	    dummyhttpserver \
+	    patchdockerfile \
 	    obs-docker-support \
 	    create_container_package_list \
 	    call-podman \
