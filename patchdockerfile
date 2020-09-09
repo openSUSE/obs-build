@@ -23,11 +23,13 @@
 use strict;
 use warnings;
 
-my $install_docker_support = "COPY .obs-docker-support /usr/local/sbin/obs-docker-support\nRUN obs-docker-support --install\n";
+my $install_docker_support = "COPY .obs-docker-support /usr/local/sbin/obs-docker-support\n" .
+                             "RUN obs-docker-support --install\n";
 my $uninstall_docker_support = "RUN obs-docker-support --uninstall\n";
 
 my @sections = ( [] );
 while (<STDIN>) {
+  $_ .= "\n" unless /\n$/s;
   push @sections, [] if /^FROM /i;
   push @{$sections[-1]}, $_;
 }
@@ -36,30 +38,22 @@ while (<STDIN>) {
 print join('', @{shift @sections});
 
 for my $s (@sections) {
-  # analyze section (first line is always FROM)
-  my @user_root;
-  my @user_nonroot;
+  # analyze the section (first line is always FROM)
+  my ($install_idx, $uninstall_idx);
   my $idx = 0;
   for my $line (@$s) {
-    if ($line =~ /^[uU][sS][eE][rR]\s+root[ \n]/) {
-      push @user_root, $idx;
+    if ($line =~ /^[uU][sS][eE][rR]\s+root[\s\n]/) {
+      $install_idx = $idx unless defined $install_idx;
+      $uninstall_idx = undef;
     } elsif ($line =~ /^[uU][sS][eE][rR]\s+/) {
-      push @user_nonroot, $idx;
+      $install_idx = 0 unless defined $install_idx;
+      $uninstall_idx = $idx unless defined $uninstall_idx;
     }
     $idx++;
   }
   # patch in commands
-  if (@user_root && (!@user_nonroot || $user_root[0] < $user_nonroot[0])) {
-    $s->[$user_root[0]] .= $install_docker_support;
-  } else {
-    $s->[0] .= $install_docker_support;
-  }
-  if (@user_nonroot && (!@user_root || $user_root[-1] < $user_nonroot[-1])) {
-    my @ok = @user_nonroot;
-    @ok = grep {$_ > $user_root[-1]} @user_nonroot if @user_root;
-    $s->[$ok[0]] = $uninstall_docker_support . $s->[$ok[0]];
-  } else {
-    $s->[-1] .= $uninstall_docker_support;
-  }
+  $s->[$install_idx || 0] .= $install_docker_support;
+  substr($s->[$uninstall_idx], 0, 0, $uninstall_docker_support) if defined $uninstall_idx;
+  $s->[-1] .= $uninstall_docker_support unless defined $uninstall_idx;
   print join('', @$s);
 }
