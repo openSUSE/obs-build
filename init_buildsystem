@@ -255,17 +255,16 @@ reorder() {
 create_devs() {
     local com file mode arg
 
-    test -d $BUILD_ROOT/dev/pts -a ! -L $BUILD_ROOT/dev/pts || rm -f $BUILD_ROOT/dev/pts
-    test -d $BUILD_ROOT/dev/shm -a ! -L $BUILD_ROOT/dev/shm || rm -f $BUILD_ROOT/dev/shm
     mkdir -m 755 -p $BUILD_ROOT/dev/pts
+    test -d $BUILD_ROOT/dev/shm || rm -f $BUILD_ROOT/dev/shm
     mkdir -m 755 -p $BUILD_ROOT/dev/shm
     while read com file mode arg ; do
 	rm -f $BUILD_ROOT/dev/$file
 	if test $com = ln ; then
 	    ln -s $arg $BUILD_ROOT/dev/$file
-	elif $com = mknod ; then
-	    mknod -m $mode $BUILD_ROOT/dev/$file $arg
+	    continue
 	fi
+	$com -m $mode $BUILD_ROOT/dev/$file $arg
     done << DEVLIST
 	mknod null    666 c 1 3
 	mknod zero    666 c 1 5
@@ -776,7 +775,6 @@ esac
 # test if we need to preinstall
 #
 if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsystem.data ; then
-    mkdir -p $BUILD_ROOT/.init_b_cache/rpms || cleanup_and_exit 1
     mkdir -p $BUILD_ROOT/etc || cleanup_and_exit 1
     mkdir -p $BUILD_ROOT/proc || cleanup_and_exit 1
     test -f $BUILD_ROOT/etc/HOSTNAME || hostname -f > $BUILD_ROOT/etc/HOSTNAME
@@ -792,9 +790,6 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
 	PACKAGES_TO_VMINSTALL_FILTERED=`preinstall_image_filter $PACKAGES_TO_VMINSTALL_FILTERED`
     fi
     PACKAGES_TO_PREINSTALL_FILTERED=`reorder $PACKAGES_TO_PREINSTALL_FILTERED`
-    if test -n "$PREPARE_VM" ; then
-        PACKAGES_TO_VMINSTALL_FILTERED=`reorder $PACKAGES_TO_VMINSTALL_FILTERED`
-    fi
     progress_setup PACKAGES_TO_PREINSTALL_FILTERED
     for PKG in $PACKAGES_TO_PREINSTALL_FILTERED ; do
 	progress_step PACKAGES_TO_PREINSTALL_FILTERED
@@ -802,6 +797,7 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
     done
     echo
     if test -n "$PREPARE_VM" ; then
+        PACKAGES_TO_VMINSTALL_FILTERED=`reorder $PACKAGES_TO_VMINSTALL_FILTERED`
 	progress_setup PACKAGES_TO_VMINSTALL_FILTERED
 	for PKG in $PACKAGES_TO_VMINSTALL_FILTERED ; do
 	    progress_step PACKAGES_TO_VMINSTALL_FILTERED
@@ -813,14 +809,8 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
     if test -w /root ; then
 	test -c $BUILD_ROOT/dev/null || create_devs
     fi
-    if ! test -e $BUILD_ROOT/etc/fstab ; then
-	rm -f $BUILD_ROOT/etc/fstab
-	touch $BUILD_ROOT/etc/fstab
-    fi
-    if test ! -e $BUILD_ROOT/etc/ld.so.conf -a -e $BUILD_ROOT/etc/ld.so.conf.in -a ! -L $BUILD_ROOT/etc/ld.so.conf.in ; then
-	rm -rf $BUILD_ROOT/etc/ld.so.conf
-	cp $BUILD_ROOT/etc/ld.so.conf.in $BUILD_ROOT/etc/ld.so.conf
-    fi
+    test -e $BUILD_ROOT/etc/fstab || touch $BUILD_ROOT/etc/fstab
+    test ! -e $BUILD_ROOT/etc/ld.so.conf -a -e $BUILD_ROOT/etc/ld.so.conf.in && cp $BUILD_ROOT/etc/ld.so.conf.in $BUILD_ROOT/etc/ld.so.conf
     if test -z "$PREPARE_VM" ; then
 	run_pkg_scripts
 	pkg_initdb
@@ -845,7 +835,6 @@ if test -n "$PREPARE_VM" ; then
     check_exit
     echo 'done'
     Q="'\''"
-    rm -rf "$BUILD_ROOT/.build/init_buildsystem.data"
     echo "PACKAGES_TO_INSTALL='${PACKAGES_TO_INSTALL//"'"/$Q}'" > $BUILD_ROOT/.build/init_buildsystem.data
     echo "PACKAGES_TO_RUNSCRIPTS='${PACKAGES_TO_RUNSCRIPTS//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
     # needed for continuation in xen/kvm with rpm-x86
