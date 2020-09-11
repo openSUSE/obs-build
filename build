@@ -1583,7 +1583,7 @@ if test -n "$RPMS" -a -d "$BUILD_ROOT/usr/lib/build/checks" ; then
     TIME_POSTCHECKS=`date +%s`
     for CHECKSCRIPT in $BUILD_ROOT/usr/lib/build/checks/* ; do
 	echo "... running ${CHECKSCRIPT##*/}"
-	$CHECKSCRIPT || cleanup_and_exit 1
+	BUILD_ROOT=/ chroot "$BUILD_ROOT" "/usr/lib/build/checks/${CHECKSCRIPT##*/}" || cleanup_and_exit 1
     done
     TIME_POSTCHECKS=$(( `date +%s` - $TIME_POSTCHECKS ))
     # workaround for broken 13.1 check scripts which umount /proc
