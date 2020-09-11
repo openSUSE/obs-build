@@ -152,6 +152,7 @@ sub parse {
     'imagerepos' => [],
   };
 
+  my $excludedline;
   while (@lines) {
     my $line = shift @lines;
     $line =~ s/^\s+//;
@@ -175,6 +176,14 @@ sub parse {
       if ($line =~ /^#!Milestone:\s*(\S+)\s*$/) {
 	$ret->{'milestone'} = $1;
       }
+      if ($line =~ /^#!ArchExclusiveLine:\s*(.*?)$/) {
+	my ($arch) = Build::gettargetarchos($cf);
+	$excludedline = grep {$_ eq $arch} split(' ', $1) ? undef : 1;
+      }
+      if ($line =~ /^#!ArchExcludedLine:\s*(.*?)$/) {
+	my ($arch) = Build::gettargetarchos($cf);
+	$excludedline = grep {$_ eq $arch} split(' ', $1) ? 1 : undef;
+      }
       next;
     }
     # add continuation lines
@@ -185,6 +194,10 @@ sub parse {
     $line =~ s/^\s+//;
     $line =~ s/\s+$//;
     next unless $line;
+    if ($excludedline) {
+      undef $excludedline;
+      next;
+    }
     my ($cmd, @args);
     ($cmd, $line) = split(' ', $line, 2);
     $cmd = uc($cmd);
