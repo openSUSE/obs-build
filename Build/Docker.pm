@@ -25,6 +25,15 @@ use Build::SimpleJSON;
 
 use strict;
 
+sub gettargetarch {
+  my ($config) = @_;
+  my $arch = 'noarch';
+  for (@{$config->{'macros'} || []}) {
+    $arch = $1 if /^%define _target_cpu (\S+)/;
+  }
+  return $arch;
+}
+
 sub slurp {
   my ($fn) = @_;
   local *F;
@@ -177,12 +186,12 @@ sub parse {
 	$ret->{'milestone'} = $1;
       }
       if ($line =~ /^#!ArchExclusiveLine:\s*(.*?)$/) {
-	my ($arch) = Build::gettargetarchos($cf);
-	$excludedline = grep {$_ eq $arch} split(' ', $1) ? undef : 1;
+	my $arch = gettargetarch($cf);
+	$excludedline = (grep {$_ eq $arch} split(' ', $1)) ? undef : 1;
       }
       if ($line =~ /^#!ArchExcludedLine:\s*(.*?)$/) {
-	my ($arch) = Build::gettargetarchos($cf);
-	$excludedline = grep {$_ eq $arch} split(' ', $1) ? 1 : undef;
+	my $arch = gettargetarch($cf);
+	$excludedline = (grep {$_ eq $arch} split(' ', $1)) ? 1 : undef;
       }
       next;
     }
