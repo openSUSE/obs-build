@@ -61,12 +61,12 @@ pkg_finalize_arch() {
 pkg_preinstall_arch() {
     mkdir -p ".init_b_cache/scripts"
     $TAR -f "$BUILD_ROOT/.init_b_cache/rpms/$PKG.arch"
-    rm -f ".init_b_cache/scripts/$PKG.post"
+    rm -rf ".init_b_cache/scripts/$PKG.post"
     if test -f .INSTALL ; then
 	cat .INSTALL > ".init_b_cache/scripts/$PKG.post"
 	echo 'type post_install >/dev/null 2>&1 && post_install' >> ".init_b_cache/scripts/$PKG.post"
     fi
-    rm -f .PKGINFO .INSTALL
+    rm -rf .PKGINFO .INSTALL
 }
 
 pkg_runscripts_arch() {
