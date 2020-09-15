@@ -444,11 +444,11 @@ cleanup_and_exit () {
 	test -n "$browner" && chown "$browner" $BUILD_ROOT
 	vm_shutdown "$1"
     else
-	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
-	umount -n $BUILD_ROOT/proc 2>/dev/null || true
-	umount -n $BUILD_ROOT/dev/pts 2>/dev/null || true
-	umount -n $BUILD_ROOT/dev/shm 2>/dev/null || true
-	umount -n $BUILD_ROOT/sys 2>/dev/null || true
+	buildroot_umount /proc/sys/fs/binfmt_misc
+	buildroot_umount /proc
+	buildroot_umount /sys
+	buildroot_umount /dev/pts
+	buildroot_umount /dev/shm
 	test -n "$VM_ROOT" -a "$VM_ROOT" != 1 && umount $BUILD_ROOT 2>/dev/null || true
 	test -n "$VM_TYPE" && vm_cleanup
     fi
@@ -799,11 +799,11 @@ mount_stuff() {
 
 umount_stuff() {
     if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
-	umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2>/dev/null || true
-	umount -n $BUILD_ROOT/proc 2>/dev/null || true
-	umount -n $BUILD_ROOT/dev/pts 2>/dev/null || true
-	umount -n $BUILD_ROOT/dev/shm 2>/dev/null || true
-	umount -n $BUILD_ROOT/sys 2>/dev/null || true
+	buildroot_umount /proc/sys/fs/binfmt_misc
+	buildroot_umount /proc
+	buildroot_umount /sys
+	buildroot_umount /dev/pts
+	buildroot_umount /dev/shm
     fi
 }
 

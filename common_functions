@@ -140,3 +140,17 @@ progress_step() {
     local LEN=$1__LENGTH__
     printf "${2-[%d/%d] }" $(($IDX++)) ${!LEN}
 }
+
+# umount that does not follow symlinks
+buildroot_umount() {
+    local d="$1"
+    local d2="/$d"
+    while test -n "$d2" ; do
+        test -L "$BUILD_ROOT$d2" && return
+        test -d "$BUILD_ROOT$d2" || return
+        d2="${d2%/*}"
+    done
+    # XXX: use stat -f /dev/pts/ -c %T  to check whether it's mounted and not suppress errors?
+    umount -n "$BUILD_ROOT/$d" 2>/dev/null || true
+}
+

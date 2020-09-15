@@ -153,22 +153,24 @@ cleanup_and_exit() {
     test "$BUILD_ROOT" = / -a -n "$browner" && chown "$browner" "$BUILD_ROOT"
     # umount so init_buildsystem can be used standalone
     if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
-# XXX: use stat -f /dev/pts/ -c %T  to check whether it's mounted and not suppress errors then?
-	umount -n "$BUILD_ROOT/proc/sys/fs/binfmt_misc" 2> /dev/null || true
-	umount -n "$BUILD_ROOT/proc" 2> /dev/null || true
-	umount -n "$BUILD_ROOT/dev/pts" 2> /dev/null || true
-	umount -n "$BUILD_ROOT/mnt" 2> /dev/null || true
+	buildroot_umount "/proc/sys/fs/binfmt_misc"
+	buildroot_umount "/proc"
+	buildroot_umount "/sys"
+	buildroot_umount "/dev/pts"
+	buildroot_umount "/dev/shm"
+	buildroot_umount "/mnt"
     fi
     exit $1
 }
 
 clean_build_root() {
     if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
-	umount -n "$BUILD_ROOT/proc/sys/fs/binfmt_misc" 2> /dev/null || true
-	umount -n "$BUILD_ROOT/proc" 2> /dev/null || true
-	umount -n "$BUILD_ROOT/dev/pts" 2> /dev/null || true
-	umount -n "$BUILD_ROOT/dev/shm" 2> /dev/null || true
-	umount -n "$BUILD_ROOT/mnt" 2> /dev/null || true
+	buildroot_umount "/proc/sys/fs/binfmt_misc"
+	buildroot_umount "/proc"
+	buildroot_umount "/sys"
+	buildroot_umount "/dev/pts"
+	buildroot_umount "/dev/shm"
+	buildroot_umount "/mnt"
 	rm -rf -- "$BUILD_ROOT"/* 2> /dev/null || true
 	chattr -a -A -i -R -- "$BUILD_ROOT" 2> /dev/null || true
 	rm -rf -- "$BUILD_ROOT"/*
@@ -485,10 +487,12 @@ if test -e "$BUILD_IS_RUNNING" ; then
 	    cleanup_and_exit 1
     fi
     echo "To be sure, we will build it again completely..."
-    umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
-    umount -n $BUILD_ROOT/proc 2> /dev/null
-    umount -n $BUILD_ROOT/dev/pts 2> /dev/null
-    umount -n $BUILD_ROOT/mnt 2> /dev/null
+    buildroot_umount "/proc/sys/fs/binfmt_misc"
+    buildroot_umount "/proc"
+    buildroot_umount "/sys"
+    buildroot_umount "/dev/pts"
+    buildroot_umount "/dev/shm"
+    buildroot_umount "/mnt"
     echo "Your build system is broken!! Shall I execute"
     echo
     echo "    rm -rf -- $BUILD_ROOT/*"
