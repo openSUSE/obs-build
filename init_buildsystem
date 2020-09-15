@@ -204,13 +204,13 @@ preinstall_image() {
     echo "unpacking preinstall image${2:+ $2}"
     cd $BUILD_ROOT || cleanup_and_exit 1
     if test -x /usr/bin/bsdtar ; then
-	TAR="/usr/bin/bsdtar -P --chroot --numeric-owner -x"
+	TAR="/usr/bin/bsdtar --exclude .build --exclude .init_b_cache -P --chroot --numeric-owner -x"
     else
 	unsafe_preinstall_check
-	TAR="tar -x"
+	TAR="tar --exclude .build --exclude .init_b_cache -x"
     fi
     # pipe output through perl to print a dot every 1000 lines
-    if ! $TAR -z --exclude .build --exclude .init_b_cache -f "$BUILD_ROOT/.init_b_cache/rpms/$1" -v > >(tee "$BUILD_ROOT/.preinstallimage.unpack" | perl -e '$|=1; my $done=0; $done++ % 1000 or print "." while <STDIN>; print "\n";')  2>&1 ; then
+    if ! $TAR -z -f "$BUILD_ROOT/.init_b_cache/rpms/$1" -v > >(tee "$BUILD_ROOT/.preinstallimage.unpack" | perl -e '$|=1; my $done=0; $done++ % 1000 or print "." while <STDIN>; print "\n";')  2>&1 ; then
 	echo "unpack failed."
 	test -e "$BUILD_ROOT/.preinstallimage.unpack" && cat "$BUILD_ROOT/.preinstallimage.unpack"
 	cleanup_and_exit 1
@@ -224,12 +224,12 @@ preinstall() {
     echo "preinstalling $PKG..."
     cd $BUILD_ROOT || cleanup_and_exit 1
     if test -x /usr/bin/bsdtar ; then
-	CPIO="/usr/bin/bsdtar -P --chroot -o --numeric-owner -x -f-"
-	TAR="/usr/bin/bsdtar -P --chroot -o --numeric-owner -x"
+	CPIO="/usr/bin/bsdtar --exclude .build --exclude .init_b_cache -P --chroot -o --numeric-owner -x -f-"
+	TAR="/usr/bin/bsdtar --exclude .build --exclude .init_b_cache -P --chroot -o --numeric-owner -x"
     else
 	unsafe_preinstall_check
 	CPIO="cpio --extract --unconditional --preserve-modification-time --make-directories --no-absolute-filenames --quiet"
-	TAR="tar -x"
+	TAR="tar --exclude .build --exclude .init_b_cache -x"
     fi
     pkg_preinstall
 }
