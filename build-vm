@@ -847,6 +847,7 @@ vm_first_stage() {
     # the watchdog needs a log file
     test -n "$LOGFILE" || VM_WATCHDOG=
     # put our config into .build/build.data
+    rm -rf $BUILD_ROOT/.build/build.data
     Q="'\''"
     echo "RECIPEFILE='${RECIPEFILE//"'"/$Q}'" > $BUILD_ROOT/.build/build.data
     echo "BUILD_JOBS='${BUILD_JOBS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
@@ -905,7 +906,9 @@ vm_first_stage() {
     echo "BUILD_FLAVOR='$BUILD_FLAVOR'" >> $BUILD_ROOT/.build/build.data
     echo "OBS_PACKAGE='$OBS_PACKAGE'" >> $BUILD_ROOT/.build/build.data
     # fallback time for broken hosts
+    rm -rf $BUILD_ROOT/.build/.date
     date '+@%s' > $BUILD_ROOT/.build/.date
+
     # we're done with the root file system, unmount
     umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
     umount -n $BUILD_ROOT/proc 2> /dev/null || true
@@ -939,7 +942,7 @@ vm_first_stage() {
 	# needs to work otherwise we have a corrupted file system
 	if test -z "$VM_USE_VIRT_FS" ; then
 	    if ! umount $BUILD_ROOT; then
-		rm -rf "$KERNEL_TEMP_DIR"
+		test -n "$KERNEL_TEMP_DIR" && rm -rf "$KERNEL_TEMP_DIR"
 		cleanup_and_exit 3
 	    fi
         else

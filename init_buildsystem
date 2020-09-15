@@ -172,13 +172,14 @@ clean_build_root() {
 	buildroot_umount "/dev/shm"
 	buildroot_umount "/mnt"
 	rm -rf -- "$BUILD_ROOT"/* 2> /dev/null || true
-	chattr -a -A -i -R -- "$BUILD_ROOT" 2> /dev/null || true
+	chattr -a -A -i -R -- "$BUILD_ROOT" 2> /dev/null || true    # does not follow symlinks
 	rm -rf -- "$BUILD_ROOT"/*
 	rm -rf -- "$BUILD_ROOT/.build"
 	rm -rf -- "$BUILD_ROOT"/.build.kernel.*
 	rm -rf -- "$BUILD_ROOT"/.build.initrd.*
 	rm -rf -- "$BUILD_ROOT/.root"
 	rm -rf -- "$BUILD_ROOT/.init_b_cache"
+	test -L "$BUILD_ROOT/.preinstall_image" && rm -f -- "$BUILD_ROOT/.preinstall_image"
 	rm -rf -- "$BUILD_ROOT"/.preinstall_image/*
 	rm -rf -- "$BUILD_ROOT"/.preinstallimage*
     fi
@@ -201,6 +202,17 @@ preinstall_image_filter() {
     done
 }
 
+assert_dirs() {
+    local d
+    for d in usr usr/sbin etc .build .init_b_cache .init_b_cache/scripts .init_b_cache/rpms .preinstall_image proc proc/sys proc/sys/fs proc/sys/fs/binfmt_misc dev dev/pts mnt ; do
+	test -L "$BUILD_ROOT/$d" && cleanup_and_exit 1 "$d: is a symlink"
+	test -e "$BUILD_ROOT/$d" -a ! -d "$BUILD_ROOT/$d" && "$d: not a directory"
+    done
+    if test -L "$BUILD_ROOT/sbin" ; then
+	test "$(readlink $BUILD_ROOT/sbin)" = "usr/sbin" || cleanup_and_exit 1 "/sbin does not link to usr/sbin"
+    fi
+}
+
 preinstall_image() {
     check_exit
     echo "unpacking preinstall image${2:+ $2}"
@@ -214,10 +226,11 @@ preinstall_image() {
     # pipe output through perl to print a dot every 1000 lines
     if ! $TAR -z -f "$BUILD_ROOT/.init_b_cache/rpms/$1" -v > >(tee "$BUILD_ROOT/.preinstallimage.unpack" | perl -e '$|=1; my $done=0; $done++ % 1000 or print "." while <STDIN>; print "\n";')  2>&1 ; then
 	echo "unpack failed."
-	test -e "$BUILD_ROOT/.preinstallimage.unpack" && cat "$BUILD_ROOT/.preinstallimage.unpack"
+	test -f "$BUILD_ROOT/.preinstallimage.unpack" -a ! -L "$BUILD_ROOT/.preinstallimage.unpack" && cat "$BUILD_ROOT/.preinstallimage.unpack"
 	cleanup_and_exit 1
     fi
-    rm -f "$BUILD_ROOT/.preinstallimage.unpack"
+    rm -rf "$BUILD_ROOT/.preinstallimage.unpack"
+    assert_dirs
 }
 
 preinstall() {
@@ -234,6 +247,7 @@ preinstall() {
 	TAR="tar --exclude .build --exclude .init_b_cache -x"
     fi
     pkg_preinstall
+    assert_dirs
 }
 
 run_pkg_scripts() {
@@ -257,16 +271,17 @@ reorder() {
 create_devs() {
     local com file mode arg
 
+    test -d $BUILD_ROOT/dev/pts -a ! -L $BUILD_ROOT/dev/pts || rm -f $BUILD_ROOT/dev/pts
+    test -d $BUILD_ROOT/dev/shm -a ! -L $BUILD_ROOT/dev/shm || rm -f $BUILD_ROOT/dev/shm
     mkdir -m 755 -p $BUILD_ROOT/dev/pts
-    test -d $BUILD_ROOT/dev/shm || rm -f $BUILD_ROOT/dev/shm
     mkdir -m 755 -p $BUILD_ROOT/dev/shm
     while read com file mode arg ; do
 	rm -f $BUILD_ROOT/dev/$file
 	if test $com = ln ; then
 	    ln -s $arg $BUILD_ROOT/dev/$file
-	    continue
+	elif $com = mknod ; then
+	    mknod -m $mode $BUILD_ROOT/dev/$file $arg
 	fi
-	$com -m $mode $BUILD_ROOT/dev/$file $arg
     done << DEVLIST
 	mknod null    666 c 1 3
 	mknod zero    666 c 1 5
@@ -529,7 +544,7 @@ if test "$UID" = 0 -a -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
 fi
 
 if test -n "$PREPARE_VM" ; then
-    rm -f $BUILD_ROOT/.build/init_buildsystem.data
+    rm -rf $BUILD_ROOT/.build/init_buildsystem.data
 fi
 
 if test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
@@ -779,6 +794,7 @@ esac
 # test if we need to preinstall
 #
 if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsystem.data ; then
+    mkdir -p $BUILD_ROOT/.init_b_cache/rpms || cleanup_and_exit 1
     mkdir -p $BUILD_ROOT/etc || cleanup_and_exit 1
     mkdir -p $BUILD_ROOT/proc || cleanup_and_exit 1
     test -f $BUILD_ROOT/etc/HOSTNAME || hostname -f > $BUILD_ROOT/etc/HOSTNAME
@@ -794,6 +810,9 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
 	PACKAGES_TO_VMINSTALL_FILTERED=`preinstall_image_filter $PACKAGES_TO_VMINSTALL_FILTERED`
     fi
     PACKAGES_TO_PREINSTALL_FILTERED=`reorder $PACKAGES_TO_PREINSTALL_FILTERED`
+    if test -n "$PREPARE_VM" ; then
+        PACKAGES_TO_VMINSTALL_FILTERED=`reorder $PACKAGES_TO_VMINSTALL_FILTERED`
+    fi
     progress_setup PACKAGES_TO_PREINSTALL_FILTERED
     for PKG in $PACKAGES_TO_PREINSTALL_FILTERED ; do
 	progress_step PACKAGES_TO_PREINSTALL_FILTERED
@@ -801,7 +820,6 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
     done
     echo
     if test -n "$PREPARE_VM" ; then
-        PACKAGES_TO_VMINSTALL_FILTERED=`reorder $PACKAGES_TO_VMINSTALL_FILTERED`
 	progress_setup PACKAGES_TO_VMINSTALL_FILTERED
 	for PKG in $PACKAGES_TO_VMINSTALL_FILTERED ; do
 	    progress_step PACKAGES_TO_VMINSTALL_FILTERED
@@ -813,8 +831,14 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
     if test -w /root ; then
 	test -c $BUILD_ROOT/dev/null || create_devs
     fi
-    test -e $BUILD_ROOT/etc/fstab || touch $BUILD_ROOT/etc/fstab
-    test ! -e $BUILD_ROOT/etc/ld.so.conf -a -e $BUILD_ROOT/etc/ld.so.conf.in && cp $BUILD_ROOT/etc/ld.so.conf.in $BUILD_ROOT/etc/ld.so.conf
+    if ! test -e $BUILD_ROOT/etc/fstab ; then
+	rm -rf $BUILD_ROOT/etc/fstab
+	touch $BUILD_ROOT/etc/fstab
+    fi
+    if test ! -e $BUILD_ROOT/etc/ld.so.conf -a -f $BUILD_ROOT/etc/ld.so.conf.in -a ! -L $BUILD_ROOT/etc/ld.so.conf.in ; then
+	rm -rf $BUILD_ROOT/etc/ld.so.conf
+	cp $BUILD_ROOT/etc/ld.so.conf.in $BUILD_ROOT/etc/ld.so.conf
+    fi
     if test -z "$PREPARE_VM" ; then
 	run_pkg_scripts
 	pkg_initdb
@@ -828,7 +852,7 @@ fi
 if test -n "$PREPARE_VM" ; then
     echo "copying packages..."
     for PKG in $PACKAGES_TO_ALL ; do
-	rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
+	rm -rf $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
 	cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
 	ln -s -f ../$PKG.$PSUF $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF
 	check_exit
@@ -839,6 +863,7 @@ if test -n "$PREPARE_VM" ; then
     check_exit
     echo 'done'
     Q="'\''"
+    rm -rf "$BUILD_ROOT/.build/init_buildsystem.data"
     echo "PACKAGES_TO_INSTALL='${PACKAGES_TO_INSTALL//"'"/$Q}'" > $BUILD_ROOT/.build/init_buildsystem.data
     echo "PACKAGES_TO_RUNSCRIPTS='${PACKAGES_TO_RUNSCRIPTS//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
     # needed for continuation in xen/kvm with rpm-x86
