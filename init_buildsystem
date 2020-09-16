@@ -279,7 +279,7 @@ create_devs() {
 	rm -f $BUILD_ROOT/dev/$file
 	if test $com = ln ; then
 	    ln -s $arg $BUILD_ROOT/dev/$file
-	elif $com = mknod ; then
+	elif test $com = mknod ; then
 	    mknod -m $mode $BUILD_ROOT/dev/$file $arg
 	fi
     done << DEVLIST
