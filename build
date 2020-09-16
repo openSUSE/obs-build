@@ -73,6 +73,7 @@ DO_INIT_TOPDIR=true
 DO_LINT=
 DO_CHECKS=true
 CLEAN_BUILD=
+REMOVE_CCACHE=
 GENBUILDREQS_CLEAN_BUILD=
 RECIPEFILES=()
 SRCDIR=
@@ -859,6 +860,7 @@ while test -n "$1"; do
       -clean)
 	test "$CLEAN_BUILD" = '--clean' && GENBUILDREQS_CLEAN_BUILD='--clean'
 	CLEAN_BUILD='--clean'
+	REMOVE_CCACHE="$CLEAN_BUILD"
       ;;
       -wipe)
 	DO_WIPE=true
@@ -1601,10 +1603,14 @@ if test -n "$RPMS" -a "$DO_CHECKS" != false ; then
 fi
 
 if test -n "$CCACHE" ; then
-    echo "... cleaning ccache"
-    test "$(ccache -h | grep -c evict-older-than)" != 0 && ccache --evict-older-than $((`date +%s` - $CCACHE_SETUP_START_TIME))
+    if test -n "$REMOVE_CCACHE" ; then
+        echo "... cleaning ccache"
+        test_cmd="ccache -h | grep -c evict-older-than"
+        clean_cmd="ccache --evict-older-than $(($(date +%s) - $CCACHE_SETUP_START_TIME))"
+        chroot $BUILD_ROOT su -c "$test_cmd && $clean_cmd" - $BUILD_USER
+    fi
     echo "... saving ccache"
-    tar --remove-files -cf "$BUILD_ROOT/$TOPDIR/OTHER/_ccache.tar" -C "$BUILD_ROOT/.ccache/" .
+    tar ${REMOVE_CCACHE:+--remove-files} -cf "$BUILD_ROOT/$TOPDIR/OTHER/_ccache.tar" -C "$BUILD_ROOT/.ccache/" .
 fi
 
 if test \( -n "$RPMS" -o -n "$DEBS" \) -a -n "$CREATE_BASELIBS"; then
