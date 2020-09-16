@@ -148,7 +148,7 @@ pkg_preinstall_deb() {
     fi
     if test -f "data.tar.gz" -a ! -L "data.tar.gz" ; then
 	$TAR -z -f data.tar.gz
-    elif test -f "data.tar.xz" -a ! -L "data.tar.gz" ; then
+    elif test -f "data.tar.xz" -a ! -L "data.tar.xz" ; then
 	$TAR -J -f data.tar.xz
     fi
     rm -rf ".init_b_cache/scripts/$PKG.pre" ".init_b_cache/scripts/$PKG.post"
