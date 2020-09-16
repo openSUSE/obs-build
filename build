@@ -41,7 +41,7 @@ test -z "$BUILD_ROOT" && BUILD_ROOT=/var/tmp/build-root
 test -z "$CONFIG_DIR" && CONFIG_DIR="$BUILD_DIR/configs"
 
 export BUILD_ARCH BUILD_HOST_ARCH BUILD_ROOT BUILD_RPMS BUILD_DIR BUILD_DEBUG
-export BUILD_DIST
+export BUILD_DIST ABUILD_UID ABUILD_GID
 
 icecream=0
 definesnstuff=()
