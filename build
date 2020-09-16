@@ -494,7 +494,6 @@ setupccache() {
 	    done
 	fi
 	mkdir -p "$BUILD_ROOT/.ccache"
-	chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.ccache"
 	echo 'export PATH=/var/lib/build/ccache/bin:$PATH' >> "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
 
         local cconf="$BUILD_ROOT"/etc/ccache.conf
@@ -507,6 +506,7 @@ setupccache() {
         fi
         local ccachetar="$BUILD_ROOT/.build.oldpackages/_ccache.tar"
         test -e $ccachetar && tar -xf $ccachetar -C "$BUILD_ROOT/.ccache/"
+        chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.ccache"
     else
         CCACHE_SETUP_START_TIME=
 	rm -f "$BUILD_ROOT"/var/lib/build/ccache/bin/{gcc,g++,cc,c++,clang,clang++}
