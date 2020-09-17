@@ -203,14 +203,18 @@ preinstall_image_filter() {
 }
 
 assert_dirs() {
-    local d
-    for d in usr usr/sbin etc .build .init_b_cache .init_b_cache/scripts .init_b_cache/rpms .preinstall_image proc proc/sys proc/sys/fs proc/sys/fs/binfmt_misc dev dev/pts mnt ; do
-	test -L "$BUILD_ROOT/$d" && cleanup_and_exit 1 "$d: is a symlink"
-	test -e "$BUILD_ROOT/$d" -a ! -d "$BUILD_ROOT/$d" && "$d: not a directory"
+    local d rl
+    for d in usr sbin usr/bin usr/sbin etc .build .init_b_cache .init_b_cache/scripts .init_b_cache/rpms .preinstall_image proc proc/sys proc/sys/fs proc/sys/fs/binfmt_misc dev dev/pts mnt ; do
+	if test -L "$BUILD_ROOT/$d" ; then
+	    rl="$(readlink "$BUILD_ROOT/$d")"
+	    test "$d" = sbin -a "x$rl" = "xusr/sbin" && continue
+	    test "$d" = sbin -a "x$rl" = "xusr/bin" && continue
+	    test "$d" = usr/sbin -a "x$rl" = "xbin" && continue
+	    cleanup_and_exit 1 "$d: illegal symlink to $rl"
+	else
+	    test -e "$BUILD_ROOT/$d" -a ! -d "$BUILD_ROOT/$d" && cleanup_and_exit 1 "$d: not a directory"
+	fi
     done
-    if test -L "$BUILD_ROOT/sbin" ; then
-	test "$(readlink $BUILD_ROOT/sbin)" = "usr/sbin" || cleanup_and_exit 1 "/sbin does not link to usr/sbin"
-    fi
 }
 
 preinstall_image() {
