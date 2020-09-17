@@ -101,6 +101,7 @@ my $std_macros = q{
 %define arm     armv3l armv4b armv4l armv4tl armv5b armv5l armv5teb armv5tel armv5tejl armv6l armv6hl armv7l armv7hl armv7hnl       armv5el armv5eb armv6el armv6eb armv7el armv7eb armv7nhl armv8el
 %define arml    armv3l armv4l armv5l armv5tel armv6l armv6hl armv7l armv7hl armv7hnl
 %define armb    armv4b armv5b armv5teb
+%define arm64   aarch64
 %define mips32  mips mipsel mipsr6 mipsr6el
 %define mips64  mips64 mips64el mips64r6 mips64r6el
 %define mipseb  mips mipsr6 mips64 mips64r6
