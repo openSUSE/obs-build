@@ -31,6 +31,15 @@ use File::Basename;
 
 use strict;
 
+sub get_zypp_baseurl {
+  my ($reponame) = @_;
+  require Build::Zypp;
+  my $repo = Build::Zypp::parserepo($reponame);
+  die("can't parse $reponame\n") unless $repo;
+  die "missing url in repo $repo->{'name'}\n" unless $repo->{'baseurl'};
+  return $repo->{'baseurl'};
+}
+
 die "USAGE: $0 DIR URLS..." unless $#ARGV >= 1;
 
 my $dir = shift @ARGV;
@@ -44,19 +53,15 @@ my $ua = LWP::UserAgent->new(
 
 for my $url (@ARGV) {
   if ($url =~ /^zypp:\/\/([^\/]*)\/?/) {
-    use Build::Zypp;
-    my $repo = Build::Zypp::parserepo($1);
-    die "can't parse $1\n" unless $repo;
-    die "missing url in repo ".$repo->{'name'}."\n" unless exists $repo->{'baseurl'};
-    my $u = $repo->{'baseurl'};
-    $u .= '/' unless $u =~ /\/$/;
-    $url =~ s/^zypp:\/\/[^\/]*\/*//;
-    $url = URI->new($u.$url);
+    my $baseurl = get_zypp_baseurl($1);
+    $baseurl .= '/' unless $baseurl =~ /\/$/;
+    $url =~ s/^zypp:\/\/[^\/]*\/*/$baseurl/;
+    $url = URI->new($url);
     if ($url->scheme eq 'dir') {
       my $dest = "$dir/".basename($url->path);
       unlink($dest);	# just in case
       system('cp', $url->path, $dest) && die("cp $url->path $dest failed\n");
-      last;
+      next;
     }
   } else {
     $url = URI->new($url);
