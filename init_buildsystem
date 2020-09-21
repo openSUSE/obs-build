@@ -205,7 +205,7 @@ preinstall_image_filter() {
 
 assert_dirs() {
     local d rl
-    for d in usr sbin usr/bin usr/sbin etc .build .init_b_cache .init_b_cache/scripts .init_b_cache/rpms .preinstall_image proc proc/sys proc/sys/fs proc/sys/fs/binfmt_misc sys dev dev/pts mnt ; do
+    for d in usr sbin usr/bin usr/sbin etc .build .init_b_cache .init_b_cache/scripts .init_b_cache/rpms .preinstall_image proc proc/sys proc/sys/fs proc/sys/fs/binfmt_misc sys dev dev/pts dev/shm mnt ; do
 	if test -L "$BUILD_ROOT/$d" ; then
 	    rl="$(readlink "$BUILD_ROOT/$d")"
 	    test "$d" = sbin -a "x$rl" = "xusr/sbin" && continue
