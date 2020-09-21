@@ -932,10 +932,10 @@ vm_first_stage() {
 	KERNEL_TEMP_DIR=
         local vm_type="$VM_TYPE"
         test "$vm_type" = "qemu" && vm_type=kvm
-	if test -z "$VM_KERNEL" -a -e "$BUILD_ROOT/.build.kernel.$vm_type" ; then
+	if test -z "$VM_KERNEL" -a -f "$BUILD_ROOT/.build.kernel.$vm_type" -a ! -L "$BUILD_ROOT/.build.kernel.$vm_type" ; then
 	    KERNEL_TEMP_DIR=`mktemp -d`
 	    cp "$BUILD_ROOT/.build.kernel.$vm_type" "$KERNEL_TEMP_DIR/kernel"
-	    if test -e  "$BUILD_ROOT/.build.initrd.$vm_type" ; then
+	    if test -f "$BUILD_ROOT/.build.initrd.$vm_type" -a ! -L "$BUILD_ROOT/.build.initrd.$vm_type" ; then
 	        cp "$BUILD_ROOT/.build.initrd.$vm_type" "$KERNEL_TEMP_DIR/initrd"
 	    fi
 	fi
@@ -948,10 +948,11 @@ vm_first_stage() {
 	    fi
         else
             /usr/bin/virt-make-fs --format=raw -t ext3 --size="$VMDISK_ROOTSIZE"M $BUILD_ROOT $VM_ROOT || cleanup_and_exit 1
-￼           #rm -rf -- "$BUILD_ROOT"/*
+	    #rm -rf -- "$BUILD_ROOT"/*
 	fi
 	# copy back the kernel and set it for VM
 	if test -n "$KERNEL_TEMP_DIR" ; then
+	    rm -rf "$BUILD_ROOT/boot"
 	    mkdir -p "$BUILD_ROOT/boot"
 	    mv "$KERNEL_TEMP_DIR/kernel" "$BUILD_ROOT/boot/kernel"
 	    vm_kernel="$BUILD_ROOT/boot/kernel"
