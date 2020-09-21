@@ -135,6 +135,7 @@ fi
 
 BUILD_IS_RUNNING=$BUILD_ROOT/not-ready
 TMPFILE=$BUILD_ROOT/tmpfile
+BUILD_INIT_CACHE="$BUILD_ROOT/.init_b_cache"
 
 #
 # needed functions
@@ -204,7 +205,7 @@ preinstall_image_filter() {
 
 assert_dirs() {
     local d rl
-    for d in usr sbin usr/bin usr/sbin etc .build .init_b_cache .init_b_cache/scripts .init_b_cache/rpms .preinstall_image proc proc/sys proc/sys/fs proc/sys/fs/binfmt_misc dev dev/pts mnt ; do
+    for d in usr sbin usr/bin usr/sbin etc .build .init_b_cache .init_b_cache/scripts .init_b_cache/rpms .preinstall_image proc proc/sys proc/sys/fs proc/sys/fs/binfmt_misc sys dev dev/pts mnt ; do
 	if test -L "$BUILD_ROOT/$d" ; then
 	    rl="$(readlink "$BUILD_ROOT/$d")"
 	    test "$d" = sbin -a "x$rl" = "xusr/sbin" && continue
@@ -217,10 +218,35 @@ assert_dirs() {
     done
 }
 
+preinstall_setup() {
+    cd "$BUILD_ROOT" || cleanup_and_exit 1
+    rm -rf build-preinstall
+    mkdir build-preinstall || cleanup_and_exit 1
+    for i in * .* ; do
+	case "$i" in
+	    .|..|.build|.init_b_cache|build-preinstall|proc|sys) continue ;;
+	esac
+	mv "./$i" build-preinstall || cleanup_and_exit 1
+    done
+    cd build-preinstall || cleanup_and_exit 1
+}
+
+preinstall_integrate() {
+    cd "$BUILD_ROOT/build-preinstall" || cleanup_and_exit 1
+    for i in * .* ; do
+	case "$i" in
+	    .|..|.build|.init_b_cache|build-preinstall|proc|sys) continue ;;
+	esac
+	mv "./$i" .. || cleanup_and_exit 1
+    done
+    cd "$BUILD_ROOT" || cleanup_and_exit 1
+    assert_dirs
+}
+
 preinstall_image() {
     check_exit
     echo "unpacking preinstall image${2:+ $2}"
-    cd $BUILD_ROOT || cleanup_and_exit 1
+    preinstall_setup
     if test -x /usr/bin/bsdtar ; then
 	TAR="/usr/bin/bsdtar --exclude .build --exclude .init_b_cache -P --chroot --numeric-owner -x"
     else
@@ -228,20 +254,20 @@ preinstall_image() {
 	TAR="tar --exclude .build --exclude .init_b_cache -x"
     fi
     # pipe output through perl to print a dot every 1000 lines
-    if ! $TAR -z -f "$BUILD_ROOT/.init_b_cache/rpms/$1" -v > >(tee "$BUILD_ROOT/.preinstallimage.unpack" | perl -e '$|=1; my $done=0; $done++ % 1000 or print "." while <STDIN>; print "\n";')  2>&1 ; then
+    if ! $TAR -z -f "$BUILD_INIT_CACHE/rpms/$1" -v > >(tee "$BUILD_INIT_CACHE/.preinstallimage.unpack" | perl -e '$|=1; my $done=0; $done++ % 1000 or print "." while <STDIN>; print "\n";')  2>&1 ; then
 	echo "unpack failed."
-	test -f "$BUILD_ROOT/.preinstallimage.unpack" -a ! -L "$BUILD_ROOT/.preinstallimage.unpack" && cat "$BUILD_ROOT/.preinstallimage.unpack"
+	test -f "$BUILD_INIT_CACHE/.preinstallimage.unpack" && cat "$BUILD_INIT_CACHE/.preinstallimage.unpack"
 	cleanup_and_exit 1
     fi
-    rm -rf "$BUILD_ROOT/.preinstallimage.unpack"
-    assert_dirs
+    rm -rf "$BUILD_INIT_CACHE/.preinstallimage.unpack"
+    preinstall_integrate
 }
 
 preinstall() {
     local PKG="$1"
     check_exit
     echo "preinstalling $PKG..."
-    cd $BUILD_ROOT || cleanup_and_exit 1
+    preinstall_setup
     if test -x /usr/bin/bsdtar ; then
 	CPIO="/usr/bin/bsdtar --exclude .build --exclude .init_b_cache -P --chroot -o --numeric-owner -x -f-"
 	TAR="/usr/bin/bsdtar --exclude .build --exclude .init_b_cache -P --chroot -o --numeric-owner -x"
@@ -251,7 +277,7 @@ preinstall() {
 	TAR="tar --exclude .build --exclude .init_b_cache -x"
     fi
     pkg_preinstall
-    assert_dirs
+    preinstall_integrate
 }
 
 run_pkg_scripts() {
@@ -822,8 +848,8 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
 	progress_step PACKAGES_TO_PREINSTALL_FILTERED
 	preinstall ${PKG##*/}
     done
-    echo
     if test -n "$PREPARE_VM" ; then
+	echo
 	progress_setup PACKAGES_TO_VMINSTALL_FILTERED
 	for PKG in $PACKAGES_TO_VMINSTALL_FILTERED ; do
 	    progress_step PACKAGES_TO_VMINSTALL_FILTERED

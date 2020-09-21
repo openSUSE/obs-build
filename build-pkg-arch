@@ -59,20 +59,20 @@ pkg_finalize_arch() {
 }
 
 pkg_preinstall_arch() {
-    mkdir -p ".init_b_cache/scripts"
-    $TAR -f "$BUILD_ROOT/.init_b_cache/rpms/$PKG.arch"
-    rm -rf ".init_b_cache/scripts/$PKG.post"
-    if test -f .INSTALL -a ! -L .INSTALL ; then
-	cat .INSTALL > ".init_b_cache/scripts/$PKG.post"
-	echo 'type post_install >/dev/null 2>&1 && post_install' >> ".init_b_cache/scripts/$PKG.post"
+    mkdir -p "$BUILD_INIT_CACHE/scripts"
+    $TAR -f "$BUILD_INIT_CACHE/rpms/$PKG.arch"
+    rm -rf "$BUILD_INIT_CACHE/scripts/$PKG.post"
+    if test -e "$BUILD_INIT_CACHE/scripts/$PKG.run" -a -f .INSTALL -a ! -L .INSTALL ; then
+	cat .INSTALL > "$BUILD_INIT_CACHE/scripts/$PKG.post"
+	echo 'type post_install >/dev/null 2>&1 && post_install' >> "$BUILD_INIT_CACHE/scripts/$PKG.post"
     fi
     rm -rf .PKGINFO .INSTALL
 }
 
 pkg_runscripts_arch() {
-    if test -e "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post" ; then
+    if test -e "$BUILD_INIT_CACHE/scripts/$PKG.post" ; then
 	echo "running $PKG postinstall script"
 	( cd $BUILD_ROOT && chroot $BUILD_ROOT ".init_b_cache/scripts/$PKG.post" < /dev/null )
-	rm -f "$BUILD_ROOT/.init_b_cache/scripts/$PKG.post"
+	rm -f "$BUILD_INIT_CACHE/scripts/$PKG.post"
     fi
 }

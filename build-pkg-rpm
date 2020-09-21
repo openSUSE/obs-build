@@ -153,7 +153,7 @@ pkg_finalize_rpm() {
 
 pkg_preinstall_rpm() {
     PAYLOADDECOMPRESS=cat
-    case `rpm -qp --nodigest --nosignature --qf "%{PAYLOADCOMPRESSOR}\n" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm"` in
+    case `rpm -qp --nodigest --nosignature --qf "%{PAYLOADCOMPRESSOR}\n" "$BUILD_INIT_CACHE/rpms/$PKG.rpm"` in
 	lzma) rpm --showrc | egrep 'PayloadIsLzma|_lzma' > /dev/null || PAYLOADDECOMPRESS="lzma -d" ;;
 	xz) rpm --showrc | egrep 'PayloadIsXz|_xz' > /dev/null || PAYLOADDECOMPRESS="xz -d" ;;
 	zstd) rpm --showrc | egrep 'PayloadIsZstd' > /dev/null || PAYLOADDECOMPRESS="zstd -d" ;;
@@ -173,31 +173,31 @@ pkg_preinstall_rpm() {
 	    test -f "$BUILD_DIR/zstddec.sh" && PAYLOADDECOMPRESS="bash $BUILD_DIR/zstddec.sh"
 	fi
     fi
-    mkdir -p ".init_b_cache/scripts"
+    mkdir -p "$BUILD_INIT_CACHE/scripts"
     if test "$PAYLOADDECOMPRESS" = cat ; then
-	rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" | $CPIO || cleanup_and_exit 1
+	rpm2cpio "$BUILD_INIT_CACHE/rpms/$PKG.rpm" | $CPIO || cleanup_and_exit 1
     else
-	rpm2cpio "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" | $PAYLOADDECOMPRESS | $CPIO || cleanup_and_exit 1
+	rpm2cpio "$BUILD_INIT_CACHE/rpms/$PKG.rpm" | $PAYLOADDECOMPRESS | $CPIO || cleanup_and_exit 1
     fi
-    test -L ".init_b_cache/scripts" && cleanup_and_exit 1
-    rm -rf ".init_b_cache/scripts/$PKG.pre" ".init_b_cache/scripts/$PKG.preprog" ".init_b_cache/scripts/$PKG.post" ".init_b_cache/scripts/$PKG.postprog"
-    if test -e ".init_b_cache/scripts/$PKG.run" ; then
-	rpm -qp --nodigest --nosignature --qf "%{PREIN}" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" > ".init_b_cache/scripts/$PKG.pre"
-	rpm -qp --nodigest --nosignature --qf "%{PREINPROG}" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" > ".init_b_cache/scripts/$PKG.preprog"
-	rpm -qp --nodigest --nosignature --qf "%{POSTIN}" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" > ".init_b_cache/scripts/$PKG.post"
-	rpm -qp --nodigest --nosignature --qf "%{POSTINPROG}" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.rpm" > ".init_b_cache/scripts/$PKG.postprog"
-	rm -f .init_b_cache/scripts/.none
-	echo -n '(none)' > .init_b_cache/scripts/.none
-	cmp -s ".init_b_cache/scripts/$PKG.pre" .init_b_cache/scripts/.none && rm -f ".init_b_cache/scripts/$PKG.pre"
-	cmp -s ".init_b_cache/scripts/$PKG.post" .init_b_cache/scripts/.none && rm -f ".init_b_cache/scripts/$PKG.post"
-	rm -f .init_b_cache/scripts/.none
+    test -L "$BUILD_INIT_CACHE/scripts" && cleanup_and_exit 1
+    rm -rf "$BUILD_INIT_CACHE/scripts/$PKG.pre" "$BUILD_INIT_CACHE/scripts/$PKG.preprog" "$BUILD_INIT_CACHE/scripts/$PKG.post" "$BUILD_INIT_CACHE/scripts/$PKG.postprog"
+    if test -e "$BUILD_INIT_CACHE/scripts/$PKG.run" ; then
+	rpm -qp --nodigest --nosignature --qf "%{PREIN}" "$BUILD_INIT_CACHE/rpms/$PKG.rpm" > "$BUILD_INIT_CACHE/scripts/$PKG.pre"
+	rpm -qp --nodigest --nosignature --qf "%{PREINPROG}" "$BUILD_INIT_CACHE/rpms/$PKG.rpm" > "$BUILD_INIT_CACHE/scripts/$PKG.preprog"
+	rpm -qp --nodigest --nosignature --qf "%{POSTIN}" "$BUILD_INIT_CACHE/rpms/$PKG.rpm" > "$BUILD_INIT_CACHE/scripts/$PKG.post"
+	rpm -qp --nodigest --nosignature --qf "%{POSTINPROG}" "$BUILD_INIT_CACHE/rpms/$PKG.rpm" > "$BUILD_INIT_CACHE/scripts/$PKG.postprog"
+	rm -f "$BUILD_INIT_CACHE/scripts/.none"
+	echo -n '(none)' > "$BUILD_INIT_CACHE/scripts/.none"
+	cmp -s "$BUILD_INIT_CACHE/scripts/$PKG.pre" "$BUILD_INIT_CACHE/scripts/.none" && rm -f "$BUILD_INIT_CACHE/scripts/$PKG.pre"
+	cmp -s "$BUILD_INIT_CACHE/scripts/$PKG.post" "$BUILD_INIT_CACHE/scripts/.none" && rm -f "$BUILD_INIT_CACHE/scripts/$PKG.post"
+	rm -f "$BUILD_INIT_CACHE/scripts/.none"
     fi
     # hack for rpm erasures
     if test -d "$BUILD_ROOT/installed-pkg" -a -z "$PREPARE_VM" ; then
 	# call for rpm-4.x and not rpm-devel
-        test -z "${PKG##rpm-[0-9]*}" && chroot $BUILD_ROOT rpm --rebuilddb
+        test -z "${PKG##rpm-[0-9]*}" && chroot . rpm --rebuilddb
         # also exec for exchanged rpm !  naming is rpm-x86-<target>-<ver>
-        test -z "${PKG##rpm-x86-*[0-9]*}" && chroot $BUILD_ROOT rpm --rebuilddb
+        test -z "${PKG##rpm-x86-*[0-9]*}" && chroot . rpm --rebuilddb
     fi
 }
 
