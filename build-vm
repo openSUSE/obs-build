@@ -910,11 +910,12 @@ vm_first_stage() {
     date '+@%s' > $BUILD_ROOT/.build/.date
 
     # we're done with the root file system, unmount
-    umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2> /dev/null || true
-    umount -n $BUILD_ROOT/proc 2> /dev/null || true
-    umount -n $BUILD_ROOT/dev/pts 2> /dev/null || true
-    umount -n $BUILD_ROOT/dev/shm 2> /dev/null || true
-    umount -n $BUILD_ROOT/mnt 2> /dev/null || true
+    buildroot_umount /proc/sys/fs/binfmt_misc
+    buildroot_umount /proc
+    buildroot_umount /sys
+    buildroot_umount /dev/pts
+    buildroot_umount /dev/shm
+    buildroot_umount /mnt
 
     vm_init_script="/.build/build"
     if check_use_emulator ; then
