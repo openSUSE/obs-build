@@ -139,7 +139,7 @@ pkg_preinstall_deb() {
     rm -rf control.tar.gz control.tar.xz data.tar.gz data.tar.xz
     ar x "$BUILD_INIT_CACHE/rpms/$PKG.deb" control.tar.gz control.tar.xz data.tar.gz data.tar.xz 2>/dev/null
     rm -rf "$BUILD_INIT_CACHE/scripts/control"
-    mkdir -p "$BUILD_INIT_CACHE/scripts/control"
+    mkdir "$BUILD_INIT_CACHE/scripts/control" || cleanup_and_exit 1
     :> "$BUILD_INIT_CACHE/scripts/control/.dummy"	# pin control dir
     if test -f "control.tar.gz" -a ! -L "control.tar.gz" ; then
 	$TAR -C "$BUILD_INIT_CACHE/scripts/control" -z -f control.tar.gz

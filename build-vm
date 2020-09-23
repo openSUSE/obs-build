@@ -772,15 +772,18 @@ vm_update_hostarch() {
     local newhostarch
     local vm_type="$VM_TYPE"
     test "$vm_type" = "qemu" && vm_type=kvm
-    if test -z "$VM_KERNEL" -a -e "$BUILD_ROOT/.build.kernel.$vm_type" ; then
+    if test -z "$VM_KERNEL" -a -f "$BUILD_ROOT/.build.kernel.$vm_type" -a ! -L "$BUILD_ROOT/.build.kernel.$vm_type" ; then
 	kernel="$BUILD_ROOT/.build.kernel.$vm_type"
-	hostarchfile="$BUILD_ROOT/.build.hostarch.$vm_type"
-    elif test -n "$kernel" -a -e "$kernel" -a -e "$kernel.hostarch" ; then
+	if test -f "$BUILD_ROOT/.build.hostarch.$vm_type" -a ! -L "$BUILD_ROOT/.build.hostarch.$vm_type" ; then
+	    hostarchfile="$BUILD_ROOT/.build.hostarch.$vm_type"
+	fi
+    elif test -n "$kernel" -a -f "$kernel" -a -f "$kernel.hostarch" ; then
 	hostarchfile="$kernel.hostarch"
     fi
-    if test -n "$hostarchfile" -a -e "$hostarchfile"; then
-	newhostarch=`cat "$hostarchfile"`
-    elif test -n "$kernel" -a -e "$kernel" ; then
+    if test -n "$hostarchfile" -a -f "$hostarchfile" ; then
+	local dummy
+	read newhostarch dummy < "$hostarchfile"
+    elif test -n "$kernel" -a -f "$kernel" ; then
 	case `objdump -f "$kernel" | sed -ne 's/.*file format //p'` in
 	    elf64-powerpcle) newhostarch=ppc64le ;;
 	    elf64-powerpc) newhostarch=ppc64 ;;
