@@ -826,7 +826,7 @@ vm_first_stage() {
     cp -a $BUILD_DIR/. $BUILD_ROOT/.build
     if ! test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
 	rm -rf "$BUILD_ROOT/.build-srcdir"
-	mkdir "$BUILD_ROOT/.build-srcdir"
+	mkdir "$BUILD_ROOT/.build-srcdir" || cleanup_and_exit 1
 	if test "$BUILDTYPE" = kiwi -o "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman ; then
 	    cp -pRL "$MYSRCDIR"/* $BUILD_ROOT/.build-srcdir
 	else
