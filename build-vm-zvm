@@ -333,15 +333,15 @@ vm_initrd_obs_modules_zvm() {
     # 3. kernel_version to add modules
     # initrd is to be created at $2-$3
     # first, test if initrd has already been created
-    test -f ${2}-${3} && return
+    test -f "${2}-${3}" && return
     TEMPDIR=$(mktemp -d /tmp/initrd.XXX)
     pushd $TEMPDIR
     # unpack initrd to add the kernel modules
-    xzcat $2 | cpio -i
+    xzcat "$2" | cpio -i
     # detect currently installed kernel version
     current_kernel_version=$(ls lib/modules)
     # copy modules from kernel that is installed to the buildsystem:
-    mkdir -p $TEMPDIR/lib/modules/$3
+    mkdir -p "$TEMPDIR/lib/modules/$3"
     while read module; do
         (cd ${BUILD_ROOT}/lib/modules/${3}; \
             rsync -a --relative $module ${TEMPDIR}/lib/modules/$3)
@@ -366,19 +366,21 @@ vm_fixup_zvm() {
     # have to copy kernel/initrd and run zipl to be able to IPL
     # have to set init_script before unmounting, thus doing it statically for now.
     zvm_init_script="/.build/build"
+    assert_dirs boot boot/zipl
     mkdir -p $BUILD_ROOT/boot
     mkdir -p $BUILD_ROOT/boot/zipl
     vm_kernel="/.build.kernel.kvm"
-    kernel_version=$(get_kernel_version ${BUILD_ROOT}${vm_kernel})
+    test -e "${BUILD_ROOT}${vm_kernel}" -a ! -L "${BUILD_ROOT}${vm_kernel}" || cleanup_and_exit 1 "${vm_kernel} does not exist"
+    kernel_version=$(get_kernel_version "${BUILD_ROOT}${vm_kernel}")
     # add kernel modules to existing initrd
-    vm_initrd_obs_modules_zvm ${BUILD_ROOT} ${vm_initrd} ${kernel_version}
-    vm_initrd=${vm_initrd}-${kernel_version}
+    vm_initrd_obs_modules_zvm "${BUILD_ROOT}" "${vm_initrd}" "${kernel_version}"
+    vm_initrd="${vm_initrd}-${kernel_version}"
     # copy initrd to build worker:
     echo "copy $vm_initrd to $BUILD_ROOT"
-    cp -a ${vm_initrd} ${BUILD_ROOT}/boot
+    cp -a "${vm_initrd}" "${BUILD_ROOT}/boot"
     # finally, install bootloader to the worker disk
-    zipl -t $BUILD_ROOT/boot/zipl -i ${BUILD_ROOT}${vm_kernel} \
-         -r ${BUILD_ROOT}${vm_initrd} \
+    zipl -t "$BUILD_ROOT/boot/zipl" -i "${BUILD_ROOT}${vm_kernel}" \
+         -r "${BUILD_ROOT}${vm_initrd}" \
 	 --parameters "${zvm_param} init=$zvm_init_script rootfsopts=noatime"
     sync
     udevadm settle

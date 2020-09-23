@@ -44,7 +44,7 @@ lxcsh() {
 vm_startup_lxc() {
     lxc_get_id
     LXCCONF="$BUILD_ROOT/.build.lxc.conf"
-    rm -f "$LXCCONF"
+    rm -rf "$LXCCONF"
     vm_startup_lxc_$LXC_TYPE
     BUILDSTATUS="$?"
     test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
@@ -71,7 +71,8 @@ vm_startup_lxc_standalone() {
             ;;
     esac
     # XXX: do this always instead of leaking the hosts' one?
-    echo "rootfs / rootfs rw 0 0" > $BUILD_ROOT/etc/mtab
+    rm -rf "$BUILD_ROOT/etc/mtab"
+    echo "rootfs / rootfs rw 0 0" > "$BUILD_ROOT/etc/mtab"
     lxc-destroy -n "$LXCID" >/dev/null 2>&1 || true
     mkdir -p "$LXCROOTFS"
     cat > "$LXCHOOK" <<-EOF

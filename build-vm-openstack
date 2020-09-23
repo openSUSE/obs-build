@@ -217,6 +217,7 @@ vm_cleanup_openstack() {
 
 vm_fixup_openstack() {
     # No way to handle this via init= parameter here....
+    rm -rf "$BUILD_ROOT/sbin/init"
     echo "#!/bin/sh"               >  "$BUILD_ROOT/sbin/init"
     echo 'echo "exec /.build/build \"$@\""' >> "$BUILD_ROOT/sbin/init"
     echo 'exec /.build/build "$@"' >> "$BUILD_ROOT/sbin/init"

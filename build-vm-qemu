@@ -214,7 +214,7 @@ vm_fixup_qemu() {
     vm_fixup_kvm
 
     if test -z "$qemu_serial_device" ; then
-        if test -e "$BUILD_ROOT/.build.console.kvm" && grep -q '^virtio$' "$BUILD_ROOT/.build.console.kvm" ; then
+        if test -e "$BUILD_ROOT/.build.console.kvm" -a ! -L "$BUILD_ROOT/.build.console.kvm" && grep -q '^virtio$' "$BUILD_ROOT/.build.console.kvm" ; then
             echo "Detected virtio-serial support"
             qemu_serial_device=virtio-serial,max_ports=2
             qemu_console=hvc0
