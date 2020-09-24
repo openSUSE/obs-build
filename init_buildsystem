@@ -227,7 +227,7 @@ preinstall_setup() {
     mkdir build-preinstall || cleanup_and_exit 1
     for i in * .* ; do
 	case "$i" in
-	    .|..|.build|.init_b_cache|build-preinstall|proc|sys) continue ;;
+	    .|..|.build|.build.*|.build-srcdir|.init_b_cache|.pkgs|build-preinstall|proc|sys) continue ;;
 	esac
 	mv "./$i" build-preinstall || cleanup_and_exit 1
     done
@@ -238,7 +238,7 @@ preinstall_integrate() {
     cd "$BUILD_ROOT/build-preinstall" || cleanup_and_exit 1
     for i in * .* ; do
 	case "$i" in
-	    .|..|.build|.init_b_cache|build-preinstall|proc|sys) continue ;;
+	    .|..|.build|.build.*|.build-srcdir|.init_b_cache|.pkgs|build-preinstall|proc|sys) continue ;;
 	esac
 	mv "./$i" .. || cleanup_and_exit 1
     done
