@@ -1010,7 +1010,7 @@ while test -n "$1"; do
 	shift
       ;;
       -linksources)
-	LINKSOURCES=true
+	LINKSOURCES=--linksources
       ;;
       -changelog)
 	CHANGELOG=true
@@ -1180,7 +1180,7 @@ if test -n "$LIST_STATE" ; then
 	recipe_unpack_srcrpm
 	RECIPEFILE="$MYSRCDIR/$RECIPEFILE"
     fi
-    init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --list-state "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $DLNOSIGNATURE $USEUSEDFORBUILD $RECIPEFILE $BUILD_EXTRA_PACKS
+    init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --list-state "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $DLNOSIGNATURE $USEUSEDFORBUILD $RECIPEFILE $BUILD_EXTRA_PACKS $LINKSOURCES
     ERR=$?
     rm -rf "$BUILD_ROOT"
     cleanup_and_exit $ERR

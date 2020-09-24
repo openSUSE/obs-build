@@ -79,6 +79,10 @@ while test -n "$1" ; do
 	    shift
 	    LIST_STATE=true
 	    ;;
+	--linksources)
+	    shift
+	    LINKSOURCES=true
+	    ;;
 	--rpmlist)
 	    shift
 	    RPMLIST=$1
@@ -227,7 +231,10 @@ preinstall_setup() {
     mkdir build-preinstall || cleanup_and_exit 1
     for i in * .* ; do
 	case "$i" in
-	    .|..|.build|.init_b_cache|build-preinstall|proc|sys) continue ;;
+	    .|..|.build|build-preinstall|proc|sys) continue ;;
+	    .pkgs|.init_b_cache)
+	       test -z "$LINKSOURCES" && continue
+	       ;;
 	esac
 	mv "./$i" build-preinstall || cleanup_and_exit 1
     done
