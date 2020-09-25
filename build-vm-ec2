@@ -131,7 +131,7 @@ vm_detach_swap_ec2() {
 
 vm_fixup_ec2() {
     # No way to handle this via init= parameter here....
-    rm -rf "$BUILD_ROOT/sbin/init"
+    buildroot_rm /sbin/init
     echo "#!/bin/sh"               >  "$BUILD_ROOT/sbin/init"
     echo 'exec /.build/build "$@"' >> "$BUILD_ROOT/sbin/init"
     chmod 0755 "$BUILD_ROOT/sbin/init"
@@ -146,6 +146,7 @@ vm_fixup_ec2() {
     if ! test -e "$BUILD_ROOT/boot/grub/menu.lst"; then
 	assert_dirs boot/grub
 	mkdir -p "$BUILD_ROOT/boot/grub"
+	buildroot_rm /boot/grub/menu.lst
 	echo "serial --unit=0 --speed=9600"                                                   >  "$BUILD_ROOT/boot/grub/menu.lst"
 	echo "terminal --dumb serial"                                                         >> "$BUILD_ROOT/boot/grub/menu.lst"
 	echo "default 0"                                                                      >> "$BUILD_ROOT/boot/grub/menu.lst"

@@ -44,7 +44,7 @@ lxcsh() {
 vm_startup_lxc() {
     lxc_get_id
     LXCCONF="$BUILD_ROOT/.build.lxc.conf"
-    rm -rf "$LXCCONF"
+    buildroot_rm .build.lxc.conf
     vm_startup_lxc_$LXC_TYPE
     BUILDSTATUS="$?"
     test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
@@ -71,7 +71,7 @@ vm_startup_lxc_standalone() {
             ;;
     esac
     # XXX: do this always instead of leaking the hosts' one?
-    rm -rf "$BUILD_ROOT/etc/mtab"
+    buildroot_rm /etc/mtab
     echo "rootfs / rootfs rw 0 0" > "$BUILD_ROOT/etc/mtab"
     lxc-destroy -n "$LXCID" >/dev/null 2>&1 || true
     mkdir -p "$LXCROOTFS"
@@ -94,8 +94,8 @@ vm_startup_lxc_standalone() {
            cleanup_and_exit 1
            ;;
     esac
-    if ! [ -r "$BUILD_ROOT/.build/_exitcode" ]; then
-        echo "'$BUILD_ROOT/.build/_exitcode' not found"
+    if ! [ -r "$BUILD_ROOT/.build/_exitcode" -a ! -L "$BUILD_ROOT/.build/_exitcode" ]; then
+        echo "'$BUILD_ROOT/.build/_exitcode' not found or symlink"
         return 3
     fi
     exitcode=$(cat $BUILD_ROOT/.build/_exitcode)
@@ -149,6 +149,7 @@ vm_startup_lxc_libvirt() {
 	</domain>
 	EOF
     # XXX: do this always instead of leaking the hosts' one?
+    buildroot_rm /etc/mtab
     echo "rootfs / rootfs rw 0 0" > $BUILD_ROOT/etc/mtab
     # could LOGFILE be used instead?
     lxcsh create --console $LXCCONF | sed -ure 's/\x0d//g;:redo /.\x08/{s/.\x08//; b redo}'
@@ -156,8 +157,8 @@ vm_startup_lxc_libvirt() {
     if [ "$exitcode" -gt 0 ]; then
         return $exitcode # libvirt errors
     fi
-    if ! [ -r "$BUILD_ROOT/.build/_exitcode" ]; then
-        echo "'$BUILD_ROOT/.build/_exitcode' not found"
+    if ! [ -r "$BUILD_ROOT/.build/_exitcode" -a ! -L "$BUILD_ROOT/.build/_exitcode" ]; then
+        echo "'$BUILD_ROOT/.build/_exitcode' not found or symlink"
         return 3
     fi
     exitcode=$(cat $BUILD_ROOT/.build/_exitcode)

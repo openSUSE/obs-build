@@ -342,8 +342,10 @@ vm_initrd_obs_modules_zvm() {
     current_kernel_version=$(ls lib/modules)
     # copy modules from kernel that is installed to the buildsystem:
     mkdir -p "$TEMPDIR/lib/modules/$3"
+    assert_dir_path "lib/modules/${3}"
     while read module; do
         (cd ${BUILD_ROOT}/lib/modules/${3}; \
+	    assert_dir_path "lib/modules/${3}/${module%.xz}"
             rsync -a --relative $module ${TEMPDIR}/lib/modules/$3)
     done < <(cd $TEMPDIR/lib/modules/${current_kernel_version}; \
             find . -name "*.xz")
@@ -366,8 +368,7 @@ vm_fixup_zvm() {
     # have to copy kernel/initrd and run zipl to be able to IPL
     # have to set init_script before unmounting, thus doing it statically for now.
     zvm_init_script="/.build/build"
-    assert_dirs boot boot/zipl
-    mkdir -p $BUILD_ROOT/boot
+    assert_dir_path boot/zipl
     mkdir -p $BUILD_ROOT/boot/zipl
     vm_kernel="/.build.kernel.kvm"
     test -e "${BUILD_ROOT}${vm_kernel}" -a ! -L "${BUILD_ROOT}${vm_kernel}" || cleanup_and_exit 1 "${vm_kernel} does not exist"
@@ -377,8 +378,11 @@ vm_fixup_zvm() {
     vm_initrd="${vm_initrd}-${kernel_version}"
     # copy initrd to build worker:
     echo "copy $vm_initrd to $BUILD_ROOT"
+    rm -rf "${BUILD_ROOT}/boot/${vm_initrd}"
     cp -a "${vm_initrd}" "${BUILD_ROOT}/boot"
     # finally, install bootloader to the worker disk
+    # XXX/TODO: does zipl read or write ${BUILD_ROOT}${vm_initrd}? Either
+    # rm -rf the file or check for a symlink
     zipl -t "$BUILD_ROOT/boot/zipl" -i "${BUILD_ROOT}${vm_kernel}" \
          -r "${BUILD_ROOT}${vm_initrd}" \
 	 --parameters "${zvm_param} init=$zvm_init_script rootfsopts=noatime"

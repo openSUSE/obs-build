@@ -154,3 +154,32 @@ buildroot_umount() {
     umount -n "$BUILD_ROOT/$d" 2>/dev/null || true
 }
 
+# rm that makes sure the file is gone
+buildroot_rm() {
+    rm -rf "$BUILD_ROOT/$1"
+    test -e "$BUILD_ROOT/$1" && cleanup_and_exit 1 "could not remove $BUILD_ROOT/$1"
+}
+
+
+assert_dirs() {
+    local d rl
+    if test -z "$1" ; then
+       set usr sbin usr/bin usr/sbin etc .build .init_b_cache .init_b_cache/scripts .init_b_cache/rpms .preinstall_image proc proc/sys proc/sys/fs proc/sys/fs/binfmt_misc sys dev dev/pts dev/shm mnt
+    fi
+    for d in "$@" ; do
+	if test -L "$BUILD_ROOT/$d" ; then
+	    rl="$(readlink "$BUILD_ROOT/$d")"
+	    test "$d" = sbin -a "x$rl" = "xusr/sbin" && continue
+	    test "$d" = sbin -a "x$rl" = "xusr/bin" && continue
+	    test "$d" = usr/sbin -a "x$rl" = "xbin" && continue
+	    cleanup_and_exit 1 "$d: illegal symlink to $rl"
+	else
+	    test -e "$BUILD_ROOT/$d" -a ! -d "$BUILD_ROOT/$d" && cleanup_and_exit 1 "$d: not a directory"
+	fi
+    done
+}
+
+assert_dir_path() {
+    test "$1" != "${1%/*}" && assert_dir_path "${1%/*}"
+    assert_dir "$1"
+}
