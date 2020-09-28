@@ -342,21 +342,21 @@ vm_initrd_obs_modules_zvm() {
     current_kernel_version=$(ls lib/modules)
     # copy modules from kernel that is installed to the buildsystem:
     mkdir -p "$TEMPDIR/lib/modules/$3"
-    assert_dir_path "lib/modules/${3}"
+    assert_dir_path "lib/modules/$3"
     while read module; do
         (cd ${BUILD_ROOT}/lib/modules/${3}; \
-	    assert_dir_path "lib/modules/${3}/${module%.xz}"
-            rsync -a --relative $module ${TEMPDIR}/lib/modules/$3)
+	    assert_dir_path "lib/modules/$3/${module%/*.xz}"
+            rsync -a --relative "$module" "${TEMPDIR}/lib/modules/$3")
     done < <(cd $TEMPDIR/lib/modules/${current_kernel_version}; \
             find . -name "*.xz")
     # remove old kernel modules
-    if [ "${current_kernel_version}" != ${3} ]; then
-       rm -rf $TEMPDIR/lib/modules/${current_kernel_version}
+    if [ "${current_kernel_version}" != "$3" ]; then
+       rm -rf "$TEMPDIR/lib/modules/${current_kernel_version}"
     fi
     # create module dependencies:
-    depmod -b ${TEMPDIR} ${3}
+    depmod -b "$TEMPDIR" "$3"
     # create new initrd:
-    find . | cpio -H newc -o | xz -9 --format=lzma > ${2}-${3}
+    find . | cpio -H newc -o | xz -9 --format=lzma > "${2}-${3}"
     sync
     popd
     rm -rf $TEMPDIR
