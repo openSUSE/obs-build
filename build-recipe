@@ -207,8 +207,19 @@ recipe_gendiff() {
         )
 
     if test -n "$obsgendiff"; then
-         if ! chroot $BUILD_ROOT /usr/lib/build/obsgendiff ; then
-             cleanup_and_exit 1 "/usr/lib/build/obsgendiff script failed!"
+         if test -x "$BUILD_ROOT/usr/lib/build/obsgendiff"; then
+             # FIXME: to be removed ASAP
+             if ! chroot "$BUILD_ROOT" /usr/lib/build/obsgendiff ; then
+                 cleanup_and_exit 1 "/usr/lib/build/obsgendiff script failed!"
+             fi
+         elif test -d "$BUILD_ROOT/usr/lib/build/obsgendiff.d"; then
+             for script in "$BUILD_ROOT"/usr/lib/build/obsgendiff.d/*; do
+                 if test -x "$script" && ! chroot "$BUILD_ROOT" "/usr/lib/build/obsgendiff.d/${script##*/}" ; then
+                     cleanup_and_exit 1 "/usr/lib/build/obsgendiff.d/${script##*/} script failed!"
+                 fi
+             done
+         else
+             cleanup_and_exit 1 "obsgendiff enabled but no script installed"
          fi
     fi
 }
