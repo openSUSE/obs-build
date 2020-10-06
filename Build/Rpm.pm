@@ -408,6 +408,7 @@ sub parse {
   my %macros_args;
   my $ret = {};
   my $ifdeps;
+  my %autonum = (patch => 0, source => 0);
 
   my $specdata;
   local *SPEC;
@@ -663,11 +664,18 @@ sub parse {
         # there can be a gif and xpm icon
         push @{$ret->{$tag}}, $val;
       } else {
-        $ret->{$tag} = $val;
-      }
-      if ($tag =~ /^(source|patch)(\d+)?$/) {
-	my $num = defined($2) ? $2 : ($1 eq 'source' ? 0 : -1);
-	$macros{uc($1) . "URL$num"} = $val if $num >= 0;
+	if ($tag =~ /^(source|patch)(\d+)?$/) {
+	  my $num = defined($2) ? $2 : $autonum{$1};
+	  my $m = uc($1) . "URL$num";
+	  if (exists $macros{$m}) {
+	    $ret->{'error'} = "$1 number $num exists!";
+	    return $ret;
+	  }
+	  $autonum{$1} = $num+1 if $num >= $autonum{$1};
+	  $macros{$m} = $val;
+	  $tag = "$1$num";
+	}
+	$ret->{$tag} = $val;
       }
     } elsif (!$preamble && ($line =~ /^(Source\d*|Patch\d*|Url|Icon|BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires)\s*:\s*(\S.*)$/i)) {
       print STDERR "Warning: spec file parser ".($lineno ? " line $lineno" : '').": Ignoring $1 used beyond the preamble.\n" if $config->{'warnings'};
