@@ -668,8 +668,16 @@ sub parse {
 	  my $num = defined($2) ? $2 : $autonum{$1};
 	  my $m = uc($1) . "URL$num";
 	  if (exists $macros{$m}) {
-	    $ret->{'error'} = "$1 number $num exists!";
-	    return $ret;
+	    # gross hack. Before autonumbering "Patch" and "Patch0" could
+	    # exist. So take out the previous patch and add it back
+	    # without number. This does not exactly work as old rpms
+	    # but hopefully good enough :-)
+	    if ($1 eq 'patch' && $num == 0) {
+	      $ret->{'patch'} = $ret->{$tag};
+	    } else {
+	      $ret->{'error'} = "$1 number $num exists!";
+	      return $ret;
+	    }
 	  }
 	  $autonum{$1} = $num+1 if $num >= $autonum{$1};
 	  $macros{$m} = $val;
