@@ -30,7 +30,13 @@ use Digest::MD5;
 
 sub expr_boolify {
   my ($v) = @_;
-  return !defined($v) || $v eq '"' || $v =~ /^0*$/s ? 0 : 1;
+  return !defined($v) || $v eq '"' || $v =~ /^(?:0*$|v)/s ? 0 : 1;
+}
+
+sub expr_vcmp {
+  my ($v1, $v2, $rr) = @_;
+  my $r = verscmp(substr($v1, 1), substr($v2, 1));
+  return ($r < 0 ? 1 : $r > 0 ? 4 : 2) & $rr ? 1 : 0;
 }
 
 sub expr {
@@ -55,7 +61,11 @@ sub expr {
   } elsif ($expr =~ /^([0-9]+)(.*?)$/) {
     $v = $1;
     $expr = $2;
+  } elsif ($expr =~ /^v\"(.*?)\"(.*)$/) {
+    $v = "v$1";		# version
+    $expr = $2;
   } elsif ($expr =~ /^([a-zA-Z][a-zA-Z_0-9]*)(.*)$/) {
+    # actually no longer supported with new rpm versions
     $v = "\"$1";
     $expr = $2;
   } elsif ($expr =~ /^(\".*?)\"(.*)$/) {
@@ -81,32 +91,32 @@ sub expr {
       return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 2), 3);
       return undef unless defined $v2;
-      $v = (($v =~ /^\"/) ? $v ge $v2 : $v >= $v2) ? 1 : 0;
+      $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 6) : ($v =~ /^\"/) ? $v ge $v2 : $v >= $v2) ? 1 : 0;
     } elsif ($expr =~ /^>/) {
       return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 1), 3);
       return undef unless defined $v2;
-      $v = (($v =~ /^\"/) ? $v gt $v2 : $v > $v2) ? 1 : 0;
+      $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 4) : ($v =~ /^\"/) ? $v gt $v2 : $v > $v2) ? 1 : 0;
     } elsif ($expr =~ /^<=/) {
       return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 2), 3);
       return undef unless defined $v2;
-      $v = (($v =~ /^\"/) ? $v le $v2 : $v <= $v2) ? 1 : 0;
+      $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 3) : ($v =~ /^\"/) ? $v le $v2 : $v <= $v2) ? 1 : 0;
     } elsif ($expr =~ /^</) {
       return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 1), 3);
       return undef unless defined $v2;
-      $v = (($v =~ /^\"/) ? $v lt $v2 : $v < $v2) ? 1 : 0;
+      $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 1) : ($v =~ /^\"/) ? $v lt $v2 : $v < $v2) ? 1 : 0;
     } elsif ($expr =~ /^==/) {
       return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 2), 3);
       return undef unless defined $v2;
-      $v = (($v =~ /^\"/) ? $v eq $v2 : $v == $v2) ? 1 : 0;
+      $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 2) : ($v =~ /^\"/) ? $v eq $v2 : $v == $v2) ? 1 : 0;
     } elsif ($expr =~ /^!=/) {
       return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 2), 3);
       return undef unless defined $v2;
-      $v = (($v =~ /^\"/) ? $v ne $v2 : $v != $v2) ? 1 : 0;
+      $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 5) : ($v =~ /^\"/) ? $v ne $v2 : $v != $v2) ? 1 : 0;
     } elsif ($expr =~ /^\+/) {
       return ($v, $expr) if $lev >= 4;
       ($v2, $expr) = expr(substr($expr, 1), 4);
