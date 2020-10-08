@@ -74,7 +74,7 @@ recipe_build_helm() {
     local version=$(perl -I$BUILD_DIR -MBuild::Helm -e 'Build::Helm::show' -- "${args[@]}" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" version)
     local nameversion="$name-$version"
     # avoid packaging sources services and changes files (also include content from _helmignore)
-    chroot $BUILD_ROOT su -c "(cd $TOPDIR/BUILD; [ -f _helmignore ] && mv -f _helmignore .helmignore; echo -e '*.changes\n_*\n' >> .helmignore; )"  - $BUILD_USER || cleanup_and_exit 1
+    chroot $BUILD_ROOT su -c "(cd $TOPDIR/BUILD; [ -f _helmignore ] && mv -f _helmignore .helmignore; echo -e '/*.changes\n/_*\n' >> .helmignore; )"  - $BUILD_USER || cleanup_and_exit 1
     # create chart
     chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && helm package -d $TOPDIR/HELM ."  - $BUILD_USER || cleanup_and_exit 1
     test -f "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz" || cleanup_and_exit 1 "helm package command did not create $nameversion.tgz"
