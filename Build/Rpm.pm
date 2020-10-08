@@ -286,7 +286,7 @@ reexpand:
       # this is wrong, should expand in expr
       $macalt = expandmacros($config, $macalt, $lineno, $macros, $macros_args, $tries);
       $macalt = (expr($macalt))[0];
-      $macalt =~ s/^\"//;
+      $macalt =~ s/^[v\"]//;
       $expandedline .= $macalt;
     } elsif ($macname eq 'define' || $macname eq 'global') {
       my $isglobal = $macname eq 'global' ? 1 : 0;
@@ -335,7 +335,7 @@ reexpand:
       $macalt = '' if $mactest == -1;
       $macalt = expandmacros($config, $macalt, $lineno, $macros, $macros_args, $tries);
       $macalt = (expr($macalt))[0];
-      $macalt =~ s/^\"//;
+      $macalt =~ s/^[v\"]//;
       $expandedline .= $macalt;
     } elsif (exists($macros->{$macname})) {
       if (!defined($macros->{$macname})) {
