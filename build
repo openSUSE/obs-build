@@ -507,6 +507,7 @@ setupccache() {
         fi
         local ccachetar="$BUILD_ROOT/.build.oldpackages/_ccache.tar"
         test -e $ccachetar && tar -xf $ccachetar -C "$BUILD_ROOT/.ccache/"
+        rm -f $ccachetar
         chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.ccache"
     else
         CCACHE_SETUP_START_TIME=
