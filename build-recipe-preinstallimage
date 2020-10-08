@@ -45,6 +45,7 @@ recipe_build_preinstallimage() {
 	.build.kernel.*) ;; # to be packaged
 	.build.hostarch.*) ;; # to be packaged
 	.build.initrd.*) ;; # to be packaged
+	.build.console.*) ;; # to be packaged
 	.build*) continue ;;
 	.init_b_cache) continue ;;
 	.preinstallimage*) continue ;;

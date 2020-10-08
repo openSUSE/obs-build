@@ -211,7 +211,7 @@ preinstall_setup() {
 	# please keep in sync with recipe_build_preinstallimage
 	case "$i" in
 	    .|..|build-preinstall) continue ;;
-	    .build.kernel.*|.build.hostarch.*|.build.initrd.*|.build.console.kvm) ;;
+	    .build.kernel.*|.build.hostarch.*|.build.initrd.*|.build.console.*) ;;
 	    .build*|.init_b_cache|.preinstallimage*|.srcfiles*|.pkgs|.rpm-cache|installed-pkg|proc|sys) continue ;;
 	esac
 	mv "./$i" build-preinstall || cleanup_and_exit 1
@@ -224,7 +224,7 @@ preinstall_integrate() {
     for i in * .* ; do
 	case "$i" in
 	    .|..|build-preinstall) continue ;;
-	    .build.kernel.*|.build.hostarch.*|.build.initrd.*|.build.console.kvm) ;;
+	    .build.kernel.*|.build.hostarch.*|.build.initrd.*|.build.console.*) ;;
 	    .build*|.init_b_cache|.preinstallimage*|.srcfiles*|.pkgs|.rpm-cache|installed-pkg|proc|sys) continue ;;
 	esac
 	mv "./$i" .. || cleanup_and_exit 1
