@@ -66,6 +66,7 @@ sub parse {
   my $res = {};
   $res->{'name'} = $d->{'name'};
   $res->{'version'} = $d->{'version'};
+  $res->{'deps'} = [];
   my $release = $cf->{'buildrelease'};
   for (@tags) {
     s/<NAME>/$d->{'name'}/g;
