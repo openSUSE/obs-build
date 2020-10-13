@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 11;
+use Test::More tests => 12;
 
 use Build::Rpm;
 
@@ -41,6 +41,9 @@ q{
 %define bar() "Bar %#: %{?1} %{?2}"
 %define foo() "Foo %#: %{?1} %{?2}" %bar a
 %foo 1 2}			=> '"Foo 2: 1 2" "Bar 1: a "',
+q{
+%define foo hello" + "world
+%["%foo"]}			=> 'hello" + "world',
 );
 
 while (@tests) {

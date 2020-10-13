@@ -39,37 +39,86 @@ sub expr_vcmp {
   return ($r < 0 ? 1 : $r > 0 ? 4 : 2) & $rr ? 1 : 0;
 }
 
+sub expr_macroend {
+  my ($expr) = @_;
+  if ($expr =~ /^%([\(\{\[])/s) {
+    my $o = $1;
+    my $c = $o eq '[' ? ']' : $o eq '(' ? ')' : '}';
+    my $m = substr($expr, 0, 2, '');
+    my $cnt = 1;
+    my $r = qr/^(.*?)([$o$c\\])/s;
+    while ($expr =~ /$r/) {
+      $m .= substr($expr, 0, length($1) + 1, '');
+      if ($2 eq '\\') {
+	$m .= substr($expr, 0, 1, '');
+      } elsif ($2 eq $o) {
+	$cnt++;
+      } elsif ($2 eq $c) {
+	return $m if --$cnt == 0;
+      }
+    }
+    return "$m$expr";
+  }
+  return $1 if $expr =~ /^(%[?!]*-?[a-zA-Z0-9_]*(?:\*|\*\*|\#)?)/s;
+}
+
+sub expr_dummyexpander {
+  return '';
+}
+
+sub expr_expand {
+  my ($v, $expr, $xp, $r) = @_;
+  while (1) {
+    if ($expr =~ /^%%/s) {
+      $v .= substr($expr, 0, 2, '');
+    } elsif ($expr =~ /^%/s) {
+      my $m = expr_macroend($expr);
+      $v .= substr($expr, 0, length($m), '');
+    } elsif ($expr =~ /$r/) {
+      $v .= substr($expr, 0, length($1), '');
+    } else {
+      return ($xp->($v), $expr);
+    }
+  }
+}
+
 sub expr {
-  my ($expr, $lev) = @_;
+  my ($expr, $lev, $xp) = @_;
 
   $lev ||= 0;
   my ($v, $v2);
   $expr =~ s/^\s+//;
   my $t = substr($expr, 0, 1);
   if ($t eq '(') {
-    ($v, $expr) = expr(substr($expr, 1), 0);
+    ($v, $expr) = expr(substr($expr, 1), 0, $xp);
     return undef unless defined $v;
     return undef unless $expr =~ s/^\)//;
   } elsif ($t eq '!') {
-    ($v, $expr) = expr(substr($expr, 1), 6);
+    ($v, $expr) = expr(substr($expr, 1), 6, $xp);
     return undef unless defined $v;
     $v = expr_boolify($v) ? 0 : 1;
   } elsif ($t eq '-') {
-    ($v, $expr) = expr(substr($expr, 1), 6);
+    ($v, $expr) = expr(substr($expr, 1), 6, $xp);
     return undef unless defined $v;
     $v = -$v;
-  } elsif ($expr =~ /^([0-9]+)(.*?)$/) {
+  } elsif ($expr =~ /^([0-9]+)(.*?)$/s || ($xp && $expr =~ /^(%)(.*)$/)) {
     $v = $1;
     $expr = $2;
-  } elsif ($expr =~ /^v\"(.*?)\"(.*)$/) {
+    ($v, $expr) = expr_expand('0', "$1$2", $xp, qr{/^([0-9]+)/}) if $xp;
+    $v = 0 + $v;
+  } elsif ($expr =~ /^v\"(.*?)(\".*)$/s) {
     $v = "v$1";		# version
     $expr = $2;
-  } elsif ($expr =~ /^([a-zA-Z][a-zA-Z_0-9]*)(.*)$/) {
+    ($v, $expr) = expr_expand('v', substr("$1$2", 2), $xp, qr{/^([^%\"]+)/}) if $xp;
+    $expr =~ s/^\"//s;
+  } elsif ($expr =~ /^(\".*?)(\".*)$/s) {
+    $v = $1;
+    $expr = $2;
+    ($v, $expr) = expr_expand('"', substr("$1$2", 1), $xp, qr{/^([^%\"]+)/}) if $xp;
+    $expr =~ s/^\"//s;
+  } elsif ($expr =~ /^([a-zA-Z][a-zA-Z_0-9]*)(.*)$/s) {
     # actually no longer supported with new rpm versions
     $v = "\"$1";
-    $expr = $2;
-  } elsif ($expr =~ /^(\".*?)\"(.*)$/) {
-    $v = $1;
     $expr = $2;
   } else {
     return;
@@ -79,47 +128,49 @@ sub expr {
     $expr =~ s/^\s+//;
     if ($expr =~ /^&&/) {
       return ($v, $expr) if $lev >= 2;
-      ($v2, $expr) = expr(substr($expr, 2), 2);
+      my $b = expr_boolify($v);
+      ($v2, $expr) = expr(substr($expr, 2), 2, $xp && !$b ? \&expr_dummyexpander : $xp);
       return undef unless defined $v2;
-      $v = $v2 if expr_boolify($v);
+      $v = $v2 if $b;
     } elsif ($expr =~ /^\|\|/) {
       return ($v, $expr) if $lev >= 2;
-      ($v2, $expr) = expr(substr($expr, 2), 2);
+      my $b = expr_boolify($v);
+      ($v2, $expr) = expr(substr($expr, 2), 2, $xp && $b ? \&expr_dummyexpander : $xp);
       return undef unless defined $v2;
-      $v = $v2 unless expr_boolify($v);
+      $v = $v2 unless $b;
     } elsif ($expr =~ /^>=/) {
       return ($v, $expr) if $lev >= 3;
-      ($v2, $expr) = expr(substr($expr, 2), 3);
+      ($v2, $expr) = expr(substr($expr, 2), 3, $xp);
       return undef unless defined $v2;
       $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 6) : ($v =~ /^\"/) ? $v ge $v2 : $v >= $v2) ? 1 : 0;
     } elsif ($expr =~ /^>/) {
       return ($v, $expr) if $lev >= 3;
-      ($v2, $expr) = expr(substr($expr, 1), 3);
+      ($v2, $expr) = expr(substr($expr, 1), 3, $xp);
       return undef unless defined $v2;
       $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 4) : ($v =~ /^\"/) ? $v gt $v2 : $v > $v2) ? 1 : 0;
     } elsif ($expr =~ /^<=/) {
       return ($v, $expr) if $lev >= 3;
-      ($v2, $expr) = expr(substr($expr, 2), 3);
+      ($v2, $expr) = expr(substr($expr, 2), 3, $xp);
       return undef unless defined $v2;
       $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 3) : ($v =~ /^\"/) ? $v le $v2 : $v <= $v2) ? 1 : 0;
     } elsif ($expr =~ /^</) {
       return ($v, $expr) if $lev >= 3;
-      ($v2, $expr) = expr(substr($expr, 1), 3);
+      ($v2, $expr) = expr(substr($expr, 1), 3, $xp);
       return undef unless defined $v2;
       $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 1) : ($v =~ /^\"/) ? $v lt $v2 : $v < $v2) ? 1 : 0;
     } elsif ($expr =~ /^==/) {
       return ($v, $expr) if $lev >= 3;
-      ($v2, $expr) = expr(substr($expr, 2), 3);
+      ($v2, $expr) = expr(substr($expr, 2), 3, $xp);
       return undef unless defined $v2;
       $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 2) : ($v =~ /^\"/) ? $v eq $v2 : $v == $v2) ? 1 : 0;
     } elsif ($expr =~ /^!=/) {
       return ($v, $expr) if $lev >= 3;
-      ($v2, $expr) = expr(substr($expr, 2), 3);
+      ($v2, $expr) = expr(substr($expr, 2), 3, $xp);
       return undef unless defined $v2;
       $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 5) : ($v =~ /^\"/) ? $v ne $v2 : $v != $v2) ? 1 : 0;
     } elsif ($expr =~ /^\+/) {
       return ($v, $expr) if $lev >= 4;
-      ($v2, $expr) = expr(substr($expr, 1), 4);
+      ($v2, $expr) = expr(substr($expr, 1), 4, $xp);
       return undef unless defined $v2;
       if ($v =~ /^\"/ && $v2 =~ s/^\"//) {
 	$v .= $v2;
@@ -128,24 +179,25 @@ sub expr {
       }
     } elsif ($expr =~ /^-/) {
       return ($v, $expr) if $lev >= 4;
-      ($v2, $expr) = expr(substr($expr, 1), 4);
+      ($v2, $expr) = expr(substr($expr, 1), 4, $xp);
       return undef unless defined $v2;
       $v -= $v2;
     } elsif ($expr =~ /^\*/) {
-      ($v2, $expr) = expr(substr($expr, 1), 5);
+      ($v2, $expr) = expr(substr($expr, 1), 5, $xp);
       return undef unless defined $v2;
       $v *= $v2;
     } elsif ($expr =~ /^\//) {
-      ($v2, $expr) = expr(substr($expr, 1), 5);
+      ($v2, $expr) = expr(substr($expr, 1), 5, $xp);
       return undef unless defined $v2 && 0 + $v2;
       $v /= $v2;
     } elsif ($expr =~ /^\?/) {
       return ($v, $expr) if $lev > 1;
-      $v2 = expr_boolify($v);
-      ($v, $expr) = expr(substr($expr, 1), 1);
-      warn("syntax error while parsing ternary in $_[0]\n") unless $expr =~ s/^://;
-      ($v, $expr) = expr($expr, 1) unless $v2;
-      (undef, $expr) = expr($expr, 1) if $v2;
+      my $b = expr_boolify($v);
+      ($v, $expr) = expr(substr($expr, 1), 1, $xp && !$b ? \&expr_dummyexpander : $xp);
+      warn("syntax error while parsing ternary in $_[0]\n") unless defined($v) && $expr =~ s/^://;
+      ($v2, $expr) = expr($expr, 1, $xp && $b ? \&expr_dummyexpander : $xp);
+      return undef unless defined $v2;
+      $v = $v2 unless $b;
     } elsif ($expr =~ /^([=&|])/) {
       warn("syntax error while parsing $1$1\n");
       return ($v, $expr);
@@ -283,9 +335,8 @@ reexpand:
       }
       $macalt =~ s/^\[//;
       $macalt =~ s/\]$//;
-      # this is wrong, should expand in expr
-      $macalt = expandmacros($config, $macalt, $lineno, $macros, $macros_args, $tries);
-      $macalt = (expr($macalt))[0];
+      my $xp = sub {expandmacros($config, $_[0], $lineno, $macros, $macros_args, $tries)};
+      $macalt = (expr($macalt, 0, $xp))[0];
       $macalt =~ s/^[v\"]//;
       $expandedline .= $macalt;
     } elsif ($macname eq 'define' || $macname eq 'global') {
