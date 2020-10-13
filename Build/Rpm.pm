@@ -39,29 +39,6 @@ sub expr_vcmp {
   return ($r < 0 ? 1 : $r > 0 ? 4 : 2) & $rr ? 1 : 0;
 }
 
-sub expr_macroend {
-  my ($expr) = @_;
-  if ($expr =~ /^%([\(\{\[])/s) {
-    my $o = $1;
-    my $c = $o eq '[' ? ']' : $o eq '(' ? ')' : '}';
-    my $m = substr($expr, 0, 2, '');
-    my $cnt = 1;
-    my $r = qr/^(.*?)([$o$c\\])/s;
-    while ($expr =~ /$r/) {
-      $m .= substr($expr, 0, length($1) + 1, '');
-      if ($2 eq '\\') {
-	$m .= substr($expr, 0, 1, '');
-      } elsif ($2 eq $o) {
-	$cnt++;
-      } elsif ($2 eq $c) {
-	return $m if --$cnt == 0;
-      }
-    }
-    return "$m$expr";
-  }
-  return $1 if $expr =~ /^(%[?!]*-?[a-zA-Z0-9_]*(?:\*|\*\*|\#)?)/s;
-}
-
 sub expr_dummyexpander {
   return '';
 }
@@ -72,7 +49,7 @@ sub expr_expand {
     if ($expr =~ /^%%/s) {
       $v .= substr($expr, 0, 2, '');
     } elsif ($expr =~ /^%/s) {
-      my $m = expr_macroend($expr);
+      my $m = macroend($expr);
       $v .= substr($expr, 0, length($m), '');
     } elsif ($expr =~ /$r/) {
       $v .= substr($expr, 0, length($1), '');
@@ -104,17 +81,17 @@ sub expr {
   } elsif ($expr =~ /^([0-9]+)(.*?)$/s || ($xp && $expr =~ /^(%)(.*)$/)) {
     $v = $1;
     $expr = $2;
-    ($v, $expr) = expr_expand('0', "$1$2", $xp, qr{/^([0-9]+)/}) if $xp;
+    ($v, $expr) = expr_expand('0', "$1$2", $xp, qr/^([0-9]+)/) if $xp;
     $v = 0 + $v;
   } elsif ($expr =~ /^v\"(.*?)(\".*)$/s) {
     $v = "v$1";		# version
     $expr = $2;
-    ($v, $expr) = expr_expand('v', substr("$1$2", 2), $xp, qr{/^([^%\"]+)/}) if $xp;
+    ($v, $expr) = expr_expand('v', substr("$1$2", 2), $xp, qr/^([^%\"]+)/) if $xp;
     $expr =~ s/^\"//s;
   } elsif ($expr =~ /^(\".*?)(\".*)$/s) {
     $v = $1;
     $expr = $2;
-    ($v, $expr) = expr_expand('"', substr("$1$2", 1), $xp, qr{/^([^%\"]+)/}) if $xp;
+    ($v, $expr) = expr_expand('"', substr("$1$2", 1), $xp, qr/^([^%\"]+)/) if $xp;
     $expr =~ s/^\"//s;
   } elsif ($expr =~ /^([a-zA-Z][a-zA-Z_0-9]*)(.*)$/s) {
     # actually no longer supported with new rpm versions
@@ -266,6 +243,29 @@ sub initmacros {
   }
 }
 
+sub macroend {
+  my ($expr) = @_;
+  if ($expr =~ /^%([\(\{\[])/s) {
+    my $o = $1;
+    my $c = $o eq '[' ? ']' : $o eq '(' ? ')' : '}';
+    my $m = substr($expr, 0, 2, '');
+    my $cnt = 1;
+    my $r = qr/^(.*?)([$o$c\\])/s;
+    while ($expr =~ /$r/) {
+      $m .= substr($expr, 0, length($1) + 1, '');
+      if ($2 eq '\\') {
+	$m .= substr($expr, 0, 1, '');
+      } elsif ($2 eq $o) {
+	$cnt++;
+      } elsif ($2 eq $c) {
+	return $m if --$cnt == 0;
+      }
+    }
+    return "$m$expr";
+  }
+  return $1 if $expr =~ /^(%[?!]*-?[a-zA-Z0-9_]*(?:\*|\*\*|\#)?)/s;
+}
+
 sub expandmacros {
   my ($config, $line, $lineno, $macros, $macros_args, $tries) = @_;
 
@@ -297,13 +297,12 @@ reexpand:
     my $macdata;
     my $macalt;
     if (defined($3)) {
-      if ($macname =~ /{/) {	# {
-	while (($macname =~ y/{/{/) > ($macname =~ y/}/}/)) {
-	  last unless $line =~ /^([^}]*)}(.*)$/;
-	  $macname .= "}$1";
-	  $macorig .= "$1}";
-	  $line = $2;
-	}
+      if ($macname =~ /[{\\]/) {	# tricky, use macroend
+	$macname = macroend("%$macorig$line");
+	$line = substr("%$macorig$line", length($macname));
+        $macorig = substr($macname, 1);
+	$macname =~ s/^%\{//s;
+	$macname =~ s/\}$//s;
       }
       $macdata = '';
       if ($macname =~ /^([^\s:]+)([\s:])(.*)$/) {
@@ -327,17 +326,13 @@ reexpand:
       $line = 'MACRO';
       last;
     } elsif ($macname eq '[') {
-      # find matching ']'
-      $macalt = '[';
-      while (($macalt =~ y/\[/\[/) > ($macalt =~ y/\]/\]/) && $line =~ /^(.*?\])(.*)$/) {
-	$macalt .= $1;
-        $line = $2;
-      }
-      $macalt =~ s/^\[//;
+      $macalt = macroend("%[$line");
+      $line = substr($line, length($macalt) - 2);
+      $macalt =~ s/^%\[//;
       $macalt =~ s/\]$//;
       my $xp = sub {expandmacros($config, $_[0], $lineno, $macros, $macros_args, $tries)};
       $macalt = (expr($macalt, 0, $xp))[0];
-      $macalt =~ s/^[v\"]//;
+      $macalt =~ s/^[v\"]//;	# stringify
       $expandedline .= $macalt;
     } elsif ($macname eq 'define' || $macname eq 'global') {
       my $isglobal = $macname eq 'global' ? 1 : 0;
@@ -386,7 +381,7 @@ reexpand:
       $macalt = '' if $mactest == -1;
       $macalt = expandmacros($config, $macalt, $lineno, $macros, $macros_args, $tries);
       $macalt = (expr($macalt))[0];
-      $macalt =~ s/^[v\"]//;
+      $macalt =~ s/^[v\"]//;	# stringify
       $expandedline .= $macalt;
     } elsif (exists($macros->{$macname})) {
       if (!defined($macros->{$macname})) {
