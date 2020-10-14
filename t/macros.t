@@ -1,11 +1,23 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 14;
+use Test::More tests => 20;
 
 use Build::Rpm;
 
 my @tests = (
+q{
+%%}				=> '%',
+q{
+%{%}}				=> '%{%}',
+q{
+%not_defined}			=> '%not_defined',
+q{
+%{not_defined}}			=> '%{not_defined}',
+q{
+%{}}				=> '%{}',
+q{
+%{ test }}			=> '%{ test }',
 q{
 %define this that
 %{this}} 			=> 'that',
