@@ -612,7 +612,7 @@ sub parse {
     if (@subpacks && $preamble && exists($ret->{'version'}) && $line =~ /^Version\s*:\s*(\S+)/i) {
       $ret->{'multiversion'} = 1 if $ret->{'version'} ne $1;
     }
-    if ($preamble && $line =~ /^\#\!ForceMultiVersion\s*$/) {
+    if ($preamble && $line =~ /^\#\!ForceMultiVersion\s*$/i) {
       $ret->{'multiversion'} = 1;
     }
     if ($line =~ /^(?:Requires\(pre\)|Requires\(post\)|PreReq)\s*:\s*(\S.*)$/i) {
