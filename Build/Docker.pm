@@ -44,11 +44,24 @@ sub slurp {
   return $content;
 }
 
+sub expandvar_cplx {
+  my ($n, $m, $v, $vars) = @_;
+  $v = expandvars($v, $vars) if $v =~ /\$/;
+  my $o = join(' ', @{$vars->{$n} || []});
+  return $o ne '' ? $vars->{$n} : [ $v ] if $m eq '-';
+  return $o ne '' ? [ $v ] : [] if $m eq '+';
+  return [];
+}
+
+sub expandvars {
+  my ($str, $vars) = @_;
+  $str =~ s/\$([a-zA-Z0-9_]+)|\$\{([^\}:]+)\}|\$\{([^\}:]+):([-+])([^}]*)\}/join(' ', @{$3 ? expandvar_cplx($3, $4, $5, $vars) : $vars->{$2 || $1} || []})/ge;
+  return $str;
+}
+
 sub quote {
   my ($str, $q, $vars) = @_;
-  if ($q ne "'" && $str =~ /\$/) {
-    $str =~ s/\$([a-zA-Z0-9_]+|\{([^\}]+)\})/join(' ', @{$vars->{$2 || $1} || []})/ge;
-  }
+  $str = expandvars($str, $vars) if $vars && $q ne "'" && $str =~ /\$/;
   $str =~ s/([ \t\"\'\$\(\)])/sprintf("%%%02X", ord($1))/ge;
   return $str;
 }
@@ -143,6 +156,16 @@ sub cmd_apt_get {
   }
 }
 
+sub get_build_vars {
+  my ($cf, $vars_env) = @_;
+  my $vars = { %$vars_env };
+  return $vars unless defined $cf->{'buildflags:dockerbuildarg'};
+  for (@{$cf->{'buildflags'} || []}) {
+    $vars->{$1} = [ $2 ] if /^dockerbuildarg:(.*?)=(.*)$/s && !$vars_env->{$1};
+  }
+  return $vars;
+}
+
 sub parse {
   my ($cf, $fn) = @_;
 
@@ -162,6 +185,9 @@ sub parse {
   };
 
   my $excludedline;
+  my $vars = {};
+  my $vars_env = {};
+
   while (@lines) {
     my $line = shift @lines;
     $line =~ s/^\s+//;
@@ -210,31 +236,35 @@ sub parse {
     my ($cmd, @args);
     ($cmd, $line) = split(' ', $line, 2);
     $cmd = uc($cmd);
-    my $vars = {};
-    # split line into args
+    # escape and unquote
     $line =~ s/%/%25/g;
     $line =~ s/\\(.)/sprintf("%%%02X", ord($1))/ge;
     while ($line =~ /([\"\'])/) {
       my $q = $1;
       last unless $line =~ s/$q(.*?)$q/quote($1, $q, $vars)/e;
     }
-    if ($line =~ /\$/) {
-      $line =~ s/\$([a-zA-Z0-9_]+|\{([^\}]+)\})/join(' ', @{$vars->{$2 || $1} || []})/ge;
-    }
+    # split into args then expand
     @args = split(/[ \t]+/, $line);
-    s/%([a-fA-F0-9]{2})/chr(hex($1))/ge for @args;
+    for my $arg (@args) {
+      $arg = expandvars($arg, $vars) if $arg =~ /\$/;
+      $arg =~ s/%([a-fA-F0-9]{2})/chr(hex($1))/ge;
+    }
+    # process commands
     if ($cmd eq 'FROM') {
       shift @args if @args && $args[0] =~ /^--platform=/;
       if (@args && !$basecontainer && $args[0] ne 'scratch') {
         $basecontainer = $args[0];
         $basecontainer .= ':latest' unless $basecontainer =~ /:[^:\/]+$/;
       }
+      $vars_env = {};		# should take env from base container
+      $vars = get_build_vars($cf, $vars_env);
     } elsif ($cmd eq 'RUN') {
       $line =~ s/#.*//;	# get rid of comments
       for my $l (split(/(?:\||\|\||\&|\&\&|;|\)|\()/, $line)) {
 	$l =~ s/^\s+//;
 	$l =~ s/\s+$//;
-        @args = split(/[ \t]+/, $l);
+	$l = expandvars($l, $vars) if $l =~ /\$/;
+	@args = split(/[ \t]+/, $l);
 	s/%([a-fA-F0-9]{2})/chr(hex($1))/ge for @args;
 	next unless @args;
 	my $rcmd = shift @args;
@@ -247,6 +277,17 @@ sub parse {
 	} elsif ($rcmd eq 'obs_pkg_mgr') {
 	  cmd_obs_pkg_mgr($ret, @args);
 	}
+      }
+    } elsif ($cmd eq 'ENV') {
+      for (@args) {
+        next unless /^(.*?)=(.*)#/;
+	$vars->{$1} = [ $2 ];
+	$vars_env->{$1} = [ $2 ];
+      }
+    } elsif ($cmd eq 'ARG') {
+      for (@args) {
+        next unless /^(.*?)=(.*)#/;
+	$vars->{$1} = [ $2 ] unless $vars_env->{$1};
       }
     }
   }

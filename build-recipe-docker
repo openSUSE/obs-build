@@ -137,6 +137,16 @@ recipe_build_docker() {
 	tagargs[${#tagargs[@]}]="$t"
     done
 
+    buildargs=()
+    while read kv ; do
+	case "$kv" in
+	    [a-zA-Z0-9_]*=*)
+		buildargs[${#buildargs[@]}]='--build-arg'
+		buildargs[${#buildargs[@]}]="$kv"
+		;;
+	esac
+    done < <( queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ dockerbuildarg )
+
     # patch in obs-docker-support helper
     patchdockerfile < "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" > "$BUILD_ROOT/$TOPDIR/SOURCES/.$RECIPEFILE" && \
        mv "$BUILD_ROOT/$TOPDIR/SOURCES/.$RECIPEFILE" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
@@ -154,11 +164,11 @@ recipe_build_docker() {
 
     if test "$DOCKER_TOOL" = podman ; then
 	test -n "$squashopt" && squashopt="--layers=false"
-	if ! $BUILD_DIR/call-podman --root "$BUILD_ROOT" build $squashopt -v "$TOPDIR/SOURCES/repos:$TOPDIR/SOURCES/repos" --network=host "${tagargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
+	if ! $BUILD_DIR/call-podman --root "$BUILD_ROOT" build $squashopt -v "$TOPDIR/SOURCES/repos:$TOPDIR/SOURCES/repos" --network=host "${tagargs[@]}" "${buildargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
 	    cleanup_and_exit 1 "$DOCKER_TOOL build command failed"
 	fi
     else
-	if ! chroot $BUILD_ROOT $DOCKER_TOOL build $squashopt --network=host "${tagargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
+	if ! chroot $BUILD_ROOT $DOCKER_TOOL build $squashopt --network=host "${tagargs[@]}" "${buildargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
 	    cleanup_and_exit 1 "$DOCKER_TOOL build command failed"
 	fi
     fi

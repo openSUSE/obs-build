@@ -69,6 +69,11 @@ if ($type eq 'buildflags') {
   die("Specify which buildflag to query\n") unless $argument;
   my $result = $cf->{"buildflags:$argument"};
   print "$result\n" if defined $result;
+} elsif ($type eq 'buildflags+') {
+  die("Specify which buildflag to query\n") unless $argument;
+  for (@{$cf->{'buildflags'} || []}) {
+    print "$1\n" if /\Q$argument\E:(.*)/;
+  }
 } elsif ($type eq 'hostarch') {
   my $result = $cf->{"hostarch"};
   print "$result\n" if defined $result;
