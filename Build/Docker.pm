@@ -156,16 +156,6 @@ sub cmd_apt_get {
   }
 }
 
-sub get_build_vars {
-  my ($cf, $vars_env) = @_;
-  my $vars = { %$vars_env };
-  return $vars unless defined $cf->{'buildflags:dockerarg'};
-  for (@{$cf->{'buildflags'} || []}) {
-    $vars->{$1} = [ $2 ] if /^dockerarg:(.*?)=(.*)$/s && !$vars_env->{$1};
-  }
-  return $vars;
-}
-
 sub parse {
   my ($cf, $fn) = @_;
 
@@ -183,6 +173,13 @@ sub parse {
     'path' => [],
     'imagerepos' => [],
   };
+
+  my %build_vars;
+  if ($cf->{'buildflags:dockerarg'}) {
+    for (@{$cf->{'buildflags'} || []}) {
+      $build_vars{$1} = [ $2 ] if /^dockerarg:(.*?)=(.*)$/s;
+    }
+  }
 
   my $excludedline;
   my $vars = {};
@@ -257,7 +254,7 @@ sub parse {
         $basecontainer .= ':latest' unless $basecontainer =~ /:[^:\/]+$/;
       }
       $vars_env = {};		# should take env from base container
-      $vars = get_build_vars($cf, $vars_env);
+      $vars = { %$vars_env };
     } elsif ($cmd eq 'RUN') {
       $line =~ s/#.*//;	# get rid of comments
       for my $l (split(/(?:\||\|\||\&|\&\&|;|\)|\()/, $line)) {
@@ -286,8 +283,9 @@ sub parse {
       }
     } elsif ($cmd eq 'ARG') {
       for (@args) {
-        next unless /^(.*?)=(.*)#/;
-	$vars->{$1} = [ $2 ] unless $vars_env->{$1};
+	next unless /^([^=]+)(?:=(.*))?$/;
+	next if $vars_env->{$1};
+	$vars->{$1} = $build_vars{$1} || (defined($2) ? [ $2 ] : []);
       }
     }
   }
