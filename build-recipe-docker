@@ -145,7 +145,7 @@ recipe_build_docker() {
 		buildargs[${#buildargs[@]}]="$kv"
 		;;
 	esac
-    done < <( queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ dockerbuildarg )
+    done < <( queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ dockerarg )
 
     # patch in obs-docker-support helper
     patchdockerfile < "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" > "$BUILD_ROOT/$TOPDIR/SOURCES/.$RECIPEFILE" && \

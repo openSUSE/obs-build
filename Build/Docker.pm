@@ -159,9 +159,9 @@ sub cmd_apt_get {
 sub get_build_vars {
   my ($cf, $vars_env) = @_;
   my $vars = { %$vars_env };
-  return $vars unless defined $cf->{'buildflags:dockerbuildarg'};
+  return $vars unless defined $cf->{'buildflags:dockerarg'};
   for (@{$cf->{'buildflags'} || []}) {
-    $vars->{$1} = [ $2 ] if /^dockerbuildarg:(.*?)=(.*)$/s && !$vars_env->{$1};
+    $vars->{$1} = [ $2 ] if /^dockerarg:(.*?)=(.*)$/s && !$vars_env->{$1};
   }
   return $vars;
 }
