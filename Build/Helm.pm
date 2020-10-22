@@ -23,7 +23,6 @@ package Build::Helm;
 use strict;
 
 use Build::SimpleJSON;
-use Digest;
 
 eval { require YAML::XS; $YAML::XS::LoadBlessed = 0; };
 *YAML::XS::LoadFile = sub {die("YAML::XS is not available\n")} unless defined &YAML::XS::LoadFile;
@@ -121,6 +120,7 @@ sub show {
     $helminfo->{'disturl'} = $disturl if $disturl;
     $helminfo->{'buildtime'} = time();
     if ($chart) {
+      require Digest;
       $helminfo->{'chart'} = $chart;
       $helminfo->{'chart'} =~ s/.*\///;
       my $ctx = Digest->new("SHA-256");
