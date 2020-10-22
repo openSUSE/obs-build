@@ -141,6 +141,25 @@ BUILD_INIT_CACHE="$BUILD_ROOT/.init_b_cache"
 # needed functions
 #
 
+mount_stuff() {
+    if test "$UID" = 0 -a -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
+	mount -n -tproc none "$BUILD_ROOT/proc"
+	test -e "$BUILD_ROOT/proc/self" || cleanup_and_exit 1 "Could not mount /proc, is this a container with missing capabilities?"
+	mount -n -tdevpts -omode=0620,gid=5 none "$BUILD_ROOT/dev/pts"
+    fi
+}
+
+umount_stuff() {
+    if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
+	buildroot_umount "/proc/sys/fs/binfmt_misc"
+	buildroot_umount "/proc"
+	buildroot_umount "/sys"
+	buildroot_umount "/dev/pts"
+	buildroot_umount "/dev/shm"
+	buildroot_umount "/mnt"
+    fi
+}
+
 cleanup_and_exit() {
     trap EXIT
     test -z "$1" && set 0
@@ -153,25 +172,13 @@ cleanup_and_exit() {
     fi
     test "$BUILD_ROOT" = / -a -n "$browner" && chown "$browner" "$BUILD_ROOT"
     # umount so init_buildsystem can be used standalone
-    if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
-	buildroot_umount "/proc/sys/fs/binfmt_misc"
-	buildroot_umount "/proc"
-	buildroot_umount "/sys"
-	buildroot_umount "/dev/pts"
-	buildroot_umount "/dev/shm"
-	buildroot_umount "/mnt"
-    fi
+    umount_stuff
     exit $1
 }
 
 clean_build_root() {
     if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
-	buildroot_umount "/proc/sys/fs/binfmt_misc"
-	buildroot_umount "/proc"
-	buildroot_umount "/sys"
-	buildroot_umount "/dev/pts"
-	buildroot_umount "/dev/shm"
-	buildroot_umount "/mnt"
+	umount_stuff
 	rm -rf -- "$BUILD_ROOT"/* 2> /dev/null || true
 	chattr -a -A -i -R -- "$BUILD_ROOT" 2> /dev/null || true    # does not follow symlinks
 	rm -rf -- "$BUILD_ROOT"/*
@@ -522,12 +529,7 @@ if test -e "$BUILD_IS_RUNNING" ; then
 	    cleanup_and_exit 1
     fi
     echo "To be sure, we will build it again completely..."
-    buildroot_umount "/proc/sys/fs/binfmt_misc"
-    buildroot_umount "/proc"
-    buildroot_umount "/sys"
-    buildroot_umount "/dev/pts"
-    buildroot_umount "/dev/shm"
-    buildroot_umount "/mnt"
+    umount_stuff
     echo "Your build system is broken!! Shall I execute"
     echo
     echo "    rm -rf -- $BUILD_ROOT/*"
@@ -547,35 +549,31 @@ if test -e "$BUILD_IS_RUNNING" ; then
     esac
 fi
 
-#
-# store that we start to build system
-#
-mkdir -p $BUILD_ROOT
-mkdir -p $BUILD_ROOT/.build
-touch $BUILD_IS_RUNNING
-
-# mount /proc and /dev/pts
-mkdir -p $BUILD_ROOT/proc
-mkdir -p $BUILD_ROOT/dev/pts
-if test "$UID" = 0 -a -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
-    mount -n -tproc none "$BUILD_ROOT/proc"
-    test -e "$BUILD_ROOT/proc/self" || cleanup_and_exit 1 "Could not mount /proc, is this a container with missing capabilities?"
-    mount -n -tdevpts -omode=0620,gid=5 none "$BUILD_ROOT/dev/pts"
+# check for surprises
+if test -z "$CLEAN_BUILD" -a -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
+    assert_dirs
 fi
+# umount stuff if mounted
+if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / -a -e "$BUILD_ROOT/proc/self" ; then
+    umount_stuff
+fi
+
+#
+# store that we start to build the system
+#
+mkdir -p "$BUILD_ROOT"
+mkdir -p "$BUILD_ROOT/.build"
+mkdir -p "$BUILD_ROOT/proc"
+mkdir -p "$BUILD_ROOT/dev/pts"
+touch $BUILD_IS_RUNNING
 
 if test -n "$PREPARE_VM" ; then
     rm -rf $BUILD_ROOT/.build/init_buildsystem.data
 fi
 
 if test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
-    # vm continuation
+    # vm continuation, read old config
     . $BUILD_ROOT/.build/init_buildsystem.data
-    if ! test -e $BUILD_ROOT/.init_b_cache/preinstall_finished ; then
-	# finish preinstall
-	run_pkg_scripts
-	pkg_initdb
-	touch $BUILD_ROOT/.init_b_cache/preinstall_finished
-    fi
 else
     #
     # now make sure that all the packages are installed.
@@ -860,6 +858,7 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
 	cp $BUILD_ROOT/etc/ld.so.conf.in $BUILD_ROOT/etc/ld.so.conf
     fi
     if test -z "$PREPARE_VM" ; then
+	mount_stuff
 	run_pkg_scripts
 	pkg_initdb
 	touch $BUILD_ROOT/.init_b_cache/preinstall_finished
@@ -867,6 +866,11 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
     # mark as preinstalled no longer needed
     rm -rf "$BUILD_ROOT/installed-pkg"
     mkdir -p "$BUILD_ROOT/installed-pkg"
+else
+    # preinstall was already done
+    if test -z "$PREPARE_VM" ; then
+	mount_stuff
+    fi
 fi
 
 if test -n "$PREPARE_VM" ; then
@@ -894,6 +898,14 @@ if test -n "$PREPARE_VM" ; then
     cleanup_and_exit 0
 fi
 
+#
+# finish preinstall if this is a vm continuation
+#
+if test -e "$BUILD_ROOT/.build/init_buildsystem.data" -a ! -e "$BUILD_ROOT/.init_b_cache/preinstall_finished" ; then
+    run_pkg_scripts
+    pkg_initdb
+    touch "$BUILD_ROOT/.init_b_cache/preinstall_finished"
+fi
 
 #
 # create .build.binaries directory if requested
