@@ -297,8 +297,8 @@ for my $spec (@specs) {
   my $cf = Build::read_config_dist($dist, $archs[0], $configdir);
   my $parsed = Build::parse($cf, $spec);
 
-  if (!defined $parsed) {
-    die "can't parse $spec\n";
+  if (!defined $parsed || $parsed->{'error'}) {
+    die "can't parse $spec: ".($parsed->{'error'}||'unknown error')."\n";
   }
 
   for my $tag (@opt_showtag) {
