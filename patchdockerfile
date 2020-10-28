@@ -30,7 +30,7 @@ my $uninstall_docker_support = "RUN obs-docker-support --uninstall\n";
 my @sections = ( [] );
 while (<STDIN>) {
   $_ .= "\n" unless /\n$/s;
-  push @sections, [] if /^FROM /i;
+  push @sections, [] if /^FROM\s/i;
   push @{$sections[-1]}, $_;
 }
 
