@@ -168,7 +168,6 @@ sub parse {
 
   my @lines = split(/\r?\n/, $dockerfile_data);
   my $ret = {
-    'name' => 'docker',
     'deps' => [],
     'path' => [],
     'imagerepos' => [],
@@ -192,6 +191,9 @@ sub parse {
       if ($line =~ /^#!BuildTag:\s*(.*?)$/) {
 	my @tags = split(' ', $1);
 	push @{$ret->{'containertags'}}, @tags if @tags;
+      }
+      if ($line =~ /^#!BuildName:\s*(\S+)\s*$/) {
+	$ret->{'name'} = $1;
       }
       if ($line =~ /^#!BuildVersion:\s*(\S+)\s*$/) {
 	$ret->{'version'} = $1;
@@ -297,6 +299,7 @@ sub parse {
     s/<VERSION>/$version/g if defined $version;
     s/<RELEASE>/$release/g if defined $release;
   }
+  $ret->{'name'} = 'docker' if !defined($ret->{'name'}) && !$cf->{'__dockernoname'};
   $ret->{'path'} = [ { 'project' => '_obsrepositories', 'repository' => '' } ] if $useobsrepositories;
   $ret->{'basecontainer'} = $basecontainer if $basecontainer;
   $ret->{'nosquash'} = 1 if $nosquash;
@@ -316,7 +319,7 @@ sub showcontainerinfo {
   }
   my ($fn, $image, $taglist, $annotationfile) = @ARGV;
   local $Build::Kiwi::urlmapper = sub { return $_[0] };
-  my $cf = {};
+  my $cf = { '__dockernoname' => 1 };
   $cf->{'buildrelease'} = $release if defined $release;
   my $d = {};
   $d = parse($cf, $fn) if $fn;
@@ -352,6 +355,7 @@ sub showcontainerinfo {
   $containerinfo->{'repos'} = \@repos if @repos;
   $containerinfo->{'file'} = $image if defined $image;
   $containerinfo->{'disturl'} = $disturl if defined $disturl;
+  $containerinfo->{'name'} = $d->{'name'} if defined $d->{'name'};
   $containerinfo->{'version'} = $d->{'version'} if defined $d->{'version'};
   $containerinfo->{'release'} = $release if defined $release;
   $containerinfo->{'milestone'} = $d->{'milestone'} if defined $d->{'milestone'};
