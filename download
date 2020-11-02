@@ -52,20 +52,17 @@ my $ua = LWP::UserAgent->new(
   });
 
 for my $url (@ARGV) {
-  if ($url =~ /^zypp:\/\/([^\/]*)\/?/) {
-    my $baseurl = get_zypp_baseurl($1);
-    $baseurl .= '/' unless $baseurl =~ /\/$/;
-    $url =~ s/^zypp:\/\/[^\/]*\/*/$baseurl/;
-    $url = URI->new($url);
-    if ($url->scheme eq 'dir') {
-      my $dest = "$dir/".basename($url->path);
-      unlink($dest);	# just in case
-      system('cp', $url->path, $dest) && die("cp $url->path $dest failed\n");
-      next;
-    }
-  } else {
-    $url = URI->new($url);
+  if ($url =~ m#^zypp://#) {
+    die("do not know how to download $url\n") unless $url =~ m#^zypp://([^/]+)/((?:.*/)?([^/]+)\.rpm)$#;
+    my ($repo, $path, $pkg) = ($1, $2, $3);
+    my $dest = "$dir/$pkg.rpm";
+    system('/usr/bin/zypper', '--no-refresh', '-q', '--pkg-cache-dir', $dir,
+           'download', '-r', $repo, $pkg)
+	&& die("zypper download $pkg failed\n");
+    rename("$dir/$repo/$path", "$dest") || die("rename $dir/$repo/$path $dest: $!\n");
+    next;
   }
+  $url = URI->new($url);
   $ua->env_proxy;
   my $dest = "$dir/".basename($url->path);
   unlink($dest);	# just in case
