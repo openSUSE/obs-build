@@ -23,7 +23,9 @@ package Build::Helm;
 use strict;
 
 use Build::SimpleJSON;
-use Digest::SHA;
+
+eval { require Digest::SHA; $Digest::SHA::LoadBlessed = 0; };
+*Digest::SHA::LoadFile = sub {die("Digest::SHA is not available\n")} unless defined &Digest::SHA::LoadFile;
 
 eval { require YAML::XS; $YAML::XS::LoadBlessed = 0; };
 *YAML::XS::LoadFile = sub {die("YAML::XS is not available\n")} unless defined &YAML::XS::LoadFile;
