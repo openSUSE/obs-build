@@ -24,9 +24,6 @@ use strict;
 
 use Build::SimpleJSON;
 
-eval { require Digest::SHA; $Digest::SHA::LoadBlessed = 0; };
-*Digest::SHA::LoadFile = sub {die("Digest::SHA is not available\n")} unless defined &Digest::SHA::LoadFile;
-
 eval { require YAML::XS; $YAML::XS::LoadBlessed = 0; };
 *YAML::XS::LoadFile = sub {die("YAML::XS is not available\n")} unless defined &YAML::XS::LoadFile;
 
@@ -123,6 +120,7 @@ sub show {
     $helminfo->{'disturl'} = $disturl if $disturl;
     $helminfo->{'buildtime'} = time();
     if ($chart) {
+      require Digest::SHA;
       $helminfo->{'chart'} = $chart;
       $helminfo->{'chart'} =~ s/.*\///;
       my $ctx = Digest::SHA->new(256);
