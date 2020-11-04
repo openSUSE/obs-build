@@ -339,9 +339,9 @@ vm_img_create() {
 	rm -f "${img}.size"
     fi
 
-    mkdir -p "${img%/*}" || cleanup_and_exit 3
+    mkdir -p "${img%/*}" || cleanup_and_exit 4
     # truncate file to the desired size
-    dd if=/dev/zero of="$img" bs=1M count=0 seek="$size" || cleanup_and_exit 3
+    dd if=/dev/zero of="$img" bs=1M count=0 seek="$size" || cleanup_and_exit 4
     echo "$size" > "${img}.size"
     # allocate blocks
     if type -p fallocate > /dev/null ; then
@@ -351,7 +351,7 @@ vm_img_create() {
             echo $errout
             if test "${errout/Operation not supported/}" = "$errout"; then
                 # Do not fail on not support file systems, eg ext2 or ext3
-                cleanup_and_exit 3
+                cleanup_and_exit 4
             fi
         fi
     fi
@@ -389,11 +389,11 @@ vm_img_mkfs() {
             cleanup_and_exit 3
         else
             echo "Filesystem creation failed, trying again without extra options..."
-            $mkfs $labelopt "$img" || cleanup_and_exit 3
+            $mkfs $labelopt "$img" || cleanup_and_exit 4
         fi
     fi
     if test -n "$tunefs" ; then
-	$tunefs "$img" || cleanup_and_exit 3
+	$tunefs "$img" || cleanup_and_exit 4
     fi
 }
 
@@ -737,31 +737,31 @@ vm_setup() {
 	    if test -z "$origrootsize" -o "$origrootsize" != "$VMDISK_ROOTSIZE" ; then
 		# the size has changed, re-create file system
 		vm_img_create "$VM_ROOT" "$VMDISK_ROOTSIZE"
-		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" || cleanup_and_exit 3
+		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" || cleanup_and_exit 4
 	    fi
 	fi
     fi
     if test ! -e "$VM_ROOT" ; then
-	cleanup_and_exit 3 "you need to create $VM_ROOT first"
+	cleanup_and_exit 4 "you need to create $VM_ROOT first"
     fi
     if test -n "$CLEAN_BUILD" ; then
-	vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" || cleanup_and_exit 3
+	vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" || cleanup_and_exit 4
     fi
     # now mount root/swap
     mkdir_build_root
     if test -w /root ; then
 	if test -b $VM_ROOT ; then
 	    # mount device directly
-	    mount $VMDISK_MOUNT_OPTIONS $VM_ROOT $BUILD_ROOT || cleanup_and_exit 3
+	    mount $VMDISK_MOUNT_OPTIONS $VM_ROOT $BUILD_ROOT || cleanup_and_exit 4
 	else
-	    mount ${VMDISK_MOUNT_OPTIONS},loop $VM_ROOT $BUILD_ROOT || cleanup_and_exit 3
+	    mount ${VMDISK_MOUNT_OPTIONS},loop $VM_ROOT $BUILD_ROOT || cleanup_and_exit 4
 	fi
     else
 	if ! mount $BUILD_ROOT; then
 	    echo "mounting the build root failed. An fstab entry is probably missing or incorrect."
 	    echo "/etc/fstab should contain an entry like this:"
 	    echo "$VM_ROOT $BUILD_ROOT auto noauto,user,loop 0 0"
-	    cleanup_and_exit 3
+	    cleanup_and_exit 4
 	fi
     fi
 }
@@ -948,10 +948,10 @@ vm_first_stage() {
 	if test -z "$VM_USE_VIRT_FS" ; then
 	    if ! umount $BUILD_ROOT; then
 		test -n "$KERNEL_TEMP_DIR" && rm -rf "$KERNEL_TEMP_DIR"
-		cleanup_and_exit 3
+		cleanup_and_exit 4
 	    fi
         else
-            /usr/bin/virt-make-fs --format=raw -t ext3 --size="$VMDISK_ROOTSIZE"M $BUILD_ROOT $VM_ROOT || cleanup_and_exit 1
+            /usr/bin/virt-make-fs --format=raw -t ext3 --size="$VMDISK_ROOTSIZE"M $BUILD_ROOT $VM_ROOT || cleanup_and_exit 4
 	    #rm -rf -- "$BUILD_ROOT"/*
 	fi
 	# copy back the kernel and set it for VM

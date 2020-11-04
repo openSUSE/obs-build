@@ -393,7 +393,8 @@ usage () {
 #  return values: 0 -> success, new packages built
 #                 1 -> error, build failed
 #                 2 -> successfull build, but no changes to former built packages
-#                 3 -> something wrong with build host
+#                 3 -> something wrong with build or the host, leads to a retry
+#                 4 -> something FATAL with build or the host, leads to a retry, but do not build on this host anymore
 #
 cleanup_and_exit () {
     trap EXIT
@@ -703,7 +704,7 @@ mkdir_build_root() {
     fi
 
     if test ! -w "$BUILD_ROOT" ; then
-	cleanup_and_exit 3 "Error: BUILD_ROOT=$BUILD_ROOT not writeable, try --clean."
+	cleanup_and_exit 4 "Error: BUILD_ROOT=$BUILD_ROOT not writeable, try --clean."
     fi
 
     rm -rf "$BUILD_ROOT/.build.packages"
