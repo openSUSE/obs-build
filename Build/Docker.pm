@@ -107,15 +107,21 @@ sub cmd_zypper {
     s/^([^<=>]+)([<=>]+)/$1 $2 / for @deps;
     push @{$ret->{'deps'}}, @deps;
   } elsif ($args[0] eq 'ar' || $args[0] eq 'addrepo') {
+    my $prio;
     shift @args;
     while (@args && $args[0] =~ /^-/) {
+      if ($args[0] eq '-p' || $args[0] eq '--priority') {
+	$prio = 99 - $args[1];
+	splice(@args, 0, 2);
+	next;
+      }
       shift @args if $args[0] =~ /^--(?:repo|type)$/ || $args[0] =~ /^-[rt]$/;
       shift @args;
     }
     if (@args) {
       my $path = $args[0];
       $path =~ s/\/[^\/]*\.repo$//;
-      addrepo($ret, $path);
+      addrepo($ret, $path, $prio);
     }
   }
 }
