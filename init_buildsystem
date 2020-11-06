@@ -784,6 +784,7 @@ else
     # compatibility...
     test -z "$RUNSCRIPTS_SEEN" && PACKAGES_TO_RUNSCRIPTS="$PACKAGES_TO_PREINSTALL"
 
+    buildroot_rm .guessed_dist
     echo "$GUESSED_DIST" > $BUILD_ROOT/.guessed_dist
     test -n "$BUILD_DIST" || BUILD_DIST="$GUESSED_DIST"
 
@@ -815,6 +816,7 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
     mkdir -p $BUILD_ROOT/.init_b_cache/rpms || cleanup_and_exit 1
     mkdir -p $BUILD_ROOT/etc || cleanup_and_exit 1
     mkdir -p $BUILD_ROOT/proc || cleanup_and_exit 1
+    test -L $BUILD_ROOT/etc/HOSTNAME && buildroot_rm etc/HOSTNAME
     test -f $BUILD_ROOT/etc/HOSTNAME || hostname -f > $BUILD_ROOT/etc/HOSTNAME
     for PKG in $PACKAGES_TO_RUNSCRIPTS ; do
 	: > $BUILD_ROOT/.init_b_cache/scripts/$PKG.run

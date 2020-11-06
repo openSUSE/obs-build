@@ -927,6 +927,7 @@ vm_first_stage() {
     fi
 
     # rsync as source and dest could be same
+    test -L "$BUILD_ROOT/.build.oldpackages/_ccache.tar" && buildroot_rm .build.oldpackages/_ccache.tar
     test -n "$PKG_CCACHE" && \
             mkdir -p "$BUILD_ROOT/.build.oldpackages/" && \
             rsync -av "$PKG_CCACHE" "$BUILD_ROOT/.build.oldpackages/_ccache.tar"

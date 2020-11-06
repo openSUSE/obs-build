@@ -164,7 +164,7 @@ buildroot_rm() {
 assert_dirs() {
     local d rl
     if test -z "$1" ; then
-       set usr sbin usr/bin usr/sbin etc .build .init_b_cache .init_b_cache/scripts .init_b_cache/rpms .preinstall_image proc proc/sys proc/sys/fs proc/sys/fs/binfmt_misc sys dev dev/pts dev/shm mnt
+       set usr sbin usr/bin usr/sbin etc .build .build.oldpackages .init_b_cache .init_b_cache/scripts .init_b_cache/rpms .preinstall_image proc proc/sys proc/sys/fs proc/sys/fs/binfmt_misc sys dev dev/pts dev/shm mnt
     fi
     for d in "$@" ; do
 	if test -L "$BUILD_ROOT/$d" ; then
