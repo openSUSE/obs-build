@@ -31,11 +31,15 @@ eval { require Archive::Tar; };
 
 # parse a PKGBUILD file
 
+sub expandvars {
+  my ($str, $vars) = @_;
+  $str =~ s/\$([a-zA-Z0-9_]+|\{([^\}]+)\})/join(' ', @{$vars->{$2 || $1} || []})/ge;
+  return $str;
+}
+
 sub quote {
   my ($str, $q, $vars) = @_;
-  if ($q ne "'" && $str =~ /\$/) {
-    $str =~ s/\$([a-zA-Z0-9_]+|\{([^\}]+)\})/join(' ', @{$vars->{$2 || $1} || []})/ge;
-  }
+  $str = expandvars($str, $vars) if $q ne "'" && $str =~ /\$/;
   $str =~ s/([ \t\"\'\$])/sprintf("%%%02X", ord($1))/ge;
   return $str;
 }
@@ -48,9 +52,7 @@ sub unquotesplit {
     my $q = $1;
     last unless $str =~ s/$q(.*?)$q/quote($1, $q, $vars)/e;
   }
-  if ($str =~ /\$/) {
-    $str =~ s/\$([a-zA-Z0-9_]+|\{([^\}]+)\})/join(' ', @{$vars->{$2 || $1} || []})/ge;
-  }
+  $str = expandvars($str, $vars) if $str =~ /\$/;
   my @args = split(/[ \t]+/, $str);
   for (@args) {
     s/%([a-fA-F0-9]{2})/chr(hex($1))/ge
