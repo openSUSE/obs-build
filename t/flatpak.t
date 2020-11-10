@@ -4,7 +4,6 @@ use warnings;
 
 use FindBin '$Bin';
 use Test::More 0.98;
-use Test::Output qw( stdout_is );
 
 my $path = "$Bin/data";
 use Build;
@@ -12,21 +11,25 @@ use Build::Flatpak;
 
 my $conf = Build::read_config('x86_64');
 
-subtest parse => sub {
-    my @staticdeps = Build::Flatpak::_static_deps();
-    my $prefix = 'file:///usr/src/packages/SOURCES';
+sub capture_stdout {
+  my ($fn) = @_;
+  local *STDOUT;
+  open(STDOUT, '>', \my $cap) || die;
+  $fn->();
+  return $cap;
+}
 
+subtest parse => sub {
     my $expected = {
         name => 'org.gnome.Chess',
         version => 0,
         sources => [
-            "$prefix/phalanx-XXV-source.tgz",
-            "$prefix/stockfish-10-src.zip",
-            "$prefix/gnuchess-6.2.5.tar.gz",
-            "$prefix/gnome-chess-3.36.1.tar.xz",
+            "phalanx-XXV-source.tgz",
+            "stockfish-10-src.zip",
+            "gnuchess-6.2.5.tar.gz",
+            "gnome-chess-3.36.1.tar.xz",
         ],
         deps => [
-            @staticdeps,
             'org.gnome.Sdk-v3.36',
             'org.gnome.Platform-v3.36',
         ],
@@ -44,12 +47,8 @@ subtest parse => sub {
 
 subtest show => sub {
     local @ARGV = ("$path/flatpak.yaml", 'name');
-    stdout_is(
-        sub {
-            Build::Flatpak::show();
-        },
-        "org.gnome.Chess\n", 'Build::Flatpak::show name'
-    );
+    my $data = capture_stdout(sub { Build::Flatpak::show() });
+    is $data, "org.gnome.Chess\n", 'Build::Flatpak::show name';
 };
 
 done_testing;

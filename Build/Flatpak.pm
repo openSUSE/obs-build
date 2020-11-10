@@ -28,15 +28,6 @@ use Data::Dumper;
 #use URI; # not installed in kvm?
 #use JSON::PP; # not installed in kvm?
 
-my @staticdeps = qw(
-  flatpak flatpak-builder libffi7 fuse
-  unzip gzip xz librsvg gdk-pixbuf-loader-rsvg
-  kernel-obs-build kernel-default kmod-compat
-  perl-YAML-LibYAML
-);
-
-sub _static_deps { return @staticdeps }
-
 my $yamlxs = eval { require YAML::XS; $YAML::XS::LoadBlessed = 0; return 1 };
 my $yamlpp = eval { require YAML::PP; return YAML::PP->new };
 
@@ -99,7 +90,6 @@ sub parse {
   my $sdk = $data->{sdk};
 
   my @packdeps;
-  push @packdeps, _static_deps();
   push @packdeps, "$sdk-v$runtime_version";
   push @packdeps, "$runtime-v$runtime_version";
   $ret->{deps} = \@packdeps;
@@ -111,13 +101,8 @@ sub parse {
         for my $source (@$sources) {
           if ($source->{type} eq 'archive') {
             my $url = $source->{url};
-#            my $uri = URI->new($url);
-#            my $path = $uri->path;
-            # TODO
             my $path = $url;
-            # Get filename
-            $path =~ s{.*/}{};
-            $path = "file:///usr/src/packages/SOURCES/$path";
+            $path =~ s{.*/}{};	# Get filename
             push @sources, $path;
           }
         }

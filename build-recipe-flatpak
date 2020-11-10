@@ -49,7 +49,7 @@ recipe_prepare_flatpak() {
 
 # Variables:
 # $BUILD_ROOT is the chroot
-# $TOPDIR/SOURCES includes the appimages sources
+# $TOPDIR/SOURCES includes the sources
 # $RECIPEFILE the name of the flatpak.(yaml|json) config file
 
 recipe_build_flatpak() {
