@@ -322,6 +322,7 @@ create_devs() {
 	mknod loop1   640 b 7 1
 	mknod loop2   640 b 7 2
 	mknod loop3   640 b 7 3
+	mknod fuse    666 c 10 229
 	ln    fd      777 /proc/self/fd
 	ln    stdin   777 fd/0
 	ln    stdout  777 fd/1
