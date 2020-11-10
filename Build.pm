@@ -40,6 +40,7 @@ our $do_appimage;
 our $do_docker;
 our $do_fissile;
 our $do_helm;
+our $do_flatpak;
 
 sub import {
   for (@_) {
@@ -54,8 +55,9 @@ sub import {
     $do_docker = 1 if $_ eq ':docker';
     $do_fissile = 1 if $_ eq ':fissile';
     $do_helm = 1 if $_ eq ':helm';
+    $do_flatpak = 1 if $_ eq ':flatpak';
   }
-  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = $do_fissile = $do_helm = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker && !$do_fissile && !$do_helm;
+  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = $do_fissile = $do_helm = $do_flatpak = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker && !$do_fissile && !$do_helm && !$do_flatpak;
 
   if ($do_deb) {
     require Build::Deb;
@@ -86,6 +88,9 @@ sub import {
   }
   if ($do_helm) {
     require Build::Helm;
+  }
+  if ($do_flatpak) {
+    require Build::Flatpak;
   }
 }
 
@@ -1645,6 +1650,7 @@ sub recipe2buildtype {
   return 'preinstallimage' if $recipe eq '_preinstallimage';
   return 'simpleimage' if $recipe eq 'simpleimage';
   return 'helm' if $recipe eq 'Chart.yaml';
+  return 'flatpak' if $recipe =~ m/flatpak\.(?:ya?ml|json)$/;
   return undef;
 }
 
@@ -1699,6 +1705,7 @@ sub parse {
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $fnx eq 'build.collax';
   return parse_preinstallimage($cf, $fn, @args) if $fnx eq '_preinstallimage';
   return Build::Helm::parse($cf, $fn, @args) if $fnx eq 'Chart.yaml';
+  return Build::Flatpak::parse($cf, $fn, @args) if $fnx =~ m/flatpak\.(?:ya?ml|json)$/;
   return undef;
 }
 

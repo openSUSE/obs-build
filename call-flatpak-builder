@@ -1,0 +1,56 @@
+#!/bin/bash
+
+export BUILD_DIR=${BUILD_DIR:-/usr/lib/build}
+
+IS_UNSHARED=
+
+while test -n "$1" ; do
+    case "$1" in
+	--root)
+	    BUILD_ROOT="$2"
+	    shift 2
+	    ;;
+	--isunshared)
+	    IS_UNSHARED=true
+	    shift
+	    ;;
+	*)
+	    break
+	    ;;
+    esac
+done
+
+if test -z "$BUILD_ROOT" ; then
+    echo "Usage: call-flatpak-builder --root <buildroot>"
+    exit 1
+fi
+
+if test -z "$IS_UNSHARED" ; then
+    echo "Unsharing environment"
+    # unshare mounts and network
+    exec unshare -m -n $BUILD_DIR/call-flatpak-builder --isunshared --root "$BUILD_ROOT" "$@"
+    exit 1
+fi
+
+if test -n "$IS_UNSHARED" ; then
+    # make mounts private
+    mount --make-rprivate /
+fi
+
+if test "$BUILD_ROOT" != '/' ; then
+    # make build root a mount point
+    mount --rbind --make-private "$BUILD_ROOT" "$BUILD_ROOT"
+    mount --make-rprivate "$BUILD_ROOT"
+fi
+
+# setup mounts
+test -e "$BUILD_ROOT/proc/self" || mount -n -tproc none $BUILD_ROOT/proc
+
+set -x
+
+# Build into repo
+chroot "$BUILD_ROOT" bash -c "cd /usr/src/packages/FLATPAK_ROOT && flatpak-builder --force-clean --repo=$FLATPAK_REPO build-dir $FLATPAK_FILE"
+
+# Create bundle from repo
+chroot "$BUILD_ROOT" bash -c "flatpak build-bundle --runtime-repo=$FLATPAK_REMOTE $FLATPAK_REPO $TOPDIR/OTHER/$FLATPAK_APP.flatpak $FLATPAK_APP"
+
