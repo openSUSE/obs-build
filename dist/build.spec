@@ -51,6 +51,7 @@ BuildRequires:  tar
 BuildRequires:  perl(Date::Parse)
 BuildRequires:  perl(Test::Harness)
 BuildRequires:  perl(Test::More)
+BuildRequires:  perl(YAML)
 %if 0%{?fedora}
 Requires:       perl-MD5
 Requires:       perl-TimeDate
