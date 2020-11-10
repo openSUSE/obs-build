@@ -1,0 +1,4 @@
+language: perl
+perl:
+  - "5.30"
+script: "make test"
