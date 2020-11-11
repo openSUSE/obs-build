@@ -130,7 +130,8 @@ my %subst_defaults = (
     'helm',
   ],
   'build-packages:flatpak' => [
-    'flatpak', 'flatpak-builder', 'fuse', 'unzip', 'gzip', 'xz',
+    'flatpak', 'flatpak-builder', 'fuse', 'unzip', 'gzip', 'xz', 'elfutils',
+    'gdk-pixbuf-loader-rsvg',
   ],
   'system-packages:livebuild' => [
     'apt-utils', 'cpio', 'dpkg-dev', 'live-build', 'lsb-release', 'tar',
@@ -1728,6 +1729,7 @@ sub parse_typed {
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $buildtype eq 'collax';
   return parse_preinstallimage($cf, $fn, @args) if $buildtype eq 'preinstallimage';
   return Build::Helm::parse($cf, $fn, @args) if $buildtype eq 'helm';
+  return Build::Flatpak::parse($cf, $fn, @args) if $buildtype eq 'flatpak';
   return undef;
 }
 

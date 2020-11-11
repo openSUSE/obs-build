@@ -78,8 +78,8 @@ sub parse {
 #    return { error => "Failed to parse JSON file" } unless defined $data;
   }
   else {
-    $data = _load_yaml($fn);
-    return { error => "Failed to parse JSON file '$fn'" } unless defined $data;
+    $data = _load_yaml_file($fn);
+    return { error => "Failed to parse file '$fn'" } unless defined $data;
   }
 
   my $ret = {};
