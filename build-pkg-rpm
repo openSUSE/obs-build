@@ -160,17 +160,20 @@ pkg_preinstall_rpm() {
     esac
     if test "$PAYLOADDECOMPRESS" = "lzma -d" ; then
 	if ! lzma </dev/null >/dev/null 2>&1 ; then
-	    test -f "$BUILD_DIR/lzmadec.sh" && PAYLOADDECOMPRESS="bash $BUILD_DIR/lzmadec.sh"
+	    test -f "$BUILD_DIR/lzmadec.sh" || cleanup_and_exit 3 "no lzma decoder available in host system"
+	    PAYLOADDECOMPRESS="bash $BUILD_DIR/lzmadec.sh"
 	fi
     fi
     if test "$PAYLOADDECOMPRESS" = "xz -d" ; then
 	if ! xz </dev/null >/dev/null 2>&1 ; then
-	    test -f "$BUILD_DIR/xzdec.sh" && PAYLOADDECOMPRESS="bash $BUILD_DIR/xzdec.sh"
+	    test -f "$BUILD_DIR/xzdec.sh" || cleanup_and_exit 3 "no xz decoder available in host system"
+	    PAYLOADDECOMPRESS="bash $BUILD_DIR/xzdec.sh"
 	fi
     fi
     if test "$PAYLOADDECOMPRESS" = "zstd -d" ; then
 	if ! zstd </dev/null >/dev/null 2>&1 ; then
-	    test -f "$BUILD_DIR/zstddec.sh" && PAYLOADDECOMPRESS="bash $BUILD_DIR/zstddec.sh"
+	    test -f "$BUILD_DIR/zstddec.sh" || cleanup_and_exit 3 "no zstd decoder available in host system"
+	    PAYLOADDECOMPRESS="bash $BUILD_DIR/zstddec.sh"
 	fi
     fi
     mkdir -p "$BUILD_INIT_CACHE/scripts"
