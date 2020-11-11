@@ -60,7 +60,7 @@ Conflicts:      bsdtar < 2.5.5
 BuildRequires:  perl(Date::Parse)
 BuildRequires:  perl(Test::Harness)
 BuildRequires:  perl(Test::More)
-BuildRequires:  perl(YAML:PP)
+BuildRequires:  perl(YAML::PP)
 %if 0%{?suse_version} > 1000 || 0%{?centos_version} >= 800 || 0%{?rhel_version} >= 800 || 0%{?fedora_version} >= 21
 # None of them are actually required for core features.
 # Perl helper scripts use them.
