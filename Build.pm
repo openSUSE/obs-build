@@ -129,8 +129,8 @@ my %subst_defaults = (
   'build-packages:helm' => [
     'helm',
   ],
-  'build-packages:flatpack' => [
-    'flatpack', 'flatpack-builder', 'fuse', 'unzip', 'gzip', 'xz',
+  'build-packages:flatpak' => [
+    'flatpak', 'flatpak-builder', 'fuse', 'unzip', 'gzip', 'xz',
   ],
   'system-packages:livebuild' => [
     'apt-utils', 'cpio', 'dpkg-dev', 'live-build', 'lsb-release', 'tar',
@@ -610,7 +610,7 @@ sub get_build {
     return (undef, $err) if $err;
   }
   my $buildtype = $config->{'type'} || '';
-  if (grep {$_ eq $buildtype} qw{livebuild docker kiwi fissile helm flatpack}) {
+  if (grep {$_ eq $buildtype} qw{livebuild docker kiwi fissile helm flatpak}) {
     push @deps, @{$config->{'substitute'}->{"build-packages:$buildtype"}
 		  || $subst_defaults{"build-packages:$buildtype"} || []};
   }
