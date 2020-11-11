@@ -385,7 +385,7 @@ vm_sysrq_kvm() {
              syswrite(SOCK, "$ARGV[1]\n");
              shutdown(SOCK, 1);
              my $output;
-             read(SOCK, $output, 8192);' "$VM_ROOT.qemu/monitor" "alt-print-$1"
+             read(SOCK, $output, 8192);' "$VM_ROOT.qemu/monitor" "sendkey alt-print-$1"
 }
 
 vm_wipe_kvm() {
