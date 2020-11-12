@@ -66,8 +66,7 @@ sub parse {
   if ($fn =~ m/\.ya?ml\z/) {
     $data = _load_yaml_file($fn);
     return { error => "Failed to parse YAML file '$fn'" } unless defined $data;
-  }
-  elsif ($fn =~ m/\.json\z/) {
+  } elsif ($fn =~ m/\.json\z/) {
     # We don't have JSON::PP, but YAML is a superset of JSON
     $data = _load_yaml_file($fn);
     return { error => "Failed to parse JSON file '$fn'" } unless defined $data;
@@ -76,8 +75,10 @@ sub parse {
 #    close $fh;
 #    $data = eval { decode_json($json) };
 #    return { error => "Failed to parse JSON file" } unless defined $data;
-  }
-  else {
+  } elsif (ref($fn) eq 'SCALAR') {
+    $data = _load_yaml($$fn);		# used in the unit test
+    return { error => "Failed to parse '$fn'" } unless defined $data;
+  } else {
     $data = _load_yaml_file($fn);
     return { error => "Failed to parse file '$fn'" } unless defined $data;
   }

@@ -35,7 +35,7 @@ subtest parse => sub {
         ],
     };
     my $yaml = do { local $/; <DATA> };
-    my $data = Build::Flatpak::parse($conf, $yaml);
+    my $data = Build::Flatpak::parse($conf, \$yaml);
     is_deeply $data, $expected, 'parse() YAML flatpak content';
 
     $data = Build::Flatpak::parse($conf, "$path/flatpak.yaml");
