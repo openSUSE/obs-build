@@ -25,7 +25,6 @@
 BUILDTYPE=
 KIWI_PARAMETERS=
 
-set -x
 for i in spec dsc kiwi arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild appimage docker podman fissile helm flatpak; do
     . "$BUILD_DIR/build-recipe-$i"
 done
