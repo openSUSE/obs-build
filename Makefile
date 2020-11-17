@@ -56,6 +56,7 @@ install:
 	    mkbaselibs \
 	    mkdrpms \
 	    listinstalled \
+	    call-flatpak-builder \
 	    createzyppdeps \
 	    createarchdeps \
 	    createdebdeps \
