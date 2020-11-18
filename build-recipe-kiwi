@@ -606,6 +606,16 @@ build_kiwi_appliance() {
 	kiwi_translate_parameters
     fi
 
+    local dep rpm_db_backend
+    for dep in $(kiwi_query_recipe deps) ; do
+	test rpm-ndb = "$dep" && rpm_db_backend=ndb
+    done
+    if test -n "$rpm_db_backend" ; then
+	cp $BUILD_ROOT/root/.rpmmacros $BUILD_ROOT/root/.rpmmacros.save
+	echo "configuring $rpm_db_backend database for image builds"
+	echo "%_db_backend $rpm_db_backend" >> $BUILD_ROOT/root/.rpmmacros
+    fi
+
     local run_bundle=true
     for imgtype in $imagetype ; do
 	for prof in ${kiwi_profile//,/ } ; do
@@ -618,6 +628,10 @@ build_kiwi_appliance() {
 	done
     done
     BUILD_SUCCEEDED=true
+
+    if test -n "$rpm_db_backend" ; then
+	mv $BUILD_ROOT/root/.rpmmacros.save $BUILD_ROOT/root/.rpmmacros
+    fi
 
     if test -n "$run_bundle"; then
 	# results are not bundled yet
