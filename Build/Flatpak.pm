@@ -120,6 +120,7 @@ sub show {
     my ($fn, $field) = @ARGV;
     my $cf = {};
     my $d = parse($cf, $fn);
+    die "$d->{error}\n" if $d->{error};
     my $value = $d->{ $field };
     print "$value\n";
 }

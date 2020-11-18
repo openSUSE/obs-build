@@ -131,7 +131,7 @@ my %subst_defaults = (
   ],
   'build-packages:flatpak' => [
     'flatpak', 'flatpak-builder', 'fuse', 'unzip', 'gzip', 'xz', 'elfutils',
-    'gdk-pixbuf-loader-rsvg',
+    'gdk-pixbuf-loader-rsvg', 'perl(YAML::LibYAML)',
   ],
   'system-packages:livebuild' => [
     'apt-utils', 'cpio', 'dpkg-dev', 'live-build', 'lsb-release', 'tar',
