@@ -223,6 +223,7 @@ sub kiwiparse {
   my $obsexcludearch;
   my $obsprofiles;
   my $unorderedrepos;
+  my @ignorepackages;
   $obsexclusivearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExclusiveArch:\s+(.*)\s+-->\s*$/im;
   $obsexcludearch = $1 if $xml =~ /^\s*<!--\s+OBS-ExcludeArch:\s+(.*)\s+-->\s*$/im;
   $obsprofiles = $1 if $xml =~ /^\s*<!--\s+OBS-Profiles:\s+(.*)\s+-->\s*$/im;
@@ -233,6 +234,9 @@ sub kiwiparse {
   $unorderedrepos = 1 if $xml =~ /^\s*<!--\s+OBS-UnorderedRepos\s+-->\s*$/im;
   for ($xml =~ /^\s*<!--\s+OBS-Imagerepo:\s+(.*)\s+-->\s*$/img) {
     push @imagerepos, { 'url' => $_ };
+  }
+  for ($xml =~ /^\s*<!--\s+OBS-IgnorePackage:\s+(.*)\s+-->\s*$/img) {
+    push @ignorepackages, split(' ', $_);
   }
 
   my $schemaversion = $kiwi->{'schemaversion'} ? versionstring($kiwi->{'schemaversion'}) : 0;
@@ -447,6 +451,7 @@ sub kiwiparse {
     # we need this package
     push @packages, $package->{'name'};
   }
+  push @packages, map {"-$_"} @ignorepackages;
   push @packages, "kiwi-packagemanager:$packman";
   push @packages, "--dorecommends--", "--dosupplements--" if $patterntype && $patterntype eq 'plusRecommended';
   push @packages, '--unorderedimagerepos', if $unorderedrepos;
