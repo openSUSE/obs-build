@@ -611,9 +611,13 @@ sub get_build {
     return (undef, $err) if $err;
   }
   my $buildtype = $config->{'type'} || '';
+  my $nobasepackages;
   if (grep {$_ eq $buildtype} qw{livebuild docker kiwi fissile helm flatpak}) {
     push @deps, @{$config->{'substitute'}->{"build-packages:$buildtype"}
 		  || $subst_defaults{"build-packages:$buildtype"} || []};
+    if ($buildtype eq 'docker' || $buildtype eq 'kiwi') {
+      $nobasepackages = 1 if $config->{"expandflags:$buildtype-nobasepackages"};
+    }
   }
   my @ndeps = grep {/^-/} @deps;
   my %ndeps = map {$_ => 1} @ndeps;
@@ -640,9 +644,10 @@ sub get_build {
     @extra = grep {!$subpacks{$_}} @extra;
   }
   @deps = grep {!$ndeps{$_}} @deps;
-  push @deps, @{$config->{'preinstall'}};
-  push @deps, @extra;
-  @deps = grep {!$ndeps{"-$_"}} @deps;
+  if (!$nobasepackages) {
+    push @deps, @{$config->{'preinstall'}}, @extra;
+    @deps = grep {!$ndeps{"-$_"}} @deps;
+  }
   @deps = do_subst($config, @deps);
   @deps = grep {!$ndeps{"-$_"}} @deps;
   if (@directdepsend) {
