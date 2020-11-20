@@ -452,7 +452,7 @@ sub kiwiparse {
     push @packages, $package->{'name'};
   }
   push @packages, map {"-$_"} @ignorepackages;
-  push @packages, "kiwi-packagemanager:$packman";
+  push @packages, "kiwi-packagemanager:$packman" if $packman;
   push @packages, "--dorecommends--", "--dosupplements--" if $patterntype && $patterntype eq 'plusRecommended';
   push @packages, '--unorderedimagerepos', if $unorderedrepos;
 
