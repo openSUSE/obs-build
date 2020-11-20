@@ -617,6 +617,7 @@ sub get_build {
 		  || $subst_defaults{"build-packages:$buildtype"} || []};
     if ($buildtype eq 'docker' || $buildtype eq 'kiwi') {
       $nobasepackages = 1 if $config->{"expandflags:$buildtype-nobasepackages"};
+      @deps = grep {!/^kiwi-image:/} @deps if $buildtype eq 'kiwi';	# only needed for sysdeps
     }
   }
   my @ndeps = grep {/^-/} @deps;
