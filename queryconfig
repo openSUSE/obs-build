@@ -21,7 +21,7 @@
 ################################################################
 
 BEGIN {
-  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/obs-build');
 }
 
 use strict;
@@ -38,7 +38,7 @@ sub evalmacros {
 
 my ($dist, $archs, $configdir, $type, $argument);
 
-$configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
+$configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/obs-build') . '/configs';
 
 while (@ARGV)  {
   if ($ARGV[0] eq '--dist') {
