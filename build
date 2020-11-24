@@ -799,7 +799,7 @@ mount_stuff() {
 umount_stuff() {
     if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
 	while read -r mountpoint; do
-	    umount -n $mountpoint 2>/dev/null || true
+	    umount -n "$(printf $mountpoint)" 2>/dev/null || true
 	done < <(awk '{print length($2) " " $2}' < /proc/mounts | sort -r -n | cut -d ' ' -f 2- | grep "^$BUILD_ROOT")
     fi
 }
