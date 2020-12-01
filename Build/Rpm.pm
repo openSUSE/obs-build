@@ -440,6 +440,23 @@ reexpand:
   return $line;
 }
 
+sub splitdeps {
+  my ($d) = @_;
+  my @deps;
+  $d =~ s/^[\s,]+//;
+  while ($d ne '') {
+    if ($d =~ /^\(/) {
+      my @s = split(' ', $d);
+      push @deps, shiftrich(\@s), undef, undef;
+      $d = join(' ', @s);
+    } else {
+      last unless $d =~ s/([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*//;
+      push @deps, $1, $2, $3;
+    }
+  }
+  return @deps;
+}
+
 # xspec may be passed as array ref to return the parsed spec files
 # an entry in the returned array can be
 # - a string: verbatim line from the original file
@@ -618,7 +635,12 @@ sub parse {
     }
     if ($line =~ /^(?:Requires\(pre\)|Requires\(post\)|PreReq)\s*:\s*(\S.*)$/i) {
       my $deps = $1;
-      my @deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
+      my @deps;
+      if (" $deps" =~ /[\s,]\(/) {
+	@deps = splitdeps($deps);
+      } else {
+	@deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
+      }
       while (@deps) {
 	my ($pack, $vers, $qual) = splice(@deps, 0, 3);
 	next if $pack eq 'MACRO';	# hope for the best...
@@ -641,19 +663,9 @@ sub parse {
       my @deps;
       if (" $deps" =~ /[\s,]\(/) {
 	# we need to be careful, there could be a rich dep
-	my $d = $deps;
-	while ($d ne '') {
-	  if ($d =~ /^\(/) {
-	    my @s = split(' ', $d);
-	    push @deps, shiftrich(\@s), undef, undef;
-	    $d = join(' ', @s);
-	  } else {
-	    last unless $d =~ s/([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*//;
-	    push @deps, $1, $2, $3;
-	  }
-	}
+	@deps = splitdeps($deps);
       } else {
-        @deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
+	@deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
       }
       my $replace = 0;
       my @ndeps = ();
