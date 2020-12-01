@@ -53,7 +53,9 @@ sub basearch {
 
 sub obsarch {
   my ($arch) = @_;
-  return grep {$obs2debian{$_} eq $arch} sort keys %obs2debian;
+  my @obs = grep {$obs2debian{$_} eq $arch} sort keys %obs2debian;
+  return @obs if @obs;
+  return $arch;
 }
 
 sub parse {
