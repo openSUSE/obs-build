@@ -31,7 +31,11 @@ recipe_prepare_debootstrap() {
 
 recipe_build_debootstrap() {
     local arch=$(chroot $BUILD_ROOT su -c "dpkg-architecture -qDEB_BUILD_ARCH")
-    local dist=$(chroot $BUILD_ROOT su -c "lsb_release --codename --short")
+    if chroot $BUILD_ROOT grep -q '/sid' /etc/debian_version ; then
+        local dist=unstable
+    else
+        local dist=$(chroot $BUILD_ROOT su -c "lsb_release --codename --short")
+    fi
     local myroot=debootstraproot
     test -d $BUILD_ROOT/.build.binaries || cleanup_and_exit 1
     if test "$DO_INIT" = true -o ! -d "$BUILD_ROOT/.build.binaries/dists" ; then
