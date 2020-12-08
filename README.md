@@ -3,9 +3,11 @@ This repository provides the `build` tool to build binary packages in a
 a safe and reproducible way. It can be used standalone or within the
 Open Build Service (OBS).
 
+Latest packages for `obs-build` can be downloaded from
+[openSUSE:Tools repositories](https://download.opensuse.org/repositories/openSUSE:/Tools/).
+
 Supported build environments
 ============================
-
  Unsecure:
  - chroot
  - LXC
