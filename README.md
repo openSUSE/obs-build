@@ -3,18 +3,20 @@ This repository provides the `build` tool to build binary packages in a
 a safe and reproducible way. It can be used standalone or within the
 Open Build Service (OBS).
 
+Latest packages for `obs-build` can be downloaded from
+[openSUSE:Tools repositories](https://download.opensuse.org/repositories/openSUSE:/Tools/).
+
 Supported build environments
 ============================
-
  Unsecure:
  - chroot
  - LXC
 
- secure but with limited reproducibility:
+ Secure but with limited reproducibility:
  - docker
  - nspawn
 
- secure and with full reproducibility:
+ Secure and with full reproducibility:
  - KVM
  - XEN
  - ZVM (S390)
@@ -26,13 +28,13 @@ Supported build environments
  - Amazon EC2
 
  For hardware emulation there are
- - qemu 
-   which runs a qemu system emulator inside of KVM. This can
-   be considered also secure and reproducibility.
+ - qemu
+   which runs a QEMU system emulator inside of KVM. This can
+   be considered also secure and reproducible.
  - The "emulator" VM can be used to run builds using any other
    emulator via a wrapper script.
- - A qemu user land emulation is also possible. This would give
-   higher speed, but requieres a preparation inside of the base
+ - A QEMU user land emulation is also possible. This would give
+   higher speed, but requires a preparation inside of the base
    distribution for this mode.
 
 Supported build formats
