@@ -27,7 +27,8 @@ vm_verify_options_nspawn() {
 }
 
 vm_startup_nspawn() {
-    local name="${BUILD_ROOT##*/}"
+    local CLEAN_BUILD_ROOT="${BUILD_ROOT%%/.mount}"
+    local name="${CLEAN_BUILD_ROOT##*/}"
     name="obsbuild.${name//_/-}"
     local pipe_opt=
     if test -z "$RUN_SHELL" && systemd-nspawn --help | fgrep -q -e --pipe; then
@@ -39,7 +40,8 @@ vm_startup_nspawn() {
 }
 
 vm_kill_nspawn() {
-    local name="${BUILD_ROOT##*/}"
+    local CLEAN_BUILD_ROOT="${BUILD_ROOT%%/.mount}"
+    local name="${CLEAN_BUILD_ROOT##*/}"
     name="obsbuild.${name//_/-}"
     machinectl terminate "$name"
 }
