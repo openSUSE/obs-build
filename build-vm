@@ -21,18 +21,6 @@
 #
 ################################################################
 
-# defaults for vm_img_mkfs
-vm_img_mkfs_ext4_options='-O ^has_journal,^huge_file,^resize_inode,sparse_super'
-vm_img_mkfs_ext4_extra='-E lazy_itable_init,discard'
-vm_img_mkfs_ext4="mkfs.ext4 -m 0 -q -F $vm_img_mkfs_ext4_options"
-vm_img_tunefs_ext4='tune2fs -c 0'
-vm_img_mkfs_ext3='mkfs.ext3 -m 0 -q -F'
-vm_img_tunefs_ext3='tune2fs -c 0 -o journal_data_writeback'
-vm_img_mkfs_ext2='mkfs.ext2 -m 0 -q -F'
-vm_img_tunefs_ext2='tune2fs -c 0'
-vm_img_mkfs_reiserfs='mkreiserfs -q -f'
-vm_img_mkfs_btrfs='mkfs.btrfs'
-vm_img_mkfs_xfs='mkfs.xfs -f'
 # ignore not backward compatible ext fs options like metadata_csum
 # Only protecting nonroot from root inside guest -> but anyone can be root inside guest
 # so disabling spectre/meltdown mitigations doesn't hurt security and gains performance
@@ -218,6 +206,11 @@ vm_parse_options() {
 	VMDISK_FILESYSTEM="$ARG"
 	shift
       ;;
+      -vm-disk-filesystem-options)
+	needarg
+	VMDISK_FILESYSTEM_OPTIONS="$ARG"
+	shift
+      ;;
       -vm-disk-mount-options|-vmdisk-mount-options)
 	needarg
 	VMDISK_MOUNT_OPTIONS="$ARG"
@@ -371,12 +364,34 @@ vm_img_wipe() {
 vm_img_mkfs() {
     local fs="$1"
     local img="$2"
+    local options="$3"
     local mkfs tunefs
-    eval "mkfs=\"\$vm_img_mkfs_${fs}\""
-    eval "mkfs_exta_options=\"\$vm_img_mkfs_${fs}_extra\""
-    eval "tunefs=\"\$vm_img_tunefs_${fs}\""
+
+    # defaults for creating the filesystem
+    vm_img_mkfs_ext4_options='-O ^has_journal,^huge_file,^resize_inode,sparse_super'
+    vm_img_mkfs_ext4_extra='-E lazy_itable_init,discard'
+    vm_img_mkfs_ext4="mkfs.ext4 -m 0 -q -F $vm_img_mkfs_ext4_options"
+    vm_img_mkfs_ext3='mkfs.ext3 -m 0 -q -F'
+    vm_img_mkfs_ext2='mkfs.ext2 -m 0 -q -F'
+    vm_img_mkfs_reiserfs='mkreiserfs -q -f'
+    vm_img_mkfs_btrfs='mkfs.btrfs'
+    vm_img_mkfs_xfs='mkfs.xfs -f'
+    # defaults for tuning the filesystem
+    vm_img_tunefs_ext4='tune2fs -c 0'
+    vm_img_tunefs_ext3='tune2fs -c 0 -o journal_data_writeback'
+    vm_img_tunefs_ext2='tune2fs -c 0'
+
+    var="vm_img_mkfs_${fs}"; mkfs="${!var}"
+    var="vm_img_mkfs_extra_options_${fs}"; mkfs_extra_options="${!var}"
+    var="vm_img_tunefs_${fs}"; vm_img_tunefs="${!var}"
+
     local labelopt=
     test "$VM_ROOTDEV" != "${VM_ROOTDEV#LABEL=}" && labelopt="-L ${VM_ROOTDEV#LABEL=}"
+
+    # extend options if wanted, multiple -O are fine
+    if test "$options" = "nodirindex" && test "$fs" = "ext2" -o "$fs" = "ext3" -o "$fs" = "ext4"; then
+        mkfs_extra_options="$mkfs_extra_options -O ^dir_index"
+    fi
 
     if test -z "$mkfs"; then
 	cleanup_and_exit 3 "filesystem \"$fs\" is not supported"
@@ -384,8 +399,8 @@ vm_img_mkfs() {
 
     echo "Creating $fs filesystem on $img"
     export MKE2FS_SYNC=0
-    if ! $mkfs $labelopt $mkfs_exta_options "$img" ; then
-        if test -z "$mkfs_exta_options" ; then
+    if ! $mkfs $labelopt $mkfs_extra_options "$img" ; then
+        if test -z "$mkfs_extra_options" ; then
             cleanup_and_exit 3
         else
             echo "Filesystem creation failed, trying again without extra options..."
@@ -617,11 +632,14 @@ vm_detect_2nd_stage() {
 
 vm_set_filesystem_type() {
     vmfstype=""
+    vmfstypeoptions=""
     if test -n "$BUILD_DIST" ; then 
         # testing for build specific filesystem, which are more important then worker defaults
         vmfstype=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags vmfstype`
     fi
-    test -n "$vmfstype" && VMDISK_FILESYSTEM="$vmfstype"
+    test -n "$vmfstype" && VMDISK_FILESYSTEM="${vmfstype%%:*}"
+    test "$vmfstype" = "${vmfstype#*:}" || vmfstypeoptions="${vmfstype#*:}"
+    test -n "$vmfstypeoptions" && VMDISK_FILESYSTEM_OPTIONS="$vmfstypeoptions"
     # use either commandline specified fs or ext3 as fallback
     test -n "$VMDISK_FILESYSTEM" || VMDISK_FILESYSTEM=ext3
 }
@@ -699,8 +717,8 @@ vm_setup() {
     echo "VM_ROOT: $VM_ROOT, VM_SWAP: $VM_SWAP"
 
     VM_USE_VIRT_FS=
-    if test -z "$RUNNING_IN_VM" -a -n "$VM_TYPE" -a -n "$VM_ROOT" ; then
-        if test -x /usr/bin/virt-make-fs -a "$VMDISK_FILESYSTEM" = ext3 ; then
+    if test -z "$RUNNING_IN_VM" -a -n "$VM_TYPE" -a -n "$VM_ROOT"; then
+        if test -x /usr/bin/virt-make-fs -a "$VMDISK_FILESYSTEM" = ext3 -a -z "$VMDISK_FILESYSTEM_OPTIONS" ; then
             VM_USE_VIRT_FS=true
         fi
     fi
@@ -737,7 +755,7 @@ vm_setup() {
 	    if test -z "$origrootsize" -o "$origrootsize" != "$VMDISK_ROOTSIZE" ; then
 		# the size has changed, re-create file system
 		vm_img_create "$VM_ROOT" "$VMDISK_ROOTSIZE"
-		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" || cleanup_and_exit 4
+		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" "$VMDISK_FILESYSTEM_OPTIONS" || cleanup_and_exit 4
 	    fi
 	fi
     fi
@@ -745,7 +763,7 @@ vm_setup() {
 	cleanup_and_exit 4 "you need to create $VM_ROOT first"
     fi
     if test -n "$CLEAN_BUILD" ; then
-	vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" || cleanup_and_exit 4
+	vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" "$VMDISK_FILESYSTEM_OPTIONS" || cleanup_and_exit 4
     fi
     # now mount root/swap
     mkdir_build_root
