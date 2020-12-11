@@ -632,14 +632,14 @@ vm_detect_2nd_stage() {
 
 vm_set_filesystem_type() {
     vmfstype=""
-    vmfstypeoptions=""
+    vmfsoptions=""
     if test -n "$BUILD_DIST" ; then 
         # testing for build specific filesystem, which are more important then worker defaults
         vmfstype=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags vmfstype`
+        vmfsoptions=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags vmfsoptions`
     fi
-    test -n "$vmfstype" && VMDISK_FILESYSTEM="${vmfstype%%:*}"
-    test "$vmfstype" = "${vmfstype#*:}" || vmfstypeoptions="${vmfstype#*:}"
-    test -n "$vmfstypeoptions" && VMDISK_FILESYSTEM_OPTIONS="$vmfstypeoptions"
+    test -n "$vmfstype" && VMDISK_FILESYSTEM="$vmfstype"
+    test -n "$vmfsoptions" && VMDISK_FILESYSTEM_OPTIONS="$vmfsoptions"
     # use either commandline specified fs or ext3 as fallback
     test -n "$VMDISK_FILESYSTEM" || VMDISK_FILESYSTEM=ext3
 }
