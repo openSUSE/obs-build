@@ -206,7 +206,7 @@ vm_parse_options() {
 	VMDISK_FILESYSTEM="$ARG"
 	shift
       ;;
-      -vm-disk-filesystem-options)
+      -vm-disk-filesystem-options|-vmdisk-filesystem-options)
 	needarg
 	VMDISK_FILESYSTEM_OPTIONS="$ARG"
 	shift
