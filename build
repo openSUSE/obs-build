@@ -348,7 +348,7 @@ Known Parameters:
               Defaults for automatic setup of VM root/swap files.
               May get overruled by build config vmfstype build flag.
 
-  --vm-disk-filesystem-option OPTIONS
+  --vm-disk-filesystem-options OPTIONS
               nodirindex: disable dir indexing on ext filesystems. Slower, but reproducible builds
 
   --vm-memory SIZEINMB
