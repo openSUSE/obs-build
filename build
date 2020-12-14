@@ -183,6 +183,13 @@ Known Parameters:
 
   --no-checks Do not run checks (postbuild and %check)
 
+  --norootforbuild
+              Force building with user 'abuild'. Otherwise, 'build'
+	      searches the recipe file for a "needsrootforbuild"
+              hint to decide what user to use.
+
+  --changelog Append rpm changelog from SUSE .changes file to spec file.
+
   --logfile logfile
               Capture build output to logfile. Defaults to
               .build.log in the build root for non-VM builds.
@@ -197,6 +204,15 @@ Known Parameters:
 
   --rpms path1:path2:...
               Specify path where to find the RPMs for the build system
+
+  --rpmlist file
+              Specify file with packages to install. Format is
+              <package> <package_source>.
+              <package> can be an ordinary package or one of preinstall:,
+              vminstall:, installonly:, noinstall:, preinstallimage:,
+              preinstallimagesource:, runscripts:, dist:, rpmid:.
+              <package_source> can be either a local path or a URL
+              (valid: zypp://, http://, https://, ftp://, ftps://).
 
   --arch arch1:arch2:...
               Specify what architectures to select from the RPMs
@@ -291,6 +307,9 @@ Known Parameters:
 
   --statistics
               monitor used resources during build inside VM
+
+  --buildflavor flavor
+              Specify flavor to replace @BUILD_FLAVOR@ in spefile with.
 
   --kvm
               Use KVM to secure build process. Your hardware needs to support

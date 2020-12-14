@@ -112,6 +112,12 @@ do not specify this option so you should almost never need it.
 
 .SH RPM BUILD SPECIFIC OPTIONS
 .TP
+.BI "\-\-buildflavor " flavor
+Specify flavor to replace @BUILD_FLAVOR@ in spefile with.
+.TP
+.B --changelog
+Append rpm changelog from SUSE .changes file to spec file.
+.TP
 .B --useusedforbuild
 Tell build not to do dependency expansion, but to extract the
 list of packages to install from "# usedforbuild" lines or, if none
@@ -119,11 +125,23 @@ are found, from all "BuildRequires" lines.  This option is useful
 if you want to re-build a package from a srcrpm with exactly the
 same packages used for the srcrpm build.
 .TP
+.BI "\-\-rpmlist " file
+Specify file with packages to install. Format is
+<package> <package_source>.
+<package> can be an ordinary package or one of 'preinstall:'
+, 'vminstall:', 'installonly:', 'noinstall:', 'preinstallimage:',
+,'preinstallimagesource:', 'runscripts:', 'dist:', 'rpmid:',
+<package_source> can be either a local path or a URL
+(valid: 'zypp://', 'http://', 'https://', 'ftp://', 'ftps://').
+.TP
 .B --stage
 Pass a stage option to rpmbuild. The default is \fB-ba\fP.
 .TP
 .B --target
 Call rpmbuild with a target option. This can be used for cross building.
+.TP
+.B --statistics
+monitor used resources during build inside VM
 .TP
 .B --verify
 Verify the files in an existing build system.
