@@ -134,8 +134,23 @@ Specify file with packages to install. Format is
 <package_source> can be either a local path or a URL
 (valid: 'zypp://', 'http://', 'https://', 'ftp://', 'ftps://').
 .TP
-.BI "--stage=" -bSTAGE
-Pass a stage option to rpmbuild. The default is \fB-ba\fP.
+.BI "\-\-stage=" -bSTAGE
+.TQ
+.BI "\-\-stage=" ..STAGE
+.TQ
+.BI "\-\-stage=" STAGE
+.TQ
+.BI "\-\-stage=" STAGE..
+.IR "-bSTAGE" :
+pass a stage option to rpmbuild (legacy). The default is \fB-ba\fP.
+.br
+Build everything up to
+.RI ( ..STAGE ),
+starting from
+.RI ( STAGE.. )
+or only
+.RI ( STAGE )
+STAGE.
 .TP
 .B --target
 Call rpmbuild with a target option. This can be used for cross building.

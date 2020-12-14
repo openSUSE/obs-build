@@ -257,8 +257,13 @@ Known Parameters:
   --release release
               Override Release in spec file
 
-  --stage=-bSTAGE
-              Set stage for rpmbuild. Defaults to -ba.
+  --stage=[-bSTAGE|..STAGE|STAGE|STAGE..]
+              -bSTAGE: Set stage for rpmbuild. Defaults to -ba.
+	      Legacy behavior.
+	      ..STAGE: Build up to and including the specified stage.
+	      STAGE: Build only the single stage.
+	      STAGE..: Build all stages from and including the specified
+              stage.
 
   --target platform
               Set target platform for rpmbuild

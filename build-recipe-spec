@@ -21,13 +21,75 @@
 #
 ################################################################
 
+# Check build stage and set stages list according to BUILD_RPM_BUILD_MODE:
+# there are three modes:
+# 'pre' or not set: build all stages up to BUILD_RPM_BUILD_STAGE
+#                  if not set, defaults to -ba
+# 'single': do an rpmbuild --short-circuit' build on stage BUILD_RPM_BUILD_STAGE
+# 'post': continue building from stage BUILD_RPM_BUILD_STAGE
+
+rpm_build_keep=
+rpm_build_stages=
+
+check_set_build_stages() {
+    local pre_d post_s
+    test -n "$BUILD_RPM_BUILD_MODE" || BUILD_RPM_BUILD_MODE=pre
+    test -z "$BUILD_RPM_BUILD_STAGE" -a "$BUILD_RPM_BUILD_MODE" != "pre" && \
+       cleanup_and_exit 1 "Error: --buildmode only allowed with --stage or BUILD_RPM_BUILD_STAGE set"
+    test -z "$BUILD_RPM_BUILD_STAGE" && BUILD_RPM_BUILD_STAGE=-ba
+    case $BUILD_RPM_BUILD_MODE in
+       pre) ;;
+       single|post)
+           test "$BUILDTYPE" = debbuild && cleanup_and_exit 1 "Error: --mode not implemented for debbuild"
+           test -z "$BUILD_RPM_BUILD_STAGE" && \
+               cleanup_and_exit 1 "Error: --buildmode only allowed with no --stage setting";
+           test "$CLEAN_BUILD" != "--clean" || \
+                             cleanup_and_exit 1 "Error: --clean not compatible with --mode"
+           case $BUILD_RPM_BUILD_STAGE in
+               -bp) test $BUILD_RPM_BUILD_MODE = post && BUILD_RPM_BUILD_STAGE=-ba
+                    BUILD_RPM_BUILD_MODE=pre ;;
+               -bc) pre_d="BUILD"; post_s="-bc -bi -bb -bs" ;;
+               -bi) pre_d="BUILD"; post_s="-bi -bb -bs" ;;
+               -bb|-ba) pre_d="BUILD BUILDROOT"; post_s="-bb -bs" ;;
+               -bl) pre_d="BUILD BUILDROOT" ;;&
+               -bs|-bl) BUILD_RPM_BUILD_MODE=single; post_s=$BUILD_RPM_BUILD_STAGE ;;
+               *) cleanup_and_exit 1 "Error: unknown stage $BUILD_RPM_BUILD_STAGE" ;;
+           esac
+           ;;
+       *) cleanup_and_exit 1 "Error: unknown build mode: $BUILD_RPM_BUILD_MODE" ;;
+    esac
+    for i in $pre_d; do
+       test -z $BUILD_ROOT$TOPDIR/$i/* &&
+           cleanup_and_exit 1 \
+               "Error: $i must not be empty for mode $BUILD_RPM_BUILD_MODE with stage $BUILD_RPM_BUILD_STAGE"
+    done
+    case $BUILD_RPM_BUILD_MODE in
+       pre|single) rpm_build_stages=$BUILD_RPM_BUILD_STAGE ;;
+       post) rpm_build_stages="$post_s" ;;
+    esac
+    [ -n "$pre_d" ] && rpm_build_keep="$pre_d"
+}
+
 recipe_setup_spec() {
+    local rpmdirs="BUILD RPMS/`uname -m` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS BUILDROOT OTHER"
     TOPDIR=`chroot $BUILD_ROOT su -c "rpm --eval '%_topdir'" - $BUILD_USER`
     if test -z "$TOPDIR"; then
 	cleanup_and_exit 1 "Error: TOPDIR empty"
     fi
-    test "$DO_INIT_TOPDIR" = false || rm -rf "$BUILD_ROOT$TOPDIR"
-    for i in BUILD RPMS/`uname -m` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS BUILDROOT OTHER ; do
+    check_set_build_stages
+    if test "$DO_INIT_TOPDIR" != false; then
+        if test -z "$rpm_build_keep"; then
+            rm -rf "$BUILD_ROOT$TOPDIR"
+        else
+            for i in $rpmdirs; do
+                for j in $rpm_build_keep; do
+                    test $i = $j && continue 2
+                done
+                rm -rf "$BUILD_ROOT$TOPDIR/$i"
+            done
+        fi
+    fi
+    for i in $rpmdirs; do
 	mkdir -p $BUILD_ROOT$TOPDIR/$i
     done
     chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
@@ -115,7 +177,6 @@ recipe_prepare_spec() {
 }
 
 recipe_build_spec() {
-    test -z "$BUILD_RPM_BUILD_STAGE" && BUILD_RPM_BUILD_STAGE=-ba
 
     rpmbuild=rpmbuild
     test -x $BUILD_ROOT/usr/bin/rpmbuild || rpmbuild=rpm
@@ -126,91 +187,97 @@ recipe_build_spec() {
 	HAVE_DYNAMIC_BUILDREQUIRES=true
     fi
 
+    for build_rpm_build_stage in $rpm_build_stages; do
     # XXX: move _srcdefattr to macro file?
-    rpmbopts=("$BUILD_RPM_BUILD_STAGE" "--define" "_srcdefattr (-,root,root)")
-    if test "$DO_CHECKS" != true ; then
-	if chroot "$BUILD_ROOT" "$rpmbuild" --nocheck --help >/dev/null 2>&1; then
-	    rpmbopts[${#rpmbopts[@]}]="--nocheck"
-	else
-	    echo "warning: --nocheck is not supported by this $rpmbuild version"
+	rpmbopts=("$build_rpm_build_stage" "--define" "_srcdefattr (-,root,root)")
+	if test "$DO_CHECKS" != true ; then
+	    if chroot "$BUILD_ROOT" "$rpmbuild" --nocheck --help >/dev/null 2>&1; then
+		rpmbopts[${#rpmbopts[@]}]="--nocheck"
+	    else
+		echo "warning: --nocheck is not supported by this $rpmbuild version"
+	    fi
 	fi
-    fi
-    if test "$rpmbuild" == "debbuild" ; then
-	rpmbopts[${#rpmbopts[@]}]="-vv"
-    fi
-    if test "$rpmbuild" == "rpmbuild" ; then
+	case $BUILD_RPM_BUILD_MODE in
+	    single|post) rpmbopts[${#rpmbopts[@]}]="--short-circuit" ;;
+	esac
+	if test "$rpmbuild" == "debbuild" ; then
+	    rpmbopts[${#rpmbopts[@]}]="-vv"
+	fi
+	if test "$rpmbuild" == "rpmbuild" ; then
 	    # use only --nosignature for rpm v4
-	rpmbopts[${#rpmbopts[@]}]="--nosignature"
-    fi
-    if test -n "$ABUILD_TARGET" ; then
-	rpmbopts[${#rpmbopts[@]}]="--target=$ABUILD_TARGET"
-    fi
-    if test -n "$BUILD_DEBUG" ; then
-	rpmbopts[${#rpmbopts[@]}]='--define'
-	rpmbopts[${#rpmbopts[@]}]="_build_create_debug 1"
-    fi
-    if test -n "$DISTURL" ; then
-	rpmbopts[${#rpmbopts[@]}]='--define'
-	rpmbopts[${#rpmbopts[@]}]="disturl $DISTURL"
-    fi
-    if test -n "$RSYNCDONE" ; then
-	rpmbopts[${#rpmbopts[@]}]='--define'
-	rpmbopts[${#rpmbopts[@]}]="RSYNCDONE 1"
-    fi
+	    rpmbopts[${#rpmbopts[@]}]="--nosignature"
+	fi
+	if test -n "$ABUILD_TARGET" ; then
+	    rpmbopts[${#rpmbopts[@]}]="--target=$ABUILD_TARGET"
+	fi
+	if test -n "$BUILD_DEBUG" ; then
+	    rpmbopts[${#rpmbopts[@]}]='--define'
+	    rpmbopts[${#rpmbopts[@]}]="_build_create_debug 1"
+	fi
+	if test -n "$DISTURL" ; then
+	    rpmbopts[${#rpmbopts[@]}]='--define'
+	    rpmbopts[${#rpmbopts[@]}]="disturl $DISTURL"
+	fi
+	if test -n "$RSYNCDONE" ; then
+	    rpmbopts[${#rpmbopts[@]}]='--define'
+	    rpmbopts[${#rpmbopts[@]}]="RSYNCDONE 1"
+	fi
 
-    buildrootoverride=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags rpm-buildroot-override)
-    if test -n "$buildrootoverride" ; then
-	rpmbopts[${#rpmbopts[@]}]='--buildroot'
-	rpmbopts[${#rpmbopts[@]}]="$buildrootoverride"
-    fi
+	buildrootoverride=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags rpm-buildroot-override)
+	if test -n "$buildrootoverride" ; then
+	    rpmbopts[${#rpmbopts[@]}]='--buildroot'
+	    rpmbopts[${#rpmbopts[@]}]="$buildrootoverride"
+	fi
 
-    GEN_BUILDREQS_PACKS=()
-    if test -n "$HAVE_DYNAMIC_BUILDREQUIRES" ; then
-	# query dynamic build requires
-	rm -f "$BUILD_ROOT$TOPDIR/SRPMS/"*.buildreqs.nosrc.rpm
-	rpmdynbropts=("${rpmbopts[@]}")
-	rpmdynbropts[0]=-br
+	GEN_BUILDREQS_PACKS=()
+	if test -n "$HAVE_DYNAMIC_BUILDREQUIRES" ; then
+	    # query dynamic build requires
+	    rm -f "$BUILD_ROOT$TOPDIR/SRPMS/"*.buildreqs.nosrc.rpm
+	    rpmdynbropts=("${rpmbopts[@]}")
+	    rpmdynbropts[0]=-br
+	    toshellscript $rpmbuild \
+		    --nodeps \
+		    "${definesnstuff[@]}" \
+		    "${rpmdynbropts[@]}" \
+		    "$TOPDIR/SOURCES/$RECIPEFILE" \
+		    > $BUILD_ROOT/.build.command
+	    chmod 755 $BUILD_ROOT/.build.command
+	    chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null
+	    st=$?
+	    if test "$st" != 0 -a "$st" != 11 ; then
+		return
+	    fi
+	    : > $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs
+	    if test "$st" = 11 ; then
+		reqsfile=
+		for i in "$BUILD_ROOT$TOPDIR/SRPMS/"*.buildreqs.nosrc.rpm ; do
+		    test -f "$i" && reqsfile=${i##*/}
+		done
+		test -n "$reqsfile" || cleanup_and_exit 1 "no buildreqs.nosrc.rpm file?"
+		chroot $BUILD_ROOT rpm -qp --requires "$TOPDIR/SRPMS/$reqsfile" | grep -v '^rpmlib(' | sort -u > $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp
+		chroot $BUILD_ROOT rpmspec -q --srpm --requires "$TOPDIR/SOURCES/$RECIPEFILE" >> $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp || cleanup_and_exit 1 "rpm -q --spec failed"
+		sort < $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp | uniq -u > $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs
+		rm -f $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp
+		while read db ; do
+		    GEN_BUILDREQS_PACKS[${#GEN_BUILDREQS_PACKS[@]}]="$db"
+		done < $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs
+	    fi
+	    rm -f "$BUILD_ROOT$TOPDIR/SRPMS/"*.buildreqs.nosrc.rpm
+	fi
+
+	# su involves a shell which would require even more
+	# complicated quoting to bypass than this
 	toshellscript $rpmbuild \
-		--nodeps \
 		"${definesnstuff[@]}" \
-		"${rpmdynbropts[@]}" \
+		"${rpmbopts[@]}" \
 		"$TOPDIR/SOURCES/$RECIPEFILE" \
 		> $BUILD_ROOT/.build.command
 	chmod 755 $BUILD_ROOT/.build.command
+	check_exit
 	chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null
 	st=$?
-	if test "$st" != 0 -a "$st" != 11 ; then
-	    return
-	fi
-	: > $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs
-	if test "$st" = 11 ; then
-	    reqsfile=
-	    for i in "$BUILD_ROOT$TOPDIR/SRPMS/"*.buildreqs.nosrc.rpm ; do
-		test -f "$i" && reqsfile=${i##*/}
-	    done
-	    test -n "$reqsfile" || cleanup_and_exit 1 "no buildreqs.nosrc.rpm file?"
-	    chroot $BUILD_ROOT rpm -qp --requires "$TOPDIR/SRPMS/$reqsfile" | grep -v '^rpmlib(' | sort -u > $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp
-	    chroot $BUILD_ROOT rpmspec -q --srpm --requires "$TOPDIR/SOURCES/$RECIPEFILE" >> $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp || cleanup_and_exit 1 "rpm -q --spec failed"
-	    sort < $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp | uniq -u > $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs
-	    rm -f $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp
-	    while read db ; do
-		GEN_BUILDREQS_PACKS[${#GEN_BUILDREQS_PACKS[@]}]="$db"
-	    done < $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs
-	fi
-	rm -f "$BUILD_ROOT$TOPDIR/SRPMS/"*.buildreqs.nosrc.rpm
-    fi
-
-    # su involves a shell which would require even more
-    # complicated quoting to bypass than this
-    toshellscript $rpmbuild \
-	    "${definesnstuff[@]}" \
-	    "${rpmbopts[@]}" \
-	    "$TOPDIR/SOURCES/$RECIPEFILE" \
-	    > $BUILD_ROOT/.build.command
-    chmod 755 $BUILD_ROOT/.build.command
-    check_exit
-    chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null
-    st=$?
+	test "$st" != 0 && break
+    done
     test "$st" = 0 && BUILD_SUCCEEDED=true
     test "$st" = 11 -a -n "$HAVE_DYNAMIC_BUILDREQUIRES" && BUILD_SUCCEEDED=genbuildreqs
 }

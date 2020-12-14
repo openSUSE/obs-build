@@ -54,7 +54,15 @@ recipe_parse_options() {
     case ${PARAM/#--/-} in
       -stage)
 	needarg
-	BUILD_RPM_BUILD_STAGE="$ARG"
+	case $ARG in
+	-b*) BUILD_RPM_BUILD_STAGE="$ARG" ;;
+	..[abcilps]) BUILD_RPM_BUILD_STAGE="-b${ARG#\.\.}"
+	    BUILD_RPM_BUILD_MODE=pre ;;
+	[abcilps]..) BUILD_RPM_BUILD_STAGE="-b${ARG%\.\.}"
+	    BUILD_RPM_BUILD_MODE=post ;;
+	[abcilps])  BUILD_RPM_BUILD_STAGE="-b${ARG}"
+	    BUILD_RPM_BUILD_MODE=single ;;
+	*) return 1 ;;
 	shift
 	;;
       -kiwi-parameter)
