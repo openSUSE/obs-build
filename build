@@ -1611,8 +1611,11 @@ if test -n "$CCACHE" ; then
     if test -n "$REMOVE_CCACHE" ; then
         echo "... cleaning ccache"
         test_cmd="ccache -h | grep -c evict-older-than"
-        clean_cmd="ccache --evict-older-than $(($(date +%s) - $CCACHE_SETUP_START_TIME))"
-        chroot $BUILD_ROOT su -c "$test_cmd && $clean_cmd" - $BUILD_USER
+        # ccache -Version >= 4.0
+        clean_cmd_with_suffix="ccache --evict-older-than $(($(date +%s) - $CCACHE_SETUP_START_TIME))s"
+        # older version with the patch (without patch, $test_cmd would fail)
+        clean_cmd_without_suffix="ccache --evict-older-than $(($(date +%s) - $CCACHE_SETUP_START_TIME))"
+        chroot $BUILD_ROOT su -c "($test_cmd && $clean_cmd_with_suffix) || ($test_cmd && $clean_cmd_without_suffix)" - $BUILD_USER
     fi
     echo "... saving ccache"
     tar ${REMOVE_CCACHE:+--remove-files} -cf "$BUILD_ROOT/$TOPDIR/OTHER/_ccache.tar" -C "$BUILD_ROOT/.ccache/" .
