@@ -339,8 +339,11 @@ if ($version =~ s/^\d+://) {
 }
 
 
-# debtransform will always generate a 1.0 format type,
-# so it has to transform all source archives into weak gzip files.
+# debtransform will always generate a source package in 1.0 (non-native) format
+print "Transforming into source package 1.0 (non-native) format\n";
+
+# for 1.0 all source archives should be transformed into weak gzip files
+# (https://wiki.debian.org/Projects/DebSrc3.0)
 my $tmptar;
 if ($tarfile =~ /\.tar\.bz2/) {
     my $old = $tarfile;
@@ -388,6 +391,7 @@ my @files;
 my @checksums_sha1;
 my @checksums_sha256;
 my $v = $version;
+# version without Debian -n suffix
 $v =~ s/-[^-]*$//;
 $tarfile =~ /.*(\.tar.*?)$/;
 my $ntarfile = "${name}_$v.orig$1";
