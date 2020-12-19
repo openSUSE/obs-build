@@ -387,7 +387,9 @@ if ($tags->{'DEBTRANSFORM-RELEASE'} && $release) {
     # On OBS, release is incremented automatically
     # (same as for RPMs)
     $version = $version . "+" . $release;
-    $tags->{'VERSION'} = $version;
+}
+if ($version ne $tags->{VERSION}) {
+    $tags->{VERSION} = $version;
     print "Modifying dsc Version field to \"$tags->{VERSION}\"\n";
 }
 
