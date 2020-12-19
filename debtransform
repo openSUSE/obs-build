@@ -380,12 +380,10 @@ if ($tarfile =~ /\.tgz$/) {
     system ( ("mv",  "$dir/$old",  "$tmptar" ) ) == 0 || die("cannot rename .tgz to .tar.gz");
 }
 
-if ( $tags->{'DEBTRANSFORM-RELEASE'} && $release ) {
-    # if dsc file contains the tag DEBTRANSFORM-RELEASE
-    # and "release" is given as a commad line parameter,
-    # replace "version" from dsc file by "version-release".
-    # From "version" the current release is stripped before
-    # (last "-" and the part after the last "-").
+if ($tags->{'DEBTRANSFORM-RELEASE'} && $release) {
+    # the tag DEBTRANSFORM-RELEASE in .dsc file instructs
+    # to append OBS build number to package version. The
+    # number is passed in "release" command line parameter.
     # On OBS, release is incremented automatically
     # (same as for RPMs)
     $version = $version . "+" . $release;
