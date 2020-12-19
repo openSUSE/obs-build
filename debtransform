@@ -78,7 +78,11 @@ sub writedsc {
     my $d = $tags->{$ucseq};
     next unless defined $d;
     $d =~ s/\n/\n /sg;
-    print F "$seq: $d\n";
+    if ($d =~ /^\n/) {
+      print F "$seq:$d\n";
+    } else {
+      print F "$seq: $d\n";
+    }
   }
   print F "\n";
   close F;
