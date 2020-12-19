@@ -339,8 +339,14 @@ if ($version =~ s/^\d+://) {
 }
 
 
-# debtransform will always generate a source package in 1.0 (non-native) format
+# debtransform generates source package in 1.0 (non-native) format
 print "Transforming into source package 1.0 (non-native) format\n";
+
+# non-native sources should always contain Debian revision
+if ($version !~ /-/) {
+	$version = $version . "-1";
+	print "Added Debian revision to Version field, which is now \"$version\".\n";
+}
 
 # for 1.0 all source archives should be transformed into weak gzip files
 # (https://wiki.debian.org/Projects/DebSrc3.0)
@@ -391,7 +397,7 @@ my @files;
 my @checksums_sha1;
 my @checksums_sha256;
 my $v = $version;
-# version without Debian -n suffix
+# version without Debian revision
 $v =~ s/-[^-]*$//;
 $tarfile =~ /.*(\.tar.*?)$/;
 my $ntarfile = "${name}_$v.orig$1";
