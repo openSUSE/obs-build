@@ -23,6 +23,7 @@
 use strict;
 use Digest::MD5;
 use Digest::SHA;
+use POSIX qw(strftime);
 
 sub usage
 {
@@ -150,6 +151,9 @@ sub dodiff {
     if ($version ne $origtarfile->{'version'}) {
       $firstline =~ s/\(.*\)/($origtarfile->{'version'})/g;
       my $date = `date -R`;
+      if (defined($ENV{SOURCE_DATE_EPOCH})) {
+        $date = strftime("%a, %d %b %Y %T +0000", gmtime($ENV{SOURCE_DATE_EPOCH}));
+      }
       chomp($date);
       my @newcontent = ($firstline, "", "  * version number update by debtransform", "", " -- debtransform <build\@opensuse.org>  ".$date, "");
       push(@newcontent, @content);
