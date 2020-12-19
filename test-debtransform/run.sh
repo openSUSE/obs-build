@@ -22,6 +22,10 @@ function run
 	    case $NAME in
 		*.dsc)
 		    debdiff $4/$NAME out/$NAME
+		    RES=$?
+		    if (( $RES != 0 )); then
+			    fail $RES
+		    fi
 		    ;;
 	    esac
 	done
