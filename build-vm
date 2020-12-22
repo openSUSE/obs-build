@@ -367,6 +367,11 @@ vm_img_mkfs() {
     local options="$3"
     local mkfs tunefs
 
+    case "$fs" in
+	ext[234]|xfs|btrfs|reiserfs) ;;
+	*) cleanup_and_exit 1 "filesystem \"$fs\" is not supported" ;;
+    esac
+
     # defaults for creating the filesystem
     vm_img_mkfs_ext4_options='-O ^has_journal,^huge_file,^resize_inode,sparse_super'
     vm_img_mkfs_ext4_extra='-E lazy_itable_init,discard'
@@ -394,7 +399,7 @@ vm_img_mkfs() {
     fi
 
     if test -z "$mkfs"; then
-	cleanup_and_exit 3 "filesystem \"$fs\" is not supported"
+	cleanup_and_exit 1 "filesystem \"$fs\" is not supported"
     fi
 
     echo "Creating $fs filesystem on $img"
