@@ -23,6 +23,7 @@
 use strict;
 use Digest::MD5;
 use Digest::SHA;
+use POSIX qw(strftime);
 
 sub usage
 {
@@ -78,7 +79,11 @@ sub writedsc {
     my $d = $tags->{$ucseq};
     next unless defined $d;
     $d =~ s/\n/\n /sg;
-    print F "$seq: $d\n";
+    if ($d =~ /^\n/) {
+      print F "$seq:$d\n";
+    } else {
+      print F "$seq: $d\n";
+    }
   }
   print F "\n";
   close F;
@@ -146,6 +151,9 @@ sub dodiff {
     if ($version ne $origtarfile->{'version'}) {
       $firstline =~ s/\(.*\)/($origtarfile->{'version'})/g;
       my $date = `date -R`;
+      if (defined($ENV{SOURCE_DATE_EPOCH})) {
+        $date = strftime("%a, %d %b %Y %T +0000", gmtime($ENV{SOURCE_DATE_EPOCH}));
+      }
       chomp($date);
       my @newcontent = ($firstline, "", "  * version number update by debtransform", "", " -- debtransform <build\@opensuse.org>  ".$date, "");
       push(@newcontent, @content);
@@ -339,8 +347,17 @@ if ($version =~ s/^\d+://) {
 }
 
 
-# debtransform will always generate a 1.0 format type,
-# so it has to transform all source archives into weak gzip files.
+# debtransform generates source package in 1.0 (non-native) format
+print "Transforming into source package 1.0 (non-native) format\n";
+
+# non-native sources should always contain Debian revision
+if ($version !~ /-/) {
+	$version = $version . "-1";
+	print "Added Debian revision to Version field, which is now \"$version\".\n";
+}
+
+# for 1.0 all source archives should be transformed into weak gzip files
+# (https://wiki.debian.org/Projects/DebSrc3.0)
 my $tmptar;
 if ($tarfile =~ /\.tar\.bz2/) {
     my $old = $tarfile;
@@ -371,16 +388,16 @@ if ($tarfile =~ /\.tgz$/) {
     system ( ("mv",  "$dir/$old",  "$tmptar" ) ) == 0 || die("cannot rename .tgz to .tar.gz");
 }
 
-if ( $tags->{'DEBTRANSFORM-RELEASE'} && $release ) {
-    # if dsc file contains the tag DEBTRANSFORM-RELEASE
-    # and "release" is given as a commad line parameter,
-    # replace "version" from dsc file by "version-release".
-    # From "version" the current release is stripped before
-    # (last "-" and the part after the last "-").
+if ($tags->{'DEBTRANSFORM-RELEASE'} && $release) {
+    # the tag DEBTRANSFORM-RELEASE in .dsc file instructs
+    # to append OBS build number to package version. The
+    # number is passed in "release" command line parameter.
     # On OBS, release is incremented automatically
     # (same as for RPMs)
     $version = $version . "+" . $release;
-    $tags->{'VERSION'} = $version;
+}
+if ($version ne $tags->{VERSION}) {
+    $tags->{VERSION} = $version;
     print "Modifying dsc Version field to \"$tags->{VERSION}\"\n";
 }
 
@@ -388,6 +405,7 @@ my @files;
 my @checksums_sha1;
 my @checksums_sha256;
 my $v = $version;
+# version without Debian revision
 $v =~ s/-[^-]*$//;
 $tarfile =~ /.*(\.tar.*?)$/;
 my $ntarfile = "${name}_$v.orig$1";
