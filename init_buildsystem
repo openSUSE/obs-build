@@ -312,7 +312,7 @@ create_devs() {
     done << DEVLIST
 	mknod null    666 c 1 3
 	mknod zero    666 c 1 5
-	mknod full    622 c 1 7
+	mknod full    666 c 1 7
 	mknod random  666 c 1 8
 	mknod urandom 644 c 1 9
 	mknod tty     666 c 5 0
