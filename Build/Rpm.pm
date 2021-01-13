@@ -736,23 +736,18 @@ sub parse {
         push @{$ret->{$tag}}, $val;
       } else {
 	if ($tag =~ /^(source|patch)(\d+)?$/) {
-	  my $num = defined($2) ? $2 : $autonum{$1};
-	  my $m = uc($1) . "URL$num";
-	  if (exists $macros{$m}) {
+	  my $num = defined($2) ? 0 + $2 : $autonum{$1};
+	  $tag = "$1$num";
+	  if ($tag eq 'patch0' && exists($ret->{$tag})) {
 	    # gross hack. Before autonumbering "Patch" and "Patch0" could
 	    # exist. So take out the previous patch and add it back
 	    # without number. This does not exactly work as old rpms
 	    # but hopefully good enough :-)
-	    if ($1 eq 'patch' && $num == 0) {
-	      $ret->{'patch'} = $ret->{$tag};
-	    } else {
-	      $ret->{'error'} = "$1 number $num exists!";
-	      return $ret;
-	    }
+	    $ret->{'patch'} = delete $ret->{$tag};
 	  }
-	  $autonum{$1} = $num+1 if $num >= $autonum{$1};
-	  $macros{$m} = $val;
-	  $tag = "$1$num";
+	  print STDERR "Warning: spec file parser: $tag already exists\n" if exists($ret->{$tag}) && $config->{'warnings'};
+	  $autonum{$1} = $num + 1 if $num >= $autonum{$1};
+	  $macros{uc($1) . "URL$num"} = $val;
 	}
 	$ret->{$tag} = $val;
       }
