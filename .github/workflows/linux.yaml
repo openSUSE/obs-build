@@ -18,6 +18,10 @@ jobs:
         run: |
           sudo apt-get install libyaml-libyaml-perl
 
+      - name: Install debdiff for debtransform test
+        run: |
+          sudo apt-get devscripts
+
       - name: Test
         run: |
           make test
