@@ -20,7 +20,7 @@ jobs:
 
       - name: Install debdiff for debtransform test
         run: |
-          sudo apt-get devscripts
+          sudo apt-get install devscripts
 
       - name: Test
         run: |
