@@ -25,6 +25,9 @@ all:
 
 test:
 	PERL5LIB=. prove -v
+	# debtransform test suite
+	cd test-debtransform
+	./run.sh
 
 install:
 	install -m755 -d \
