@@ -1,3 +1,4 @@
+#!BuildVersion: 3.36.2
 ---
 app-id: org.gnome.Chess
 runtime: org.gnome.Platform
