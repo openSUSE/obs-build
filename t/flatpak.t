@@ -22,7 +22,7 @@ sub capture_stdout {
 subtest parse => sub {
     my $expected = {
         name => 'org.gnome.Chess',
-        version => 0,
+        version => '3.36.2',
         sources => [
             "phalanx-XXV-source.tgz",
             "stockfish-10-src.zip",
@@ -49,11 +49,16 @@ subtest show => sub {
     local @ARGV = ("$path/flatpak.yaml", 'name');
     my $data = capture_stdout(sub { Build::Flatpak::show() });
     is $data, "org.gnome.Chess\n", 'Build::Flatpak::show name';
+
+    @ARGV = ("$path/flatpak.yaml", 'sources');
+    $data = capture_stdout(sub { Build::Flatpak::show() });
+    is $data, "phalanx-XXV-source.tgz\nstockfish-10-src.zip\ngnuchess-6.2.5.tar.gz\ngnome-chess-3.36.1.tar.xz\n", 'Build::Flatpak::show sources';
 };
 
 done_testing;
 
 __DATA__
+#!BuildVersion: 3.36.2
 {
     "app-id": "org.gnome.Chess",
     "runtime": "org.gnome.Platform",

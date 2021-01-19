@@ -49,8 +49,8 @@ test -e "$BUILD_ROOT/proc/self" || mount -n -tproc none $BUILD_ROOT/proc
 set -x
 
 # Build into repo
-chroot "$BUILD_ROOT" bash -c "cd /usr/src/packages/FLATPAK_ROOT && flatpak-builder --force-clean --repo=$FLATPAK_REPO build-dir $FLATPAK_FILE"
+chroot "$BUILD_ROOT" bash -c "cd /usr/src/packages/FLATPAK_ROOT && flatpak-builder --default-branch=$FLATPAK_APP_VERSION --force-clean --repo=$FLATPAK_REPO build-dir $FLATPAK_FILE"
 
 # Create bundle from repo
-chroot "$BUILD_ROOT" bash -c "flatpak build-bundle --runtime-repo=$FLATPAK_REMOTE $FLATPAK_REPO $TOPDIR/OTHER/$FLATPAK_APP.flatpak $FLATPAK_APP"
+chroot "$BUILD_ROOT" bash -c "flatpak build-bundle --runtime-repo=$FLATPAK_REMOTE $FLATPAK_REPO $TOPDIR/OTHER/$FLATPAK_APP-$FLATPAK_APP_VERSION.flatpak $FLATPAK_APP $FLATPAK_APP_VERSION"
 

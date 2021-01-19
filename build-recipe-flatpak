@@ -82,11 +82,14 @@ recipe_build_flatpak() {
 
     local FLATPAK_FILE="$TOPDIR/SOURCES/$RECIPEFILE"
     local FLATPAK_APP=$(perl -I$BUILD_DIR -MBuild::Flatpak -e 'Build::Flatpak::show' -- "$BUILD_ROOT$FLATPAK_FILE" name)
+    local FLATPAK_APP_VERSION=$(perl -I$BUILD_DIR -MBuild::Flatpak -e 'Build::Flatpak::show' -- "$BUILD_ROOT$FLATPAK_FILE" version)
+    FLATPAK_APP_VERSION="${FLATPAK_APP_VERSION:-0}"
     local FLATPAK_REPO=/tmp/flatpakrepo
     local FLATPAK_REMOTE=https://dl.flathub.org/repo/flathub.flatpakrepo
     export FLATPAK_REPO
     export FLATPAK_REMOTE
     export FLATPAK_APP
+    export FLATPAK_APP_VERSION
     export FLATPAK_FILE
     export TOPDIR
 

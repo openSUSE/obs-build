@@ -62,7 +62,30 @@ sub _load_yaml_file {
 sub parse {
   my ($cf, $fn) = @_;
 
+  my $version = '';
   my $data;
+  my @lines;
+  if (ref($fn) eq 'SCALAR') {
+    @lines = split m/(?<=\n)/, $$fn;
+  }
+  else {
+    open my $fh, '<', $fn or return { error => "Failed to open file '$fn'" };
+    @lines = <$fh>;
+    close $fh;
+  }
+
+  for my $line (@lines) {
+    if ($line =~ m/^#!BuildVersion: (\S+)/) {
+      my $string = $1;
+      if ($string =~ m/^[0-9.]+$/) {
+          $version = $string;
+      }
+      else {
+        return { error => "Invalid BuildVersion" };
+      }
+    }
+  }
+
   if ($fn =~ m/\.ya?ml\z/) {
     $data = _load_yaml_file($fn);
     return { error => "Failed to parse YAML file '$fn'" } unless defined $data;
@@ -84,8 +107,8 @@ sub parse {
   }
 
   my $ret = {};
+  $ret->{version} = $version if $version;
   $ret->{name} = $data->{'app-id'} or die "Flatpak file is missing 'app-id'";
-  $ret->{version} = $data->{version} || "0";
   my $runtime = $data->{runtime};
   my $runtime_version = $data->{'runtime-version'};
   my $sdk = $data->{sdk};
@@ -122,7 +145,12 @@ sub show {
     my $d = parse($cf, $fn);
     die "$d->{error}\n" if $d->{error};
     my $value = $d->{ $field };
-    print "$value\n";
+    if (ref $value eq 'ARRAY') {
+        print "$_\n" for @$value;
+    }
+    else {
+        print "$value\n";
+    }
 }
 
 1;
