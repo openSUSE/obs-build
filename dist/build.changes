@@ -1,4 +1,32 @@
 -------------------------------------------------------------------
+Wed Jan 20 12:37:53 UTC 2021 - Adrian Schröter <adrian@suse.de>
+
+Features:
+- initial flatpak build support added
+- ccache support added
+- debtransform: Add Debian revision if not present
+- allow nodirindex filesystems via BuildFlags: vmfsoptions:nodirindex
+- Also do rich dep handling for PreReqs
+- kiwi image: configure ndb database if we install the rpm-ndb package
+- Implement alternative method to specify build-ignores
+
+Changes:
+- Ignore kiwi-image: deps when expanding image packages
+
+Fixes:
+- Improve autonumbering of source/patch
+- init_buildsystem: fix mode of /dev/full
+- drop option transparent_hugepages=never on s390x
+- Allow --vmdisk-filesystem-options as alias for --vm-disk-filesystem-options
+- Do not add a "kiwi-packagemanager:" dependency if no package manager is defined
+- debian:
+  - Do not leave trailing whitespace while generating .dsc
+  - Save modified version into .dsc file
+  - Fail `debtransform` test if `debdiff` can't find something
+  - return the unmapped arch if it is not found in the mapping hash
+  - build-recipe-debootstrap: add fallback for Debian SID distro
+
+-------------------------------------------------------------------
 Fri Aug 28 13:48:06 UTC 2020 - Adrian Schröter <adrian@suse.de>
 
 - support rpmlint installed in /usr/bin/ as well
