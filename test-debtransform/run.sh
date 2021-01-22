@@ -36,3 +36,4 @@ export SOURCE_DATE_EPOCH=1591490034
 
 run 1 grandorgue.dsc 0 1-out
 run 2 grandorgue.dsc 0 2-out
+run 3 grandorgue.dsc 0 3-out
