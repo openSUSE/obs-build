@@ -60,7 +60,6 @@ Conflicts:      bsdtar < 2.5.5
 BuildRequires:  perl(Date::Parse)
 BuildRequires:  perl(Test::Harness)
 BuildRequires:  perl(Test::More)
-BuildRequires:  perl(YAML)
 BuildRequires:  perl(YAML::LibYAML)
 %if 0%{?suse_version} > 1000 || 0%{?centos_version} >= 800 || 0%{?rhel_version} >= 800 || 0%{?fedora_version} >= 21
 # None of them are actually required for core features.
@@ -73,7 +72,6 @@ Recommends:     perl(Time::Zone)
 Recommends:     perl(URI)
 Recommends:     perl(XML::Parser)
 Recommends:     perl(Net::SSL)
-Recommends:     perl(YAML)
 Recommends:     perl(YAML::LibYAML)
 Recommends:     bsdtar
 Recommends:     qemu-linux-user
