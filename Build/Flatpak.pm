@@ -59,11 +59,30 @@ sub _load_yaml_file {
   die "Neither YAML::PP nor YAML::XS available\n";
 }
 
+sub _read_manifest {
+  my ($fn) = @_;
+  my $data;
+  if ($fn =~ m/\.ya?ml\z/) {
+    $data = _load_yaml_file($fn);
+    return { error => "Failed to parse YAML file '$fn'" } unless defined $data;
+  } elsif ($fn =~ m/\.json\z/) {
+    # We don't have JSON::PP, but YAML is a superset of JSON anyway
+    $data = _load_yaml_file($fn);
+    return { error => "Failed to parse JSON file '$fn'" } unless defined $data;
+  } elsif (ref($fn) eq 'SCALAR') {
+    $data = _load_yaml($$fn);		# used in the unit test
+    return { error => "Failed to parse '$fn'" } unless defined $data;
+  } else {
+    $data = _load_yaml_file($fn);
+    return { error => "Failed to parse file '$fn'" } unless defined $data;
+  }
+  return $data;
+}
+
 sub parse {
   my ($cf, $fn) = @_;
 
   my $version = '';
-  my $data;
   my @lines;
   if (ref($fn) eq 'SCALAR') {
     @lines = split m/(?<=\n)/, $$fn;
@@ -86,26 +105,7 @@ sub parse {
     }
   }
 
-  if ($fn =~ m/\.ya?ml\z/) {
-    $data = _load_yaml_file($fn);
-    return { error => "Failed to parse YAML file '$fn'" } unless defined $data;
-  } elsif ($fn =~ m/\.json\z/) {
-    # We don't have JSON::PP, but YAML is a superset of JSON
-    $data = _load_yaml_file($fn);
-    return { error => "Failed to parse JSON file '$fn'" } unless defined $data;
-#    open my $fh, '<:encoding(UTF-8)', $fn or die $!;
-#    my $json = do { local $/; <$fh> };
-#    close $fh;
-#    $data = eval { decode_json($json) };
-#    return { error => "Failed to parse JSON file" } unless defined $data;
-  } elsif (ref($fn) eq 'SCALAR') {
-    $data = _load_yaml($$fn);		# used in the unit test
-    return { error => "Failed to parse '$fn'" } unless defined $data;
-  } else {
-    $data = _load_yaml_file($fn);
-    return { error => "Failed to parse file '$fn'" } unless defined $data;
-  }
-
+  my $data = _read_manifest($fn);
   my $ret = {};
   $ret->{version} = $version if $version;
   $ret->{name} = $data->{'app-id'} or die "Flatpak file is missing 'app-id'";
@@ -124,10 +124,7 @@ sub parse {
       if (my $sources = $module->{sources}) {
         for my $source (@$sources) {
           if ($source->{type} eq 'archive') {
-            my $url = $source->{url};
-            my $path = $url;
-            $path =~ s{.*/}{};	# Get filename
-            push @sources, $path;
+            push @sources, $source->{url};
           }
         }
       }
@@ -151,6 +148,35 @@ sub show {
     else {
         print "$value\n";
     }
+}
+
+# This replaces http urls with local file urls because during build
+# flatpak-builder has no network
+sub rewrite {
+  my ($fn) = @ARGV;
+  my $data = _read_manifest($fn);
+  if (my $modules = $data->{modules}) {
+    for my $module (@$modules) {
+      if (my $sources = $module->{sources}) {
+        for my $source (@$sources) {
+          if ($source->{type} eq 'archive') {
+            my $path = $source->{url};
+            $path =~ s{.*/}{}; # Get filename
+            $source->{url} = "file:///usr/src/packages/SOURCES/$path";
+          }
+        }
+      }
+    }
+  }
+  my $yaml = '';
+  if ($yamlpp) {
+    # YAML::PP would allow us to keep key order
+    $yaml = $yamlpp->dump_string($data);
+  }
+  elsif ($yamlxs) {
+    $yaml = YAML::XS::Dump($data);
+  }
+  print $yaml;
 }
 
 1;

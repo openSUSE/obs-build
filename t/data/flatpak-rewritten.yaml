@@ -1,0 +1,62 @@
+---
+app-id: org.gnome.Chess
+cleanup:
+- /share/gnuchess
+- /share/info
+- /share/man
+- /include
+command: gnome-chess
+finish-args:
+- --share=ipc
+- --socket=fallback-x11
+- --socket=wayland
+- --metadata=X-DConf=migrate-path=/org/gnome/Chess/
+modules:
+- build-commands:
+  - make
+  - install -D phalanx /app/bin/phalanx
+  - install -D pbook.phalanx /app/share/phalanx/pbook.phalanx
+  - install -D sbook.phalanx /app/share/phalanx/sbook.phalanx
+  - install -D eco.phalanx /app/share/phalanx/eco.phalanx
+  buildsystem: simple
+  name: phalanx
+  sources:
+  - sha256: b3874d5dcd22c64626b2c955b18b27bcba3aa727855361a91eab57a6324b22dd
+    type: archive
+    url: file:///usr/src/packages/SOURCES/phalanx-XXV-source.tgz
+  - path: phalanx-books-path.patch
+    type: patch
+- build-commands:
+  - make build
+  - install -D stockfish /app/bin/stockfish
+  build-options:
+    arch:
+      aarch64:
+        env:
+          ARCH: armv7
+      arm:
+        env:
+          ARCH: armv7
+      x86_64:
+        env:
+          ARCH: x86-64
+  buildsystem: simple
+  name: stockfish
+  sources:
+  - sha256: 29bd01e7407098aa9e851b82f6ea4bf2b46d26e9075a48a269cb1e40c582a073
+    type: archive
+    url: file:///usr/src/packages/SOURCES/stockfish-10-src.zip
+- name: gnuchess
+  sources:
+  - sha256: 9a99e963355706cab32099d140b698eda9de164ebce40a5420b1b9772dd04802
+    type: archive
+    url: file:///usr/src/packages/SOURCES/gnuchess-6.2.5.tar.gz
+- buildsystem: meson
+  name: gnome-chess
+  sources:
+  - sha256: b195c9f17a59d7fcc892ff55e6a6ebdd16e7329157bf37e3c2fe593b349aab98
+    type: archive
+    url: file:///usr/src/packages/SOURCES/gnome-chess-3.36.1.tar.xz
+runtime: org.gnome.Platform
+runtime-version: '3.36'
+sdk: org.gnome.Sdk
