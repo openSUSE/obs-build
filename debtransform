@@ -341,10 +341,6 @@ my $name = $tags->{'SOURCE'};
 die("dsc file contains no Source: line\n") unless defined($name);
 my $version = $tags->{'VERSION'};
 die("dsc file contains no Version: line\n") unless defined($version);
-# no epoch in version, please
-if ($version =~ s/^\d+://) {
-	print "Stripped epoch from Version field, which is now \"$version\".\n";
-}
 
 
 # debtransform generates source package in 1.0 (non-native) format
@@ -399,6 +395,11 @@ if ($tags->{'DEBTRANSFORM-RELEASE'} && $release) {
 if ($version ne $tags->{VERSION}) {
     $tags->{VERSION} = $version;
     print "Modifying dsc Version field to \"$tags->{VERSION}\"\n";
+}
+
+# no epoch in filename
+if ($version =~ s/^\d+://) {
+  print "Stripped epoch from $version for filenames.\n";
 }
 
 my @files;
