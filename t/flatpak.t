@@ -9,6 +9,11 @@ my $path = "$Bin/data";
 use Build;
 use Build::Flatpak;
 
+my $rewritten_manifest = do {
+    local $/;
+    open my $fh, '<', "$Bin/data/flatpak-rewritten.yaml" or die $!;
+    <$fh>;
+};
 my $conf = Build::read_config('x86_64');
 
 sub capture_stdout {
@@ -19,15 +24,19 @@ sub capture_stdout {
   return $cap;
 }
 
+my @sources = map { "https://example.org/$_" } (
+    "phalanx-XXV-source.tgz",
+    "stockfish-10-src.zip",
+    "gnuchess-6.2.5.tar.gz",
+    "gnome-chess-3.36.1.tar.xz",
+);
+
 subtest parse => sub {
     my $expected = {
         name => 'org.gnome.Chess',
         version => '3.36.2',
         sources => [
-            "phalanx-XXV-source.tgz",
-            "stockfish-10-src.zip",
-            "gnuchess-6.2.5.tar.gz",
-            "gnome-chess-3.36.1.tar.xz",
+            @sources,
         ],
         deps => [
             'org.gnome.Sdk-v3.36',
@@ -52,7 +61,22 @@ subtest show => sub {
 
     @ARGV = ("$path/flatpak.yaml", 'sources');
     $data = capture_stdout(sub { Build::Flatpak::show() });
-    is $data, "phalanx-XXV-source.tgz\nstockfish-10-src.zip\ngnuchess-6.2.5.tar.gz\ngnome-chess-3.36.1.tar.xz\n", 'Build::Flatpak::show sources';
+    my $exp_sources = join '', map { "$_\n" } @sources;
+    is $data, $exp_sources, 'Build::Flatpak::show sources';
+};
+
+subtest rewrite => sub {
+    local @ARGV = ("$path/flatpak.yaml");
+    my $yaml = capture_stdout(sub { Build::Flatpak::rewrite() });
+    my $ok = is $yaml, $rewritten_manifest, 'Build::Flatpak::show rewrite';
+    unless ($ok) {
+        open my $fh, '>', "/tmp/flatpak.t.compare.yaml" or die $!;
+        print $fh $yaml;
+        close $fh;
+        my $diff = qx{diff $Bin/data/flatpak-rewritten.yaml /tmp/flatpak.t.compare.yaml};
+        diag "Diff:\n$diff";
+    }
+
 };
 
 done_testing;
@@ -85,7 +109,7 @@ __DATA__
             "sources": [
                 {
                     "type": "archive",
-                    "url": "file:///usr/src/packages/SOURCES/phalanx-XXV-source.tgz",
+                    "url": "https://example.org/phalanx-XXV-source.tgz",
                     "sha256": "b3874d5dcd22c64626b2c955b18b27bcba3aa727855361a91eab57a6324b22dd"
                 },
                 {
@@ -123,7 +147,7 @@ __DATA__
             "sources": [
                 {
                     "type": "archive",
-                    "url": "file:///usr/src/packages/SOURCES/stockfish-10-src.zip",
+                    "url": "https://example.org/stockfish-10-src.zip",
                     "sha256": "29bd01e7407098aa9e851b82f6ea4bf2b46d26e9075a48a269cb1e40c582a073"
                 }
             ]
@@ -133,7 +157,7 @@ __DATA__
             "sources": [
                 {
                     "type": "archive",
-                    "url": "file:///usr/src/packages/SOURCES/gnuchess-6.2.5.tar.gz",
+                    "url": "https://example.org/gnuchess-6.2.5.tar.gz",
                     "sha256": "9a99e963355706cab32099d140b698eda9de164ebce40a5420b1b9772dd04802"
                 }
             ]
@@ -144,7 +168,7 @@ __DATA__
             "sources": [
                 {
                     "type": "archive",
-                    "url": "file:///usr/src/packages/SOURCES/gnome-chess-3.36.1.tar.xz",
+                    "url": "https://example.org/gnome-chess-3.36.1.tar.xz",
                     "sha256": "b195c9f17a59d7fcc892ff55e6a6ebdd16e7329157bf37e3c2fe593b349aab98"
                 }
             ]

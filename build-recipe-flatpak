@@ -81,8 +81,12 @@ recipe_build_flatpak() {
     cp $BUILD_ROOT$TOPDIR/SOURCES/* .
 
     local FLATPAK_FILE="$TOPDIR/SOURCES/$RECIPEFILE"
+    local FLATPAK_FILE_LOCAL="$TOPDIR/SOURCES/flatpak-local.yaml"
     local FLATPAK_APP=$(perl -I$BUILD_DIR -MBuild::Flatpak -e 'Build::Flatpak::show' -- "$BUILD_ROOT$FLATPAK_FILE" name)
     local FLATPAK_APP_VERSION=$(perl -I$BUILD_DIR -MBuild::Flatpak -e 'Build::Flatpak::show' -- "$BUILD_ROOT$FLATPAK_FILE" version)
+    # Rewrite http urls to file urls
+    perl -I$BUILD_DIR -MBuild::Flatpak -e 'Build::Flatpak::rewrite' -- "$BUILD_ROOT$FLATPAK_FILE" > "$BUILD_ROOT$FLATPAK_FILE_LOCAL"
+    FLATPAK_FILE="$FLATPAK_FILE_LOCAL"
     FLATPAK_APP_VERSION="${FLATPAK_APP_VERSION:-0}"
     local FLATPAK_REPO=/tmp/flatpakrepo
     local FLATPAK_REMOTE=https://dl.flathub.org/repo/flathub.flatpakrepo
