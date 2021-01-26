@@ -252,31 +252,48 @@ recipe_check_file_owners() {
 }
 
 recipe_run_rpmlint() {
-    # SUSE builds are using a special rpmlint binary which is not
-    # pulling in additional dependencies
-    local rpmlint="/opt/testing/bin/rpmlint"
-    if ! test -x "$BUILD_ROOT$rpmlint" ; then
-        # default rpmlint place as fallback
-        rpmlint="/usr/bin/rpmlint"
-    fi
-    if ! test -x "$BUILD_ROOT$rpmlint" ; then
-	return
-    fi
-    LINT_RPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/RPMS \
-	\( -name "*-debuginfo-*" -o -name "*-debugsource-*" \
-	-o -name "*-32bit-*" -o -name "*-64bit-*" \
-	-o -name "*-x86-*" -o -name "*-ia32-*" \) -prune \
-	-o -type f -name '*.rpm' -print))
-    SRPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/SRPMS -type f -name "*.rpm"))
+    # SUSE builds should use rpmlint-image package which is a special
+    # package that installs rpmlint and its dependencies into /usr/lib/rpmlint-image
+    # folder. We should chroot into this folder.
+    local rpmlint="/usr/bin/rpmlint"
+    local rpmlint_chroot="$BUILD_ROOT/usr/lib/rpmlint-image"
+
+    ret=0
     echo 
     echo "RPMLINT report:"
-    echo "==============="
     rpmlint_logfile=$TOPDIR/OTHER/rpmlint.log
     rm -f "$BUILD_ROOT$rpmlint_logfile"
-    ret=0
-    chroot $BUILD_ROOT su -s $rpmlint "$BUILD_USER" -- \
-	    --info ${LINT_RPM_FILE_LIST[*]#$BUILD_ROOT} \
-	    ${SRPM_FILE_LIST[*]#$BUILD_ROOT} > >(tee "$BUILD_ROOT$rpmlint_logfile") 2>&1 || ret=1
+
+    if [ -d $rpmlint_chroot ] ; then
+      # copy all rpm files (and *rpmlintrc) into $rpmlint_chroot/RPM/
+      find $BUILD_ROOT/$TOPDIR/RPMS \
+        \( -name "*-debuginfo-*" -o -name "*-debugsource-*" \
+        -o -name "*-32bit-*" -o -name "*-64bit-*" \
+        -o -name "*-x86-*" -o -name "*-ia32-*" \) -prune \
+        -o -type f -name '*.rpm' -exec cp {} $BUILD_ROOT/RPM \;
+      find $BUILD_ROOT/$TOPDIR/SRPMS -type f -name "*.rpm" -exec cp {} $rpmlint_chroot/RPM \;
+      find $BUILD_ROOT/home/abuild/rpmbuild/SOURCES/ -name "*rpmlintrc" -exec cp {} $rpmlint_chroot/RPM \;
+      RPM_FILES=$(ls $rpmlint_chroot/RPM/*rpm | sed "s,$rpmlint_chroot,,")
+      RPMLINTRC_OPTION=$(ls $rpmlint_chroot/RPM | grep rpmlintrc | sed "s,$rpmlint_chroot,,")
+      if ! [ -z "$RPMLINTRC_OPTION" ] ; then
+          RPMLINTRC_OPTION="-r RPM/$RPMLINTRC_OPTION"
+      fi
+      chroot ${rpmlint_chroot} $rpmlint --verbose --permissive $RPMLINTRC_OPTION $RPM_FILES > >(tee "$BUILD_ROOT$rpmlint_logfile") --verbose 2>&1 || ret=1
+    else
+      if ! test -x "$BUILD_ROOT$rpmlint" ; then
+        return
+      fi
+      LINT_RPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/RPMS \
+        \( -name "*-debuginfo-*" -o -name "*-debugsource-*" \
+        -o -name "*-32bit-*" -o -name "*-64bit-*" \
+        -o -name "*-x86-*" -o -name "*-ia32-*" \) -prune \
+        -o -type f -name '*.rpm' -print))
+      SRPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/SRPMS -type f -name "*.rpm"))
+      chroot $BUILD_ROOT su -s $rpmlint "$BUILD_USER" -- \
+        --info ${LINT_RPM_FILE_LIST[*]#$BUILD_ROOT} \
+        ${SRPM_FILE_LIST[*]#$BUILD_ROOT} > >(tee "$BUILD_ROOT$rpmlint_logfile") 2>&1 || ret=1
+    fi
+
     echo
     if test "$ret" = 1 ; then 
 	cleanup_and_exit 1
