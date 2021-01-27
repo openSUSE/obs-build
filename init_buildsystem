@@ -173,6 +173,8 @@ cleanup_and_exit() {
     test "$BUILD_ROOT" = / -a -n "$browner" && chown "$browner" "$BUILD_ROOT"
     # umount so init_buildsystem can be used standalone
     umount_stuff
+    # never report a fatal error when the job got killed from outside
+    test "$1" = 4 -a -e "$BUILD_ROOT/exit" && exit 1
     exit $1
 }
 
