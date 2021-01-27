@@ -703,10 +703,10 @@ vm_setup_swap() {
     fi
     if test -n "$VM_SWAP" ; then
 	vm_attach_swap
-	dd if=/dev/zero of="$VM_SWAP" bs=1024 count=1 conv=notrunc 2>/dev/null
+	dd if=/dev/zero of="$VM_SWAP" bs=1024 count=1 conv=notrunc 2>/dev/null || cleanup_and_exit 4
 	if test "$VM_SWAPDEV" != "${VM_SWAPDEV#LABEL=}"; then
 	    # call mkswap to set a label
-	    mkswap -L "${VM_SWAPDEV#LABEL=}" "$VM_SWAP"
+	    mkswap -L "${VM_SWAPDEV#LABEL=}" "$VM_SWAP" || cleanup_and_exit 4
 	fi
 	vm_detach_swap
         # mkswap happens inside of the vm

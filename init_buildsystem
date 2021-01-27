@@ -562,10 +562,10 @@ fi
 #
 # store that we start to build the system
 #
-mkdir -p "$BUILD_ROOT"
-mkdir -p "$BUILD_ROOT/.build"
-mkdir -p "$BUILD_ROOT/proc"
-mkdir -p "$BUILD_ROOT/dev/pts"
+mkdir -p "$BUILD_ROOT" || cleanup_and_exit 4
+mkdir -p "$BUILD_ROOT/.build" || cleanup_and_exit 4
+mkdir -p "$BUILD_ROOT/proc" || cleanup_and_exit 4
+mkdir -p "$BUILD_ROOT/dev/pts" || cleanup_and_exit 4
 touch $BUILD_IS_RUNNING
 
 if test -n "$PREPARE_VM" ; then
