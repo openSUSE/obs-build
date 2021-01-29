@@ -24,7 +24,6 @@ use strict;
 use warnings;
 use Build::Deb;
 use Build::Rpm;
-use Data::Dumper;
 #use URI; # not installed in kvm?
 #use JSON::PP; # not installed in kvm?
 
@@ -132,7 +131,6 @@ sub parse {
   }
   $ret->{sources} = \@sources;
 
-#  warn __PACKAGE__.':'.__LINE__.$".Data::Dumper->Dump([\$ret], ['ret']);
   return $ret;
 }
 
