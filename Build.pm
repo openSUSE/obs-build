@@ -243,13 +243,9 @@ sub dist_canon($$) {
   return $dist;
 }
 
-sub read_config_dist {
-  my ($dist, $archpath, $configdir) = @_;
+sub find_config_file {
+  my ($dist, $configdir) = @_;
 
-  my $arch = $archpath;
-  $arch = 'noarch' unless defined $arch;
-  $arch =~ s/:.*//;
-  $arch = 'noarch' if $arch eq '';
   die("Please specify a distribution!\n") unless defined $dist;
   if ($dist !~ /\//) {
     my $saved = $dist;
@@ -268,6 +264,16 @@ sub read_config_dist {
     }
   }
   die("$dist: $!\n") unless -e $dist;
+  return $dist;
+}
+
+sub read_config_dist {
+  my ($dist, $archpath, $configdir) = @_;
+  $dist = find_config_file($dist, $configdir);
+  my $arch = $archpath;
+  $arch = 'noarch' unless defined $arch;
+  $arch =~ s/:.*//;
+  $arch = 'noarch' if $arch eq '';
   my $cf = read_config($arch, $dist);
   die("$dist: parse error\n") unless $cf;
   return $cf;
