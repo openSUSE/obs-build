@@ -807,7 +807,7 @@ vm_update_hostarch() {
 	local dummy
 	read newhostarch dummy < "$hostarchfile"
     elif test -n "$kernel" -a -f "$kernel" ; then
-	case `objdump -f "$kernel" | sed -ne 's/.*file format //p'` in
+	case `objdump -f "$kernel" 2>/dev/null | sed -ne 's/.*file format //p'` in
 	    elf64-powerpcle) newhostarch=ppc64le ;;
 	    elf64-powerpc) newhostarch=ppc64 ;;
 	esac
@@ -861,6 +861,9 @@ vm_first_stage() {
 	# umount later so step aside
 	cd "$SRCDIR"
     fi
+
+    # some time has passed copying files, lets make sure we should not exit
+    check_exit
 
     # do vm specific fixups
     vm_fixup
