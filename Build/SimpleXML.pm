@@ -145,6 +145,10 @@ sub unparse {
     my $de = $d->{$e};
     $de = [ $de ] unless ref($de) eq 'ARRAY';
     for my $se (@$de) {
+      if (ref($se) eq '') {
+	$r .= "$indent<$en>".unparse_escape($se)."</$en>$nl";
+	next;
+      }
       my @sk = unparse_keys($se);
       my @sa = grep {ref($se->{$_}) eq ''} @sk;
       my @se = grep {ref($se->{$_}) ne ''} @sk;
