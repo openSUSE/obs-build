@@ -1,0 +1,322 @@
+#!/usr/bin/perl
+################################################################
+#
+# Copyright (c) 2021 SUSE LLC
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+BEGIN {
+  unshift @INC, ($::ENV{'BUILD_DIR'} && ! -e '/etc/build.conf' ? $::ENV{'BUILD_DIR'} : '/usr/lib/build');
+}
+
+use Data::Dumper;
+use POSIX;
+
+use Build;
+use PBuild::Source;
+use PBuild::Recipe;
+use PBuild::RemoteRepo;
+use PBuild::LocalRepo;
+use PBuild::Multibuild;
+use PBuild::Link;
+use PBuild::Expand;
+use PBuild::Depsort;
+use PBuild::Checker;
+use PBuild::Options;
+use PBuild::Cando;
+use PBuild::BuildConfig;
+
+# parse options
+my ($opts, @dirs) = PBuild::Options::parse_options(@ARGV);
+die("Usage: pbuild [options] [dir]\n") if @dirs > 1;
+my $dir = @dirs ? $dirs[0] : '.';
+
+# set defaults
+my $libbuild = $INC[0];
+$opts->{'libbuild'} = $libbuild;
+$opts->{'root'} ||= '/var/tmp/build-root';
+$opts->{'configdir'} ||= "$libbuild/configs";
+if (!$opts->{'hostarch'}) {
+  $opts->{'hostarch'} = (POSIX::uname())[4];
+  die("cannot determine hostarch\n") unless $opts->{'hostarch'};
+  $opts->{'hostarch'} = 'armv6hl' if $opts->{'hostarch'} eq 'armv6l';
+  $opts->{'hostarch'} = 'armv7hl' if $opts->{'hostarch'} eq 'armv7l';
+}
+$opts->{'arch'} ||= $opts->{'hostarch'};
+$opts->{'buildjobs'} = 1 unless $opts->{'buildjobs'};
+$opts->{'buildjobs'} = 32 if $opts->{'buildjobs'} > 32;
+
+# make testing easier for now... remove if we have urls in the config
+$opts->{'repo'} ||= [ 'http://download.opensuse.org/distribution/leap/15.1/repo/oss/' ] if $opts->{'dist'} && $opts->{'dist'} eq 'sl15.1';
+
+# setup builders
+my @builders;
+for my $no (1..$opts->{'buildjobs'}) {
+  my $broot = $opts->{'root'};
+  if ($opts->{'buildjobs'} > 1) {
+    $broot .= '/%I' if $broot !~ /%I/;
+    $broot =~ s/%I/$no/g;
+  }
+  push @builders, {
+    'name' => $no,
+    'root' => $broot,
+    'idx' => scalar(@builders),
+    'nbuilders' => $opts->{'buildjobs'},
+  };
+}
+
+my $myarch = $opts->{'arch'};
+
+my $baseconfigfile;
+$baseconfigfile = Build::find_config_file($opts->{'dist'}, $opts->{'configdir'}) if $opts->{'dist'};
+my $baseconfig = $baseconfigfile ? PBuild::Util::readstr($baseconfigfile) : '';
+my $buildconfig = -s "$dir/_config" ? PBuild::Util::readstr("$dir/_config") : '';
+$buildconfig = PBuild::BuildConfig::combineconfigs($baseconfig, $buildconfig);
+die("Please specify a distribution\n") unless $buildconfig;
+
+my $bconf = Build::read_config($myarch, [ split("\n", $buildconfig) ]);
+my $reponame = "_build.$myarch";
+my $builddir = "$dir/$reponame";
+$buildtype = $bconf->{'type'} || '';
+$buildtype = 'spec' if !$buildtype || $buildtype eq 'UNDEFINED';
+
+print "searching for packages\n";
+my @pkgs = PBuild::Source::find_packages($dir);
+die("no packages found in '$dir'\n") unless @pkgs;
+my $npkgs = @pkgs;
+print "found $npkgs packages\n";
+
+print "getting package information\n";
+my %pkgsrc;
+for my $pkg (@pkgs) {
+  my $files = PBuild::Source::list_package("$dir/$pkg");
+  $pkgsrc{$pkg} = {
+    'pkg' => $pkg,
+    'dir' => "$dir/$pkg",
+    'files' => $files,
+    'srcmd5' => PBuild::Source::calc_srcmd5($files),
+  };
+}
+
+print "expanding package links\n";
+PBuild::Link::expand_links(\%pkgsrc);
+
+print "expanding multibuild packages\n";
+PBuild::Multibuild::expand_multibuilds(\%pkgsrc);
+
+@pkgs = sort keys %pkgsrc;
+
+print "parsing recipe files\n";
+for my $pkg (@pkgs) {
+  my $p = $pkgsrc{$pkg};
+  PBuild::Recipe::parse($bconf, $p, $buildtype, $myarch);
+}
+
+#FIXME
+for my $pkg (@pkgs) {
+  my $p = $pkgsrc{$pkg};
+  $p->{'useforbuildenabled'} = 1;
+}
+
+my @repos;
+print "fetching local repo metadata\n";
+my $localbins = PBuild::LocalRepo::fetchrepo($bconf, $myarch, $builddir, \%pkgsrc);
+push @repos, { 'dir' => $builddir, 'bins' => $localbins };
+
+print "fetching remote repo metadata\n";
+for my $repourl (@{$opts->{'repo'}}) {
+  my $repodir = "$builddir/.pbuild/_base/".Digest::MD5::md5_hex($repourl);
+  my $repobins = PBuild::RemoteRepo::fetchrepo($bconf, $myarch, $repodir, $repourl, $buildtype);
+  push @repos, { 'dir' => $repodir, 'bins' => $repobins, 'url' => $repourl };
+}
+
+# load lastcheck cache
+my %lastcheck;
+if (-s "$builddir/.pbuild/_lastcheck") {
+  my $oldlastcheck = PBuild::Util::retrieve("$builddir/.pbuild/_lastcheck", 1) || {};
+  for my $pkg (@pkgs) {
+    my $old = $oldlastcheck->{$pkg};
+    $lastcheck{$pkg} = $old if $old && length($old) > 96;
+  }
+}
+
+# create our package checker
+my $ctx = PBuild::Checker::create($bconf, $myarch, $buildtype, \%pkgsrc, $builddir, $opts);
+print "preparing package pool\n";
+PBuild::Checker::prepare($ctx, \@repos);
+print "expanding dependencies\n";
+PBuild::Checker::pkgexpand($ctx, @pkgs);
+print "sorting packages\n";
+@pkgs = PBuild::Checker::pkgsort($ctx, @pkgs);
+
+# the big loop: while there is something to do
+while (1) {
+
+  if (!$ctx) {
+    $ctx = PBuild::Checker::create($bconf, $myarch, $buildtype, \%pkgsrc, $builddir, $opts);
+    print "preparing package pool\n";
+    PBuild::Checker::prepare($ctx, \@repos);
+    print "expanding dependencies\n";
+    PBuild::Checker::pkgexpand($ctx, @pkgs);
+    print "sorting packages\n";
+    @pkgs = PBuild::Checker::pkgsort($ctx, @pkgs);
+  }
+
+  my @cpacks = @pkgs;
+  my %packstatus;
+  my %packerror;
+
+  $ctx->{'notready'} = {};	# building or blocked
+  $ctx->{'building'} = {};	# building
+  $ctx->{'lastcheck'} = \%lastcheck;
+  $ctx->{'nharder'} = 0;
+  $ctx->{'buildconfig'} = $buildconfig;
+  $ctx->{'builders'} = \@builders;
+
+  my %cycpass;
+  my $cychash = $ctx->{'cychash'};
+
+  $ctx->{'building'}->{$_->{'job'}->{'pdata'}->{'pkg'}} = $_->{'job'} for grep {$_->{'job'}} @builders;
+
+  # now check every package
+  while (@cpacks) {
+    my $packid = shift @cpacks;
+
+    # cycle handling code
+    my $incycle = 0; 
+    if ($cychash->{$packid}) {
+      ($packid, $incycle) = PBuild::Checker::handlecycle($ctx, $packid, \@cpacks, \%cycpass, \%packstatus);
+      next unless $incycle;
+    }
+    my $p = $pkgsrc{$packid};
+    if ($p->{'error'}) {
+      if ($p->{'error'} =~ /^(excluded|disabled|locked)(?::(.*))?$/) {
+	$packstatus{$packid} = $1;
+	$packerror{$packid} = $2 if $2;
+	next;
+      }
+      $packstatus{$packid} = 'broken';
+      $packerror{$packid} = $p->{'error'};
+      next;
+    }
+    if ($p->{'dep_experror'}) {
+      $packstatus{$packid} = 'unresolvable';
+      $packerror{$packid} = $p->{'dep_experror'};
+      next;
+    }
+
+    if ($ctx->{'building'}->{$packid}) {
+      my $job = $ctx->{'building'}->{$packid};
+      $packstatus{$packid} = 'building';
+      $packerror{$packid} = "on builder $job->{'name'}" if $job->{'nbuilders'} > 1;
+      $ctx->{'notready'}->{$p->{'name'} || $p->{'pkg'}} = 1 if $p->{'useforbuildenabled'};
+      next;
+    }
+
+    my ($status, $error) = PBuild::Checker::check($ctx, $packid, $incycle);
+    #printf("%s -> %s%s", $packid, $status, $error && $status ne 'scheduled' ? " ($error)" : '');
+    if ($status eq 'scheduled') {
+      my $builder;
+      for (@builders) {
+	next if $_->{'job'};
+	$builder = $_;
+	last;
+      }
+      if (!$builder) {
+        $packstatus{$packid} = 'blocked';
+        $packerror{$packid} = 'waiting for free builder';
+	next;
+      }
+      ($status, $error) = PBuild::Checker::build($ctx, $packid, $error, $builder);
+      if ($status eq 'building') {
+	my $job = $error;
+	$error = undef;
+	$error = "on builder $job->{'name'}" if $job->{'nbuilders'} > 1;
+        my $bid = ($builder->{'nbuilders'} || 1) > 1 ? "$builder->{'name'}: " : '';
+        print "${bid}building $p->{'pkg'}/$p->{'recipe'}\n";
+        $ctx->{'building'}->{$packid} = $builder->{'job'};
+      }
+      #printf("%s -> %s%s", $packid, $status, $error ? " ($error)" : '');
+    } elsif ($status eq 'done') {
+      # map done to succeeded/failed
+      if (-e "$builddir/$packid/_meta.fail") {
+	$status = 'failed';
+      } else {
+	$status = 'succeeded';
+      }
+    }
+    if ($status eq 'blocked' || $status eq 'building') {
+      $ctx->{'notready'}->{$p->{'name'} || $p->{'pkg'}} = 1 if $p->{'useforbuildenabled'};
+    }
+    $packstatus{$packid} = $status;
+    $packerror{$packid} = $error if defined $error;
+  }
+
+  # all packages are checked, update on-disk data
+  PBuild::Util::mkdir_p("$builddir/.pbuild");
+  my %result;
+  for my $packid (sort keys %packstatus) {
+    my $r = { 'code' => $packstatus{$packid} };
+    $r->{'details'} = $packerror{$packid} if defined $packerror{$packid};
+    $result{$packid} = $r;
+  }
+  PBuild::Util::store("$builddir/.pbuild/._result.$$", "$builddir/.pbuild/_result", \%result);
+  PBuild::Util::store("$builddir/.pbuild/._lastcheck.$$", "$builddir/.pbuild/_lastcheck", \%lastcheck);
+
+  # get list of building jobs
+  my @building = map {$_->{'job'}} grep {$_->{'job'}} @builders;
+  last unless @building;
+
+  # wait for one job to finish
+  my $job = PBuild::Job::waitjob(@building);
+  for (@builders) {
+    delete $_->{'job'} if $_->{'job'} && $_->{'job'} == $job;
+  }
+  # process finished job
+  my ($code, $result) = PBuild::Job::finishjob($job);
+  my $p = $job->{'pdata'};
+  my $duration = $job->{'endtime'} - $job->{'starttime'};
+  $duration = sprintf("%d:%02d", int($duration / 60), $duration % 60);
+  my $bid = ($job->{'nbuilders'} || 1) > 1 ? "$job->{'name'}: " : '';
+  print "${bid}finished $p->{'pkg'}/$p->{'recipe'} after ${duration}s: $code\n";
+
+  my $jobhist = PBuild::BuildResult::makejobhist($p, $code, $job->{'readytime'}, $job->{'starttime'}, $job->{'endtime'}, $job->{'reason'}, $job->{'hostarch'});
+  PBuild::BuildResult::addjobhist($builddir, $jobhist);
+
+  # integrate build artifacts and extra files
+  my $bininfo = PBuild::BuildResult::integrate_job($builddir, $job, $code, $result);
+
+  # if the build was successful, update artifact information and the local repo
+  if ($bininfo) {
+    PBuild::LocalRepo::update_gbininfo($ctx->{'builddir'}, $p->{'pkg'}, $bininfo);
+    if ($p->{'useforbuildenabled'}) {
+      # update with new local bin information
+      my $localbins = PBuild::LocalRepo::fetchrepo($bconf, $myarch, $builddir, \%pkgsrc);
+      $repos[0]->{'bins'} = $localbins;
+      # we also need a new checker
+      undef $ctx;
+      $ctx = PBuild::Checker::create($bconf, $myarch, $buildtype, \%pkgsrc, $builddir, $opts);
+      PBuild::Checker::prepare($ctx, \@repos);
+      PBuild::Checker::pkgexpand($ctx, @pkgs);
+      @pkgs = PBuild::Checker::pkgsort($ctx, @pkgs);
+    }
+  }
+}
+
+print "done\n";
+
+

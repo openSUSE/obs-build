@@ -31,11 +31,13 @@ install:
 	    $(DESTDIR)$(pkglibdir)/configs \
 	    $(DESTDIR)$(pkglibdir)/baselibs_configs \
 	    $(DESTDIR)$(pkglibdir)/Build \
+	    $(DESTDIR)$(pkglibdir)/PBuild \
 	    $(DESTDIR)$(pkglibdir)/emulator \
 	    $(DESTDIR)$(bindir) \
 	    $(DESTDIR)$(man1dir)
 	install -m755 \
 	    build \
+	    pbuild \
 	    vc \
 	    createdirdeps \
 	    order \
@@ -86,6 +88,7 @@ install:
 	    $(DESTDIR)$(pkglibdir)
 	install -m755 emulator/emulator.sh $(DESTDIR)$(pkglibdir)/emulator/
 	install -m644 Build/*.pm $(DESTDIR)$(pkglibdir)/Build
+	install -m644 PBuild/*.pm $(DESTDIR)$(pkglibdir)/PBuild
 	install -m644 build-vm build-vm-* $(DESTDIR)$(pkglibdir)
 	install -m644 build-recipe build-recipe-* $(DESTDIR)$(pkglibdir)
 	install -m644 build-pkg build-pkg-* $(DESTDIR)$(pkglibdir)
