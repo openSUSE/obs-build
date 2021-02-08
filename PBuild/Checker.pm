@@ -77,8 +77,12 @@ sub prepare {
 
 sub pkgexpand {
   my ($ctx, @pkgs) = @_;
-  my $pkgsrc = $ctx->{'pkgsrc'};
   my $bconf = $ctx->{'bconf'};
+  if ($bconf->{'expandflags:preinstallexpand'}) {
+    my $err = Build::expandpreinstalls($bconf);
+    die("cannot expand preinstalls: $err\n") if $err;
+  }
+  my $pkgsrc = $ctx->{'pkgsrc'};
   my $subpacks = $ctx->{'subpacks'};
   for my $pkg (@pkgs) {
     PBuild::Expand::expand_deps($pkgsrc->{$pkg}, $bconf, $subpacks);
@@ -116,6 +120,21 @@ sub pkgsort {
 
 sub genmeta {
   my ($ctx, $p, $edeps, $repodata) = @_;
+  if ($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker' || $p->{'buildtype'} eq 'preinstallimage') {
+    if ($p->{'buildtype'} eq 'preinstallimage') {
+      my @pdeps = Build::get_preinstalls($ctx->{'bconf'});
+      my @vmdeps = Build::get_vminstalls($ctx->{'bconf'});
+      $edeps = [ PBuild::Util::unify(@$edeps, @pdeps, @vmdeps) ];
+    }
+    my @new_meta;
+    for my $bin (@$edeps) {
+      my $q = $repodata->{$bin};
+      push @new_meta, (($q || {})->{'hdrmd5'} || 'd0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0')."  $bin";
+    }
+    @new_meta = sort {substr($a, 34) cmp substr($b, 34) || $a cmp $b} @new_meta;
+    unshift @new_meta, ($p->{'verifymd5'} || $p->{'srcmd5'})."  $p->{'pkg'}";
+    return \@new_meta;
+  }
   my $metacache = $ctx->{'metacache'};
   my @new_meta;
   my $builddir = $ctx->{'builddir'};
@@ -144,11 +163,50 @@ sub genmeta {
   return \@new_meta;
 }
 
+sub check_image {
+  my ($ctx, $packid) = @_;
+  my $bconf = $ctx->{'bconf'};
+  my $p = $ctx->{'pkgsrc'}->{$packid};
+  my $edeps = $p->{'dep_expanded'} || [];
+  my $notready = $ctx->{'notready'};
+  my $dep2src = $ctx->{'dep2src'};
+  my @blocked = grep {$notready->{$dep2src->{$_}}} @$edeps;
+  @blocked = () if $ctx->{'block'} && $ctx->{'block'} eq 'never';
+  if (@blocked) {
+    splice(@blocked, 10, scalar(@blocked), '...') if @blocked > 10;
+    return ('blocked', join(', ', @blocked));
+  }
+  my $new_meta = genmeta($ctx, $p, $edeps, $ctx->{'repodata'});
+  my $dst = "$ctx->{'builddir'}/$packid";
+  my @meta;
+  my $mfp;
+  if (open($mfp, '<', "$dst/_meta")) {
+    @meta = <$mfp>;
+    close $mfp;
+    chomp @meta;
+  }
+  return ('scheduled', [ { 'explain' => 'new build' } ]) if !@meta;
+  return ('scheduled', [ { 'explain' => 'source change', 'oldsource' => substr($meta[0], 0, 32) } ]) if $meta[0] ne $new_meta->[0];
+  my $rebuildmethod = $ctx->{'rebuild'} || 'transitive';
+  if ($rebuildmethod eq 'local') {
+    return ('scheduled', [ { 'explain' => 'rebuild counter sync' } ]) if $ctx->{'relsynctrigger'}->{$packid};
+    return ('done');
+  }
+  if (@meta == @$new_meta && join('\n', @meta) eq join('\n', @$new_meta)) {
+    return ('scheduled', [ { 'explain' => 'rebuild counter sync' } ]) if $ctx->{'relsynctrigger'}->{$packid};
+    return ('done');
+  }
+  my @diff = PBuild::Meta::diffsortedmd5(\@meta, $new_meta);
+  my $reason = PBuild::Meta::sortedmd5toreason(@diff);
+  return ('scheduled', [ { 'explain' => 'meta change', 'packagechange' => $reason } ] );
+}
+
 sub check {
   my ($ctx, $packid, $incycle) = @_;
 
   my $p = $ctx->{'pkgsrc'}->{$packid};
   my $buildtype = $p->{'buildtype'};
+  return check_image($ctx, $packid) if $buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'preinstallimage';
 
   my $notready = $ctx->{'notready'};
   my $dep2src = $ctx->{'dep2src'};
@@ -393,7 +451,7 @@ sub build {
       push @bdeps, @{$bconf->{'substitute'}->{'build-packages:ccache'} || [ 'ccache' ] };
     }
   }
-  if ($kiwimode || $buildtype eq 'buildenv') {
+  if ($kiwimode || $buildtype eq 'buildenv' || $buildtype eq 'preinstallimage') {
     @bdeps = (1, @$edeps);      # reuse edeps packages, no need to expand again
   } else {
     @bdeps = Build::get_build($bconf, $ctx->{'subpacks'}->{$p->{'name'}}, @bdeps);
@@ -413,7 +471,7 @@ sub build {
   }
   getremotebinaries($ctx, @pdeps, @vmdeps, @sysdeps, @bdeps);
   my $readytime = time();
-  my $job = PBuild::Job::createjob($ctx, $builder->{'name'}, $builder->{'nbuilders'}, $builder->{'root'}, $p, \@bdeps, \@pdeps, \@vmdeps, $edeps, \@sysdeps, $nounchanged);
+  my $job = PBuild::Job::createjob($ctx, $builder->{'name'}, $builder->{'nbuilders'}, $builder->{'root'}, $p, \@bdeps, \@pdeps, \@vmdeps, \@sysdeps, $nounchanged);
   $job->{'readytime'} = $readytime;
   $job->{'reason'} = $reason;
   $job->{'hostarch'} = $ctx->{'hostarch'};

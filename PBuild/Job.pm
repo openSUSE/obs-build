@@ -146,7 +146,7 @@ sub collect_result {
 # Create a new build job
 #
 sub createjob {
-  my ($ctx, $jobname, $nbuilders, $buildroot, $p, $bdeps, $pdeps, $vmdeps, $edeps, $sysdeps, $nounchanged) = @_;
+  my ($ctx, $jobname, $nbuilders, $buildroot, $p, $bdeps, $pdeps, $vmdeps, $sysdeps, $nounchanged) = @_;
   my $opts = $ctx->{'opts'};
   my $hostarch = $opts->{'hostarch'};
 
@@ -161,11 +161,14 @@ sub createjob {
   my %bdeps = map {$_ => 1} @$bdeps;
   my %pdeps = map {$_ => 1} @$pdeps;
   my %vmdeps = map {$_ => 1} @$vmdeps;
-  my %edeps = map {$_ => 1} @$edeps;
   my %sysdeps = map {$_ => 1} @$sysdeps;
 
-  my @alldeps = PBuild::Util::unify(@$pdeps, @$vmdeps, @$edeps, @$bdeps, @$sysdeps);
-
+  my @alldeps;
+  if ($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker') {
+    @alldeps = PBuild::Util::unify(@$pdeps, @$vmdeps, @$sysdeps);
+  } else {
+    @alldeps = PBuild::Util::unify(@$pdeps, @$vmdeps, @$bdeps, @$sysdeps);
+  }
   my @rpmlist;
   my $repodata = $ctx->{'repodata'};
   for my $bin (@alldeps) {
@@ -173,7 +176,6 @@ sub createjob {
     die("missing package $bin\n") unless $q && $q->{'filename'};
     my $repono = $q->{'repono'};
     my $repo = $ctx->{'repos'}->[$repono || 0];
-    print Dumper($q) unless defined($repono) && $repo;
     die("bad package $bin\n") unless defined($repono) && $repo;
     if ($q->{'packid'}) {
       push @rpmlist, "$bin $repo->{'dir'}/$q->{'packid'}/$q->{'filename'}";
@@ -184,7 +186,10 @@ sub createjob {
   push @rpmlist, "preinstall: ".join(' ', @$pdeps);
   push @rpmlist, "vminstall: ".join(' ', @$vmdeps);
   push @rpmlist, "runscripts: ".join(' ', grep {$runscripts{$_}} (@$pdeps, @$vmdeps));
-  # FIXME noinstall/installonly
+  if (@$sysdeps && $p->{'buildtype'} ne 'kiwi' && $p->{'buildtype'} ne 'docker') {
+    push @rpmlist, "noinstall: ".join(' ', grep {!($sysdeps{$_} || $vmdeps{$_} || $pdeps{$_})} @$bdeps);
+    push @rpmlist, "installonly: ".join(' ', grep {!$bdeps{$_}} @$sysdeps);
+  }
   PBuild::Util::mkdir_p($buildroot);
   PBuild::Util::writestr("$buildroot/.build.rpmlist", undef, join("\n", @rpmlist)."\n");
   PBuild::Util::writestr("$buildroot/.build.config", undef, $ctx->{'buildconfig'});
@@ -259,6 +264,36 @@ sub createjob {
   push @args, "--buildflavor=$p->{'flavor'}" if $p->{'flavor'};
   push @args, "--obspackage=".($p->{'originpackage'} || $p->{'pkg'}) if $needobspackage;
   push @args, "$p->{'dir'}/$p->{'recipe'}";
+
+  if ($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker') {
+    # for kiwi/docker we need to copy the sources to $buildroot/.build-srcdir
+    # so that we can set up a "repos" directory
+    my $kiwisrcdir = "$buildroot/.build-srcdir";
+    PBuild::Util::mkdir_p($kiwisrcdir);
+    PBuild::Util::cleandir($kiwisrcdir);
+    PBuild::Util::cp("$p->{'dir'}/$_", "$kiwisrcdir/$_") for sort keys %{$p->{'files'}};
+    $args[-1] = "$kiwisrcdir/$p->{'recipe'}";
+    # copy binaries
+    PBuild::Util::mkdir_p("$kiwisrcdir/repos/pbuild/pbuild");
+    for my $bin (@$bdeps) {
+      my $q = $repodata->{$bin};
+      die("missing package $bin\n") unless $q && $q->{'filename'};
+      my $repono = $q->{'repono'};
+      my $repo = $ctx->{'repos'}->[$repono || 0];
+      die("bad package $bin\n") unless defined($repono) && $repo;
+      my $from = "$repo->{'dir'}/$q->{'filename'}";
+      $from = "$repo->{'dir'}/$q->{'packid'}/$q->{'filename'}" if $q->{'packid'};
+      PBuild::Util::cp($from, "$kiwisrcdir/repos/pbuild/pbuild/$q->{'filename'}");
+    }
+  }
+  if ($p->{'buildtype'} eq 'kiwi') {
+    my @kiwiargs;
+    push @kiwiargs, '--ignore-repos';
+    push @kiwiargs, '--add-repo', 'dir://./repos/pbuild/pbuild';
+    push @kiwiargs, '--add-repotype', 'rpm-md';
+    push @kiwiargs, '--add-repoprio', '1';
+    push @args, map {"--kiwi-parameter=$_"} @kiwiargs;
+  }
 
   unlink("$buildroot/.build.log");
   #print "building $p->{'pkg'}/$p->{'recipe'}\n";

@@ -82,12 +82,36 @@ sub expand_deps {
   delete $p->{'dep_experror'};
   return unless $p->{'name'};
   my @deps = @{$p->{'dep'} || []};
-  if ($p->{'genbuildreqs'}) {
-    push @deps, @{$p->{'genbuildreqs'}};
+  if ($buildtype eq 'kiwi' || $buildtype eq 'docker') {
+    if ($p->{'error'}) {
+      $p->{'dep_expanded'} = [];
+      return;
+    }
+    my ($ok, @edeps) = Build::get_build($bconf, [], @deps, '--ignoreignore--');
+    if (!$ok) {
+      delete $p->{'dep_expanded'};
+      $p->{'dep_experror'} = join(', ', @edeps);
+    } else {
+      $p->{'dep_expanded'} = \@edeps;
+    }
+    return;
   }
-  if ($buildtype eq 'kiwi' || $buildtype eq 'aggregate' || $buildtype eq 'docker' || $buildtype eq 'patchinfo') {
+  if ($buildtype eq 'preinstallimage') {
+    my ($ok, @edeps) = Build::get_build($bconf, [], @deps);
+    if (!$ok) {
+      delete $p->{'dep_expanded'};
+      $p->{'dep_experror'} = join(', ', @edeps);
+    } else {
+      $p->{'dep_expanded'} = \@edeps;
+    }
+    return;
+  }
+  if ($buildtype eq 'aggregate' || $buildtype eq 'patchinfo') {
     $p->{'dep_expanded'} = \@deps;
     return;
+  }
+  if ($p->{'genbuildreqs'}) {
+    push @deps, @{$p->{'genbuildreqs'}};
   }
   my ($ok, @edeps) = Build::get_deps($bconf, $subpacks->{$p->{'name'}}, @deps);
   if (!$ok) {

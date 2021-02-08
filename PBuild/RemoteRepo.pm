@@ -205,7 +205,6 @@ sub replace_with_local {
 	$bad = 1;
 	next;
       }
-      my @s = stat("$repodir/$file");
       $files{$file} = 2;
       next;
     }
@@ -286,7 +285,7 @@ sub querybinary {
   my $data;
   my $leadsigmd5;
   die("$dir/$file: no hdrmd5\n") unless Build::queryhdrmd5("$dir/$file", \$leadsigmd5);
-  $data = Build::query("$dir/$file", 'evra' => 1, 'conflicts' => 1, 'weakdeps' => 1, 'addselfprovides' => 1);
+  $data = Build::query("$dir/$file", 'evra' => 1, 'conflicts' => 1, 'weakdeps' => 1, 'addselfprovides' => 1, 'filedeps' => 1);
   die("$dir/$file: query failed\n") unless $data;
   PBuild::Verify::verify_nevraquery($data);
   $data->{'leadsigmd5'} = $leadsigmd5 if $leadsigmd5;
