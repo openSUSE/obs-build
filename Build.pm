@@ -1365,6 +1365,8 @@ sub expand {
 	  my $ri = (split(/[ <=>]/, $r, 2))[0];
 	  next if $ignore->{"$p:$ri"} || $xignore->{"$p:$ri"};
 	  next if $ignore->{$ri} || $xignore->{$ri};
+	  next if $ri =~ /^rpmlib\("/;
+	  next if $ri =~ /^\// && !@{$whatprovides->{$ri} || []};
 	  push @todo, ($r, $p);
 	}
 	if (!$ignoreconflicts) {
@@ -1414,7 +1416,7 @@ sub expand {
 	}
 
 	if (!@q) {
-	  next if $r =~ /^\// && defined($p);
+	  next if defined($p) && ($r =~ /^\// || $r =~ /^rpmlib\(/);
 	  push @error, "nothing provides $r$pn";
 	  next;
 	}
