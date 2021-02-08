@@ -1149,6 +1149,9 @@ sub query {
   if ($opts{'alldeps'}) {
     $data->{'provides'} = [ @{$res{'PROVIDENAME'} || []} ];
     $data->{'requires'} = [ @{$res{'REQUIRENAME'} || []} ];
+  } elsif ($opts{'filedeps'}) {
+    $data->{'provides'} = [ grep {!/^rpmlib\(/} @{$res{'PROVIDENAME'} || []} ];
+    $data->{'requires'} = [ grep {!/^rpmlib\(/} @{$res{'REQUIRENAME'} || []} ];
   } else {
     $data->{'provides'} = [ grep {!/^rpmlib\(/ && !/^\//} @{$res{'PROVIDENAME'} || []} ];
     $data->{'requires'} = [ grep {!/^rpmlib\(/ && !/^\//} @{$res{'REQUIRENAME'} || []} ];
