@@ -39,6 +39,7 @@ my %known_options = (
   'configdir' => 'configdir:',
   'repo' => 'repo::',
   'repository' => 'repo::',
+  'registry' => 'registry::',
   'vm-emulator-script' => 'vm-emulator-script:',
   'emulator-script' => 'vm-emulator-script:',
   'xen' => \&vm_type_special_optarg,

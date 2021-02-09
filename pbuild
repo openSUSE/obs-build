@@ -30,6 +30,7 @@ use Build;
 use PBuild::Source;
 use PBuild::Recipe;
 use PBuild::RemoteRepo;
+use PBuild::RemoteRegistry;
 use PBuild::LocalRepo;
 use PBuild::Multibuild;
 use PBuild::Link;
@@ -62,6 +63,7 @@ $opts->{'buildjobs'} = 32 if $opts->{'buildjobs'} > 32;
 
 # make testing easier for now... remove if we have urls in the config
 $opts->{'repo'} ||= [ 'http://download.opensuse.org/distribution/leap/15.1/repo/oss/' ] if $opts->{'dist'} && $opts->{'dist'} eq 'sl15.1';
+$opts->{'repo'} ||= [ 'http://download.opensuse.org/distribution/leap/15.2/repo/oss/' ] if $opts->{'dist'} && $opts->{'dist'} eq 'sl15.2';
 
 # setup builders
 my @builders;
@@ -119,11 +121,17 @@ print "expanding multibuild packages\n";
 PBuild::Multibuild::expand_multibuilds(\%pkgsrc);
 
 @pkgs = sort keys %pkgsrc;
+my %containertags;
 
 print "parsing recipe files\n";
 for my $pkg (@pkgs) {
   my $p = $pkgsrc{$pkg};
   PBuild::Recipe::parse($bconf, $p, $buildtype, $myarch);
+  if (($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker') && !$p->{'error'}) {
+    my @containerdeps = grep {/^container:/} @{$p->{'dep'} || []};
+    next unless @containerdeps;
+    $containertags{substr($_, 10)} = 1 for @containerdeps;
+  }
 }
 
 #FIXME
@@ -141,7 +149,18 @@ print "fetching remote repo metadata\n";
 for my $repourl (@{$opts->{'repo'}}) {
   my $repodir = "$builddir/.pbuild/_base/".Digest::MD5::md5_hex($repourl);
   my $repobins = PBuild::RemoteRepo::fetchrepo($bconf, $myarch, $repodir, $repourl, $buildtype);
-  push @repos, { 'dir' => $repodir, 'bins' => $repobins, 'url' => $repourl };
+  push @repos, { 'dir' => $repodir, 'bins' => $repobins, 'url' => $repourl, 'type' => 'repo' };
+}
+
+if (@{$opts->{'registry'} || []} && %containertags) {
+  print "fetching remote registry metadata\n";
+  for my $registry (@{$opts->{'registry'} || []}) {
+    my $repourl = $registry;
+    $repourl = "https://$repourl" unless $repourl =~ /^[^\/]+\/\//;
+    my $repodir = "$builddir/.pbuild/_base/".Digest::MD5::md5_hex("registry:$repourl");
+    my $repobins = PBuild::RemoteRegistry::fetchrepo($bconf, $myarch, $repodir, $repourl, [ sort keys %containertags ]);
+    push @repos, { 'dir' => $repodir, 'bins' => $repobins, 'url' => $repourl, 'type' => 'registry' };
+  }
 }
 
 # load lastcheck cache

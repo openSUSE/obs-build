@@ -74,6 +74,13 @@ sub verify_packid {
   die("packid '$packid' is illegal\n") unless $packid;
 }
 
+sub verify_digest {
+  my $digest = $_[0];
+  die("digest is empty\n") unless defined($digest) && $digest ne '';
+  die("digest '$digest' is illegal\n") unless $digest =~ /^(?:[a-zA-Z0-9]+:)?[a-fA-F0-9]+$/s;
+}
+
+
 sub verify_multibuild {
   my ($mb) = @_;
   die("multibuild is weird\n") unless ref($mb) eq 'HASH';

@@ -26,6 +26,8 @@ use Data::Dumper;
 use Time::HiRes ();
 
 use PBuild::Cando;
+use PBuild::RemoteRegistry;
+use PBuild::Verify;
 
 sub forkjob {
   my ($args) = @_;
@@ -273,14 +275,23 @@ sub createjob {
     PBuild::Util::cleandir($kiwisrcdir);
     PBuild::Util::cp("$p->{'dir'}/$_", "$kiwisrcdir/$_") for sort keys %{$p->{'files'}};
     $args[-1] = "$kiwisrcdir/$p->{'recipe'}";
-    # copy binaries
+    # copy binaries and containers
     PBuild::Util::mkdir_p("$kiwisrcdir/repos/pbuild/pbuild");
     for my $bin (@$bdeps) {
       my $q = $repodata->{$bin};
-      die("missing package $bin\n") unless $q && $q->{'filename'};
       my $repono = $q->{'repono'};
       my $repo = $ctx->{'repos'}->[$repono || 0];
       die("bad package $bin\n") unless defined($repono) && $repo;
+      if ($repo->{'type'} eq 'registry') {
+	my $containerfile = "$q->{'name'}.tar";
+	$containerfile =~ s/^container://;
+	$containerfile =~ s/[\/:]/_/g;
+	PBuild::Verify::verify_filename($containerfile);
+	PBuild::Util::mkdir_p("$kiwisrcdir/containers");
+	PBuild::RemoteRegistry::construct_containertar($repo->{'dir'}, $q, "$kiwisrcdir/containers/$containerfile");
+	next;
+      }
+      die("missing package $bin\n") unless $q && $q->{'filename'};
       my $from = "$repo->{'dir'}/$q->{'filename'}";
       $from = "$repo->{'dir'}/$q->{'packid'}/$q->{'filename'}" if $q->{'packid'};
       PBuild::Util::cp($from, "$kiwisrcdir/repos/pbuild/pbuild/$q->{'filename'}");

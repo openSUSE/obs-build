@@ -23,6 +23,8 @@ package PBuild::Recipe;
 use strict;
 use Build;
 
+$Build::Kiwi::urlmapper = 0;	# disable url -> prp mapping
+
 sub find_recipe {
   my ($p, $type) = @_;
   my %files = map {$_ => $_} keys %{$p->{'files'} || {}};
@@ -114,12 +116,6 @@ sub parse {
   if ($bt eq 'kiwi' && $imagetype eq 'product') {
     $p->{'error'} = 'cannot build kiwi products yet';
     return;
-  }
-  if ($bt eq 'kiwi') {
-    for (@{$p->{'path'} || []}) {
-      next if $_->{'project'} eq '_obsrepositories';
-      $p->{'error'} = 'only obsrepositories:/ repositories supported for now';
-    }
   }
 }
 

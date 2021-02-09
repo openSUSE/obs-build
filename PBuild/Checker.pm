@@ -28,6 +28,8 @@ use PBuild::Meta;
 use PBuild::Util;
 use PBuild::Job;
 use PBuild::LocalRepo;
+use PBuild::RemoteRepo;
+use PBuild::RemoteRegistry;
 
 #
 # Create a checker
@@ -345,16 +347,20 @@ sub getremotebinaries {
   my %tofetch;
   my $repodata = $ctx->{'repodata'};
   for my $bin (PBuild::Util::unify(@bins)) {
-    my $p = $repodata->{$bin};
-    die("unknown binary $bin?\n") unless $p;
-    next if $p->{'hdrmd5'};
-    my $repono = $p->{'repono'};
+    my $q = $repodata->{$bin};
+    die("unknown binary $bin?\n") unless $q;
+    next if $q->{'filename'};
+    my $repono = $q->{'repono'};
     die("binary $bin does not belong to a repo?\n") unless defined $repono;
-    push @{$tofetch{$repono}}, $p;
+    push @{$tofetch{$repono}}, $q;
   }
   for my $repono (sort {$a <=> $b} keys %tofetch) {
     my $repo = $ctx->{'repos'}->[$repono];
-    PBuild::RemoteRepo::fetchbinaries($repo, $tofetch{$repono});
+    if ($repo->{'type'} eq 'repo') {
+      PBuild::RemoteRepo::fetchbinaries($repo, $tofetch{$repono});
+    } elsif ($repo->{'type'} eq 'registry') {
+      PBuild::RemoteRegistry::fetchbinaries($repo, $tofetch{$repono});
+    }
   }
 }
 
