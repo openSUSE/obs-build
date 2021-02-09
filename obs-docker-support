@@ -173,7 +173,7 @@ select(S);
 $| = 1;
 print S "PUT $ARGV[0] HTTP/1.1\r\nContent-Length: ".length($data)."\r\n\r\n$data";
 read(S, $ans, 1024);
-die($ans) unless $ans =~ /^200/;
+die($ans) unless $ans =~ / 200 /;
 '
 
 upload_packages() {
@@ -184,7 +184,7 @@ upload_packages() {
 	if test -n "$DATA_DIR" ; then
 	    cp /tmp/packages "$DATA_DIR/UPLOAD/$n"
 	elif test -x /usr/bin/curl ; then
-	    curl "http://localhost:80/$n" -T /tmp/packages
+	    curl "http://localhost:80/$n" -T /tmp/packages > /dev/null
 	elif test -x /usr/bin/perl ; then
 	    perl -e "$upload_with_perl" "/$n" < /tmp/packages
         else
