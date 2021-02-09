@@ -71,6 +71,10 @@ sub addrepo {
 
   unshift @{$ret->{'imagerepos'}}, { 'url' => $url };
   $ret->{'imagerepos'}->[0]->{'priority'} = $prio if defined $prio;
+  if (defined($Build::Kiwi::urlmapper) && !$Build::Kiwi::urlmapper) {
+    unshift @{$ret->{'path'}}, { %{$ret->{'imagerepos'}->[0]} };
+    return 1;
+  }
   if ($Build::Kiwi::urlmapper) {
     my $prp = $Build::Kiwi::urlmapper->($url);
     if (!$prp) {

@@ -199,6 +199,20 @@ sub kiwiparse_product {
   return $ret;
 }
 
+sub unify_repo {
+  my ($repo) = @_;
+  my @r;
+  my %seen;
+  for (@{$repo || []}) {
+    if ($_->{'url'}) {
+      next if $seen{$_->{'url'}};
+      $seen{$_->{'url'}} = 1;
+    }
+    push @r, $_;
+  }
+  return \@r;
+}
+
 sub kiwiparse {
   my ($xml, $arch, $buildflavor, $release, $count) = @_;
   $count ||= 0;
@@ -324,10 +338,23 @@ sub kiwiparse {
 	if ($derived =~ /^obs:\/{1,3}([^\/]+)\/([^\/]+)\/(.*?)(?:#([^\#\/]+))?$/) {
 	  $name = defined($4) ? "$3:$4" : "$3:latest";
 	  $prp = "$1/$2";
+	  $prp = "obs:/$prp" if defined($urlmapper) && !$urlmapper;
 	} elsif ($derived =~ /^obsrepositories:\/{1,3}([^\/].*?)(?:#([^\#\/]+))?$/) {
 	  $name = defined($2) ? "$1:$2" : "$1:latest";
 	} elsif ($derived =~ /^file:/) {
 	  next;		# just ignore and hope
+	} elsif (defined($urlmapper) && !$urlmapper) {
+	  if ($derived =~ /^https:\/\/([^\/]+)\/(.*?)(?:#([^\#\/]+))?$/) {
+	    $prp = $1;
+	    $name = defined($3) ? "$2:$3" : "$2:latest";
+	  } elsif ($derived =~ /([^\/]+\.[^\/]+)\/(.*?)(?:#([^\#\/]+))?$/) {
+	    $prp = "https://$1";
+	    $name = defined($3) ? "$2:$3" : "$2:latest";
+	  } elsif ($derived =~ /^(.*?)(?:#([^\#\/]+))?$/) {
+	    $name = defined($2) ? "$1:$2" : "$1:latest";
+	  } else {
+	    die("cannot decode derived_from: $derived\n");
+	  }
 	} elsif ($derived =~ /^(.*)\/([^\/]+?)(?:#([^\#\/]+))?$/) {
 	  my $url = $1;
 	  $name = defined($3) ? "$2:$3" : "$2:latest";
@@ -353,7 +380,11 @@ sub kiwiparse {
           next unless $bootxml;
           push @extrasources, $xsrc if $xsrc;
           my $bret = kiwiparse($bootxml, $arch, $buildflavor, $release, $count);
-          push @bootrepos, map {"$_->{'project'}/$_->{'repository'}"} @{$bret->{'path'} || []};
+	  if (defined($urlmapper) && !$urlmapper) {
+            push @bootrepos, @{$bret->{'path'} || []};
+	  } else {
+            push @bootrepos, map {"$_->{'project'}/$_->{'repository'}"} @{$bret->{'path'} || []};
+	  }
           push @packages, @{$bret->{'deps'} || []};
           push @extrasources, @{$bret->{'extrasource'} || []};
         } else {
@@ -382,21 +413,27 @@ sub kiwiparse {
   for my $repository (@repositories) {
     my $kiwisource = ($repository->{'source'} || [])->[0];
     next unless $kiwisource;	# huh?
-    next if $kiwisource->{'path'} eq '/var/lib/empty';	# grr
+    my $url = $kiwisource->{'path'};
+    next if !$url || $url eq '/var/lib/empty';	# grr
     if ($repository->{'imageonly'} || $repository->{'imageinclude'}) {
       # this repo will be configured in the image. Save so that we can write it into the containerinfo
-      my $imagerepo = { 'url' => $kiwisource->{'path'} };
-      $imagerepo->{'priority'} = $repository->{'sortprio'} if defined $repository->{'priority'};
-      push @imagerepos, $imagerepo;
+      push @imagerepos, { 'url' => $url };
+      $imagerepos[-1]->{'priority'} = $repository->{'sortprio'} if defined $repository->{'priority'};
     }
     next if $repository->{'imageonly'};
+    if (defined($urlmapper) && !$urlmapper) {
+      # urlmapping disabled
+      push @repos, { 'url' => $url };
+      $repos[-1]->{'priority'} = $repository->{'sortprio'} if $repoextras && defined $repository->{'priority'};
+      next;
+    }
     my $prp;
-    if ($kiwisource->{'path'} eq 'obsrepositories:/') {
+    if ($url eq 'obsrepositories:/') {
       $prp = '_obsrepositories/';
-    } elsif ($kiwisource->{'path'} =~ /^obs:\/{1,3}([^\/]+)\/([^\/]+)\/?$/) {
+    } elsif ($url =~ /^obs:\/{1,3}([^\/]+)\/([^\/]+)\/?$/) {
       $prp = "$1/$2";
     } else {
-      $prp = $urlmapper->($kiwisource->{'path'}) if $urlmapper;
+      $prp = $urlmapper->($url) if $urlmapper;
       die("repo url not using obs:/ scheme: $kiwisource->{'path'}\n") unless $prp;
     }
     push @repos, $prp;
@@ -463,14 +500,19 @@ sub kiwiparse {
   $ret->{'containerpath'} = [ unify(@containerrepos) ] if @containerrepos;
   $ret->{'imagetype'} = [ unify(@types) ];
   $ret->{'extrasource'} = \@extrasources if @extrasources;
-  for (@{$ret->{'path'} || []}) {
-    my @s = split('/', $_, 2);
-    $_ = {'project' => $s[0], 'repository' => $s[1]};
-    $_->{'priority'} = $repoprio{"$s[0]/$s[1]"} if $repoextras && defined $repoprio{"$s[0]/$s[1]"};
-  }
-  for (@{$ret->{'containerpath'} || []}) {
-    my @s = split('/', $_, 2);
-    $_ = {'project' => $s[0], 'repository' => $s[1]};
+  if (defined($urlmapper) && !$urlmapper) {
+    $ret->{'path'} = [ unify_repo($ret->{'path'}) ] if @{$ret->{'path'} || []};
+    $ret->{'containerpath'} = [ unify_repo($ret->{'containerpath'}) ] if @{$ret->{'containerpath'} || []};
+  } else {
+    for (@{$ret->{'path'} || []}) {
+      my @s = split('/', $_, 2);
+      $_ = {'project' => $s[0], 'repository' => $s[1]};
+      $_->{'priority'} = $repoprio{"$s[0]/$s[1]"} if $repoextras && defined $repoprio{"$s[0]/$s[1]"};
+    }
+    for (@{$ret->{'containerpath'} || []}) {
+      my @s = split('/', $_, 2);
+      $_ = {'project' => $s[0], 'repository' => $s[1]};
+    }
   }
   $ret->{'imagerepos'} = \@imagerepos if @imagerepos;
   if ($containerconfig) {
