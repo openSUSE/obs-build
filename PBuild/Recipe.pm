@@ -25,6 +25,9 @@ use Build;
 
 $Build::Kiwi::urlmapper = 0;	# disable url -> prp mapping
 
+#
+# Select a recipe file from the source files
+#
 sub find_recipe {
   my ($p, $type) = @_;
   my %files = map {$_ => $_} keys %{$p->{'files'} || {}};

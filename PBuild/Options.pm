@@ -42,11 +42,11 @@ my %known_options = (
   'registry' => 'registry::',
   'vm-emulator-script' => 'vm-emulator-script:',
   'emulator-script' => 'vm-emulator-script:',
-  'xen' => \&vm_type_special_optarg,
-  'kvm' => \&vm_type_special_optarg,
-  'uml' => \&vm_type_special_optarg,
-  'qemu' => \&vm_type_special_optarg,
-  'emulator' => \&vm_type_special_optarg,
+  'xen' => \&vm_type_special,
+  'kvm' => \&vm_type_special,
+  'uml' => \&vm_type_special,
+  'qemu' => \&vm_type_special,
+  'emulator' => \&vm_type_special,
   'zvm' => \&vm_type_special,
   'lxc' => \&vm_type_special,
   'vm-type' => 'vm-type:',
@@ -98,12 +98,8 @@ sub getarg {
 
 sub vm_type_special {
   my ($opts, $origopt, $opt, $args) = @_;
-  $opts->{'vm-type'} = $opt;
-}
-
-sub vm_type_special_optarg {
-  my ($opts, $origopt, $opt, $args) = @_;
-  my $arg = getarg($origopt, $args, 1);
+  my $arg;
+  $arg = getarg($origopt, $args, 1) unless $opt eq 'zvm' || $opt eq 'lxc';
   $opts->{'vm-disk'} = $arg if defined $arg;
   $opts->{'vm-type'} = $opt;
 }
@@ -130,10 +126,11 @@ sub parse_options {
     if (ref($ko)) {
       $ko->(\%opts, $origopt, $opt, \@args);
     } elsif ($ko =~ s/(:.*)//) {
+      my $arg = getarg($origopt, \@args);
       if ($1 eq '::') {
-        push @{$opts{$ko}}, getarg($origopt, \@args);
+        push @{$opts{$ko}}, $arg;
       } else {
-        $opts{$ko} = getarg($origopt, \@args);
+        $opts{$ko} = $arg;
       }
     } else {
       $opts{$ko} = 1;
@@ -144,4 +141,3 @@ sub parse_options {
 }
 
 1;
-

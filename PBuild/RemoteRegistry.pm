@@ -68,7 +68,7 @@ sub bearer_authenticate {
 sub arch2goarch {
   my ($arch) = @_;
   return ('amd64') if $arch eq 'x86_64';
-  return ('386') if $arch =~ /^i[3456]86/;
+  return ('386') if $arch =~ /^i[3456]86$/;
   return ('arm64', 'v8') if $arch eq 'aarch64';
   return ('arm', "v$1") if $arch =~ /^armv(\d+)/;
   return $arch;

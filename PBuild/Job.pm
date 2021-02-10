@@ -22,13 +22,16 @@ package PBuild::Job;
 
 use strict;
 
-use Data::Dumper;
 use Time::HiRes ();
 
+use PBuild::Util;
 use PBuild::Cando;
-use PBuild::RemoteRegistry;
 use PBuild::Verify;
+use PBuild::RemoteRegistry;
 
+#
+# Fork and exec the build tool
+#
 sub forkjob {
   my ($args) = @_;
   my $pid = PBuild::Util::xfork();
@@ -41,7 +44,7 @@ sub forkjob {
 }
 
 #
-# update the logile_lines element by counting lines in the logfile
+# Update the logile_lines element by counting lines in the logfile
 #
 sub updatelines {
   my ($job) = @_;
@@ -69,7 +72,7 @@ sub updatelines {
 }
 
 #
-# wait for one or more build jobs to finish
+# Wait for one or more build jobs to finish
 #
 sub waitjob {
   my (@jobs) = @_;
@@ -142,6 +145,37 @@ sub collect_result {
   }
   delete $send{'_log'};
   return \%send;
+}
+
+#
+# Setup the repo/containers directories used for image/container
+# builds
+#
+sub setupimagefiles {
+  my ($ctx, $p, $bdeps, $dstdir) = @_;
+
+  PBuild::Util::mkdir_p("$dstdir/repos/pbuild/pbuild");
+  my $repodata = $ctx->{'repodata'};
+  for my $bin (@$bdeps) {
+    my $q = $repodata->{$bin};
+    my $repono = $q->{'repono'};
+    my $repo = $ctx->{'repos'}->[$repono || 0];
+    die("bad package $bin\n") unless defined($repono) && $repo;
+    if ($repo->{'type'} eq 'registry') {
+      my $containerfile = "$q->{'name'}.tar";
+      $containerfile =~ s/^container://;
+      $containerfile =~ s/[\/:]/_/g;
+      PBuild::Verify::verify_filename($containerfile);
+      PBuild::Util::mkdir_p("$dstdir/containers");
+      PBuild::RemoteRegistry::construct_containertar($repo->{'dir'}, $q, "$dstdir/containers/$containerfile");
+      next;
+    }
+    die("missing package $bin\n") unless $q && $q->{'filename'};
+    PBuild::Verify::verify_filename($q->{'filename'});
+    my $from = "$repo->{'dir'}/$q->{'filename'}";
+    $from = "$repo->{'dir'}/$q->{'packid'}/$q->{'filename'}" if $q->{'packid'};
+    PBuild::Util::cp($from, "$dstdir/repos/pbuild/pbuild/$q->{'filename'}");
+  }
 }
 
 #
@@ -269,41 +303,28 @@ sub createjob {
 
   if ($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker') {
     # for kiwi/docker we need to copy the sources to $buildroot/.build-srcdir
-    # so that we can set up a "repos" directory
+    # so that we can set up the "repos" and "containers" directories
     my $kiwisrcdir = "$buildroot/.build-srcdir";
     PBuild::Util::mkdir_p($kiwisrcdir);
     PBuild::Util::cleandir($kiwisrcdir);
     PBuild::Util::cp("$p->{'dir'}/$_", "$kiwisrcdir/$_") for sort keys %{$p->{'files'}};
     $args[-1] = "$kiwisrcdir/$p->{'recipe'}";
-    # copy binaries and containers
-    PBuild::Util::mkdir_p("$kiwisrcdir/repos/pbuild/pbuild");
-    for my $bin (@$bdeps) {
-      my $q = $repodata->{$bin};
-      my $repono = $q->{'repono'};
-      my $repo = $ctx->{'repos'}->[$repono || 0];
-      die("bad package $bin\n") unless defined($repono) && $repo;
-      if ($repo->{'type'} eq 'registry') {
-	my $containerfile = "$q->{'name'}.tar";
-	$containerfile =~ s/^container://;
-	$containerfile =~ s/[\/:]/_/g;
-	PBuild::Verify::verify_filename($containerfile);
-	PBuild::Util::mkdir_p("$kiwisrcdir/containers");
-	PBuild::RemoteRegistry::construct_containertar($repo->{'dir'}, $q, "$kiwisrcdir/containers/$containerfile");
-	next;
+    # now setup the repos/containers directories
+    setupimagefiles($ctx, $p, $bdeps, $kiwisrcdir);
+    # tell kiwi how to use them
+    if ($p->{'buildtype'} eq 'kiwi') {
+      my @kiwiargs;
+      push @kiwiargs, '--ignore-repos';
+      push @kiwiargs, '--add-repo', 'dir://./repos/pbuild/pbuild';
+      push @kiwiargs, '--add-repotype', 'rpm-md';
+      push @kiwiargs, '--add-repoprio', '1';
+      if (-d "$kiwisrcdir/containers") {
+	for my $containerfile (grep {/\.tar$/} sort(ls("$kiwisrcdir/containers")))  {
+	  push @kiwiargs, "--set-container-derived-from=dir://./containers/$containerfile";
+	}
       }
-      die("missing package $bin\n") unless $q && $q->{'filename'};
-      my $from = "$repo->{'dir'}/$q->{'filename'}";
-      $from = "$repo->{'dir'}/$q->{'packid'}/$q->{'filename'}" if $q->{'packid'};
-      PBuild::Util::cp($from, "$kiwisrcdir/repos/pbuild/pbuild/$q->{'filename'}");
+      push @args, map {"--kiwi-parameter=$_"} @kiwiargs;
     }
-  }
-  if ($p->{'buildtype'} eq 'kiwi') {
-    my @kiwiargs;
-    push @kiwiargs, '--ignore-repos';
-    push @kiwiargs, '--add-repo', 'dir://./repos/pbuild/pbuild';
-    push @kiwiargs, '--add-repotype', 'rpm-md';
-    push @kiwiargs, '--add-repoprio', '1';
-    push @args, map {"--kiwi-parameter=$_"} @kiwiargs;
   }
 
   unlink("$buildroot/.build.log");
@@ -345,7 +366,7 @@ sub finishjob {
       rmdir("$buildroot/.build.packages");
       rename("$buildroot/.mount/.build.packages", "$buildroot/.build.packages") || die("final rename failed: $!\n");
     }
-    die("XXX: unimpl");
+    die("XXX: dynamic buildreqs not implemented yet");
   }
   
   if (!$ret && (-l "$buildroot/.build.log" || ! -s _)) {
