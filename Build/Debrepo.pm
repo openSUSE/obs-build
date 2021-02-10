@@ -127,4 +127,54 @@ sub parse {
   return $res;
 }
 
+sub urldecode {
+  my ($str, $iscgi) = @_;
+  $str =~ tr/+/ / if $iscgi;
+  $str =~ s/%([a-fA-F0-9]{2})/chr(hex($1))/sge;
+  return $str;
+}
+
+sub parserepourl {
+  my ($url) = @_;
+  my @components;
+  my $baseurl;
+  if ($url =~ /\?/) {
+    my ($base, $query) = split(/\?/, $url, 2);
+    if ("&$query" =~ /\&dist=/) {
+      my $dist;
+      for my $querypart (split('&', $query)) {
+        my ($k, $v) = split('=', $querypart, 2);
+        $k = urldecode($k, 1);
+        $v = urldecode($v, 1);
+        $dist = $v if $k eq 'dist';
+        push @components, split(/[,+]/, $v) if $k eq 'component';
+      }
+      $baseurl = $base;
+      $baseurl .= '/' unless $baseurl =~ /\/$/;
+      $url = "${baseurl}dists/${dist}/";
+      push @components, 'main' unless @components;
+    }
+  }
+  if (@components) {
+    ;   # all done above
+  } elsif ($url =~ /^(.*\/)\.(\/.*)?$/) {
+    # flat repo
+    $baseurl = $1;
+    @components = ('.');
+    $url = defined($2) ? "$1$2" : $1;
+    $url .= '/' unless $url =~ /\/$/;
+  } else {
+    if ($url =~ /([^\/]+)$/) {
+      @components = split(/[,+]/, $1);
+      $url =~ s/([^\/]+)$//;
+    }
+    push @components, 'main' unless @components;
+    $url .= '/' unless $url =~ /\/$/;
+    $baseurl = $url;
+    $url =~ s/([^\/]+\/)$/dists\/$1/;
+    $baseurl =~ s/([^\/]+\/)$//;
+  }
+  return $baseurl, $url, \@components;
+}
+
 1;
