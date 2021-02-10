@@ -25,6 +25,7 @@ BEGIN {
 
 use Data::Dumper;
 use POSIX;
+use Cwd ();
 
 use Build;
 use PBuild::Source;
@@ -45,6 +46,7 @@ use PBuild::BuildConfig;
 my ($opts, @dirs) = PBuild::Options::parse_options(@ARGV);
 die("Usage: pbuild [options] [dir]\n") if @dirs > 1;
 my $dir = @dirs ? $dirs[0] : '.';
+$dir = Cwd::abs_path($dir) if $dir !~ /^\//;
 
 # set defaults
 my $libbuild = $INC[0];
