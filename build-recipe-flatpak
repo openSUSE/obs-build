@@ -96,6 +96,7 @@ recipe_build_flatpak() {
     export FLATPAK_APP_VERSION
     export FLATPAK_FILE
     export TOPDIR
+    export RELEASE
 
     modprobe fuse
     chroot "$BUILD_ROOT" su -c "flatpak list"
