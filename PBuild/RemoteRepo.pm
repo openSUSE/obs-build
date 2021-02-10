@@ -36,44 +36,29 @@ use Build::Debrepo;
 use Build::Deb;
 
 use PBuild::Util;
+use PBuild::Download;
 use PBuild::Verify;
 
 my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst};
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
 
-sub urldecode {
-  my ($str, $iscgi) = @_;
-  $str =~ tr/+/ / if $iscgi;
-  $str =~ s/%([a-fA-F0-9]{2})/chr(hex($1))/sge;
-  return $str;
-}
-
 sub download_zypp {
-  my ($url, $dest);
+  my ($url, $dest, $digest);
   die("do not know how to download $url\n") unless $url =~ m#^zypp://([^/]+)/((?:.*/)?([^/]+)\.rpm)$#;
   my ($repo, $path, $pkg) = ($1, $2, $3);
   die("bad dest $dest\n") if $dest !~ /^(.*)\/\Q$pkg\E\.rpm$/;
   my $dir = $1;
   system('/usr/bin/zypper', '--no-refresh', '-q', '--pkg-cache-dir', $dir, 'download', '-r', $repo, $pkg)
       && die("zypper download $pkg failed\n");
-  rename("$dir/$repo/$path", "$dir/$pkg.rpm") || die("rename $dir/$repo/$path $dir/$pkg.rpm: $!\n");
+  die("zypper download of $pkg did not create $dir/$repo/$path\n") unless -f "$dir/$repo/$path";
+  PBuild::Download::checkdigest("$dir/$repo/$path", $digest) if $digest;
+  rename("$dir/$repo/$path", $dest) || die("rename $dir/$repo/$path $dest: $!\n");
 }
 
 sub download {
-  my ($url, $dest) = @_;
-  return download_zypp($url, $dest) if $url =~ m#^zypp://#;
-  $url = URI->new($url);
-  my $ua = LWP::UserAgent->new(agent => "openSUSE build script", timeout => 42, ssl_opts => { verify_hostname => 1 });
-  $ua->env_proxy;
-  unlink($dest);        # just in case
-  my $retry = 3;
-  while ($retry--) {
-    my $res = $ua->mirror($url, $dest);
-    last if $res->is_success;
-    # if it's a redirect we probably got a bad mirror and should just retry
-    die "requesting $url failed: ".$res->status_line."\n" unless $retry && $res->previous;
-    warn "retrying $url\n";
-  }
+  my ($url, $dest, $destfinal, $digest, $ua) = @_;
+  return download_zypp($url, $destfinal || $dest, $digest) if $url =~ /^zypp:\/\//;
+  PBuild::Download::download($url, $dest, $destfinal, $digest, $ua, 3);
 }
 
 sub addpkg {
@@ -99,55 +84,16 @@ sub fetchrepo_arch {
 
 sub fetchrepo_debian {
   my ($url, $tmpdir, $arch) = @_;
-  my @components;
-  my $baseurl = $url;
-
+  my ($baseurl, $disturl, $components) = Build::Debrepo::parserepourl($url);
   my $basearch = Build::Deb::basearch($arch);
-
-  if ($url =~ /\?/) {
-    my ($base, $query) = split(/\?/, $url, 2);
-    if ("&$query" =~ /\&dist=/) {
-      my $dist;
-      for my $querypart (split('&', $query)) {
-        my ($k, $v) = split('=', $querypart, 2);
-        $k = urldecode($k, 1);
-        $v = urldecode($v, 1);
-        $dist = $v if $k eq 'dist';
-        push @components, split(/[,+]/, $v) if $k eq 'component';
-      }
-      $baseurl = $base;
-      $baseurl .= '/' unless $baseurl =~ /\/$/;
-      $url = "${baseurl}dists/${dist}/";
-      push @components, 'main' unless @components;
-    }
-  }
-  if (@components) {
-    ;   # all done above
-  } elsif ($url =~ /^(.*\/)\.(\/.*)?$/) {
-    # flat repo
-    $baseurl = $1;
-    @components = ('.');
-    $url = defined($2) ? "$1$2" : $1;
-    $url .= '/' unless $url =~ /\/$/;
-  } else {
-    if ($url =~ /([^\/]+)$/) {
-      @components = split(/[,+]/, $1);
-      $url =~ s/([^\/]+)$//;
-    }
-    push @components, 'main' unless @components;
-    $url .= '/' unless $url =~ /\/$/;
-    $baseurl = $url;
-    $url =~ s/([^\/]+\/)$/dists\/$1/;
-    $baseurl =~ s/([^\/]+\/)$//;
-  }
   my @repodata;
-  for my $component (@components) {
+  for my $component (@$components) {
     unlink("$tmpdir/Packages.gz");
     if ($component eq '.') {
-      download("${url}Packages.gz", "$tmpdir/Packages.gz");
+      download("${disturl}Packages.gz", "$tmpdir/Packages.gz");
       die("Packages.gz missing\n") unless -s "$tmpdir/Packages.gz";
     } else {
-      download("$url$component/binary-$basearch/Packages.gz", "$tmpdir/Packages.gz");
+      download("$disturl$component/binary-$basearch/Packages.gz", "$tmpdir/Packages.gz");
       die("Packages.gz missing for basearch $basearch, component $component\n") unless -s "$tmpdir/Packages.gz";
     }
     Build::Debrepo::parse("$tmpdir/Packages.gz", sub { addpkg(\@repodata, $_[0], $url) }, 'addselfprovides' => 1);
@@ -169,11 +115,11 @@ sub fetchrepo_rpmmd {
     utf8::downgrade($u);
     next unless $u =~ /(primary\.xml(?:\.gz)?)$/;
     my $fn = $1;
-    download("${baseurl}/$f->{'location'}", "$tmpdir/$fn");
+    download("${baseurl}/$f->{'location'}", "$tmpdir/$fn", undef, $f->{'checksum'});
     my $fh;
     open($fh, '<', "$tmpdir/$fn") or die "Error opening $tmpdir/$fn: $!\n";
     if ($fn =~ /\.gz$/) {
-      $fh = new IO::Uncompress::Gunzip $fh or die "Error opening $u: $IO::Uncompress::Gunzip::GunzipError\n";
+      $fh = IO::Uncompress::Gunzip->new($fh) or die("Error opening $u: $IO::Uncompress::Gunzip::GunzipError\n");
     }
     Build::Rpmmd::parse($fh, sub { addpkg(\@repodata, $_[0], $url) }, 'addselfprovides' => 1);
     last;
@@ -181,6 +127,9 @@ sub fetchrepo_rpmmd {
   return \@repodata;
 }
 
+#
+# Generate the on-disk filename from the metadata
+#
 sub calc_binname {
   my ($bin) = @_;
   die("bad location: $bin->{'location'}\n") unless $bin->{'location'} =~ /\.($binsufsre)$/;
@@ -192,6 +141,9 @@ sub calc_binname {
   return $binname;
 }
 
+#
+# Replace already downloaded entries in the metadata
+#
 sub replace_with_local {
   my ($repodir, $bins) = @_;
   my $bad;
@@ -210,9 +162,15 @@ sub replace_with_local {
     }
     $file = calc_binname($bin);
     next unless $files{$file};
-    my $q = querybinary($repodir, $file);
-    %$bin = %$q;
-    $files{$file} = 2;
+    eval {
+      my $q = querybinary($repodir, $file);
+      %$bin = %$q;
+      $files{$file} = 2;
+    };
+    if ($@) {
+      warn($@);
+      unlink($file);
+    }
   }
   for my $file (grep {$files{$_} == 1} sort keys %files) {
     unlink("$repodir/$file");
@@ -221,28 +179,34 @@ sub replace_with_local {
 }
 
 #
+# Guess the repotype from the build config
+#
+sub guess_repotype {
+  my ($bconf, $buildtype) = @_;
+  return undef unless $bconf;
+  for (@{$bconf->{'repotype'} || []}) {
+    return $_ if $_ eq 'arch' || $_ eq 'debian' || $_ eq 'hdlist2' || $_ eq 'rpm-md';
+  }
+  return 'arch' if ($bconf->{'binarytype'} || '') eq 'arch';
+  return 'debian' if ($bconf->{'binarytype'} || '') eq 'deb';
+  $buildtype ||= $bconf->{'type'};
+  return 'rpm-md' if ($buildtype || '') eq 'spec';
+  return 'debian' if ($buildtype || '') eq 'dsc';
+  return 'arch' if ($buildtype || '') eq 'arch';
+  return undef;
+}
+
+#
 # Get repository metadata for a remote repository
 #
 sub fetchrepo {
   my ($bconf, $arch, $repodir, $url, $buildtype) = @_;
-  $bconf ||= {};
   my $repotype;
-  for (@{$bconf->{'repotype'} || []}) {
-    $repotype = $_ if $_ eq 'arch' || $_ eq 'debian' || $_ eq 'hdlist2' || $_ eq 'rpm-md';
-  }
-  if (!$repotype) {
-    $repotype = 'arch' if ($bconf->{'binarytype'} || '') eq 'arch';
-    $repotype = 'debian' if ($bconf->{'binarytype'} || '') eq 'deb';
-  }
-  if (!$repotype) {
-    $repotype = 'rpm-md' if ($buildtype || '') eq 'spec';
-    $repotype = 'debian' if ($buildtype || '') eq 'dsc';
-    $repotype = 'arch' if ($buildtype || '') eq 'arch';
-  }
   if ($url =~ /^(arch|debian|hdlist2|rpmmd|rpm-md|suse)\@(.*)$/) {
     $repotype = $1;
     $url = $2;
   }
+  $repotype ||= guess_repotype($bconf, $buildtype) || 'rpmmd';
   my $tmpdir = "$repodir/.tmp";
   PBuild::Util::cleandir($tmpdir) if -e $tmpdir;
   PBuild::Util::mkdir_p($tmpdir);
@@ -267,6 +231,9 @@ sub fetchrepo {
   return $bins;
 }
 
+#
+# Check if the downloaded package matches the repository metadata
+#
 sub is_matching_binary {
   my ($b1, $b2) = @_;
   return 0 if $b1->{'name'} ne $b2->{'name'};
@@ -277,6 +244,9 @@ sub is_matching_binary {
   return 1;
 }
 
+#
+# Query dependencies of a downloaded binary package
+#
 sub querybinary {
   my ($dir, $file) = @_;
   my @s = stat("$dir/$file");
@@ -305,6 +275,7 @@ sub fetchbinaries {
   die("bad repo\n") unless $url;
   print "fetching $nbins binaries from $url\n";
   PBuild::Util::mkdir_p($repodir);
+  my $ua = PBuild::Download::create_ua();
   for my $bin (@$bins) {
     my $location = $bin->{'location'};
     print Dumper($bin) unless $location;
@@ -313,7 +284,7 @@ sub fetchbinaries {
     my $binname = calc_binname($bin);
     next if -e "$repodir/$binname";		# hey!
     my $tmpname = ".$$.$binname";
-    download($location, "$repodir/$tmpname");
+    download($location, "$repodir/$tmpname", undef, $bin->{'checksum'}, $ua);
     my $q = querybinary($repodir, $tmpname);
     die("downloaded binary $binname does not match repository metadata\n") unless is_matching_binary($bin, $q);
     rename("$repodir/$tmpname", "$repodir/$binname") || die("rename $repodir/$tmpname $repodir/$binname\n");
@@ -329,4 +300,3 @@ sub fetchbinaries {
 }
 
 1;
-

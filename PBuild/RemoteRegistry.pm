@@ -24,9 +24,9 @@ use strict;
 
 use LWP::UserAgent;
 use URI;
-use Data::Dumper;
 
 use PBuild::Verify;
+use PBuild::Download;
 use Build::SimpleJSON;
 
 eval { require JSON::XS };
@@ -145,19 +145,12 @@ sub queryremotecontainer {
 }
 
 #
-# create a user agent for download
-#
-sub create_ua {
-  return LWP::UserAgent->new(agent => "openSUSE build script", timeout => 42, ssl_opts => { verify_hostname => 1 });
-}
-
-#
 # get data from a registry for a set of containers
 #
 sub fetchrepo {
   my ($bconf, $arch, $repodir, $url, $repotags) = @_;
   my @bins;
-  my $ua = create_ua();
+  my $ua = PBuild::Download::create_ua();
   for my $repotag (@{$repotags || []}) {
     my $bin = queryremotecontainer($ua, $arch, $url, $repotag);
     push @bins, $bin if $bin;
@@ -189,15 +182,13 @@ sub fetchbinaries {
   my @tofetch = sort keys %tofetch;
   my $ntofetch = @tofetch;
   print "fetching $ntofetch container blobs from $url\n";
-  my $ua = create_ua();
+  my $ua = PBuild::Download::create_ua();
   PBuild::Util::mkdir_p($repodir);
   for my $tofetch (@tofetch) {
     next unless $tofetch =~ /^(.*)\/(.*)?$/;
     my ($repository, $digest) = ($1, $2);
     next if -s "$repodir/blob.$digest";
-    my $res = $ua->mirror("$url/v2/$repository/blobs/$digest", "$repodir/.blob.$digest.$$");
-    die("unknown blob $repository/$digest\n") unless$res->is_success;
-    rename("$repodir/.blob.$digest.$$", "$repodir/blob.$digest") || die;
+    PBuild::Download::download("$url/v2/$repository/blobs/$digest", "$repodir/.blob.$digest.$$", "$repodir/blob.$digest", $digest, $ua);
   }
 }
 
