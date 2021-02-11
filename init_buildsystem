@@ -183,6 +183,8 @@ clean_build_root() {
 	chattr -a -A -i -R -- "$BUILD_ROOT" 2> /dev/null || true    # does not follow symlinks
 	rm -rf -- "$BUILD_ROOT"/*
 	rm -rf -- "$BUILD_ROOT/.build"
+	rm -rf -- "$BUILD_ROOT"/.build.console.*
+	rm -rf -- "$BUILD_ROOT"/.build.hostarch.*
 	rm -rf -- "$BUILD_ROOT"/.build.kernel.*
 	rm -rf -- "$BUILD_ROOT"/.build.initrd.*
 	rm -rf -- "$BUILD_ROOT/.root"
