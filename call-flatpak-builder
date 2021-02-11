@@ -52,5 +52,9 @@ set -x
 chroot "$BUILD_ROOT" bash -c "cd /usr/src/packages/FLATPAK_ROOT && flatpak-builder --default-branch=$FLATPAK_APP_VERSION --force-clean --repo=$FLATPAK_REPO build-dir $FLATPAK_FILE"
 
 # Create bundle from repo
-chroot "$BUILD_ROOT" bash -c "flatpak build-bundle --runtime-repo=$FLATPAK_REMOTE $FLATPAK_REPO $TOPDIR/OTHER/$FLATPAK_APP-$FLATPAK_APP_VERSION.flatpak $FLATPAK_APP $FLATPAK_APP_VERSION"
+VERSION_RELEASE="$FLATPAK_APP_VERSION"
+if [[ -n $RELEASE ]]; then
+    VERSION_RELEASE+="-$RELEASE"
+fi
+chroot "$BUILD_ROOT" bash -c "flatpak build-bundle --runtime-repo=$FLATPAK_REMOTE $FLATPAK_REPO $TOPDIR/OTHER/$FLATPAK_APP-$VERSION_RELEASE.flatpak $FLATPAK_APP $FLATPAK_APP_VERSION"
 
