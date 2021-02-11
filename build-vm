@@ -925,6 +925,7 @@ vm_first_stage() {
     echo ")" >> $BUILD_ROOT/.build/build.data
     echo "VM_TYPE='$VM_TYPE'" >> $BUILD_ROOT/.build/build.data
     echo "RUN_SHELL='$RUN_SHELL'" >> $BUILD_ROOT/.build/build.data
+    echo "RUN_SHELL_AFTER_FAIL='$RUN_SHELL_AFTER_FAIL'" >> $BUILD_ROOT/.build/build.data
     echo "RUN_SHELL_CMD='$RUN_SHELL_CMD'" >> $BUILD_ROOT/.build/build.data
     echo "DO_STATISTICS='$DO_STATISTICS'" >> $BUILD_ROOT/.build/build.data
     echo "TIME_PREINSTALL='$TIME_PREINSTALL'" >> $BUILD_ROOT/.build/build.data
