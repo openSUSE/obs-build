@@ -744,10 +744,10 @@ vm_setup() {
     # and calling virt-make-fs accordingly
     if test -n "$VM_USE_VIRT_FS" ; then
         echo "Using virt-make-fs to create root image"
+        rm -rf "$BUILD_ROOT"/* "$BUILD_ROOT"/.[^.]* 
         if test -z "$CLEAN_BUILD" ; then
 	    echo "Recovering former build root"
-	    rm -rf "$BUILD_ROOT"
-	    debugfs -f <(echo rdump / $BUILD_ROOT) "$VM_ROOT"
+	    debugfs -f <(echo rdump / "$BUILD_ROOT") "$VM_ROOT"
         fi
         return 0
     fi
