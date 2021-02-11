@@ -173,6 +173,8 @@ cleanup_and_exit() {
     test "$BUILD_ROOT" = / -a -n "$browner" && chown "$browner" "$BUILD_ROOT"
     # umount so init_buildsystem can be used standalone
     umount_stuff
+    # never report a fatal error when the job got killed from outside
+    test "$1" = 4 -a -e "$BUILD_ROOT/exit" && exit 1
     exit $1
 }
 
@@ -564,10 +566,10 @@ fi
 #
 # store that we start to build the system
 #
-mkdir -p "$BUILD_ROOT"
-mkdir -p "$BUILD_ROOT/.build"
-mkdir -p "$BUILD_ROOT/proc"
-mkdir -p "$BUILD_ROOT/dev/pts"
+mkdir -p "$BUILD_ROOT" || cleanup_and_exit 4
+mkdir -p "$BUILD_ROOT/.build" || cleanup_and_exit 4
+mkdir -p "$BUILD_ROOT/proc" || cleanup_and_exit 4
+mkdir -p "$BUILD_ROOT/dev/pts" || cleanup_and_exit 4
 touch $BUILD_IS_RUNNING
 
 if test -n "$PREPARE_VM" ; then
