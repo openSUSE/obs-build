@@ -105,6 +105,7 @@ RSYNCDONE=
 SIGNDUMMY=
 DO_STATISTICS=
 RUN_SHELL=
+RUN_SHELL_AFTER_FAIL=
 RUN_SHELL_CMD=
 CCACHE=
 PKG_CCACHE=
@@ -836,6 +837,17 @@ needarg() {
     fi
 }
 
+run_shell() {
+    echo "Executing interactive shell..."
+    if test -n "$RUN_SHELL_CMD"; then
+      chroot $BUILD_ROOT "${RUN_SHELL_CMD:=/bin/bash}"
+      cleanup_and_exit $?
+    else
+      chroot $BUILD_ROOT su - $BUILD_USER
+      cleanup_and_exit $?
+    fi
+}
+
 validate_init "$BUILD_CONF"
 
 while test -n "$1"; do
@@ -1057,6 +1069,9 @@ while test -n "$1"; do
       ;;  
       -shell)
 	RUN_SHELL=1
+      ;;
+      -shell-after-fail)
+	RUN_SHELL_AFTER_FAIL=1
       ;;
       -shell-cmd)
 	needarg
@@ -1440,15 +1455,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     setupicecream
     setupccache
 
-    if test -n "$RUN_SHELL" ; then
-	if test -n "$RUN_SHELL_CMD"; then
-	  chroot $BUILD_ROOT "${RUN_SHELL_CMD:=/bin/bash}"
-          cleanup_and_exit $?
-	else
-	  chroot $BUILD_ROOT su - $BUILD_USER
-          cleanup_and_exit $?
-        fi
-    fi
+    test -n "$RUN_SHELL" && run_shell
 
     # fill build directories with sources. Also sets TOPDIR
     recipe_setup
@@ -1544,6 +1551,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	cleanup_and_exit 9
     fi
 
+    test -n "$RUN_SHELL_AFTER_FAIL" -a "$BUILD_SUCCEEDED" != true && run_shell
     test "$BUILD_SUCCEEDED" = true || cleanup_and_exit 1
 
     recipe_build_time_statistics
