@@ -41,6 +41,7 @@ use PBuild::Checker;
 use PBuild::Options;
 use PBuild::Cando;
 use PBuild::BuildConfig;
+use PBuild::Result;
 
 # parse options
 my ($opts, @dirs) = PBuild::Options::parse_options(@ARGV);
@@ -84,6 +85,13 @@ for my $no (1..$opts->{'buildjobs'}) {
 }
 
 my $myarch = $opts->{'arch'};
+my $reponame = "_build.$myarch";
+my $builddir = "$dir/$reponame";
+
+if ($opts->{'result-code'} || $opts->{'result-pkg'}) {
+  PBuild::Result::print_result($opts, $builddir);
+  exit;
+}
 
 my $baseconfigfile;
 $baseconfigfile = Build::find_config_file($opts->{'dist'}, $opts->{'configdir'}) if $opts->{'dist'};
@@ -93,8 +101,6 @@ $buildconfig = PBuild::BuildConfig::combineconfigs($baseconfig, $buildconfig);
 die("Please specify a distribution\n") unless $buildconfig;
 
 my $bconf = Build::read_config($myarch, [ split("\n", $buildconfig) ]);
-my $reponame = "_build.$myarch";
-my $builddir = "$dir/$reponame";
 $buildtype = $bconf->{'type'} || '';
 $buildtype = 'spec' if !$buildtype || $buildtype eq 'UNDEFINED';
 
@@ -339,5 +345,6 @@ while (1) {
 }
 
 print "done\n";
+PBuild::Result::print_result($opts, $builddir);
 
 

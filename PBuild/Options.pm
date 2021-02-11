@@ -40,8 +40,10 @@ my %known_options = (
   'repo' => 'repo::',
   'repository' => 'repo::',
   'registry' => 'registry::',
-  'vm-emulator-script' => 'vm-emulator-script:',
-  'emulator-script' => 'vm-emulator-script:',
+  'result' => \&result_special,
+  'result-pkg' => 'result-pkg::',
+  'result-code' => 'result-code::',
+  'details' => 'result-details',
   'xen' => \&vm_type_special,
   'kvm' => \&vm_type_special,
   'uml' => \&vm_type_special,
@@ -86,6 +88,8 @@ my %known_options = (
   'vm-custom-opt' => 'vm-custom-opt:',
   'vm-openstack-flavor' => 'vm-openstack-flavor:',
   'openstack-flavor' => 'vm-openstack-flavor:',
+  'vm-emulator-script' => 'vm-emulator-script:',
+  'emulator-script' => 'vm-emulator-script:',
 );
 
 sub getarg {
@@ -102,6 +106,24 @@ sub vm_type_special {
   $arg = getarg($origopt, $args, 1) unless $opt eq 'zvm' || $opt eq 'lxc';
   $opts->{'vm-disk'} = $arg if defined $arg;
   $opts->{'vm-type'} = $opt;
+}
+
+my @codes = qw{broken succeeded failed unresolvable blocked scheduled waiting building excluded disabled locked};
+my %known_codes = map {$_ => 1} @codes;
+
+sub result_special {
+  my ($opts, $origopt, $opt, $args) = @_;
+  my $arg;
+  $arg = getarg($origopt, $args, 1);
+  if (!defined($arg) || $arg eq 'all') {
+    push @{$opts->{'result-code'}}, 'all';
+    return;
+  }
+  if ($known_codes{$arg}) {
+    push @{$opts->{'result-code'}}, $arg;
+  } else {
+    push @{$opts->{'result-pkg'}}, $arg;
+  }
 }
 
 sub parse_options {
