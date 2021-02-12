@@ -20,6 +20,11 @@
 ################################################################
 
 BEGIN {
+  if (!$::ENV{'BUILD_DIR'} && $0 ne '-' && $0 ne '-e' && -e $0 && ! -e '/etc/build.conf') {
+    use Cwd ();
+    my $p = Cwd::abs_path($0);
+    $::ENV{'BUILD_DIR'} = $p if $p =~ s/\/[^\/]+$// && $p ne '/usr/lib/build' && -d "$p/PBuild";
+  }
   unshift @INC, ($::ENV{'BUILD_DIR'} && ! -e '/etc/build.conf' ? $::ENV{'BUILD_DIR'} : '/usr/lib/build');
 }
 
@@ -53,6 +58,7 @@ $dir = Cwd::abs_path($dir) if $dir !~ /^\//;
 my $libbuild = $INC[0];
 $opts->{'libbuild'} = $libbuild;
 $opts->{'root'} ||= '/var/tmp/build-root';
+$opts->{'root'} = Cwd::abs_path($opts->{'root'}) if $opts->{'root'} !~ /^\//;
 $opts->{'configdir'} ||= "$libbuild/configs";
 if (!$opts->{'hostarch'}) {
   $opts->{'hostarch'} = (POSIX::uname())[4];
@@ -86,6 +92,7 @@ for my $no (1..$opts->{'buildjobs'}) {
 
 my $myarch = $opts->{'arch'};
 my $reponame = "_build.$myarch";
+$reponame = "_build.$opts->{'dist'}.$myarch" if $opts->{'dist'} !~ /\//;
 my $builddir = "$dir/$reponame";
 
 if ($opts->{'result-code'} || $opts->{'result-pkg'}) {
@@ -264,11 +271,10 @@ while (1) {
 	last;
       }
       if (!$builder) {
-        $packstatus{$packid} = 'blocked';
-        $packerror{$packid} = 'waiting for free builder';
-	next;
+	$status = 'waiting';
+      } else {
+        ($status, $error) = PBuild::Checker::build($ctx, $packid, $error, $builder);
       }
-      ($status, $error) = PBuild::Checker::build($ctx, $packid, $error, $builder);
       if ($status eq 'building') {
 	my $job = $error;
 	$error = undef;
@@ -286,7 +292,7 @@ while (1) {
 	$status = 'succeeded';
       }
     }
-    if ($status eq 'blocked' || $status eq 'building') {
+    if ($status eq 'blocked' || $status eq 'building' || $status eq 'waiting') {
       $ctx->{'notready'}->{$p->{'name'} || $p->{'pkg'}} = 1 if $p->{'useforbuildenabled'};
     }
     $packstatus{$packid} = $status;
@@ -344,7 +350,6 @@ while (1) {
   }
 }
 
-print "done\n";
+print "pbuild is done.\n";
 PBuild::Result::print_result($opts, $builddir);
-
 
