@@ -156,6 +156,8 @@ my $baseconfig = '';
 if ($opts->{'dist'}) {
   if ($opts->{'dist'} =~ /^https?/) {
     $baseconfig = PBuild::Download::fetch($opts->{'dist'});
+  } elsif (-e "$dir/_configs/$opts->{'dist'}.conf") {
+    $baseconfig = PBuild::Util::readstr("$dir/_configs/$opts->{'dist'}.conf");
   } else {
     my $baseconfigfile = Build::find_config_file($opts->{'dist'}, $opts->{'configdir'});
     $baseconfig = PBuild::Util::readstr($baseconfigfile) if $baseconfigfile;
