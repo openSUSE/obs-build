@@ -28,10 +28,10 @@ use strict;
 
 our $pbuild = [
     'pbuild' =>
-     [[ 'repo' =>
+     [[ 'destination' =>
 	    'name',
 	    'config',
-	  [ 'url' ],
+	  [ 'repo' ],
 	  [ 'registry' ],
      ]],
 ];

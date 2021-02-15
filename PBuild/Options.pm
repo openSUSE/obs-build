@@ -25,8 +25,7 @@ use strict;
 my %known_options = (
   'h' => 'help',
   'help' => 'help',
-  'name' => 'reponame',
-  'reponame' => 'reponame',
+  'destination' => 'dest',
   'nochecks' => 'nochecks',
   'no-checks' => 'nochecks',
   'arch' => 'arch:',
