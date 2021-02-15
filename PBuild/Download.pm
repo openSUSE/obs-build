@@ -23,27 +23,74 @@ package PBuild::Download;
 use strict;
 
 use LWP::UserAgent;
-use URI;
 use Digest::MD5 ();
 use Digest::SHA ();
 
+#
+# Create a user agent used to access remote servers
+#
 sub create_ua {
   my $ua = LWP::UserAgent->new(agent => "openSUSE build script", timeout => 42, ssl_opts => { verify_hostname => 1 });
   $ua->env_proxy;
   return $ua;
 }
 
+#
+# Create a hash context from a digest
+#
+sub digest2ctx {
+  my ($digest) = @_;
+  return Digest::SHA->new(1) if $digest =~ /^sha1?:/i;
+  return Digest::SHA->new($1) if $digest =~ /^sha(\d+):/i;
+  return Digest::MD5->new() if $digest =~ /^md5:/i;
+  return undef;
+}
+
+#
+# Verify that some data matches a digest
+#
 sub checkdigest {
-  my ($file, $digest) = @_;
-  my $ctx;
-  if ($digest =~ /^sha1?:/i) {
-    $ctx = Digest::SHA->new(1);
-  } elsif ($digest =~ /^sha(\d+):/i) {
-    $ctx = Digest::SHA->new($1);
-  } elsif ($digest =~ /^md5:/i) {
-    $ctx = Digest::MD5->new();
+  my ($data, $digest) = @_;
+  my $ctx = digest2ctx($digest);
+  die("unsupported digest algo '$digest'\n") unless $ctx;
+  $ctx->add($data);
+  my $hex = $ctx->hexdigest();
+  if (lc($hex) ne lc((split(':', $digest, 2))[1])) {
+    die("digest mismatch: $digest, got $hex\n");
   }
-  die("$file unsupported digest algo '$digest'\n") unless $ctx;
+}
+
+#
+# Download data from a server
+#
+sub fetch {
+  my ($url, %opt) = @_;
+  my $ua = $opt{'ua'} || create_ua();
+  my $retry = $opt{'retry'} || 0;
+  my $res;
+  my @accept;
+  @accept = ('Accept', join(', ', @{$opt{'accept'}})) if $opt{'accept'};
+  while (1) {
+    $res = $ua->get($url, @accept, @{$opt{'headers'} || []});
+    last if $res->is_success;
+    return undef if $opt{'missingok'} && $res->code == 404;
+    my $status = $res->status_line;
+    die("download of $url failed: $status\n") unless $retry-- > 0 && $res->previous;
+    warn("retrying $url\n");
+  }
+  my $data = $res->decoded_content;
+  my $ct = $res->header('content_type');
+  checkdigest($data, $opt{'digest'}) if $opt{'digest'};
+  return ($data, $ct);
+}
+
+#
+# Verify that the content of a file matches a digest
+#
+sub checkfiledigest {
+  my ($file, $digest) = @_;
+  my $ctx = digest2ctx($digest);
+  die("$file: unsupported digest algo '$digest'\n") unless $ctx;
   my $fd;
   open ($fd, '<', $file) || die("$file: $!\n");
   $ctx->addfile($fd);
@@ -54,20 +101,22 @@ sub checkdigest {
   }
 }
 
+#
+# Download a file from a server
+#
 sub download {
-  my ($url, $dest, $destfinal, $digest, $ua, $retry) = @_;
-  $ua ||= create_ua();
-  $retry ||= 0;
+  my ($url, $dest, $destfinal, %opt) = @_;
+  my $ua = $opt{'ua'} || create_ua();
+  my $retry = $opt{'retry'} || 0;
   while (1) {
-    unlink($dest);        # just in case
+    unlink($dest);        # disable last-modified handling, always download
     my $res = $ua->mirror($url, $dest);
     last if $res->is_success;
     my $status = $res->status_line;
-    die("download of $url failed: $status\n") unless $retry >= 0 && $res->previous;
+    die("download of $url failed: $status\n") unless $retry-- > 0 && $res->previous;
     warn("retrying $url\n");
-    $retry--;
   }
-  checkdigest($dest, $digest) if $digest;
+  checkfiledigest($dest, $opt{'digest'}) if $opt{'digest'};
   if ($destfinal) {
     rename($dest, $destfinal) || die("rename $dest $destfinal: $!\n");
   }

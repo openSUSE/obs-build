@@ -32,6 +32,14 @@ use Build::SimpleJSON;
 eval { require JSON::XS };
 *JSON::XS::decode_json = sub {die("JSON::XS is not available\n")} unless defined &JSON::XS::decode_json;
 
+#
+# mime types
+#
+my $mt_docker_manifest     = 'application/vnd.docker.distribution.manifest.v2+json';
+my $mt_docker_manifestlist = 'application/vnd.docker.distribution.manifest.list.v2+json';
+my $mt_oci_manifest        = 'application/vnd.oci.image.manifest.v1+json';
+my $mt_oci_index           = 'application/vnd.oci.image.index.v1+json';
+
 # 
 # simple anon bearer authenticator
 # 
@@ -101,26 +109,23 @@ sub queryremotecontainer {
   my ($repository, $tag) = ($1, $2);
   $repository = "library/$repository" if $repository !~ /\// && $registry =~ /docker.io\/?$/;
 
-  my $response = $ua->get("$registry/v2/$repository/manifests/$tag", 'Accept', 'application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json');
-  if (!$response->is_success) {
-    my $code = $response->code;
-    return undef if $code eq '404';
-    die("rpc failed: $code!\n");
-  }
-  my $ct = $response->header('content_type');
+  my @accept = ($mt_docker_manifestlist, $mt_docker_manifest, $mt_oci_index, $mt_oci_manifest);
+  my ($data, $ct) = PBuild::Download::fetch("$registry/v2/$repository/manifests/$tag",
+	'ua' => $ua, 'accept' => \@accept, 'missingok' => 1);
+  return undef unless defined $data;
   die("no content type set in answer\n") unless $ct;
-  my $r = JSON::XS::decode_json($response->decoded_content);
-  if ($ct eq 'application/vnd.docker.distribution.manifest.list.v2+json' || $ct eq 'application/vnd.oci.image.index.v1+json') {
+  if ($ct eq $mt_docker_manifestlist || $ct eq $mt_oci_index) {
     # fat manifest, select the one we want
+    my $r = JSON::XS::decode_json($data);
     my $manifest = select_manifest($arch, $r->{'manifests'} || []);
     return undef unless $manifest;
-    $response = $ua->get("$registry/v2/$repository/manifests/$manifest->{'digest'}", 'Accept', 'application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json');
-    die("failed!\n") unless $response->is_success;
-    $ct = $response->header('content_type');
+    @accept = ($mt_docker_manifest, $mt_oci_manifest);
+    ($data, $ct) = PBuild::Download::fetch("$registry/v2/$repository/manifests/$manifest->{'digest'}",
+	'ua' => $ua, 'accept' => \@accept);
     die("no content type set in answer\n") unless $ct;
-    $r = JSON::XS::decode_json($response->decoded_content);
   }
-
+  die("unknown content type\n") unless $ct eq $mt_docker_manifest || $ct eq $mt_oci_manifest;
+  my $r = JSON::XS::decode_json($data);
   my @blobs;
   die("manifest has no config\n") unless $r->{'config'};
   push @blobs, $r->{'config'};
@@ -188,7 +193,7 @@ sub fetchbinaries {
     next unless $tofetch =~ /^(.*)\/(.*)?$/;
     my ($repository, $digest) = ($1, $2);
     next if -s "$repodir/blob.$digest";
-    PBuild::Download::download("$url/v2/$repository/blobs/$digest", "$repodir/.blob.$digest.$$", "$repodir/blob.$digest", $digest, $ua);
+    PBuild::Download::download("$url/v2/$repository/blobs/$digest", "$repodir/.blob.$digest.$$", "$repodir/blob.$digest", 'digest' => $digest, 'ua' => $ua);
   }
 }
 

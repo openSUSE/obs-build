@@ -22,8 +22,6 @@ package PBuild::RemoteRepo;
 
 use strict;
 
-use LWP::UserAgent;
-use URI;
 use Encode;
 use IO::Uncompress::Gunzip ();
 use Digest::MD5 ();
@@ -51,14 +49,14 @@ sub download_zypp {
   system('/usr/bin/zypper', '--no-refresh', '-q', '--pkg-cache-dir', $dir, 'download', '-r', $repo, $pkg)
       && die("zypper download $pkg failed\n");
   die("zypper download of $pkg did not create $dir/$repo/$path\n") unless -f "$dir/$repo/$path";
-  PBuild::Download::checkdigest("$dir/$repo/$path", $digest) if $digest;
+  PBuild::Download::checkfiledigest("$dir/$repo/$path", $digest) if $digest;
   rename("$dir/$repo/$path", $dest) || die("rename $dir/$repo/$path $dest: $!\n");
 }
 
 sub download {
   my ($url, $dest, $destfinal, $digest, $ua) = @_;
   return download_zypp($url, $destfinal || $dest, $digest) if $url =~ /^zypp:\/\//;
-  PBuild::Download::download($url, $dest, $destfinal, $digest, $ua, 3);
+  PBuild::Download::download($url, $dest, $destfinal, 'digest' => $digest, 'ua' => $ua, 'retry' => 3);
 }
 
 sub addpkg {
@@ -121,7 +119,7 @@ sub fetchrepo_rpmmd {
     if ($fn =~ /\.gz$/) {
       $fh = IO::Uncompress::Gunzip->new($fh) or die("Error opening $u: $IO::Uncompress::Gunzip::GunzipError\n");
     }
-    Build::Rpmmd::parse($fh, sub { addpkg(\@repodata, $_[0], $url) }, 'addselfprovides' => 1);
+    Build::Rpmmd::parse($fh, sub { addpkg(\@repodata, $_[0], $baseurl) }, 'addselfprovides' => 1);
     last;
   }
   return \@repodata;
