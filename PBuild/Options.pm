@@ -25,6 +25,8 @@ use strict;
 my %known_options = (
   'h' => 'help',
   'help' => 'help',
+  'name' => 'reponame',
+  'reponame' => 'reponame',
   'nochecks' => 'nochecks',
   'no-checks' => 'nochecks',
   'arch' => 'arch:',
@@ -114,7 +116,7 @@ my %known_codes = map {$_ => 1} @codes;
 sub result_special {
   my ($opts, $origopt, $opt, $args) = @_;
   my $arg;
-  $arg = getarg($origopt, $args, 1);
+  $arg = getarg($origopt, $args, 1) if @$args && (ref($args->[0]) || $args->[0] !~ /\//);
   if (!defined($arg) || $arg eq 'all') {
     push @{$opts->{'result-code'}}, 'all';
     return;
