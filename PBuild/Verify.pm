@@ -43,17 +43,6 @@ sub verify_arch {
   verify_simple($arch);
 }
 
-sub verify_nevraquery {
-  my ($q) = @_;
-  verify_arch($q->{'arch'});
-  die("binary has no name\n") unless defined $q->{'name'};
-  die("binary has no version\n") unless defined $q->{'version'};
-  my $f = "$q->{'name'}-$q->{'version'}";
-  $f .= "-$q->{'release'}" if defined $q->{'release'};
-  verify_filename($f);
-  verify_simple($f);
-}
-
 sub verify_packid {
   my $packid = $_[0];
   die("packid is empty\n") unless defined($packid) && $packid ne '';
@@ -80,21 +69,25 @@ sub verify_digest {
   die("digest '$digest' is illegal\n") unless $digest =~ /^(?:[a-zA-Z0-9]+:)?[a-fA-F0-9]+$/s;
 }
 
+sub verify_nevraquery {
+  my ($q) = @_;
+  verify_arch($q->{'arch'});
+  die("binary has no name\n") unless defined $q->{'name'};
+  die("binary has no version\n") unless defined $q->{'version'};
+  my $f = "$q->{'name'}-$q->{'version'}";
+  $f .= "-$q->{'release'}" if defined $q->{'release'};
+  verify_filename($f);
+  verify_simple($f);
+}
 
 sub verify_multibuild {
   my ($mb) = @_;
-  die("multibuild is weird\n") unless ref($mb) eq 'HASH';
-  die("_multibuild containes extra elements\n") if grep {$_ ne 'package' && $_ ne 'flavor'} keys %$mb;
-  die("_multibuild package element is weird\n") if exists($mb->{'package'}) && ref($mb->{'package'}) ne 'ARRAY';
-  die("_multibuild flavor element is weird\n") if exists($mb->{'flavor'}) && ref($mb->{'flavor'}) ne 'ARRAY';
   die("multibuild cannot have both package and flavor elements\n") if $mb->{'package'} && $mb->{'flavor'};
   for my $packid (@{$mb->{'package'} || []}) {
-    die("_multibuild package element is weird\n") unless ref($packid) eq '';
     verify_packid($packid);
     die("packid $packid is illegal in multibuild\n") if $packid =~ /:/;
   }
   for my $packid (@{$mb->{'flavor'} || []}) {
-    die("_multibuild flavor element is weird\n") unless ref($packid) eq '';
     verify_packid($packid);
     die("flavor $packid is illegal in multibuild\n") if $packid =~ /:/;
   }

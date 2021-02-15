@@ -22,9 +22,8 @@ package PBuild::Multibuild;
 
 use strict;
 
-use Build::SimpleXML;
+use PBuild::Structured;
 use PBuild::Verify;
-use PBuild::Util;
 
 sub find_mbname {
   my ($files) = @_;
@@ -41,8 +40,7 @@ sub find_mbname {
 
 sub readmbxml {
   my ($xmlfile) = @_;
-  my $xml = PBuild::Util::readstr($xmlfile);
-  my $mb = Build::SimpleXML::parse($xml);
+  my $mb = PBuild::Structured::readxml($xmlfile, $PBuild::Structured::multibuild);
   PBuilder::Verify::verify_multibuild($mb);
   return $mb;
 }

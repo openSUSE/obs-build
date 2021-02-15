@@ -22,10 +22,7 @@ package PBuild::Link;
 
 use strict;
 
-use Data::Dumper;
-
-use Build::SimpleXML;
-use PBuild::Verify;
+use PBuild::Structured;
 use PBuild::Util;
 
 sub expand_single_link {
@@ -37,22 +34,20 @@ sub expand_single_link {
     next if $p->{'error'} && $p->{'error'} =~ /^link expansion:/;
     my $files = $p->{'files'} || {};
     next unless $files->{'_link'};
-    my $linkxml = PBuild::Util::readstr("$p->{'dir'}/_link");
-    my $link = Build::SimpleXML::parse($linkxml);
-    if (ref($link) ne 'HASH' || !$link->{'link'} || ref($link->{'link'}) ne 'ARRAY' || ref($link->{'link'}->[0]) ne 'HASH') {
+    my $link = PBuild::Structured::readxml("$p->{'dir'}/_link", $PBuild::Structured::link, 1, 1);
+    if (!defined($link)) {
       $p->{'error'} = 'link expansion: bad _link xml';
       next;
     }
-    $link = $link->{'link'}->[0];
     if (exists $link->{'project'}) {
       $p->{'error'} = 'link expansion: only local links allowed';
       next;
     }
-    if (!$link->{'package'} || ref($link->{'package'})) {
+    if (!$link->{'package'}) {
       $p->{'error'} = 'link expansion: no package attribute';
       next;
     }
-    if ((exists($link->{'patches'}) && (ref($link->{'patches'}) ne 'ARRAY' || @{$link->{'patches'}} != 1 || ref($link->{'patches'}->[0]) ne 'HASH' || %{$link->{'patches'}->[0]})) || keys(%$files) != 1) {
+    if ((exists($link->{'patches'}) && exists($link->{'patches'}->{''})) || keys(%$files) != 1) {
       $p->{'error'} = 'link expansion: only simple links supported';
       next;
     }

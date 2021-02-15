@@ -33,7 +33,6 @@ use POSIX;
 use Cwd ();
 
 use Build;
-use Build::SimpleXML;
 
 use PBuild::Source;
 use PBuild::Recipe;
@@ -50,6 +49,7 @@ use PBuild::Cando;
 use PBuild::BuildConfig;
 use PBuild::Result;
 use PBuild::Download;
+use PBuild::Structured;
 
 # parse options
 my ($opts, @dirs) = PBuild::Options::parse_options(@ARGV);
@@ -74,31 +74,15 @@ $opts->{'buildjobs'} = 1 unless $opts->{'buildjobs'};
 $opts->{'buildjobs'} = 32 if $opts->{'buildjobs'} > 32;
 
 my $reponame = $opts->{'reponame'};
+
 # read _pbuild if present
 my $pbuildrepo;
 if (-f "$dir/_pbuild") {
-  my $pbuild = Build::SimpleXML::parse(PBuild::Util::readstr("$dir/_pbuild"));
-  die("bad _pbuild data\n") unless $pbuild && ref($pbuild) eq 'HASH' && $pbuild->{'pbuild'} && ref($pbuild->{'pbuild'}) eq 'ARRAY';
-  $pbuild = $pbuild->{'pbuild'}->[0];
-  die("bad _pbuild data\n") unless ref($pbuild) eq 'HASH';
-  if ($pbuild->{'repo'}) {
-    die("bad _pbuild data\n") unless ref($pbuild->{'repo'}) eq 'ARRAY';
-    for my $repo (@{$pbuild->{'repo'}}) {
-      die("bad _pbuild data\n") unless ref($repo) eq 'HASH';
-      die("bad _pbuild data\n") unless ref($repo->{'name'}) eq '';
-      if (!defined($reponame) || $reponame eq $repo->{'name'}) {
-	$pbuildrepo = $repo;
-	last;
-      }
-    }
-  }
-  if ($pbuildrepo) {
-    for my $d ('config', 'url', 'registry') {
-      next unless $pbuildrepo->{$d};
-      die("bad _pbuild data\n") unless ref($pbuildrepo->{$d}) eq 'ARRAY';
-      for (@{$pbuildrepo->{$d}}) {
-        die("bad _pbuild data\n") unless ref($_) eq 'HASH';
-      }
+  $pbuild = PBuild::Structured::readxml("$dir/_pbuild", $PBuild::Structured::pbuild);
+  for my $repo (@{$pbuild->{'repo'} || []}) {
+    if (!defined($reponame) || (defined($repo->{'name'}) && $reponame eq $repo->{'name'})) {
+      $pbuildrepo = $repo;
+      last;
     }
   }
 }
@@ -107,14 +91,14 @@ if (-f "$dir/_pbuild") {
 if ($pbuildrepo) {
   $reponame = $pbuildrepo->{'name'};
   if ($pbuildrepo->{'config'} && !$opts->{'dist'}) {
-    $opts->{'dist'} = $pbuildrepo->{'config'}->[0]->{'_content'};
+    $opts->{'dist'} = $pbuildrepo->{'config'};
   }
   if ($pbuildrepo->{'url'} && !$opts->{'repo'}) {
     for (@{$pbuildrepo->{'url'}}) {
       push @{$opts->{'repo'}}, $_->{'_content'};
     }
   }
-  if ($pbuildrepo->{'url'} && !$opts->{'registry'}) {
+  if ($pbuildrepo->{'registry'} && !$opts->{'registry'}) {
     for (@{$pbuildrepo->{'registry'}}) {
       push @{$opts->{'registry'}}, $_->{'_content'};
     }
