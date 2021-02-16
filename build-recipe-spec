@@ -127,7 +127,7 @@ recipe_build_spec() {
     fi
 
     # XXX: move _srcdefattr to macro file?
-    rpmbopts=("$BUILD_RPM_BUILD_STAGE" "--define" "_srcdefattr (-,root,root)")
+    rpmbopts=("--define" "_srcdefattr (-,root,root)")
     if test "$DO_CHECKS" != true ; then
 	if chroot "$BUILD_ROOT" "$rpmbuild" --nocheck --help >/dev/null 2>&1; then
 	    rpmbopts[${#rpmbopts[@]}]="--nocheck"
@@ -168,12 +168,11 @@ recipe_build_spec() {
     if test -n "$HAVE_DYNAMIC_BUILDREQUIRES" ; then
 	# query dynamic build requires
 	rm -f "$BUILD_ROOT$TOPDIR/SRPMS/"*.buildreqs.nosrc.rpm
-	rpmdynbropts=("${rpmbopts[@]}")
-	rpmdynbropts[0]=-br
 	toshellscript $rpmbuild \
 		--nodeps \
 		"${definesnstuff[@]}" \
-		"${rpmdynbropts[@]}" \
+		-br \
+		"${rpmbopts[@]}" \
 		"$TOPDIR/SOURCES/$RECIPEFILE" \
 		> $BUILD_ROOT/.build.command
 	chmod 755 $BUILD_ROOT/.build.command
@@ -204,6 +203,7 @@ recipe_build_spec() {
     # complicated quoting to bypass than this
     toshellscript $rpmbuild \
 	    "${definesnstuff[@]}" \
+	    "$BUILD_RPM_BUILD_STAGE" \
 	    "${rpmbopts[@]}" \
 	    "$TOPDIR/SOURCES/$RECIPEFILE" \
 	    > $BUILD_ROOT/.build.command
