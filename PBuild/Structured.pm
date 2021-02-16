@@ -28,9 +28,9 @@ use strict;
 
 our $pbuild = [
     'pbuild' =>
-     [[ 'destination' =>
+     [[ 'preset' =>
 	    'name',
-	    'config',
+	  [ 'config' ],
 	  [ 'repo' ],
 	  [ 'registry' ],
      ]],
@@ -164,7 +164,7 @@ sub readxml {
   };
   if ($@) {
     return undef if $nonfatal;
-    die($@);
+    die("$fn: $@");
   }
   return $d;
 }
