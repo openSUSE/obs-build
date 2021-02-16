@@ -278,7 +278,7 @@ sub fetchbinaries {
     my $location = $bin->{'location'};
     print Dumper($bin) unless $location;
     die("missing location for binary $bin->{'name'}\n") unless $location;
-    die("bad location: $location\n") unless $location =~ /^(?:https?|zypp):\/\//;
+    die("bad location: $location\n") unless $location =~ /^(?:https?:\/|zypp:\/|file:)\//;
     my $binname = calc_binname($bin);
     next if -e "$repodir/$binname";		# hey!
     my $tmpname = ".$$.$binname";
