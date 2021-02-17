@@ -576,6 +576,10 @@ if test -n "$PREPARE_VM" ; then
     rm -rf $BUILD_ROOT/.build/init_buildsystem.data
 fi
 
+if test "${repos[*]}" = config: ; then
+    repos=(`queryconfig repourl --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`)
+fi
+
 if test -e $BUILD_ROOT/.build/init_buildsystem.data ; then
     # vm continuation, read old config
     . $BUILD_ROOT/.build/init_buildsystem.data

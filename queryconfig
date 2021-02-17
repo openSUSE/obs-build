@@ -79,7 +79,7 @@ if ($type eq 'buildflags') {
   print "$result\n" if defined $result;
 } elsif ($type eq 'target' || $type eq 'type' || $type eq 'binarytype' || $type eq 'buildengine' || $type eq 'rawmacros') {
   print "$cf->{$type}\n" if $cf->{$type};
-} elsif ($type eq 'repotype') {
+} elsif ($type eq 'repotype' || $type eq 'repourl' || $type eq 'registryurl') {
   print join(' ', @{$cf->{$type}})."\n" if $cf->{$type};
 } elsif ($type eq 'optflags') {
   exit(0) unless $cf->{'optflags'};
