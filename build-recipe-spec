@@ -22,11 +22,12 @@
 ################################################################
 
 recipe_setup_spec() {
+    spec_setup_stages "$BUILD_RPM_BUILD_STAGE"
     TOPDIR=`chroot $BUILD_ROOT su -c "rpm --eval '%_topdir'" - $BUILD_USER`
     if test -z "$TOPDIR"; then
 	cleanup_and_exit 1 "Error: TOPDIR empty"
     fi
-    test "$DO_INIT_TOPDIR" = false || rm -rf "$BUILD_ROOT$TOPDIR"
+    test "$DO_INIT_TOPDIR" = false || spec_init_topdir
     for i in BUILD RPMS/`uname -m` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS BUILDROOT OTHER ; do
 	mkdir -p $BUILD_ROOT$TOPDIR/$i
     done
@@ -114,9 +115,63 @@ recipe_prepare_spec() {
     fi
 }
 
-recipe_build_spec() {
-    test -z "$BUILD_RPM_BUILD_STAGE" && BUILD_RPM_BUILD_STAGE=-ba
+spec_is_empty_dir() {
+    local d
+    for d in "$1"/* ; do
+	test -e "$d" && return 1
+    done
+    return 0
+}
 
+spec_init_topdir() {
+    local d keepbuild keepbuildroot
+    case "${rpmstages[0]}" in
+	-b[ci]\ --short-circuit) keepbuild=BUILD ;;
+	-bb\ --short-circuit | -bl) keepbuild=BUILD keepbuildroot=BUILDROOT ;;
+    esac
+    if test -n "$keepbuild$keepbuildroot" ; then
+	for d in $keepbuild $keepbuildroot ; do
+	    spec_is_empty_dir "$BUILD_ROOT$TOPDIR/$d" && cleanup_and_exit 1 "need files in $TOPDIR/$d for '${rpmstages[0]}'"
+	done
+	for d in "$BUILD_ROOT$TOPDIR"/* "$BUILD_ROOT$TOPDIR"/.[^.]* ; do
+	    test "$d" = "$BUILD_ROOT$TOPDIR/$keepbuild" -o "$d" = "$BUILD_ROOT$TOPDIR/$keepbuildroot" && continue
+	    rm -rf "$d"
+	done
+    else
+	rm -rf "$BUILD_ROOT$TOPDIR"
+    fi
+}
+
+spec_setup_stages() {
+    local stage="$1"
+    test "$stage#-b[a-z]" != "$stage" && stage="${stage#-b}"        # compat
+    local xstage=pciba
+    case $stage in
+	"")	     stage=pciba ;;
+	[lr])        ;;
+	[pciba])     stage="${xstage%$stage*}$stage" ;;
+	[pcibalr]=)  stage="${stage%=}" ;;
+	[pciba]+)    stage="${stage%+}${xstage#*${stage%+}}" ;;
+	s+ | s= | s) stage=s ;;
+	*)           cleanup_and_exit 1 "unknown stage '$stage'" ;;
+    esac
+    stage=${stage//s/a}
+    rpmstages=()
+    case $stage in
+	p | pc | pci | pcib | pciba) rpmstages[${#rpmstages[@]}]="-b${stage: -1}" ; stage= ;;
+    esac
+    while test -n "$stage" ; do
+	local opt="-b${stage:0:1}"
+	case "${stage:0:1}" in
+	    a)     opt="-bs" ;;
+	    [cib]) opt="$opt --short-circuit" ;;
+	esac
+	rpmstages[${#rpmstages[@]}]="$opt"
+	stage=${stage:1}
+    done
+}
+
+recipe_build_spec() {
     rpmbuild=rpmbuild
     test -x $BUILD_ROOT/usr/bin/rpmbuild || rpmbuild=rpm
     test "$BUILDTYPE" = debbuild && rpmbuild=debbuild
@@ -199,18 +254,21 @@ recipe_build_spec() {
 	rm -f "$BUILD_ROOT$TOPDIR/SRPMS/"*.buildreqs.nosrc.rpm
     fi
 
-    # su involves a shell which would require even more
-    # complicated quoting to bypass than this
-    toshellscript $rpmbuild \
-	    "${definesnstuff[@]}" \
-	    "$BUILD_RPM_BUILD_STAGE" \
-	    "${rpmbopts[@]}" \
-	    "$TOPDIR/SOURCES/$RECIPEFILE" \
-	    > $BUILD_ROOT/.build.command
-    chmod 755 $BUILD_ROOT/.build.command
-    check_exit
-    chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null
-    st=$?
+    for rpmstage in "${rpmstages[@]}" ; do
+	# su involves a shell which would require even more
+	# complicated quoting to bypass than this
+	toshellscript $rpmbuild \
+		"${definesnstuff[@]}" \
+		$rpmstage \
+		"${rpmbopts[@]}" \
+		"$TOPDIR/SOURCES/$RECIPEFILE" \
+		> $BUILD_ROOT/.build.command
+	chmod 755 $BUILD_ROOT/.build.command
+	check_exit
+	chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null
+	st=$?
+	test "$st" = 0 || break
+    done
     test "$st" = 0 && BUILD_SUCCEEDED=true
     test "$st" = 11 -a -n "$HAVE_DYNAMIC_BUILDREQUIRES" && BUILD_SUCCEEDED=genbuildreqs
 }
