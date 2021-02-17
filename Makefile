@@ -96,6 +96,7 @@ install:
 	install -m644 configs/* $(DESTDIR)$(pkglibdir)/configs
 	install -m644 baselibs_configs/* $(DESTDIR)$(pkglibdir)/baselibs_configs
 	install -m644 build.1 $(DESTDIR)$(man1dir)
+	install -m644 pbuild.1 $(DESTDIR)$(man1dir)
 	install -m644 buildvc.1 $(DESTDIR)$(man1dir)
 	install -m644 unrpm.1 $(DESTDIR)$(man1dir)
 	ln -sf $(pkglibdir)/build $(DESTDIR)$(bindir)/build

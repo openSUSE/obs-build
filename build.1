@@ -4,9 +4,9 @@
 .ns
 .TP \\$1
 ..
-.TH BUILD 1 "(c) 1997-2018 SUSE Linux AG Nuernberg, Germany"
+.TH BUILD 1 "(c) 1997-2021 SUSE LLC"
 .SH NAME
-build \- build SUSE Linux RPMs in a chroot environment
+build \- build packages in a reproducible way
 .SH SYNOPSIS
 .B build
 .RB [ --clean | --no-init]
@@ -120,7 +120,10 @@ if you want to re-build a package from a srcrpm with exactly the
 same packages used for the srcrpm build.
 .TP
 .B --stage
-Pass a stage option to rpmbuild. The default is \fB-ba\fP.
+Set stage for rpmbuild. Defaults to '\fBa\fP'. Append a trailing '\fB=\fP'
+to only run the specified stage. Append a trailing '\fB+\fP' to run
+the specified stage and all stages coming after it. With no
+suffix, stages up to and included the specified stage are run.
 .TP
 .B --target
 Call rpmbuild with a target option. This can be used for cross building.
@@ -215,13 +218,14 @@ The directory where build should install the chrooted build system.
 This can be used instead of the \fB--rpms\fP option. Deprecated.
 .TP
 .B BUILD_RPM_BUILD_STAGE
-The rpm build stage (-ba, -bb, ...).  This is just passed through to
-rpm, check the rpm manpage for a complete list and descriptions.
-"-ba" is the default. You should probably use the \fB--stage\fP
-option instead.
+The rpm build stage (a, b, ...).  See the \fB--stage\fP option
+for more information.
 
 .SH SEE ALSO
-.BR rpm (8), dpkg (8), pacman (8), kiwi (8)
+.BR rpm (8),
+.BR dpkg (8),
+.BR pacman (8),
+.BR kiwi (8)
 .TP
 .BR "Maximum RPM":
 .I http://www.rpm.org/max-rpm/

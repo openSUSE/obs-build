@@ -1,0 +1,125 @@
+.TH PBUILD 1 "(c) 2021 SUSE LLC"
+.SH NAME
+pbuild \- build a project consisting of a set of packages
+
+.SH SYNOPSIS
+.B pbuild
+.RB [ --preset
+.IR preset ]
+.RB [ --dist
+.IR dist ]
+.RB [ --buildjobs
+.IR num ]
+.RI [ dir ]
+.br
+.B pbuild
+.RB [ --preset
+.IR preset ]
+.RB [ --dist
+.IR dist ]
+.B --result
+.RB [ --details ]
+.RI [ dir ]
+
+.SH DESCRIPTION
+The pbuild packages builds a project consisting of a set of packages stored
+in the specified directory \fIdir\fP. If the directory is not specified,
+the current working directory is used instead.
+
+A package consists of files stored in a directory where the package name is
+the name of the directory. Directories with names starting with "." or "_"
+are ignored.
+
+Pbuild works by parsing the recipe files from the packages to get dependency
+information, sorting the packages by dependency and then creating build
+jobs for every package that needs to be rebuild. Pbuild stores extra
+information with the build results so that it is able to resume after
+interruption or integrate new source changes.
+
+The results of the package builds are stored in a directory
+"\fB_result.\fP\fIreponame\fP\fB.\fP\fIarch\fP", where \fIreponame\fP
+defaults to the name of the base distribution selected with the
+--dist or --preset options.
+
+.SH COMMON OPTIONS
+.TP
+.BI "\-\-arch " arch
+Build for the specified architecture. If this option is not used, pbuild
+will build for the host architecture.
+.TP
+.BI "\-\-preset " preset
+Use a defined preset to set the distribution config, the repositories,
+and the container registries. Presets can be defined by having a "_pbuild"
+file in the source directory.
+.TP
+.BI "\-\-dist " dist
+Use the specified distribution config \fIdist\fP to configure the build
+environment.
+.TP
+.BI "\-\-reponame " name
+Use the specified name to generate the directory name used to store the
+package build results.
+
+.SH BUILD OPTIONS
+.TP
+.BI "\-\-repo " url
+Use the specified location to set up the build environment. The repo
+option can be used multiple times to create a search path. Note that
+the order of the option matters, i.e. the first repository containing a
+package with a specific name wins regardless of the version. If no
+repo is configured, the default repositories specified in the
+distribution config is used.
+.TP
+.BI "\-\-registry " url
+Use the specified location to search for remote containers.
+.TP
+.BI "\-\-buildjobs " num
+Start up to \fInum\fP processes to build packages in parallel.
+.TP
+.B "\-\-vm-..."
+.PD 0
+.TP
+.B "\-\-jobs"
+.TP
+.B "\-\-threads"
+.TP
+.B "\-\-xen, \-\-kvm, ..."
+.TP
+.B "\-\-no-checks"
+.TP
+.B "\-\-target"
+.PD
+This options are passed on to the call of the build tool used to build
+packages.
+
+.SH QUERY OPTIONS
+.TP
+.BI "\-\-result-pkg " packagename
+Only show build results for the specified package. This option can be
+used multiple times.
+.TP
+.BI "\-\-result-code " code
+Only show build results for builds that resulted in the specified code.
+This option can be used multiple times.
+.TP
+.BI "\-\-result " \fR[\fPcode_or_packagename\fR]\fP
+This is a short hand form for resut querying. If no argument is given,
+the results for all packages are shown. If the argument is a known
+result code, builds that resulted in the specified code are shown.
+Otherwise it is assumed that the argument is a package name.
+
+.SH MISC OPTIONS
+.TP
+.BI "\-\-hostarch " arch
+Assume the specified host architecture instead of using "uname -m".
+.TP
+.BI "\-\-configdir " dir
+Specify a different directory containing distribution configurations.
+.TP
+.BI "\-\-help"
+Print a short help text.
+
+
+.SH SEE ALSO
+.BR build (1)
+
