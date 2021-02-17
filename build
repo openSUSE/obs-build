@@ -239,11 +239,14 @@ Known Parameters:
   --define 'X Y'
               Define macro X with value Y
 
-  --release release
-              Override Release in spec file
+  --release RELEASE
+              Override the Release line in the spec file
 
-  --stage -bSTAGE
-              Set stage for rpmbuild. Defaults to -ba.
+  --stage STAGE
+              Set stage for rpmbuild. Defaults to 'a'. Append a trailing '='
+              to only run the specified stage. Append a trailing '+' to run
+              the specified stage and all stages coming after it. With no
+              suffix, stages up to and included the specified stage are run.
 
   --target platform
               Set target platform for rpmbuild
@@ -350,7 +353,8 @@ Known Parameters:
               May get overruled by build config vmfstype build flag.
 
   --vm-disk-filesystem-options OPTIONS
-              nodirindex: disable dir indexing on ext filesystems. Slower, but reproducible builds
+              nodirindex: disable dir indexing on ext filesystems. Slower,
+              but more reproducible builds
 
   --vm-memory SIZEINMB
               Set amount of RAM for VMs
@@ -366,12 +370,12 @@ Known Parameters:
               User name to run qemu/kvm process
 
   --vm-telnet PORT
-              Is forwarding PORT to a telnet session inside of the VM.
-              Specify also needed extra packages via -x parameter, usually:
+              Forward the PORT to a telnet session inside of the VM.
+              Specify the needed extra packages via -x parameter, usually:
                  --vm-telnet 1234 -x telnet-server -x net-tools
               And connect from the host via
                  telnet 1234
-              NOTE: The telnet server gets started after all packages got installed.
+              The telnet server is started after all packages got installed.
 
   --vm-net OPTION
   --vm-netdev OPTION
@@ -379,8 +383,21 @@ Known Parameters:
               KVM only: Attach kvm option
               Available options are -net, -netdev, -device
 	      (This options in kvm can not guarantee reproducible builds)
+
   --debug
               Enable creation of a debuginfo package
+
+  --buildflavor FLAVOR
+              Specify the flavor to build. For rpm builds, it replaces 
+              the @BUILD_FLAVOR@ macro in the spec file.
+
+  --changelog
+              Append the rpm changelog from a SUSE .changes file to the spec file
+
+  --norootforbuild
+              Force building with user 'abuild', ignore the "needsrootforbuild"
+              hint from the recipe file
+              
 
 Remember to have fun!
 
