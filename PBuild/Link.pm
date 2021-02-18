@@ -25,6 +25,15 @@ use strict;
 use PBuild::Structured;
 use PBuild::Util;
 
+my $dtd_link = [
+    'link' =>
+        'project',
+        'package',
+        'baserev',
+        'missingok',
+      [ 'patches' => [[ '' => [] ]] ],
+];
+
 sub expand_single_link {
   my ($pkgs, $pkg) = @_;
   my @todo = ($pkg);
@@ -34,7 +43,7 @@ sub expand_single_link {
     next if $p->{'error'} && $p->{'error'} =~ /^link expansion:/;
     my $files = $p->{'files'} || {};
     next unless $files->{'_link'};
-    my $link = PBuild::Structured::readxml("$p->{'dir'}/_link", $PBuild::Structured::link, 1, 1);
+    my $link = PBuild::Structured::readxml("$p->{'dir'}/_link", $dtd_link, 1, 1);
     if (!defined($link)) {
       $p->{'error'} = 'link expansion: bad _link xml';
       next;

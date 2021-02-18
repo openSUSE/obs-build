@@ -41,13 +41,12 @@ use PBuild::RemoteRegistry;
 use PBuild::LocalRepo;
 use PBuild::Multibuild;
 use PBuild::Link;
-use PBuild::Expand;
 use PBuild::Checker;
 use PBuild::Options;
 use PBuild::BuildConfig;
 use PBuild::Result;
 use PBuild::Download;
-use PBuild::Structured;
+use PBuild::Preset;
 
 # parse options
 my ($opts, @dirs) = PBuild::Options::parse_options(@ARGV);
@@ -73,26 +72,8 @@ $opts->{'buildjobs'} = 32 if $opts->{'buildjobs'} > 32;
 
 
 # read presets
-my $presetname = $opts->{'preset'};
-my $preset;
-if (-f "$dir/_pbuild") {
-  $pbuild = PBuild::Structured::readxml("$dir/_pbuild", $PBuild::Structured::pbuild);
-  for my $d (@{$pbuild->{'preset'} || []}) {
-    if (!defined($presetname) || (defined($d->{'name'}) && $presetname eq $d->{'name'})) {
-      $preset = $d;
-      last;
-    }
-  }
-  die("unknown preset '$presetname'\n") if defined($presetname) && !$preset;
-}
-
-# get reponame/dist/repo/registry options from preset
-if ($preset) {
-  $opts->{'reponame'} = $preset->{'name'} if $preset->{'name'} && !$opts->{'reponame'};
-  push @{$opts->{'dist'}}, @{$preset->{'config'}} if $preset->{'config'} && !$opts->{'dist'};
-  push @{$opts->{'repo'}}, @{$preset->{'repo'}} if $preset->{'repo'} && !$opts->{'repo'};
-  push @{$opts->{'registry'}}, @{$preset->{'registry'}} if $preset->{'registry'} && !$opts->{'registry'};
-}
+my $preset = PBuild::Preset::read_presets($dir, $opts->{'preset'});
+PBuild::Preset::apply_preset($opts, $preset) if $preset;
 
 my $reponame = $opts->{'reponame'};
 if (!$reponame && $opts->{'dist'}) {

@@ -26,31 +26,6 @@ use PBuild::Util;
 
 use strict;
 
-our $pbuild = [
-    'pbuild' =>
-     [[ 'preset' =>
-	    'name',
-	  [ 'config' ],
-	  [ 'repo' ],
-	  [ 'registry' ],
-     ]],
-];
-
-our $link = [
-    'link' =>
-        'project',
-        'package',
-        'baserev',
-        'missingok',
-      [ 'patches' => [[ '' => [] ]] ],
-];
-
-our $multibuild = [
-    'multibuild' =>
-          [ 'package' ],        # obsolete
-          [ 'flavor' ],
-];
-
 #
 # Convert dtd to a hash mapping elements/attributes to multi/subdtd tupels
 #

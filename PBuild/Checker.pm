@@ -24,6 +24,7 @@ use strict;
 use Digest::MD5 ();
 use Data::Dumper;
 
+use PBuild::Expand;
 use PBuild::Depsort;
 use PBuild::Meta;
 use PBuild::Util;

@@ -25,6 +25,12 @@ use strict;
 use PBuild::Structured;
 use PBuild::Verify;
 
+my $dtd_multibuild = [
+    'multibuild' =>
+          [ 'package' ],        # obsolete
+          [ 'flavor' ],
+];
+
 sub find_mbname {
   my ($files) = @_;
   my $mbname = '_multibuild';
@@ -40,7 +46,7 @@ sub find_mbname {
 
 sub readmbxml {
   my ($xmlfile) = @_;
-  my $mb = PBuild::Structured::readxml($xmlfile, $PBuild::Structured::multibuild);
+  my $mb = PBuild::Structured::readxml($xmlfile, $dtd_multibuild);
   PBuilder::Verify::verify_multibuild($mb);
   return $mb;
 }
