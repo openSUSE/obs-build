@@ -151,12 +151,42 @@ sub fetchrepo {
   my @pkgs = sort keys %$pkgsrc;
   my $gbininfo = read_gbininfo($builddir, \@pkgs);
   my $filter = PBuild::ExportFilter::calculate_exportfilter($bconf, $arch);
-  my $useforbuild = { map {$_ => $pkgsrc->{$_}->{'useforbuildenabled'}} @pkgs };
-  my %full = gbininfo2full($gbininfo, $arch, $useforbuild, $filter);
+  my %useforbuild = map {$_ => $pkgsrc->{$_}->{'useforbuildenabled'}} @pkgs;
+  for (@pkgs) {
+    my $p = $pkgsrc->{$_};
+    delete $useforbuild{$_} if ($p->{'error'} || '') eq 'excluded';
+  }
+  my %full = gbininfo2full($gbininfo, $arch, \%useforbuild, $filter);
   my $bins = [ sort { $a->{'name'} cmp $b->{'name'} } values %full ];
   my $repofile = "$builddir/.pbuild/_metadata";
   PBuild::Util::store("$builddir/.pbuild/._metadata.$$", $repofile, $bins);
   return $bins;
+}
+
+#
+# Delete no obsolete entries in the builddir
+#
+sub cleanup_builddir {
+  my ($builddir, $pkgsrc) = @_;
+  my @pkgs = sort keys %$pkgsrc;
+  my @d = PBuild::Util::ls($builddir);
+  my %obsolete;
+  for my $d (@d) {
+    next if $d eq '.pbuild' || $d =~ /^_/;
+    my $p = $pkgsrc->{$d};
+    $obsolete{$d} = 1 if !$p || ($p->{'error'} || '') eq 'excluded';
+  }
+  return unless %obsolete;
+  my $gbininfo = PBuild::Util::retrieve("$builddir/.pbuild/_bininfo", 1);
+  if ($gbininfo) {
+    delete $gbininfo->{$_} for keys %obsolete;
+    PBuild::Util::store("$builddir/.pbuild/._bininfo.$$", "$builddir/.pbuild/_bininfo", $gbininfo);
+  }
+  for my $d (sort keys %obsolete) {
+    next unless -d "$builddir/$d";
+    PBuild::Util::cleandir("$builddir/$d");
+    rmdir("$builddir/$d");
+  }
 }
 
 1;

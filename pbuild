@@ -190,6 +190,9 @@ for my $pkg (@pkgs) {
   $p->{'useforbuildenabled'} = 1;
 }
 
+# delete obsolete entries from builddir
+PBuild::LocalRepo::cleanup_builddir($builddir, \%pkgsrc);
+
 my @repos;
 print "fetching local repo metadata\n";
 my $localbins = PBuild::LocalRepo::fetchrepo($bconf, $myarch, $builddir, \%pkgsrc);
@@ -322,9 +325,9 @@ while (1) {
 	last;
       }
       if (!$builder) {
-	$status = 'waiting';
+	($status, $error) = ('waiting', undef);
       } else {
-        ($status, $error) = PBuild::Checker::build($ctx, $packid, $error, $builder);
+	($status, $error) = PBuild::Checker::build($ctx, $packid, $error, $builder);
       }
       if ($status eq 'building') {
 	my $job = $error;
