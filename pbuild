@@ -169,9 +169,32 @@ print "expanding multibuild packages\n";
 PBuild::Multibuild::expand_multibuilds(\%pkgsrc);
 
 @pkgs = sort keys %pkgsrc;
-my %containertags;
+
+if (exists $bconf->{'buildflags:excludebuild'}) {
+  my %excludebuild;
+  /^excludebuild:(.*)$/s && ($excludebuild{$1} = 1) for @{$bconf->{'buildflags'} || []};
+  if (%excludebuild) {
+    for my $pkg (@pkgs) {
+      my $p = $pkgsrc{$pkg};
+      my $releasename = $p->{'releasename'} || $pkg;
+      $p->{'error'} = "excluded:project config excludebuild list" if $excludebuild{$pkg} || $excludebuild{$releasename};
+    }
+  }
+}
+if (exists $bconf->{'buildflags:onlybuild'}) {
+  my %onlybuild;
+  /^onlybuild:(.*)$/s && ($onlybuild{$1} = 1) for @{$bconf->{'buildflags'} || []};
+  if (%onlybuild) {
+    for my $pkg (@pkgs) {
+      my $p = $pkgsrc{$pkg};
+      my $releasename = $p->{'releasename'} || $pkg;
+      $p->{'error'} = "excluded:project config onlybuild list" unless $onlybuild{$pkg} || $onlybuild{$releasename};
+    }
+  }
+}
 
 print "parsing recipe files\n";
+my %containertags;
 my $buildtype = $bconf->{'type'} || '';
 $buildtype = 'spec' if !$buildtype || $buildtype eq 'UNDEFINED';
 for my $pkg (@pkgs) {
