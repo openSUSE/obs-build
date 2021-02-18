@@ -155,9 +155,9 @@ sub setupimagefiles {
   my ($ctx, $p, $bdeps, $dstdir) = @_;
 
   PBuild::Util::mkdir_p("$dstdir/repos/pbuild/pbuild");
-  my $repodata = $ctx->{'repodata'};
+  my $dep2pkg = $ctx->{'dep2pkg'};
   for my $bin (@$bdeps) {
-    my $q = $repodata->{$bin};
+    my $q = $dep2pkg->{$bin};
     my $repono = $q->{'repono'};
     my $repo = $ctx->{'repos'}->[$repono || 0];
     die("bad package $bin\n") unless defined($repono) && $repo;
@@ -206,9 +206,9 @@ sub createjob {
     @alldeps = PBuild::Util::unify(@$pdeps, @$vmdeps, @$bdeps, @$sysdeps);
   }
   my @rpmlist;
-  my $repodata = $ctx->{'repodata'};
+  my $dep2pkg = $ctx->{'dep2pkg'};
   for my $bin (@alldeps) {
-    my $q = $repodata->{$bin};
+    my $q = $dep2pkg->{$bin};
     die("missing package $bin\n") unless $q && $q->{'filename'};
     my $repono = $q->{'repono'};
     my $repo = $ctx->{'repos'}->[$repono || 0];

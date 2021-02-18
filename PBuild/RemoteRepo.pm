@@ -62,13 +62,13 @@ sub download {
 }
 
 sub addpkg {
-  my ($repodata, $pkg, $locprefix) = @_;
+  my ($bins, $pkg, $locprefix) = @_;
   return unless defined($pkg->{'name'}) && defined($pkg->{'arch'});
   return if $pkg->{'arch'} eq 'src' || $pkg->{'arch'} eq 'nosrc';
   $locprefix = '' unless defined $locprefix;
   $pkg->{'location'} = "$locprefix$pkg->{'location'}" if defined $locprefix;
   delete $pkg->{'filename'};	# just in case
-  push @$repodata, $pkg;
+  push @$bins, $pkg;
 }
 
 sub fetchrepo_arch {
@@ -77,16 +77,16 @@ sub fetchrepo_arch {
   my $reponame = $1;
   $url .= '/' unless $url =~ /\/$/;
   download("$url$reponame.db", "$tmpdir/repo.db");
-  my @repodata;
-  Build::Archrepo::parse("$tmpdir/repo.db", sub { addpkg(\@repodata, $_[0], $url) }, 'addselfprovides' => 1);
-  return \@repodata;
+  my @bins;
+  Build::Archrepo::parse("$tmpdir/repo.db", sub { addpkg(\@bins, $_[0], $url) }, 'addselfprovides' => 1);
+  return \@bins;
 }
 
 sub fetchrepo_debian {
   my ($url, $tmpdir, $arch) = @_;
   my ($baseurl, $disturl, $components) = Build::Debrepo::parserepourl($url);
   my $basearch = Build::Deb::basearch($arch);
-  my @repodata;
+  my @bins;
   for my $component (@$components) {
     unlink("$tmpdir/Packages.gz");
     if ($component eq '.') {
@@ -96,9 +96,9 @@ sub fetchrepo_debian {
       download("$disturl$component/binary-$basearch/Packages.gz", "$tmpdir/Packages.gz");
       die("Packages.gz missing for basearch $basearch, component $component\n") unless -s "$tmpdir/Packages.gz";
     }
-    Build::Debrepo::parse("$tmpdir/Packages.gz", sub { addpkg(\@repodata, $_[0], $url) }, 'addselfprovides' => 1, 'withchecksum' => 1);
+    Build::Debrepo::parse("$tmpdir/Packages.gz", sub { addpkg(\@bins, $_[0], $url) }, 'addselfprovides' => 1, 'withchecksum' => 1);
   }
-  return \@repodata;
+  return \@bins;
 }
 
 sub fetchrepo_rpmmd {
@@ -109,7 +109,7 @@ sub fetchrepo_rpmmd {
   download("${baseurl}repodata/repomd.xml", "$tmpdir/repomd.xml") unless $iszypp;
   Build::Rpmmd::parse_repomd("$tmpdir/repomd.xml", \@primaryfiles);
   @primaryfiles = grep {$_->{'type'} eq 'primary' && defined($_->{'location'})} @primaryfiles;
-  my @repodata;
+  my @bins;
   for my $f (@primaryfiles) {
     my $u = "$f->{'location'}";
     utf8::downgrade($u);
@@ -129,10 +129,10 @@ sub fetchrepo_rpmmd {
     if ($fn =~ /\.gz$/) {
       $fh = IO::Uncompress::Gunzip->new($fh) or die("Error opening $u: $IO::Uncompress::Gunzip::GunzipError\n");
     }
-    Build::Rpmmd::parse($fh, sub { addpkg(\@repodata, $_[0], $baseurl) }, 'addselfprovides' => 1, 'withchecksum' => 1);
+    Build::Rpmmd::parse($fh, sub { addpkg(\@bins, $_[0], $baseurl) }, 'addselfprovides' => 1, 'withchecksum' => 1);
     last;
   }
-  return \@repodata;
+  return \@bins;
 }
 
 sub fetchrepo_susetags {
@@ -142,14 +142,14 @@ sub fetchrepo_susetags {
   my $baseurl = $url;
   $baseurl .= '/' unless $baseurl =~ /\/$/;
   download("${baseurl}$descrdir/packages.gz", "$tmpdir/packages.gz") unless $iszypp;
-  my @repodata;
+  my @bins;
   Build::Susetags::parse("$tmpdir/packages.gz", sub {
     my $xurl = $baseurl;
     $xurl =~ s/1\/$/$_[0]->{'medium'}/ if $_[0]->{'medium'};
     $xurl .= "$datadir/" if $datadir;
-    addpkg(\@repodata, $_[0], $xurl)
+    addpkg(\@bins, $_[0], $xurl)
   }, 'addselfprovides' => 1, 'withchecksum' => 1);
-  return \@repodata;
+  return \@bins;
 }
 
 sub fetchrepo_zypp {

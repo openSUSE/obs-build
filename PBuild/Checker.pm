@@ -61,21 +61,18 @@ sub prepare {
   my ($ctx, $repos) = @_;
   my $repodata = PBuild::Expand::configure_repos($ctx->{'bconf'}, $repos);
   my %dep2src;
-  my %dep2pkg;
   my %subpacks;
   for my $n (sort keys %$repodata) {
     my $bin = $repodata->{$n};
     my $sn = $bin->{'source'};
     $sn = $n unless defined $n;
-    $dep2pkg{$n} = $bin;
     $dep2src{$n} = $sn;
   }
   push @{$subpacks{$dep2src{$_}}}, $_ for keys %dep2src;
   $ctx->{'dep2src'} = \%dep2src;
-  $ctx->{'dep2pkg'} = \%dep2pkg;
+  $ctx->{'dep2pkg'} = $repodata;
   $ctx->{'subpacks'} = \%subpacks;
   $ctx->{'repos'} = $repos;
-  $ctx->{'repodata'} = $repodata;
   PBuild::Meta::setgenmetaalgo($ctx->{'genmetaalgo'});
 }
 
@@ -123,7 +120,8 @@ sub pkgsort {
 }
 
 sub genmeta {
-  my ($ctx, $p, $edeps, $repodata) = @_;
+  my ($ctx, $p, $edeps) = @_;
+  my $dep2pkg = $ctx->{'dep2pkg'};
   if ($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker' || $p->{'buildtype'} eq 'preinstallimage') {
     if ($p->{'buildtype'} eq 'preinstallimage') {
       my @pdeps = Build::get_preinstalls($ctx->{'bconf'});
@@ -132,7 +130,7 @@ sub genmeta {
     }
     my @new_meta;
     for my $bin (@$edeps) {
-      my $q = $repodata->{$bin};
+      my $q = $dep2pkg->{$bin};
       push @new_meta, (($q || {})->{'hdrmd5'} || 'd0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0')."  $bin";
     }
     @new_meta = sort {substr($a, 34) cmp substr($b, 34) || $a cmp $b} @new_meta;
@@ -143,7 +141,7 @@ sub genmeta {
   my @new_meta;
   my $builddir = $ctx->{'builddir'};
   for my $bin (@$edeps) {
-    my $q = $repodata->{$bin};
+    my $q = $dep2pkg->{$bin};
     my $binpackid = $q->{'packid'};
     if (!$binpackid) {
       # use the hdrmd5 for non-local packages
@@ -180,7 +178,7 @@ sub check_image {
     splice(@blocked, 10, scalar(@blocked), '...') if @blocked > 10;
     return ('blocked', join(', ', @blocked));
   }
-  my $new_meta = genmeta($ctx, $p, $edeps, $ctx->{'repodata'});
+  my $new_meta = genmeta($ctx, $p, $edeps);
   my $dst = "$ctx->{'builddir'}/$packid";
   my @meta;
   my $mfp;
@@ -291,10 +289,10 @@ sub check {
     }
     my $check = substr($mylastcheck, 32, 32);	# metamd5
 
-    my $repodata = $ctx->{'repodata'};
+    my $dep2pkg = $ctx->{'dep2pkg'};
     $check .= $ctx->{'genmetaalgo'} if $ctx->{'genmetaalgo'};
     $check .= $rebuildmethod;
-    $check .= $repodata->{$_}->{'hdrmd5'} || 'd0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0' for sort @$edeps;
+    $check .= $dep2pkg->{$_}->{'hdrmd5'} || 'd0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0' for sort @$edeps;
     $check = Digest::MD5::md5_hex($check);
     if ($check eq substr($mylastcheck, 64, 32)) {
       # print "      - $packid ($buildtype)\n";
@@ -303,7 +301,7 @@ sub check {
     }
     substr($mylastcheck, 64, 32) = $check;	# substitute new hdrmetamd5
     # even more work, generate new meta, check if it changed
-    my $new_meta = genmeta($ctx, $p, $edeps, $repodata);
+    my $new_meta = genmeta($ctx, $p, $edeps);
     if (Digest::MD5::md5_hex(join("\n", @$new_meta)) eq substr($mylastcheck, 32, 32)) {
       # print "      - $packid ($buildtype)\n";
       # print "        nothing changed (looked harder)\n";
@@ -347,9 +345,9 @@ relsynccheck:
 sub getremotebinaries {
   my ($ctx, @bins) = @_;
   my %tofetch;
-  my $repodata = $ctx->{'repodata'};
+  my $dep2pkg = $ctx->{'dep2pkg'};
   for my $bin (PBuild::Util::unify(@bins)) {
-    my $q = $repodata->{$bin};
+    my $q = $dep2pkg->{$bin};
     die("unknown binary $bin?\n") unless $q;
     next if $q->{'filename'};
     my $repono = $q->{'repono'};
@@ -470,9 +468,10 @@ sub build {
   if (@sysdeps && !shift(@sysdeps)) {
     return ('unresolvable', join(', ', @sysdeps));
   }
+  my $dep2pkg = $ctx->{'dep2pkg'};
   my @pdeps = Build::get_preinstalls($bconf);
   my @vmdeps = Build::get_vminstalls($bconf);
-  my @missing = grep {!$ctx->{'dep2pkg'}->{$_}} (@pdeps, @vmdeps);
+  my @missing = grep {!$dep2pkg->{$_}} (@pdeps, @vmdeps);
   if (@missing) {
     my $missing = join(', ', sort(BSUtil::unify(@missing)));
     return ('unresolvable', "missing pre/vminstalls: $missing");
@@ -484,7 +483,7 @@ sub build {
   $job->{'reason'} = $reason;
   $job->{'hostarch'} = $ctx->{'hostarch'};
   # calculate meta (again) as remote binaries have been replaced
-  $job->{'meta'} = genmeta($ctx, $p, $edeps, $ctx->{'repodata'});
+  $job->{'meta'} = genmeta($ctx, $p, $edeps);
   $builder->{'job'} = $job;
   return ('building', $job);
 }
