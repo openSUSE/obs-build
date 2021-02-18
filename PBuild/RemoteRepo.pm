@@ -32,6 +32,8 @@ use Build::Rpmmd;
 use Build::Archrepo;
 use Build::Debrepo;
 use Build::Deb;
+use Build::Susetags;
+use Build::Zypp;
 
 use PBuild::Util;
 use PBuild::Download;
@@ -41,10 +43,10 @@ my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst};
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
 
 sub download_zypp {
-  my ($url, $dest, $digest);
+  my ($url, $dest, $digest) = @_;
   die("do not know how to download $url\n") unless $url =~ m#^zypp://([^/]+)/((?:.*/)?([^/]+)\.rpm)$#;
   my ($repo, $path, $pkg) = ($1, $2, $3);
-  die("bad dest $dest\n") if $dest !~ /^(.*)\/\Q$pkg\E\.rpm$/;
+  die("bad dest $dest for $pkg\n") if $dest !~ /^(.*)\/[^\/]*\Q$pkg\E\.rpm$/;
   my $dir = $1;
   system('/usr/bin/zypper', '--no-refresh', '-q', '--pkg-cache-dir', $dir, 'download', '-r', $repo, $pkg)
       && die("zypper download $pkg failed\n");
@@ -94,17 +96,17 @@ sub fetchrepo_debian {
       download("$disturl$component/binary-$basearch/Packages.gz", "$tmpdir/Packages.gz");
       die("Packages.gz missing for basearch $basearch, component $component\n") unless -s "$tmpdir/Packages.gz";
     }
-    Build::Debrepo::parse("$tmpdir/Packages.gz", sub { addpkg(\@repodata, $_[0], $url) }, 'addselfprovides' => 1);
+    Build::Debrepo::parse("$tmpdir/Packages.gz", sub { addpkg(\@repodata, $_[0], $url) }, 'addselfprovides' => 1, 'withchecksum' => 1);
   }
   return \@repodata;
 }
 
 sub fetchrepo_rpmmd {
-  my ($url, $tmpdir, $arch) = @_;
+  my ($url, $tmpdir, $arch, $iszypp) = @_;
   my $baseurl = $url;
-  my @primaryfiles;
   $baseurl .= '/' unless $baseurl =~ /\/$/;
-  download("${baseurl}repodata/repomd.xml", "$tmpdir/repomd.xml");
+  my @primaryfiles;
+  download("${baseurl}repodata/repomd.xml", "$tmpdir/repomd.xml") unless $iszypp;
   Build::Rpmmd::parse_repomd("$tmpdir/repomd.xml", \@primaryfiles);
   @primaryfiles = grep {$_->{'type'} eq 'primary' && defined($_->{'location'})} @primaryfiles;
   my @repodata;
@@ -113,16 +115,61 @@ sub fetchrepo_rpmmd {
     utf8::downgrade($u);
     next unless $u =~ /(primary\.xml(?:\.gz)?)$/;
     my $fn = $1;
-    download("${baseurl}/$f->{'location'}", "$tmpdir/$fn", undef, $f->{'checksum'});
+    if ($iszypp) {
+      $fn = $u;
+      $fn =~ s/.*\///s;
+      die("zypp repo $url is not up to date, please refresh first\n") unless -s "$tmpdir/$fn";
+    } else {
+      die("primary file $u does not have a checksum\n") unless $f->{'checksum'} && $f->{'checksum'} =~ /:(.*)/;
+      $fn = "$1-$fn";
+      download("${baseurl}/$f->{'location'}", "$tmpdir/$fn", undef, $f->{'checksum'});
+    }
     my $fh;
     open($fh, '<', "$tmpdir/$fn") or die "Error opening $tmpdir/$fn: $!\n";
     if ($fn =~ /\.gz$/) {
       $fh = IO::Uncompress::Gunzip->new($fh) or die("Error opening $u: $IO::Uncompress::Gunzip::GunzipError\n");
     }
-    Build::Rpmmd::parse($fh, sub { addpkg(\@repodata, $_[0], $baseurl) }, 'addselfprovides' => 1);
+    Build::Rpmmd::parse($fh, sub { addpkg(\@repodata, $_[0], $baseurl) }, 'addselfprovides' => 1, 'withchecksum' => 1);
     last;
   }
   return \@repodata;
+}
+
+sub fetchrepo_susetags {
+  my ($url, $tmpdir, $arch, $iszypp) = @_;
+  my $descrdir = 'suse/setup/descr';
+  my $datadir = 'suse';
+  my $baseurl = $url;
+  $baseurl .= '/' unless $baseurl =~ /\/$/;
+  download("${baseurl}$descrdir/packages.gz", "$tmpdir/packages.gz") unless $iszypp;
+  my @repodata;
+  Build::Susetags::parse("$tmpdir/packages.gz", sub {
+    my $xurl = $baseurl;
+    $xurl =~ s/1\/$/$_[0]->{'medium'}/ if $_[0]->{'medium'};
+    $xurl .= "$datadir/" if $datadir;
+    addpkg(\@repodata, $_[0], $xurl)
+  }, 'addselfprovides' => 1, 'withchecksum' => 1);
+  return \@repodata;
+}
+
+sub fetchrepo_zypp {
+  my ($url, $tmpdir, $arch) = @_;
+  die("zypp repo must start with zypp://\n") unless $url =~ /^zypp:\/\/([^\/]*)/;
+  my $repo = Build::Zypp::parserepo($1);
+  my $type = $repo->{'type'};
+  my $zyppcachedir = "/var/cache/zypp/raw/$repo->{'name'}";
+  if (!$type) {
+    $type = 'yast2' if -e "$zyppcachedir/suse/setup/descr";
+    $type = 'rpm-md' if -e "$zyppcachedir/repodata";
+  }
+  die("could not determine repo type for '$repo->{'name'}'\n") unless $type;
+  if($type eq 'rpm-md') {
+    die("zypp repo $url is not up to date, please refresh first\n") unless -s "$zyppcachedir/repodata/repomd.xml";
+    fetchrepo_rpmmd("zypp://$repo->{'name'}", "$zyppcachedir/repodata", $arch, 1);
+  } else {
+    die("zypp repo $url is not up to date, please refresh first\n") unless -s "$zyppcachedir/suse/setup/descr/packages.gz";
+    fetchrepo_susetags("zypp://$repo->{'name'}", "$zyppcachedir/suse/setup/descr", $arch, 1);
+  }
 }
 
 #
@@ -135,6 +182,7 @@ sub calc_binname {
   my $binname = $bin->{'version'};
   $binname = "$bin->{'epoch'}:$binname" if $bin->{'epoch'};
   $binname .= "-$bin->{'release'}" if defined $bin->{'release'};
+  $binname .= ".$bin->{'arch'}" if $bin->{'arch'};
   $binname = "$bin->{'name'}-$binname.$suf";
   return $binname;
 }
@@ -200,7 +248,8 @@ sub guess_repotype {
 sub fetchrepo {
   my ($bconf, $arch, $repodir, $url, $buildtype) = @_;
   my $repotype;
-  if ($url =~ /^(arch|debian|hdlist2|rpmmd|rpm-md|suse)\@(.*)$/) {
+  $repotype = 'zypp' if $url =~ /^zypp:/;
+  if ($url =~ /^(arch|debian|hdlist2|rpmmd|rpm-md|suse|zypp)\@(.*)$/) {
     $repotype = $1;
     $url = $2;
   }
@@ -220,6 +269,10 @@ sub fetchrepo {
     $bins = fetchrepo_debian($url, $tmpdir, $arch);
   } elsif ($repotype eq 'arch') {
     $bins = fetchrepo_arch($url, $tmpdir, $arch);
+  } elsif ($repotype eq 'suse') {
+    $bins = fetchrepo_susetags($url, $tmpdir, $arch);
+  } elsif ($repotype eq 'zypp') {
+    $bins = fetchrepo_zypp($url, $tmpdir, $arch);
   } else {
     die("unsupported repotype '$repotype'\n");
   }
