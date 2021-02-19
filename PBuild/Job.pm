@@ -213,7 +213,9 @@ sub createjob {
   push @args, "$opts->{'libbuild'}/build";
   my $vm = $opts->{'vm_type'} || '';
   if ($vm =~ /(xen|kvm|zvm|emulator|pvm)/) {
-    # allow overriding the filesystem type via the build config
+    # allow setting the filesystem type with the build config
+    $opts->{'vm-disk-filesystem'} ||= $bconf->{'buildflags:vmfstype'} if $bconf->{'buildflags:vmfstype'};
+    $opts->{'vm-disk-filesystem-options'} ||= $bconf->{'buildflags:vmfsoptions'} if $bconf->{'buildflags:vmfsoptions'};
     mkdir("$buildroot/.mount") unless -d "$buildroot/.mount";
     push @args, "--root=$buildroot/.mount";
     for my $opt (qw{vm-type vm-disk vm-swap vm-emulator-script vm-memory vm-kernel vm-initrd vm-custom-opt vm-disk-size vm-swap-size vm-disk-filesystem vm-disk-filesystem-options vm-disk-mount-options vm-disk-clean vm-hugetlbfs vm-worker vm-worker-no vm-enable-console}) {
