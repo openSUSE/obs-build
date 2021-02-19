@@ -27,7 +27,7 @@ use Time::HiRes ();
 use PBuild::Util;
 use PBuild::Cando;
 use PBuild::Verify;
-use PBuild::RemoteRegistry;
+use PBuild::Repo;
 
 #
 # Fork and exec the build tool
@@ -148,37 +148,6 @@ sub collect_result {
 }
 
 #
-# Setup the repo/containers directories used for image/container
-# builds
-#
-sub setupimagefiles {
-  my ($ctx, $p, $bdeps, $dstdir) = @_;
-
-  PBuild::Util::mkdir_p("$dstdir/repos/pbuild/pbuild");
-  my $dep2pkg = $ctx->{'dep2pkg'};
-  for my $bin (@$bdeps) {
-    my $q = $dep2pkg->{$bin};
-    my $repono = $q->{'repono'};
-    my $repo = $ctx->{'repos'}->[$repono || 0];
-    die("bad package $bin\n") unless defined($repono) && $repo;
-    if ($repo->{'type'} eq 'registry') {
-      my $containerfile = "$q->{'name'}.tar";
-      $containerfile =~ s/^container://;
-      $containerfile =~ s/[\/:]/_/g;
-      PBuild::Verify::verify_filename($containerfile);
-      PBuild::Util::mkdir_p("$dstdir/containers");
-      PBuild::RemoteRegistry::construct_containertar($repo->{'dir'}, $q, "$dstdir/containers/$containerfile");
-      next;
-    }
-    die("missing package $bin\n") unless $q && $q->{'filename'};
-    PBuild::Verify::verify_filename($q->{'filename'});
-    my $from = "$repo->{'dir'}/$q->{'filename'}";
-    $from = "$repo->{'dir'}/$q->{'packid'}/$q->{'filename'}" if $q->{'packid'};
-    PBuild::Util::cp($from, "$dstdir/repos/pbuild/pbuild/$q->{'filename'}");
-  }
-}
-
-#
 # Create a new build job
 #
 sub createjob {
@@ -206,18 +175,9 @@ sub createjob {
     @alldeps = PBuild::Util::unify(@$pdeps, @$vmdeps, @$bdeps, @$sysdeps);
   }
   my @rpmlist;
-  my $dep2pkg = $ctx->{'dep2pkg'};
+  my $binlocations = PBuild::Repo::getbinarylocations($ctx->{'repos'}, $ctx->{'dep2pkg'}, \@alldeps);
   for my $bin (@alldeps) {
-    my $q = $dep2pkg->{$bin};
-    die("missing package $bin\n") unless $q && $q->{'filename'};
-    my $repono = $q->{'repono'};
-    my $repo = $ctx->{'repos'}->[$repono || 0];
-    die("bad package $bin\n") unless defined($repono) && $repo;
-    if ($q->{'packid'}) {
-      push @rpmlist, "$bin $repo->{'dir'}/$q->{'packid'}/$q->{'filename'}";
-    } else {
-      push @rpmlist, "$bin $repo->{'dir'}/$q->{'filename'}";
-    }
+    push @rpmlist, "$bin $binlocations->{$bin}";
   }
   push @rpmlist, "preinstall: ".join(' ', @$pdeps);
   push @rpmlist, "vminstall: ".join(' ', @$vmdeps);
@@ -310,7 +270,7 @@ sub createjob {
     PBuild::Util::cp("$p->{'dir'}/$_", "$kiwisrcdir/$_") for sort keys %{$p->{'files'}};
     $args[-1] = "$kiwisrcdir/$p->{'recipe'}";
     # now setup the repos/containers directories
-    setupimagefiles($ctx, $p, $bdeps, $kiwisrcdir);
+    PBuild::Repo::copyimagebinaries($ctx->{'repos'}, $ctx->{'dep2pkg'}, $bdeps, $kiwisrcdir);
     # tell kiwi how to use them
     if ($p->{'buildtype'} eq 'kiwi') {
       my @kiwiargs;

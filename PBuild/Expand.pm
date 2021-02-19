@@ -37,9 +37,9 @@ sub configure_repos {
   
   # this is what perl-BSSolv does. It is different to the
   # code in expanddeps!
-  my $repono = 0;
   for my $repo (@$repos) {
     my $bins = $repo->{'bins'} || [];
+    my $repono = $repo->{'repono'};
     for my $bin (@$bins) {
       my $n = $bin->{'name'};
       next if $packs_done{$n};
@@ -66,7 +66,6 @@ sub configure_repos {
       $packs{$n} = $bin;
     }
     %packs_done = %packs;
-    $repono++;
   }
   Build::forgetdeps($bconf);	# free mem first
   Build::readdeps($bconf, undef, \%packs);

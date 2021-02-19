@@ -29,9 +29,7 @@ use PBuild::Depsort;
 use PBuild::Meta;
 use PBuild::Util;
 use PBuild::Job;
-use PBuild::LocalRepo;
-use PBuild::RemoteRepo;
-use PBuild::RemoteRegistry;
+use PBuild::Repo;
 
 #
 # Create a checker
@@ -342,28 +340,6 @@ relsynccheck:
   return ('done');
 }
 
-sub getremotebinaries {
-  my ($ctx, @bins) = @_;
-  my %tofetch;
-  my $dep2pkg = $ctx->{'dep2pkg'};
-  for my $bin (PBuild::Util::unify(@bins)) {
-    my $q = $dep2pkg->{$bin};
-    die("unknown binary $bin?\n") unless $q;
-    next if $q->{'filename'};
-    my $repono = $q->{'repono'};
-    die("binary $bin does not belong to a repo?\n") unless defined $repono;
-    push @{$tofetch{$repono}}, $q;
-  }
-  for my $repono (sort {$a <=> $b} keys %tofetch) {
-    my $repo = $ctx->{'repos'}->[$repono];
-    if ($repo->{'type'} eq 'repo') {
-      PBuild::RemoteRepo::fetchbinaries($repo, $tofetch{$repono});
-    } elsif ($repo->{'type'} eq 'registry') {
-      PBuild::RemoteRegistry::fetchbinaries($repo, $tofetch{$repono});
-    }
-  }
-}
-
 sub handlecycle {
   my ($ctx, $packid, $cpacks, $cycpass, $packstatus) = @_;
 
@@ -476,7 +452,7 @@ sub build {
     my $missing = join(', ', sort(BSUtil::unify(@missing)));
     return ('unresolvable', "missing pre/vminstalls: $missing");
   }
-  getremotebinaries($ctx, @pdeps, @vmdeps, @sysdeps, @bdeps);
+  PBuild::Repo::getremotebinaries($ctx->{'repos'}, $ctx->{'dep2pkg'}, [ @pdeps, @vmdeps, @sysdeps, @bdeps ]);
   my $readytime = time();
   my $job = PBuild::Job::createjob($ctx, $builder->{'name'}, $builder->{'nbuilders'}, $builder->{'root'}, $p, \@bdeps, \@pdeps, \@vmdeps, \@sysdeps, $nounchanged);
   $job->{'readytime'} = $readytime;

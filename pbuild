@@ -200,13 +200,13 @@ PBuild::LocalRepo::cleanup_builddir($builddir, \%pkgsrc);
 my @repos;
 print "fetching local repo metadata\n";
 my $localbins = PBuild::LocalRepo::fetchrepo($bconf, $myarch, $builddir, \%pkgsrc);
-push @repos, { 'dir' => $builddir, 'bins' => $localbins };
+push @repos, { 'dir' => $builddir, 'bins' => $localbins, 'repono' => scalar(@repos) };
 
 print "fetching remote repo metadata\n";
 for my $repourl (@{$opts->{'repo'}}) {
   my $repodir = "$builddir/.pbuild/_base/".Digest::MD5::md5_hex($repourl);
   my $repobins = PBuild::RemoteRepo::fetchrepo($bconf, $myarch, $repodir, $repourl, $buildtype);
-  push @repos, { 'dir' => $repodir, 'bins' => $repobins, 'url' => $repourl, 'type' => 'repo' };
+  push @repos, { 'dir' => $repodir, 'bins' => $repobins, 'url' => $repourl, 'type' => 'repo', 'repono' => scalar(@repos) };
 }
 
 if (@{$opts->{'registry'} || []} && %containertags) {
@@ -216,7 +216,7 @@ if (@{$opts->{'registry'} || []} && %containertags) {
     $repourl = "https://$repourl" unless $repourl =~ /^[^\/]+\/\//;
     my $repodir = "$builddir/.pbuild/_base/".Digest::MD5::md5_hex("registry:$repourl");
     my $repobins = PBuild::RemoteRegistry::fetchrepo($bconf, $myarch, $repodir, $repourl, [ sort keys %containertags ]);
-    push @repos, { 'dir' => $repodir, 'bins' => $repobins, 'url' => $repourl, 'type' => 'registry' };
+    push @repos, { 'dir' => $repodir, 'bins' => $repobins, 'url' => $repourl, 'type' => 'registry', 'repono' => scalar(@repos) };
   }
 }
 
