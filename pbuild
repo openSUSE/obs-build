@@ -143,6 +143,7 @@ for my $pkg (@pkgs) {
   };
 }
 
+# handle local links and multibuild packages
 print "expanding package links\n";
 PBuild::Link::expand_links(\%pkgsrc);
 
@@ -151,6 +152,7 @@ PBuild::Multibuild::expand_multibuilds(\%pkgsrc);
 
 @pkgs = sort keys %pkgsrc;
 
+# handle onlybuild/excludebuild from the build config
 if (exists $bconf->{'buildflags:excludebuild'}) {
   my %excludebuild;
   /^excludebuild:(.*)$/s && ($excludebuild{$1} = 1) for @{$bconf->{'buildflags'} || []};
@@ -174,6 +176,7 @@ if (exists $bconf->{'buildflags:onlybuild'}) {
   }
 }
 
+# parse all recipes in the packages to get dependency information
 print "parsing recipe files\n";
 my %containertags;
 my $buildtype = $bconf->{'type'} || '';
@@ -197,6 +200,7 @@ for my $pkg (@pkgs) {
 # delete obsolete entries from builddir
 PBuild::LocalRepo::cleanup_builddir($builddir, \%pkgsrc);
 
+# setup the repositories and registries
 my @repos;
 print "fetching local repo metadata\n";
 my $localbins = PBuild::LocalRepo::fetchrepo($bconf, $myarch, $builddir, \%pkgsrc);
@@ -257,7 +261,7 @@ for my $no (1..$opts->{'buildjobs'}) {
 
 # the big loop: while there is something to do
 while (1) {
-
+  # create and setup checker
   if (!$ctx) {
     $ctx = PBuild::Checker::create($bconf, $myarch, $buildtype, \%pkgsrc, $builddir, $opts);
     print "preparing package pool\n";
@@ -267,105 +271,15 @@ while (1) {
     print "sorting packages\n";
     @pkgs = PBuild::Checker::pkgsort($ctx, @pkgs);
   }
-
-  my @cpacks = @pkgs;
-  my %packstatus;
-  my %packerror;
-
-  $ctx->{'notready'} = {};	# building or blocked
-  $ctx->{'building'} = {};	# building
-  $ctx->{'lastcheck'} = \%lastcheck;
-  $ctx->{'nharder'} = 0;
   $ctx->{'buildconfig'} = $buildconfig;
-  $ctx->{'builders'} = \@builders;
+  $ctx->{'lastcheck'} = \%lastcheck;
 
-  my %cycpass;
-  my $cychash = $ctx->{'cychash'};
+  # check all packages
+  my $result = PBuild::Checker::pkgcheck($ctx, \@builders, @pkgs);
 
-  $ctx->{'building'}->{$_->{'job'}->{'pdata'}->{'pkg'}} = $_->{'job'} for grep {$_->{'job'}} @builders;
-
-  # now check every package
-  while (@cpacks) {
-    my $packid = shift @cpacks;
-
-    # cycle handling code
-    my $incycle = 0; 
-    if ($cychash->{$packid}) {
-      ($packid, $incycle) = PBuild::Checker::handlecycle($ctx, $packid, \@cpacks, \%cycpass, \%packstatus);
-      next unless $incycle;
-    }
-    my $p = $pkgsrc{$packid};
-    if ($p->{'error'}) {
-      if ($p->{'error'} =~ /^(excluded|disabled|locked)(?::(.*))?$/) {
-	$packstatus{$packid} = $1;
-	$packerror{$packid} = $2 if $2;
-	next;
-      }
-      $packstatus{$packid} = 'broken';
-      $packerror{$packid} = $p->{'error'};
-      next;
-    }
-    if ($p->{'dep_experror'}) {
-      $packstatus{$packid} = 'unresolvable';
-      $packerror{$packid} = $p->{'dep_experror'};
-      next;
-    }
-
-    if ($ctx->{'building'}->{$packid}) {
-      my $job = $ctx->{'building'}->{$packid};
-      $packstatus{$packid} = 'building';
-      $packerror{$packid} = "on builder $job->{'name'}" if $job->{'nbuilders'} > 1;
-      $ctx->{'notready'}->{$p->{'name'} || $p->{'pkg'}} = 1 if $p->{'useforbuildenabled'};
-      next;
-    }
-
-    my ($status, $error) = PBuild::Checker::check($ctx, $packid, $incycle);
-    #printf("%s -> %s%s", $packid, $status, $error && $status ne 'scheduled' ? " ($error)" : '');
-    if ($status eq 'scheduled') {
-      my $builder;
-      for (@builders) {
-	next if $_->{'job'};
-	$builder = $_;
-	last;
-      }
-      if (!$builder) {
-	($status, $error) = ('waiting', undef);
-      } else {
-	($status, $error) = PBuild::Checker::build($ctx, $packid, $error, $builder);
-      }
-      if ($status eq 'building') {
-	my $job = $error;
-	$error = undef;
-	$error = "on builder $job->{'name'}" if $job->{'nbuilders'} > 1;
-        my $bid = ($builder->{'nbuilders'} || 1) > 1 ? "$builder->{'name'}: " : '';
-        print "${bid}building $p->{'pkg'}/$p->{'recipe'}\n";
-        $ctx->{'building'}->{$packid} = $builder->{'job'};
-      }
-      #printf("%s -> %s%s", $packid, $status, $error ? " ($error)" : '');
-    } elsif ($status eq 'done') {
-      # map done to succeeded/failed
-      if (-e "$builddir/$packid/_meta.fail") {
-	$status = 'failed';
-      } else {
-	$status = 'succeeded';
-      }
-    }
-    if ($status eq 'blocked' || $status eq 'building' || $status eq 'waiting') {
-      $ctx->{'notready'}->{$p->{'name'} || $p->{'pkg'}} = 1 if $p->{'useforbuildenabled'};
-    }
-    $packstatus{$packid} = $status;
-    $packerror{$packid} = $error if defined $error;
-  }
-
-  # all packages are checked, update on-disk data
+  # update on-disk data
   PBuild::Util::mkdir_p("$builddir/.pbuild");
-  my %result;
-  for my $packid (sort keys %packstatus) {
-    my $r = { 'code' => $packstatus{$packid} };
-    $r->{'details'} = $packerror{$packid} if defined $packerror{$packid};
-    $result{$packid} = $r;
-  }
-  PBuild::Util::store("$builddir/.pbuild/._result.$$", "$builddir/.pbuild/_result", \%result);
+  PBuild::Util::store("$builddir/.pbuild/._result.$$", "$builddir/.pbuild/_result", $result);
   PBuild::Util::store("$builddir/.pbuild/._lastcheck.$$", "$builddir/.pbuild/_lastcheck", \%lastcheck);
 
   # get list of building jobs
@@ -378,7 +292,7 @@ while (1) {
     delete $_->{'job'} if $_->{'job'} && $_->{'job'} == $job;
   }
   # process finished job
-  my ($code, $result) = PBuild::Job::finishjob($job);
+  my ($code, $buildresult) = PBuild::Job::finishjob($job);
   my $p = $job->{'pdata'};
   my $duration = $job->{'endtime'} - $job->{'starttime'};
   $duration = sprintf("%d:%02d", int($duration / 60), $duration % 60);
@@ -389,7 +303,7 @@ while (1) {
   PBuild::BuildResult::addjobhist($builddir, $jobhist);
 
   # integrate build artifacts and extra files
-  my $bininfo = PBuild::BuildResult::integrate_job($builddir, $job, $code, $result);
+  my $bininfo = PBuild::BuildResult::integrate_job($builddir, $job, $code, $buildresult);
 
   # if the build was successful, update artifact information and the local repo
   if ($bininfo) {
@@ -408,6 +322,7 @@ while (1) {
   }
 }
 
+# say goodbye
 print "\npbuild is done:\n";
 PBuild::Result::print_result($opts, $builddir);
 

@@ -32,7 +32,7 @@ use PBuild::Job;
 use PBuild::Repo;
 
 #
-# Create a checker
+# Create a new package status checker
 #
 sub create {
   my ($bconf, $arch, $buildtype, $pkgsrc, $builddir, $opts) = @_;
@@ -55,6 +55,9 @@ sub create {
   return bless $ctx;
 }
 
+#
+# Configure the repositories used for package building
+#
 sub prepare {
   my ($ctx, $repos) = @_;
   my $repodata = PBuild::Expand::configure_repos($ctx->{'bconf'}, $repos);
@@ -74,6 +77,9 @@ sub prepare {
   PBuild::Meta::setgenmetaalgo($ctx->{'genmetaalgo'});
 }
 
+#
+# Expand the package dependencies of all packages
+#
 sub pkgexpand {
   my ($ctx, @pkgs) = @_;
   my $bconf = $ctx->{'bconf'};
@@ -88,6 +94,9 @@ sub pkgexpand {
   }
 }
 
+#
+# Sort the packages by dependencies
+#
 sub pkgsort {
   my ($ctx, @pkgs) = @_;
   my %pdeps;
@@ -117,6 +126,110 @@ sub pkgsort {
   return @pkgs;
 }
 
+#
+# Check all packages if they need to be rebuilt
+#
+sub pkgcheck {
+  my ($ctx, $builders, @pkgs) = @_;
+
+  my %packstatus;
+  my %packdetails;
+
+  $ctx->{'building'} = {};	# building
+  $ctx->{'building'}->{$_->{'job'}->{'pdata'}->{'pkg'}} = $_->{'job'} for grep {$_->{'job'}} @$builders;
+  $ctx->{'notready'} = {};	# building or blocked
+  $ctx->{'nharder'} = 0;
+
+  my $builddir = $ctx->{'builddir'};
+  my $pkgsrc = $ctx->{'pkgsrc'};
+  my $cychash = $ctx->{'cychash'};
+  my %cycpass;
+  my @cpacks = @pkgs;
+
+  # now check every package
+  while (@cpacks) {
+    my $packid = shift @cpacks;
+
+    # cycle handling code
+    my $incycle = 0; 
+    if ($cychash->{$packid}) {
+      ($packid, $incycle) = PBuild::Checker::handlecycle($ctx, $packid, \@cpacks, \%cycpass, \%packstatus);
+      next unless $incycle;
+    }
+    my $p = $pkgsrc->{$packid};
+    if ($p->{'error'}) {
+      if ($p->{'error'} =~ /^(excluded|disabled|locked)(?::(.*))?$/) {
+	$packstatus{$packid} = $1;
+	$packdetails{$packid} = $2 if $2;
+	next;
+      }
+      $packstatus{$packid} = 'broken';
+      $packdetails{$packid} = $p->{'error'};
+      next;
+    }
+    if ($p->{'dep_experror'}) {
+      $packstatus{$packid} = 'unresolvable';
+      $packdetails{$packid} = $p->{'dep_experror'};
+      next;
+    }
+
+    if ($ctx->{'building'}->{$packid}) {
+      my $job = $ctx->{'building'}->{$packid};
+      $packstatus{$packid} = 'building';
+      $packdetails{$packid} = "on builder $job->{'name'}" if $job->{'nbuilders'} > 1;
+      $ctx->{'notready'}->{$p->{'name'} || $p->{'pkg'}} = 1 if $p->{'useforbuildenabled'};
+      next;
+    }
+
+    my ($status, $error) = PBuild::Checker::check($ctx, $packid, $incycle);
+    #printf("%s -> %s%s", $packid, $status, $error && $status ne 'scheduled' ? " ($error)" : '');
+    if ($status eq 'scheduled') {
+      my $builder;
+      for (@$builders) {
+	next if $_->{'job'};
+	$builder = $_;
+	last;
+      }
+      if (!$builder) {
+	($status, $error) = ('waiting', undef);
+      } else {
+	($status, $error) = PBuild::Checker::build($ctx, $packid, $error, $builder);
+      }
+      if ($status eq 'building') {
+	my $job = $error;
+	$error = undef;
+	$error = "on builder $job->{'name'}" if $job->{'nbuilders'} > 1;
+        my $bid = ($builder->{'nbuilders'} || 1) > 1 ? "$builder->{'name'}: " : '';
+        print "${bid}building $p->{'pkg'}/$p->{'recipe'}\n";
+        $ctx->{'building'}->{$packid} = $builder->{'job'};
+      }
+      #printf("%s -> %s%s", $packid, $status, $error ? " ($error)" : '');
+    } elsif ($status eq 'done') {
+      # map done to succeeded/failed
+      if (-e "$builddir/$packid/_meta.fail") {
+	$status = 'failed';
+      } else {
+	$status = 'succeeded';
+      }
+    }
+    if ($status eq 'blocked' || $status eq 'building' || $status eq 'waiting') {
+      $ctx->{'notready'}->{$p->{'name'} || $p->{'pkg'}} = 1 if $p->{'useforbuildenabled'};
+    }
+    $packstatus{$packid} = $status;
+    $packdetails{$packid} = $error if defined $error;
+  }
+  my %result;
+  for my $packid (sort keys %packstatus) {
+    my $r = { 'code' => $packstatus{$packid} };
+    $r->{'details'} = $packdetails{$packid} if defined $packdetails{$packid};
+    $result{$packid} = $r;
+  }
+  return \%result;
+}
+
+#
+# Generate the dependency tracking data for a package
+#
 sub genmeta {
   my ($ctx, $p, $edeps) = @_;
   my $dep2pkg = $ctx->{'dep2pkg'};
@@ -163,6 +276,9 @@ sub genmeta {
   return \@new_meta;
 }
 
+#
+# Check the status of a single image/container
+#
 sub check_image {
   my ($ctx, $packid) = @_;
   my $bconf = $ctx->{'bconf'};
@@ -201,6 +317,9 @@ sub check_image {
   return ('scheduled', [ { 'explain' => 'meta change', 'packagechange' => $reason } ] );
 }
 
+#
+# Check the status of a single package
+#
 sub check {
   my ($ctx, $packid, $incycle) = @_;
 
@@ -340,6 +459,9 @@ relsynccheck:
   return ('done');
 }
 
+#
+# Build dependency cycle handling
+#
 sub handlecycle {
   my ($ctx, $packid, $cpacks, $cycpass, $packstatus) = @_;
 
@@ -384,6 +506,9 @@ sub handlecycle {
   return ($packid, $incycle);
 }
 
+#
+# Start the build of a package
+#
 sub build {
   my ($ctx, $packid, $data, $builder) = @_;
   my $reason = $data->[0];
