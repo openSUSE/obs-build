@@ -150,6 +150,8 @@ sub collect_result {
 #
 # Create a new build job
 #
+# ctx usage: opts hostarch bconf arch repos dep2pkg buildconfig debuginfo
+#
 sub createjob {
   my ($ctx, $jobname, $nbuilders, $buildroot, $p, $bdeps, $pdeps, $vmdeps, $sysdeps, $nounchanged) = @_;
   my $opts = $ctx->{'opts'};
@@ -242,7 +244,7 @@ sub createjob {
       push @args, "--$opt=$opts->{$opt}" if defined $opts->{$opt},
     }
   } else {
-    print "VM-TYPE $vm not detected" if $vm; 
+    warn("VM-TYPE $vm is unknown\n") if $vm; 
     push @args, "--root=$buildroot";
     push @args, "--vm-type=$vm" if $vm; 
   }
@@ -292,7 +294,6 @@ sub createjob {
   unlink("$buildroot/.build.log");
   #print "building $p->{'pkg'}/$p->{'recipe'}\n";
 
-  unlink("$buildroot/.build.log");
   my $pid = forkjob(\@args);
   return { 'name' => $jobname, 'nbuilders' => $nbuilders, 'pid' => $pid, 'buildroot' => $buildroot, 'vm_type' => $vm, 'pdata' => $p, 'logfile' => "$buildroot/.build.log", 'logfile_lines' => 0, 'starttime' => time() };
 }

@@ -260,21 +260,23 @@ for my $no (1..$opts->{'buildjobs'}) {
 }
 
 # the big loop: while there is something to do
+my $runs = 0;
 while (1) {
   # create and setup checker
   if (!$ctx) {
     $ctx = PBuild::Checker::create($bconf, $myarch, $buildtype, \%pkgsrc, $builddir, $opts);
-    print "preparing package pool\n";
+    print "preparing package pool\n" unless $runs;
     PBuild::Checker::prepare($ctx, \@repos);
-    print "expanding dependencies\n";
+    print "expanding dependencies\n" unless $runs;
     PBuild::Checker::pkgexpand($ctx, @pkgs);
-    print "sorting packages\n";
+    print "sorting packages\n" unless $runs;
     @pkgs = PBuild::Checker::pkgsort($ctx, @pkgs);
   }
+  $runs++;
   $ctx->{'buildconfig'} = $buildconfig;
   $ctx->{'lastcheck'} = \%lastcheck;
 
-  # check all packages
+  # check status of all packages
   my $result = PBuild::Checker::pkgcheck($ctx, \@builders, @pkgs);
 
   # update on-disk data
@@ -314,10 +316,6 @@ while (1) {
       $repos[0]->{'bins'} = $localbins;
       # we also need a new checker
       undef $ctx;
-      $ctx = PBuild::Checker::create($bconf, $myarch, $buildtype, \%pkgsrc, $builddir, $opts);
-      PBuild::Checker::prepare($ctx, \@repos);
-      PBuild::Checker::pkgexpand($ctx, @pkgs);
-      @pkgs = PBuild::Checker::pkgsort($ctx, @pkgs);
     }
   }
 }

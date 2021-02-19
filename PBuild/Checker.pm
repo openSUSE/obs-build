@@ -153,7 +153,7 @@ sub pkgcheck {
     # cycle handling code
     my $incycle = 0; 
     if ($cychash->{$packid}) {
-      ($packid, $incycle) = PBuild::Checker::handlecycle($ctx, $packid, \@cpacks, \%cycpass, \%packstatus);
+      ($packid, $incycle) = handlecycle($ctx, $packid, \@cpacks, \%cycpass, \%packstatus);
       next unless $incycle;
     }
     my $p = $pkgsrc->{$packid};
@@ -181,7 +181,7 @@ sub pkgcheck {
       next;
     }
 
-    my ($status, $error) = PBuild::Checker::check($ctx, $packid, $incycle);
+    my ($status, $error) = check($ctx, $p, $incycle);
     #printf("%s -> %s%s", $packid, $status, $error && $status ne 'scheduled' ? " ($error)" : '');
     if ($status eq 'scheduled') {
       my $builder;
@@ -193,7 +193,7 @@ sub pkgcheck {
       if (!$builder) {
 	($status, $error) = ('waiting', undef);
       } else {
-	($status, $error) = PBuild::Checker::build($ctx, $packid, $error, $builder);
+	($status, $error) = build($ctx, $p, $error, $builder);
       }
       if ($status eq 'building') {
 	my $job = $error;
@@ -228,33 +228,41 @@ sub pkgcheck {
 }
 
 #
+# Generate the dependency tracking data for a image/container
+#
+sub genmeta_image {
+  my ($ctx, $p, $edeps) = @_;
+  if ($p->{'buildtype'} eq 'preinstallimage') {
+    my @pdeps = Build::get_preinstalls($ctx->{'bconf'});
+    my @vmdeps = Build::get_vminstalls($ctx->{'bconf'});
+    $edeps = [ PBuild::Util::unify(@$edeps, @pdeps, @vmdeps) ];
+  }
+  my $dep2pkg = $ctx->{'dep2pkg'};
+  my @new_meta;
+  for my $bin (@$edeps) {
+    my $q = $dep2pkg->{$bin};
+    push @new_meta, (($q || {})->{'hdrmd5'} || 'd0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0')."  $bin";
+  }
+  @new_meta = sort {substr($a, 34) cmp substr($b, 34) || $a cmp $b} @new_meta;
+  unshift @new_meta, ($p->{'verifymd5'} || $p->{'srcmd5'})."  $p->{'pkg'}";
+  return \@new_meta;
+}
+
+#
 # Generate the dependency tracking data for a package
 #
 sub genmeta {
   my ($ctx, $p, $edeps) = @_;
+  my $buildtype = $p->{'buildtype'};
+  return genmeta_image($ctx, $p, $edeps) if $buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'preinstallimage';
   my $dep2pkg = $ctx->{'dep2pkg'};
-  if ($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker' || $p->{'buildtype'} eq 'preinstallimage') {
-    if ($p->{'buildtype'} eq 'preinstallimage') {
-      my @pdeps = Build::get_preinstalls($ctx->{'bconf'});
-      my @vmdeps = Build::get_vminstalls($ctx->{'bconf'});
-      $edeps = [ PBuild::Util::unify(@$edeps, @pdeps, @vmdeps) ];
-    }
-    my @new_meta;
-    for my $bin (@$edeps) {
-      my $q = $dep2pkg->{$bin};
-      push @new_meta, (($q || {})->{'hdrmd5'} || 'd0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0')."  $bin";
-    }
-    @new_meta = sort {substr($a, 34) cmp substr($b, 34) || $a cmp $b} @new_meta;
-    unshift @new_meta, ($p->{'verifymd5'} || $p->{'srcmd5'})."  $p->{'pkg'}";
-    return \@new_meta;
-  }
   my $metacache = $ctx->{'metacache'};
   my @new_meta;
   my $builddir = $ctx->{'builddir'};
   for my $bin (@$edeps) {
     my $q = $dep2pkg->{$bin};
     my $binpackid = $q->{'packid'};
-    if (!$binpackid) {
+    if (!defined $binpackid) {
       # use the hdrmd5 for non-local packages
       push @new_meta, ($q->{'hdrmd5'} || 'd0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0')."  $bin";
       next;
@@ -269,7 +277,7 @@ sub genmeta {
       close($mfd);
       die("$mf: bad meta\n") unless length($metacache->{$binpackid}) > 34;
     }
-    PBuild::Meta::add_meta(\@new_meta, $metacache->{$q->{'packid'}}, $bin, $p->{'pkg'});
+    PBuild::Meta::add_meta(\@new_meta, $metacache->{$binpackid}, $bin, $p->{'pkg'});
   }
   @new_meta = PBuild::Meta::gen_meta($ctx->{'subpacks'}->{$p->{'name'}} || [], @new_meta);
   unshift @new_meta, ($p->{'verifymd5'} || $p->{'srcmd5'})."  $p->{'pkg'}";
@@ -280,9 +288,8 @@ sub genmeta {
 # Check the status of a single image/container
 #
 sub check_image {
-  my ($ctx, $packid) = @_;
+  my ($ctx, $p) = @_;
   my $bconf = $ctx->{'bconf'};
-  my $p = $ctx->{'pkgsrc'}->{$packid};
   my $edeps = $p->{'dep_expanded'} || [];
   my $notready = $ctx->{'notready'};
   my $dep2src = $ctx->{'dep2src'};
@@ -293,6 +300,7 @@ sub check_image {
     return ('blocked', join(', ', @blocked));
   }
   my $new_meta = genmeta($ctx, $p, $edeps);
+  my $packid = $p->{'pkg'};
   my $dst = "$ctx->{'builddir'}/$packid";
   my @meta;
   my $mfp;
@@ -321,12 +329,12 @@ sub check_image {
 # Check the status of a single package
 #
 sub check {
-  my ($ctx, $packid, $incycle) = @_;
+  my ($ctx, $p, $incycle) = @_;
 
-  my $p = $ctx->{'pkgsrc'}->{$packid};
   my $buildtype = $p->{'buildtype'};
-  return check_image($ctx, $packid) if $buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'preinstallimage';
+  return check_image($ctx, $p) if $buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'preinstallimage';
 
+  my $packid = $p->{'pkg'};
   my $notready = $ctx->{'notready'};
   my $dep2src = $ctx->{'dep2src'};
   my $edeps = $p->{'dep_expanded'} || [];
@@ -510,13 +518,12 @@ sub handlecycle {
 # Start the build of a package
 #
 sub build {
-  my ($ctx, $packid, $data, $builder) = @_;
+  my ($ctx, $p, $data, $builder) = @_;
+  my $packid = $p->{'pkg'};
   my $reason = $data->[0];
   #print Dumper($reason);
   my $nounchanged = 1 if $packid && $ctx->{'cychash'}->{$packid};
   my @btdeps;
-  my $p = $ctx->{'pkgsrc'}->{$packid};
-  die if $p->{'pkg'} ne $packid;	# just in case
   my $edeps = $p->{'dep_expanded'} || [];
   my $bconf = $ctx->{'bconf'};
   my $buildtype = $p->{'buildtype'};
