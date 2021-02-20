@@ -36,8 +36,7 @@ use Build;
 
 use PBuild::Source;
 use PBuild::Recipe;
-use PBuild::RemoteRepo;
-use PBuild::RemoteRegistry;
+use PBuild::RepoMgr;
 use PBuild::LocalRepo;
 use PBuild::Multibuild;
 use PBuild::Link;
@@ -201,26 +200,21 @@ for my $pkg (@pkgs) {
 PBuild::LocalRepo::cleanup_builddir($builddir, \%pkgsrc);
 
 # setup the repositories and registries
+my $repomgr = PBuild::RepoMgr::create();
 my @repos;
 print "fetching local repo metadata\n";
-my $localbins = PBuild::LocalRepo::fetchrepo($bconf, $myarch, $builddir, \%pkgsrc);
-push @repos, { 'dir' => $builddir, 'bins' => $localbins, 'repono' => scalar(@repos) };
+push @repos, $repomgr->addlocalrepo($bconf, $myarch, $builddir, \%pkgsrc);
 
 print "fetching remote repo metadata\n";
 for my $repourl (@{$opts->{'repo'}}) {
-  my $repodir = "$builddir/.pbuild/_base/".Digest::MD5::md5_hex($repourl);
-  my $repobins = PBuild::RemoteRepo::fetchrepo($bconf, $myarch, $repodir, $repourl, $buildtype);
-  push @repos, { 'dir' => $repodir, 'bins' => $repobins, 'url' => $repourl, 'type' => 'repo', 'repono' => scalar(@repos) };
+  push @repos, $repomgr->addremoterepo($bconf, $myarch, $builddir, $repourl, $buildtype);
 }
 
 if (@{$opts->{'registry'} || []} && %containertags) {
   print "fetching remote registry metadata\n";
+  my @containertags = sort keys %containertags;
   for my $registry (@{$opts->{'registry'} || []}) {
-    my $repourl = $registry;
-    $repourl = "https://$repourl" unless $repourl =~ /^[^\/]+\/\//;
-    my $repodir = "$builddir/.pbuild/_base/".Digest::MD5::md5_hex("registry:$repourl");
-    my $repobins = PBuild::RemoteRegistry::fetchrepo($bconf, $myarch, $repodir, $repourl, [ sort keys %containertags ]);
-    push @repos, { 'dir' => $repodir, 'bins' => $repobins, 'url' => $repourl, 'type' => 'registry', 'repono' => scalar(@repos) };
+    push @repos, $repomgr->addremoteregistry($bconf, $myarch, $builddir, $registry, \@containertags);
   }
 }
 
@@ -233,15 +227,6 @@ if (-s "$builddir/.pbuild/_lastcheck") {
     $lastcheck{$pkg} = $old if $old && length($old) > 96;
   }
 }
-
-# create our package checker
-my $ctx = PBuild::Checker::create($bconf, $myarch, $buildtype, \%pkgsrc, $builddir, $opts);
-print "preparing package pool\n";
-PBuild::Checker::prepare($ctx, \@repos);
-print "expanding dependencies\n";
-PBuild::Checker::pkgexpand($ctx, @pkgs);
-print "sorting packages\n";
-@pkgs = PBuild::Checker::pkgsort($ctx, @pkgs);
 
 # setup builders
 my @builders;
@@ -259,25 +244,26 @@ for my $no (1..$opts->{'buildjobs'}) {
   };
 }
 
-# the big loop: while there is something to do
+my $ctx;
 my $runs = 0;
+# the big loop: while there is something to do
 while (1) {
   # create and setup checker
   if (!$ctx) {
     $ctx = PBuild::Checker::create($bconf, $myarch, $buildtype, \%pkgsrc, $builddir, $opts);
     print "preparing package pool\n" unless $runs;
-    PBuild::Checker::prepare($ctx, \@repos);
+    $ctx->prepare(\@repos);
     print "expanding dependencies\n" unless $runs;
-    PBuild::Checker::pkgexpand($ctx, @pkgs);
+    $ctx->pkgexpand(@pkgs);
     print "sorting packages\n" unless $runs;
-    @pkgs = PBuild::Checker::pkgsort($ctx, @pkgs);
+    @pkgs = $ctx->pkgsort(@pkgs);
   }
   $runs++;
   $ctx->{'buildconfig'} = $buildconfig;
   $ctx->{'lastcheck'} = \%lastcheck;
 
   # check status of all packages
-  my $result = PBuild::Checker::pkgcheck($ctx, \@builders, @pkgs);
+  my $result = $ctx->pkgcheck(\@builders, @pkgs);
 
   # update on-disk data
   PBuild::Util::mkdir_p("$builddir/.pbuild");
@@ -309,11 +295,10 @@ while (1) {
 
   # if the build was successful, update artifact information and the local repo
   if ($bininfo) {
-    PBuild::LocalRepo::update_gbininfo($ctx->{'builddir'}, $p->{'pkg'}, $bininfo);
+    PBuild::LocalRepo::update_gbininfo($builddir, $p->{'pkg'}, $bininfo);
     if ($p->{'useforbuildenabled'}) {
       # update with new local bin information
-      my $localbins = PBuild::LocalRepo::fetchrepo($bconf, $myarch, $builddir, \%pkgsrc);
-      $repos[0]->{'bins'} = $localbins;
+      $repomgr->updatelocalrepo($bconf, $myarch, $builddir, \%pkgsrc);
       # we also need a new checker
       undef $ctx;
     }

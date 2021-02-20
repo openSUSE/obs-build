@@ -29,13 +29,13 @@ use PBuild::Depsort;
 use PBuild::Meta;
 use PBuild::Util;
 use PBuild::Job;
-use PBuild::Repo;
+use PBuild::RepoMgr;
 
 #
 # Create a new package status checker
 #
 sub create {
-  my ($bconf, $arch, $buildtype, $pkgsrc, $builddir, $opts) = @_;
+  my ($bconf, $arch, $buildtype, $pkgsrc, $builddir, $opts, $repomgr) = @_;
   my $genmetaalgo = $bconf->{'buildflags:genmetaalgo'};
   $genmetaalgo = 1 unless defined $genmetaalgo;
   my $ctx = {
@@ -51,6 +51,7 @@ sub create {
     'genmetaalgo' => $genmetaalgo,
     'lastcheck' => {},
     'metacache' => {},
+    'repomgr' => $repomgr,
   };
   return bless $ctx;
 }
@@ -60,20 +61,19 @@ sub create {
 #
 sub prepare {
   my ($ctx, $repos) = @_;
-  my $repodata = PBuild::Expand::configure_repos($ctx->{'bconf'}, $repos);
+  my $dep2pkg = PBuild::Expand::configure_repos($ctx->{'bconf'}, $repos);
   my %dep2src;
   my %subpacks;
-  for my $n (sort keys %$repodata) {
-    my $bin = $repodata->{$n};
+  for my $n (sort keys %$dep2pkg) {
+    my $bin = $dep2pkg->{$n};
     my $sn = $bin->{'source'};
     $sn = $n unless defined $n;
     $dep2src{$n} = $sn;
   }
   push @{$subpacks{$dep2src{$_}}}, $_ for keys %dep2src;
   $ctx->{'dep2src'} = \%dep2src;
-  $ctx->{'dep2pkg'} = $repodata;
+  $ctx->{'dep2pkg'} = $dep2pkg;
   $ctx->{'subpacks'} = \%subpacks;
-  $ctx->{'repos'} = $repos;
   PBuild::Meta::setgenmetaalgo($ctx->{'genmetaalgo'});
 }
 
@@ -338,7 +338,6 @@ sub check {
   my $notready = $ctx->{'notready'};
   my $dep2src = $ctx->{'dep2src'};
   my $edeps = $p->{'dep_expanded'} || [];
-  my $myarch = $ctx->{'arch'};
   my $dst = "$ctx->{'builddir'}/$packid";
 
   # calculate if we're blocked
@@ -515,6 +514,20 @@ sub handlecycle {
 }
 
 #
+# Convert binary names to binary objects
+#
+sub dep2bins {
+  my ($ctx, @deps) = @_;
+  my $dep2pkg = $ctx->{'dep2pkg'};
+  for (@deps) {
+    my $q = $dep2pkg->{$_};
+    die("unknown binary $_\n") unless $q;
+    $_ = $q;
+  }
+  return \@deps;
+}
+
+#
 # Start the build of a package
 #
 sub build {
@@ -584,7 +597,8 @@ sub build {
     my $missing = join(', ', sort(BSUtil::unify(@missing)));
     return ('unresolvable', "missing pre/vminstalls: $missing");
   }
-  PBuild::Repo::getremotebinaries($ctx->{'repos'}, $ctx->{'dep2pkg'}, [ @pdeps, @vmdeps, @sysdeps, @bdeps ]);
+  my $bins = dep2bins($ctx, PBuild::Util::unify(@pdeps, @vmdeps, @sysdeps, @bdeps));
+  $ctx->{'repomgr'}->getremotebinaries($bins);
   my $readytime = time();
   my $job = PBuild::Job::createjob($ctx, $builder->{'name'}, $builder->{'nbuilders'}, $builder->{'root'}, $p, \@bdeps, \@pdeps, \@vmdeps, \@sysdeps, $nounchanged);
   $job->{'readytime'} = $readytime;

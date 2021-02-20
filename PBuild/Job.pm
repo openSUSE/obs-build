@@ -27,7 +27,7 @@ use Time::HiRes ();
 use PBuild::Util;
 use PBuild::Cando;
 use PBuild::Verify;
-use PBuild::Repo;
+use PBuild::RepoMgr;
 
 #
 # Fork and exec the build tool
@@ -177,7 +177,7 @@ sub createjob {
     @alldeps = PBuild::Util::unify(@$pdeps, @$vmdeps, @$bdeps, @$sysdeps);
   }
   my @rpmlist;
-  my $binlocations = PBuild::Repo::getbinarylocations($ctx->{'repos'}, $ctx->{'dep2pkg'}, \@alldeps);
+  my $binlocations = $ctx->{'repomgr'}->getbinarylocations($ctx->dep2bins(@alldeps));
   for my $bin (@alldeps) {
     push @rpmlist, "$bin $binlocations->{$bin}";
   }
@@ -274,7 +274,7 @@ sub createjob {
     PBuild::Util::cp("$p->{'dir'}/$_", "$kiwisrcdir/$_") for sort keys %{$p->{'files'}};
     $args[-1] = "$kiwisrcdir/$p->{'recipe'}";
     # now setup the repos/containers directories
-    PBuild::Repo::copyimagebinaries($ctx->{'repos'}, $ctx->{'dep2pkg'}, $bdeps, $kiwisrcdir);
+    $ctx->{'repomgr'}->copyimagebinaries($ctx->dep2bins(@$bdeps), $kiwisrcdir);
     # tell kiwi how to use them
     if ($p->{'buildtype'} eq 'kiwi') {
       my @kiwiargs;
