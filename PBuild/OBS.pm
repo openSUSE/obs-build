@@ -155,11 +155,84 @@ sub fetch_all_configs {
 }
 
 #
+# parse a dependency in libsolv's testcase style
+#
+my %testcaseops  = (  
+  '&'       => 1,
+  '|'       => 2,
+  '<IF>'    => 3,
+  '<UNLESS' => 4,
+  '<ELSE>'  => 5,
+  '+'       => 6,
+  '-'       => 7,
+);
+
+sub parse_testcasedep_rec {
+  my ($dep, $chainop) = @_;
+  my $d = $dep;
+  $chainop ||= 0;
+  my ($r, $r2);
+  $d =~ s/^\s+//;
+  if ($d =~ s/^\(//) {
+    ($d, $r) = parse_testcasedep_rec($d);
+    return ($d, undef) unless $r && $d =~ s/\s*^\)//;
+  } else {
+    return ($d, undef) if $d eq '' || $d =~ /^\)/;
+    return ($d, undef) unless $d =~ s/([^\s\)]+)//;
+    $r = $1;
+    $r = "$r$1" if $d =~ s/^( (?:<|<=|>|>=|<=>|=) [^\s\)]+)//;
+    $r =~ s/\\([A-Fa-f2-9][A-Fa-f0-9])/chr(hex($1))/sge;
+    $r = [0, $r];
+  }
+  $d =~ s/^\s+//;
+  return ($d, $r) if $d eq '' || $d =~ /^\)/;
+  return ($d, undef) unless $d =~ s/([^\s\)]+)//;
+  my $op = $testcaseops{$1};
+  return ($d, undef) unless $op; 
+  return ($d, undef) if $op == 5 && $chainop != 3 && $chainop != 4;
+  $chainop = 0 if $op == 5;
+  return ($d, undef) if $chainop && (($chainop != 1 && $chainop != 2 && $chainop != 6) || $op != $chainop);
+  ($d, $r2) = parse_testcasedep_rec($d, $op);
+  return ($d, undef) unless $r2; 
+  if (($op == 3 || $op == 4) && $r2->[0] == 5) { 
+    $r = [$op, $r, $r2->[1], $r2->[2]];
+  } else {
+    $r = [$op, $r, $r2];
+  }
+  return ($d, $r); 
+}
+
+#
+# convert a parsed dependency to rpm's rich dep style
+#
+my @rpmops = ('', 'and', 'or', 'if', 'unless', 'else', 'with', 'without');
+
+sub rpmdepformat_rec {
+  my ($r, $addparens) = @_;
+  my $op = $r->[0];
+  return $r->[1] unless $op;
+  my $top = $rpmops[$op];
+  my $r1 = rpmdepformat_rec($r->[1], 1);
+  if (($op == 3 || $op == 4) && @$r == 4) {
+    $r1 = "$r1 $top " . rpmdepformat_rec($r->[2], 1);
+    $top = 'else';
+  }
+  my $addparens2 = 1;
+  $addparens2 = 0 if $r->[2]->[0] == $op && ($op == 1 || $op == 2 || $op == 6);
+  my $r2 = rpmdepformat_rec($r->[-1], $addparens2);
+  return $addparens ? "($r1 $top $r2)" : "$r1 $top $r2";
+}
+
+#
 # recode the dependencies in a binary from testcaseformat to native
 #
 sub recode_deps {
   my ($b) = @_;
-  for my $d (@{$b->{'requires'} || []}, @{$b->{'conflicts'} || []}, @{$b->{'recommends'} || []}, @{$b->{'supplements'} || []}) {
+  for my $dep (@{$b->{'requires'} || []}, @{$b->{'conflicts'} || []}, @{$b->{'recommends'} || []}, @{$b->{'supplements'} || []}) {
+    next unless $dep =~ / (?:<[A-Z]|[\-\+\|\&\.])/;
+    my ($d, $r) = parse_testcasedep_rec($dep);
+    next if !$r || $d ne '';
+    $dep = rpmdepformat_rec($r, 1);	# currently only rpm supported
   }
 }
 
