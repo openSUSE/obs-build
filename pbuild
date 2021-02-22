@@ -96,7 +96,8 @@ my @baseobsrepos;
 for my $dist (@{$opts->{'dist'} || []}) {
   $distcnt++;
   if ($dist =~ /^https?:\/\//) {
-    push @baseconfigs, PBuild::Download::fetch($dist);
+    my ($config) = PBuild::Download::fetch($dist);
+    push @baseconfigs, $config;
   } elsif ($dist =~ /^obs:\//) {
     my $islast = $distcnt == @{$opts->{'dist'} || []} ? 1 : 0;
     my ($obsconfigs, $obsrepos) = PBuild::OBS::fetch_all_configs($dist, $opts, $islast);
