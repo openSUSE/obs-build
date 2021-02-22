@@ -91,9 +91,17 @@ if ($opts->{'result-code'} || $opts->{'result-pkg'}) {
 }
 
 my @baseconfigs;
+my $distcnt = 0;
+my @baseobsrepos;
 for my $dist (@{$opts->{'dist'} || []}) {
-  if ($dist =~ /^https?/) {
+  $distcnt++;
+  if ($dist =~ /^https?:\/\//) {
     push @baseconfigs, PBuild::Download::fetch($dist);
+  } elsif ($dist =~ /^obs:\//) {
+    my $islast = $distcnt == @{$opts->{'dist'} || []} ? 1 : 0;
+    my ($obsconfigs, $obsrepos) = PBuild::OBS::fetch_all_configs($dist, $opts, $islast);
+    push @baseconfigs, @$obsconfigs;
+    push @baseobsrepos, @$obsrepos;
   } elsif (-e "$dir/_configs/$opts->{'dist'}.conf") {
     push @baseconfigs, PBuild::Util::readstr("$dir/_configs/$dist.conf");
   } else {
@@ -101,6 +109,8 @@ for my $dist (@{$opts->{'dist'} || []}) {
     push @baseconfigs, PBuild::Util::readstr($baseconfigfile);
   }
 }
+# set repos from obs, does not work well with "mixed" configs
+push @{$opts->{'repo'}}, @baseobsrepos if @baseobsrepos && !$opts->{'repo'};
 
 my $localconfig = -s "$dir/_config" ? PBuild::Util::readstr("$dir/_config") : '';
 $localconfig = "\n%define _repository $reponame\n\n$localconfig" if $localconfig ne '';

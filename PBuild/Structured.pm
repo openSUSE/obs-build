@@ -127,6 +127,22 @@ sub xmlpostprocess {
 }
 
 #
+# Convert data from xml
+#
+sub fromxml {
+  my ($d, $dtd, $nonfatal, $allowunknown) = @_;
+  eval {
+    $d = Build::SimpleXML::parse($d);
+    $d = xmlpostprocess($d, $dtd, $allowunknown);
+  };
+  if ($@) {
+    return undef if $nonfatal;
+    die($@);
+  }
+  return $d;
+}
+
+#
 # Read a file containing XML, parse and postprocess it according to the provided dtd
 #
 sub readxml {

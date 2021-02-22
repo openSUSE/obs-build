@@ -39,6 +39,7 @@ use PBuild::Util;
 use PBuild::Download;
 use PBuild::Verify;
 use PBuild::Cpio;
+use PBuild::OBS;
 
 my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst};
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
@@ -190,6 +191,7 @@ sub fetchrepo_obs {
     $_->{'location'} = "${baseurl}build/$prp/$opts->{'arch'}/_repository/$_->{'path'}";
   }
   # recode deps from testcase format to rpm
+  PBuild::OBS::recode_deps($_) for @bins;
   return \@bins;
 }
 
