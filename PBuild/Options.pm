@@ -42,6 +42,7 @@ my %known_options = (
   'repo' => 'repo::',
   'repository' => 'repo::',
   'registry' => 'registry::',
+  'obs' => 'obs:',
   'result' => \&result_special,
   'result-pkg' => 'result-pkg::',
   'result-code' => 'result-code::',

@@ -38,6 +38,7 @@ use Build::Zypp;
 use PBuild::Util;
 use PBuild::Download;
 use PBuild::Verify;
+use PBuild::Cpio;
 
 my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst};
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
@@ -172,6 +173,26 @@ sub fetchrepo_zypp {
   }
 }
 
+sub fetchrepo_obs {
+  my ($url, $tmpdir, $arch, $opts) = @_;
+  die("bad obs: reference\n") unless $url =~ /^obs:\/{1,3}([^\/]+\/[^\/]+)\/?$/;
+  my $prp = $1;
+  die("please specify the build service url with the --obs option\n") unless $opts->{'obs'};
+  my $baseurl = $opts->{'obs'};
+  $baseurl .= '/' unless $baseurl =~ /\/$/;
+  download("${baseurl}build/$prp/$opts->{'arch'}/_repository?view=cache", "$tmpdir/repository.cpio");
+  PBuild::Cpio::cpio_extract("$tmpdir/repository.cpio", 'repositorycache', "$tmpdir/repository.data");
+  my $rdata = PBuild::Util::retrieve("$tmpdir/repository.data");
+  my @bins = grep {ref($_) eq 'HASH' && defined($_->{'name'})} values %{$rdata || {}};
+  @bins = sort {$a->{'name'} cmp $b->{'name'}} @bins;
+  for (@bins) {
+    delete $_->{'filename'};	# hey!
+    $_->{'location'} = "${baseurl}build/$prp/$opts->{'arch'}/_repository/$_->{'path'}";
+  }
+  # recode deps from testcase format to rpm
+  return \@bins;
+}
+
 #
 # Generate the on-disk filename from the metadata
 #
@@ -246,10 +267,11 @@ sub guess_repotype {
 # Get repository metadata for a remote repository
 #
 sub fetchrepo {
-  my ($bconf, $arch, $repodir, $url, $buildtype) = @_;
+  my ($bconf, $arch, $repodir, $url, $buildtype, $opts) = @_;
   my $repotype;
   $repotype = 'zypp' if $url =~ /^zypp:/;
-  if ($url =~ /^(arch|debian|hdlist2|rpmmd|rpm-md|suse|zypp)\@(.*)$/) {
+  $repotype = 'obs' if $url =~ /^obs:/;
+  if ($url =~ /^(arch|debian|hdlist2|rpmmd|rpm-md|suse)\@(.*)$/) {
     $repotype = $1;
     $url = $2;
   }
@@ -273,6 +295,8 @@ sub fetchrepo {
     $bins = fetchrepo_susetags($url, $tmpdir, $arch);
   } elsif ($repotype eq 'zypp') {
     $bins = fetchrepo_zypp($url, $tmpdir, $arch);
+  } elsif ($repotype eq 'obs') {
+    $bins = fetchrepo_obs($url, $tmpdir, $arch, $opts);
   } else {
     die("unsupported repotype '$repotype'\n");
   }

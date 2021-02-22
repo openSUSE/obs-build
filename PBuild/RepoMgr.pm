@@ -38,11 +38,11 @@ sub create {
 # Add a remote repository to the manager
 #
 sub addremoterepo {
-  my ($repos, $bconf, $myarch, $builddir, $repourl, $buildtype) = @_;
+  my ($repos, $bconf, $myarch, $builddir, $repourl, $buildtype, $opts) = @_;
   my $id = Digest::MD5::md5_hex($repourl);
   return $repos->{$id} if $repos->{$id};
   my $repodir = "$builddir/.pbuild/_base/$id";
-  my $bins = PBuild::RemoteRepo::fetchrepo($bconf, $myarch, $repodir, $repourl, $buildtype);
+  my $bins = PBuild::RemoteRepo::fetchrepo($bconf, $myarch, $repodir, $repourl, $buildtype, $opts);
   $_->{'repoid'} = $id for @$bins;
   my $repo = { 'dir' => $repodir, 'bins' => $bins, 'url' => $repourl, 'type' => 'repo', 'repoid' => $id };
   $repos->{$id} = $repo;

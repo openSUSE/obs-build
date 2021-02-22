@@ -183,7 +183,7 @@ $buildtype = 'spec' if !$buildtype || $buildtype eq 'UNDEFINED';
 for my $pkg (@pkgs) {
   my $p = $pkgsrc{$pkg};
   PBuild::Recipe::parse($bconf, $p, $buildtype, $myarch);
-  if (($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker') && !$p->{'error'}) {
+  if ($p->{'buildtype'} && ($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker') && !$p->{'error'}) {
     my @containerdeps = grep {/^container:/} @{$p->{'dep'} || []};
     next unless @containerdeps;
     $containertags{substr($_, 10)} = 1 for @containerdeps;
@@ -207,7 +207,7 @@ push @repos, $repomgr->addlocalrepo($bconf, $myarch, $builddir, \%pkgsrc);
 
 print "fetching remote repo metadata\n";
 for my $repourl (@{$opts->{'repo'}}) {
-  push @repos, $repomgr->addremoterepo($bconf, $myarch, $builddir, $repourl, $buildtype);
+  push @repos, $repomgr->addremoterepo($bconf, $myarch, $builddir, $repourl, $buildtype, $opts);
 }
 
 if (@{$opts->{'registry'} || []} && %containertags) {
@@ -250,7 +250,7 @@ my $runs = 0;
 while (1) {
   # create and setup checker
   if (!$ctx) {
-    $ctx = PBuild::Checker::create($bconf, $myarch, $buildtype, \%pkgsrc, $builddir, $opts);
+    $ctx = PBuild::Checker::create($bconf, $myarch, $buildtype, \%pkgsrc, $builddir, $opts, $repomgr);
     print "preparing package pool\n" unless $runs;
     $ctx->prepare(\@repos);
     print "expanding dependencies\n" unless $runs;
