@@ -125,20 +125,30 @@ sub copyimagebinaries {
   for my $q (@$bins) {
     my $repo = $repos->{$q->{'repoid'}};
     die("package $q->{'name'} has no repo\n") unless $repo;
-    if ($repo->{'type'} eq 'registry') {
-      my $containerfile = "$q->{'name'}.tar";
-      $containerfile =~ s/^container://;
-      $containerfile =~ s/[\/:]/_/g;
-      PBuild::Verify::verify_filename($containerfile);
+    my ($from, $to);
+    if ($q->{'filename'}) {
+      PBuild::Verify::verify_filename($q->{'filename'});
+      $from = "$repo->{'dir'}/$q->{'filename'}";
+      $from = "$repo->{'dir'}/$q->{'packid'}/$q->{'filename'}" if $q->{'packid'};
+      $to = "$dstdir/repos/pbuild/pbuild/$q->{'filename'}";
+    }
+    if ($q->{'name'} =~ /^container:/) {
       PBuild::Util::mkdir_p("$dstdir/containers");
-      PBuild::RemoteRegistry::construct_containertar($repo->{'dir'}, $q, "$dstdir/containers/$containerfile");
+      $to = "$q->{'name'}.tar";
+      $to =~ s/^container://;
+      $to =~ s/[\/:]/_/g;
+      PBuild::Verify::verify_filename($to);
+      $to = "$dstdir/containers/$to";
+      if ($repo->{'type'} eq 'registry') {
+        PBuild::RemoteRegistry::construct_containertar($repo->{'dir'}, $q, $to);
+      } else {
+        die("package $q->{'name'} is not available\n") unless $from;
+        PBuild::Util::cp($from, $to);
+      }
       next;
     }
-    die("package $q->{'name'} is not available\n") unless $q->{'filename'};
-    PBuild::Verify::verify_filename($q->{'filename'});
-    my $from = "$repo->{'dir'}/$q->{'filename'}";
-    $from = "$repo->{'dir'}/$q->{'packid'}/$q->{'filename'}" if $q->{'packid'};
-    PBuild::Util::cp($from, "$dstdir/repos/pbuild/pbuild/$q->{'filename'}");
+    die("package $q->{'name'} is not available\n") unless $from && $to;
+    PBuild::Util::cp($from, $to);
   }
 }
 

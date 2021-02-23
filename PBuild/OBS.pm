@@ -169,6 +169,7 @@ my %testcaseops  = (
 
 sub parse_testcasedep_rec {
   my ($dep, $chainop) = @_;
+  no warnings 'recursion';
   my $d = $dep;
   $chainop ||= 0;
   my ($r, $r2);
@@ -209,6 +210,7 @@ my @rpmops = ('', 'and', 'or', 'if', 'unless', 'else', 'with', 'without');
 
 sub rpmdepformat_rec {
   my ($r, $addparens) = @_;
+  no warnings 'recursion';
   my $op = $r->[0];
   return $r->[1] unless $op;
   my $top = $rpmops[$op];

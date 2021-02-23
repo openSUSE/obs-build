@@ -181,17 +181,20 @@ sub fetchrepo_obs {
   die("please specify the build service url with the --obs option\n") unless $opts->{'obs'};
   my $baseurl = $opts->{'obs'};
   $baseurl .= '/' unless $baseurl =~ /\/$/;
-  download("${baseurl}build/$prp/$opts->{'arch'}/_repository?view=cache", "$tmpdir/repository.cpio");
+  download("${baseurl}build/$prp/$arch/_repository?view=cache", "$tmpdir/repository.cpio");
   PBuild::Cpio::cpio_extract("$tmpdir/repository.cpio", 'repositorycache', "$tmpdir/repository.data");
   my $rdata = PBuild::Util::retrieve("$tmpdir/repository.data");
   my @bins = grep {ref($_) eq 'HASH' && defined($_->{'name'})} values %{$rdata || {}};
   @bins = sort {$a->{'name'} cmp $b->{'name'}} @bins;
   for (@bins) {
-    delete $_->{'filename'};	# hey!
-    $_->{'location'} = "${baseurl}build/$prp/$opts->{'arch'}/_repository/$_->{'path'}";
+    delete $_->{'filename'};	# just in case
+    if ($_->{'path'} =~ /^\.\.\/([^\/\.][^\/]*\/[^\/\.][^\/]*)$/s) {
+      $_->{'location'} = "${baseurl}build/$prp/$arch/$1";	# obsbinlink to package
+    } else {
+      $_->{'location'} = "${baseurl}build/$prp/$arch/_repository/$_->{'path'}";
+    }
+    PBuild::OBS::recode_deps($_);	# recode deps from testcase format to rpm
   }
-  # recode deps from testcase format to rpm
-  PBuild::OBS::recode_deps($_) for @bins;
   return \@bins;
 }
 
@@ -200,13 +203,19 @@ sub fetchrepo_obs {
 #
 sub calc_binname {
   my ($bin) = @_;
-  die("bad location: $bin->{'location'}\n") unless $bin->{'location'} =~ /\.($binsufsre)$/;
-  my $suf = $1;
+  my $suf;
+  if ($bin->{'name'} =~ /^container:/) {
+    $suf = 'tar';
+  } else {
+    die("bad location: $bin->{'location'}\n") unless $bin->{'location'} =~ /\.($binsufsre)$/;
+    $suf = $1;
+  }
   my $binname = $bin->{'version'};
   $binname = "$bin->{'epoch'}:$binname" if $bin->{'epoch'};
   $binname .= "-$bin->{'release'}" if defined $bin->{'release'};
   $binname .= ".$bin->{'arch'}" if $bin->{'arch'};
   $binname = "$bin->{'name'}-$binname.$suf";
+  $binname = "$bin->{'hdrmd5'}-$binname" if $binname =~ s/^container:// && $bin->{'hdrmd5'};
   return $binname;
 }
 
@@ -231,6 +240,11 @@ sub replace_with_local {
     }
     $file = calc_binname($bin);
     next unless $files{$file};
+    if ($bin->{'name'} =~ /^container:/) {
+      delete $bin->{'id'};
+      $bin->{'filename'} = $file;
+      next;
+    }
     eval {
       my $q = querybinary($repodir, $file);
       %$bin = %$q;
@@ -355,12 +369,20 @@ sub fetchbinaries {
   my $ua = PBuild::Download::create_ua();
   for my $bin (@$bins) {
     my $location = $bin->{'location'};
-    print Dumper($bin) unless $location;
     die("missing location for binary $bin->{'name'}\n") unless $location;
     die("bad location: $location\n") unless $location =~ /^(?:https?|zypp):\/\//;
     my $binname = calc_binname($bin);
+    PBuild::Verify::verify_filename($binname);
     next if -e "$repodir/$binname";		# hey!
     my $tmpname = ".$$.$binname";
+    if ($bin->{'name'} =~ /^container:/) {
+      # we cannot query containers, just download and set the filename
+      die("container has no hdrmd5\n") unless $bin->{'hdrmd5'};
+      download($location, "$repodir/$tmpname", "$repodir/$binname", "md5:$bin->{'hdrmd5'}", $ua);
+      delete $bin->{'id'};
+      $bin->{'filename'} = $binname;
+      next;
+    }
     download($location, "$repodir/$tmpname", undef, $bin->{'checksum'}, $ua);
     my $q = querybinary($repodir, $tmpname);
     die("downloaded binary $binname does not match repository metadata\n") unless is_matching_binary($bin, $q);
