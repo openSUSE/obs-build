@@ -134,17 +134,22 @@ sub queryremotecontainer {
   my $id = $blobs[0]->{'digest'};
   $id =~ s/.*://;
   $id = substr($id, 0, 32);
-  my $name = "container:$repotag";
+  my $name = $repotag;
+  $name =~ s/[:\/]/-/g;
+  $name = "container:$name";
   my $version = 0;
+  my @provides = ("$name = $version");
+  push @provides, "container:$repotag" unless $name eq "container:$repotag";
   my $q = {
     'name' => $name,
     'version' => $version,
     'arch' => 'noarch',
     'source' => $name,
-    'provides' => [ "$name = $version" ],
+    'provides' => \@provides,
     'hdrmd5' => $id,
     'location' => $repository,
     'blobs' => \@blobs,
+    'containertags' => [ $repotag ],
   };
   return $q;
 }
@@ -230,6 +235,7 @@ sub maketarhead {
 #
 sub construct_containertar {
   my ($repodir, $q, $dst) = @_;
+  die("construct_containertar: $q->{'name'}: not a container\n") unless $q->{'name'} =~ /^container:/;
   my $fd;
   open ($fd, '>', $dst) || die("$dst: $!\n");
   my $mtime = time();
@@ -255,15 +261,12 @@ sub construct_containertar {
     print $fd $pad;
     close($bfd);
   }
-  my $tag = $q->{'name'};
-  $tag =~ s/^container://;
-  my @repotags = ( $tag );
   my @digests = map {$_->{'digest'}} @$blobs;
   my $configdigest = shift @digests;
   my $manifest = {
     'Config' => $configdigest,
     'Layers' => \@digests,
-    'RepoTags' => \@repotags,
+    'RepoTags' => $q->{'containertags'},
     '_order' => [ 'Config', 'RepoTags', 'Layers' ],
   };
   my $manifest_json = Build::SimpleJSON::unparse([ $manifest ], 'ugly' => 1);

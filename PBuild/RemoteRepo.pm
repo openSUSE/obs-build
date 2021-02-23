@@ -70,6 +70,7 @@ sub addpkg {
   $locprefix = '' unless defined $locprefix;
   $pkg->{'location'} = "$locprefix$pkg->{'location'}" if defined $locprefix;
   delete $pkg->{'filename'};	# just in case
+  delete $pkg->{'packid'};	# just in case
   push @$bins, $pkg;
 }
 
@@ -188,6 +189,7 @@ sub fetchrepo_obs {
   @bins = sort {$a->{'name'} cmp $b->{'name'}} @bins;
   for (@bins) {
     delete $_->{'filename'};	# just in case
+    delete $_->{'packid'};	# just in case
     if ($_->{'path'} =~ /^\.\.\/([^\/\.][^\/]*\/[^\/\.][^\/]*)$/s) {
       $_->{'location'} = "${baseurl}build/$prp/$arch/$1";	# obsbinlink to package
     } else {
