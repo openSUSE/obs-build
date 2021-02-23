@@ -318,5 +318,4 @@ while (1) {
 
 # say goodbye
 print "\npbuild is done:\n";
-PBuild::Result::print_result($opts, $builddir);
-
+exit PBuild::Result::print_result($opts, $builddir);
