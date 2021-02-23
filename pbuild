@@ -101,7 +101,7 @@ for my $dist (@{$opts->{'dist'} || []}) {
   } elsif ($dist =~ /^obs:\//) {
     my $islast = $distcnt == @{$opts->{'dist'} || []} ? 1 : 0;
     my ($obsconfigs, $obsrepos) = PBuild::OBS::fetch_all_configs($dist, $opts, $islast);
-    push @baseconfigs, @$obsconfigs;
+    push @baseconfigs, reverse @$obsconfigs;
     push @baseobsrepos, @$obsrepos;
   } elsif (-e "$dir/_configs/$opts->{'dist'}.conf") {
     push @baseconfigs, PBuild::Util::readstr("$dir/_configs/$dist.conf");
