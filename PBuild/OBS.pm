@@ -90,7 +90,7 @@ sub fetch_config {
   $projid2 =~ s/([\000-\040<>;\"#\?&\+=%[\177-\377])/sprintf("%%%02X",ord($1))/sge;
   my ($config) = PBuild::Download::fetch("${baseurl}source/$projid2/_config", 'missingok' => 1);
   $config = '' unless defined $config;
-  $config .= "\n### from $projid\n%define _repository $repoid\n$config" if $config;
+  $config = "\n### from $projid\n%define _repository $repoid\n$config" if $config;
   return $config;
 }
 
