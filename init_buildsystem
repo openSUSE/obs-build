@@ -569,6 +569,7 @@ fi
 mkdir -p "$BUILD_ROOT" || cleanup_and_exit 4
 mkdir -p "$BUILD_ROOT/.build" || cleanup_and_exit 4
 mkdir -p "$BUILD_ROOT/proc" || cleanup_and_exit 4
+mkdir -p "$BUILD_ROOT/sys" || cleanup_and_exit 4
 mkdir -p "$BUILD_ROOT/dev/pts" || cleanup_and_exit 4
 touch $BUILD_IS_RUNNING
 
