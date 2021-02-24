@@ -112,7 +112,9 @@ PKG_CCACHE=
 DLNOSIGNATURE=
 BUILD_FLAVOR=
 OBS_PACKAGE=
+OBSURL=
 CACHE_DIR=/var/cache/build
+BUILD_DIST_TMP=
 
 RECIPE_BUILD_START_TIME=
 CCACHE_SETUP_START_TIME=
@@ -427,6 +429,7 @@ cleanup_and_exit () {
 	    echo "$2"
 	fi
     fi
+    test -n "$BUILD_DIST_TMP" && rm -f "$BUILD_DIST_TMP"
     if test -z "$BUILD_OPTIONS_PARSED" ; then
 	# if we haven't parsed the options yet we do
 	# not know the correct build root. just exit.
@@ -1112,6 +1115,11 @@ while test -n "$1"; do
 	OBS_PACKAGE=$ARG
 	shift
       ;;
+      -obs)
+	needarg
+	OBSURL=$ARG
+	shift
+      ;;
       ---noarg)
 	cleanup_and_exit 1 "$ARG does not take an argument"
       ;;
@@ -1167,6 +1175,10 @@ if test -n "$OBS_PACKAGE" ; then
     initbuildsysstuff[${#initbuildsysstuff[@]}]="--obspackage"
     initbuildsysstuff[${#initbuildsysstuff[@]}]="$OBS_PACKAGE"
 fi
+if test -n "$OBSURL" ; then
+    initbuildsysstuff[${#initbuildsysstuff[@]}]="--obs"
+    initbuildsysstuff[${#initbuildsysstuff[@]}]="$OBSURL"
+fi
 
 if test -n "$DO_WIPE" ; then
     wipe_build_environment
@@ -1189,7 +1201,7 @@ if test -n "$CLEAN_BUILD" ; then
 fi
 
 if test -z "$RPMLIST" -a -z "$RUNNING_IN_VM" ; then
-    if test -z "$repos" -a -z "$BUILD_RPMS" ; then
+    if test -z "$repos" -a -z "$BUILD_RPMS" -a "$BUILD_DIST" = "${BUILD_DIST#obs:/}"; then
 	repos=(--repository 'zypp://')
     fi
 else
@@ -1271,6 +1283,21 @@ if test -n "$LOGFILE" -a -z "$RUN_SHELL" ; then
 fi
 
 setmemorylimit
+
+case $BUILD_DIST in
+    obs:/*) 
+	test -n "$OBSURL" || cleanup_and_exit 1 "Please use the --obs option to specify the url of the obs instance"
+	BUILD_DIST_TMP=$(mktemp)
+	$BUILD_DIR/queryobs config --obs "$OBSURL" "$BUILD_DIST" > "$BUILD_DIST_TMP"
+	if test -z "$repos" ; then
+	    for repo in $($BUILD_DIR/queryobs expandpath --obs "$OBSURL" "$BUILD_DIST") ; do
+		repos[${#repos[@]}]="--repository"
+		repos[${#repos[@]}]="$repo"
+	    done
+	fi
+	BUILD_DIST="$BUILD_DIST_TMP"
+	;;
+esac
 
 #
 # say hello

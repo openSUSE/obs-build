@@ -253,6 +253,7 @@ sed -i 's,build-mkbaselibs,,' ../configs/*.conf
 %defattr(-,root,root)
 %doc README.md
 /usr/bin/build
+/usr/bin/pbuild
 /usr/bin/buildvc
 /usr/bin/unrpm
 /usr/lib/build

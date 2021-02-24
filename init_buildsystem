@@ -59,6 +59,7 @@ CLEAN_BUILD=
 CREATE_BUILD_BINARIES=
 DLNOSIGNATURE=
 CACHE_DIR=/var/cache/build
+OBSURL=
 test -z "$CONFIG_DIR" && CONFIG_DIR="$BUILD_DIR/configs"
 
 while test -n "$1" ; do
@@ -119,6 +120,10 @@ while test -n "$1" ; do
 	    ;;
 	--dist)
 	    BUILD_DIST="$2"
+	    shift 2
+	    ;;
+	--obs)
+	    OBSURL="$2"
 	    shift 2
 	    ;;
 	*)
@@ -441,6 +446,10 @@ create_cache_file() {
 	elif test "${SRC#zypp://}" != "$SRC" ; then
 	    # special zypp repo
 	    set -- $BUILD_DIR/createzyppdeps --cachedir="$CACHE_DIR" "$SRC"
+	elif test "${SRC#obs:/}" != "$SRC" ; then
+	    # open build service repo
+	    test -n "$OBSURL" || cleanup_and_exit 1 "Please use the --obs option to specify the url of the obs instance"
+	    set -- $BUILD_DIR/queryobs repo --cachedir="$CACHE_DIR" --obs "$OBSURL" --arch "${BUILD_ARCH%%:*}" "$SRC"
 	elif test ! -e "$SRC" ; then
 	    cleanup_and_exit 1 "*** $SRC does not exist"
 	elif test -z "$findonly" -a \( -e "$SRC"/suse/setup/descr/packages -o -e "$SRC"/suse/setup/descr/packages.gz \) ; then

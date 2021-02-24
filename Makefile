@@ -79,6 +79,7 @@ install:
 	    obs-docker-support \
 	    create_container_package_list \
 	    call-podman \
+	    queryobs \
 	    $(DESTDIR)$(pkglibdir)
 	install -m644 \
 	    qemu-reg \
@@ -100,6 +101,7 @@ install:
 	install -m644 buildvc.1 $(DESTDIR)$(man1dir)
 	install -m644 unrpm.1 $(DESTDIR)$(man1dir)
 	ln -sf $(pkglibdir)/build $(DESTDIR)$(bindir)/build
+	ln -sf $(pkglibdir)/pbuild $(DESTDIR)$(bindir)/pbuild
 	ln -sf $(pkglibdir)/vc    $(DESTDIR)$(bindir)/buildvc
 	ln -sf $(pkglibdir)/unrpm $(DESTDIR)$(bindir)/unrpm
 	ln -s baselibs_configs/baselibs_global.conf $(DESTDIR)$(pkglibdir)/baselibs_global.conf
