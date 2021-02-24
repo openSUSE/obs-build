@@ -47,7 +47,7 @@ sub find_mbname {
 sub readmbxml {
   my ($xmlfile) = @_;
   my $mb = PBuild::Structured::readxml($xmlfile, $dtd_multibuild);
-  PBuilder::Verify::verify_multibuild($mb);
+  PBuild::Verify::verify_multibuild($mb);
   return $mb;
 }
 
