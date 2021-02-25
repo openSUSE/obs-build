@@ -39,7 +39,6 @@ sub configure_repos {
   # code in expanddeps!
   for my $repo (@$repos) {
     my $bins = $repo->{'bins'} || [];
-    my $repono = $repo->{'repono'};
     for my $bin (@$bins) {
       my $n = $bin->{'name'};
       next if $packs_done{$n};
@@ -62,7 +61,6 @@ sub configure_repos {
 	  next if ($oarch eq 'noarch' || $arch ne 'noarch') && $oarch cmp $arch >= 0;
 	}
       }
-      $bin->{'repono'} = $repono;
       $packs{$n} = $bin;
     }
     %packs_done = %packs;

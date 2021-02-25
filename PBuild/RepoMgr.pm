@@ -39,6 +39,7 @@ sub create {
 #
 sub addremoterepo {
   my ($repos, $bconf, $myarch, $builddir, $repourl, $buildtype, $opts) = @_;
+  return addemptyrepo($repos) if $repourl =~ /^empty:/;
   my $id = Digest::MD5::md5_hex($repourl);
   return $repos->{$id} if $repos->{$id};
   my $repodir = "$builddir/.pbuild/_base/$id";
@@ -76,6 +77,18 @@ sub addlocalrepo {
   my $bins = PBuild::LocalRepo::fetchrepo($bconf, $myarch, $builddir, $pkgsrc);
   $_->{'repoid'} = $id for @$bins;
   my $repo = { 'dir' => $builddir, 'bins' => $bins, 'type' => 'local', 'repoid' => $id };
+  $repos->{$id} = $repo;
+  return $repo;
+}
+
+#
+# Add an emptt repository to the manager
+#
+sub addemptyrepo {
+  my ($repos) = @_;
+  my $id = 'empty';
+  return $repos->{$id} if $repos->{$id};
+  my $repo = { 'bins' => [], 'type' => 'empty', 'repoid' => $id };
   $repos->{$id} = $repo;
   return $repo;
 }

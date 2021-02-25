@@ -390,14 +390,10 @@ sub fetchbinaries {
     die("downloaded binary $binname does not match repository metadata\n") unless is_matching_binary($bin, $q);
     rename("$repodir/$tmpname", "$repodir/$binname") || die("rename $repodir/$tmpname $repodir/$binname\n");
     $q->{'filename'} = $binname;
-    # inline replace!
-    $q->{'repono'} = $bin->{'repono'} if defined $bin->{'repono'};
-    %$bin = %$q;
+    %$bin = %$q;	# inline replace!
   }
   # update _metadata
-  my $newbins = PBuild::Util::clone($repo->{'bins'});
-  delete $_->{'repono'} for @$newbins;
-  PBuild::Util::store("$repodir/._metadata.$$", "$repodir/_metadata", $newbins);
+  PBuild::Util::store("$repodir/._metadata.$$", "$repodir/_metadata", $repo->{'bins'});
 }
 
 1;
