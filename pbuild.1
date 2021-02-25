@@ -123,6 +123,13 @@ Specify a different directory containing distribution configurations.
 .BI "\-\-help"
 Print a short help text.
 
+.SH RETURN CODES
+.TP
+.BI 0
+When none of the builds finished with failure, unresolvable or in broken state
+.TP
+.BI 1
+When one or more builds failed, remained unresolvable or in broken state
 
 .SH SEE ALSO
 .BR build (1)

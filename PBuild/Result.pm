@@ -25,6 +25,7 @@ use strict;
 use PBuild::Util;
 
 my @code_order = qw{broken succeeded failed unresolvable blocked scheduled waiting building excluded disabled locked};
+my @code_failures = qw{broken failed unresolvable};
 
 sub print_result {
   my ($opts, $builddir) = @_;
@@ -32,10 +33,13 @@ sub print_result {
   die("pbuild has not run yet for $builddir\n") unless $r;
   my %codefilter = map {$_ => 1} @{$opts->{'result-code'} || []};
   my %pkgfilter = map {$_ => 1} @{$opts->{'result-pkg'} || []};
+  my %buildfailfilter = map{$_ => 1} @code_failures;
+  my $found_failures = 0;
   my %codes_seen;
   for my $pkg (sort keys %$r) {
     next if %pkgfilter && !$pkgfilter{$pkg};
     my $code = $r->{$pkg}->{'code'} || 'unknown';
+    $found_failures = 1 if ($buildfailfilter{$code});
     next if %codefilter && !$codefilter{'all'} && !$codefilter{$code};
     push @{$codes_seen{$code}}, $pkg;
   }
@@ -62,6 +66,7 @@ sub print_result {
       }
     }
   }
+  return $found_failures;
 }
 
 1;
