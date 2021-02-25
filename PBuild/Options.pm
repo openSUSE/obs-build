@@ -165,4 +165,39 @@ sub parse_options {
   return (\%opts, @back);
 }
 
+sub usage {
+  my ($exitstatus) = @_;
+  print <<'EOS';
+Usage: pbuild [options] [dir]
+
+Build all packages in the directory 'dir'.
+
+Important options (see the man page for a full list):
+
+  --dist known_dist|url|file
+        distribution to build for
+  --repo url
+        repository to use, can be given multiple times
+  --registry url
+        registry to use, can be given multiple times
+  --reponame name
+        name of the destination dir
+        defaults to "_build.<dist>.<arch>"
+  --buildjobs number
+        build in parallel with 'number' jobs
+  --root rootdir
+        do the build in the 'rootdir' directory
+        defaults to '/var/tmp/build-root'
+  --arch arch
+        build for architecture 'arch'
+        defaults to the host architecture
+  --obs url
+        open build service instance for obs:/ type urls
+  --vm-*, --xen, --kvm, ...
+	passed to the build tool, see the build(1) manpage
+
+EOS
+  exit($exitstatus) if defined $exitstatus;
+}
+
 1;

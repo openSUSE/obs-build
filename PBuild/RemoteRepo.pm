@@ -325,6 +325,25 @@ sub fetchrepo {
 }
 
 #
+# Expand the special zypp:// repo to all enabled zypp repositories
+#
+sub expand_zypp_repo {
+  my ($opts) = @_;
+  return unless grep {/^zypp:\/{0,2}$/} @{$opts->{'repo'} || []};
+  my @r;
+  for my $url (@{$opts->{'repo'}}) {
+    if ($url =~ /^zypp:\/{0,2}$/) {
+      for my $r (Build::Zypp::parseallrepos()) {
+        push @r, "zypp://$r->{'name'}" if $r->{'enabled'};
+      }
+    } else {
+      push @r, $url;
+    }
+  }
+  @{$opts->{'repo'}} = @r;
+}
+
+#
 # Check if the downloaded package matches the repository metadata
 #
 sub is_matching_binary {

@@ -49,6 +49,7 @@ use PBuild::Preset;
 
 # parse options
 my ($opts, @dirs) = PBuild::Options::parse_options(@ARGV);
+PBuild::Options::usage(0) if $opts->{'help'};
 die("Usage: pbuild [options] [dir]\n") if @dirs > 1;
 my $dir = @dirs ? $dirs[0] : '.';
 $dir = Cwd::abs_path($dir) if $dir !~ /^\//;
@@ -119,7 +120,10 @@ my $localconfig = -s "$dir/_config" ? PBuild::Util::readstr("$dir/_config") : ''
 $localconfig = "\n%define _repository $reponame\n\n$localconfig" if $localconfig ne '';
 
 my $buildconfig = PBuild::BuildConfig::combineconfigs(@baseconfigs, $localconfig);
-die("Please specify a distribution\n") unless $buildconfig;
+if (!$buildconfig) {
+  print("Please specify a distribution!\n\n");
+  PBuild::Options::usage(1);
+}
 
 my $bconf = Build::read_config($myarch, [ split("\n", $buildconfig) ]);
 
@@ -136,6 +140,9 @@ for (splice(@{$opts->{'registry'}})) {
   push @{$opts->{'registry'}}, $_;
   splice(@{$opts->{'registry'}}, -1, 1, @{$bconf->{'registryurl'}}) if $_ eq 'config:';
 }
+
+# expand the zypp:// repo
+PBuild::RemoteRepo::expand_zypp_repo($opts) if $opts->{'repo'};
 
 print "searching for packages\n";
 my @pkgs = PBuild::Source::find_packages($dir);
