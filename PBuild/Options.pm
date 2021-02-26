@@ -26,6 +26,8 @@ my %known_options = (
   'h' => 'help',
   'help' => 'help',
   'preset' => 'preset:',
+  'list-presets' => 'list-presets',
+  'listpresets' => 'list-presets',
   'reponame' => 'reponame:',
   'nochecks' => 'nochecks',
   'no-checks' => 'nochecks',
@@ -180,6 +182,10 @@ Important options (see the man page for a full list):
         repository to use, can be given multiple times
   --registry url
         registry to use, can be given multiple times
+  --preset name
+        specify a preset defined in the project
+  --list-presets
+        list all known presets
   --reponame name
         name of the destination dir
         defaults to "_build.<dist>.<arch>"
@@ -194,7 +200,9 @@ Important options (see the man page for a full list):
   --obs url
         open build service instance for obs:/ type urls
   --vm-*, --xen, --kvm, ...
-	passed to the build tool, see the build(1) manpage
+        passed to the build tool, see the build(1) manpage
+  --result
+        show the package build status
 
 EOS
   exit($exitstatus) if defined $exitstatus;

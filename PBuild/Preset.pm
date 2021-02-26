@@ -21,6 +21,7 @@
 package PBuild::Preset;
 
 use PBuild::Structured;
+use PBuild::Util;
 
 use strict;
 
@@ -37,18 +38,45 @@ my $dtd_pbuild = [
 # read presets
 sub read_presets {
   my ($dir, $presetname) = @_;
+  return undef unless defined $presetname;
   my $preset;
   if (-f "$dir/_pbuild") {
     my $pbuild = PBuild::Structured::readxml("$dir/_pbuild", $dtd_pbuild);
     for my $d (@{$pbuild->{'preset'} || []}) {
-      if (!defined($presetname) || (defined($d->{'name'}) && $presetname eq $d->{'name'})) {
+      if (defined($d->{'name'}) && $presetname eq $d->{'name'}) {
         $preset = $d;
         last;
       }
     }
-    die("unknown preset '$presetname'\n") if defined($presetname) && !$preset;
   }
+  die("unknown preset '$presetname'\n") unless $preset;
   return $preset;
+}
+
+# get a list of defined presets
+sub known_presets {
+  my ($dir) = @_;
+  my @presetnames;
+  if (-f "$dir/_pbuild") {
+    my $pbuild = PBuild::Structured::readxml("$dir/_pbuild", $dtd_pbuild);
+    for my $d (@{$pbuild->{'preset'} || []}) {
+      push @presetnames, $d->{'name'} if defined $d->{'name'};
+    }
+    @presetnames = PBuild::Util::unify(@presetnames);
+  }
+  return @presetnames;
+}
+
+# show resets
+sub list_presets {
+  my ($dir) = @_;
+  my @presetnames = known_presets($dir);
+  if (@presetnames) {
+    print "Known presets:\n";
+    print "  - $_\n" for @presetnames;
+  } else {
+    print "No presets defined\n";
+  }
 }
 
 # get reponame/dist/repo/registry options from preset

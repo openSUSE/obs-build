@@ -53,12 +53,14 @@ PBuild::Options::usage(0) if $opts->{'help'};
 die("Usage: pbuild [options] [dir]\n") if @dirs > 1;
 my $dir = @dirs ? $dirs[0] : '.';
 $dir = Cwd::abs_path($dir) if $dir !~ /^\//;
+$dir =~ s/(.)\/+$/$1/s;
 
 # set defaults
 my $libbuild = $INC[0];
 $opts->{'libbuild'} = $libbuild;
 $opts->{'root'} ||= '/var/tmp/build-root';
 $opts->{'root'} = Cwd::abs_path($opts->{'root'}) if $opts->{'root'} !~ /^\//;
+$opts->{'root'} =~ s/(.)\/+$/$1/s;
 $opts->{'configdir'} ||= "$libbuild/configs";
 if (!$opts->{'hostarch'}) {
   $opts->{'hostarch'} = (POSIX::uname())[4];
@@ -70,6 +72,10 @@ $opts->{'arch'} ||= $opts->{'hostarch'};
 $opts->{'buildjobs'} = 1 unless $opts->{'buildjobs'};
 $opts->{'buildjobs'} = 32 if $opts->{'buildjobs'} > 32;
 
+if ($opts->{'list-presets'}) {
+  PBuild::Preset::list_presets($dir);
+  exit;
+}
 
 # read presets
 my $preset = PBuild::Preset::read_presets($dir, $opts->{'preset'});
@@ -102,7 +108,7 @@ for my $dist (@{$opts->{'dist'} || []}) {
   } elsif ($dist =~ /^obs:\//) {
     my $islast = $distcnt == @{$opts->{'dist'} || []} ? 1 : 0;
     my ($obsconfigs, $obsrepos) = PBuild::OBS::fetch_all_configs($dist, $opts, $islast);
-    push @baseconfigs, reverse @$obsconfigs;
+    push @baseconfigs, @$obsconfigs;
     push @baseobsrepos, @$obsrepos;
   } elsif ($dist =~ /^empty:/) {
     next;
@@ -119,13 +125,18 @@ push @{$opts->{'repo'}}, @baseobsrepos if @baseobsrepos && !$opts->{'repo'};
 my $localconfig = -s "$dir/_config" ? PBuild::Util::readstr("$dir/_config") : '';
 $localconfig = "\n%define _repository $reponame\n\n$localconfig" if $localconfig ne '';
 
-my $buildconfig = PBuild::BuildConfig::combineconfigs(@baseconfigs, $localconfig);
-if (!$buildconfig) {
-  print("Please specify a distribution!\n\n");
+my $buildconfig = PBuild::BuildConfig::combineconfigs(reverse(@baseconfigs), $localconfig);
+my $bconf = Build::read_config($myarch, [ split("\n", $buildconfig) ]);
+if (!@{$bconf->{'preinstall'} || []}) {
+  my @presetnames = PBuild::Preset::known_presets($dir);
+  if (@presetnames) {
+    print("Please specify a distribution or a preset!\n\n");
+  } else {
+    print("Please specify a distribution!\n\n");
+  }
   PBuild::Options::usage(1);
 }
 
-my $bconf = Build::read_config($myarch, [ split("\n", $buildconfig) ]);
 
 # default to repo/registry from config if not set
 push @{$opts->{'repo'}}, 'config:' unless @{$opts->{'repo'} || []};
@@ -144,6 +155,20 @@ for (splice(@{$opts->{'registry'}})) {
 # expand the zypp:// repo
 PBuild::RemoteRepo::expand_zypp_repo($opts) if $opts->{'repo'};
 
+print "starting project builder\n";
+print "    source directory: $dir\n";
+print "    result directory: $builddir\n";
+print "    build area: $opts->{'root'}\n";
+print "    architecture: $myarch\n";
+print "    preset: $preset->{'name'}\n" if $preset;
+if (@{$opts->{'dist'} || []}) {
+  print "    build config:\n";
+  print "      - $_\n" for @{$opts->{'dist'}};
+}
+if (@{$opts->{'repo'} || []}) {
+  print "    repositories:\n";
+  print "      - $_\n" for @{$opts->{'repo'}};
+}
 print "searching for packages\n";
 my @pkgs = PBuild::Source::find_packages($dir);
 die("no packages found in '$dir'\n") unless @pkgs;
