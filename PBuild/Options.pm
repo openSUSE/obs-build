@@ -52,6 +52,7 @@ my %known_options = (
   'rebuild' => \&result_rebuild_special,
   'rebuild-pkg' => 'rebuild-pkg::',
   'rebuild-code' => 'rebuild-code::',
+  'buildtrigger' => 'buildtrigger:',
   'xen' => \&vm_type_special,
   'kvm' => \&vm_type_special,
   'uml' => \&vm_type_special,

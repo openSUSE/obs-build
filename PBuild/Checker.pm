@@ -55,6 +55,7 @@ sub create {
     'repomgr' => $repomgr,
     'assetmgr' => $assetmgr,
   };
+  $ctx->{'rebuild'} = $opts->{'buildtrigger'} if $opts->{'buildtrigger'};
   return bless $ctx;
 }
 
