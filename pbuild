@@ -84,9 +84,11 @@ PBuild::Preset::apply_preset($opts, $preset) if $preset;
 
 my $reponame = $opts->{'reponame'};
 if (!$reponame && $opts->{'dist'}) {
-  $reponame = $opts->{'dist'}->[-1];
+  $reponame = $opts->{'dist'}->[0];
+  $reponame = $1 if $reponame =~ /^obs:\/.*?([^\/]+)\/standard\/*$/s;
   $reponame =~ s/.*\///;
   $reponame =~ s/\.conf$//;
+  $reponame =~ s/[:\s]+/_/g;
 }
 
 my $myarch = $opts->{'arch'};
@@ -124,7 +126,7 @@ for my $dist (@{$opts->{'dist'} || []}) {
 push @{$opts->{'repo'}}, @baseobsrepos if @baseobsrepos && !$opts->{'repo'};
 
 my $localconfig = -s "$dir/_config" ? PBuild::Util::readstr("$dir/_config") : '';
-$localconfig = "\n%define _repository $reponame\n\n$localconfig" if $localconfig ne '';
+$localconfig = "\n%define _repository $reponame\n\n$localconfig" if $reponame && $localconfig ne '';
 
 my $buildconfig = PBuild::BuildConfig::combineconfigs(reverse(@baseconfigs), $localconfig);
 my $bconf = Build::read_config($myarch, [ split("\n", $buildconfig) ]);
