@@ -45,10 +45,13 @@ my %known_options = (
   'repository' => 'repo::',
   'registry' => 'registry::',
   'obs' => 'obs:',
-  'result' => \&result_special,
+  'result' => \&result_rebuild_special,
   'result-pkg' => 'result-pkg::',
   'result-code' => 'result-code::',
   'details' => 'result-details',
+  'rebuild' => \&result_rebuild_special,
+  'rebuild-pkg' => 'rebuild-pkg::',
+  'rebuild-code' => 'rebuild-code::',
   'xen' => \&vm_type_special,
   'kvm' => \&vm_type_special,
   'uml' => \&vm_type_special,
@@ -116,18 +119,16 @@ sub vm_type_special {
 my @codes = qw{broken succeeded failed unresolvable blocked scheduled waiting building excluded disabled locked};
 my %known_codes = map {$_ => 1} @codes;
 
-sub result_special {
+sub result_rebuild_special {
   my ($opts, $origopt, $opt, $args) = @_;
   my $arg;
   $arg = getarg($origopt, $args, 1) if @$args && (ref($args->[0]) || $args->[0] !~ /\//);
   if (!defined($arg) || $arg eq 'all') {
-    push @{$opts->{'result-code'}}, 'all';
-    return;
-  }
-  if ($known_codes{$arg}) {
-    push @{$opts->{'result-code'}}, $arg;
+    push @{$opts->{"$opt-code"}}, 'all';
+  } elsif ($known_codes{$arg}) {
+    push @{$opts->{"$opt-code"}}, $arg;
   } else {
-    push @{$opts->{'result-pkg'}}, $arg;
+    push @{$opts->{"$opt-pkg"}}, $arg;
   }
 }
 

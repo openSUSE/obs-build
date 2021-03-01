@@ -80,6 +80,20 @@ obs:/ urls need to be resolved.
 .BI "\-\-buildjobs " num
 Start up to \fInum\fP processes to build packages in parallel.
 .TP
+.BI "\-\-rebuild-pkg " packagename
+Force a rebuild of the specified package. This option can be
+used multiple times.
+.TP
+.BI "\-\-rebuild-code " code
+Force a rebuild of the packages in state "code". This option can be
+used multiple times.
+.TP
+.BI "\-\-rebuild " \fR[\fPcode_or_packagename\fR]\fP
+Short hand form to force a rebuild. If no argument is given,
+all packages are rebuilt. If the argument is a known
+result code, packages with a state matching the specified code are rebuilt.
+Otherwise it is assumed that the argument is a package name.
+.TP
 .B "\-\-vm-..."
 .PD 0
 .TP
@@ -107,10 +121,13 @@ Only show build results for builds that resulted in the specified code.
 This option can be used multiple times.
 .TP
 .BI "\-\-result " \fR[\fPcode_or_packagename\fR]\fP
-This is a short hand form for resut querying. If no argument is given,
+This is a short hand form for result querying. If no argument is given,
 the results for all packages are shown. If the argument is a known
 result code, builds that resulted in the specified code are shown.
 Otherwise it is assumed that the argument is a package name.
+.TP
+.B "\-\-details"
+Show more information about the package state.
 
 .SH MISC OPTIONS
 .TP

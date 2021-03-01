@@ -311,6 +311,7 @@ sub check_image {
   }
   return ('scheduled', [ { 'explain' => 'new build' } ]) if !@meta;
   return ('scheduled', [ { 'explain' => 'source change', 'oldsource' => substr($meta[0], 0, 32) } ]) if $meta[0] ne $new_meta->[0];
+  return ('scheduled', [ { 'explain' => 'forced rebuild' } ]) if $p->{'force_rebuild'};
   my $rebuildmethod = $ctx->{'rebuild'} || 'transitive';
   if ($rebuildmethod eq 'local') {
     return ('scheduled', [ { 'explain' => 'rebuild counter sync' } ]) if $ctx->{'relsynctrigger'}->{$packid};
@@ -393,6 +394,8 @@ sub check {
     return ('scheduled', [ { 'explain' => 'new build' } ]);
   } elsif (substr($mylastcheck, 0, 32) ne ($p->{'verifymd5'} || $p->{'srcmd5'})) {
     return ('scheduled', [ { 'explain' => 'source change', 'oldsource' => substr($mylastcheck, 0, 32) } ]);
+  } elsif ($p->{'force_rebuild'}) {
+    return ('scheduled', [ { 'explain' => 'forced rebuild' } ]);
   } elsif (substr($mylastcheck, 32, 32) eq 'fakefakefakefakefakefakefakefake') {
     my @s = stat("$dst/_meta");
     if (!@s || $s[9] + 14400 > time()) {
