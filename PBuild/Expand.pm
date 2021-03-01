@@ -57,8 +57,8 @@ sub configure_repos {
 	if ($oevr ne $evr) {
           next if ($verscmp->($oevr, $evr) || $oevr cmp $evr) >= 0;
         } elsif ($arch ne $oarch) {
-	  next if $oarch eq 'noarch' && $arch ne 'noarch';
-	  next if ($oarch eq 'noarch' || $arch ne 'noarch') && $oarch cmp $arch >= 0;
+	  next if $arch eq 'noarch' && $oarch ne 'noarch';
+	  next if !($oarch eq 'noarch' && $arch ne 'noarch') && ($oarch cmp $arch) >= 0;
 	}
       }
       $packs{$n} = $bin;

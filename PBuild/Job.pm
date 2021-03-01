@@ -148,6 +148,18 @@ sub collect_result {
 }
 
 #
+# Copy the package sources into the build root
+#
+sub copy_sources {
+  my ($p, $srcdir) = @_;
+  # for kiwi/docker we need to copy the sources to $buildroot/.build-srcdir
+  # so that we can set up the "repos" and "containers" directories
+  PBuild::Util::mkdir_p($srcdir);
+  PBuild::Util::cleandir($srcdir);
+  PBuild::Util::cp("$p->{'dir'}/$_", "$srcdir/$_") for sort keys %{$p->{'files'}};
+}
+
+#
 # Create a new build job
 #
 # ctx usage: opts hostarch bconf arch repos dep2pkg buildconfig debuginfo
@@ -210,6 +222,15 @@ sub createjob {
     }
   }
 
+  my $srcdir = $p->{'dir'};
+  # for kiwi/docker we need to copy the sources to $buildroot/.build-srcdir
+  # so that we can set up the "repos" and "containers" directories
+  if ($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker' || $p->{'asset_files'}) {
+    $srcdir = "$buildroot/.build-srcdir";
+    copy_sources($p, $srcdir);
+    $ctx->{'assetmgr'}->copy_assets($p, $srcdir) if $p->{'asset_files'};
+  }
+
   my @args;
   push @args, $helper if $helper;
   push @args, "$opts->{'libbuild'}/build";
@@ -263,18 +284,11 @@ sub createjob {
   push @args, '--threads', $opts->{'threads'} if $opts->{'threads'};
   push @args, "--buildflavor=$p->{'flavor'}" if $p->{'flavor'};
   push @args, "--obspackage=".($p->{'originpackage'} || $p->{'pkg'}) if $needobspackage;
-  push @args, "$p->{'dir'}/$p->{'recipe'}";
+  push @args, "$srcdir/$p->{'recipe'}";
 
   if ($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker') {
-    # for kiwi/docker we need to copy the sources to $buildroot/.build-srcdir
-    # so that we can set up the "repos" and "containers" directories
-    my $kiwisrcdir = "$buildroot/.build-srcdir";
-    PBuild::Util::mkdir_p($kiwisrcdir);
-    PBuild::Util::cleandir($kiwisrcdir);
-    PBuild::Util::cp("$p->{'dir'}/$_", "$kiwisrcdir/$_") for sort keys %{$p->{'files'}};
-    $args[-1] = "$kiwisrcdir/$p->{'recipe'}";
     # now setup the repos/containers directories
-    $ctx->{'repomgr'}->copyimagebinaries($ctx->dep2bins(@$bdeps), $kiwisrcdir);
+    $ctx->{'repomgr'}->copyimagebinaries($ctx->dep2bins(@$bdeps), $srcdir);
     # tell kiwi how to use them
     if ($p->{'buildtype'} eq 'kiwi') {
       my @kiwiargs;
@@ -282,8 +296,8 @@ sub createjob {
       push @kiwiargs, '--add-repo', 'dir://./repos/pbuild/pbuild';
       push @kiwiargs, '--add-repotype', 'rpm-md';
       push @kiwiargs, '--add-repoprio', '1';
-      if (-d "$kiwisrcdir/containers") {
-	for my $containerfile (grep {/\.tar$/} sort(ls("$kiwisrcdir/containers")))  {
+      if (-d "$srcdir/containers") {
+	for my $containerfile (grep {/\.tar$/} sort(ls("$srcdir/containers")))  {
 	  push @kiwiargs, "--set-container-derived-from=dir://./containers/$containerfile";
 	}
       }

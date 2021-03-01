@@ -36,6 +36,7 @@ use Build;
 
 use PBuild::Source;
 use PBuild::Recipe;
+use PBuild::AssetMgr;
 use PBuild::RepoMgr;
 use PBuild::LocalRepo;
 use PBuild::Multibuild;
@@ -175,6 +176,8 @@ die("no packages found in '$dir'\n") unless @pkgs;
 my $npkgs = @pkgs;
 print "found $npkgs packages\n";
 
+my $assetmgr = PBuild::AssetMgr::create("$dir/.pbuild/_assets");
+
 print "getting package information\n";
 my %pkgsrc;
 for my $pkg (@pkgs) {
@@ -185,6 +188,7 @@ for my $pkg (@pkgs) {
     'files' => $files,
     'srcmd5' => PBuild::Source::calc_srcmd5($files),
   };
+  $assetmgr->find_assets($pkgsrc{$pkg});
 }
 
 # handle local links and multibuild packages
@@ -312,7 +316,7 @@ my $runs = 0;
 while (1) {
   # create and setup checker
   if (!$ctx) {
-    $ctx = PBuild::Checker::create($bconf, $myarch, $buildtype, \%pkgsrc, $builddir, $opts, $repomgr);
+    $ctx = PBuild::Checker::create($bconf, $myarch, $buildtype, \%pkgsrc, $builddir, $opts, $repomgr, $assetmgr);
     print "preparing package pool\n" unless $runs;
     $ctx->prepare(\@repos);
     print "expanding dependencies\n" unless $runs;

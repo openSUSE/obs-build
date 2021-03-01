@@ -30,12 +30,13 @@ use PBuild::Meta;
 use PBuild::Util;
 use PBuild::Job;
 use PBuild::RepoMgr;
+use PBuild::AssetMgr;
 
 #
 # Create a new package status checker
 #
 sub create {
-  my ($bconf, $arch, $buildtype, $pkgsrc, $builddir, $opts, $repomgr) = @_;
+  my ($bconf, $arch, $buildtype, $pkgsrc, $builddir, $opts, $repomgr, $assetmgr) = @_;
   my $genmetaalgo = $bconf->{'buildflags:genmetaalgo'};
   $genmetaalgo = 1 unless defined $genmetaalgo;
   my $ctx = {
@@ -52,6 +53,7 @@ sub create {
     'lastcheck' => {},
     'metacache' => {},
     'repomgr' => $repomgr,
+    'assetmgr' => $assetmgr,
   };
   return bless $ctx;
 }
@@ -600,6 +602,7 @@ sub build {
     my $missing = join(', ', sort(BSUtil::unify(@missing)));
     return ('unresolvable', "missing pre/vminstalls: $missing");
   }
+  $ctx->{'assetmgr'}->getremoteassets($p);
   my $bins = dep2bins($ctx, PBuild::Util::unify(@pdeps, @vmdeps, @sysdeps, @bdeps));
   $ctx->{'repomgr'}->getremotebinaries($bins);
   my $readytime = time();
