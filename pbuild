@@ -144,6 +144,7 @@ if (!@{$bconf->{'preinstall'} || []}) {
 # default to repo/registry from config if not set
 push @{$opts->{'repo'}}, 'config:' unless @{$opts->{'repo'} || []};
 push @{$opts->{'registry'}}, 'config:' unless @{$opts->{'registry'} || []};
+push @{$opts->{'assets'}}, 'config:' unless @{$opts->{'assets'} || []};
 
 # substitute config: with values from config
 for (splice(@{$opts->{'repo'}})) {
@@ -153,6 +154,10 @@ for (splice(@{$opts->{'repo'}})) {
 for (splice(@{$opts->{'registry'}})) {
   push @{$opts->{'registry'}}, $_;
   splice(@{$opts->{'registry'}}, -1, 1, @{$bconf->{'registryurl'}}) if $_ eq 'config:';
+}
+for (splice(@{$opts->{'assets'}})) {
+  push @{$opts->{'assets'}}, $_;
+  splice(@{$opts->{'assets'}}, -1, 1, @{$bconf->{'assetsurl'}}) if $_ eq 'config:';
 }
 
 # expand the zypp:// repo
@@ -172,6 +177,10 @@ if (@{$opts->{'repo'} || []}) {
   print "    repositories:\n";
   print "      - $_\n" for @{$opts->{'repo'}};
 }
+if (@{$opts->{'assets'} || []}) {
+  print "    assets:\n";
+  print "      - $_\n" for @{$opts->{'assets'}};
+}
 print "searching for packages\n";
 my @pkgs = PBuild::Source::find_packages($dir);
 die("no packages found in '$dir'\n") unless @pkgs;
@@ -179,6 +188,9 @@ my $npkgs = @pkgs;
 print "found $npkgs packages\n";
 
 my $assetmgr = PBuild::AssetMgr::create("$dir/.pbuild/_assets");
+for my $assetsurl (@{$opts->{'assets'} || []}) {
+  $assetmgr->add_assetshandler($assetsurl);
+}
 
 print "getting package information\n";
 my %pkgsrc;

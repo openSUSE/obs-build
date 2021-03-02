@@ -184,6 +184,7 @@ sub pkgcheck {
       next;
     }
 
+recheck_package:
     my ($status, $error) = check($ctx, $p, $incycle);
     #printf("%s -> %s%s", $packid, $status, $error && $status ne 'scheduled' ? " ($error)" : '');
     if ($status eq 'scheduled') {
@@ -198,6 +199,7 @@ sub pkgcheck {
       } else {
 	($status, $error) = build($ctx, $p, $error, $builder);
       }
+      goto recheck_package if $status eq 'recheck';	# assets changed
       if ($status eq 'building') {
 	my $job = $error;
 	$error = undef;
@@ -603,7 +605,10 @@ sub build {
     my $missing = join(', ', sort(BSUtil::unify(@missing)));
     return ('unresolvable', "missing pre/vminstalls: $missing");
   }
+  my $oldsrcmd5 = $p->{'srcmd5'};
   $ctx->{'assetmgr'}->getremoteassets($p);
+  return ('recheck', 'assets changed') if $p->{'srcmd5'} ne $oldsrcmd5;
+  return ('broken', $p->{'error'}) if $p->{'error'};	# missing assets
   my $bins = dep2bins($ctx, PBuild::Util::unify(@pdeps, @vmdeps, @sysdeps, @bdeps));
   $ctx->{'repomgr'}->getremotebinaries($bins);
   my $readytime = time();

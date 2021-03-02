@@ -112,6 +112,7 @@ sub download {
     unlink($dest);        # disable last-modified handling, always download
     my $res = $ua->mirror($url, $dest);
     last if $res->is_success;
+    return undef if $opt{'missingok'} && $res->code == 404;
     my $status = $res->status_line;
     die("download of $url failed: $status\n") unless $retry-- > 0 && $res->previous;
     warn("retrying $url\n");
@@ -120,6 +121,7 @@ sub download {
   if ($destfinal) {
     rename($dest, $destfinal) || die("rename $dest $destfinal: $!\n");
   }
+  return 1;
 }
 
 1;

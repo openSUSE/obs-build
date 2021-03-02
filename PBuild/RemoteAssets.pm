@@ -20,73 +20,68 @@
 
 package PBuild::RemoteAssets;
 
-use PBuild::Source;
 use PBuild::Util;
 use PBuild::Download;
 
-use Digest::MD5 ();
-
 use strict;
 
-# Fedora FedPkg
+# Fedora FedPkg support
 
+#
+# Parse a fedora "sources" asset reference file
+#
 sub fedpkg_parse {
   my ($p) = @_;
   my $files = $p->{'files'};
   return unless $files->{'sources'};
   my $fd;
   open ($fd, '<', "$p->{'dir'}/sources") || die("$p->{'dir'}/sources: $!\n");
-  my %asset_files;
   while (<$fd>) {
     chomp;
     if (/^(\S+) \(.*\) = ([0-9a-fA-F]{32,})$/s) {
-      $asset_files{$2} = lc("$1:$3");
+      $p->{'asset_files'}->{$2} = { 'file' => $2, 'digest' => lc("$1:$3") };
     } elsif (/^([0-9a-fA-F]{32})  (.*)$/) {
-      $asset_files{$2} = lc("md5:$1");
+      $p->{'asset_files'}->{$2} = { 'file' => $2, 'digest' => lc("md5:$1") };
     } else {
       warn("unparsable line in 'sources' file: $_\n");
     }
   }
   close $fd;
-  return unless %asset_files;
-  $p->{'asset_files'} = \%asset_files;
-  $p->{'asset_url'} = 'http://pkgs.fedoraproject.org/repo/pkgs';
-  my %updated_files = %$files;
-  for (sort keys %asset_files) {
-    $updated_files{$_} = substr($asset_files{$_}, 0, 32);
-  }
-  $p->{'srcmd5'} = PBuild::Source::calc_srcmd5(\%updated_files);
 }
 
-# http://pkgs.fedoraproject.org/repo/pkgs/<name>/<file>/<hashtype>/<hash>/<file>
+#
+# Get missing assets from a fedora lookaside cache server
+#
 sub fedpkg_fetch {
-  my ($p, $assetdir) = @_;
+  my ($p, $url, $assetdir) = @_;
   my %tofetch;
   my $asset_files = $p->{'asset_files'};
   for my $file (sort keys %{$asset_files || {}}) {
-    my $asset = Digest::MD5::md5_hex("$asset_files->{$file}  $file");
-    my $adir = "$assetdir/".substr($asset, 0, 2);
-    next if -e "$adir/$asset";
-    $tofetch{$asset} = [ $file, $asset_files->{$file} ] ;
+    my $asset = $asset_files->{$file};
+    next unless $asset->{'digest'};	# can only handle those
+    my $assetid = $asset->{'assetid'};
+    die("$file: no assetid element?\n") unless $assetid;
+    my $adir = "$assetdir/".substr($assetid, 0, 2);
+    next if -e "$adir/$assetid";
+    $tofetch{$assetid} = [ $file, $asset ] ;
   }
   return unless %tofetch;
   die("need a parsed name to download fedpkg assets\n") unless $p->{'name'};
-  my $url = $p->{'asset_url'};
-  die("need an asset url to download fedpkg assets\n") unless $url;
   my $ntofetch = keys %tofetch;
   print "fetching $ntofetch assets from $url\n";
-  for my $asset (sort keys %tofetch) {
-    my $file = $tofetch{$asset}->[0];
-    my $chksum = $tofetch{$asset}->[1];
-    die("need a checksum do download fedpkg assets\n") unless $chksum;
-    my $adir = "$assetdir/".substr($asset, 0, 2);
+  for my $assetid (sort keys %tofetch) {
+    my $file = $tofetch{$assetid}->[0];
+    my $digest = $tofetch{$assetid}->[1]->{'digest'};
+    die("need a digest to download fedpkg assets\n") unless $digest;
+    my $adir = "$assetdir/".substr($assetid, 0, 2);
     PBuild::Util::mkdir_p($adir);
+    # $url/<name>/<file>/<hashtype>/<hash>/<file>
     my $fedpkg_url = $url;
     $fedpkg_url =~ s/\/?$/\//;
-    my $chksum_path = $chksum;
+    my $chksum_path = $digest;
     $chksum_path =~ s/:/\//;
     $fedpkg_url .= "$p->{'name'}/$file/$chksum_path/$file";
-    PBuild::Download::download($fedpkg_url, "$adir/.$asset.$$", "$adir/$asset", 'retry' => 3, 'digest' => $chksum);
+    PBuild::Download::download($fedpkg_url, "$adir/.$assetid.$$", "$adir/$assetid", 'retry' => 3, 'digest' => $digest, 'missingok' => 1);
   }
 }
 

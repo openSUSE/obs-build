@@ -44,6 +44,7 @@ my %known_options = (
   'repo' => 'repo::',
   'repository' => 'repo::',
   'registry' => 'registry::',
+  'assets' => 'assets::',
   'obs' => 'obs:',
   'result' => \&result_rebuild_special,
   'result-pkg' => 'result-pkg::',
