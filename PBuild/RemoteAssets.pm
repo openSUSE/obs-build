@@ -85,4 +85,35 @@ sub fedpkg_fetch {
   }
 }
 
+#
+# Get missing assets from the InterPlanetary File System
+#
+sub ipfs_fetch {
+  my ($p, $assetdir) = @_;
+  my %tofetch;
+  my $asset_files = $p->{'asset_files'};
+  for my $file (sort keys %{$asset_files || {}}) {
+    my $asset = $asset_files->{$file};
+    next unless ($asset->{'type'} || '') eq 'ipfs';	# can only handle those
+    my $assetid = $asset->{'assetid'};
+    die("$file: no assetid element?\n") unless $assetid;
+    my $adir = "$assetdir/".substr($assetid, 0, 2);
+    next if -e "$adir/$assetid";
+    $tofetch{$assetid} = [ $file, $asset ] ;
+  }
+  return unless %tofetch;
+  my $ntofetch = keys %tofetch;
+  print "fetching $ntofetch assets from the InterPlanetary File System\n";
+  # for now assume /ipfs is mounted...
+  die("/ipfs is not available\n") unless -d '/ipfs';
+  for my $assetid (sort keys %tofetch) {
+    my $file = $tofetch{$assetid}->[0];
+    my $cid = $tofetch{$assetid}->[1]->{'cid'};
+    die("need a CID to download IPFS assets\n") unless $cid;
+    my $adir = "$assetdir/".substr($assetid, 0, 2);
+    PBuild::Util::mkdir_p($adir);
+    PBuild::Util::cp("$cid", "$adir/.$assetid.$$", "$adir/$assetid");
+  }
+}
+
 1;

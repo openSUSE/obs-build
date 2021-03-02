@@ -39,6 +39,7 @@ sub find_packages {
 sub list_package {
   my ($dir) = @_;
   my %files;
+  my %asset_files;
   for my $file (sort(PBuild::Util::ls($dir))) {
     next if $file =~/^\./;
     next if $file eq '_meta';
@@ -48,6 +49,12 @@ sub list_package {
       warn("$dir/$file: $!\n");
       next;
     }
+    if (-l _) {
+      my $lnk = readlink("$dir/$file");
+      if ($lnk && $lnk =~ /^(\/ipfs\/.*)$/s) {
+	$asset_files{$file} = { 'cid' => $1, 'type' => 'ipfs' };
+      }
+    }
     next unless -f _ && ! -l _;
     open($fd, '<', "$dir/$file") || die("$dir/$file: $!\n");
     my $ctx = Digest::MD5->new;
@@ -55,7 +62,7 @@ sub list_package {
     close $fd;
     $files{$file} = $ctx->hexdigest();
   }
-  return \%files;
+  return \%files, \%asset_files;
 }
 
 sub calc_srcmd5 {

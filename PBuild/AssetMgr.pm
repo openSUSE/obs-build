@@ -54,14 +54,16 @@ sub add_assetshandler {
 # Calculate the asset id used to cache the asset on-disk
 #
 sub get_assetid {
-  my ($file, $assetdata) = @_;
-  my $digest = $assetdata->{'digest'};
+  my ($file, $asset) = @_;
+  my $digest = $asset->{'digest'};
   if ($digest) {
     return Digest::MD5::md5_hex("$digest  $file");
-  } elsif ($assetdata->{'url'}) {
-    return Digest::MD5::md5_hex("$assetdata->{'url'}  $file");
+  } elsif ($asset->{'cid'}) {
+    return Digest::MD5::md5_hex("$asset->{'cid'}  $file");
+  } elsif ($asset->{'url'}) {
+    return Digest::MD5::md5_hex("$asset->{'url'}  $file");
   } else {
-    die("$file: asset must either have a digest or an url\n");
+    die("$file: asset must either have a digest, cid, or an url\n");
   }
 }
 
@@ -82,6 +84,8 @@ sub update_srcmd5 {
     my $digest = $asset->{'digest'};
     if (length($digest || '') >= 32) {
       $files{$file} = substr($digest, 0, 32);
+    } elsif ($asset->{'cid'}) {
+      $files{$file} = Digest::MD5::md5_hex("$asset->{'cid'}  $file");
     } else {
       # unpinned asset
       my $adir = "$assetdir/".substr($assetid, 0, 2);
@@ -127,11 +131,16 @@ sub getremoteassets {
     push @missing_assets, $file unless -e "$adir/$assetdir";
   }
 
-  for my $handler (@{$assetmgr->{'handlers'}}) {
-    if ($handler->{'type'} eq 'fedpkg') {
-      PBuild::RemoteAssets::fedpkg_fetch($p, $handler->{'url'}, $handler->{'asset_dir'});
-    } else {
-      die("unsupported assets type $handler->{'type'}\n");
+  if (@missing_assets) {
+    for my $handler (@{$assetmgr->{'handlers'}}) {
+      if ($handler->{'type'} eq 'fedpkg') {
+	PBuild::RemoteAssets::fedpkg_fetch($p, $handler->{'url'}, $handler->{'asset_dir'});
+      } else {
+	die("unsupported assets type $handler->{'type'}\n");
+      }
+    }
+    if (grep {($asset_files->{$_}->{'type'} || '') eq 'ipfs'} @missing_assets) {
+      PBuild::RemoteAssets::ipfs_fetch($p, $assetmgr->{'asset_dir'});
     }
   }
 
