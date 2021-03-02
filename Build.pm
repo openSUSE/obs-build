@@ -341,6 +341,7 @@ sub read_config {
   $config->{'singleexport'} = '';
   $config->{'repourl'} = [];
   $config->{'registryurl'} = [];
+  $config->{'assetsurl'} = [];
   for my $l (@spec) {
     $l = $l->[1] if ref $l;
     next unless defined $l;
@@ -357,7 +358,7 @@ sub read_config {
       }
       next;
     }
-    if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:' || $l0 eq 'expandflags:' || $l0 eq 'buildflags:' || $l0 eq 'publishflags:' || $l0 eq 'repourl:' || $l0 eq 'registryurl:') {
+    if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:' || $l0 eq 'expandflags:' || $l0 eq 'buildflags:' || $l0 eq 'publishflags:' || $l0 eq 'repourl:' || $l0 eq 'registryurl:' || $l0 eq 'assetsurl:') {
       my $t = substr($l0, 0, -1);
       for my $l (@l) {
 	if ($l eq '!*') {
