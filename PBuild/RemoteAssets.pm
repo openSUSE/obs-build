@@ -38,7 +38,7 @@ sub fedpkg_parse {
   open ($fd, '<', "$p->{'dir'}/sources") || die("$p->{'dir'}/sources: $!\n");
   while (<$fd>) {
     chomp;
-    if (/^(\S+) \(.*\) = ([0-9a-fA-F]{32,})$/s) {
+    if (/^(\S+) \((.*)\) = ([0-9a-fA-F]{32,})$/s) {
       $p->{'asset_files'}->{$2} = { 'file' => $2, 'digest' => lc("$1:$3") };
     } elsif (/^([0-9a-fA-F]{32})  (.*)$/) {
       $p->{'asset_files'}->{$2} = { 'file' => $2, 'digest' => lc("md5:$1") };
