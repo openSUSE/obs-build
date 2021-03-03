@@ -270,7 +270,7 @@ sub createjob {
     push @args, "--vm-type=$vm" if $vm; 
   }
 
-  push @args, '--clean';
+  push @args, '--clean' unless $opts->{'noclean'};
   push @args, '--changelog';
   #push @args, '--oldpackages', $oldpkgdir if $oldpkgdir && -d $oldpkgdir;
   push @args, '--dist', "$buildroot/.build.config";
