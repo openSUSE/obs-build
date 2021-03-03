@@ -40,24 +40,19 @@ sub rename_unless_present {
 sub archlinux_parse {
   my ($p, $arch) = @_;
   $arch = 'i686' if $arch =~ /^i[345]86$/;
-  for my $asuf ("_$arch", '') {
+  for my $asuf ('', "_$arch") {
     my $sources = $p->{"source$asuf"};
     next unless @{$sources || []};
     my @digests;
-    my $digesttype;
-    for ('sha512', 'sha256', 'sha1', 'md5') {
-      $digesttype = $_;
-      @digests = @{$p->{"${_}sums$asuf"} || []};
+    for my $digesttype ('sha512', 'sha256', 'sha1', 'md5') {
+      @digests = map {$_ eq 'SKIP' ? $_ : "$digesttype:$_"} @{$p->{"${_}sums$asuf"} || []};
       last if @digests;
     }
     # work around bug in source parser
     my @sources;
-    for my $s (@$sources) {
-      if ($s =~ s/\{,\.sig\}$//) {
-	push @sources, $s, "$s.sig";
-	next;
-      }
-      push @sources, $s;
+    for (@$sources) {
+      push @sources, $_;
+      splice(@sources, -1, 1, $1, "$1.sig") if /(.*)\{,\.sig\}$/;
     }
     for my $s (@sources) {
       my $digest = shift @digests;
@@ -65,7 +60,7 @@ sub archlinux_parse {
       my $file = $1;
       next if $p->{'files'}->{$file};
       my $asset = { 'file' => $file, 'url' => $s, 'type' => 'url' };
-      $asset->{'digest'} = "$digesttype:$digest" if $digest && $digest ne 'SKIP';
+      $asset->{'digest'} = $digest if $digest && $digest ne 'SKIP';
       $p->{'asset_files'}->{$file} = $asset;
     }
   }
@@ -185,18 +180,27 @@ sub url_fetch {
     $tofetch{$assetid} = [ $file, $asset ] ;
   }
   return unless %tofetch;
-  my $ntofetch = keys %tofetch;
-  print "fetching $ntofetch assets\n";
-  # for now assume /ipfs is mounted...
+  # classify by hosts
+  my %tofetch_host;
   for my $assetid (sort keys %tofetch) {
-    my $file = $tofetch{$assetid}->[0];
     my $url = $tofetch{$assetid}->[1]->{'url'};
-    my $digest = $tofetch{$assetid}->[1]->{'digest'};
     die("need a url to download an asset\n") unless $url;
-    my $adir = "$assetdir/".substr($assetid, 0, 2);
-    PBuild::Util::mkdir_p($adir);
-    if (PBuild::Download::download($url, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $digest, 'missingok' => 1)) {
-      rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
+    die("weird download url '$url' for asset\n") unless $url =~ /^(.*?\/\/.*?)\//;
+    push @{$tofetch_host{$1}}, $assetid;
+  }
+  for my $hosturl (sort keys %tofetch_host) {
+    my $assets = $tofetch_host{$hosturl};
+    my $ntofetch = @$assets;
+    print "fetching $ntofetch assets from $hosturl\n";
+    for my $assetid (@$assets) {
+      my $file = $tofetch{$assetid}->[0];
+      my $url = $tofetch{$assetid}->[1]->{'url'};
+      my $digest = $tofetch{$assetid}->[1]->{'digest'};
+      my $adir = "$assetdir/".substr($assetid, 0, 2);
+      PBuild::Util::mkdir_p($adir);
+      if (PBuild::Download::download($url, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $digest, 'missingok' => 1)) {
+        rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
+      }
     }
   }
 }
