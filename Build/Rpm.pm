@@ -539,7 +539,7 @@ sub parse {
       next;
     }
     if ($line =~ /^\s*#/) {
-      next unless $line =~ /^#!Build(?:Ignore|Conflicts|Requires)\s*:/i;
+      next unless $line =~ /^#!/;
     }
     if (!$skip && ($line =~ /%/)) {
       $line = expandmacros($config, $line, $lineno, \%macros, \%macros_args);
@@ -632,6 +632,9 @@ sub parse {
     }
     if ($preamble && $line =~ /^\#\!ForceMultiVersion\s*$/i) {
       $ret->{'multiversion'} = 1;
+    }
+    if ($preamble && $line =~ /^\#\!DownloadAssets\s*$/i) {
+      $ret->{'download_assets'} = 1;
     }
     if ($line =~ /^(?:Requires\(pre\)|Requires\(post\)|PreReq)\s*:\s*(\S.*)$/i) {
       my $deps = $1;
