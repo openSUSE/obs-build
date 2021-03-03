@@ -20,12 +20,58 @@
 
 package PBuild::RemoteAssets;
 
+use POSIX;
+
 use PBuild::Util;
 use PBuild::Download;
 
 use strict;
 
-# Fedora FedPkg support
+#
+# rename a file unless the target already exists
+#
+sub rename_unless_present {
+  my ($old, $new) = @_;
+  die("link $old $new: $!\n") if !link($old, $new) && $! != POSIX::EEXIST;
+  unlink($old);
+}
+
+# Arch linux remote assers
+sub archlinux_parse {
+  my ($p, $arch) = @_;
+  $arch = 'i686' if $arch =~ /^i[345]86$/;
+  for my $asuf ("_$arch", '') {
+    my $sources = $p->{"source$asuf"};
+    next unless @{$sources || []};
+    my @digests;
+    my $digesttype;
+    for ('sha512', 'sha256', 'sha1', 'md5') {
+      $digesttype = $_;
+      @digests = @{$p->{"${_}sums$asuf"} || []};
+      last if @digests;
+    }
+    # work around bug in source parser
+    my @sources;
+    for my $s (@$sources) {
+      if ($s =~ s/\{,\.sig\}$//) {
+	push @sources, $s, "$s.sig";
+	next;
+      }
+      push @sources, $s;
+    }
+    for my $s (@sources) {
+      my $digest = shift @digests;
+      next unless $s =~ /^https?:\/\/.*\/([^\.\/][^\/]+)$/s;
+      my $file = $1;
+      next if $p->{'files'}->{$file};
+      my $asset = { 'file' => $file, 'url' => $s, 'type' => 'url' };
+      $asset->{'digest'} = "$digesttype:$digest" if $digest && $digest ne 'SKIP';
+      $p->{'asset_files'}->{$file} = $asset;
+    }
+  }
+}
+
+# Fedora FedPkg / lookaside cache support
 
 #
 # Parse a fedora "sources" asset reference file
@@ -38,13 +84,16 @@ sub fedpkg_parse {
   open ($fd, '<', "$p->{'dir'}/sources") || die("$p->{'dir'}/sources: $!\n");
   while (<$fd>) {
     chomp;
+    my $asset;
     if (/^(\S+) \((.*)\) = ([0-9a-fA-F]{32,})$/s) {
-      $p->{'asset_files'}->{$2} = { 'file' => $2, 'digest' => lc("$1:$3") };
+      $asset = { 'file' => $2, 'digest' => lc("$1:$3") };
     } elsif (/^([0-9a-fA-F]{32})  (.*)$/) {
-      $p->{'asset_files'}->{$2} = { 'file' => $2, 'digest' => lc("md5:$1") };
+      $asset = { 'file' => $2, 'digest' => lc("md5:$1") };
     } else {
       warn("unparsable line in 'sources' file: $_\n");
+      next;
     }
+    $p->{'asset_files'}->{$asset->{'file'}} = $asset if $asset->{'file'} =~ /^[\.\/][^\/]*$/s;
   }
   close $fd;
 }
@@ -81,7 +130,9 @@ sub fedpkg_fetch {
     my $chksum_path = $digest;
     $chksum_path =~ s/:/\//;
     $fedpkg_url .= "$p->{'name'}/$file/$chksum_path/$file";
-    PBuild::Download::download($fedpkg_url, "$adir/.$assetid.$$", "$adir/$assetid", 'retry' => 3, 'digest' => $digest, 'missingok' => 1);
+    if (PBuild::Download::download($fedpkg_url, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $digest, 'missingok' => 1)) {
+      rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
+    }
   }
 }
 
@@ -112,7 +163,41 @@ sub ipfs_fetch {
     die("need a CID to download IPFS assets\n") unless $cid;
     my $adir = "$assetdir/".substr($assetid, 0, 2);
     PBuild::Util::mkdir_p($adir);
-    PBuild::Util::cp("$cid", "$adir/.$assetid.$$", "$adir/$assetid");
+    PBuild::Util::cp("$cid", "$adir/.$assetid.$$");
+    rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
+  }
+}
+
+#
+# generic resource fetcher
+#
+sub url_fetch {
+  my ($p, $assetdir) = @_;
+  my %tofetch;
+  my $asset_files = $p->{'asset_files'};
+  for my $file (sort keys %{$asset_files || {}}) {
+    my $asset = $asset_files->{$file};
+    next unless ($asset->{'type'} || '') eq 'url';	# can only handle those
+    my $assetid = $asset->{'assetid'};
+    die("$file: no assetid element?\n") unless $assetid;
+    my $adir = "$assetdir/".substr($assetid, 0, 2);
+    next if -e "$adir/$assetid";
+    $tofetch{$assetid} = [ $file, $asset ] ;
+  }
+  return unless %tofetch;
+  my $ntofetch = keys %tofetch;
+  print "fetching $ntofetch assets\n";
+  # for now assume /ipfs is mounted...
+  for my $assetid (sort keys %tofetch) {
+    my $file = $tofetch{$assetid}->[0];
+    my $url = $tofetch{$assetid}->[1]->{'url'};
+    my $digest = $tofetch{$assetid}->[1]->{'digest'};
+    die("need a url to download an asset\n") unless $url;
+    my $adir = "$assetdir/".substr($assetid, 0, 2);
+    PBuild::Util::mkdir_p($adir);
+    if (PBuild::Download::download($url, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $digest, 'missingok' => 1)) {
+      rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
+    }
   }
 }
 

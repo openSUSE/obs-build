@@ -149,15 +149,15 @@ push @{$opts->{'assets'}}, 'config:' unless @{$opts->{'assets'} || []};
 # substitute config: with values from config
 for (splice(@{$opts->{'repo'}})) {
   push @{$opts->{'repo'}}, $_;
-  splice(@{$opts->{'repo'}}, -1, 1, @{$bconf->{'repourl'}}) if $_ eq 'config:';
+  splice(@{$opts->{'repo'}}, -1, 1, reverse(@{$bconf->{'repourl'}})) if $_ eq 'config:';
 }
 for (splice(@{$opts->{'registry'}})) {
   push @{$opts->{'registry'}}, $_;
-  splice(@{$opts->{'registry'}}, -1, 1, @{$bconf->{'registryurl'}}) if $_ eq 'config:';
+  splice(@{$opts->{'registry'}}, -1, 1, reverse(@{$bconf->{'registryurl'}})) if $_ eq 'config:';
 }
 for (splice(@{$opts->{'assets'}})) {
   push @{$opts->{'assets'}}, $_;
-  splice(@{$opts->{'assets'}}, -1, 1, @{$bconf->{'assetsurl'}}) if $_ eq 'config:';
+  splice(@{$opts->{'assets'}}, -1, 1, reverse(@{$bconf->{'assetsurl'}})) if $_ eq 'config:';
 }
 
 # expand the zypp:// repo
@@ -202,8 +202,7 @@ for my $pkg (@pkgs) {
     'files' => $files,
     'srcmd5' => PBuild::Source::calc_srcmd5($files),
   };
-  $pkgsrc{$pkg}->{'asset_files'} = $asset_files if %{$asset_files || []};
-  $assetmgr->find_assets($pkgsrc{$pkg});
+  $pkgsrc{$pkg}->{'asset_files'} = $asset_files if %{$asset_files || {}};
 }
 
 # handle local links and multibuild packages
@@ -252,6 +251,11 @@ for my $pkg (@pkgs) {
     next unless @containerdeps;
     $containertags{substr($_, 10)} = 1 for @containerdeps;
   }
+}
+
+# search for assets
+for my $pkg (@pkgs) {
+  $assetmgr->find_assets($pkgsrc{$pkg}, $myarch);
 }
 
 #FIXME

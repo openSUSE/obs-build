@@ -115,6 +115,12 @@ sub parse {
   $p->{'error'} = 'excluded' if $d->{'badarch'} && grep {$_ eq $myarch} @{$d->{'badarch'}};
   $p->{'imagetype'} = $d->{'imagetype'} if $d->{'imagetype'};
 
+  # copy over asset information
+  if ($bt eq 'arch') {
+    for my $k (sort keys %$d) {
+      $p->{$k} = $d->{$k} if $k =~ /^(?:source|md5sums|sha\d+sums)(?:_|$)/;
+    }
+  }
   # check if we can build this
   if ($bt eq 'kiwi' && $imagetype eq 'product') {
     $p->{'error'} = 'cannot build kiwi products yet';

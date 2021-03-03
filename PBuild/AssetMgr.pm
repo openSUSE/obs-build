@@ -73,7 +73,8 @@ sub get_assetid {
 sub update_srcmd5 {
   my ($assetmgr, $p) = @_;
   my $asset_files = $p->{'asset_files'};
-  return unless $asset_files;
+  return 0 unless $asset_files;
+  my $old_srcmd5 = $p->{'srcmd5'};
   my $assetdir = $assetmgr->{'asset_dir'};
   my %files = %{$p->{'files'}};
   for my $file(sort keys %$asset_files) {
@@ -103,14 +104,16 @@ sub update_srcmd5 {
     }
   }
   $p->{'srcmd5'} = PBuild::Source::calc_srcmd5(\%files);
+  return $p->{'srcmd5'} eq $old_srcmd5 ? 0 : 1;
 }
 
 #
 # Generate asset information from the package source
 #
 sub find_assets {
-  my ($assetmgr, $p) = @_;
+  my ($assetmgr, $p, $arch) = @_;
   PBuild::RemoteAssets::fedpkg_parse($p) if $p->{'files'}->{'sources'};
+  PBuild::RemoteAssets::archlinux_parse($p, $arch) if ($p->{'buildtype'} || '') eq 'arch';
   update_srcmd5($assetmgr, $p) if $p->{'asset_files'};
 }
 
@@ -142,6 +145,9 @@ sub getremoteassets {
     if (grep {($asset_files->{$_}->{'type'} || '') eq 'ipfs'} @missing_assets) {
       PBuild::RemoteAssets::ipfs_fetch($p, $assetmgr->{'asset_dir'});
     }
+    if (grep {($asset_files->{$_}->{'type'} || '') eq 'url'} @missing_assets) {
+      PBuild::RemoteAssets::url_fetch($p, $assetmgr->{'asset_dir'});
+    }
   }
 
   # check if we have all assets
@@ -168,11 +174,16 @@ sub copy_assets {
   my ($assetmgr, $p, $srcdir) = @_;
   my $assetdir = $assetmgr->{'asset_dir'};
   my $asset_files = $p->{'asset_files'};
+  my $mutable_assets;
   for my $file (sort keys %{$asset_files || {}}) {
     my $asset = $asset_files->{$file};
     my $assetid = $asset->{'assetid'};
     my $adir = "$assetdir/".substr($assetid, 0, 2);
+    $mutable_assets = 1 unless $asset->{'digest'} || $asset->{'cid'};
     PBuild::Util::cp("$adir/$assetid", "$srcdir/$file");
+  }
+  if ($mutable_assets && update_srcmd5($assetmgr, $p)) {
+    copy_assets($assetmgr, $p, $srcdir);
   }
 }
 
