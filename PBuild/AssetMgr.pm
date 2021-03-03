@@ -114,6 +114,7 @@ sub find_assets {
   my ($assetmgr, $p, $arch) = @_;
   PBuild::RemoteAssets::fedpkg_parse($p) if $p->{'files'}->{'sources'};
   PBuild::RemoteAssets::archlinux_parse($p, $arch) if ($p->{'buildtype'} || '') eq 'arch';
+  PBuild::RemoteAssets::spec_parse($p, $arch) if ($p->{'buildtype'} || '') eq 'spec';
   update_srcmd5($assetmgr, $p) if $p->{'asset_files'};
 }
 

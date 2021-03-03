@@ -36,7 +36,9 @@ sub rename_unless_present {
   unlink($old);
 }
 
-# Arch linux remote assers
+#
+# Arch linux remote asset handling
+#
 sub archlinux_parse {
   my ($p, $arch) = @_;
   $arch = 'i686' if $arch =~ /^i[345]86$/;
@@ -63,6 +65,20 @@ sub archlinux_parse {
       $asset->{'digest'} = $digest if $digest && $digest ne 'SKIP';
       $p->{'asset_files'}->{$file} = $asset;
     }
+  }
+}
+
+#
+# Spec file remote asset handling
+#
+sub spec_parse {
+  my ($p) = @_;
+  for my $s (@{$p->{'source'} || []}, @{$p->{'patch'} || []}) {
+    next unless $s =~ /^https?:\/\/.*\/([^\.\/][^\/]+)$/s;
+    my $file = $1;
+    next if $p->{'files'}->{$file};
+    my $asset = { 'file' => $file, 'url' => $s, 'type' => 'url' };
+    $p->{'asset_files'}->{$file} = $asset;
   }
 }
 

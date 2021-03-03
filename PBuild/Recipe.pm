@@ -117,8 +117,13 @@ sub parse {
 
   # copy over asset information
   if ($bt eq 'arch') {
-    for my $k (sort keys %$d) {
-      $p->{$k} = $d->{$k} if $k =~ /^(?:source|md5sums|sha\d+sums)(?:_|$)/;
+    for (sort keys %$d) {
+      $p->{$_} = $d->{$_} if /^(?:source|md5sums|sha\d+sums)(?:_|$)/;
+    }
+  }
+  if ($bt eq 'spec' && $d->{'download_assets'}) {
+    for (sort keys %$d) {
+      push @{$p->{$1}}, $d->{$_} if /^(source|patch)\d*$/;
     }
   }
   # check if we can build this
