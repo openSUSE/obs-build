@@ -52,6 +52,7 @@ my %known_options = (
   'result-pkg' => 'result-pkg::',
   'result-code' => 'result-code::',
   'details' => 'result-details',
+  'terse' => 'result-terse',
   'rebuild' => \&result_rebuild_special,
   'rebuild-pkg' => 'rebuild-pkg::',
   'rebuild-code' => 'rebuild-code::',
