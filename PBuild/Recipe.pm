@@ -41,6 +41,7 @@ sub find_recipe {
   return (grep {/flatpak\.(?:ya?ml|json)$/} sort keys %files)[0] if $type eq 'flatpak';
   return $files{'PKGBUILD'} ? $files{'PKGBUILD'} : undef if $type eq 'arch';
   my $pkg = $p->{'pkg'};
+  $pkg = $p->{'flavor'} if $p->{'flavor'};
   return $files{"$pkg.$type"} if $files{"$pkg.$type"};
   # try again without last components
   return $files{"$1.$type"} if $pkg =~ /^(.*?)\./ && $files{"$1.$type"};
