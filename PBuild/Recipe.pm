@@ -121,11 +121,7 @@ sub parse {
       $p->{$_} = $d->{$_} if /^(?:source|md5sums|sha\d+sums)(?:_|$)/;
     }
   }
-  if ($bt eq 'spec' && $d->{'download_assets'}) {
-    for (sort keys %$d) {
-      push @{$p->{$1}}, $d->{$_} if /^(source|patch)\d*$/;
-    }
-  }
+  $p->{'remoteassets'} = $d->{'remoteassets'} if $bt eq 'spec' && $d->{'remoteassets'};
   # check if we can build this
   if ($bt eq 'kiwi' && $imagetype eq 'product') {
     $p->{'error'} = 'cannot build kiwi products yet';

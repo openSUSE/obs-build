@@ -73,11 +73,18 @@ sub archlinux_parse {
 #
 sub spec_parse {
   my ($p) = @_;
-  for my $s (@{$p->{'source'} || []}, @{$p->{'patch'} || []}) {
-    next unless $s =~ /^https?:\/\/.*\/([^\.\/][^\/]+)$/s;
+  for my $s (@{$p->{'remoteassets'} || []}) {
+    my $url = $s->{'url'};
+    next unless $s->{'url'} =~ /(?:^|\/)([^\.\/][^\/]+)$/s;
     my $file = $1;
     next if $p->{'files'}->{$file};
-    my $asset = { 'file' => $file, 'url' => $s, 'type' => 'url' };
+    undef $url unless $url =~ /^https?:\/\/.*\/([^\.\/][^\/]+)$/s;
+    my $digest = $s->{'digest'};
+    next unless $digest || $url;
+    my $asset = { 'file' => $file };
+    $asset->{'digest'} = $digest if $digest;
+    $asset->{'url'} = $url if $url;
+    $asset->{'type'} = 'url' if $url;
     $p->{'asset_files'}->{$file} = $asset;
   }
 }

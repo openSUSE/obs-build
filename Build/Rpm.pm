@@ -505,6 +505,7 @@ sub parse {
   my $includenum = 0;
   my $obspackage = defined($config->{'obspackage'}) ? $config->{'obspackage'} : '@OBS_PACKAGE@';
   my $buildflavor = defined($config->{'buildflavor'}) ? $config->{'buildflavor'} : '';
+  my $remoteasset;
   while (1) {
     my $line;
     my $doxspec = $xspec ? 1 : 0;
@@ -633,8 +634,9 @@ sub parse {
     if ($preamble && $line =~ /^\#\!ForceMultiVersion\s*$/i) {
       $ret->{'multiversion'} = 1;
     }
-    if ($preamble && $line =~ /^\#\!DownloadAssets\s*$/i) {
-      $ret->{'download_assets'} = 1;
+    if ($preamble && $line =~ /^\#\!RemoteAsset(?::\s*([a-z0-9]+:[0-9a-f]+))?\s*$/i) {
+      $remoteasset = {};
+      $remoteasset->{'digest'} = $1 if $1;
     }
     if ($line =~ /^(?:Requires\(pre\)|Requires\(post\)|PreReq)\s*:\s*(\S.*)$/i) {
       my $deps = $1;
@@ -754,6 +756,11 @@ sub parse {
 	}
 	$ret->{$tag} = $val;
       }
+      if ($remoteasset && $tag =~ /^(?:source|patch)/) {
+        $remoteasset->{'url'} = $val;
+        push @{$ret->{'remoteassets'}}, $remoteasset;
+      }
+      $remoteasset = undef;
     } elsif (!$preamble && ($line =~ /^(Source\d*|Patch\d*|Url|Icon|BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires)\s*:\s*(\S.*)$/i)) {
       print STDERR "Warning: spec file parser ".($lineno ? " line $lineno" : '').": Ignoring $1 used beyond the preamble.\n" if $config->{'warnings'};
     }
