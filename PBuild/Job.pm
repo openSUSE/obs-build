@@ -234,8 +234,8 @@ sub createjob {
   my @args;
   push @args, $helper if $helper;
   push @args, "$opts->{'libbuild'}/build";
-  my $vm = $opts->{'vm_type'} || '';
-  if ($vm =~ /(xen|kvm|zvm|emulator|pvm)/) {
+  my $vm = $opts->{'vm-type'} || '';
+  if ($vm =~ /(xen|kvm|zvm|emulator|pvm|qemu)/) {
     # allow setting the filesystem type with the build config
     $opts->{'vm-disk-filesystem'} ||= $bconf->{'buildflags:vmfstype'} if $bconf->{'buildflags:vmfstype'};
     $opts->{'vm-disk-filesystem-options'} ||= $bconf->{'buildflags:vmfsoptions'} if $bconf->{'buildflags:vmfsoptions'};
