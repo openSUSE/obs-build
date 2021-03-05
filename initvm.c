@@ -317,7 +317,7 @@ enum okfail binfmt_register(char *datafile, char *regfile)
 int main(int argc, char* argv[], char* env[])
 {
 	int retval;
-	char buf[BUFSIZ];
+	char buf[BUFSIZ], *build_dir;
 
 	/* mount proc filesystem if it isn't already */
 	if (mount("proc", "/proc", "proc", MS_MGC_VAL, NULL) == -1) {
@@ -362,10 +362,12 @@ int main(int argc, char* argv[], char* env[])
 		exit(1);
 	}
 
-	if (getenv("BUILD_DIR"))
-	    sprintf(buf, "%s/qemu-reg", getenv("BUILD_DIR"));
+	*buf = 0;
+	build_dir = getenv("BUILD_DIR");
+	if (build_dir && strlen(build_dir) < sizeof(buf) - 10)
+		sprintf(buf, "%s/qemu-reg", build_dir);
 
-        if (!buf || !binfmt_register(buf, SYSFS_BINFMT_MISC_REG)) {
+        if (!*buf || !binfmt_register(buf, SYSFS_BINFMT_MISC_REG)) {
 		/* setup all done, do the registration */
 		if (!binfmt_register(BINFMT_REGF_0, SYSFS_BINFMT_MISC_REG)) {
 			fprintf(stderr, "%s: failed. Trying alternate binfmt file\n",
