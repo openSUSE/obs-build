@@ -338,7 +338,7 @@ sub finishjob {
     $ret = 1;
   }
   if ($ret == 9) {
-    if ($vm =~ /(xen|kvm|zvm|emulator|pvm|openstack)/) {
+    if ($vm =~ /(xen|kvm|zvm|emulator|pvm|qemu|openstack)/) {
       PBuild::Util::cleandir("$buildroot/.build.packages");
       rmdir("$buildroot/.build.packages");
       rename("$buildroot/.mount/.build.packages", "$buildroot/.build.packages") || die("final rename failed: $!\n");
@@ -355,7 +355,7 @@ sub finishjob {
     my $result = { '_log' => "$buildroot/.build.log" };
     return ('failed', $result);
   }
-  if ($vm =~ /(xen|kvm|zvm|emulator|pvm|openstack)/) {
+  if ($vm =~ /(xen|kvm|zvm|emulator|pvm|qemu|openstack)/) {
     PBuild::Util::cleandir("$buildroot/.build.packages");
     rmdir("$buildroot/.build.packages");
     rename("$buildroot/.mount/.build.packages", "$buildroot/.build.packages") || die("final rename failed: $!\n");

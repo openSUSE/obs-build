@@ -20,7 +20,7 @@
  *
  * AUTHOR
  *      Copyright (c) 2012 James Perkins <james.perkins@linuxfoundation.org>
- * 	i                  Adrian Schroeter <adrian@suse.de>
+ * 	                   Adrian Schroeter <adrian@suse.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 or 3 as
