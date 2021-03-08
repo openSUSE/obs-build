@@ -81,4 +81,33 @@ for my $harch (keys %cando) {
   }
 }
 
+# keep in sync with extend_build_arch() in common_functions!
+my %archfilter_extra = (
+  'aarch64' => [ 'aarch64_ilp32', 'armv8l' ],
+  'aarch64_ilp32' => [ 'aarch64', 'armv8l' ],
+  'armv7hl' => [ 'armv7l', 'armv6hl', 'armv6l', 'armv5tel' ],
+  'armv7l' => [ 'armv6l', 'armv5tel' ],
+  'armv6hl' => [ 'armv6l', 'armv5tel' ],
+  'armv6l' => [ 'armv5tel' ],
+  'mips64' => [ 'mips' ],
+  'i686' => [ 'i586', 'i486', 'i386' ],
+  'i586' => [ 'i486', 'i386' ],
+  'i486' => [ 'i386' ],
+  'parisc64' => [ 'hppa64', 'hppa' ],
+  'parisc' => [ 'hppa' ],
+  'ppc64' => [ 'ppc' ],
+  's390x' => [ 's390' ],
+  'sparc64v' => [ 'sparc64', 'sparcv9v', 'sparcv9', 'sparcv8', 'sparc' ],
+  'sparc64' => [ 'sparcv9', 'sparcv8', 'sparc' ],
+  'sparcv9v' => [ 'sparcv9', 'sparcv8', 'sparc' ],
+  'sparcv9' => [ 'sparcv8', 'sparc' ],
+  'sparcv8' => [ 'sparc' ],
+  'x86_64' => [ 'i686', 'i586', 'i486', 'i386' ],
+);
+
+sub archfilter {
+  my ($hostarch) = @_;
+  return $hostarch, @{$archfilter_extra{$hostarch} || []};
+}
+
 1;

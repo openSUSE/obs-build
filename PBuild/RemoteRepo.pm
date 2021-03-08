@@ -25,7 +25,6 @@ use strict;
 use Encode;
 use IO::Uncompress::Gunzip ();
 use Digest::MD5 ();
-use Data::Dumper;
 
 use Build;
 use Build::Rpmmd;
@@ -40,6 +39,7 @@ use PBuild::Download;
 use PBuild::Verify;
 use PBuild::Cpio;
 use PBuild::OBS;
+use PBuild::Cando;
 
 my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst};
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
@@ -64,9 +64,10 @@ sub download {
 }
 
 sub addpkg {
-  my ($bins, $pkg, $locprefix) = @_;
+  my ($bins, $pkg, $locprefix, $archfilter) = @_;
   return unless defined($pkg->{'name'}) && defined($pkg->{'arch'});
   return if $pkg->{'arch'} eq 'src' || $pkg->{'arch'} eq 'nosrc';
+  return if $archfilter && !$archfilter->{$pkg->{'arch'}};
   $locprefix = '' unless defined $locprefix;
   $pkg->{'location'} = "$locprefix$pkg->{'location'}" if defined $locprefix;
   delete $pkg->{'filename'};	# just in case
@@ -75,7 +76,7 @@ sub addpkg {
 }
 
 sub fetchrepo_arch {
-  my ($url, $tmpdir, $arch) = @_;
+  my ($url, $tmpdir, $arch, $archfilter) = @_;
   die("could not determine reponame from url $url\n") unless "/$url/" =~ /.*\/([^\/]+)\/os\//;
   my $reponame = $1;
   $url .= '/' unless $url =~ /\/$/;
@@ -86,7 +87,7 @@ sub fetchrepo_arch {
 }
 
 sub fetchrepo_debian {
-  my ($url, $tmpdir, $arch) = @_;
+  my ($url, $tmpdir, $arch, $archfilter) = @_;
   my ($baseurl, $disturl, $components) = Build::Debrepo::parserepourl($url);
   my $basearch = Build::Deb::basearch($arch);
   my @bins;
@@ -105,7 +106,7 @@ sub fetchrepo_debian {
 }
 
 sub fetchrepo_rpmmd {
-  my ($url, $tmpdir, $arch, $iszypp) = @_;
+  my ($url, $tmpdir, $arch, $archfilter, $iszypp) = @_;
   my $baseurl = $url;
   $baseurl .= '/' unless $baseurl =~ /\/$/;
   my @primaryfiles;
@@ -132,14 +133,14 @@ sub fetchrepo_rpmmd {
     if ($fn =~ /\.gz$/) {
       $fh = IO::Uncompress::Gunzip->new($fh) or die("Error opening $u: $IO::Uncompress::Gunzip::GunzipError\n");
     }
-    Build::Rpmmd::parse($fh, sub { addpkg(\@bins, $_[0], $baseurl) }, 'addselfprovides' => 1, 'withchecksum' => 1);
+    Build::Rpmmd::parse($fh, sub { addpkg(\@bins, $_[0], $baseurl, $archfilter) }, 'addselfprovides' => 1, 'withchecksum' => 1);
     last;
   }
   return \@bins;
 }
 
 sub fetchrepo_susetags {
-  my ($url, $tmpdir, $arch, $iszypp) = @_;
+  my ($url, $tmpdir, $arch, $archfilter, $iszypp) = @_;
   my $descrdir = 'suse/setup/descr';
   my $datadir = 'suse';
   my $baseurl = $url;
@@ -150,13 +151,13 @@ sub fetchrepo_susetags {
     my $xurl = $baseurl;
     $xurl =~ s/1\/$/$_[0]->{'medium'}/ if $_[0]->{'medium'};
     $xurl .= "$datadir/" if $datadir;
-    addpkg(\@bins, $_[0], $xurl)
+    addpkg(\@bins, $_[0], $xurl, $archfilter)
   }, 'addselfprovides' => 1, 'withchecksum' => 1);
   return \@bins;
 }
 
 sub fetchrepo_zypp {
-  my ($url, $tmpdir, $arch) = @_;
+  my ($url, $tmpdir, $arch, $archfilter) = @_;
   die("zypp repo must start with zypp://\n") unless $url =~ /^zypp:\/\/([^\/]*)/;
   my $repo = Build::Zypp::parserepo($1);
   my $type = $repo->{'type'};
@@ -168,21 +169,22 @@ sub fetchrepo_zypp {
   die("could not determine repo type for '$repo->{'name'}'\n") unless $type;
   if($type eq 'rpm-md') {
     die("zypp repo $url is not up to date, please refresh first\n") unless -s "$zyppcachedir/repodata/repomd.xml";
-    fetchrepo_rpmmd("zypp://$repo->{'name'}", "$zyppcachedir/repodata", $arch, 1);
+    fetchrepo_rpmmd("zypp://$repo->{'name'}", "$zyppcachedir/repodata", $arch, $archfilter, 1);
   } else {
     die("zypp repo $url is not up to date, please refresh first\n") unless -s "$zyppcachedir/suse/setup/descr/packages.gz";
-    fetchrepo_susetags("zypp://$repo->{'name'}", "$zyppcachedir/suse/setup/descr", $arch, 1);
+    fetchrepo_susetags("zypp://$repo->{'name'}", "$zyppcachedir/suse/setup/descr", $arch, $archfilter, 1);
   }
 }
 
 sub fetchrepo_obs {
   my ($url, $tmpdir, $arch, $opts) = @_;
-  die("bad obs: reference\n") unless $url =~ /^obs:\/{1,3}([^\/]+\/[^\/]+)\/?$/;
+  die("bad obs: reference\n") unless $url =~ /^obs:\/{1,3}([^\/]+\/[^\/]+)(?:\/([^\/]*))?$/;
   my $prp = $1;
+  my $schedarch = $2 || $arch;
   die("please specify the build service url with the --obs option\n") unless $opts->{'obs'};
   my $baseurl = $opts->{'obs'};
   $baseurl .= '/' unless $baseurl =~ /\/$/;
-  download("${baseurl}build/$prp/$arch/_repository?view=cache", "$tmpdir/repository.cpio");
+  download("${baseurl}build/$prp/$schedarch/_repository?view=cache", "$tmpdir/repository.cpio");
   PBuild::Cpio::cpio_extract("$tmpdir/repository.cpio", 'repositorycache', "$tmpdir/repository.data");
   my $rdata = PBuild::Util::retrieve("$tmpdir/repository.data");
   my @bins = grep {ref($_) eq 'HASH' && defined($_->{'name'})} values %{$rdata || {}};
@@ -191,9 +193,9 @@ sub fetchrepo_obs {
     delete $_->{'filename'};	# just in case
     delete $_->{'packid'};	# just in case
     if ($_->{'path'} =~ /^\.\.\/([^\/\.][^\/]*\/[^\/\.][^\/]*)$/s) {
-      $_->{'location'} = "${baseurl}build/$prp/$arch/$1";	# obsbinlink to package
+      $_->{'location'} = "${baseurl}build/$prp/$schedarch/$1";	# obsbinlink to package
     } else {
-      $_->{'location'} = "${baseurl}build/$prp/$arch/_repository/$_->{'path'}";
+      $_->{'location'} = "${baseurl}build/$prp/$schedarch/_repository/$_->{'path'}";
     }
     PBuild::OBS::recode_deps($_);	# recode deps from testcase format to rpm
   }
@@ -294,6 +296,11 @@ sub fetchrepo {
     $url = $2;
   }
   $repotype ||= guess_repotype($bconf, $buildtype) || 'rpmmd';
+  my $archfilter;
+  if ($repotype ne 'obs') {
+    $archfilter = { map {$_ => 1} PBuild::Cando::archfilter($arch) };
+    $archfilter->{$_} = 1 for qw{all any noarch};
+  }
   my $tmpdir = "$repodir/.tmp";
   PBuild::Util::cleandir($tmpdir) if -e $tmpdir;
   PBuild::Util::mkdir_p($tmpdir);
@@ -304,15 +311,15 @@ sub fetchrepo {
     return $bins if $bins && replace_with_local($repodir, $bins);
   }
   if ($repotype eq 'rpmmd' || $repotype eq 'rpm-md') {
-    $bins = fetchrepo_rpmmd($url, $tmpdir, $arch);
+    $bins = fetchrepo_rpmmd($url, $tmpdir, $arch, $archfilter);
   } elsif ($repotype eq 'debian') {
-    $bins = fetchrepo_debian($url, $tmpdir, $arch);
+    $bins = fetchrepo_debian($url, $tmpdir, $arch, $archfilter);
   } elsif ($repotype eq 'arch') {
-    $bins = fetchrepo_arch($url, $tmpdir, $arch);
+    $bins = fetchrepo_arch($url, $tmpdir, $arch, $archfilter);
   } elsif ($repotype eq 'suse') {
-    $bins = fetchrepo_susetags($url, $tmpdir, $arch);
+    $bins = fetchrepo_susetags($url, $tmpdir, $arch, $archfilter);
   } elsif ($repotype eq 'zypp') {
-    $bins = fetchrepo_zypp($url, $tmpdir, $arch);
+    $bins = fetchrepo_zypp($url, $tmpdir, $arch, $archfilter);
   } elsif ($repotype eq 'obs') {
     $bins = fetchrepo_obs($url, $tmpdir, $arch, $opts);
   } else {
