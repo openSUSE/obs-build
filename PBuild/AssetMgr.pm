@@ -77,10 +77,8 @@ sub update_srcmd5 {
   my $old_srcmd5 = $p->{'srcmd5'};
   my $assetdir = $assetmgr->{'asset_dir'};
   my %files = %{$p->{'files'}};
-  for my $file(sort keys %$asset_files) {
+  for my $file (sort keys %$asset_files) {
     my $asset = $asset_files->{$file};
-    my $assetid = get_assetid($file, $asset);
-    $asset->{'assetid'} = $assetid;
     # use digest if we have one
     my $digest = $asset->{'digest'};
     if (length($digest || '') >= 32) {
@@ -89,6 +87,7 @@ sub update_srcmd5 {
       $files{$file} = Digest::MD5::md5_hex("$asset->{'cid'}  $file");
     } else {
       # unpinned asset
+      my $assetid = $asset->{'assetid'};
       my $adir = "$assetdir/".substr($assetid, 0, 2);
       my $fd;
       if (open($fd, '<', "$adir/$assetid")) {
@@ -112,10 +111,41 @@ sub update_srcmd5 {
 #
 sub find_assets {
   my ($assetmgr, $p, $arch) = @_;
-  PBuild::RemoteAssets::fedpkg_parse($p) if $p->{'files'}->{'sources'};
-  PBuild::RemoteAssets::archlinux_parse($p, $arch) if ($p->{'buildtype'} || '') eq 'arch';
-  PBuild::RemoteAssets::spec_parse($p, $arch) if ($p->{'buildtype'} || '') eq 'spec';
+  my @assets;
+  push @assets, PBuild::RemoteAssets::fedpkg_parse($p) if $p->{'files'}->{'sources'};
+  push @assets, PBuild::RemoteAssets::archlinux_parse($p, $arch) if ($p->{'buildtype'} || '') eq 'arch';
+  push @assets, PBuild::RemoteAssets::spec_parse($p, $arch) if ($p->{'buildtype'} || '') eq 'spec';
+  for my $asset (@assets) {
+    $asset->{'assetid'} = get_assetid($asset->{'file'}, $asset);
+    $p->{'asset_files'}->{$asset->{'file'}} = $asset;
+  }
   update_srcmd5($assetmgr, $p) if $p->{'asset_files'};
+}
+
+#
+# Does a package have assets that may change over time?
+#
+sub has_mutable_assets {
+  my ($assetmgr, $p) = @_;
+  for my $asset (values %{$p->{'asset_files'} || {}}) {
+    return 1 unless $asset->{'digest'} || $asset->{'cid'};
+  }
+  return 0;
+}
+
+#
+# remove the assets that we have cached on-disk
+#
+sub prune_cached_assets {
+  my ($assetmgr, @assets) = @_;
+  my $assetdir = $assetmgr->{'asset_dir'};
+  my @pruned;
+  for my $asset (@assets) {
+    my $assetid = $asset->{'assetid'};
+    my $adir = "$assetdir/".substr($assetid, 0, 2);
+    push @pruned, $asset unless -e "$adir/$assetid";
+  }
+  return @pruned;
 }
 
 #
@@ -127,45 +157,37 @@ sub getremoteassets {
   return unless $asset_files;
 
   my $assetdir = $assetmgr->{'asset_dir'};
-  my @missing_assets;
-  for my $file (sort keys %{$asset_files || {}}) {
-    my $asset = $asset_files->{$file};
-    my $assetid = $asset->{'assetid'};
-    my $adir = "$assetdir/".substr($assetid, 0, 2);
-    push @missing_assets, $file unless -e "$adir/$assetdir";
+  my %assetid_seen;
+  my @assets;
+  # unify over the assetid
+  for my $asset (map {$asset_files->{$_}} sort keys %$asset_files) {
+    push @assets, $asset unless $assetid_seen{$asset->{'assetid'}}++;
   }
-
-  if (@missing_assets) {
-    for my $handler (@{$assetmgr->{'handlers'}}) {
-      if ($handler->{'type'} eq 'fedpkg') {
-	PBuild::RemoteAssets::fedpkg_fetch($p, $handler->{'url'}, $handler->{'asset_dir'});
-      } else {
-	die("unsupported assets type $handler->{'type'}\n");
-      }
+  @assets = prune_cached_assets($assetmgr, @assets);
+  for my $handler (@{$assetmgr->{'handlers'}}) {
+    last unless @assets;
+    if ($handler->{'type'} eq 'fedpkg') {
+      PBuild::RemoteAssets::fedpkg_fetch($p, $assetdir, \@assets, $handler->{'url'});
+    } else {
+      die("unsupported assets type $handler->{'type'}\n");
     }
-    if (grep {($asset_files->{$_}->{'type'} || '') eq 'ipfs'} @missing_assets) {
-      PBuild::RemoteAssets::ipfs_fetch($p, $assetmgr->{'asset_dir'});
-    }
-    if (grep {($asset_files->{$_}->{'type'} || '') eq 'url'} @missing_assets) {
-      PBuild::RemoteAssets::url_fetch($p, $assetmgr->{'asset_dir'});
-    }
+    @assets = prune_cached_assets($assetmgr, @assets);
   }
-
-  # check if we have all assets
-  my @missing;
-  my $update_srcmd5;
-  for my $file (@missing_assets) {
-    my $asset = $asset_files->{$file};
-    my $assetid = $asset->{'assetid'};
-    my $adir = "$assetdir/".substr($assetid, 0, 2);
-    push @missing, $file unless -e "$adir/$assetid";
-    $update_srcmd5 = 1 unless $asset->{'digest'};
+  if (grep {($_->{'type'} || '') eq 'ipfs'} @assets) {
+    PBuild::RemoteAssets::ipfs_fetch($p, $assetdir, \@assets);
+    @assets = prune_cached_assets($assetmgr, @assets);
   }
-  update_srcmd5($assetmgr, $p) if $update_srcmd5;
-  if (@missing) {
+  if (grep {($_->{'type'} || '') eq 'url'} @assets) {
+    PBuild::RemoteAssets::url_fetch($p, $assetdir, \@assets);
+    @assets = prune_cached_assets($assetmgr, @assets);
+  }
+  if (@assets) {
+    my @missing = sort(map {$_->{'file'}} @assets);
     print "missing assets: @missing\n";
     $p->{'error'} = "missing assets: @missing";
+    return;
   }
+  update_srcmd5($assetmgr, $p) if has_mutable_assets($assetmgr, $p);
 }
 
 #
@@ -175,16 +197,14 @@ sub copy_assets {
   my ($assetmgr, $p, $srcdir) = @_;
   my $assetdir = $assetmgr->{'asset_dir'};
   my $asset_files = $p->{'asset_files'};
-  my $mutable_assets;
   for my $file (sort keys %{$asset_files || {}}) {
     my $asset = $asset_files->{$file};
     my $assetid = $asset->{'assetid'};
     my $adir = "$assetdir/".substr($assetid, 0, 2);
-    $mutable_assets = 1 unless $asset->{'digest'} || $asset->{'cid'};
     PBuild::Util::cp("$adir/$assetid", "$srcdir/$file");
   }
-  if ($mutable_assets && update_srcmd5($assetmgr, $p)) {
-    copy_assets($assetmgr, $p, $srcdir);
+  if (has_mutable_assets($assetmgr, $p) && update_srcmd5($assetmgr, $p)) {
+    copy_assets($assetmgr, $p, $srcdir);	# had a race, copy again
   }
 }
 

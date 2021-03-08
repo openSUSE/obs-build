@@ -42,6 +42,7 @@ sub rename_unless_present {
 sub archlinux_parse {
   my ($p, $arch) = @_;
   $arch = 'i686' if $arch =~ /^i[345]86$/;
+  my @assets;
   for my $asuf ('', "_$arch") {
     my $sources = $p->{"source$asuf"};
     next unless @{$sources || []};
@@ -63,9 +64,10 @@ sub archlinux_parse {
       next if $p->{'files'}->{$file};
       my $asset = { 'file' => $file, 'url' => $s, 'type' => 'url' };
       $asset->{'digest'} = $digest if $digest && $digest ne 'SKIP';
-      $p->{'asset_files'}->{$file} = $asset;
+      push @assets, $asset;
     }
   }
+  return @assets;
 }
 
 #
@@ -73,6 +75,7 @@ sub archlinux_parse {
 #
 sub spec_parse {
   my ($p) = @_;
+  my @assets;
   for my $s (@{$p->{'remoteassets'} || []}) {
     my $url = $s->{'url'};
     next unless $s->{'url'} =~ /(?:^|\/)([^\.\/][^\/]+)$/s;
@@ -85,8 +88,9 @@ sub spec_parse {
     $asset->{'digest'} = $digest if $digest;
     $asset->{'url'} = $url if $url;
     $asset->{'type'} = 'url' if $url;
-    $p->{'asset_files'}->{$file} = $asset;
+    push @assets, $asset;
   }
+  return @assets;
 }
 
 # Fedora FedPkg / lookaside cache support
@@ -96,9 +100,9 @@ sub spec_parse {
 #
 sub fedpkg_parse {
   my ($p) = @_;
-  my $files = $p->{'files'};
-  return unless $files->{'sources'};
+  return unless $p->{'files'}->{'sources'};
   my $fd;
+  my @assets;
   open ($fd, '<', "$p->{'dir'}/sources") || die("$p->{'dir'}/sources: $!\n");
   while (<$fd>) {
     chomp;
@@ -111,44 +115,34 @@ sub fedpkg_parse {
       warn("unparsable line in 'sources' file: $_\n");
       next;
     }
-    $p->{'asset_files'}->{$asset->{'file'}} = $asset if $asset->{'file'} =~ /^[\.\/][^\/]*$/s;
+    push @assets, $asset if $asset->{'file'} =~ /^[^\.\/][^\/]*$/s;
   }
   close $fd;
+  return @assets;
 }
 
 #
 # Get missing assets from a fedora lookaside cache server
 #
 sub fedpkg_fetch {
-  my ($p, $url, $assetdir) = @_;
-  my %tofetch;
-  my $asset_files = $p->{'asset_files'};
-  for my $file (sort keys %{$asset_files || {}}) {
-    my $asset = $asset_files->{$file};
-    next unless $asset->{'digest'};	# can only handle those
-    my $assetid = $asset->{'assetid'};
-    die("$file: no assetid element?\n") unless $assetid;
-    my $adir = "$assetdir/".substr($assetid, 0, 2);
-    next if -e "$adir/$assetid";
-    $tofetch{$assetid} = [ $file, $asset ] ;
-  }
-  return unless %tofetch;
+  my ($p, $assetdir, $assets, $url) = @_;
   die("need a parsed name to download fedpkg assets\n") unless $p->{'name'};
-  my $ntofetch = keys %tofetch;
-  print "fetching $ntofetch assets from $url\n";
-  for my $assetid (sort keys %tofetch) {
-    my $file = $tofetch{$assetid}->[0];
-    my $digest = $tofetch{$assetid}->[1]->{'digest'};
-    die("need a digest to download fedpkg assets\n") unless $digest;
+  my @assets = grep {$_->{'digest'}} @$assets;
+  return unless @assets;
+  my $nassets = @assets;
+  print "fetching $nassets assets from $url\n";
+  for my $asset (@assets) {
+    my $assetid = $asset->{'assetid'};
     my $adir = "$assetdir/".substr($assetid, 0, 2);
     PBuild::Util::mkdir_p($adir);
     # $url/<name>/<file>/<hashtype>/<hash>/<file>
+    my $path = $asset->{'digest'};
+    $path =~ s/:/\//;
+    $path = "$p->{'name'}/$asset->{'file'}/$path/$asset->{'file'}";
+    $path =~ s/([\000-\040<>;\"#\?&\+=%[\177-\377])/sprintf("%%%02X",ord($1))/sge;
     my $fedpkg_url = $url;
-    $fedpkg_url =~ s/\/?$/\//;
-    my $chksum_path = $digest;
-    $chksum_path =~ s/:/\//;
-    $fedpkg_url .= "$p->{'name'}/$file/$chksum_path/$file";
-    if (PBuild::Download::download($fedpkg_url, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $digest, 'missingok' => 1)) {
+    $fedpkg_url =~ s/\/?$/\/$path/;
+    if (PBuild::Download::download($fedpkg_url, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1)) {
       rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
     }
   }
@@ -158,30 +152,19 @@ sub fedpkg_fetch {
 # Get missing assets from the InterPlanetary File System
 #
 sub ipfs_fetch {
-  my ($p, $assetdir) = @_;
-  my %tofetch;
-  my $asset_files = $p->{'asset_files'};
-  for my $file (sort keys %{$asset_files || {}}) {
-    my $asset = $asset_files->{$file};
-    next unless ($asset->{'type'} || '') eq 'ipfs';	# can only handle those
-    my $assetid = $asset->{'assetid'};
-    die("$file: no assetid element?\n") unless $assetid;
-    my $adir = "$assetdir/".substr($assetid, 0, 2);
-    next if -e "$adir/$assetid";
-    $tofetch{$assetid} = [ $file, $asset ] ;
-  }
-  return unless %tofetch;
-  my $ntofetch = keys %tofetch;
-  print "fetching $ntofetch assets from the InterPlanetary File System\n";
+  my ($p, $assetdir, $assets) = @_;
+  my @assets = grep {($_->{'type'} || '') eq 'ipfs'} @$assets;
+  return unless @assets;
+  my $nassets = @assets;
+  print "fetching $nassets from the InterPlanetary File System\n";
   # for now assume /ipfs is mounted...
   die("/ipfs is not available\n") unless -d '/ipfs';
-  for my $assetid (sort keys %tofetch) {
-    my $file = $tofetch{$assetid}->[0];
-    my $cid = $tofetch{$assetid}->[1]->{'cid'};
-    die("need a CID to download IPFS assets\n") unless $cid;
+  for my $asset (@assets) {
+    my $assetid = $asset->{'assetid'};
+    die("need a CID to download IPFS assets\n") unless $asset->{'cid'};
     my $adir = "$assetdir/".substr($assetid, 0, 2);
     PBuild::Util::mkdir_p($adir);
-    PBuild::Util::cp("$cid", "$adir/.$assetid.$$");
+    PBuild::Util::cp($asset->{'cid'}, "$adir/.$assetid.$$");
     rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
   }
 }
@@ -190,38 +173,25 @@ sub ipfs_fetch {
 # generic resource fetcher
 #
 sub url_fetch {
-  my ($p, $assetdir) = @_;
-  my %tofetch;
-  my $asset_files = $p->{'asset_files'};
-  for my $file (sort keys %{$asset_files || {}}) {
-    my $asset = $asset_files->{$file};
-    next unless ($asset->{'type'} || '') eq 'url';	# can only handle those
-    my $assetid = $asset->{'assetid'};
-    die("$file: no assetid element?\n") unless $assetid;
-    my $adir = "$assetdir/".substr($assetid, 0, 2);
-    next if -e "$adir/$assetid";
-    $tofetch{$assetid} = [ $file, $asset ] ;
-  }
-  return unless %tofetch;
+  my ($p, $assetdir, $assets) = @_;
+  my %tofetch_hosts;
   # classify by hosts
   my %tofetch_host;
-  for my $assetid (sort keys %tofetch) {
-    my $url = $tofetch{$assetid}->[1]->{'url'};
+  for my $asset (grep {($_->{'type'} || '') eq 'url'} @$assets) {
+    my $url = $asset->{'url'};
     die("need a url to download an asset\n") unless $url;
     die("weird download url '$url' for asset\n") unless $url =~ /^(.*?\/\/.*?)\//;
-    push @{$tofetch_host{$1}}, $assetid;
+    push @{$tofetch_host{$1}}, $asset;
   }
   for my $hosturl (sort keys %tofetch_host) {
-    my $assets = $tofetch_host{$hosturl};
-    my $ntofetch = @$assets;
+    my $tofetch = $tofetch_host{$hosturl};
+    my $ntofetch = @$tofetch;
     print "fetching $ntofetch assets from $hosturl\n";
-    for my $assetid (@$assets) {
-      my $file = $tofetch{$assetid}->[0];
-      my $url = $tofetch{$assetid}->[1]->{'url'};
-      my $digest = $tofetch{$assetid}->[1]->{'digest'};
+    for my $asset (@$tofetch) {
+      my $assetid = $asset->{'assetid'};
       my $adir = "$assetdir/".substr($assetid, 0, 2);
       PBuild::Util::mkdir_p($adir);
-      if (PBuild::Download::download($url, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $digest, 'missingok' => 1)) {
+      if (PBuild::Download::download($asset->{'url'}, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1)) {
         rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
       }
     }
