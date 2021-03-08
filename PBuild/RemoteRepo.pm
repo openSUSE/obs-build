@@ -384,6 +384,69 @@ sub querybinary {
 }
 
 #
+# Extract a binary from the cpio archive downloaded by fetchbinaries_obs
+#
+sub fetchbinaries_obs_cpioextract {
+  my ($name, $xfile, $repodir, $names) = @_;
+  if (!defined($xfile)) {
+    return undef unless $name =~ s/\.($binsufsre)$//;
+    my $suf = $1;
+    return undef unless $names->{$name};
+    my ($bin, $binname) = @{$names->{$name}};
+    return undef unless $binname =~ /\.\Q$suf\E$/;
+    return "$repodir/.$$.$binname";	# ok, extract this one!
+  }
+  die unless $name =~ s/\.($binsufsre)$//;
+  die unless $names->{$name};
+  my ($bin, $binname) = @{$names->{$name}};
+  my $tmpname = ".$$.$binname";
+  PBuild::Download::checkfiledigest("$repodir/$tmpname", $bin->{'checksum'}) if $bin->{'checksum'};
+  my $q = querybinary($repodir, $tmpname);
+  die("downloaded binary $binname does not match repository metadata\n") unless is_matching_binary($bin, $q);
+  rename("$repodir/$tmpname", "$repodir/$binname") || die("rename $repodir/$tmpname $repodir/$binname\n");
+  $q->{'filename'} = $binname;
+  %$bin = %$q;	# inline replace!
+  return undef;	# continue extracting
+}
+
+#
+# Download missing binaries in batches from a remote obs instance
+#
+sub fetchbinaries_obs {
+  my ($repo, $bins, $ua) = @_;
+  my $repodir = $repo->{'dir'};
+  PBuild::Util::mkdir_p($repodir);
+  my @bad;
+  my $firstloc;
+  my %names;
+  for my $bin (@$bins) {
+    next if $bin->{'filename'};
+    my $location = $bin->{'location'};
+    die("missing location for binary $bin->{'name'}\n") unless $location;
+    next if $location =~ /^zypp:/ || $location !~ /(.+)\/_repository\//;
+    my $binname = calc_binname($bin);
+    PBuild::Verify::verify_filename($binname);
+    $firstloc = $1 unless defined $firstloc;
+    next if $1 ne $firstloc;
+    $names{$bin->{'name'}} = [ $bin, $binname ];
+  }
+  return unless %names;
+  my @names = sort keys %names;
+  while (@names) {
+    my @nchunk = splice(@names, 0, 100);
+    my $binaryq = '';
+    for (@nchunk) {
+      s/([\000-\040<>;\"#\?&\+=%[\177-\377])/sprintf("%%%02X",ord($1))/sge;
+      $binaryq .= "&binary=$_";
+    }
+    my $tmpcpio = "$repodir/.$$.binaries.cpio";
+    download("$firstloc/_repository?view=cpio$binaryq", $tmpcpio, undef, undef, $ua);
+    PBuild::Cpio::cpio_extract($tmpcpio, undef, sub {fetchbinaries_obs_cpioextract($_[0], $_[1], $repodir, \%names)});
+    unlink($tmpcpio);
+  }
+}
+
+#
 # Download missing binaries from a remote repository
 #
 sub fetchbinaries {
@@ -395,13 +458,14 @@ sub fetchbinaries {
   print "fetching $nbins binaries from $url\n";
   PBuild::Util::mkdir_p($repodir);
   my $ua = PBuild::Download::create_ua();
+  fetchbinaries_obs($repo, $bins, $ua) if $url =~ /^obs:/;
   for my $bin (@$bins) {
+    next if $bin->{'filename'};
     my $location = $bin->{'location'};
     die("missing location for binary $bin->{'name'}\n") unless $location;
     die("bad location: $location\n") unless $location =~ /^(?:https?|zypp):\/\//;
     my $binname = calc_binname($bin);
     PBuild::Verify::verify_filename($binname);
-    next if -e "$repodir/$binname";		# hey!
     my $tmpname = ".$$.$binname";
     if ($bin->{'name'} =~ /^container:/) {
       # we cannot query containers, just download and set the filename

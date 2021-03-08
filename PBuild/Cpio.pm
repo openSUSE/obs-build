@@ -59,9 +59,17 @@ sub cpio_extract {
     my ($ent, $namesize, $namepad, $size, $pad) = cpio_parse($cpiohead);
     my $name = substr(cpio_read($fd, $namesize + $namepad), 0, $namesize);
     $name =~ s/\0.*//s;
-    die("$cpiofile: no '$name' entry\n") if !$size && $name eq 'TRAILER!!!';
+    if (!$size && $name eq 'TRAILER!!!') {
+      die("$cpiofile: no '$extract' entry\n") if defined($extract);
+      last;
+    }
     $name =~ s/^\.\///s;
-    if ($name ne $extract) {
+    my $real_outfile;
+    if (!defined($extract) || $name eq $extract) {
+      $real_outfile = $outfile;
+      $real_outfile = $outfile->($name, undef) if ref($outfile) eq 'CODE';
+    }
+    if (!defined($real_outfile)) {
       $size += $pad;
       while ($size > 0) {
         my $chunk = cpio_read($fd, $size > 65536 ? 65536 : $size);
@@ -70,14 +78,18 @@ sub cpio_extract {
       next;
     }
     my $outfd;
-    open ($outfd, '>', $outfile) || die("$outfile: $!\n");
+    open ($outfd, '>', $real_outfile) || die("$real_outfile: $!\n");
     while ($size > 0) {
       my $chunk = cpio_read($fd, $size > 65536 ? 65536 : $size);
       print $outfd $chunk or die("$outfile:$!\n");
       $size -= length($chunk);
     }
-    close($outfd) || die("$outfile: $!\n");
-    last;
+    close($outfd) || die("$real_outfile: $!\n");
+    if (ref($outfile) eq 'CODE') {
+      last if $outfile->($name, $real_outfile);
+    }
+    last if defined($extract);		# found the file we wanted
+    cpio_read($fd, $pad) if $pad;
   }
   close($fd);
 }
