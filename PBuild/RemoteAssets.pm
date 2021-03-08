@@ -139,7 +139,7 @@ sub fedpkg_fetch {
     my $path = $asset->{'digest'};
     $path =~ s/:/\//;
     $path = "$p->{'name'}/$asset->{'file'}/$path/$asset->{'file'}";
-    $path =~ s/([\000-\040<>;\"#\?&\+=%[\177-\377])/sprintf("%%%02X",ord($1))/sge;
+    $path = PBuild::Util::urlencode($path);
     my $fedpkg_url = $url;
     $fedpkg_url =~ s/\/?$/\/$path/;
     if (PBuild::Download::download($fedpkg_url, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1)) {

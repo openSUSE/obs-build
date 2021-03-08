@@ -167,4 +167,22 @@ sub isotime {
   return sprintf "%04d-%02d-%02d %02d:%02d:%02d", $lt[5] + 1900, $lt[4] + 1, @lt[3,2,1,0];
 }
 
+sub urlencode {
+  my ($str, $iscgi) = @_;
+  if ($iscgi) {
+    $str =~ s/([\000-\037<>;\"#\?&\+=%[\177-\377])/sprintf("%%%02X",ord($1))/sge;
+    $str =~ tr/ /+/;
+  } else {
+    $str =~ s/([\000-\040<>;\"#\?&\+=%[\177-\377])/sprintf("%%%02X",ord($1))/sge;
+  }
+  return $str;
+}
+
+sub urldecode {
+  my ($str, $iscgi) = @_;
+  $str =~ tr/+/ / if $iscgi;
+  $str =~ s/%([a-fA-F0-9]{2})/chr(hex($1))/sge;
+  return $str;
+}
+
 1;

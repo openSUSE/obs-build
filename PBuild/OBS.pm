@@ -75,8 +75,8 @@ my $dtd_proj = [
 #
 sub fetch_proj {
   my ($projid, $baseurl) = @_;
-  $projid =~ s/([\000-\040<>;\"#\?&\+=%[\177-\377])/sprintf("%%%02X",ord($1))/sge;
-  my ($projxml) = PBuild::Download::fetch("${baseurl}source/$projid/_meta");
+  my $projid2 = PBuild::Util::urlencode($projid);
+  my ($projxml) = PBuild::Download::fetch("${baseurl}source/$projid2/_meta");
   return PBuild::Structured::fromxml($projxml, $dtd_proj, 0, 1);
 }
 
@@ -86,8 +86,7 @@ sub fetch_proj {
 sub fetch_config {
   my ($prp, $baseurl) = @_;
   my ($projid, $repoid) = split('/', $prp, 2);
-  my $projid2 = $projid;
-  $projid2 =~ s/([\000-\040<>;\"#\?&\+=%[\177-\377])/sprintf("%%%02X",ord($1))/sge;
+  my $projid2 = PBuild::Util::urlencode($projid);
   my ($config) = PBuild::Download::fetch("${baseurl}source/$projid2/_config", 'missingok' => 1);
   $config = '' unless defined $config;
   $config = "\n### from $projid\n%define _repository $repoid\n$config" if $config;
@@ -128,12 +127,11 @@ sub expand_path {
 sub fetch_all_configs {
   my ($url, $opts, $islast) = @_;
   die("bad obs: reference\n") unless $url =~ /^obs:\/{1,3}([^\/]+\/[^\/]+)\/?$/;
-  my $prp = $1;
+  my $prp = PBuild::Util::urldecode($1);
   die("please specify the build service url with the --obs option\n") unless $opts->{'obs'};
   my $baseurl = $opts->{'obs'};
   $baseurl .= '/' unless $baseurl =~ /\/$/;
 
-  $prp =~ s/%([a-fA-F0-9]{2})/chr(hex($1))/sge;
   my @prps;
   if ($islast) {
     @prps = expand_path($prp, $baseurl);
@@ -146,11 +144,7 @@ sub fetch_all_configs {
     push @configs, $config if $config;
   }
   my @repourls;
-  for my $xprp (@prps) {
-    my $xprp2 = $xprp;
-    $xprp2 =~ s/([\000-\040<>;\"#\?&\+=%[\177-\377])/sprintf("%%%02X",ord($1))/sge;
-    push @repourls, "obs:\/$xprp2";
-  }
+  push @repourls, "obs:\/".PBuild::Util::urlencode($_) for @prps;
   return (\@configs, \@repourls);
 }
 

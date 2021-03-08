@@ -435,10 +435,7 @@ sub fetchbinaries_obs {
   while (@names) {
     my @nchunk = splice(@names, 0, 100);
     my $binaryq = '';
-    for (@nchunk) {
-      s/([\000-\040<>;\"#\?&\+=%[\177-\377])/sprintf("%%%02X",ord($1))/sge;
-      $binaryq .= "&binary=$_";
-    }
+    $binaryq .= "&binary=".PBuild::Util::urlencode($_) for @nchunk;
     my $tmpcpio = "$repodir/.$$.binaries.cpio";
     download("$firstloc/_repository?view=cpio$binaryq", $tmpcpio, undef, undef, $ua);
     PBuild::Cpio::cpio_extract($tmpcpio, undef, sub {fetchbinaries_obs_cpioextract($_[0], $_[1], $repodir, \%names)});
