@@ -37,7 +37,6 @@ use Build::Zypp;
 use PBuild::Util;
 use PBuild::Download;
 use PBuild::Verify;
-use PBuild::Cpio;
 use PBuild::OBS;
 use PBuild::Cando;
 
@@ -178,28 +177,13 @@ sub fetchrepo_zypp {
 
 sub fetchrepo_obs {
   my ($url, $tmpdir, $arch, $opts) = @_;
-  die("bad obs: reference\n") unless $url =~ /^obs:\/{1,3}([^\/]+\/[^\/]+)(?:\/([^\/]*))?$/;
-  my $prp = $1;
-  my $schedarch = $2 || $arch;
-  die("please specify the build service url with the --obs option\n") unless $opts->{'obs'};
-  my $baseurl = $opts->{'obs'};
-  $baseurl .= '/' unless $baseurl =~ /\/$/;
-  download("${baseurl}build/$prp/$schedarch/_repository?view=cache", "$tmpdir/repository.cpio");
-  PBuild::Cpio::cpio_extract("$tmpdir/repository.cpio", 'repositorycache', "$tmpdir/repository.data");
-  my $rdata = PBuild::Util::retrieve("$tmpdir/repository.data");
-  my @bins = grep {ref($_) eq 'HASH' && defined($_->{'name'})} values %{$rdata || {}};
-  @bins = sort {$a->{'name'} cmp $b->{'name'}} @bins;
-  for (@bins) {
+  my $bins = PBuild::OBS::fetch_repodata($url, $tmpdir, $arch, $opts);
+  @$bins = sort {$a->{'name'} cmp $b->{'name'}} @$bins;
+  for (@$bins) {
     delete $_->{'filename'};	# just in case
     delete $_->{'packid'};	# just in case
-    if ($_->{'path'} =~ /^\.\.\/([^\/\.][^\/]*\/[^\/\.][^\/]*)$/s) {
-      $_->{'location'} = "${baseurl}build/$prp/$schedarch/$1";	# obsbinlink to package
-    } else {
-      $_->{'location'} = "${baseurl}build/$prp/$schedarch/_repository/$_->{'path'}";
-    }
-    PBuild::OBS::recode_deps($_);	# recode deps from testcase format to rpm
   }
-  return \@bins;
+  return $bins;
 }
 
 #
@@ -384,29 +368,16 @@ sub querybinary {
 }
 
 #
-# Extract a binary from the cpio archive downloaded by fetchbinaries_obs
+# Check if the downloaded binary matches and commit it into the repo
 #
-sub fetchbinaries_obs_cpioextract {
-  my ($name, $xfile, $repodir, $names) = @_;
-  if (!defined($xfile)) {
-    return undef unless $name =~ s/\.($binsufsre)$//;
-    my $suf = $1;
-    return undef unless $names->{$name};
-    my ($bin, $binname) = @{$names->{$name}};
-    return undef unless $binname =~ /\.\Q$suf\E$/;
-    return "$repodir/.$$.$binname";	# ok, extract this one!
-  }
-  die unless $name =~ s/\.($binsufsre)$//;
-  die unless $names->{$name};
-  my ($bin, $binname) = @{$names->{$name}};
-  my $tmpname = ".$$.$binname";
+sub fetchbinaries_commit {
+  my ($repodir, $tmpname, $binname, $bin) = @_;
   PBuild::Download::checkfiledigest("$repodir/$tmpname", $bin->{'checksum'}) if $bin->{'checksum'};
   my $q = querybinary($repodir, $tmpname);
   die("downloaded binary $binname does not match repository metadata\n") unless is_matching_binary($bin, $q);
   rename("$repodir/$tmpname", "$repodir/$binname") || die("rename $repodir/$tmpname $repodir/$binname\n");
   $q->{'filename'} = $binname;
   %$bin = %$q;	# inline replace!
-  return undef;	# continue extracting
 }
 
 #
@@ -414,10 +385,7 @@ sub fetchbinaries_obs_cpioextract {
 #
 sub fetchbinaries_obs {
   my ($repo, $bins, $ua) = @_;
-  my $repodir = $repo->{'dir'};
-  PBuild::Util::mkdir_p($repodir);
-  my @bad;
-  my $firstloc;
+  my $url;
   my %names;
   for my $bin (@$bins) {
     next if $bin->{'filename'};
@@ -426,21 +394,14 @@ sub fetchbinaries_obs {
     next if $location =~ /^zypp:/ || $location !~ /(.+)\/_repository\//;
     my $binname = calc_binname($bin);
     PBuild::Verify::verify_filename($binname);
-    $firstloc = $1 unless defined $firstloc;
-    next if $1 ne $firstloc;
-    $names{$bin->{'name'}} = [ $bin, $binname ];
+    $url = $1 unless defined $url;
+    next if $1 ne $url;
+    $names{$bin->{'name'}} = [ ".$$.$binname", $binname, $bin ];
   }
   return unless %names;
-  my @names = sort keys %names;
-  while (@names) {
-    my @nchunk = splice(@names, 0, 100);
-    my $binaryq = '';
-    $binaryq .= "&binary=".PBuild::Util::urlencode($_) for @nchunk;
-    my $tmpcpio = "$repodir/.$$.binaries.cpio";
-    download("$firstloc/_repository?view=cpio$binaryq", $tmpcpio, undef, undef, $ua);
-    PBuild::Cpio::cpio_extract($tmpcpio, undef, sub {fetchbinaries_obs_cpioextract($_[0], $_[1], $repodir, \%names)});
-    unlink($tmpcpio);
-  }
+  my $repodir = $repo->{'dir'};
+  PBuild::Util::mkdir_p($repodir);
+  PBuild::OBS::fetch_binaries($url, $repodir, \%names, \&fetchbinaries_commit, $ua);
 }
 
 #
@@ -472,12 +433,8 @@ sub fetchbinaries {
       $bin->{'filename'} = $binname;
       next;
     }
-    download($location, "$repodir/$tmpname", undef, $bin->{'checksum'}, $ua);
-    my $q = querybinary($repodir, $tmpname);
-    die("downloaded binary $binname does not match repository metadata\n") unless is_matching_binary($bin, $q);
-    rename("$repodir/$tmpname", "$repodir/$binname") || die("rename $repodir/$tmpname $repodir/$binname\n");
-    $q->{'filename'} = $binname;
-    %$bin = %$q;	# inline replace!
+    download($location, "$repodir/$tmpname", undef, undef, $ua);
+    fetchbinaries_commit($repodir, $tmpname, $binname, $bin);
   }
   # update _metadata
   PBuild::Util::store("$repodir/._metadata.$$", "$repodir/_metadata", $repo->{'bins'});

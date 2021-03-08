@@ -22,8 +22,13 @@ package PBuild::OBS;
 
 use strict;
 
+use PBuild::Util;
 use PBuild::Download;
+use PBuild::Cpio;
 use PBuild::Structured;
+
+my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst};
+my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
 
 my @dtd_disableenable = (
      [[ 'disable' =>
@@ -230,6 +235,69 @@ sub recode_deps {
     next if !$r || $d ne '';
     $dep = rpmdepformat_rec($r, 1);	# currently only rpm supported
   }
+}
+
+#
+# Extract a binary from the cpio archive downloaded by fetchbinaries
+#
+sub fetch_binaries_cpioextract {
+  my ($name, $xfile, $repodir, $names, $callback) = @_;
+  if (!defined($xfile)) {
+    return undef unless $name =~ s/\.($binsufsre)$//;
+    my $suf = $1;
+    return undef unless $names->{$name};
+    my $tmpname = $names->{$name}->[0];
+    return undef unless $tmpname =~ /\.\Q$suf\E$/;
+    return "$repodir/$tmpname";	# ok, extract this one!
+  }
+  die unless $name =~ s/\.($binsufsre)$//;
+  die unless $names->{$name};
+  $callback->($repodir, @{$names->{$name}});
+  return undef;	# continue extracting
+}
+
+#
+# Download binaries in batches from a remote obs instance
+#
+sub fetch_binaries {
+  my ($url, $repodir, $names, $callback, $ua) = @_;
+  my @names = sort keys %$names;
+  while (@names) {
+    $ua ||= PBuild::Download::create_ua();
+    my @nchunk = splice(@names, 0, 100);
+    my $chunkurl = "$url/_repository?view=cpio";
+    $chunkurl .= "&binary=".PBuild::Util::urlencode($_) for @nchunk;
+    my $tmpcpio = "$repodir/.$$.binaries.cpio";
+    PBuild::Download::download($chunkurl, $tmpcpio, undef, 'ua' => $ua, 'retry' => 3);
+    PBuild::Cpio::cpio_extract($tmpcpio, undef, sub {fetch_binaries_cpioextract($_[0], $_[1], $repodir, $names, $callback)});
+    unlink($tmpcpio);
+  }
+}
+
+#
+# Get the repository metadata for an OBS repo
+#
+sub fetch_repodata {
+  my ($url, $tmpdir, $arch, $opts) = @_;
+  die("bad obs: reference\n") unless $url =~ /^obs:\/{1,3}([^\/]+\/[^\/]+)(?:\/([^\/]*))?$/;
+  my $prp = $1;
+  $arch = $2 if $2;
+  die("please specify the build service url with the --obs option\n") unless $opts->{'obs'};
+  my $baseurl = $opts->{'obs'};
+  $baseurl .= '/' unless $baseurl =~ /\/$/;
+  PBuild::Download::download("${baseurl}build/$prp/$arch/_repository?view=cache", "$tmpdir/repository.cpio", undef, 'retry' => 3);
+  PBuild::Cpio::cpio_extract("$tmpdir/repository.cpio", 'repositorycache', "$tmpdir/repository.data");
+  my $rdata = PBuild::Util::retrieve("$tmpdir/repository.data");
+  my @bins = grep {ref($_) eq 'HASH' && defined($_->{'name'})} values %{$rdata || {}};
+  for (@bins) {
+    if ($_->{'path'} =~ /^\.\.\/([^\/\.][^\/]*\/[^\/\.][^\/]*)$/s) {
+      $_->{'location'} = "${baseurl}build/$prp/$arch/$1";  # obsbinlink to package
+    } else {
+      $_->{'location'} = "${baseurl}build/$prp/$arch/_repository/$_->{'path'}";
+    }
+    recode_deps($_);       # recode deps from testcase format to rpm
+  }
+  return \@bins;
 }
 
 1;
