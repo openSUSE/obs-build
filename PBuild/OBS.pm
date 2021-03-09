@@ -278,14 +278,16 @@ sub fetch_binaries {
 # Get the repository metadata for an OBS repo
 #
 sub fetch_repodata {
-  my ($url, $tmpdir, $arch, $opts) = @_;
+  my ($url, $tmpdir, $arch, $opts, $modules) = @_;
   die("bad obs: reference\n") unless $url =~ /^obs:\/{1,3}([^\/]+\/[^\/]+)(?:\/([^\/]*))?$/;
   my $prp = $1;
   $arch = $2 if $2;
   die("please specify the build service url with the --obs option\n") unless $opts->{'obs'};
   my $baseurl = $opts->{'obs'};
   $baseurl .= '/' unless $baseurl =~ /\/$/;
-  PBuild::Download::download("${baseurl}build/$prp/$arch/_repository?view=cache", "$tmpdir/repository.cpio", undef, 'retry' => 3);
+  my $requrl .= "${baseurl}build/$prp/$arch/_repository?view=cache";
+  $requrl .= "&module=".PBuild::Util::urlencode($_) for @{$modules || []};
+  PBuild::Download::download($requrl, "$tmpdir/repository.cpio", undef, 'retry' => 3);
   PBuild::Cpio::cpio_extract("$tmpdir/repository.cpio", 'repositorycache', "$tmpdir/repository.data");
   my $rdata = PBuild::Util::retrieve("$tmpdir/repository.data");
   my @bins = grep {ref($_) eq 'HASH' && defined($_->{'name'})} values %{$rdata || {}};
