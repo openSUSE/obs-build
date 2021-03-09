@@ -33,6 +33,7 @@ use Build::Debrepo;
 use Build::Deb;
 use Build::Susetags;
 use Build::Zypp;
+use Build::Modules;
 
 use PBuild::Util;
 use PBuild::Download;
@@ -104,19 +105,29 @@ sub fetchrepo_debian {
   return \@bins;
 }
 
+sub open_uncompressed {
+  my ($filename) = @_;
+  my $fh;
+  open($fh, '<', $filename) or die("Error opening $filename: $!\n");
+  if ($filename =~ /\.gz$/) {
+    $fh = IO::Uncompress::Gunzip->new($fh) or die("Error opening $filename: $IO::Uncompress::Gunzip::GunzipError\n");
+  }
+  return $fh;
+}
+
 sub fetchrepo_rpmmd {
-  my ($url, $tmpdir, $arch, $archfilter, $iszypp) = @_;
+  my ($url, $tmpdir, $arch, $archfilter, $modules, $iszypp) = @_;
   my $baseurl = $url;
   $baseurl .= '/' unless $baseurl =~ /\/$/;
-  my @primaryfiles;
+  my @resources;
   download("${baseurl}repodata/repomd.xml", "$tmpdir/repomd.xml") unless $iszypp;
-  Build::Rpmmd::parse_repomd("$tmpdir/repomd.xml", \@primaryfiles);
-  @primaryfiles = grep {$_->{'type'} eq 'primary' && defined($_->{'location'})} @primaryfiles;
+  Build::Rpmmd::parse_repomd("$tmpdir/repomd.xml", \@resources);
+  my @primaryfiles = grep {$_->{'type'} eq 'primary' && defined($_->{'location'})} @resources;
   my @bins;
   for my $f (@primaryfiles) {
     my $u = "$f->{'location'}";
     utf8::downgrade($u);
-    next unless $u =~ /(primary\.xml(?:\.gz)?)$/;
+    next unless $u =~ /(primary\.xml(?:\.gz)?)$/s;
     my $fn = $1;
     if ($iszypp) {
       $fn = $u;
@@ -127,12 +138,24 @@ sub fetchrepo_rpmmd {
       $fn = "$1-$fn";
       download("${baseurl}/$f->{'location'}", "$tmpdir/$fn", undef, $f->{'checksum'});
     }
-    my $fh;
-    open($fh, '<', "$tmpdir/$fn") or die "Error opening $tmpdir/$fn: $!\n";
-    if ($fn =~ /\.gz$/) {
-      $fh = IO::Uncompress::Gunzip->new($fh) or die("Error opening $u: $IO::Uncompress::Gunzip::GunzipError\n");
-    }
+    my $fh = open_uncompressed("$tmpdir/$fn");
     Build::Rpmmd::parse($fh, sub { addpkg(\@bins, $_[0], $baseurl, $archfilter) }, 'addselfprovides' => 1, 'withchecksum' => 1);
+    last;
+  }
+  my @moduleinfofiles = grep {$_->{'type'} eq 'modules' && defined($_->{'location'})} @resources;
+  for my $f (@moduleinfofiles) {
+    my $u = "$f->{'location'}";
+    utf8::downgrade($u);
+    next unless $u =~ /(modules\.yaml(?:\.gz)?)$/s;
+    my $fn = $1;
+    die("zypp:// repos do not support module data\n") if $iszypp;
+    die("modules file $u does not have a checksum\n") unless $f->{'checksum'} && $f->{'checksum'} =~ /:(.*)/;
+    $fn = "$1-$fn";
+    download("${baseurl}/$f->{'location'}", "$tmpdir/$fn", undef, $f->{'checksum'});
+    my $fh = open_uncompressed("$tmpdir/$fn");
+    my $moduleinfo = {};
+    Build::Modules::parse($fh, $moduleinfo);
+    push @bins, { 'name' => 'moduleinfo:', 'data' => $moduleinfo };
     last;
   }
   return \@bins;
@@ -156,7 +179,7 @@ sub fetchrepo_susetags {
 }
 
 sub fetchrepo_zypp {
-  my ($url, $tmpdir, $arch, $archfilter) = @_;
+  my ($url, $tmpdir, $arch, $archfilter, $modules) = @_;
   die("zypp repo must start with zypp://\n") unless $url =~ /^zypp:\/\/([^\/]*)/;
   my $repo = Build::Zypp::parserepo($1);
   my $type = $repo->{'type'};
@@ -168,7 +191,7 @@ sub fetchrepo_zypp {
   die("could not determine repo type for '$repo->{'name'}'\n") unless $type;
   if($type eq 'rpm-md') {
     die("zypp repo $url is not up to date, please refresh first\n") unless -s "$zyppcachedir/repodata/repomd.xml";
-    fetchrepo_rpmmd("zypp://$repo->{'name'}", "$zyppcachedir/repodata", $arch, $archfilter, 1);
+    fetchrepo_rpmmd("zypp://$repo->{'name'}", "$zyppcachedir/repodata", $arch, $archfilter, $modules, 1);
   } else {
     die("zypp repo $url is not up to date, please refresh first\n") unless -s "$zyppcachedir/suse/setup/descr/packages.gz";
     fetchrepo_susetags("zypp://$repo->{'name'}", "$zyppcachedir/suse/setup/descr", $arch, $archfilter, 1);
@@ -176,13 +199,14 @@ sub fetchrepo_zypp {
 }
 
 sub fetchrepo_obs {
-  my ($url, $tmpdir, $arch, $opts) = @_;
-  my $bins = PBuild::OBS::fetch_repodata($url, $tmpdir, $arch, $opts);
+  my ($url, $tmpdir, $arch, $opts, $modules) = @_;
+  my $bins = PBuild::OBS::fetch_repodata($url, $tmpdir, $arch, $opts, $modules);
   @$bins = sort {$a->{'name'} cmp $b->{'name'}} @$bins;
   for (@$bins) {
     delete $_->{'filename'};	# just in case
     delete $_->{'packid'};	# just in case
   }
+  push @$bins, { 'name' => 'moduleinfo:', 'modules' => $modules } if @{$modules || []};
   return $bins;
 }
 
@@ -217,6 +241,7 @@ sub replace_with_local {
   delete $files{'_metadata'};
   delete $files{'.tmp'};
   for my $bin (@$bins) {
+    next if $bin->{'name'} eq 'moduleinfo:';
     my $file = $bin->{'filename'};
     if (defined $file) {
       if (!$files{$file}) {
@@ -285,17 +310,26 @@ sub fetchrepo {
     $archfilter = { map {$_ => 1} PBuild::Cando::archfilter($arch) };
     $archfilter->{$_} = 1 for qw{all any noarch};
   }
-  my $tmpdir = "$repodir/.tmp";
-  PBuild::Util::cleandir($tmpdir) if -e $tmpdir;
-  PBuild::Util::mkdir_p($tmpdir);
+  my $modules = [ PBuild::Util::unify(sort(@{$bconf->{'modules'} || []})) ];
   my $bins;
   my $repofile = "$repodir/_metadata";
   if (-s $repofile) {
     $bins = PBuild::Util::retrieve($repofile, 1);
+    if ($repotype eq 'obs') {
+      # obs repo data changes with the modules, so be careful
+      my $repomodules = [];
+      if (@$bins && $bins->[-1]->{'name'} eq 'moduleinfo:') {
+        $repomodules = $bins->[-1]->{'modules'} || [];
+      }
+      undef $bins if join(',', @$modules) ne join(',', @$repomodules);
+    }
     return $bins if $bins && replace_with_local($repodir, $bins);
   }
+  my $tmpdir = "$repodir/.tmp";
+  PBuild::Util::cleandir($tmpdir) if -e $tmpdir;
+  PBuild::Util::mkdir_p($tmpdir);
   if ($repotype eq 'rpmmd' || $repotype eq 'rpm-md') {
-    $bins = fetchrepo_rpmmd($url, $tmpdir, $arch, $archfilter);
+    $bins = fetchrepo_rpmmd($url, $tmpdir, $arch, $archfilter, $modules);
   } elsif ($repotype eq 'debian') {
     $bins = fetchrepo_debian($url, $tmpdir, $arch, $archfilter);
   } elsif ($repotype eq 'arch') {
@@ -303,9 +337,9 @@ sub fetchrepo {
   } elsif ($repotype eq 'suse') {
     $bins = fetchrepo_susetags($url, $tmpdir, $arch, $archfilter);
   } elsif ($repotype eq 'zypp') {
-    $bins = fetchrepo_zypp($url, $tmpdir, $arch, $archfilter);
+    $bins = fetchrepo_zypp($url, $tmpdir, $arch, $archfilter, $modules);
   } elsif ($repotype eq 'obs') {
-    $bins = fetchrepo_obs($url, $tmpdir, $arch, $opts);
+    $bins = fetchrepo_obs($url, $tmpdir, $arch, $opts, $modules);
   } else {
     die("unsupported repotype '$repotype'\n");
   }
@@ -368,9 +402,9 @@ sub querybinary {
 }
 
 #
-# Check if the downloaded binary matches and commit it into the repo
+# Check if the downloaded binary matches and replace the stub with it
 #
-sub fetchbinaries_commit {
+sub fetchbinaries_replace {
   my ($repodir, $tmpname, $binname, $bin) = @_;
   PBuild::Download::checkfiledigest("$repodir/$tmpname", $bin->{'checksum'}) if $bin->{'checksum'};
   my $q = querybinary($repodir, $tmpname);
@@ -401,7 +435,7 @@ sub fetchbinaries_obs {
   return unless %names;
   my $repodir = $repo->{'dir'};
   PBuild::Util::mkdir_p($repodir);
-  PBuild::OBS::fetch_binaries($url, $repodir, \%names, \&fetchbinaries_commit, $ua);
+  PBuild::OBS::fetch_binaries($url, $repodir, \%names, \&fetchbinaries_replace, $ua);
 }
 
 #
@@ -434,7 +468,7 @@ sub fetchbinaries {
       next;
     }
     download($location, "$repodir/$tmpname", undef, undef, $ua);
-    fetchbinaries_commit($repodir, $tmpname, $binname, $bin);
+    fetchbinaries_replace($repodir, $tmpname, $binname, $bin);
   }
   # update _metadata
   PBuild::Util::store("$repodir/._metadata.$$", "$repodir/_metadata", $repo->{'bins'});
