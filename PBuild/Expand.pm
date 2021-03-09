@@ -24,6 +24,52 @@ use strict;
 use Build;
 
 #
+# reduce the binaries to the ones selected by the given module list
+#
+sub prune_to_modules {
+  my ($bins, $modules, $data) = @_;
+  my %modules = map {$_ => 1} @{$modules || []};
+  # expand modules to streams if we have the data
+  my $moduleinfo = $data->{'/moduleinfo'};
+  if ($moduleinfo) {
+    for (keys %modules) {
+      $modules{$_} = 1 if /^(.*)-/;	# also provide without the stream suffix
+    }
+    my %xmodules;
+    for my $mi (@$moduleinfo) {
+      next unless $modules{$mi->{'name'}};
+      my @req = grep {$_ ne 'platform' && !/^platform-/} @{$mi->{'requires'} || []};
+      next if grep {!$modules{$_}} @req;
+      $xmodules{"$mi->{'name'}\@$mi->{'context'}"} = 1;
+    }
+    %modules = %xmodules;
+  }
+  # now get rid of all packages not in a module
+  my @nbins;
+  my @notmod;
+  my %inmod;
+  for my $bin (@$bins) {
+    my $evr = $bin->{'epoch'} ? "$bin->{'epoch'}:$bin->{'version'}" : $bin->{'version'};
+    $evr .= "-$bin->{'release'}" if defined $bin->{'release'};
+    my $nevra = "$bin->{'name'}-$evr.$bin->{'arch'}";
+    if ($data->{$nevra}) {
+      next unless grep {$modules{$_}} @{$data->{$nevra}};
+      $inmod{$bin->{'name'}} = 1;
+    } else {
+      # not in a module
+      next if $bin->{'release'} && $bin->{'release'} =~ /\.module_/;	# hey!
+      push @notmod, $bin;
+    }
+    push @nbins, $bin;
+  }
+  for (@notmod) {
+    $_ = undef if $inmod{$_->{'name'}};
+  }
+  @nbins = grep {defined($_)} @nbins;
+  return \@nbins;
+}
+
+#
 # configure the expander with the available repos
 #
 sub configure_repos {
@@ -39,6 +85,9 @@ sub configure_repos {
   # code in expanddeps!
   for my $repo (@$repos) {
     my $bins = $repo->{'bins'} || [];
+    if (@$bins && $bins->[-1]->{'name'} eq 'moduleinfo:' && $bins->[-1]->{'data'}) {
+      $bins = prune_to_modules($bins, $bconf->{'modules'}, $bins->[-1]->{'data'});
+    }
     for my $bin (@$bins) {
       my $n = $bin->{'name'};
       next if $packs_done{$n};
@@ -65,6 +114,7 @@ sub configure_repos {
     }
     %packs_done = %packs;
   }
+  delete $packs{'moduleinfo:'};
   Build::forgetdeps($bconf);	# free mem first
   Build::readdeps($bconf, undef, \%packs);
   return \%packs;
