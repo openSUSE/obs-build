@@ -310,7 +310,7 @@ sub slurp_config_file {
     my $otherfile = $1;
     if (!$seen) {
       $seen = {};
-      $seen{$1} = 1 if $file =~ /([^\/]*)$/;
+      $seen->{$1} = 1 if $file =~ /([^\/]*)$/;
     }
     if (!$seen->{$otherfile}++) {
       $file =~ s/[^\/]*$/$otherfile/;
