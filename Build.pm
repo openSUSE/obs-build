@@ -243,6 +243,38 @@ sub dist_canon($$) {
   return $dist;
 }
 
+# combine multiple config files into a single config
+sub combine_configs {
+  my (@c) = @_;
+  my $config = '';
+  my $macros = '';
+  for my $c (@c) {
+    $c =~ s/\n?$/\n/s if $c ne '';
+    if ($c =~ /^\s*:macros\s*$/im) {
+      # probably multiple macro sections with %if statements
+      # flush out macros
+      $config .= "\nMacros:\n$macros:Macros\n\n" if $macros ne '';
+      $macros = '';
+      my $s1 = '\A(.*^\s*:macros\s*$)(.*?)\Z';  # should always match
+      if ($c =~ /$s1/msi) {
+        $config .= $1;
+        $c = $2;
+      } else {
+        $config .= $c;
+        $c = '';
+      }
+    }
+    if ($c =~ /^(.*\n)?\s*macros:[^\n]*\n(.*)/si) {
+      # has single macro section at end. cumulate
+      $c = defined($1) ? $1 : '';
+      $macros .= $2;
+    }
+    $config .= $c;
+  }
+  $config .= "\nMacros:\n$macros" if $macros ne '';
+  return $config;
+}
+
 sub find_config_file {
   my ($dist, $configdir) = @_;
 
@@ -267,6 +299,28 @@ sub find_config_file {
   return $dist;
 }
 
+sub slurp_config_file {
+  my ($file, $seen) = @_;
+  local *CONF;
+  die("$file: $!\n") unless open(CONF, '<', $file);
+  my @config = <CONF>;
+  close CONF;
+  chomp @config;
+  if (@config && $config[0] =~ /^#!PrependConfigFile:\s*([^\.\/][^\/]*?)\s*$/) {
+    my $otherfile = $1;
+    if (!$seen) {
+      $seen = {};
+      $seen{$1} = 1 if $file =~ /([^\/]*)$/;
+    }
+    if (!$seen->{$otherfile}++) {
+      $file =~ s/[^\/]*$/$otherfile/;
+      my $otherconfig = slurp_config_file($file, $seen) || [];
+      return [ split("\n", combine_configs(join("\n", @$otherconfig), join("\n", @config))) ];
+    }
+  }
+  return \@config;
+}
+
 sub read_config_dist {
   my ($dist, $archpath, $configdir) = @_;
   $dist = find_config_file($dist, $configdir);
@@ -274,7 +328,8 @@ sub read_config_dist {
   $arch = 'noarch' unless defined $arch;
   $arch =~ s/:.*//;
   $arch = 'noarch' if $arch eq '';
-  my $cf = read_config($arch, $dist);
+  my $cfile = slurp_config_file($dist);
+  my $cf = read_config($arch, $cfile);
   die("$dist: parse error\n") unless $cf;
   return $cf;
 }

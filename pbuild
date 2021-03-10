@@ -44,7 +44,6 @@ use PBuild::Multibuild;
 use PBuild::Link;
 use PBuild::Checker;
 use PBuild::Options;
-use PBuild::BuildConfig;
 use PBuild::Result;
 use PBuild::Download;
 use PBuild::Preset;
@@ -122,10 +121,12 @@ for my $dist (@{$opts->{'dist'} || []}) {
   } elsif ($dist =~ /^empty:/) {
     next;
   } elsif (-e "$dir/_configs/$opts->{'dist'}.conf") {
-    push @baseconfigs, PBuild::Util::readstr("$dir/_configs/$dist.conf");
+    my $c = Build::slurp_config_file("$dir/_configs/$dist.conf");
+    push @baseconfigs, join("\n", @$c);
   } else {
     my $baseconfigfile = Build::find_config_file($dist, $opts->{'configdir'});
-    push @baseconfigs, PBuild::Util::readstr($baseconfigfile);
+    my $c = Build::slurp_config_file($baseconfigfile);
+    push @baseconfigs, join("\n", @$c);
   }
 }
 # set repos from obs, does not work well with "mixed" configs
@@ -134,7 +135,7 @@ push @{$opts->{'repo'}}, @baseobsrepos if @baseobsrepos && !$opts->{'repo'};
 my $localconfig = -s "$dir/_config" ? PBuild::Util::readstr("$dir/_config") : '';
 $localconfig = "\n%define _repository $reponame\n\n$localconfig" if $reponame && $localconfig ne '';
 
-my $buildconfig = PBuild::BuildConfig::combineconfigs(reverse(@baseconfigs), $localconfig);
+my $buildconfig = Build::combine_configs(reverse(@baseconfigs), $localconfig);
 my $bconf = Build::read_config($myarch, [ split("\n", $buildconfig) ]);
 if (!@{$bconf->{'preinstall'} || []}) {
   my @presetnames = PBuild::Preset::known_presets($dir);
