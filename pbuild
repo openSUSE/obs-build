@@ -378,7 +378,7 @@ while (1) {
   my $duration = $job->{'endtime'} - $job->{'starttime'};
   $duration = sprintf("%d:%02d", int($duration / 60), $duration % 60);
   my $bid = ($job->{'nbuilders'} || 1) > 1 ? "$job->{'name'}: " : '';
-  print "${bid}finished $p->{'pkg'}/$p->{'recipe'} after ${duration}s: $code\n";
+  print "${bid}finished $p->{'pkg'}/$p->{'recipe'} after ${duration}: $code\n";
 
   my $jobhist = PBuild::BuildResult::makejobhist($p, $code, $job->{'readytime'}, $job->{'starttime'}, $job->{'endtime'}, $job->{'reason'}, $job->{'hostarch'});
   PBuild::BuildResult::addjobhist($builddir, $jobhist);
