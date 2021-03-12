@@ -1,0 +1,47 @@
+######################################################
+# Flatpak manifest example for Open Build Service
+# https://docs.flatpak.org/en/latest/manifests.html
+# Input should be YAML, even though the file can have
+# a .json suffix (JSON is a subset of YAML).
+# Don't use '//' comments!
+# Copied from https://github.com/flathub/org.gnome.Mahjongg
+######################################################
+
+# Special OBS field because flatpak does not have a version field
+# Default will be '0' if the field is missing.
+#!BuildVersion: 3.38.2
+---
+app-id: org.gnome.Mahjongg
+runtime: org.gnome.Platform
+sdk: org.gnome.Sdk
+runtime-version: '3.38'
+command: gnome-mahjongg
+
+finish-args:
+- --share=ipc
+- --socket=fallback-x11
+- --socket=wayland
+- --device=dri
+- --metadata=X-DConf=migrate-path=/org/gnome/Mahjongg/
+
+cleanup:
+- "/share/man"
+
+modules:
+- name: gnome-mahjongg
+  buildsystem: meson
+  config-opts:
+  - -Dcompile-schemas=enabled
+  - -Dupdate-icon-cache=enabled
+  sources:
+  - type: archive
+
+    # Source archives should be put into the OBS package, but you can
+    # keep the original URL from where it was downloaded here.
+    url: https://download.gnome.org/sources/gnome-mahjongg/3.38/gnome-mahjongg-3.38.2.tar.xz
+
+    # You can also just specify a simple filename
+    # url: gnome-mahjongg-3.36.2.tar.xz
+
+    # flatpak-builder will do a checksum
+    sha256: '928708b4c625cad4b05199ca2948f6a545bfab368a1fc576feed0a7432e454f3'

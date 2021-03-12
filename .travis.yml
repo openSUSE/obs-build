@@ -1,0 +1,11 @@
+---
+virt: vm
+os: linux
+dist: focal
+services:
+- docker
+script:
+- docker pull registry.opensuse.org/opensuse/leap:15.2 && docker images
+- docker run -t --rm -v$PWD:/obs-build --privileged
+    --cap-add SYS_ADMIN --device /dev/fuse
+    registry.opensuse.org/opensuse/leap:15.2 /obs-build/t/data/flatpak.sh
