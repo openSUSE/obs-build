@@ -98,7 +98,6 @@ recipe_build_flatpak() {
     export TOPDIR
     export RELEASE
 
-    modprobe fuse
     chroot "$BUILD_ROOT" su -c "flatpak list"
 
     $BUILD_DIR/call-flatpak-builder --root "$BUILD_ROOT"
