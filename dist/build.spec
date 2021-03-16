@@ -247,6 +247,9 @@ exit 0
 %endif
 # we need to patch the not packaged configs, due to the buildignore
 sed -i 's,build-mkbaselibs,,' ../configs/*.conf
+if [ ! -e /.build.packages/rpmlint-Factory.rpm ]; then
+  sed -i 's,rpmlint-Factory,,' ../configs/*.conf
+fi
 ./testbuild.sh /.build.binaries/
 
 %files
