@@ -53,7 +53,7 @@ sub print_result {
     next if ($code eq 'disabled' || $code eq 'excluded') && !$codefilter{$code};
     next unless $opts->{'result-code'} || $opts->{'result-pkg'};
     for my $pkg (@{$codes_seen{$code}}) {
-      if (!$opts->{'result-terse'}) {
+      if (!$opts->{'terse'}) {
 	my $details = $r->{$pkg}->{'details'};
 	if ($details) {
           print "    $pkg ($details)\n";

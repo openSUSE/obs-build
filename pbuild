@@ -48,6 +48,7 @@ use PBuild::Result;
 use PBuild::Download;
 use PBuild::Preset;
 use PBuild::Distro;
+use PBuild::Repoquery;
 
 # parse options
 my ($opts, @dirs) = PBuild::Options::parse_options(@ARGV);
@@ -308,6 +309,11 @@ if (@{$opts->{'registry'} || []} && %containertags) {
   for my $registry (@{$opts->{'registry'} || []}) {
     push @repos, $repomgr->addremoteregistry($bconf, $myarch, $builddir, $registry, \@containertags);
   }
+}
+
+if ($opts->{'repoquery'}) {
+  PBuild::Repoquery::repoquery($bconf, $myarch, \@repos, $opts);
+  exit;
 }
 
 # load lastcheck cache
