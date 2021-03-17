@@ -300,14 +300,16 @@ sub fetchrepo {
   my $repotype;
   $repotype = 'zypp' if $url =~ /^zypp:/;
   $repotype = 'obs' if $url =~ /^obs:/;
-  if ($url =~ /^(arch|debian|hdlist2|rpmmd|rpm-md|suse)\@(.*)$/) {
+  my $archfilter;
+  if ($url =~ /^(arch|debian|hdlist2|rpmmd|rpm-md|suse)(?:\+archfilter=([^\@\/]+))?\@(.*)$/) {
     $repotype = $1;
-    $url = $2;
+    $archfilter = [ split(',', $2) ] if $2;
+    $url = $3;
   }
   $repotype ||= guess_repotype($bconf, $buildtype) || 'rpmmd';
-  my $archfilter;
-  if ($repotype ne 'obs') {
-    $archfilter = { map {$_ => 1} PBuild::Cando::archfilter($arch) };
+  $archfilter ||= [ PBuild::Cando::archfilter($arch) ] if $repotype ne 'obs';
+  if ($archfilter) {
+    $archfilter = { map {$_ => 1} @$archfilter };
     $archfilter->{$_} = 1 for qw{all any noarch};
   }
   my $modules = [ PBuild::Util::unify(sort(@{$bconf->{'modules'} || []})) ];
