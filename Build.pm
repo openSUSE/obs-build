@@ -946,6 +946,48 @@ my %addproviders_fm = (
   '<=' => 6,
 );
 
+sub matchsingledep {
+  my ($p, $d, $binarytype) = @_;
+
+  return 1 if $p eq $d;
+  if ($d !~ /^(.*?)\s*([<=>]{1,2})\s*(.*?)$/) {
+    # d is bare
+    $d =~ s/:any$// if $binarytype eq 'deb';
+    return 1 if $p eq $d;
+    return 1 if $p =~ /^\Q$d\E\s*([<=>]{1,2})\s*(.*?)$/;
+    return 0;
+  }
+  my $dn = $1;
+  my $dv = $3;
+  my $df = $addproviders_fm{$2};
+  return 0 unless $df;
+  $dn =~ s/:any$// if $binarytype eq 'deb';
+  if ($p !~ /^\Q$dn\E\s*([<=>]{1,2})\s*(.*?)$/) {
+    # p is bare or not matching 
+    return 0 if $binarytype eq 'deb';
+    return $p eq $dn ? 1 : 0;
+  }
+  my $pv = $2;
+  my $pf = $addproviders_fm{$1};
+  return 0 unless $pf;
+  return 1 if $pf & $df & 5;
+  if ($pv eq $dv) {
+    return 0 unless $pf & $df & 2;
+    return 1;
+  }
+  my $rr = $df == 2 ? $pf : ($df ^ 5);
+  $rr &= 5 unless $pf & 2;
+  # verscmp for spec and kiwi types
+  my $vv;
+  if ($binarytype eq 'deb') {
+    $vv = Build::Deb::verscmp($pv, $dv, 1);
+  } else {
+    $vv = Build::Rpm::verscmp($pv, $dv, 1);
+  }
+  return 1 if $rr & (1 << ($vv + 1));
+  return 0;
+}
+
 sub addproviders {
   my ($config, $r) = @_;
 
