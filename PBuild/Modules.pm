@@ -72,6 +72,18 @@ sub prune_to_modules {
 }
 
 #
+# return the modules a package belongs to
+#
+sub getmodules {
+  my ($data, $bin) = @_;
+  my $moduleinfo = $data->{'/moduleinfo'};
+  my $evr = $bin->{'epoch'} ? "$bin->{'epoch'}:$bin->{'version'}" : $bin->{'version'};
+  $evr .= "-$bin->{'release'}" if defined $bin->{'release'};
+  my $nevra = "$bin->{'name'}-$evr.$bin->{'arch'}";
+  return @{$data->{$nevra} || []};
+}
+
+#
 # return which modules are missing from the module config
 #
 sub missingmodules {
