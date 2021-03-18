@@ -47,13 +47,14 @@ VM_DEVICEOPT=()
 VM_TELNET=
 VM_CONSOLE_INPUT=
 VM_USER=
+VM_USE_MKFS_COPYIN=
+VM_POPULATE_FILESYSTEM=
 VMDISK_ROOTSIZE=4096
 VMDISK_SWAPSIZE=1024
 VMDISK_FILESYSTEM=
 VMDISK_MOUNT_OPTIONS=__default
 VMDISK_CLEAN=
 VM_HOSTNAME=
-VM_USE_VIRT_FS=
 
 # zvm specific?
 VM_WORKER_NO=
@@ -174,6 +175,10 @@ vm_parse_options() {
       -vm-swap|-xenswap|-swap)
 	needarg
 	VM_SWAP="$ARG"
+	shift
+      ;;
+      -vm-use-mkfs-copyin)
+	VM_USE_MKFS_COPYIN="true"
 	shift
       ;;
       -vm-memory|-xenmemory|-memory)
@@ -365,6 +370,7 @@ vm_img_mkfs() {
     local fs="$1"
     local img="$2"
     local options="$3"
+    local populate="$4"
     local mkfs tunefs
 
     case "$fs" in
@@ -396,6 +402,14 @@ vm_img_mkfs() {
     # extend options if wanted, multiple -O are fine
     if test "$options" = "nodirindex" && test "$fs" = "ext2" -o "$fs" = "ext3" -o "$fs" = "ext4"; then
         mkfs_extra_options="$mkfs_extra_options -O ^dir_index"
+    fi
+    if test -n "$populate"; then
+      if test "$fs" = "ext2" -o "$fs" = "ext3" -o "$fs" = "ext4"; then
+        mkfs_extra_options="$mkfs_extra_options -d $populate"
+      else
+        print "ERROR: populating filesystem is only supported with ext file systems"
+        cleanup_and_exit 1
+      fi
     fi
 
     if test -z "$mkfs"; then
@@ -647,6 +661,11 @@ vm_set_filesystem_type() {
     test -n "$vmfsoptions" && VMDISK_FILESYSTEM_OPTIONS="$vmfsoptions"
     # use either commandline specified fs or ext3 as fallback
     test -n "$VMDISK_FILESYSTEM" || VMDISK_FILESYSTEM=ext3
+    if test -n "$VM_USE_MKFS_COPYIN"; then
+       test "${VMDISK_FILESYSTEM:0:3}" == "ext" || cleanup_and_exit 4 "mkfs copy in works only with ext filesystems"
+       /sbin/mkfs.ext3 -d /var/lib/empty -V >& /dev/null || cleanup_and_exit 4 "mkfs is too old for copy in files"
+       VM_POPULATE_FILESYSTEM="$BUILD_ROOT"
+    fi
 }
 
 vm_set_mount_options() {
@@ -685,6 +704,7 @@ vm_set_defaults() {
 	VM_SWAP_TYPE=file
 	test -b "$VM_SWAP" && VM_SWAP_TYPE=device
     fi
+    test $UID != 0 && VM_USE_MKFS_COPYIN="true"
 }
 
 #
@@ -721,13 +741,6 @@ vm_setup() {
     vm_set_mount_options
     echo "VM_ROOT: $VM_ROOT, VM_SWAP: $VM_SWAP"
 
-    VM_USE_VIRT_FS=
-    if test -z "$RUNNING_IN_VM" -a -n "$VM_TYPE" -a -n "$VM_ROOT"; then
-        if test -x /usr/bin/virt-make-fs -a "$VMDISK_FILESYSTEM" = ext3 -a -z "$VMDISK_FILESYSTEM_OPTIONS" ; then
-            VM_USE_VIRT_FS=true
-        fi
-    fi
-
     vm_attach_root
     vm_setup_swap
     # this should not be needed, but sometimes a xen instance got lost
@@ -739,17 +752,14 @@ vm_setup() {
 	    rm -f "$VM_ROOT"
 	fi
     fi
-    # using virt-make-fs for ext3 file VMDISK_FILESYSTEM
-    # so nothing is needed to do part from creating appropriate folders
-    # and calling virt-make-fs accordingly
-    if test -n "$VM_USE_VIRT_FS" ; then
-        echo "Using virt-make-fs to create root image"
+    # Check for populating filesystem during mkfs
+    if test -n "$VM_POPULATE_FILESYSTEM"; then
+        echo "Populating filesystem during formating"
         rm -rf "$BUILD_ROOT"/* "$BUILD_ROOT"/.[^.]* 
         if test -z "$CLEAN_BUILD" ; then
-	    echo "Recovering former build root"
-	    debugfs -f <(echo rdump / "$BUILD_ROOT") "$VM_ROOT"
+           echo "Recovering former build root"
+           debugfs -f <(echo rdump / "$BUILD_ROOT") "$VM_ROOT"
         fi
-        return 0
     fi
     if test "$VM_ROOT_TYPE" = file ; then
 	if test -n "$CLEAN_BUILD" ; then
@@ -760,12 +770,16 @@ vm_setup() {
 	    if test -z "$origrootsize" -o "$origrootsize" != "$VMDISK_ROOTSIZE" ; then
 		# the size has changed, re-create file system
 		vm_img_create "$VM_ROOT" "$VMDISK_ROOTSIZE"
+		test -n "$VM_POPULATE_FILESYSTEM" && return
 		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" "$VMDISK_FILESYSTEM_OPTIONS" || cleanup_and_exit 4
 	    fi
 	fi
     fi
     if test ! -e "$VM_ROOT" ; then
 	cleanup_and_exit 4 "you need to create $VM_ROOT first"
+    fi
+    if test -n "$VM_POPULATE_FILESYSTEM"; then
+        return
     fi
     if test -n "$CLEAN_BUILD" ; then
 	vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" "$VMDISK_FILESYSTEM_OPTIONS" || cleanup_and_exit 4
@@ -972,17 +986,14 @@ vm_first_stage() {
 	    fi
 	fi
 	check_exit
-	# needs to work otherwise we have a corrupted file system
-	if test -z "$VM_USE_VIRT_FS" ; then
+	if test -n "$VM_POPULATE_FILESYSTEM"; then
+             vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" "$VMDISK_FILESYSTEM_OPTIONS" "$VM_POPULATE_FILESYSTEM" || cleanup_and_exit 4
+        else
+	    # needs to work otherwise we have a corrupted file system
 	    if ! umount $BUILD_ROOT; then
 		test -n "$KERNEL_TEMP_DIR" && rm -rf "$KERNEL_TEMP_DIR"
 		cleanup_and_exit 4
 	    fi
-        else
-	    export LIBGUESTFS_CACHEDIR=$BUILD_ROOT/.guestfs
-	    test -d $BUILD_ROOT/.guestfs || mkdir $BUILD_ROOT/.guestfs
-	    /usr/bin/virt-make-fs --format=raw -t ext3 --size="$VMDISK_ROOTSIZE"M $BUILD_ROOT $VM_ROOT || cleanup_and_exit 4
-	    #rm -rf -- "$BUILD_ROOT"/*
 	fi
 	# copy back the kernel and set it for VM
 	if test -n "$KERNEL_TEMP_DIR" ; then

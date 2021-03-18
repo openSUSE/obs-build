@@ -358,6 +358,12 @@ Known Parameters:
               nodirindex: disable dir indexing on ext filesystems. Slower,
               but more reproducible builds
 
+  --vm-use-mkfs-copyin
+              Avoid syscalls like mount for preinstall phase for VM
+              builds. Copy files into filesystem during filesystem
+              creationg time instead.
+              Currently limited to ext filesystems.
+
   --vm-memory SIZEINMB
               Set amount of RAM for VMs
 
