@@ -231,8 +231,9 @@ vm_verify_options_kvm() {
 
     if test -n "$kvm_rng_device" ; then
         if test -c /dev/hwrng &&
-	    test -f /sys/class/misc/hw_random/rng_current &&
-	    test "$(cat /sys/class/misc/hw_random/rng_current)" != none; then
+           test -w /dev/hwrng &&
+           test -f /sys/class/misc/hw_random/rng_current &&
+           test "$(cat /sys/class/misc/hw_random/rng_current)" != none; then
             rng_dev="/dev/hwrng"
         else
             rng_dev="/dev/random"
@@ -275,9 +276,6 @@ vm_startup_kvm() {
     qemu_args=(-drive file="$VM_ROOT",format=raw,if=none,id=disk,cache=unsafe -device "$kvm_device",drive=disk,serial=0)
     if [ -n "$VM_USER" ] ; then
 	getent passwd "$VM_USER" > /dev/null || cleanup_and_exit 3 "cannot find KVM user '$VM_USER'"
-    else
-	# use qemu user by default if available
-	getent passwd qemu >/dev/null && VM_USER=qemu
     fi
     [ -n "$VM_USER" ] && kvm_options="$kvm_options -runas $VM_USER"
     if test -n "$VM_SWAP" ; then
