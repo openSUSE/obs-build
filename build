@@ -359,10 +359,9 @@ Known Parameters:
               but more reproducible builds
 
   --vm-use-mkfs-copyin
-              Avoid syscalls like mount for preinstall phase for VM
-              builds. Copy files into filesystem during filesystem
-              creationg time instead.
-              Currently limited to ext filesystems.
+              Avoid mounting in the preinstall phase for VM builds. Instead,
+              copy files into the filesystem during filesystem creation time.
+              Currently limited to the ext filesystems.
 
   --vm-memory SIZEINMB
               Set amount of RAM for VMs

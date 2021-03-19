@@ -48,7 +48,6 @@ VM_TELNET=
 VM_CONSOLE_INPUT=
 VM_USER=
 VM_USE_MKFS_COPYIN=
-VM_POPULATE_FILESYSTEM=
 VMDISK_ROOTSIZE=4096
 VMDISK_SWAPSIZE=1024
 VMDISK_FILESYSTEM=
@@ -650,8 +649,8 @@ vm_detect_2nd_stage() {
 }
 
 vm_set_filesystem_type() {
-    vmfstype=""
-    vmfsoptions=""
+    local vmfstype
+    local vmfsoptions
     if test -n "$BUILD_DIST" ; then 
         # testing for build specific filesystem, which are more important then worker defaults
         vmfstype=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags vmfstype`
@@ -662,9 +661,8 @@ vm_set_filesystem_type() {
     # use either commandline specified fs or ext3 as fallback
     test -n "$VMDISK_FILESYSTEM" || VMDISK_FILESYSTEM=ext3
     if test -n "$VM_USE_MKFS_COPYIN"; then
-       test "${VMDISK_FILESYSTEM:0:3}" == "ext" || cleanup_and_exit 4 "mkfs copy in works only with ext filesystems"
-       /sbin/mkfs.ext3 -d /var/lib/empty -V >& /dev/null || cleanup_and_exit 4 "mkfs is too old for copy in files"
-       VM_POPULATE_FILESYSTEM="$BUILD_ROOT"
+       test "${VMDISK_FILESYSTEM:0:3}" == "ext" || cleanup_and_exit 4 "mkfs copyin works only with ext filesystems"
+       /sbin/mkfs.ext3 -d /var/lib/empty -V >& /dev/null || cleanup_and_exit 4 "mkfs is missing the -d option needed for copyin files"
     fi
 }
 
@@ -753,35 +751,36 @@ vm_setup() {
 	fi
     fi
     # Check for populating filesystem during mkfs
-    if test -n "$VM_POPULATE_FILESYSTEM"; then
-        echo "Populating filesystem during formating"
+    if test -n "$VM_USE_MKFS_COPYIN" ; then
+	echo "Using mkfs copyin mode to populate the root filesystem"
+	mkdir_build_root
         rm -rf "$BUILD_ROOT"/* "$BUILD_ROOT"/.[^.]* 
-        if test -z "$CLEAN_BUILD" ; then
+        if test -z "$CLEAN_BUILD" -a -e "$VM_ROOT" ; then
            echo "Recovering former build root"
            debugfs -f <(echo rdump / "$BUILD_ROOT") "$VM_ROOT"
         fi
     fi
+    local clean_build="$CLEAN_BUILD"
     if test "$VM_ROOT_TYPE" = file ; then
-	if test -n "$CLEAN_BUILD" ; then
-	    vm_img_create "$VM_ROOT" "$VMDISK_ROOTSIZE"
-	else
+	if test -z "$clean_build" ; then
 	    local origrootsize
 	    test -e "$VM_ROOT" -a -e "${VM_ROOT}.size" && origrootsize=$(cat "${VM_ROOT}.size" 2>/dev/null)
 	    if test -z "$origrootsize" -o "$origrootsize" != "$VMDISK_ROOTSIZE" ; then
 		# the size has changed, re-create file system
-		vm_img_create "$VM_ROOT" "$VMDISK_ROOTSIZE"
-		test -n "$VM_POPULATE_FILESYSTEM" && return
-		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" "$VMDISK_FILESYSTEM_OPTIONS" || cleanup_and_exit 4
+		clean_build=true
 	    fi
+	fi
+	if test -n "$clean_build" ; then
+	    vm_img_create "$VM_ROOT" "$VMDISK_ROOTSIZE"
 	fi
     fi
     if test ! -e "$VM_ROOT" ; then
 	cleanup_and_exit 4 "you need to create $VM_ROOT first"
     fi
-    if test -n "$VM_POPULATE_FILESYSTEM"; then
+    if test -n "$VM_USE_MKFS_COPYIN" ; then
         return
     fi
-    if test -n "$CLEAN_BUILD" ; then
+    if test -n "$clean_build" ; then
 	vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" "$VMDISK_FILESYSTEM_OPTIONS" || cleanup_and_exit 4
     fi
     # now mount root/swap
@@ -986,8 +985,8 @@ vm_first_stage() {
 	    fi
 	fi
 	check_exit
-	if test -n "$VM_POPULATE_FILESYSTEM"; then
-             vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" "$VMDISK_FILESYSTEM_OPTIONS" "$VM_POPULATE_FILESYSTEM" || cleanup_and_exit 4
+	if test -n "$VM_USE_MKFS_COPYIN" ; then
+	    vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" "$VMDISK_FILESYSTEM_OPTIONS" "$BUILD_ROOT" || cleanup_and_exit 4
         else
 	    # needs to work otherwise we have a corrupted file system
 	    if ! umount $BUILD_ROOT; then
