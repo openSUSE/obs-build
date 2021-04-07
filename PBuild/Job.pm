@@ -313,6 +313,26 @@ sub createjob {
 }
 
 #
+# move the build result into the correct place if we used a
+# subdirectory for building
+#
+sub rename_build_result {
+  my ($vm, $buildroot) = @_;
+  return unless $vm =~ /(xen|kvm|zvm|emulator|pvm|qemu|openstack)/;
+  # get rid of old results
+  unlink("$buildroot/.build.packages");
+  if (-d "$buildroot/.build.packages") {
+    PBuild::Util::cleandir("$buildroot/.build.packages");
+    rmdir("$buildroot/.build.packages");
+  }
+  rename("$buildroot/.mount/.build.packages", "$buildroot/.build.packages") || die("final rename failed: $!\n");
+  # XXX: extracted cpio is flat but code below expects those directories...
+  symlink('.', "$buildroot/.build.packages/SRPMS");
+  symlink('.', "$buildroot/.build.packages/DEBS");
+  symlink('.', "$buildroot/.build.packages/KIWI");
+}
+
+#
 # Finalize a build job after the build process has finished
 #
 sub finishjob {
@@ -338,11 +358,7 @@ sub finishjob {
     $ret = 1;
   }
   if ($ret == 9) {
-    if ($vm =~ /(xen|kvm|zvm|emulator|pvm|qemu|openstack)/) {
-      PBuild::Util::cleandir("$buildroot/.build.packages");
-      rmdir("$buildroot/.build.packages");
-      rename("$buildroot/.mount/.build.packages", "$buildroot/.build.packages") || die("final rename failed: $!\n");
-    }
+    rename_build_result($vm, $buildroot);
     die("XXX: dynamic buildreqs not implemented yet");
   }
   
@@ -355,15 +371,7 @@ sub finishjob {
     my $result = { '_log' => "$buildroot/.build.log" };
     return ('failed', $result);
   }
-  if ($vm =~ /(xen|kvm|zvm|emulator|pvm|qemu|openstack)/) {
-    PBuild::Util::cleandir("$buildroot/.build.packages");
-    rmdir("$buildroot/.build.packages");
-    rename("$buildroot/.mount/.build.packages", "$buildroot/.build.packages") || die("final rename failed: $!\n");
-    # XXX: extracted cpio is flat but code below expects those directories...
-    symlink('.', "$buildroot/.build.packages/SRPMS");
-    symlink('.', "$buildroot/.build.packages/DEBS");
-    symlink('.', "$buildroot/.build.packages/KIWI");
-  }
+  rename_build_result($vm, $buildroot);
   my $result = collect_result($p, $buildroot);
   $result->{'_log'} = "$buildroot/.build.log";
   return ('succeeded', $result);
