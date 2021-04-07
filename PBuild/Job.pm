@@ -320,7 +320,7 @@ sub finishjob {
 
   die("job is still building\n") if $job->{'pid'};
   my $buildroot = $job->{'buildroot'};
-  my $vm = $job->{'buildroot'};
+  my $vm = $job->{'vm_type'};
   my $p = $job->{'pdata'};
   my $ret = $job->{'waitstatus'};
   die("waitstatus not set\n") unless defined $ret;
