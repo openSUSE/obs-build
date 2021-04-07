@@ -259,7 +259,7 @@ sub createjob {
     for my $opt (qw{vm-type vm-disk vm-swap vm-server vm-worker vm-kernel vm-openstack-flavor}) {
       push @args, "--$opt=$opts->{$opt}" if defined $opts->{$opt},
     }
-  } elsif ($vm eq 'lxc') {
+  } elsif ($vm eq 'lxc' || $vm eq 'docker') {
     push @args, "--root=$buildroot";
     for my $opt (qw{vm-type vm-memory}) {
       push @args, "--$opt=$opts->{$opt}" if defined $opts->{$opt},
