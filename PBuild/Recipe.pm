@@ -23,6 +23,8 @@ package PBuild::Recipe;
 use strict;
 use Build;
 
+use PBuild::Service;
+
 $Build::Kiwi::urlmapper = 0;	# disable url -> prp mapping
 
 #
@@ -105,6 +107,9 @@ sub parse {
     my %deps = map {$_ => 1} (@{$d->{'deps'} || []}, @{$d->{'subpacks'} || []});
     my @prereqs = grep {!$deps{$_} && !/^%/} @{$d->{'prereqs'}};
     $p->{'prereq'} = \@prereqs if @prereqs;
+  }
+  if ($p->{'files'}->{'_service'}) {
+    push @{$p->{'buildtimeservice'}}, $_ for PBuild::Service::get_buildtimeservices($p);
   }
   my $imagetype = $bt eq 'kiwi' && $d->{'imagetype'} ? ($d->{'imagetype'}->[0] || '') : '';
   if ($bt eq 'kiwi' && $imagetype eq 'product') {
