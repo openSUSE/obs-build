@@ -83,6 +83,7 @@ if ($opts->{'list-presets'}) {
 # read presets
 my $preset = PBuild::Preset::read_presets($dir, $opts->{'preset'});
 PBuild::Preset::apply_preset($opts, $preset) if $preset;
+print "Using default preset: $preset->{'name'}\n" if $preset && !$opts->{'preset'};
 
 my $reponame = $opts->{'reponame'};
 if (!$reponame && $opts->{'dist'}) {
@@ -142,6 +143,8 @@ if (!@{$bconf->{'preinstall'} || []}) {
   my @presetnames = PBuild::Preset::known_presets($dir);
   if (@presetnames) {
     print("Please specify a distribution or a preset!\n\n");
+    PBuild::Preset::list_presets($dir);
+    exit;
   } else {
     print("Please specify a distribution!\n\n");
   }
