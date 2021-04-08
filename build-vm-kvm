@@ -331,6 +331,7 @@ vm_startup_kvm() {
     "$@"
     qemu_ret=$?
     test "$qemu_ret" = "137" && cleanup_and_exit 3 "qemu got SIGKILL"
+    test "$qemu_ret" = "143" && cleanup_and_exit 1 "qemu got SIGTERM"
 }
 
 vm_kill_kvm() {
