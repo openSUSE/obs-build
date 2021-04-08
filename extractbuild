@@ -2,7 +2,7 @@
 
 ################################################################
 #
-# Copyright (c) 1995-2018 SUSE Linux Products GmbH
+# Copyright (c) 1995-2021 SUSE Linux Products GmbH
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 or 3 as
@@ -22,10 +22,76 @@
 
 use strict;
 
+sub read_blob {
+  my ($fd, $l, $off) = @_;
+  !defined($off) || sysseek($fd, $off, 0) || die("sysseek $off: $!\n");
+  my $buf = '';
+  while ($l > 0) {
+    my $r = sysread($fd, $buf, $l, length($buf));
+    die("sysread: $!\n") unless defined $r;
+    die("sysread: EOF\n") unless $r > 0;
+    $l -= $r;
+  }
+  return $buf;
+}
+
+sub qcow_open {
+  my ($fd) = @_;
+  my @hdr = unpack("N*", read_blob($fd, 72, 0));
+  die("now a qcow image\n") unless $hdr[0] == 0x514649fb;
+  die("unsupported qcow2 version $hdr[1]\n") unless $hdr[1] == 2 || $hdr[1] == 3;
+  die("illegal cluster bits size $hdr[5]\n") if $hdr[5] < 9 || $hdr[5] > 24;
+  die("encrypted qcow image\n") if $hdr[8];
+  if ($hdr[1] == 3) {
+    push @hdr, unpack("N*", read_blob($fd, 32));
+    die("incompatible qcow feature ($hdr[18]/$hdr[19])\n") if $hdr[18] || ($hdr[19] & 0xfffffffc);
+  }
+  my @l1 = unpack("N*", read_blob($fd, $hdr[9] * 8, $hdr[10] * 4294967296 + $hdr[11]));
+  my @l;
+  while (@l1) {
+    my ($l1a, $l1b) = splice(@l1, 0, 2);
+    die("bad l1 table entry\n") if $l1b & 0x1ff;
+    my $l2off = ($l1b & 0xfffffe00) + ($l1a & 0xffffff) * 4294967296;
+    if (!$l2off) {
+      push @l, (undef) x (1 << ($hdr[5] - 8));
+      next;	# unallocated
+    }
+    my @l2 = unpack("N*", read_blob($fd, (1 << $hdr[5]), $l2off));
+    while (@l2) {
+      my ($l2a, $l2b) = splice(@l2, 0, 2);
+      if ($l2a & 0x40000000) {
+	die("compressed clusters are not yet supported\n");
+      } else {
+	die("all zero clusters are not supported\n") if $l2b & 1;
+	my $coff = ($l2b & 0xfffffe00) + ($l2a & 0xffffff) * 4294967296;
+	push @l, $coff ? $coff : undef;
+      }
+    }
+  }
+  my $qcow = [ $fd, (1 << $hdr[5]), \@l, \@hdr];
+  return $qcow;
+}
+
+sub qcow_copy {
+  my ($qcow, $out, $start, $len) = @_;
+  my $csize = $qcow->[1];
+  while ($len > 0) {
+    my ($c, $co)  = (int($start / $csize), $start % $csize);
+    die("cluster outside of mapping table\n") if $c < 0 || $c >= @{$qcow->[2]};
+    my $off = $qcow->[2]->[$c];
+    die("unmapped qcow cluster $c\n") unless defined $off;
+    my $l = $csize - $co;
+    my $chunk = read_blob($qcow->[0], $l > $len ? $len : $l, $off + $co);
+    (syswrite($out, $chunk) || 0) == length($chunk) || die("write error\n");
+    $len -= length($chunk);
+    $start += length($chunk);
+  }
+}
+
 # buffer size for reading
 my $bufsize = 4*1024*1024;
 
-my ($opt_skip, $opt_disk, $opt_input, $opt_verbose);
+my ($opt_skip, $opt_disk, $opt_input, $opt_verbose, $opt_qcow);
 $opt_verbose = 0;
 
 while (@ARGV)  {
@@ -44,6 +110,11 @@ while (@ARGV)  {
     $opt_input = shift @ARGV;
     next;
   }
+  if ($ARGV[0] eq '--qcow') {
+    shift @ARGV;
+    $opt_qcow = 1;
+    next;
+  }
   if ($ARGV[0] eq '--verbose' || $ARGV[0] eq '-v') {
     shift @ARGV;
     $opt_verbose++;
@@ -52,7 +123,7 @@ while (@ARGV)  {
   last;
 }
 
-die "need to specify disk image\n" unless $opt_disk;
+die "usage: extractbuild [--qcow] [--verbose] [--skip n] [--input <manifest] --disk <image>\n" unless $opt_disk;
 
 open(F, '<', $opt_disk) || die "$opt_disk: $!\n";
 
@@ -66,6 +137,9 @@ if ($opt_input) {
 if ($opt_skip) {
   seek(S, $opt_skip, 0) || die "seek: $!\n";
 }
+
+my $qcow;
+$qcow = qcow_open(\*F) if $opt_qcow;
 
 my %done;
 while (<S>) {
@@ -129,12 +203,16 @@ while (<S>) {
     $len = $left if $len > $left;	# it's ok to overshoot the last block
     $left -= $len;
     if ($start == 0) { # a hole!
-      seek(O, $len, 1);
+      sysseek(O, $len, 1);
       $needtruncate = 1;
       next;
     }
     $needtruncate = undef;
-    seek(F, $start, 0) || die "$file: seek: $!\n";
+    if ($qcow) {
+      qcow_copy($qcow, \*O, $start, $len);
+      next;
+    }
+    sysseek(F, $start, 0) || die "$file: seek: $!\n";
     while ($len > 0) {
       my $size = $len > $bufsize ? $bufsize : $len;
       my $buf;
