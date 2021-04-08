@@ -53,7 +53,7 @@ sub qcow_open {
     die("bad l1 table entry\n") if $l1b & 0x1ff;
     my $l2off = ($l1b & 0xfffffe00) + ($l1a & 0xffffff) * 4294967296;
     if (!$l2off) {
-      push @l, (undef) x (1 << ($hdr[5] - 8));
+      push @l, (undef) x (1 << ($hdr[5] - 3));
       next;	# unallocated
     }
     my @l2 = unpack("N*", read_blob($fd, (1 << $hdr[5]), $l2off));
