@@ -39,25 +39,21 @@ my $dtd_pbuild = [
 # read presets, take default if non given.
 sub read_presets {
   my ($dir, $presetname) = @_;
-  my $preset;
   if (-f "$dir/_pbuild") {
     my $pbuild = PBuild::Structured::readxml("$dir/_pbuild", $dtd_pbuild);
-    for my $d (@{$pbuild->{'preset'} || []}) {
-      # check for selected preset
+    for my $preset (@{$pbuild->{'preset'} || []}) {
+      next unless $preset->{'name'};
       if (defined($presetname)) {
-	if (defined($d->{'name'}) && $presetname eq $d->{'name'}) {
-          $preset = $d;
-          last;
-        }
-	next;
+	# check for selected preset
+	return $preset if $presetname eq $preset->{'name'};
+      } else {
+	# check for default
+	return $preset if $preset->{'default'};
       }
-      # check for default
-      $preset = $d if defined($d->{'name'}) && exists($d->{'default'});
     }
   }
-  return undef unless $preset || $presetname;
-  die("unknown preset '$presetname'\n") unless $preset;
-  return $preset;
+  die("unknown preset '$presetname'\n") if defined $presetname;
+  return undef;
 }
 
 # get a list of defined presets
