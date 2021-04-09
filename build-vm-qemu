@@ -138,6 +138,7 @@ vm_verify_options_qemu() {
 
     if test -n "$qemu_rng_device" ; then
         if test -c /dev/hwrng &&
+            test -w /dev/hwrng &&
             test -f /sys/class/misc/hw_random/rng_current &&
             test "$(cat /sys/class/misc/hw_random/rng_current)" != none; then
             rng_dev="/dev/hwrng"
@@ -152,7 +153,7 @@ vm_startup_qemu() {
     qemu_args=(-drive file="$VM_ROOT",format=raw,if=none,id=disk,cache=unsafe -device "$qemu_device",drive=disk,serial=0)
     if [ -n "$VM_USER" ] ; then
         getent passwd "$VM_USER" > /dev/null || cleanup_and_exit 3 "cannot find KVM user '$VM_USER'"
-    else
+    elif test $UID = 0 ; then
         # use qemu user by default if available
         getent passwd qemu >/dev/null && VM_USER=qemu
     fi
