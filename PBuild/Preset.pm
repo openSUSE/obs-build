@@ -48,7 +48,7 @@ sub read_presets {
 	return $preset if $presetname eq $preset->{'name'};
       } else {
 	# check for default
-	return $preset if $preset->{'default'};
+	return $preset if exists $preset->{'default'};
       }
     }
   }
