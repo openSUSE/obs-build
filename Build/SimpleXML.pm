@@ -95,9 +95,12 @@ sub parse {
     } else {
       die("element '$tag' closes without open\n") unless @nodestack;
       die("element '$tag' closes, but I expected '$nodestack[-1]->[0]'\n") unless $nodestack[-1]->[0] eq $tag;
-      $c =~ s/^\s*//s;
-      $c =~ s/\s*$//s;
-      $node->{'_content'} = $c if $c ne '';
+      if (!$opts{'notrim'}) {
+        $c =~ s/^\s*//s;
+        $c =~ s/\s*$//s;
+        $c = undef if $c eq '';
+      }
+      $node->{'_content'} = $c if defined $c;
       $node->{'_end'} = $xmllen - length($xml) if $record;
       $node = $nodestack[-1]->[1];
       $c = $nodestack[-1]->[2];
@@ -105,9 +108,12 @@ sub parse {
     }
   }
   $c .= $xml;
-  $c =~ s/^\s*//s;
-  $c =~ s/\s*$//s;
-  $node->{'_content'} = $c if $c ne '';
+  if (!$opts{'notrim'}) {
+    $c =~ s/^\s*//s;
+    $c =~ s/\s*$//s;
+    $c = undef if $c eq '';
+  }
+  $node->{'_content'} = $c if defined $c;
   return $node;
 }
 
