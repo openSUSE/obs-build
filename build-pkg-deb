@@ -39,6 +39,7 @@ deb_chroot ()
 	    DEBIAN_FRONTEND=noninteractive DEBIAN_PRIORITY=critical \
 			   DEBCONF_NONINTERACTIVE_SEEN=true \
 			   LC_ALL=C.UTF-8 LANGUAGE=C.UTF-8 LANG=C.UTF-8 \
+			   TZ=UTC \
 			   chroot $*
     )
 }
