@@ -152,7 +152,11 @@ sub unparse {
     $de = [ $de ] unless ref($de) eq 'ARRAY';
     for my $se (@$de) {
       if (ref($se) eq '') {
-	$r .= "$indent<$en>".unparse_escape($se)."</$en>$nl";
+	if (defined($se)) {
+	  $r .= "$indent<$en>".unparse_escape($se)."</$en>$nl";
+	} else {
+	  $r .= "$indent<$en/>$nl";
+	}
 	next;
       }
       my @sk = unparse_keys($se);
