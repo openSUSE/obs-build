@@ -115,7 +115,7 @@ sub parse {
     my $data;
     ($tag, $data) = split(':', $_, 2);
     next unless defined $data;
-    $tag = $tmap{lc($tag)};
+    $tag = $ltmap{lc($tag)};
     next unless $tag;
     $data =~ s/^\s*//;
     $pkg->{$tag} = $data;
