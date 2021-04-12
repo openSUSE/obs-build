@@ -137,7 +137,7 @@ sub xmlpostprocess {
 sub fromxml {
   my ($d, $dtd, $nonfatal, $allowunknown) = @_;
   eval {
-    $d = Build::SimpleXML::parse($d);
+    $d = Build::SimpleXML::parse($d, 'notrim' => 1);
     $d = xmlpostprocess($d, $dtd, $allowunknown);
   };
   if ($@) {
