@@ -21,7 +21,6 @@
 package PBuild::Options;
 
 use strict;
-use POSIX qw(getuid);
 
 my %known_options = (
   'h' => 'help',
@@ -173,7 +172,7 @@ sub parse_options {
     die("Option $origopt does not take an argument\n") if @args && ref($args[0]);
   }
   # default to KVM for builds as non-root user
-  $opts{'vm-type'} = 'kvm' if !$opts{'vm-type'} && getuid() > 0;
+  $opts{'vm-type'} = 'kvm' if !$opts{'vm-type'} && $< > 0;
 
   return (\%opts, @back);
 }
