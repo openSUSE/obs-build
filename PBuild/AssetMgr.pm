@@ -68,6 +68,24 @@ sub get_assetid {
 }
 
 #
+# calculate an id that identifies an mutable asset
+#
+sub calc_mutable_id {
+  my ($assetmgr, $asset) = @_;
+  my $assetid = $asset->{'assetid'};
+  my $adir = "$assetmgr->{'asset_dir'}/".substr($assetid, 0, 2);
+  my $fd;
+  if (open($fd, '<', "$adir/$assetid")) {
+    # already have it, use md5sum to track content
+    my $ctx = Digest::MD5->new;
+    $ctx->addfile($fd);
+    close $fd;
+    return $ctx->hexdigest();
+  }
+  return 'd0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0';	# download on demand
+}
+
+#
 # Add the asset information to the package's srcmd5
 #
 sub update_srcmd5 {
@@ -75,7 +93,6 @@ sub update_srcmd5 {
   my $asset_files = $p->{'asset_files'};
   return 0 unless $asset_files;
   my $old_srcmd5 = $p->{'srcmd5'};
-  my $assetdir = $assetmgr->{'asset_dir'};
   my %files = %{$p->{'files'}};
   for my $file (sort keys %$asset_files) {
     my $asset = $asset_files->{$file};
@@ -86,20 +103,7 @@ sub update_srcmd5 {
     } elsif ($asset->{'cid'}) {
       $files{$file} = Digest::MD5::md5_hex("$asset->{'cid'}  $file");
     } else {
-      # unpinned asset
-      my $assetid = $asset->{'assetid'};
-      my $adir = "$assetdir/".substr($assetid, 0, 2);
-      my $fd;
-      if (open($fd, '<', "$adir/$assetid")) {
-        # already have it, use md5sum
-	my $ctx = Digest::MD5->new;
-	$ctx->addfile($fd);
-	close $fd;
- 	$files{$file} = $ctx->hexdigest();
-      } else {
-	# don't have it yet, mark as download on demand
-	$files{$file} = 'd0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0';
-      }
+      $files{$file} = calc_mutable_id($assetmgr, $asset);
     }
   }
   $p->{'srcmd5'} = PBuild::Source::calc_srcmd5(\%files);
