@@ -51,7 +51,7 @@ sub parse_service {
 #
 sub get_buildtimeservices {
   my ($p) = @_;
-  return [] unless $p->{'files'}->{'_service'};
+  return () unless $p->{'files'}->{'_service'};
   my @bt;
   my $services = parse_service($p);
   for my $service (@{$services->{'service'} || []}) {

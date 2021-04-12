@@ -166,7 +166,7 @@ sub copy_sources {
 #
 sub createjob {
   my ($ctx, $jobname, $nbuilders, $buildroot, $p, $bdeps, $pdeps, $vmdeps, $sysdeps, $nounchanged) = @_;
-  my $opts = $ctx->{'opts'};
+  my $opts = { %{$ctx->{'opts'}} };	# create copy so we can modify
   my $hostarch = $opts->{'hostarch'};
 
   my $bconf = $ctx->{'bconf'};
@@ -265,7 +265,6 @@ sub createjob {
       push @args, "--$opt=$opts->{$opt}" if defined $opts->{$opt},
     }
   } else {
-    warn("VM-TYPE $vm is unknown\n") if $vm; 
     push @args, "--root=$buildroot";
     push @args, "--vm-type=$vm" if $vm; 
   }
