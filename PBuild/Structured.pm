@@ -55,6 +55,11 @@ sub _workin {
   die("bad input\n") unless ref($in) eq 'HASH';
   for my $x (sort keys %$in) {
     my $k = $known->{$x};
+    if ($x eq '_content') {
+      $in->{$x} =~ s/^\s+//s;
+      $in->{$x} =~ s/\s+$//s;
+      next if $in->{$x} eq '';
+    }
     if (!defined($k) && defined($known->{''})) {
       $k = $known->{''};
       die("bad dtd\n") unless ref($k);
@@ -90,7 +95,7 @@ sub _workin {
     }
     if (!ref($k)) {
       for (@$v) {
-        die("element '$x' has subelements\n") if !exists($_->{'_content'}) || keys(%$_) != 1;
+        die("element '$x' has subelements\n") if %$_ && (!exists($_->{'_content'}) || keys(%$_) != 1);
       }
       if (!$k) {
 	die("element '$x' must be singleton\n") unless @$v == 1 && !exists($out->{$x});
@@ -150,7 +155,7 @@ sub readxml {
   my $d = PBuild::Util::readstr($fn, $nonfatal);
   return $d unless defined $d;
   eval {
-    $d = Build::SimpleXML::parse($d);
+    $d = Build::SimpleXML::parse($d, 'notrim' => 1);
     $d = xmlpostprocess($d, $dtd, $allowunknown);
   };
   if ($@) {
