@@ -151,12 +151,12 @@ sub unparse {
     my $de = $d->{$e};
     $de = [ $de ] unless ref($de) eq 'ARRAY';
     for my $se (@$de) {
-      if (ref($se) eq '') {
-	if (defined($se)) {
-	  $r .= "$indent<$en>".unparse_escape($se)."</$en>$nl";
-	} else {
-	  $r .= "$indent<$en/>$nl";
-	}
+      if (defined($se) && ref($se) eq '') {
+	$r .= "$indent<$en>".unparse_escape($se)."</$en>$nl";
+	next;
+      }
+      if (!$se || !%$se) {
+        $r .= "$indent<$en/>$nl";
 	next;
       }
       my @sk = unparse_keys($se);
