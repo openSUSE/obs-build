@@ -33,6 +33,8 @@ my $dtd_pbuild = [
 	  [ 'config' ],
 	  [ 'repo' ],
 	  [ 'registry' ],
+	  [ 'assets' ],
+	    'obs',
      ]],
 ];
 
@@ -89,6 +91,8 @@ sub apply_preset {
   push @{$opts->{'dist'}}, @{$preset->{'config'}} if $preset->{'config'} && !$opts->{'dist'};
   push @{$opts->{'repo'}}, @{$preset->{'repo'}} if $preset->{'repo'} && !$opts->{'repo'};
   push @{$opts->{'registry'}}, @{$preset->{'registry'}} if $preset->{'registry'} && !$opts->{'registry'};
+  push @{$opts->{'assets'}}, @{$preset->{'assets'}} if $preset->{'assets'} && !$opts->{'assets'};
+  $opts->{'obs'} = $preset->{'obs'} if $preset->{'obs'} && !$opts->{'obs'};
 }
 
 1;
