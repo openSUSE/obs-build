@@ -71,7 +71,6 @@ if (!$opts->{'hostarch'}) {
   $opts->{'hostarch'} = 'armv6hl' if $opts->{'hostarch'} eq 'armv6l';
   $opts->{'hostarch'} = 'armv7hl' if $opts->{'hostarch'} eq 'armv7l';
 }
-$opts->{'arch'} ||= $opts->{'hostarch'};
 $opts->{'buildjobs'} = 1 unless $opts->{'buildjobs'};
 $opts->{'buildjobs'} = 32 if $opts->{'buildjobs'} > 32;
 
@@ -94,6 +93,8 @@ if (!$reponame && $opts->{'dist'}) {
   $reponame =~ s/[:\s]+/_/g;
 }
 
+my $hostarch = $opts->{'hostarch'};
+$opts->{'arch'} ||= $hostarch;
 my $myarch = $opts->{'arch'};
 
 my $builddir = $reponame ? "$dir/_build.$reponame.$myarch" : "$dir/_build.$myarch";
@@ -102,6 +103,8 @@ if ($opts->{'result-code'} || $opts->{'result-pkg'}) {
   PBuild::Result::print_result($opts, $builddir);
   exit;
 }
+
+my $cross = $myarch ne $hostarch && $opts->{'hostrepo'} ? 1 : 0;
 
 my @baseconfigs;
 my $distcnt = 0;
@@ -139,7 +142,9 @@ $localconfig = "\n%define _repository $reponame\n\n$localconfig" if $reponame &&
 
 my $buildconfig = Build::combine_configs(reverse(@baseconfigs), $localconfig);
 my $bconf = Build::read_config($myarch, [ split("\n", $buildconfig) ]);
-if (!@{$bconf->{'preinstall'} || []}) {
+my $hostbconf = $cross ? Build::read_config($hostarch, [ split("\n", $buildconfig) ]) : undef;
+
+if (!@{($hostbconf || $bconf)->{'preinstall'} || []}) {
   my @presetnames = PBuild::Preset::known_presets($dir);
   if (@presetnames) {
     print("Please specify a distribution or a preset!\n\n");
@@ -151,11 +156,11 @@ if (!@{$bconf->{'preinstall'} || []}) {
   PBuild::Options::usage(1);
 }
 
-
 # default to repo/registry from config if not set
 push @{$opts->{'repo'}}, 'config:' unless @{$opts->{'repo'} || []};
 push @{$opts->{'registry'}}, 'config:' unless @{$opts->{'registry'} || []};
 push @{$opts->{'assets'}}, 'config:' unless @{$opts->{'assets'} || []};
+push @{$opts->{'hostrepo'}}, 'config:' if $cross && !@{$opts->{'hostrepo'} || []};
 
 # substitute config: with values from config
 for (splice(@{$opts->{'repo'}})) {
@@ -170,6 +175,10 @@ for (splice(@{$opts->{'assets'}})) {
   push @{$opts->{'assets'}}, $_;
   splice(@{$opts->{'assets'}}, -1, 1, reverse(@{$bconf->{'assetsurl'}})) if $_ eq 'config:';
 }
+for (splice(@{$opts->{'hostrepo'}})) {
+  push @{$opts->{'hostrepo'}}, $_;
+  splice(@{$opts->{'hostrepo'}}, -1, 1, reverse(@{$hostbconf->{'repourl'}})) if $_ eq 'config:';
+}
 
 # expand the zypp:// repo
 PBuild::RemoteRepo::expand_zypp_repo($opts) if $opts->{'repo'};
@@ -179,6 +188,7 @@ print "    source directory: $dir\n";
 print "    result directory: $builddir\n";
 print "    build area: $opts->{'root'}\n";
 print "    architecture: $myarch\n";
+print "    host architecture: $hostarch\n" if $cross;
 print "    preset: $preset->{'name'}\n" if $preset;
 if (@{$opts->{'dist'} || []}) {
   print "    build config:\n";
@@ -191,6 +201,10 @@ if (@{$opts->{'repo'} || []}) {
 if (@{$opts->{'assets'} || []}) {
   print "    assets:\n";
   print "      - $_\n" for @{$opts->{'assets'}};
+}
+if ($cross && @{$opts->{'hostrepo'} || []}) {
+  print "    host repositories:\n";
+  print "      - $_\n" for @{$opts->{'hostrepo'}};
 }
 print "searching for packages\n";
 my @pkgs = PBuild::Source::find_packages($dir);
@@ -298,12 +312,18 @@ PBuild::LocalRepo::cleanup_builddir($builddir, \%pkgsrc);
 # setup the repositories and registries
 my $repomgr = PBuild::RepoMgr::create();
 my @repos;
+my @hostrepos;
 print "fetching local repo metadata\n";
 push @repos, $repomgr->addlocalrepo($bconf, $myarch, $builddir, \%pkgsrc);
 
 print "fetching remote repo metadata\n";
 for my $repourl (@{$opts->{'repo'}}) {
   push @repos, $repomgr->addremoterepo($bconf, $myarch, $builddir, $repourl, $buildtype, $opts);
+}
+if ($cross) {
+  for my $repourl (@{$opts->{'hostrepo'}}) {
+    push @hostrepos, $repomgr->addremoterepo($hostbconf, $hostarch, $builddir, $repourl, $buildtype, $opts);
+  }
 }
 
 if (@{$opts->{'registry'} || []} && %containertags) {
@@ -353,7 +373,12 @@ while (1) {
   if (!$ctx) {
     $ctx = PBuild::Checker::create($bconf, $myarch, $buildtype, \%pkgsrc, $builddir, $opts, $repomgr, $assetmgr);
     print "preparing package pool\n" unless $runs;
-    $ctx->prepare(\@repos);
+    if ($cross) {
+      $ctx->{'hostbconf'} = $hostbconf;
+      $ctx->prepare(\@hostrepos, \@repos);
+    } else {
+      $ctx->prepare(\@repos);
+    }
     print "expanding dependencies\n" unless $runs;
     $ctx->pkgexpand(@pkgs);
     print "sorting packages\n" unless $runs;

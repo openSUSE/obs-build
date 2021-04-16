@@ -165,7 +165,7 @@ sub copy_sources {
 # ctx usage: opts hostarch bconf arch repos dep2pkg buildconfig debuginfo
 #
 sub createjob {
-  my ($ctx, $jobname, $nbuilders, $buildroot, $p, $bdeps, $pdeps, $vmdeps, $sysdeps, $nounchanged) = @_;
+  my ($ctx, $jobname, $nbuilders, $buildroot, $p, $bdeps, $pdeps, $vmdeps, $sysdeps, $tdeps, $nounchanged) = @_;
   my $opts = { %{$ctx->{'opts'}} };	# create copy so we can modify
   my $hostarch = $opts->{'hostarch'};
 
@@ -192,6 +192,12 @@ sub createjob {
   my $binlocations = $ctx->{'repomgr'}->getbinarylocations($ctx->dep2bins(@alldeps));
   for my $bin (@alldeps) {
     push @rpmlist, "$bin $binlocations->{$bin}";
+  }
+  if (@{$tdeps || []}) {
+    $binlocations = $ctx->{'repomgr'}->getbinarylocations($ctx->dep2bins_target(@$tdeps));
+    for my $bin (@$tdeps) {
+      push @rpmlist, "target: $bin $binlocations->{$bin}";
+    }
   }
   push @rpmlist, "preinstall: ".join(' ', @$pdeps);
   push @rpmlist, "vminstall: ".join(' ', @$vmdeps);

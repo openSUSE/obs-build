@@ -125,6 +125,17 @@ pkg_install_rpm() {
 	      grep -v "^warning:.*saved as.*rpmorig$"
 }
 
+pkg_targetinstall_rpm() {
+    export ADDITIONAL_PARAMS=
+    if test "$USE_FORCE" = true ; then
+	export ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --force"
+    fi
+    ( cd $BUILD_ROOT && chroot $BUILD_ROOT rpm --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
+		$ADDITIONAL_PARAMS --noscripts --root /.build.target .init_b_cache/$PKG.rpm 2>&1 || \
+	  touch $BUILD_ROOT/exit ) | \
+	      grep -v "^warning:.*saved as.*rpmorig$"
+}
+
 pkg_finalize_rpm() {
     if test -n "${CUMULATED_LIST[*]}" ; then
 	echo "now installing cumulated packages"

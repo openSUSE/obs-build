@@ -660,6 +660,7 @@ else
     PACKAGES_TO_VMINSTALL=
     PACKAGES_TO_INSTALLONLY=
     PACKAGES_TO_NOINSTALL=
+    PACKAGES_TO_TARGETINSTALL=
     PREINSTALL_IMAGE=
     PREINSTALL_IMAGE_SOURCE=
     RUNSCRIPTS_SEEN=
@@ -706,6 +707,10 @@ else
 	    echo "${SRC#*:}" > $BUILD_ROOT/.init_b_cache/rpms/${SRC%%:*}.id
 	    continue
 	fi
+	if test "$PKG" = "target:" ; then
+	    PKG="__target__${SRC%%[ 	]*}"
+	    SRC="${SRC#*[ 	]}"
+	fi
 	if test "$PKG" != "${PKG%:}"; then
 	    echo "Warning: ignoring unsupported tag '$PKG'" >&2
 	    continue
@@ -715,7 +720,11 @@ else
 	    PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $PKG"
 	    continue
 	fi
-	PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $PKG"
+	if test "$PKG" = "${PKG#__target__}" ; then
+	    PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $PKG"
+	else
+	    PACKAGES_TO_TARGETINSTALL="$PACKAGES_TO_TARGETINSTALL $PKG"
+	fi
 	if test "${SRC#/}" = "$SRC" ; then
 	    case "$SRC" in
 		zypp://* | http://* | https://* | ftp://* | ftps://*)
@@ -896,7 +905,7 @@ fi
 
 if test -n "$PREPARE_VM" ; then
     echo "copying packages..."
-    for PKG in $PACKAGES_TO_ALL ; do
+    for PKG in $PACKAGES_TO_ALL $PACKAGES_TO_TARGETINSTALL ; do
 	rm -rf $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
 	cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
 	ln -s -f ../$PKG.$PSUF $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF
@@ -914,6 +923,7 @@ if test -n "$PREPARE_VM" ; then
     # needed for continuation in xen/kvm with rpm-x86
     echo "PACKAGES_TO_PREINSTALL='${PACKAGES_TO_PREINSTALL//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
     echo "PACKAGES_TO_AVAILABLE='${PACKAGES_TO_AVAILABLE//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
+    echo "PACKAGES_TO_TARGETINSTALL='${PACKAGES_TO_TARGETINSTALL//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
     echo "PSUF='$PSUF'" >> $BUILD_ROOT/.build/init_buildsystem.data
     rm -f $BUILD_IS_RUNNING
     cleanup_and_exit 0
@@ -1088,6 +1098,29 @@ for PKG in $MAIN_LIST ; do
     echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
     test -n "$PKG_HDRMD5" && echo "$PKG_HDRMD5 $PKGID" > $BUILD_ROOT/.preinstall_image/$PKG
 
+done
+
+rm -rf "$BUILD_ROOT/.build.target"
+MAIN_LIST="$PACKAGES_TO_TARGETINSTALL"
+progress_setup MAIN_LIST
+for PKG in $MAIN_LIST ; do
+    progress_step MAIN_LIST
+    test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF || continue
+
+    if test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF.buildid" ; then
+	read PKGID < "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF.buildid"
+    else
+	PKGID=$(perl -I$BUILD_DIR -MBuild -e Build::showquery "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" buildid)
+    fi
+    echo "installing ${PKGID%% *}"
+    if ! test "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" -ef "$BUILD_ROOT/.init_b_cache/$PKG.$PSUF" ; then
+	rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
+	cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
+    fi
+    pkg_targetinstall
+    check_exit
+    rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
+    echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
 done
 
 # do post-installation work

@@ -40,12 +40,12 @@ sub create {
 sub addremoterepo {
   my ($repos, $bconf, $myarch, $builddir, $repourl, $buildtype, $opts) = @_;
   return addemptyrepo($repos) if $repourl =~ /^empty:/;
-  my $id = Digest::MD5::md5_hex($repourl);
+  my $id = Digest::MD5::md5_hex("$myarch/$repourl");
   return $repos->{$id} if $repos->{$id};
   my $repodir = "$builddir/.pbuild/_base/$id";
   my $bins = PBuild::RemoteRepo::fetchrepo($bconf, $myarch, $repodir, $repourl, $buildtype, $opts);
   $_->{'repoid'} = $id for @$bins;
-  my $repo = { 'dir' => $repodir, 'bins' => $bins, 'url' => $repourl, 'type' => 'repo', 'repoid' => $id };
+  my $repo = { 'dir' => $repodir, 'bins' => $bins, 'url' => $repourl, 'arch' => $myarch, 'type' => 'repo', 'repoid' => $id };
   $repos->{$id} = $repo;
   return $repo;
 }
@@ -57,12 +57,12 @@ sub addremoteregistry {
   my ($repos, $bconf, $myarch, $builddir, $registry, $tags) = @_;
   my $repourl = $registry;
   $repourl = "https://$repourl" unless $repourl =~ /^[^\/]+\/\//;
-  my $id = Digest::MD5::md5_hex($repourl);
+  my $id = Digest::MD5::md5_hex("$myarch/$repourl");
   return $repos->{$id} if $repos->{$id};
   my $repodir = "$builddir/.pbuild/_base/$id";
   my $bins = PBuild::RemoteRegistry::fetchrepo($bconf, $myarch, $repodir, $repourl, $tags);
   $_->{'repoid'} = $id for @$bins;
-  my $repo = { 'dir' => $repodir, 'bins' => $bins, 'url' => $repourl, 'type' => 'registry', 'repoid' => $id };
+  my $repo = { 'dir' => $repodir, 'bins' => $bins, 'url' => $repourl, 'arch' => $myarch, 'type' => 'registry', 'repoid' => $id };
   $repos->{$id} = $repo;
   return $repo;
 }
@@ -72,11 +72,11 @@ sub addremoteregistry {
 #
 sub addlocalrepo {
   my ($repos, $bconf, $myarch, $builddir, $pkgsrc) = @_;
-  my $id = 'local';
+  my $id = "$myarch/local";
   die("local repo already added\n") if $repos->{$id};
   my $bins = PBuild::LocalRepo::fetchrepo($bconf, $myarch, $builddir, $pkgsrc);
   $_->{'repoid'} = $id for @$bins;
-  my $repo = { 'dir' => $builddir, 'bins' => $bins, 'type' => 'local', 'repoid' => $id };
+  my $repo = { 'dir' => $builddir, 'bins' => $bins, 'arch' => $myarch, 'type' => 'local', 'repoid' => $id };
   $repos->{$id} = $repo;
   return $repo;
 }
@@ -98,7 +98,7 @@ sub addemptyrepo {
 #
 sub updatelocalrepo {
   my ($repos, $bconf, $myarch, $builddir, $pkgsrc) = @_;
-  my $id = 'local';
+  my $id = "$myarch/local";
   my $repo = $repos->{$id};
   die("local repo does not exist\n") unless $repo;
   my $bins = PBuild::LocalRepo::fetchrepo($bconf, $myarch, $builddir, $pkgsrc);

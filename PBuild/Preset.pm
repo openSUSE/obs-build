@@ -30,11 +30,13 @@ my $dtd_pbuild = [
      [[ 'preset' =>
 	    'name',
  	    'default',
+	    'arch',
 	  [ 'config' ],
 	  [ 'repo' ],
 	  [ 'registry' ],
 	  [ 'assets' ],
 	    'obs',
+	  [ 'hostrepo' ],
      ]],
 ];
 
@@ -87,12 +89,14 @@ sub list_presets {
 # get reponame/dist/repo/registry options from preset
 sub apply_preset {
   my ($opts, $preset) = @_;
+  $opts->{'arch'} = $preset->{'arch'} if $preset->{'arch'} && !$opts->{'arch'};
   $opts->{'reponame'} = $preset->{'name'} if $preset->{'name'} && !$opts->{'reponame'};
   push @{$opts->{'dist'}}, @{$preset->{'config'}} if $preset->{'config'} && !$opts->{'dist'};
   push @{$opts->{'repo'}}, @{$preset->{'repo'}} if $preset->{'repo'} && !$opts->{'repo'};
   push @{$opts->{'registry'}}, @{$preset->{'registry'}} if $preset->{'registry'} && !$opts->{'registry'};
   push @{$opts->{'assets'}}, @{$preset->{'assets'}} if $preset->{'assets'} && !$opts->{'assets'};
   $opts->{'obs'} = $preset->{'obs'} if $preset->{'obs'} && !$opts->{'obs'};
+  push @{$opts->{'hostrepo'}}, @{$preset->{'hostrepo'}} if $preset->{'hostrepo'} && !$opts->{'hostrepo'};
 }
 
 1;

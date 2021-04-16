@@ -63,8 +63,9 @@ sub create {
 # Configure the repositories used for package building
 #
 sub prepare {
-  my ($ctx, $repos) = @_;
-  my $dep2pkg = PBuild::Expand::configure_repos($ctx->{'bconf'}, $repos);
+  my ($ctx, $repos, $targetrepos) = @_;
+  my $bconf = $ctx->{'hostbconf'} || $ctx->{'bconf'};
+  my $dep2pkg = PBuild::Expand::configure_repos($bconf, $repos);
   my %dep2src;
   my %subpacks;
   for my $n (sort keys %$dep2pkg) {
@@ -78,6 +79,7 @@ sub prepare {
   $ctx->{'dep2pkg'} = $dep2pkg;
   $ctx->{'subpacks'} = \%subpacks;
   PBuild::Meta::setgenmetaalgo($ctx->{'genmetaalgo'});
+  $ctx->{'dep2pkg_target'} = PBuild::Expand::configure_repos($ctx->{'bconf'}, $targetrepos) if $targetrepos;
 }
 
 #
@@ -85,7 +87,7 @@ sub prepare {
 #
 sub pkgexpand {
   my ($ctx, @pkgs) = @_;
-  my $bconf = $ctx->{'bconf'};
+  my $bconf = $ctx->{'hostbconf'} || $ctx->{'bconf'};
   if ($bconf->{'expandflags:preinstallexpand'}) {
     my $err = Build::expandpreinstalls($bconf);
     die("cannot expand preinstalls: $err\n") if $err;
@@ -535,6 +537,25 @@ sub dep2bins {
   return \@deps;
 }
 
+sub dep2bins_target {
+  my ($ctx, @deps) = @_;
+  my $dep2pkg = $ctx->{'dep2pkg_target'};
+  for (@deps) {
+    my $q = $dep2pkg->{$_};
+    die("unknown binary $_\n") unless $q;
+    $_ = $q;
+  }
+  return \@deps;
+}
+
+sub get_targetbuild {
+  local $_[0]->{'support'} = [];
+  local $_[0]->{'required'} = [];
+  local $_[0]->{'preinstall'} = [];
+  local $_[0]->{'vminstall'} = [];
+  return Build::get_build(@_);
+}
+
 #
 # Start the build of a package
 #
@@ -546,7 +567,7 @@ sub build {
   my $nounchanged = 1 if $packid && $ctx->{'cychash'}->{$packid};
   my @btdeps;
   my $edeps = $p->{'dep_expanded'} || [];
-  my $bconf = $ctx->{'bconf'};
+  my $bconf = $ctx->{'hostbconf'} || $ctx->{'bconf'};
   my $buildtype = $p->{'buildtype'};
   $buildtype = 'kiwi-image' if $buildtype eq 'kiwi';
   my $kiwimode;
@@ -605,14 +626,22 @@ sub build {
     my $missing = join(', ', sort(BSUtil::unify(@missing)));
     return ('unresolvable', "missing pre/vminstalls: $missing");
   }
+  my $tdeps;
+  if ($ctx->{'hostbconf'}) {
+    $tdeps = [ get_targetbuild($ctx->{'bconf'}, [], @{$p->{'dep'} || []}) ];
+    if (!shift(@$tdeps)) {
+      return ('unresolvable', join(', ', @$tdeps));
+    }
+  }
   my $oldsrcmd5 = $p->{'srcmd5'};
   $ctx->{'assetmgr'}->getremoteassets($p);
   return ('recheck', 'assets changed') if $p->{'srcmd5'} ne $oldsrcmd5;
   return ('broken', $p->{'error'}) if $p->{'error'};	# missing assets
   my $bins = dep2bins($ctx, PBuild::Util::unify(@pdeps, @vmdeps, @sysdeps, @bdeps));
+  push @$bins, @{dep2bins_target($ctx, PBuild::Util::unify(@$tdeps))} if $tdeps;
   $ctx->{'repomgr'}->getremotebinaries($bins);
   my $readytime = time();
-  my $job = PBuild::Job::createjob($ctx, $builder->{'name'}, $builder->{'nbuilders'}, $builder->{'root'}, $p, \@bdeps, \@pdeps, \@vmdeps, \@sysdeps, $nounchanged);
+  my $job = PBuild::Job::createjob($ctx, $builder->{'name'}, $builder->{'nbuilders'}, $builder->{'root'}, $p, \@bdeps, \@pdeps, \@vmdeps, \@sysdeps, $tdeps, $nounchanged);
   $job->{'readytime'} = $readytime;
   $job->{'reason'} = $reason;
   $job->{'hostarch'} = $ctx->{'hostarch'};
