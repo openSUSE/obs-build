@@ -95,7 +95,12 @@ sub pkgexpand {
   my $pkgsrc = $ctx->{'pkgsrc'};
   my $subpacks = $ctx->{'subpacks'};
   for my $pkg (@pkgs) {
-    PBuild::Expand::expand_deps($pkgsrc->{$pkg}, $bconf, $subpacks);
+    my $buildtype = $pkg->{'buildtype'};
+    if ($ctx->{'hostbconf'} && ($buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'fissile')) {
+      PBuild::Expand::expand_deps($pkgsrc->{$pkg}, $ctx->{'bconf'}, $subpacks);
+    } else {
+      PBuild::Expand::expand_deps($pkgsrc->{$pkg}, $bconf, $subpacks);
+    }
   }
 }
 
@@ -627,7 +632,7 @@ sub build {
     return ('unresolvable', "missing pre/vminstalls: $missing");
   }
   my $tdeps;
-  if ($ctx->{'hostbconf'}) {
+  if (!$kiwimode && $ctx->{'hostbconf'}) {
     $tdeps = [ get_targetbuild($ctx->{'bconf'}, [], @{$p->{'dep'} || []}) ];
     if (!shift(@$tdeps)) {
       return ('unresolvable', join(', ', @$tdeps));
@@ -637,8 +642,14 @@ sub build {
   $ctx->{'assetmgr'}->getremoteassets($p);
   return ('recheck', 'assets changed') if $p->{'srcmd5'} ne $oldsrcmd5;
   return ('broken', $p->{'error'}) if $p->{'error'};	# missing assets
-  my $bins = dep2bins($ctx, PBuild::Util::unify(@pdeps, @vmdeps, @sysdeps, @bdeps));
-  push @$bins, @{dep2bins_target($ctx, PBuild::Util::unify(@$tdeps))} if $tdeps;
+  my $bins;
+  if ($kiwimode && $ctx->{'hostbconf'}) {
+    $bins = dep2bins($ctx, PBuild::Util::unify(@pdeps, @vmdeps, @sysdeps));
+    push @$bins, @{dep2bins_target($ctx, PBuild::Util::unify(@bdeps))};
+  } else {
+    $bins = dep2bins($ctx, PBuild::Util::unify(@pdeps, @vmdeps, @sysdeps, @bdeps));
+    push @$bins, @{dep2bins_target($ctx, PBuild::Util::unify(@$tdeps))} if $tdeps;
+  }
   $ctx->{'repomgr'}->getremotebinaries($bins);
   my $readytime = time();
   my $job = PBuild::Job::createjob($ctx, $builder->{'name'}, $builder->{'nbuilders'}, $builder->{'root'}, $p, \@bdeps, \@pdeps, \@vmdeps, \@sysdeps, $tdeps, $nounchanged);

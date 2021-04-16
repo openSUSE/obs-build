@@ -183,7 +183,8 @@ sub createjob {
   my %sysdeps = map {$_ => 1} @$sysdeps;
 
   my @alldeps;
-  if ($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker') {
+  my $kiwimode = $p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker' || $p->{'buildtype'} eq 'fissile' ? $p->{'buildtype'} : undef;
+  if ($kiwimode) {
     @alldeps = PBuild::Util::unify(@$pdeps, @$vmdeps, @$sysdeps);
   } else {
     @alldeps = PBuild::Util::unify(@$pdeps, @$vmdeps, @$bdeps, @$sysdeps);
@@ -202,7 +203,7 @@ sub createjob {
   push @rpmlist, "preinstall: ".join(' ', @$pdeps);
   push @rpmlist, "vminstall: ".join(' ', @$vmdeps);
   push @rpmlist, "runscripts: ".join(' ', grep {$runscripts{$_}} (@$pdeps, @$vmdeps));
-  if (@$sysdeps && $p->{'buildtype'} ne 'kiwi' && $p->{'buildtype'} ne 'docker') {
+  if (@$sysdeps && !$kiwimode) {
     push @rpmlist, "noinstall: ".join(' ', grep {!($sysdeps{$_} || $vmdeps{$_} || $pdeps{$_})} @$bdeps);
     push @rpmlist, "installonly: ".join(' ', grep {!$bdeps{$_}} @$sysdeps);
   }
@@ -231,7 +232,7 @@ sub createjob {
   my $srcdir = $p->{'dir'};
   # for kiwi/docker we need to copy the sources to $buildroot/.build-srcdir
   # so that we can set up the "repos" and "containers" directories
-  if ($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker' || $p->{'asset_files'}) {
+  if ($kiwimode || $p->{'asset_files'}) {
     $srcdir = "$buildroot/.build-srcdir";
     copy_sources($p, $srcdir);
     $ctx->{'assetmgr'}->copy_assets($p, $srcdir) if $p->{'asset_files'};
@@ -291,9 +292,13 @@ sub createjob {
   push @args, "--obspackage=".($p->{'originpackage'} || $p->{'pkg'}) if $needobspackage;
   push @args, "$srcdir/$p->{'recipe'}";
 
-  if ($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker') {
+  if ($kiwimode) {
     # now setup the repos/containers directories
-    $ctx->{'repomgr'}->copyimagebinaries($ctx->dep2bins(@$bdeps), $srcdir);
+    if ($ctx->{'hostbconf'}) {
+      $ctx->{'repomgr'}->copyimagebinaries($ctx->dep2bins_target(@$bdeps), $srcdir);
+    } else {
+      $ctx->{'repomgr'}->copyimagebinaries($ctx->dep2bins(@$bdeps), $srcdir);
+    }
     # tell kiwi how to use them
     if ($p->{'buildtype'} eq 'kiwi') {
       my @kiwiargs;

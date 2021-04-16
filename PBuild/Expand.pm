@@ -87,7 +87,7 @@ sub expand_deps {
   delete $p->{'dep_experror'};
   return unless $p->{'name'};
   my @deps = @{$p->{'dep'} || []};
-  if ($buildtype eq 'kiwi' || $buildtype eq 'docker') {
+  if ($buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'fissile') {
     if ($p->{'error'}) {
       $p->{'dep_expanded'} = [];
       return;
