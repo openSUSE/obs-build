@@ -95,7 +95,7 @@ sub pkgexpand {
   my $pkgsrc = $ctx->{'pkgsrc'};
   my $subpacks = $ctx->{'subpacks'};
   for my $pkg (@pkgs) {
-    my $buildtype = $pkg->{'buildtype'};
+    my $buildtype = $pkgsrc->{$pkg}->{'buildtype'};
     if ($ctx->{'hostbconf'} && ($buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'fissile')) {
       PBuild::Expand::expand_deps($pkgsrc->{$pkg}, $ctx->{'bconf'}, $subpacks);
     } else {
