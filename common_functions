@@ -90,20 +90,27 @@ check_exit() {
     fi
 }
 
-check_use_emulator() {
-    INITVM_NAME=
-    # check if the extended host arch contains the build arch
+check_native_arch() {
+    local arch="$1"
     local old_build_arch="$BUILD_ARCH"
-    local arch="${BUILD_ARCH%%:*}"
     BUILD_ARCH="$BUILD_HOST_ARCH"
     extend_build_arch
     BUILD_ARCH=":$BUILD_ARCH:"
     if test "$BUILD_ARCH" != "${BUILD_ARCH/:$arch:/}" ; then
-	# native supported arch, no emulator
 	BUILD_ARCH="$old_build_arch"
-	return 1
+	return 0
     fi
     BUILD_ARCH="$old_build_arch"
+    return 1
+}
+
+check_use_emulator() {
+    INITVM_NAME=
+    # check if the extended host arch contains the build arch
+    if check_native_arch "${BUILD_ARCH%%:*}" ; then
+	# native supported arch, no emulator needed
+	return 1
+    fi
 
     # to run the qemu initialization in the vm, we need to
     # register it with a static program or shell script

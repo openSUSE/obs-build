@@ -329,6 +329,11 @@ recipe_setup_kiwi() {
     # extract macros from configuration
     # some post scripts might call rpm-build and rely on the macros
     queryconfig rawmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" > $BUILD_ROOT/root/.rpmmacros
+
+    if test -z "$ABUILD_TARGET"; then
+        ABUILD_TARGET=$(queryconfig target --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" )
+        test -z "$ABUILD_TARGET" || echo "build target is $ABUILD_TARGET"
+    fi  
 }
 
 recipe_prepare_kiwi() {
@@ -457,6 +462,12 @@ perform_image_build() {
 	build_call="cd $TOPDIR/SOURCES && rm -rf $TOPDIR/KIWI-$imgtype"
 	build_call="$build_call && LANG=en_US.UTF-8 $kiwi_path --debug $KIWI_MAIN_PARAMETERS"
 	test -n "$profile" && build_call="$build_call --profile $profile"
+	if test -n "$ABUILD_TARGET" ; then
+	    local target="${ABUILD_TARGET%%-*}"
+	    if test -n "$target" && ! check_native_arch "$target" ; then
+		build_call="$build_call --target-arch=$target"
+	    fi
+	fi
 	build_call="$build_call system build --description $TOPDIR/SOURCES --target-dir $TOPDIR/KIWI-$imgtype"
 	build_call="$build_call $KIWI_BUILD_PARAMETERS"
 	echo "$build_call"
