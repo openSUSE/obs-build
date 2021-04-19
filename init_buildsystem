@@ -60,6 +60,7 @@ CREATE_BUILD_BINARIES=
 DLNOSIGNATURE=
 CACHE_DIR=/var/cache/build
 OBSURL=
+BUILD_SYSROOT=/build-sysroot
 test -z "$CONFIG_DIR" && CONFIG_DIR="$BUILD_DIR/configs"
 
 while test -n "$1" ; do
@@ -660,7 +661,7 @@ else
     PACKAGES_TO_VMINSTALL=
     PACKAGES_TO_INSTALLONLY=
     PACKAGES_TO_NOINSTALL=
-    PACKAGES_TO_TARGETINSTALL=
+    PACKAGES_TO_SYSROOTINSTALL=
     PREINSTALL_IMAGE=
     PREINSTALL_IMAGE_SOURCE=
     RUNSCRIPTS_SEEN=
@@ -707,8 +708,8 @@ else
 	    echo "${SRC#*:}" > $BUILD_ROOT/.init_b_cache/rpms/${SRC%%:*}.id
 	    continue
 	fi
-	if test "$PKG" = "target:" ; then
-	    PKG="__target__${SRC%%[ 	]*}"
+	if test "$PKG" = "sysroot:" ; then
+	    PKG="__sysroot__${SRC%%[ 	]*}"
 	    SRC="${SRC#*[ 	]}"
 	fi
 	if test "$PKG" != "${PKG%:}"; then
@@ -720,10 +721,10 @@ else
 	    PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $PKG"
 	    continue
 	fi
-	if test "$PKG" = "${PKG#__target__}" ; then
+	if test "$PKG" = "${PKG#__sysroot__}" ; then
 	    PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $PKG"
 	else
-	    PACKAGES_TO_TARGETINSTALL="$PACKAGES_TO_TARGETINSTALL $PKG"
+	    PACKAGES_TO_SYSROOTINSTALL="$PACKAGES_TO_SYSROOTINSTALL $PKG"
 	fi
 	if test "${SRC#/}" = "$SRC" ; then
 	    case "$SRC" in
@@ -905,7 +906,7 @@ fi
 
 if test -n "$PREPARE_VM" ; then
     echo "copying packages..."
-    for PKG in $PACKAGES_TO_ALL $PACKAGES_TO_TARGETINSTALL ; do
+    for PKG in $PACKAGES_TO_ALL $PACKAGES_TO_SYSROOTINSTALL ; do
 	rm -rf $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
 	cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
 	ln -s -f ../$PKG.$PSUF $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF
@@ -923,7 +924,7 @@ if test -n "$PREPARE_VM" ; then
     # needed for continuation in xen/kvm with rpm-x86
     echo "PACKAGES_TO_PREINSTALL='${PACKAGES_TO_PREINSTALL//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
     echo "PACKAGES_TO_AVAILABLE='${PACKAGES_TO_AVAILABLE//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
-    echo "PACKAGES_TO_TARGETINSTALL='${PACKAGES_TO_TARGETINSTALL//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
+    echo "PACKAGES_TO_SYSROOTINSTALL='${PACKAGES_TO_SYSROOTINSTALL//"'"/$Q}'" >> $BUILD_ROOT/.build/init_buildsystem.data
     echo "PSUF='$PSUF'" >> $BUILD_ROOT/.build/init_buildsystem.data
     rm -f $BUILD_IS_RUNNING
     cleanup_and_exit 0
@@ -1100,8 +1101,8 @@ for PKG in $MAIN_LIST ; do
 
 done
 
-rm -rf "$BUILD_ROOT/.build.target"
-MAIN_LIST="$PACKAGES_TO_TARGETINSTALL"
+rm -rf "$BUILD_ROOT/$BUILD_SYSROOT"
+MAIN_LIST="$PACKAGES_TO_SYSROOTINSTALL"
 progress_setup MAIN_LIST
 for PKG in $MAIN_LIST ; do
     progress_step MAIN_LIST
@@ -1117,7 +1118,7 @@ for PKG in $MAIN_LIST ; do
 	rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
 	cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
     fi
-    pkg_targetinstall
+    pkg_sysrootinstall
     check_exit
     rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
     echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG

@@ -125,13 +125,17 @@ pkg_install_rpm() {
 	      grep -v "^warning:.*saved as.*rpmorig$"
 }
 
-pkg_targetinstall_rpm() {
+pkg_sysrootinstall_rpm() {
     export ADDITIONAL_PARAMS=
+    if ! test -d "$BUILD_ROOT$BUILD_SYSROOT" ; then
+	chroot $BUILD_ROOT mkdir -p "$BUILD_SYSROOT"
+	chroot $BUILD_ROOT rpm  --root "$BUILD_SYSROOT" --initdb
+    fi
     if test "$USE_FORCE" = true ; then
 	export ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --force"
     fi
     ( cd $BUILD_ROOT && chroot $BUILD_ROOT rpm --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
-		$ADDITIONAL_PARAMS --noscripts --root /.build.target .init_b_cache/$PKG.rpm 2>&1 || \
+		$ADDITIONAL_PARAMS --noscripts --root "$BUILD_SYSROOT" .init_b_cache/$PKG.rpm 2>&1 || \
 	  touch $BUILD_ROOT/exit ) | \
 	      grep -v "^warning:.*saved as.*rpmorig$"
 }

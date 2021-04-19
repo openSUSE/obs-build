@@ -37,8 +37,8 @@ pkg_install() {
     pkg_install_$PSUF "$@"
 }
 
-pkg_targetinstall() {
-    pkg_targetinstall_$PSUF "$@"
+pkg_sysrootinstall() {
+    pkg_sysrootinstall_$PSUF "$@"
 }
 
 pkg_verify_installed() {

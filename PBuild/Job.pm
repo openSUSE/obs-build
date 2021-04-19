@@ -197,7 +197,7 @@ sub createjob {
   if (@{$tdeps || []}) {
     $binlocations = $ctx->{'repomgr'}->getbinarylocations($ctx->dep2bins_target(@$tdeps));
     for my $bin (@$tdeps) {
-      push @rpmlist, "target: $bin $binlocations->{$bin}";
+      push @rpmlist, "sysroot: $bin $binlocations->{$bin}";
     }
   }
   push @rpmlist, "preinstall: ".join(' ', @$pdeps);

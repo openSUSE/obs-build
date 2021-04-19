@@ -553,7 +553,7 @@ sub dep2bins_target {
   return \@deps;
 }
 
-sub get_targetbuild {
+sub get_sysrootbuild {
   local $_[0]->{'support'} = [];
   local $_[0]->{'required'} = [];
   local $_[0]->{'preinstall'} = [];
@@ -621,7 +621,7 @@ sub build {
     return ('unresolvable', join(', ', @bdeps));
   }
   if (@sysdeps && !shift(@sysdeps)) {
-    return ('unresolvable', join(', ', @sysdeps));
+    return ('unresolvable', 'sysdeps:' . join(', ', @sysdeps));
   }
   my $dep2pkg = $ctx->{'dep2pkg'};
   my @pdeps = Build::get_preinstalls($bconf);
@@ -633,9 +633,9 @@ sub build {
   }
   my $tdeps;
   if (!$kiwimode && $ctx->{'hostbconf'}) {
-    $tdeps = [ get_targetbuild($ctx->{'bconf'}, [], @{$p->{'dep'} || []}) ];
+    $tdeps = [ get_sysrootbuild($ctx->{'bconf'}, $ctx->{'subpacks'}->{$p->{'name'}}, @{$p->{'dep'} || []}) ];
     if (!shift(@$tdeps)) {
-      return ('unresolvable', join(', ', @$tdeps));
+      return ('unresolvable', 'sysroot:' . join(', ', @$tdeps));
     }
   }
   my $oldsrcmd5 = $p->{'srcmd5'};
