@@ -277,6 +277,7 @@ sub createjob {
   }
 
   push @args, '--clean' unless $opts->{'noclean'};
+  push @args, '--skip-bundle';
   push @args, '--changelog';
   #push @args, '--oldpackages', $oldpkgdir if $oldpkgdir && -d $oldpkgdir;
   push @args, '--dist', "$buildroot/.build.config";

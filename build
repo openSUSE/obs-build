@@ -1125,6 +1125,9 @@ while test -n "$1"; do
 	OBSURL=$ARG
 	shift
       ;;
+      -skip-bundle)
+	BUILD_SKIP_BUNDLE=1
+      ;;
       ---noarg)
 	cleanup_and_exit 1 "$ARG does not take an argument"
       ;;

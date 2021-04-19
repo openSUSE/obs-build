@@ -488,8 +488,9 @@ perform_image_build() {
 perform_image_bundle() {
     local imgtype=$1
     local profile=$2
-    local bundle_call
+    test -n "$BUILD_SKIP_BUNDLE" && return 0
 
+    local bundle_call
     local bundle_id="Build$RELEASE"
     test -n "$profile" && bundle_id="${profile}-$bundle_id"
 
