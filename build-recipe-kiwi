@@ -460,15 +460,23 @@ perform_image_build() {
 	local build_call
 	echo "running kiwi system build for $imgtype${profile:+, profile $profile}..."
 	build_call="cd $TOPDIR/SOURCES && rm -rf $TOPDIR/KIWI-$imgtype"
+        # cross prepare needed?
+	if test -n "$ABUILD_TARGET" ; then
+	    local target="${ABUILD_TARGET%%-*}"
+	    if test -n "$target" && ! check_native_arch "$target" ; then
+		build_call="$build_call && LANG=en_US.UTF-8 $kiwi_path system crossprepare --target-arch $target --init /usr/lib/build/initvm.`uname -m` --target-dir $TOPDIR/KIWI-$imgtype"
+	    fi
+	fi
 	build_call="$build_call && LANG=en_US.UTF-8 $kiwi_path --debug $KIWI_MAIN_PARAMETERS"
 	test -n "$profile" && build_call="$build_call --profile $profile"
 	if test -n "$ABUILD_TARGET" ; then
 	    local target="${ABUILD_TARGET%%-*}"
 	    if test -n "$target" && ! check_native_arch "$target" ; then
+                # cross build target
 		build_call="$build_call --target-arch=$target"
 	    fi
 	fi
-	build_call="$build_call system build --description $TOPDIR/SOURCES --target-dir $TOPDIR/KIWI-$imgtype"
+	build_call="$build_call system build --allow-existing-root --description $TOPDIR/SOURCES --target-dir $TOPDIR/KIWI-$imgtype"
 	build_call="$build_call $KIWI_BUILD_PARAMETERS"
 	echo "$build_call"
 	chroot $BUILD_ROOT su -c "$build_call" - root < /dev/null || cleanup_and_exit 1
