@@ -325,7 +325,8 @@ sub fetchrepo {
       }
       undef $bins if join(',', @$modules) ne join(',', @$repomodules);
     }
-    return $bins if $bins && replace_with_local($repodir, $bins);
+# FIXME: this is harmful since remote changes never get taken into account and this may lead to download errors
+#    return $bins if $bins && replace_with_local($repodir, $bins);
   }
   my $tmpdir = "$repodir/.tmp";
   PBuild::Util::cleandir($tmpdir) if -e $tmpdir;
