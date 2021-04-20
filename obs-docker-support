@@ -51,7 +51,7 @@ zypper() {
 	exec /usr/bin/zypper -D $LOCAL_REPOS_D "${globalopts[@]}" "$cmd" "$@"
 	;;
     ar|addrepo)
-	exec /usr/bin/zypper "${globalopts[@]}" "$cmd" -C "$@"
+	exec /usr/bin/zypper "${globalopts[@]}" "$cmd" -C "${@%/*.repo}"
 	;;
     ref|refresh)
 	echo "skipping zypper refresh"
