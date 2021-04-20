@@ -949,6 +949,7 @@ vm_first_stage() {
     echo "BUILD_FLAVOR='$BUILD_FLAVOR'" >> $BUILD_ROOT/.build/build.data
     echo "OBS_PACKAGE='$OBS_PACKAGE'" >> $BUILD_ROOT/.build/build.data
     echo "REMOVE_CCACHE='$REMOVE_CCACHE'" >> $BUILD_ROOT/.build/build.data
+    echo "BUILD_SKIP_BUNDLE='$BUILD_SKIP_BUNDLE'" >> $BUILD_ROOT/.build/build.data
     # fallback time for broken hosts
     rm -rf $BUILD_ROOT/.build/.date
     date '+@%s' > $BUILD_ROOT/.build/.date

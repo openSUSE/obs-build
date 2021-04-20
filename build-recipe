@@ -63,6 +63,9 @@ recipe_parse_options() {
 	KIWI_PARAMETERS="$KIWI_PARAMETERS $ARG"
 	shift
 	;;
+      -skip-bundle)
+	BUILD_SKIP_BUNDLE=1
+      ;;
       -*)
 	return 1
 	;;
