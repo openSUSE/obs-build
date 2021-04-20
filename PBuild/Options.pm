@@ -33,6 +33,9 @@ my %known_options = (
   'no-clean' => 'noclean',
   'nochecks' => 'nochecks',
   'no-checks' => 'nochecks',
+  'singlejob' => 'singlejob',
+  'shell' => 'shell',
+  'shell-after-fail' => 'shell-after-fail',
   'arch' => 'arch:',
   'hostarch' => 'hostarch:',
   'host-arch' => 'hostarch:',
@@ -175,6 +178,12 @@ sub parse_options {
   }
   # default to KVM for builds as non-root user
   $opts{'vm-type'} = 'kvm' if !$opts{'vm-type'} && $< > 0;
+
+  if ($opts{'shell'} || $opts{'shell-after-fail'}) {
+    $opts{'noclean'} = 1;
+    $opts{'singlejob'} = 1;
+    $opts{'buildjobs'} = 1;
+  }
 
   return (\%opts, @back);
 }

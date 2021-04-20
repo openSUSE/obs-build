@@ -33,12 +33,14 @@ use PBuild::RepoMgr;
 # Fork and exec the build tool
 #
 sub forkjob {
-  my ($args) = @_;
+  my ($opts, $args) = @_;
   my $pid = PBuild::Util::xfork();
   return $pid if $pid;
-  open(STDIN, '<', '/dev/null');
-  open(STDOUT, '>', '/dev/null');
-  open(STDERR, '>&STDOUT');
+  unless ($opts->{'singlejob'}) {
+    open(STDIN, '<', '/dev/null');
+    open(STDOUT, '>', '/dev/null');
+    open(STDERR, '>&STDOUT');
+  };
   exec(@$args);
   die("$args->[0]: $!\n");
 }
@@ -75,7 +77,7 @@ sub updatelines {
 # Wait for one or more build jobs to finish
 #
 sub waitjob {
-  my (@jobs) = @_;
+  my ($opts, @jobs) = @_;
   local $| = 1;
   my $oldmsg;
   while (1) {
@@ -99,7 +101,7 @@ sub waitjob {
       return $job;
     }
     $msg .= ' ]';
-    print "\r$msg" if !$oldmsg || $oldmsg ne $msg;
+    print "\r$msg" if !$opts->{'singlejob'} && (!$oldmsg || $oldmsg ne $msg);
     $oldmsg = $msg;
   }
 }
@@ -277,6 +279,8 @@ sub createjob {
   }
 
   push @args, '--clean' unless $opts->{'noclean'};
+  push @args, '--shell' if $opts->{'shell'};
+  push @args, '--shell-after-fail' if $opts->{'shell-after-fail'};
   push @args, '--skip-bundle';
   push @args, '--changelog';
   #push @args, '--oldpackages', $oldpkgdir if $oldpkgdir && -d $oldpkgdir;
@@ -315,7 +319,7 @@ sub createjob {
   unlink("$buildroot/.build.log");
   #print "building $p->{'pkg'}/$p->{'recipe'}\n";
 
-  my $pid = forkjob(\@args);
+  my $pid = forkjob($opts, \@args);
   return { 'name' => $jobname, 'nbuilders' => $nbuilders, 'pid' => $pid, 'buildroot' => $buildroot, 'vm_type' => $vm, 'pdata' => $p, 'logfile' => "$buildroot/.build.log", 'logfile_lines' => 0, 'starttime' => time() };
 }
 

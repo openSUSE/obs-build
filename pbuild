@@ -412,7 +412,7 @@ while (1) {
   last unless @building;
 
   # wait for one job to finish
-  my $job = PBuild::Job::waitjob(@building);
+  my $job = PBuild::Job::waitjob($opts, @building);
   for (@builders) {
     delete $_->{'job'} if $_->{'job'} && $_->{'job'} == $job;
   }
