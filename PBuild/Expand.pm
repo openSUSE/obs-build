@@ -82,7 +82,7 @@ sub configure_repos {
 # expand dependencies of a single package
 #
 sub expand_deps {
-  my ($p, $bconf, $subpacks) = @_;
+  my ($p, $bconf, $subpacks, $cross) = @_;
   my $buildtype = $p->{'buildtype'} || 'unknown';
   delete $p->{'dep_experror'};
   return unless $p->{'name'};
@@ -118,8 +118,13 @@ sub expand_deps {
   if ($p->{'genbuildreqs'}) {
     push @deps, @{$p->{'genbuildreqs'}};
   }
-  my ($ok, @edeps) = Build::get_deps($bconf, $subpacks->{$p->{'name'}}, @deps);
-  if (!$ok) {
+  my @edeps;
+  if ($cross) {
+    @edeps = Build::get_sysroot($bconf, $subpacks->{$p->{'name'}}, @deps);
+  } else {
+    @edeps = Build::get_deps($bconf, $subpacks->{$p->{'name'}}, @deps);
+  }
+  if (!shift @edeps) {
     delete $p->{'dep_expanded'};
     $p->{'dep_experror'} = join(', ', @edeps);
   } else {

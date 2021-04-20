@@ -63,9 +63,8 @@ sub create {
 # Configure the repositories used for package building
 #
 sub prepare {
-  my ($ctx, $repos, $targetrepos) = @_;
-  my $bconf = $ctx->{'hostbconf'} || $ctx->{'bconf'};
-  my $dep2pkg = PBuild::Expand::configure_repos($bconf, $repos);
+  my ($ctx, $repos, $hostrepos) = @_;
+  my $dep2pkg = PBuild::Expand::configure_repos($ctx->{'bconf'}, $repos);
   my %dep2src;
   my %subpacks;
   for my $n (sort keys %$dep2pkg) {
@@ -79,7 +78,7 @@ sub prepare {
   $ctx->{'dep2pkg'} = $dep2pkg;
   $ctx->{'subpacks'} = \%subpacks;
   PBuild::Meta::setgenmetaalgo($ctx->{'genmetaalgo'});
-  $ctx->{'dep2pkg_target'} = PBuild::Expand::configure_repos($ctx->{'bconf'}, $targetrepos) if $targetrepos;
+  $ctx->{'dep2pkg_host'} = PBuild::Expand::configure_repos($ctx->{'bconf_host'}, $hostrepos) if $hostrepos;
 }
 
 #
@@ -87,20 +86,16 @@ sub prepare {
 #
 sub pkgexpand {
   my ($ctx, @pkgs) = @_;
-  my $bconf = $ctx->{'hostbconf'} || $ctx->{'bconf'};
+  my $bconf = $ctx->{'bconf'};
   if ($bconf->{'expandflags:preinstallexpand'}) {
     my $err = Build::expandpreinstalls($bconf);
     die("cannot expand preinstalls: $err\n") if $err;
   }
   my $pkgsrc = $ctx->{'pkgsrc'};
   my $subpacks = $ctx->{'subpacks'};
+  my $cross = $ctx->{'bconf_host'} ? 1 : 0;
   for my $pkg (@pkgs) {
-    my $buildtype = $pkgsrc->{$pkg}->{'buildtype'};
-    if ($ctx->{'hostbconf'} && ($buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'fissile')) {
-      PBuild::Expand::expand_deps($pkgsrc->{$pkg}, $ctx->{'bconf'}, $subpacks);
-    } else {
-      PBuild::Expand::expand_deps($pkgsrc->{$pkg}, $bconf, $subpacks);
-    }
+    PBuild::Expand::expand_deps($pkgsrc->{$pkg}, $bconf, $subpacks, $cross);
   }
 }
 
@@ -264,7 +259,7 @@ sub genmeta_image {
 # Generate the dependency tracking data for a package
 #
 sub genmeta {
-  my ($ctx, $p, $edeps) = @_;
+  my ($ctx, $p, $edeps, $hdeps) = @_;
   my $buildtype = $p->{'buildtype'};
   return genmeta_image($ctx, $p, $edeps) if $buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'preinstallimage';
   my $dep2pkg = $ctx->{'dep2pkg'};
@@ -290,6 +285,15 @@ sub genmeta {
       die("$mf: bad meta\n") unless length($metacache->{$binpackid}) > 34;
     }
     PBuild::Meta::add_meta(\@new_meta, $metacache->{$binpackid}, $bin, $p->{'pkg'});
+  }
+  if ($hdeps) {
+    my $dep2pkg_host = $ctx->{'dep2pkg_host'};
+    my $hostarch = $ctx->{'hostarch'};
+    for my $bin (@$hdeps) {
+      my $q = $dep2pkg_host->{$bin};
+      die("host dep $bin is local\n") if $q->{'packid'};
+      push @new_meta, ($q->{'hdrmd5'} || 'd0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0')."  $hostarch:$bin";
+    }
   }
   @new_meta = PBuild::Meta::gen_meta($ctx->{'subpacks'}->{$p->{'name'}} || [], @new_meta);
   unshift @new_meta, ($p->{'verifymd5'} || $p->{'srcmd5'})."  $p->{'pkg'}";
@@ -374,6 +378,17 @@ sub check {
     splice(@blocked, 10, scalar(@blocked), '...') if @blocked > 10;
     return ('blocked', join(', ', @blocked));
   }
+  # expand host deps
+  my $hdeps;
+  if ($ctx->{'bconf_host'}) {
+    my $subpacks = $ctx->{'subpacks'};
+    $hdeps = [ @{$p->{'dep_host'} || $p->{'dep'} || []} ];
+    @$hdeps = Build::get_deps($ctx->{'bconf_host'}, $subpacks->{$p->{'name'}}, @$hdeps);
+    if (!shift @$hdeps) {
+      return ('unresolvable', join(', ', @$hdeps));
+    }
+  }
+
   my $reason;
   my @meta_s = stat("$dst/_meta");
   # we store the lastcheck data in one string instead of an array
@@ -403,17 +418,17 @@ sub check {
     }
   }
   if (!$mylastcheck) {
-    return ('scheduled', [ { 'explain' => 'new build' } ]);
+    return ('scheduled', [ { 'explain' => 'new build' }, $hdeps ]);
   } elsif (substr($mylastcheck, 0, 32) ne ($p->{'verifymd5'} || $p->{'srcmd5'})) {
-    return ('scheduled', [ { 'explain' => 'source change', 'oldsource' => substr($mylastcheck, 0, 32) } ]);
+    return ('scheduled', [ { 'explain' => 'source change', 'oldsource' => substr($mylastcheck, 0, 32) }, $hdeps ]);
   } elsif ($p->{'force_rebuild'}) {
-    return ('scheduled', [ { 'explain' => 'forced rebuild' } ]);
+    return ('scheduled', [ { 'explain' => 'forced rebuild' }, $hdeps ]);
   } elsif (substr($mylastcheck, 32, 32) eq 'fakefakefakefakefakefakefakefake') {
     my @s = stat("$dst/_meta");
     if (!@s || $s[9] + 14400 > time()) {
       return ('failed')
     }
-    return ('scheduled', [ { 'explain' => 'retrying bad build' } ]);
+    return ('scheduled', [ { 'explain' => 'retrying bad build' }, $hdeps ]);
   } else {
     my $rebuildmethod = $ctx->{'rebuild'} || 'transitive';
     if ($rebuildmethod eq 'local' || $p->{'hasbuildenv'}) {
@@ -429,9 +444,11 @@ sub check {
     my $check = substr($mylastcheck, 32, 32);	# metamd5
 
     my $dep2pkg = $ctx->{'dep2pkg'};
+    my $dep2pkg_host = $ctx->{'dep2pkg_host'};
     $check .= $ctx->{'genmetaalgo'} if $ctx->{'genmetaalgo'};
     $check .= $rebuildmethod;
     $check .= $dep2pkg->{$_}->{'hdrmd5'} || 'd0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0' for sort @$edeps;
+    $check .= $dep2pkg_host->{$_}->{'hdrmd5'} || 'd0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0' for sort @{$hdeps || []};
     $check = Digest::MD5::md5_hex($check);
     if ($check eq substr($mylastcheck, 64, 32)) {
       # print "      - $packid ($buildtype)\n";
@@ -440,7 +457,7 @@ sub check {
     }
     substr($mylastcheck, 64, 32) = $check;	# substitute new hdrmetamd5
     # even more work, generate new meta, check if it changed
-    my $new_meta = genmeta($ctx, $p, $edeps);
+    my $new_meta = genmeta($ctx, $p, $edeps, $hdeps);
     if (Digest::MD5::md5_hex(join("\n", @$new_meta)) eq substr($mylastcheck, 32, 32)) {
       # print "      - $packid ($buildtype)\n";
       # print "        nothing changed (looked harder)\n";
@@ -472,11 +489,11 @@ sub check {
     }
     my @diff = PBuild::Meta::diffsortedmd5(\@meta, $new_meta);
     my $reason = PBuild::Meta::sortedmd5toreason(@diff);
-    return ('scheduled', [ { 'explain' => 'meta change', 'packagechange' => $reason } ] );
+    return ('scheduled', [ { 'explain' => 'meta change', 'packagechange' => $reason }, $hdeps ] );
   }
 relsynccheck:
   if ($ctx->{'relsynctrigger'}->{$packid}) {
-    return ('scheduled', [ { 'explain' => 'rebuild counter sync' } ] );
+    return ('scheduled', [ { 'explain' => 'rebuild counter sync' }, $hdeps ] );
   }
   return ('done');
 }
@@ -542,23 +559,15 @@ sub dep2bins {
   return \@deps;
 }
 
-sub dep2bins_target {
+sub dep2bins_host {
   my ($ctx, @deps) = @_;
-  my $dep2pkg = $ctx->{'dep2pkg_target'};
+  my $dep2pkg = $ctx->{'dep2pkg_host'} || $ctx->{'dep2pkg'};
   for (@deps) {
     my $q = $dep2pkg->{$_};
     die("unknown binary $_\n") unless $q;
     $_ = $q;
   }
   return \@deps;
-}
-
-sub get_sysrootbuild {
-  local $_[0]->{'support'} = [];
-  local $_[0]->{'required'} = [];
-  local $_[0]->{'preinstall'} = [];
-  local $_[0]->{'vminstall'} = [];
-  return Build::get_build(@_);
 }
 
 #
@@ -568,11 +577,12 @@ sub build {
   my ($ctx, $p, $data, $builder) = @_;
   my $packid = $p->{'pkg'};
   my $reason = $data->[0];
+  my $hdeps = $data->[1];
   #print Dumper($reason);
   my $nounchanged = 1 if $packid && $ctx->{'cychash'}->{$packid};
   my @btdeps;
   my $edeps = $p->{'dep_expanded'} || [];
-  my $bconf = $ctx->{'hostbconf'} || $ctx->{'bconf'};
+  my $bconf = $ctx->{'bconf_host'} || $ctx->{'bconf'};
   my $buildtype = $p->{'buildtype'};
   $buildtype = 'kiwi-image' if $buildtype eq 'kiwi';
   my $kiwimode;
@@ -603,7 +613,11 @@ sub build {
   my @bdeps = grep {!/^\// || $bconf->{'fileprovides'}->{$_}} @{$p->{'prereq'} || []};
   unshift @bdeps, '--directdepsend--' if @bdeps;
   unshift @bdeps, @{$genbuildreqs->[1]} if $genbuildreqs;
-  unshift @bdeps, @{$p->{'dep'} || []}, @btdeps;
+  if (!$kiwimode && $ctx->{'bconf_host'}) {
+    unshift @bdeps, @{$p->{'dep_host'} || $p->{'dep'} || []}, @btdeps;
+  } else {
+    unshift @bdeps, @{$p->{'dep'} || []}, @btdeps;
+  }
   push @bdeps, '--ignoreignore--' if @sysdeps || $buildtype eq 'simpleimage';
   if (exists($bconf->{'buildflags:useccache'}) && ($buildtype eq 'arch' || $buildtype eq 'spec' || $buildtype eq 'dsc')) {
     my $opackid = $packid;
@@ -623,7 +637,7 @@ sub build {
   if (@sysdeps && !shift(@sysdeps)) {
     return ('unresolvable', 'sysdeps:' . join(', ', @sysdeps));
   }
-  my $dep2pkg = $ctx->{'dep2pkg'};
+  my $dep2pkg = $ctx->{'dep2pkg_host'} || $ctx->{'dep2pkg'};
   my @pdeps = Build::get_preinstalls($bconf);
   my @vmdeps = Build::get_vminstalls($bconf);
   my @missing = grep {!$dep2pkg->{$_}} (@pdeps, @vmdeps);
@@ -632,8 +646,8 @@ sub build {
     return ('unresolvable', "missing pre/vminstalls: $missing");
   }
   my $tdeps;
-  if (!$kiwimode && $ctx->{'hostbconf'}) {
-    $tdeps = [ get_sysrootbuild($ctx->{'bconf'}, $ctx->{'subpacks'}->{$p->{'name'}}, @{$p->{'dep'} || []}) ];
+  if (!$kiwimode && $ctx->{'bconf_host'}) {
+    $tdeps = [ Build::get_sysroot($ctx->{'bconf'}, $ctx->{'subpacks'}->{$p->{'name'}}, @{$p->{'dep'} || []}) ];
     if (!shift(@$tdeps)) {
       return ('unresolvable', 'sysroot:' . join(', ', @$tdeps));
     }
@@ -643,12 +657,12 @@ sub build {
   return ('recheck', 'assets changed') if $p->{'srcmd5'} ne $oldsrcmd5;
   return ('broken', $p->{'error'}) if $p->{'error'};	# missing assets
   my $bins;
-  if ($kiwimode && $ctx->{'hostbconf'}) {
-    $bins = dep2bins($ctx, PBuild::Util::unify(@pdeps, @vmdeps, @sysdeps));
-    push @$bins, @{dep2bins_target($ctx, PBuild::Util::unify(@bdeps))};
+  if ($kiwimode && $ctx->{'bconf_host'}) {
+    $bins = dep2bins_host($ctx, PBuild::Util::unify(@pdeps, @vmdeps, @sysdeps));
+    push @$bins, @{dep2bins($ctx, PBuild::Util::unify(@bdeps))};
   } else {
-    $bins = dep2bins($ctx, PBuild::Util::unify(@pdeps, @vmdeps, @sysdeps, @bdeps));
-    push @$bins, @{dep2bins_target($ctx, PBuild::Util::unify(@$tdeps))} if $tdeps;
+    $bins = dep2bins_host($ctx, PBuild::Util::unify(@pdeps, @vmdeps, @sysdeps, @bdeps));
+    push @$bins, @{dep2bins($ctx, PBuild::Util::unify(@$tdeps))} if $tdeps;
   }
   $ctx->{'repomgr'}->getremotebinaries($bins);
   my $readytime = time();
@@ -657,7 +671,7 @@ sub build {
   $job->{'reason'} = $reason;
   $job->{'hostarch'} = $ctx->{'hostarch'};
   # calculate meta (again) as remote binaries have been replaced
-  $job->{'meta'} = genmeta($ctx, $p, $edeps);
+  $job->{'meta'} = genmeta($ctx, $p, $edeps, $hdeps);
   $builder->{'job'} = $job;
   return ('building', $job);
 }

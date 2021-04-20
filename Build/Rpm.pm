@@ -475,6 +475,7 @@ sub parse {
   my @subpacks;
   my @packdeps;
   my @prereqs;
+  my @fromhost;
   my $hasnfb;
   my $nfbline;
   my %macros;
@@ -657,7 +658,7 @@ sub parse {
       }
       next;
     }
-    if ($preamble && ($line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires)\s*:\s*(\S.*)$/i)) {
+    if ($preamble && ($line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires|\#\!FromHost)\s*:\s*(\S.*)$/i)) {
       my $what = $1;
       my $deps = $2;
       $ifdeps = 1 if $hasif;
@@ -705,6 +706,10 @@ sub parse {
 
       $replace = 1 if grep {/^-/} @ndeps;
       my $lcwhat = lc($what);
+      if ($lcwhat eq '!#fromhost') {
+	push @fromhost, @ndeps;
+	next;
+      }
       if ($lcwhat ne 'buildrequires' && $lcwhat ne 'buildprereq' && $lcwhat ne '#!buildrequires') {
         if ($conflictdeps && $what =~ /conflict/i) {
 	  push @packdeps, map {"!$_"} @ndeps;
@@ -799,6 +804,7 @@ sub parse {
   $ret->{'badarch'} = $badarch if defined $badarch;
   $ret->{'deps'} = \@packdeps;
   $ret->{'prereqs'} = \@prereqs if @prereqs;
+  $ret->{'fromhost'} = \@fromhost if @fromhost;
   $ret->{'configdependent'} = 1 if $ifdeps;
   return $ret;
 }

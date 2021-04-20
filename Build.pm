@@ -378,6 +378,7 @@ sub read_config {
   $config->{'prefer'} = [];
   $config->{'ignore'} = [];
   $config->{'conflict'} = [];
+  $config->{'fromhost'} = [];
   $config->{'substitute'} = {};
   $config->{'substitute_vers'} = {};
   $config->{'optflags'} = {};
@@ -413,7 +414,7 @@ sub read_config {
       }
       next;
     }
-    if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:' || $l0 eq 'expandflags:' || $l0 eq 'buildflags:' || $l0 eq 'publishflags:' || $l0 eq 'repourl:' || $l0 eq 'registryurl:' || $l0 eq 'assetsurl:') {
+    if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:' || $l0 eq 'expandflags:' || $l0 eq 'buildflags:' || $l0 eq 'publishflags:' || $l0 eq 'repourl:' || $l0 eq 'registryurl:' || $l0 eq 'assetsurl:' || $l0 eq 'fromhost:') {
       my $t = substr($l0, 0, -1);
       for my $l (@l) {
 	if ($l eq '!*') {
@@ -714,6 +715,33 @@ sub get_build {
     push @deps, @{$config->{'preinstall'}}, @extra;
     @deps = grep {!$ndeps{"-$_"}} @deps;
   }
+  @deps = do_subst($config, @deps);
+  @deps = grep {!$ndeps{"-$_"}} @deps;
+  if (@directdepsend) {
+    @directdepsend = do_subst($config, @directdepsend);
+    @directdepsend = grep {!$ndeps{"-$_"}} @directdepsend;
+    unshift @directdepsend, '--directdepsend--' if @directdepsend;
+  }
+  @deps = expand($config, @deps, @ndeps, @directdepsend);
+  return @deps;
+}
+
+# Delivers all packages which get used for the cross building sysroot
+sub get_sysroot {
+  my ($config, $subpacks, @deps) = @_;
+  my @ndeps = grep {/^-/} @deps;
+  my %ndeps = map {$_ => 1} @ndeps;
+  my @directdepsend;
+  if ($ndeps{'--directdepsend--'}) {
+    @directdepsend = @deps;
+    for (splice @deps) {
+      last if $_ eq '--directdepsend--';
+      push @deps, $_;
+    }
+    @directdepsend = grep {!/^-/} splice(@directdepsend, @deps + 1);
+  }
+  unshift @deps, 'sysroot-packages' if $config->{'substitute'}->{'sysroot-packages'};
+  @deps = grep {!$ndeps{$_}} @deps;
   @deps = do_subst($config, @deps);
   @deps = grep {!$ndeps{"-$_"}} @deps;
   if (@directdepsend) {

@@ -142,9 +142,9 @@ $localconfig = "\n%define _repository $reponame\n\n$localconfig" if $reponame &&
 
 my $buildconfig = Build::combine_configs(reverse(@baseconfigs), $localconfig);
 my $bconf = Build::read_config($myarch, [ split("\n", $buildconfig) ]);
-my $hostbconf = $cross ? Build::read_config($hostarch, [ split("\n", $buildconfig) ]) : undef;
+my $bconf_host = $cross ? Build::read_config($hostarch, [ split("\n", $buildconfig) ]) : undef;
 
-if (!@{($hostbconf || $bconf)->{'preinstall'} || []}) {
+if (!@{($bconf_host || $bconf)->{'preinstall'} || []}) {
   my @presetnames = PBuild::Preset::known_presets($dir);
   if (@presetnames) {
     print("Please specify a distribution or a preset!\n\n");
@@ -175,9 +175,11 @@ for (splice(@{$opts->{'assets'}})) {
   push @{$opts->{'assets'}}, $_;
   splice(@{$opts->{'assets'}}, -1, 1, reverse(@{$bconf->{'assetsurl'}})) if $_ eq 'config:';
 }
-for (splice(@{$opts->{'hostrepo'}})) {
-  push @{$opts->{'hostrepo'}}, $_;
-  splice(@{$opts->{'hostrepo'}}, -1, 1, reverse(@{$hostbconf->{'repourl'}})) if $_ eq 'config:';
+if ($cross) {
+  for (splice(@{$opts->{'hostrepo'}})) {
+    push @{$opts->{'hostrepo'}}, $_;
+    splice(@{$opts->{'hostrepo'}}, -1, 1, reverse(@{$bconf_host->{'repourl'}})) if $_ eq 'config:';
+  }
 }
 
 # expand the zypp:// repo
@@ -270,7 +272,7 @@ my $buildtype = $bconf->{'type'} || '';
 $buildtype = 'spec' if !$buildtype || $buildtype eq 'UNDEFINED';
 for my $pkg (@pkgs) {
   my $p = $pkgsrc{$pkg};
-  PBuild::Recipe::parse($bconf, $p, $buildtype, $myarch);
+  PBuild::Recipe::parse($bconf, $p, $buildtype, $myarch, $cross);
   if ($p->{'buildtype'} && ($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker') && !$p->{'error'}) {
     my @containerdeps = grep {/^container:/} @{$p->{'dep'} || []};
     next unless @containerdeps;
@@ -322,7 +324,7 @@ for my $repourl (@{$opts->{'repo'}}) {
 }
 if ($cross) {
   for my $repourl (@{$opts->{'hostrepo'}}) {
-    push @hostrepos, $repomgr->addremoterepo($hostbconf, $hostarch, $builddir, $repourl, $buildtype, $opts);
+    push @hostrepos, $repomgr->addremoterepo($bconf_host, $hostarch, $builddir, $repourl, $buildtype, $opts);
   }
 }
 
@@ -337,6 +339,14 @@ if (@{$opts->{'registry'} || []} && %containertags) {
 if ($opts->{'repoquery'}) {
   PBuild::Repoquery::repoquery($bconf, $myarch, \@repos, $opts);
   exit;
+}
+
+# split deps if cross building
+if ($cross) {
+  for my $pkg (@pkgs) {
+    my $p = $pkgsrc{$pkg};
+    PBuild::Recipe::split_hostdeps($p, $bconf);
+  }
 }
 
 # load lastcheck cache
@@ -372,10 +382,11 @@ while (1) {
   # create and setup checker
   if (!$ctx) {
     $ctx = PBuild::Checker::create($bconf, $myarch, $buildtype, \%pkgsrc, $builddir, $opts, $repomgr, $assetmgr);
+    $ctx->{'hostarch'} = $hostarch;
     print "preparing package pool\n" unless $runs;
     if ($cross) {
-      $ctx->{'hostbconf'} = $hostbconf;
-      $ctx->prepare(\@hostrepos, \@repos);
+      $ctx->{'bconf_host'} = $bconf_host;
+      $ctx->prepare(\@repos, \@hostrepos);
     } else {
       $ctx->prepare(\@repos);
     }

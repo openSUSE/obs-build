@@ -70,7 +70,7 @@ sub find_recipe {
 # Find and parse a recipe file
 #
 sub parse {
-  my ($bconf, $p, $buildtype, $arch) = @_;
+  my ($bconf, $p, $buildtype, $arch, $cross) = @_;
   if ($p->{'pkg'} eq '_product') {
     $p->{'error'} = 'excluded';
     return;
@@ -103,6 +103,7 @@ sub parse {
   $p->{'version'} = $version;
   $p->{'name'} = $d->{'name'};
   $p->{'dep'} = $d->{'deps'};
+  $p->{'fromhost'} = $d->{'fromhost'} if $d->{'fromhost'};
   if ($d->{'prereqs'}) {
     my %deps = map {$_ => 1} (@{$d->{'deps'} || []}, @{$d->{'subpacks'} || []});
     my @prereqs = grep {!$deps{$_} && !/^%/} @{$d->{'prereqs'}};
@@ -133,6 +134,26 @@ sub parse {
     $p->{'error'} = 'cannot build kiwi products yet';
     return;
   }
+}
+
+# split host deps from deps if cross building 
+sub split_hostdeps {
+  my ($p, $bconf) = @_;
+  return if $p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker' || $p->{'buildtype'} eq 'fissile';
+  return unless @{$p->{'dep'} || []};
+  my %fromhost = map {$_ => 1} @{$bconf->{'fromhost'} || []};
+  for (@{$p->{'fromhost'} || []}) {
+    if (/^!(.*)/) {
+      delete $fromhost{$1};
+    } else {
+      $fromhost{$_} = 1;
+    }
+  }
+  return unless %fromhost;
+  my @hdep = grep {$fromhost{$_}} @{$p->{'dep'}};
+  return unless @hdep;
+  $p->{'dep_host'} = \@hdep;
+  $p->{'dep'} = [ grep {!$fromhost{$_}} @{$p->{'dep'}}];
 }
 
 1;

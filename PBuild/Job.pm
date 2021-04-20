@@ -190,12 +190,12 @@ sub createjob {
     @alldeps = PBuild::Util::unify(@$pdeps, @$vmdeps, @$bdeps, @$sysdeps);
   }
   my @rpmlist;
-  my $binlocations = $ctx->{'repomgr'}->getbinarylocations($ctx->dep2bins(@alldeps));
+  my $binlocations = $ctx->{'repomgr'}->getbinarylocations($ctx->dep2bins_host(@alldeps));
   for my $bin (@alldeps) {
     push @rpmlist, "$bin $binlocations->{$bin}";
   }
   if (@{$tdeps || []}) {
-    $binlocations = $ctx->{'repomgr'}->getbinarylocations($ctx->dep2bins_target(@$tdeps));
+    $binlocations = $ctx->{'repomgr'}->getbinarylocations($ctx->dep2bins(@$tdeps));
     for my $bin (@$tdeps) {
       push @rpmlist, "sysroot: $bin $binlocations->{$bin}";
     }
@@ -295,11 +295,7 @@ sub createjob {
 
   if ($kiwimode) {
     # now setup the repos/containers directories
-    if ($ctx->{'hostbconf'}) {
-      $ctx->{'repomgr'}->copyimagebinaries($ctx->dep2bins_target(@$bdeps), $srcdir);
-    } else {
-      $ctx->{'repomgr'}->copyimagebinaries($ctx->dep2bins(@$bdeps), $srcdir);
-    }
+    $ctx->{'repomgr'}->copyimagebinaries($ctx->dep2bins(@$bdeps), $srcdir);
     # tell kiwi how to use them
     if ($p->{'buildtype'} eq 'kiwi') {
       my @kiwiargs;
