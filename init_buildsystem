@@ -60,7 +60,7 @@ CREATE_BUILD_BINARIES=
 DLNOSIGNATURE=
 CACHE_DIR=/var/cache/build
 OBSURL=
-BUILD_SYSROOT=/build-sysroot
+BUILD_SYSROOT=
 test -z "$CONFIG_DIR" && CONFIG_DIR="$BUILD_DIR/configs"
 
 while test -n "$1" ; do
@@ -1029,6 +1029,12 @@ mkdir -p "$BUILD_ROOT/installed-pkg"
 
 test -x $BUILD_ROOT/sbin/ldconfig && chroot $BUILD_ROOT /sbin/ldconfig 2>&1
 
+# query sysroot config
+BUILD_SYSROOT=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" eval '%{?_sysroot}'`
+test -z "$BUILD_SYSROOT" && BUILD_SYSROOT=/build-sysroot
+# we must not remove the sysroot after preinstall, some files like the gcc would get removed
+rm -rf "$BUILD_ROOT/$BUILD_SYSROOT"
+
 MAIN_LIST="$PACKAGES_TO_INSTALL"
 progress_setup MAIN_LIST
 for PKG in $MAIN_LIST ; do
@@ -1101,7 +1107,6 @@ for PKG in $MAIN_LIST ; do
 
 done
 
-rm -rf "$BUILD_ROOT/$BUILD_SYSROOT"
 MAIN_LIST="$PACKAGES_TO_SYSROOTINSTALL"
 progress_setup MAIN_LIST
 for PKG in $MAIN_LIST ; do
