@@ -198,6 +198,8 @@ recipe_build_spec() {
 	rpmbopts[${#rpmbopts[@]}]="--nosignature"
     fi
     if test -n "$ABUILD_TARGET" ; then
+        # The sysroot has no rpm db atm
+	rpmbopts[${#rpmbopts[@]}]="--nodeps"
 	rpmbopts[${#rpmbopts[@]}]="--target=$ABUILD_TARGET"
     fi
     if test -n "$BUILD_DEBUG" ; then
