@@ -220,7 +220,7 @@ recipe_gendiff() {
                  fi
              done
          else
-             cleanup_and_exit 1 "obsgendiff enabled but no script installed"
+             cleanup_and_exit 1 "ERROR: obsgendiff enabled but no script installed"
          fi
     fi
 }
