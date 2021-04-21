@@ -55,6 +55,14 @@ pkg_cumulate() {
 
 pkg_finalize() {
     pkg_finalize_$PSUF "$@"
+
+    # fix absolute links to take sysroot into account
+    if test -d "$BUILD_ROOT/$BUILD_SYSROOT"; then
+        chroot "$BUILD_ROOT" find "$BUILD_SYSROOT" -type l -lname '/*' | while read link; do
+            linktarget="$(chroot $BUILD_ROOT readlink "$link")"
+            ln -sf "$BUILD_SYSROOT$linktarget" "$BUILD_ROOT/$link"
+        done
+    fi
 }
 
 pkg_preinstall() {
