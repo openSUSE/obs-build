@@ -706,7 +706,7 @@ sub parse {
 
       $replace = 1 if grep {/^-/} @ndeps;
       my $lcwhat = lc($what);
-      if ($lcwhat eq '!#fromhost') {
+      if ($lcwhat eq '#!fromhost') {
 	push @fromhost, @ndeps;
 	next;
       }
