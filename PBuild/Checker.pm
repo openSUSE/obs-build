@@ -385,7 +385,7 @@ sub check {
     $hdeps = [ @{$p->{'dep_host'} || $p->{'dep'} || []} ];
     @$hdeps = Build::get_deps($ctx->{'bconf_host'}, $subpacks->{$p->{'name'}}, @$hdeps);
     if (!shift @$hdeps) {
-      return ('unresolvable', join(', ', @$hdeps));
+      return ('unresolvable', 'host: '.join(', ', @$hdeps));
     }
   }
 
