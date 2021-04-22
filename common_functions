@@ -188,5 +188,5 @@ assert_dirs() {
 
 assert_dir_path() {
     test "$1" != "${1%/*}" && assert_dir_path "${1%/*}"
-    assert_dir "$1"
+    assert_dirs "$1"
 }
