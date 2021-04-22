@@ -1029,11 +1029,12 @@ mkdir -p "$BUILD_ROOT/installed-pkg"
 
 test -x $BUILD_ROOT/sbin/ldconfig && chroot $BUILD_ROOT /sbin/ldconfig 2>&1
 
-# query sysroot config
-BUILD_SYSROOT=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" eval '%{?_sysroot}'`
-test -z "$BUILD_SYSROOT" && BUILD_SYSROOT=/build-sysroot
-# we must not remove the sysroot after preinstall, some files like the gcc would get removed
-rm -rf "$BUILD_ROOT/$BUILD_SYSROOT"
+if test -n "$PACKAGES_TO_SYSROOTINSTALL" ; then
+    # query sysroot config
+    BUILD_SYSROOT=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" eval '%{?_sysroot}'`
+    test -n "$BUILD_SYSROOT" || BUILD_SYSROOT=/build-sysroot
+    BUILD_SYSROOT="/${BUILD_SYSROOT#/}"
+fi
 
 MAIN_LIST="$PACKAGES_TO_INSTALL"
 progress_setup MAIN_LIST
@@ -1131,6 +1132,7 @@ done
 
 # do post-installation work
 pkg_finalize
+test -n "$BUILD_SYSROOT" && pkg_finalize_sysroot
 
 # devices can vanish if devs got uninstalled
 test -c $BUILD_ROOT/dev/null || create_devs
