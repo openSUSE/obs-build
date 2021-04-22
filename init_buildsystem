@@ -1108,31 +1108,35 @@ for PKG in $MAIN_LIST ; do
 
 done
 
-MAIN_LIST="$PACKAGES_TO_SYSROOTINSTALL"
-progress_setup MAIN_LIST
-for PKG in $MAIN_LIST ; do
-    progress_step MAIN_LIST
-    test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF || continue
+if test -n "$PACKAGES_TO_SYSROOTINSTALL" ; then
+    pkg_sysrootinstall --prepare
+    MAIN_LIST="$PACKAGES_TO_SYSROOTINSTALL"
+    progress_setup MAIN_LIST
+    for PKG in $MAIN_LIST ; do
+	progress_step MAIN_LIST
+	test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF || continue
 
-    if test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF.buildid" ; then
-	read PKGID < "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF.buildid"
-    else
-	PKGID=$(perl -I$BUILD_DIR -MBuild -e Build::showquery "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" buildid)
-    fi
-    echo "installing ${PKGID%% *}"
-    if ! test "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" -ef "$BUILD_ROOT/.init_b_cache/$PKG.$PSUF" ; then
+	if test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF.buildid" ; then
+	    read PKGID < "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF.buildid"
+	else
+	    PKGID=$(perl -I$BUILD_DIR -MBuild -e Build::showquery "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" buildid)
+	fi
+	echo "installing ${PKGID%% *}"
+	if ! test "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" -ef "$BUILD_ROOT/.init_b_cache/$PKG.$PSUF" ; then
+	    rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
+	    cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
+	fi
+	pkg_sysrootinstall
+	check_exit
 	rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
-	cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
-    fi
-    pkg_sysrootinstall
-    check_exit
-    rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
-    echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
-done
+	echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
+    done
+    pkg_sysrootinstall --finalize
+    pkg_finalize_sysroot
+fi
 
 # do post-installation work
 pkg_finalize
-test -n "$BUILD_SYSROOT" && pkg_finalize_sysroot
 
 # devices can vanish if devs got uninstalled
 test -c $BUILD_ROOT/dev/null || create_devs
