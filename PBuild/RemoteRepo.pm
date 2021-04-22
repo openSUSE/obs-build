@@ -76,7 +76,7 @@ sub addpkg {
 }
 
 sub fetchrepo_arch {
-  my ($url, $tmpdir, $arch, $archfilter) = @_;
+  my ($url, $tmpdir, %opts) = @_;
   die("could not determine reponame from url $url\n") unless "/$url/" =~ /.*\/([^\/]+)\/os\//;
   my $reponame = $1;
   $url .= '/' unless $url =~ /\/$/;
@@ -87,9 +87,10 @@ sub fetchrepo_arch {
 }
 
 sub fetchrepo_debian {
-  my ($url, $tmpdir, $arch, $archfilter) = @_;
+  my ($url, $tmpdir, %opts) = @_;
   my ($baseurl, $disturl, $components) = Build::Debrepo::parserepourl($url);
-  my $basearch = Build::Deb::basearch($arch);
+  die("fetchrepo_debian needs an architecture\n") unless $opts{'arch'};
+  my $basearch = Build::Deb::basearch($opts{'arch'});
   my @bins;
   for my $component (@$components) {
     unlink("$tmpdir/Packages.gz");
@@ -116,22 +117,24 @@ sub open_uncompressed {
 }
 
 sub fetchrepo_rpmmd {
-  my ($url, $tmpdir, $arch, $archfilter, $modules, $iszypp, $oldbins, $oldcookie) = @_;
+  my ($url, $tmpdir, %opts) = @_;
   my $baseurl = $url;
   $baseurl .= '/' unless $baseurl =~ /\/$/;
   my @resources;
-  download("${baseurl}repodata/repomd.xml", "$tmpdir/repomd.xml") unless $iszypp;
+  download("${baseurl}repodata/repomd.xml", "$tmpdir/repomd.xml") unless $opts{'iszypp'};
   my $cookie = Digest::MD5::md5_hex(PBuild::Util::readstr("$tmpdir/repomd.xml"));
-  return ($oldbins, $cookie) if ($oldbins && $oldcookie && $cookie eq $oldcookie);
+  my $oldrepo = $opts{'oldrepo'};
+  return $oldrepo if $oldrepo && $oldrepo->{'cookie'} && $cookie eq $oldrepo->{'cookie'};
   Build::Rpmmd::parse_repomd("$tmpdir/repomd.xml", \@resources);
   my @primaryfiles = grep {$_->{'type'} eq 'primary' && defined($_->{'location'})} @resources;
+  my $archfilter = $opts{'archfilter'};
   my @bins;
   for my $f (@primaryfiles) {
     my $u = "$f->{'location'}";
     utf8::downgrade($u);
     next unless $u =~ /(primary\.xml(?:\.gz)?)$/s;
     my $fn = $1;
-    if ($iszypp) {
+    if ($opts{'iszypp'}) {
       $fn = $u;
       $fn =~ s/.*\///s;
       die("zypp repo $url is not up to date, please refresh first\n") unless -s "$tmpdir/$fn";
@@ -150,7 +153,7 @@ sub fetchrepo_rpmmd {
     utf8::downgrade($u);
     next unless $u =~ /(modules\.yaml(?:\.gz)?)$/s;
     my $fn = $1;
-    die("zypp:// repos do not support module data\n") if $iszypp;
+    die("zypp:// repos do not support module data\n") if $opts{'iszypp'};
     die("modules file $u does not have a checksum\n") unless $f->{'checksum'} && $f->{'checksum'} =~ /:(.*)/;
     $fn = "$1-$fn";
     download("${baseurl}/$f->{'location'}", "$tmpdir/$fn", undef, $f->{'checksum'});
@@ -160,16 +163,17 @@ sub fetchrepo_rpmmd {
     push @bins, { 'name' => 'moduleinfo:', 'data' => $moduleinfo };
     last;
   }
-  return (\@bins, $cookie);
+  return { 'bins' => \@bins, 'cookie' => $cookie };
 }
 
 sub fetchrepo_susetags {
-  my ($url, $tmpdir, $arch, $archfilter, $iszypp) = @_;
+  my ($url, $tmpdir, %opts) = @_;
   my $descrdir = 'suse/setup/descr';
   my $datadir = 'suse';
   my $baseurl = $url;
   $baseurl .= '/' unless $baseurl =~ /\/$/;
-  download("${baseurl}$descrdir/packages.gz", "$tmpdir/packages.gz") unless $iszypp;
+  download("${baseurl}$descrdir/packages.gz", "$tmpdir/packages.gz") unless $opts{'iszypp'};
+  my $archfilter = $opts{'archfilter'};
   my @bins;
   Build::Susetags::parse("$tmpdir/packages.gz", sub {
     my $xurl = $baseurl;
@@ -181,7 +185,7 @@ sub fetchrepo_susetags {
 }
 
 sub fetchrepo_zypp {
-  my ($url, $tmpdir, $arch, $archfilter, $modules) = @_;
+  my ($url, $tmpdir, %opts) = @_;
   die("zypp repo must start with zypp://\n") unless $url =~ /^zypp:\/\/([^\/]*)/;
   my $repo = Build::Zypp::parserepo($1);
   my $type = $repo->{'type'};
@@ -193,16 +197,17 @@ sub fetchrepo_zypp {
   die("could not determine repo type for '$repo->{'name'}'\n") unless $type;
   if($type eq 'rpm-md') {
     die("zypp repo $url is not up to date, please refresh first\n") unless -s "$zyppcachedir/repodata/repomd.xml";
-    return fetchrepo_rpmmd("zypp://$repo->{'name'}", "$zyppcachedir/repodata", $arch, $archfilter, $modules, 1);
+    return fetchrepo_rpmmd("zypp://$repo->{'name'}", "$zyppcachedir/repodata", %opts, 'iszypp' => 1);
   } else {
     die("zypp repo $url is not up to date, please refresh first\n") unless -s "$zyppcachedir/suse/setup/descr/packages.gz";
-    return fetchrepo_susetags("zypp://$repo->{'name'}", "$zyppcachedir/suse/setup/descr", $arch, $archfilter, 1);
+    return fetchrepo_susetags("zypp://$repo->{'name'}", "$zyppcachedir/suse/setup/descr", %opts, 'iszypp' => 1);
   }
 }
 
 sub fetchrepo_obs {
-  my ($url, $tmpdir, $arch, $opts, $modules) = @_;
-  my $bins = PBuild::OBS::fetch_repodata($url, $tmpdir, $arch, $opts, $modules);
+  my ($url, $tmpdir, %opts) = @_;
+  my $modules = $opts{'modules'};
+  my $bins = PBuild::OBS::fetch_repodata($url, $tmpdir, $opts{'arch'}, $opts{'opts'}, $modules);
   @$bins = sort {$a->{'name'} cmp $b->{'name'}} @$bins;
   for (@$bins) {
     delete $_->{'filename'};	# just in case
@@ -315,51 +320,48 @@ sub fetchrepo {
     $archfilter->{$_} = 1 for qw{all any noarch};
   }
   my $modules = [ PBuild::Util::unify(sort(@{$bconf->{'modules'} || []})) ];
-  my $bins;
   my $repofile = "$repodir/_metadata";
   my $cookie;
+  my $oldrepo;
   if (-s $repofile) {
-    $bins = PBuild::Util::retrieve($repofile, 1);
-    if (ref($bins) eq 'HASH') {
-      $cookie = $bins->{'cookie'};
-      $bins = $bins->{'bins'};
-    }
-    if ($repotype eq 'obs') {
+    $oldrepo = PBuild::Util::retrieve($repofile, 1);
+    undef $oldrepo unless ref($oldrepo) eq 'HASH' && $oldrepo->{'bins'};
+    if ($oldrepo && $repotype eq 'obs') {
       # obs repo data changes with the modules, so be careful
+      my $oldbins = $oldrepo->{'bins'};
       my $repomodules = [];
-      if (@$bins && $bins->[-1]->{'name'} eq 'moduleinfo:') {
-        $repomodules = $bins->[-1]->{'modules'} || [];
+      if (@$oldbins && $oldbins->[-1]->{'name'} eq 'moduleinfo:') {
+        $repomodules = $oldbins->[-1]->{'modules'} || [];
       }
-      undef $bins if join(',', @$modules) ne join(',', @$repomodules);
+      undef $oldrepo if join(',', @$modules) ne join(',', @$repomodules);
     }
-    undef $bins if $bins && !replace_with_local($repodir, $bins);
+    undef $oldrepo if $oldrepo && !replace_with_local($repodir, $oldrepo->{'bins'});
   }
   my $tmpdir = "$repodir/.tmp";
   PBuild::Util::cleandir($tmpdir) if -e $tmpdir;
   PBuild::Util::mkdir_p($tmpdir);
+  my $repo;
+  my %opts = ( 'arch' => $arch, 'archfilter' => $archfilter, 'modules' => $modules, 'oldrepo' => $oldrepo , 'opts' => $opts);
   if ($repotype eq 'rpmmd' || $repotype eq 'rpm-md') {
-    ($bins, $cookie) = fetchrepo_rpmmd($url, $tmpdir, $arch, $archfilter, $modules, undef, $bins, $cookie);
+    $repo = fetchrepo_rpmmd($url, $tmpdir, %opts);
   } elsif ($repotype eq 'debian') {
-    ($bins, $cookie) = fetchrepo_debian($url, $tmpdir, $arch, $archfilter);
+    $repo = fetchrepo_debian($url, $tmpdir, %opts);
   } elsif ($repotype eq 'arch') {
-    ($bins, $cookie) = fetchrepo_arch($url, $tmpdir, $arch, $archfilter);
+    $repo = fetchrepo_arch($url, $tmpdir, %opts);
   } elsif ($repotype eq 'suse') {
-    ($bins, $cookie) = fetchrepo_susetags($url, $tmpdir, $arch, $archfilter);
+    $repo = fetchrepo_susetags($url, $tmpdir, %opts);
   } elsif ($repotype eq 'zypp') {
-    ($bins, $cookie) = fetchrepo_zypp($url, $tmpdir, $arch, $archfilter, $modules);
+    $repo = fetchrepo_zypp($url, $tmpdir, %opts);
   } elsif ($repotype eq 'obs') {
-    ($bins, $cookie) = fetchrepo_obs($url, $tmpdir, $arch, $opts, $modules);
+    $repo = fetchrepo_obs($url, $tmpdir, %opts);
   } else {
     die("unsupported repotype '$repotype'\n");
   }
-  die unless $bins;
-  replace_with_local($repodir, $bins);
-  if ($cookie) {
-    PBuild::Util::store("$repodir/._metadata.$$", $repofile, { 'bins' => $bins, 'cookie' => $cookie });
-  } else {
-    PBuild::Util::store("$repodir/._metadata.$$", $repofile, $bins);
-  }
-  return $bins;
+  $repo = { 'bins' => $repo } if $repo && ref($repo) ne 'HASH';
+  die unless $repo && $repo->{'bins'};
+  replace_with_local($repodir, $repo->{'bins'}) unless $repo == $oldrepo;
+  PBuild::Util::store("$repodir/._metadata.$$", $repofile, $repo);
+  return $repo->{'bins'};
 }
 
 #
