@@ -131,7 +131,7 @@ pkg_sysrootinstall_rpm() {
 	chroot $BUILD_ROOT mkdir -p "$BUILD_SYSROOT"
 	chroot $BUILD_ROOT rpm  --root "$BUILD_SYSROOT" --initdb
 	local installed=$(chroot $BUILD_ROOT rpm  --root "$BUILD_SYSROOT" -qa)
-	test -n "$installed" && chroot $BUILD_ROOT rpm  --root "$BUILD_SYSROOT" -e --allmatches $installed
+	test -n "$installed" && chroot $BUILD_ROOT rpm  --root "$BUILD_SYSROOT" --nodeps --noscripts -e --allmatches $installed
 	return
     fi
     if test "x$1" = "x--finalize" ; then
