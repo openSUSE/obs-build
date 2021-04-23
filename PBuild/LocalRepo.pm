@@ -147,8 +147,8 @@ sub gbininfo2full {
 # get metadata of build artifacts that are to be used in subsequent builds
 #
 sub fetchrepo {
-  my ($bconf, $arch, $builddir, $pkgsrc) = @_;
-  my @pkgs = sort keys %$pkgsrc;
+  my ($bconf, $arch, $builddir, $pkgsrc, $pkgs) = @_;
+  my @pkgs = sort @{$pkgs || [ sort keys %$pkgsrc ] };
   my $gbininfo = read_gbininfo($builddir, \@pkgs);
   my $filter = PBuild::ExportFilter::calculate_exportfilter($bconf, $arch);
   my %useforbuild = map {$_ => $pkgsrc->{$_}->{'useforbuildenabled'}} @pkgs;

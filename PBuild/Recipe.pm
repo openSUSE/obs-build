@@ -70,7 +70,7 @@ sub find_recipe {
 # Find and parse a recipe file
 #
 sub parse {
-  my ($bconf, $p, $buildtype, $arch, $cross) = @_;
+  my ($bconf, $p, $buildtype, $arch) = @_;
   if ($p->{'pkg'} eq '_product') {
     $p->{'error'} = 'excluded';
     return;
@@ -140,6 +140,7 @@ sub parse {
 sub split_hostdeps {
   my ($p, $bconf) = @_;
   return if $p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker' || $p->{'buildtype'} eq 'fissile';
+  return if $p->{'native'};
   return unless @{$p->{'dep'} || []};
   my %fromhost = map {$_ => 1} @{$bconf->{'fromhost'} || []};
   for (@{$p->{'fromhost'} || []}) {

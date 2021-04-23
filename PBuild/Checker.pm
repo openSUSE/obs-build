@@ -87,15 +87,21 @@ sub prepare {
 sub pkgexpand {
   my ($ctx, @pkgs) = @_;
   my $bconf = $ctx->{'bconf'};
-  if ($bconf->{'expandflags:preinstallexpand'}) {
-    my $err = Build::expandpreinstalls($bconf);
+  my $bconf_host = $ctx->{'bconf_host'};
+  if (($bconf_host || $bconf)->{'expandflags:preinstallexpand'}) {
+    my $err = Build::expandpreinstalls($bconf_host || $bconf);
     die("cannot expand preinstalls: $err\n") if $err;
   }
   my $pkgsrc = $ctx->{'pkgsrc'};
   my $subpacks = $ctx->{'subpacks'};
-  my $cross = $ctx->{'bconf_host'} ? 1 : 0;
+  my $cross = $bconf_host ? 1 : 0;
   for my $pkg (@pkgs) {
-    PBuild::Expand::expand_deps($pkgsrc->{$pkg}, $bconf, $subpacks, $cross);
+    my $p = $pkgsrc->{$pkg};
+    if ($p->{'native'}) {
+      PBuild::Expand::expand_deps($p, $bconf_host, $subpacks);
+    } else {
+      PBuild::Expand::expand_deps($p, $bconf, $subpacks, $cross);
+    }
   }
 }
 
@@ -244,7 +250,7 @@ sub genmeta_image {
     my @vmdeps = Build::get_vminstalls($ctx->{'bconf'});
     $edeps = [ PBuild::Util::unify(@$edeps, @pdeps, @vmdeps) ];
   }
-  my $dep2pkg = $ctx->{'dep2pkg'};
+  my $dep2pkg = $p->{'native'} ? $ctx->{'dep2pkg_host'} : $ctx->{'dep2pkg'};
   my @new_meta;
   for my $bin (@$edeps) {
     my $q = $dep2pkg->{$bin};
@@ -262,7 +268,7 @@ sub genmeta {
   my ($ctx, $p, $edeps, $hdeps) = @_;
   my $buildtype = $p->{'buildtype'};
   return genmeta_image($ctx, $p, $edeps) if $buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'preinstallimage';
-  my $dep2pkg = $ctx->{'dep2pkg'};
+  my $dep2pkg = $p->{'native'} ? $ctx->{'dep2pkg_host'} : $ctx->{'dep2pkg'};
   my $metacache = $ctx->{'metacache'};
   my @new_meta;
   my $builddir = $ctx->{'builddir'};
@@ -291,7 +297,6 @@ sub genmeta {
     my $hostarch = $ctx->{'hostarch'};
     for my $bin (@$hdeps) {
       my $q = $dep2pkg_host->{$bin};
-      die("host dep $bin is local\n") if $q->{'packid'};
       push @new_meta, ($q->{'hdrmd5'} || 'd0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0')."  $hostarch:$bin";
     }
   }
@@ -305,7 +310,6 @@ sub genmeta {
 #
 sub check_image {
   my ($ctx, $p) = @_;
-  my $bconf = $ctx->{'bconf'};
   my $edeps = $p->{'dep_expanded'} || [];
   my $notready = $ctx->{'notready'};
   my $dep2src = $ctx->{'dep2src'};
@@ -380,7 +384,7 @@ sub check {
   }
   # expand host deps
   my $hdeps;
-  if ($ctx->{'bconf_host'}) {
+  if ($ctx->{'bconf_host'} && !$p->{'native'}) {
     my $subpacks = $ctx->{'subpacks'};
     $hdeps = [ @{$p->{'dep_host'} || $p->{'dep'} || []} ];
     @$hdeps = Build::get_deps($ctx->{'bconf_host'}, $subpacks->{$p->{'name'}}, @$hdeps);
@@ -443,7 +447,7 @@ sub check {
     }
     my $check = substr($mylastcheck, 32, 32);	# metamd5
 
-    my $dep2pkg = $ctx->{'dep2pkg'};
+    my $dep2pkg = $p->{'native'} ? $ctx->{'dep2pkg_host'} : $ctx->{'dep2pkg'};
     my $dep2pkg_host = $ctx->{'dep2pkg_host'};
     $check .= $ctx->{'genmetaalgo'} if $ctx->{'genmetaalgo'};
     $check .= $rebuildmethod;
@@ -646,7 +650,7 @@ sub build {
     return ('unresolvable', "missing pre/vminstalls: $missing");
   }
   my $tdeps;
-  if (!$kiwimode && $ctx->{'bconf_host'}) {
+  if (!$kiwimode && !$p->{'native'} && $ctx->{'bconf_host'}) {
     $tdeps = [ Build::get_sysroot($ctx->{'bconf'}, $ctx->{'subpacks'}->{$p->{'name'}}, @{$p->{'dep'} || []}) ];
     if (!shift(@$tdeps)) {
       return ('unresolvable', 'sysroot:' . join(', ', @$tdeps));

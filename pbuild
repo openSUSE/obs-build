@@ -241,6 +241,15 @@ PBuild::Multibuild::expand_multibuilds(\%pkgsrc);
 
 @pkgs = sort keys %pkgsrc;
 
+# split into target/native packages
+my @pkgs_target = @pkgs;
+my @pkgs_native;
+if ($cross) {
+  $pkgsrc{$_}->{'native'} = 1 for grep {/^native-/} @pkgs;
+  @pkgs_target = grep {!$pkgsrc{$_}->{'native'}} @pkgs;
+  @pkgs_native = grep {$pkgsrc{$_}->{'native'}} @pkgs;
+}
+
 # handle onlybuild/excludebuild from the build config
 if (exists $bconf->{'buildflags:excludebuild'}) {
   my %excludebuild;
@@ -272,7 +281,11 @@ my $buildtype = $bconf->{'type'} || '';
 $buildtype = 'spec' if !$buildtype || $buildtype eq 'UNDEFINED';
 for my $pkg (@pkgs) {
   my $p = $pkgsrc{$pkg};
-  PBuild::Recipe::parse($bconf, $p, $buildtype, $myarch, $cross);
+  if ($p->{'native'}) {
+    PBuild::Recipe::parse($bconf_host, $p, $buildtype, $hostarch);
+  } else {
+    PBuild::Recipe::parse($bconf, $p, $buildtype, $myarch);
+  }
   if ($p->{'buildtype'} && ($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker') && !$p->{'error'}) {
     my @containerdeps = grep {/^container:/} @{$p->{'dep'} || []};
     next unless @containerdeps;
@@ -316,7 +329,8 @@ my $repomgr = PBuild::RepoMgr::create();
 my @repos;
 my @hostrepos;
 print "fetching local repo metadata\n";
-push @repos, $repomgr->addlocalrepo($bconf, $myarch, $builddir, \%pkgsrc);
+push @repos, $repomgr->addlocalrepo($bconf, $myarch, $builddir, \%pkgsrc, \@pkgs_target);
+push @hostrepos, $repomgr->addlocalrepo($bconf_host, $hostarch, $builddir, \%pkgsrc, \@pkgs_native) if @pkgs_native;
 
 print "fetching remote repo metadata\n";
 for my $repourl (@{$opts->{'repo'}}) {
@@ -393,7 +407,13 @@ while (1) {
     print "expanding dependencies\n" unless $runs;
     $ctx->pkgexpand(@pkgs);
     print "sorting packages\n" unless $runs;
-    @pkgs = $ctx->pkgsort(@pkgs);
+    if (@pkgs_native) {
+      @pkgs_native = $ctx->pkgsort(@pkgs_native);
+      @pkgs_target = $ctx->pkgsort(@pkgs_target);
+      @pkgs = (@pkgs_native, @pkgs_target);
+    } else {
+      @pkgs = $ctx->pkgsort(@pkgs);
+    }
   }
   $runs++;
   $ctx->{'buildconfig'} = $buildconfig;
@@ -436,7 +456,11 @@ while (1) {
     PBuild::LocalRepo::update_gbininfo($builddir, $p->{'pkg'}, $bininfo);
     if ($p->{'useforbuildenabled'}) {
       # update with new local bin information
-      $repomgr->updatelocalrepo($bconf, $myarch, $builddir, \%pkgsrc);
+      if ($p->{'native'}) {
+        $repomgr->updatelocalrepo($bconf, $hostarch, $builddir, \%pkgsrc, \@pkgs_native);
+      } else {
+        $repomgr->updatelocalrepo($bconf, $myarch, $builddir, \%pkgsrc, \@pkgs_target);
+      }
       # we also need a new checker
       undef $ctx;
     }

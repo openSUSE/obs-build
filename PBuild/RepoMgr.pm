@@ -71,10 +71,10 @@ sub addremoteregistry {
 # Add a local repository to the manager
 #
 sub addlocalrepo {
-  my ($repos, $bconf, $myarch, $builddir, $pkgsrc) = @_;
+  my ($repos, $bconf, $myarch, $builddir, $pkgsrc, $pkgs) = @_;
   my $id = "$myarch/local";
   die("local repo already added\n") if $repos->{$id};
-  my $bins = PBuild::LocalRepo::fetchrepo($bconf, $myarch, $builddir, $pkgsrc);
+  my $bins = PBuild::LocalRepo::fetchrepo($bconf, $myarch, $builddir, $pkgsrc, $pkgs);
   $_->{'repoid'} = $id for @$bins;
   my $repo = { 'dir' => $builddir, 'bins' => $bins, 'arch' => $myarch, 'type' => 'local', 'repoid' => $id };
   $repos->{$id} = $repo;
@@ -97,11 +97,11 @@ sub addemptyrepo {
 # Update the local reposiory with new binary data
 #
 sub updatelocalrepo {
-  my ($repos, $bconf, $myarch, $builddir, $pkgsrc) = @_;
+  my ($repos, $bconf, $myarch, $builddir, $pkgsrc, $pkgs) = @_;
   my $id = "$myarch/local";
   my $repo = $repos->{$id};
   die("local repo does not exist\n") unless $repo;
-  my $bins = PBuild::LocalRepo::fetchrepo($bconf, $myarch, $builddir, $pkgsrc);
+  my $bins = PBuild::LocalRepo::fetchrepo($bconf, $myarch, $builddir, $pkgsrc, $pkgs);
   $_->{'repoid'} = $id for @$bins;
   $repo->{'bins'} = $bins;
 }

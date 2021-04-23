@@ -170,9 +170,10 @@ sub createjob {
   my ($ctx, $jobname, $nbuilders, $buildroot, $p, $bdeps, $pdeps, $vmdeps, $sysdeps, $tdeps, $nounchanged) = @_;
   my $opts = { %{$ctx->{'opts'}} };	# create copy so we can modify
   my $hostarch = $opts->{'hostarch'};
+  my $arch = $p->{'native'} ? $hostarch : $ctx->{'arch'};
 
   my $bconf = $ctx->{'bconf'};
-  my $helperarch = $bconf->{'hostarch'} || $ctx->{'arch'};
+  my $helperarch = $bconf->{'hostarch'} || $arch;
   die("don't know how to build arch $helperarch\n") unless $PBuild::Cando::knownarch{$helperarch};
 
   my $helper = '';
@@ -289,7 +290,7 @@ sub createjob {
   push @args, '--logfile', "$buildroot/.build.log";
   #push @args, '--release', "$release" if defined $release;
   push @args, '--debug' if $ctx->{'debuginfo'};
-  push @args, "--arch=$ctx->{'arch'}";
+  push @args, "--arch=$arch";
   push @args, '--jobs', $opts->{'jobs'} if $opts->{'jobs'};
   #push @args, '--ccache' if $useccache && $oldpkgdir;
   push @args, '--threads', $opts->{'threads'} if $opts->{'threads'};
