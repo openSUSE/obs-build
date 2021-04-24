@@ -1031,7 +1031,7 @@ test -x $BUILD_ROOT/sbin/ldconfig && chroot $BUILD_ROOT /sbin/ldconfig 2>&1
 
 if test -n "$PACKAGES_TO_SYSROOTINSTALL" ; then
     # query sysroot config
-    BUILD_SYSROOT=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" eval '%{?_sysroot}'`
+    BUILD_SYSROOT=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" eval '%{?cross_sysroot}'`
     test -n "$BUILD_SYSROOT" || BUILD_SYSROOT=/build-sysroot
     BUILD_SYSROOT="/${BUILD_SYSROOT#/}"
 fi
