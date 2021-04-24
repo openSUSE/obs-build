@@ -418,6 +418,7 @@ while (1) {
   $runs++;
   $ctx->{'buildconfig'} = $buildconfig;
   $ctx->{'lastcheck'} = \%lastcheck;
+  $ctx->{'singlejob'} = $opts->{'singlejob'} if $opts->{'singlejob'};
 
   # check status of all packages
   my $result = $ctx->pkgcheck(\@builders, @pkgs);

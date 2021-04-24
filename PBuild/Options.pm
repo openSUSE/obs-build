@@ -33,7 +33,7 @@ my %known_options = (
   'no-clean' => 'noclean',
   'nochecks' => 'nochecks',
   'no-checks' => 'nochecks',
-  'singlejob' => 'singlejob',
+  'singlejob' => 'singlejob:',
   'shell' => 'shell',
   'shell-after-fail' => 'shell-after-fail',
   'arch' => 'arch:',
@@ -184,6 +184,8 @@ sub parse_options {
     $opts{'singlejob'} = 1;
     $opts{'buildjobs'} = 1;
   }
+  # enforce the rebuild of the singlejob build
+  $opts{'rebuild-pkg'} = $opts{'singlejob'} if $opts{'singlejob'};
 
   return (\%opts, @back);
 }
