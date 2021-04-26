@@ -38,6 +38,8 @@ recipe_prepare_simpleimage() {
 
 recipe_build_simpleimage() {
     TOPDIR=/usr/src/packages
+    rm -f $BUILD_ROOT/.build.packages
+    ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
 
     echo "creating simple image..."
     cd $BUILD_ROOT || cleanup_and_exit 1
@@ -77,27 +79,27 @@ recipe_build_simpleimage() {
       esac
       TOPDIRS="$TOPDIRS $DIR"
     done
-	rm -rf "$BUILD_ROOT$TOPDIR"
     mkdir -p .tmp/{proc,sys}
-    if ! $TAR -cvzf .simpleimage.tar.gz --one-file-system $TOPDIRS -C .tmp proc sys; then
-      cleanup_and_exit 1
-    fi
-    if [ -x "`which mksquashfs 2> /dev/null`" ]; then
+    if grep -q "^#!NoTarBall" $SRCDIR/simpleimage; then
+      echo "Image creation is disabled, hopefully done in %build section"
+    elif [ -x "`which mksquashfs 2> /dev/null`" ]; then
       echo
       echo "Tarball done, creating squashfs image as well"
       echo
       mksquashfs $TOPDIRS .tmp/proc .tmp/sys .simpleimage.squashfs -info -keep-as-directory -no-progress || cleanup_and_exit 1
+    elif ! $TAR -cvzf .simpleimage.tar.gz --one-file-system $TOPDIRS -C .tmp proc sys; then
+      cleanup_and_exit 1
     fi
     echo "simple image created."
 
     DEST="$BUILD_ROOT$TOPDIR/OTHER"
     mkdir -p "$DEST"
-    mv $BUILD_ROOT/.simpleimage.tar.gz $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz
+    if [ -r "$BUILD_ROOT/.simpleimage.tar.gz" ]; then
+      mv "$BUILD_ROOT/.simpleimage.tar.gz" "$DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.tar.gz"
+    fi
     if [ -r .simpleimage.squashfs ]; then
       mv $BUILD_ROOT/.simpleimage.squashfs $DEST/$NAME-${VERSION}_${BUILD_ARCH%%:*}.squashfs
     fi
-    rm -f $BUILD_ROOT/.build.packages
-    ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
     test -d "$SRCDIR" && cd "$SRCDIR"
     BUILD_SUCCEEDED=true
 }
