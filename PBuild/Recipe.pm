@@ -102,8 +102,10 @@ sub parse {
   my $version = defined($d->{'version'}) ? $d->{'version'} : 'unknown';
   $p->{'version'} = $version;
   $p->{'name'} = $d->{'name'};
+  $p->{'native'} = 1 if $d->{'nativebuild'};
   $p->{'dep'} = $d->{'deps'};
-  $p->{'fromhost'} = $d->{'fromhost'} if $d->{'fromhost'};
+  $p->{'onlynative'} = $d->{'onlynative'} if $d->{'onlynative'};
+  $p->{'alsonative'} = $d->{'alsonative'} if $d->{'alsonative'};
   if ($d->{'prereqs'}) {
     my %deps = map {$_ => 1} (@{$d->{'deps'} || []}, @{$d->{'subpacks'} || []});
     my @prereqs = grep {!$deps{$_} && !/^%/} @{$d->{'prereqs'}};
@@ -142,19 +144,27 @@ sub split_hostdeps {
   return if $p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker' || $p->{'buildtype'} eq 'fissile';
   return if $p->{'native'};
   return unless @{$p->{'dep'} || []};
-  my %fromhost = map {$_ => 1} @{$bconf->{'fromhost'} || []};
-  for (@{$p->{'fromhost'} || []}) {
+  my %onlynative = map {$_ => 1} @{$bconf->{'onlynative'} || []};
+  my %alsonative = map {$_ => 1} @{$bconf->{'alsonative'} || []};
+  for (@{$p->{'onlynative'} || []}) {
     if (/^!(.*)/) {
-      delete $fromhost{$1};
+      delete $onlynative{$1};
     } else {
-      $fromhost{$_} = 1;
+      $onlynative{$_} = 1;
     }
   }
-  return unless %fromhost;
-  my @hdep = grep {$fromhost{$_}} @{$p->{'dep'}};
+  for (@{$p->{'alsonative'} || []}) {
+    if (/^!(.*)/) {
+      delete $alsonative{$1};
+    } else {
+      $alsonative{$_} = 1;
+    }
+  }
+  return unless %onlynative || %alsonative;
+  my @hdep = grep {$onlynative{$_} || $alsonative{$_}} @{$p->{'dep'}};
   return unless @hdep;
   $p->{'dep_host'} = \@hdep;
-  $p->{'dep'} = [ grep {!$fromhost{$_}} @{$p->{'dep'}}];
+  $p->{'dep'} = [ grep {!$onlynative{$_}} @{$p->{'dep'}}] if %onlynative;
 }
 
 1;

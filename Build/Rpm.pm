@@ -475,7 +475,8 @@ sub parse {
   my @subpacks;
   my @packdeps;
   my @prereqs;
-  my @fromhost;
+  my @alsonative;
+  my @onlynative;
   my $hasnfb;
   my $nfbline;
   my %macros;
@@ -635,6 +636,9 @@ sub parse {
     if ($preamble && $line =~ /^\#\!ForceMultiVersion\s*$/i) {
       $ret->{'multiversion'} = 1;
     }
+    if ($preamble && $line =~ /^\#\!NativeBuild\s*$/i) {
+      $ret->{'nativebuild'} = 1;
+    }
     if ($preamble && $line =~ /^\#\!RemoteAsset(?::\s*([a-z0-9]+:[0-9a-f]+))?\s*$/i) {
       $remoteasset = {};
       $remoteasset->{'digest'} = $1 if $1;
@@ -658,7 +662,7 @@ sub parse {
       }
       next;
     }
-    if ($preamble && ($line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires|\#\!FromHost)\s*:\s*(\S.*)$/i)) {
+    if ($preamble && ($line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires|\#\!AlsoNative|\#\!OnlyNative)\s*:\s*(\S.*)$/i)) {
       my $what = $1;
       my $deps = $2;
       $ifdeps = 1 if $hasif;
@@ -706,8 +710,12 @@ sub parse {
 
       $replace = 1 if grep {/^-/} @ndeps;
       my $lcwhat = lc($what);
-      if ($lcwhat eq '#!fromhost') {
-	push @fromhost, @ndeps;
+      if ($lcwhat eq '#!alsonative') {
+	push @alsonative, @ndeps;
+	next;
+      }
+      if ($lcwhat eq '#!onlynative') {
+	push @onlynative, @ndeps;
 	next;
       }
       if ($lcwhat ne 'buildrequires' && $lcwhat ne 'buildprereq' && $lcwhat ne '#!buildrequires') {
@@ -804,7 +812,8 @@ sub parse {
   $ret->{'badarch'} = $badarch if defined $badarch;
   $ret->{'deps'} = \@packdeps;
   $ret->{'prereqs'} = \@prereqs if @prereqs;
-  $ret->{'fromhost'} = \@fromhost if @fromhost;
+  $ret->{'onlynative'} = \@onlynative if @onlynative;
+  $ret->{'alsonative'} = \@alsonative if @alsonative;
   $ret->{'configdependent'} = 1 if $ifdeps;
   return $ret;
 }

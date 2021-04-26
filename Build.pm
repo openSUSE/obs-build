@@ -378,7 +378,8 @@ sub read_config {
   $config->{'prefer'} = [];
   $config->{'ignore'} = [];
   $config->{'conflict'} = [];
-  $config->{'fromhost'} = [];
+  $config->{'alsonative'} = [];
+  $config->{'onlynative'} = [];
   $config->{'substitute'} = {};
   $config->{'substitute_vers'} = {};
   $config->{'optflags'} = {};
@@ -414,7 +415,7 @@ sub read_config {
       }
       next;
     }
-    if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:' || $l0 eq 'expandflags:' || $l0 eq 'buildflags:' || $l0 eq 'publishflags:' || $l0 eq 'repourl:' || $l0 eq 'registryurl:' || $l0 eq 'assetsurl:' || $l0 eq 'fromhost:') {
+    if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:' || $l0 eq 'expandflags:' || $l0 eq 'buildflags:' || $l0 eq 'publishflags:' || $l0 eq 'repourl:' || $l0 eq 'registryurl:' || $l0 eq 'assetsurl:' || $l0 eq 'onlynative:' || $l0 eq 'alsonative:') {
       my $t = substr($l0, 0, -1);
       for my $l (@l) {
 	if ($l eq '!*') {

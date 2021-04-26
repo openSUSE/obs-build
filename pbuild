@@ -245,7 +245,6 @@ PBuild::Multibuild::expand_multibuilds(\%pkgsrc);
 my @pkgs_target = @pkgs;
 my @pkgs_native;
 if ($cross) {
-  $pkgsrc{$_}->{'native'} = 1 for grep {/^native-/} @pkgs;
   @pkgs_target = grep {!$pkgsrc{$_}->{'native'}} @pkgs;
   @pkgs_native = grep {$pkgsrc{$_}->{'native'}} @pkgs;
 }
