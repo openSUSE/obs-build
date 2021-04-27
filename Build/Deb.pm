@@ -24,9 +24,14 @@ use strict;
 use Digest::MD5;
 
 my $have_zlib;
+my $have_rawlzma;
 eval {
   require Compress::Zlib;
   $have_zlib = 1;
+};
+eval {
+  require Compress::Raw::Lzma;
+  $have_rawlzma = 1;
 };
 
 my %obs2debian = (
@@ -177,10 +182,24 @@ sub parse {
   return $ret;
 }
 
+sub uncompress_rawlzma {
+  my ($in) = @_;
+  return undef unless defined($in) && $in ne '';
+  my $out = '';
+  my ($lz, $status) = Compress::Raw::Lzma::AutoDecoder->new('ConsumeInput' => 1, 'AppendOutput' => 1);
+  return undef unless $lz;
+  while (1) {
+    $status = $lz->code($in, $out);
+    return $out if $status == Compress::Raw::Lzma::LZMA_STREAM_END();
+    return undef if $status != Compress::Raw::Lzma::LZMA_OK();
+  }
+}
+
 sub uncompress {
   my ($data, $tool) = @_;
   return $data if $tool eq 'cat';
   return Compress::Zlib::memGunzip($data) if $have_zlib && $tool eq 'gunzip';
+  return uncompress_rawlzma($data) if $have_rawlzma && $tool eq 'unxz';
   local (*TMP, *TMP2);
   open(TMP, "+>", undef) or die("could not open tmpfile\n");
   syswrite TMP, $data;
