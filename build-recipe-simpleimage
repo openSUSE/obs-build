@@ -80,15 +80,18 @@ recipe_build_simpleimage() {
       TOPDIRS="$TOPDIRS $DIR"
     done
     mkdir -p .tmp/{proc,sys}
-    if grep -q "^#!NoTarBall" $SRCDIR/simpleimage; then
-      echo "Image creation is disabled, hopefully done in %build section"
-    elif [ -x "`which mksquashfs 2> /dev/null`" ]; then
-      echo
-      echo "Tarball done, creating squashfs image as well"
-      echo
-      mksquashfs $TOPDIRS .tmp/proc .tmp/sys .simpleimage.squashfs -info -keep-as-directory -no-progress || cleanup_and_exit 1
-    elif ! $TAR -cvzf .simpleimage.tar.gz --one-file-system $TOPDIRS -C .tmp proc sys; then
-      cleanup_and_exit 1
+    if ! grep -q "^#!NoSquashfs" $SRCDIR/simpleimage; then
+      if [ -x "`which mksquashfs 2> /dev/null`" ]; then
+        echo
+        echo "Tarball done, creating squashfs image as well"
+        echo
+        mksquashfs $TOPDIRS .tmp/proc .tmp/sys .simpleimage.squashfs -info -keep-as-directory -no-progress || cleanup_and_exit 1
+      fi
+    fi
+    if ! grep -q "^#!NoTarBall" $SRCDIR/simpleimage; then
+      if ! $TAR -cvzf .simpleimage.tar.gz --one-file-system $TOPDIRS -C .tmp proc sys; then
+        cleanup_and_exit 1
+      fi
     fi
     echo "simple image created."
 
