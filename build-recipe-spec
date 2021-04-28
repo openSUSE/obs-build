@@ -199,6 +199,7 @@ recipe_build_spec() {
     fi
     if test -n "$ABUILD_TARGET" ; then
         # The sysroot has no rpm db atm
+	rpmbopts[${#rpmbopts[@]}]="--nocheck"
 	rpmbopts[${#rpmbopts[@]}]="--nodeps"
 	rpmbopts[${#rpmbopts[@]}]="--target=$ABUILD_TARGET"
     fi
