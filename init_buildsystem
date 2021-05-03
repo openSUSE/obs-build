@@ -195,6 +195,7 @@ clean_build_root() {
 	rm -rf -- "$BUILD_ROOT"/.build.hostarch.*
 	rm -rf -- "$BUILD_ROOT"/.build.kernel.*
 	rm -rf -- "$BUILD_ROOT"/.build.initrd.*
+	rm -rf -- "$BUILD_ROOT"/.build.sysroot
 	rm -rf -- "$BUILD_ROOT/.root"
 	rm -rf -- "$BUILD_ROOT/.init_b_cache"
 	test -L "$BUILD_ROOT/.preinstall_image" && rm -f -- "$BUILD_ROOT/.preinstall_image"
@@ -1108,6 +1109,10 @@ for PKG in $MAIN_LIST ; do
 
 done
 
+# do post-installation work
+pkg_finalize
+
+rm -f "$BUILD_ROOT/.build.sysroot"
 if test -n "$PACKAGES_TO_SYSROOTINSTALL" ; then
     pkg_sysrootinstall --prepare
     MAIN_LIST="$PACKAGES_TO_SYSROOTINSTALL"
@@ -1133,10 +1138,8 @@ if test -n "$PACKAGES_TO_SYSROOTINSTALL" ; then
     done
     pkg_sysrootinstall --finalize
     pkg_finalize_sysroot
+    ln -sf "${BUILD_SYSROOT#/}" "$BUILD_ROOT/.build.sysroot"
 fi
-
-# do post-installation work
-pkg_finalize
 
 # devices can vanish if devs got uninstalled
 test -c $BUILD_ROOT/dev/null || create_devs
