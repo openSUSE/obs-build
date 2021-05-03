@@ -651,12 +651,7 @@ sub build {
     return ('unresolvable', "missing pre/vminstalls: $missing");
   }
   my $tdeps;
-  if (!$kiwimode && !$p->{'native'} && $ctx->{'bconf_host'}) {
-    $tdeps = [ Build::get_sysroot($ctx->{'bconf'}, $ctx->{'subpacks'}->{$p->{'name'}}, @{$p->{'dep'} || []}) ];
-    if (!shift(@$tdeps)) {
-      return ('unresolvable', 'sysroot:' . join(', ', @$tdeps));
-    }
-  }
+  $tdeps = [ @$edeps ] if !$kiwimode && !$p->{'native'} && $ctx->{'bconf_host'};
   my $oldsrcmd5 = $p->{'srcmd5'};
   $ctx->{'assetmgr'}->getremoteassets($p);
   return ('recheck', 'assets changed') if $p->{'srcmd5'} ne $oldsrcmd5;
