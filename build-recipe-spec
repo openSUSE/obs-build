@@ -198,10 +198,12 @@ recipe_build_spec() {
 	rpmbopts[${#rpmbopts[@]}]="--nosignature"
     fi
     if test -n "$ABUILD_TARGET" ; then
-        # The sysroot has no rpm db atm
+	rpmbopts[${#rpmbopts[@]}]="--target=$ABUILD_TARGET"
+    fi
+    # sysroot packages are not in the database
+    if test -n "$ABUILD_TARGET" -a -d "$BUILD_ROOT/.build.sysroot" ; then
 	rpmbopts[${#rpmbopts[@]}]="--nocheck"
 	rpmbopts[${#rpmbopts[@]}]="--nodeps"
-	rpmbopts[${#rpmbopts[@]}]="--target=$ABUILD_TARGET"
     fi
     if test -n "$BUILD_DEBUG" ; then
 	rpmbopts[${#rpmbopts[@]}]='--define'
