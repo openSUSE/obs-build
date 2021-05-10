@@ -285,6 +285,15 @@ vm_startup_kvm() {
 
     kvm_add_console_args "$kvm_serial_device"
 
+    # figure out kvm cpu based on possible provided hostarch file
+    case `uname -m` in
+        armv8l|aarch64)
+            if test "$BUILD_HOST_ARCH" != "aarch64" ; then
+                kvm_cpu="-cpu host,aarch64=off"
+            fi
+            ;;
+    esac
+
     if test -n "$BUILD_JOBS" -a "$icecream" = 0 -a -z "$BUILD_THREADS" ; then
 	qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS")
     elif test -n "$BUILD_JOBS" -a -n "$BUILD_THREADS" ; then
@@ -300,13 +309,6 @@ vm_startup_kvm() {
     if test -n "$VMDISK_MOUNT_OPTIONS" ; then
         qemu_append="$qemu_append rootflags=${VMDISK_MOUNT_OPTIONS#-o }"
     fi
-    case `uname -m` in
-        armv8l|aarch64)
-            if test "$BUILD_HOST_ARCH" != "aarch64" ; then
-                qemu_append="-cpu host,aarch64=off"
-            fi
-            ;;
-    esac
     qemu_append="$qemu_append $vm_linux_kernel_parameter"
     qemu_append="$qemu_append panic=1 quiet no-kvmclock elevator=noop"
     qemu_append="$qemu_append nmi_watchdog=0 rw rd.driver.pre=binfmt_misc"
