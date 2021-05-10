@@ -169,14 +169,18 @@ sub cmd_apt_get {
 sub parse {
   my ($cf, $fn) = @_;
 
-  my $basecontainer;
   my $unorderedrepos;
   my $useobsrepositories;
   my $nosquash;
-  my $dockerfile_data = slurp($fn);
-  return { 'error' => 'could not open Dockerfile' } unless defined $dockerfile_data;
-
+  my $dockerfile_data;
+  if (ref($fn) eq 'SCALAR') {
+    $dockerfile_data = $$fn;
+  } else {
+    $dockerfile_data = slurp($fn);
+    return { 'error' => 'could not open Dockerfile' } unless defined $dockerfile_data;
+  }
   my @lines = split(/\r?\n/, $dockerfile_data);
+
   my $ret = {
     'deps' => [],
     'path' => [],
@@ -261,9 +265,15 @@ sub parse {
     # process commands
     if ($cmd eq 'FROM') {
       shift @args if @args && $args[0] =~ /^--platform=/;
-      if (@args && !$basecontainer && $args[0] ne 'scratch') {
-        $basecontainer = $args[0];
-        $basecontainer .= ':latest' unless $basecontainer =~ /:[^:\/]+$/;
+      if (@args) {
+        my $container = $args[0];
+        if ($container ne 'scratch') {
+          $container .= ':latest' unless $container =~ /:[^:\/]+$/;
+          $container = "container:$container";
+          if ($container && !grep {$_ eq $container} @{$ret->{'deps'}}) {
+            push @{$ret->{'deps'}}, $container;
+          }
+        }
       }
       $vars_env = {};		# should take env from base container
       $vars = { %$vars_env };
@@ -301,7 +311,6 @@ sub parse {
       }
     }
   }
-  push @{$ret->{'deps'}}, "container:$basecontainer" if $basecontainer;
   push @{$ret->{'deps'}}, '--unorderedimagerepos' if $unorderedrepos;
   my $version = $ret->{'version'};
   my $release = $cf->{'buildrelease'};
@@ -311,7 +320,6 @@ sub parse {
   }
   $ret->{'name'} = 'docker' if !defined($ret->{'name'}) && !$cf->{'__dockernoname'};
   $ret->{'path'} = [ { 'project' => '_obsrepositories', 'repository' => '' } ] if $useobsrepositories;
-  $ret->{'basecontainer'} = $basecontainer if $basecontainer;
   $ret->{'nosquash'} = 1 if $nosquash;
   return $ret;
 }
