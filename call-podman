@@ -77,7 +77,9 @@ fi
 # setup mounts
 test -e "$BUILD_ROOT/proc/self" || mount -n -tproc none $BUILD_ROOT/proc
 
+# use runc if crun is not available (SLE..)
+RUNTIME_OPT=""
+[ -x "$BUILD_ROOT/usr/bin/crun" ] || RUNTIME_OPT="--runtime runc"
+
 # run the command
-exec chroot "$BUILD_ROOT" podman --cgroup-manager=cgroupfs "$@"
-
-
+exec chroot "$BUILD_ROOT" podman $RUNTIME_OPT --cgroup-manager=cgroupfs "$@"
