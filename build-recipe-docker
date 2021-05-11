@@ -5,6 +5,7 @@
 ################################################################
 #
 # Copyright (c) 2017 SUSE Linux Products GmbH
+# Copyright (c) 2021 SUSE LLC
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 or 3 as
@@ -28,18 +29,18 @@ recipe_setup_docker() {
     TOPDIR="/usr/src/packages"
     test "$DO_INIT_TOPDIR" != false && rm -Rf "$BUILD_ROOT/$TOPDIR"
     mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
-    if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then 
+    if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
         mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
     else
-        if test -z "$LINKSOURCES" ; then 
+        if test -z "$LINKSOURCES" ; then
             cp -dLR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
         else
             cp -lR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
         fi
-        if test "$?" != 0 ; then 
+        if test "$?" != 0 ; then
             cleanup_and_exit 1 "source copy failed"
         fi
-    fi  
+    fi
 }
 
 recipe_prepare_docker() {
@@ -55,58 +56,55 @@ recipe_prepare_docker() {
 recipe_build_docker() {
     touch $BUILD_ROOT/etc/resolv.conf
 
-    base_image_path=
-    base_image_tag=$(grep "^\s*FROM" "$RECIPEFILE" | head -n 1 | cut -d" " -f2)
-
-    if test "$base_image_tag" != scratch ; then
-	base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
-	test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
-    fi
-
-    if test "$BUILDENGINE" = podman; then
-        DOCKER_TOOL=podman
+    if test "$BUILDENGINE" = "podman"; then
+        DOCKER_TOOL="$BUILD_DIR/call-podman --root $BUILD_ROOT"
     else
-        DOCKER_TOOL=docker
+        DOCKER_TOOL="chroot $BUILD_ROOT docker"
         if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver "$TOPDIR/SOURCES/repos" --webserver-upload "$TOPDIR/SOURCES/repos/UPLOAD" ; then
-             cleanup_and_exit 1
+            cleanup_and_exit 1
         fi
     fi
     DOCKERD_STARTED=true
 
-    if test "$DOCKER_TOOL" = podman; then
-	sed -e "s!^DATA_DIR=!DATA_DIR=$TOPDIR/SOURCES/repos!" <"$BUILD_DIR/obs-docker-support" >"$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
+    if test "$BUILDENGINE" = podman; then
+        sed -e "s!^DATA_DIR=!DATA_DIR=$TOPDIR/SOURCES/repos!" <"$BUILD_DIR/obs-docker-support" >"$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
     else
-	cp $BUILD_DIR/obs-docker-support "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
+        cp $BUILD_DIR/obs-docker-support "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
     fi
     chmod 755 "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
 
-    if test -n "$base_image_path"; then
-	echo "Loading base image"
-	if test -L "$base_image_path" ; then
-	    # copy into build root
-	    cp -L "$base_image_path" "$base_image_path.lnk"
-	    mv "$base_image_path.lnk" "$base_image_path"
-	fi
+    # Load all OBS provided containers
+    for base_image_path in $(find containers -regextype egrep -regex "containers/.*\.(tgz|tar|tar\.xz|tar\.gz)$" -print); do
+        if [ ! -f "$base_image_path" ]; then
+            echo "Cannot read container $base_image_path"
+            cleanup_and_exit 1
+        fi
 
-	# Inspect the content of the image to decide if this is a layered image
-	# or a filesystem one. We need to know if we will "docker load" it or
-	# "docker import" it.
-	if tar -tf $base_image_path | grep -q "^manifest.json" ; then
-	    echo "Layered image found"
-	    chroot $BUILD_ROOT $DOCKER_TOOL load --input $TOPDIR/SOURCES/$base_image_path
-	else
-	    echo "Filesystem image found"
-	    chroot $BUILD_ROOT $DOCKER_TOOL import $TOPDIR/SOURCES/$base_image_path "$base_image_tag"
-	fi
-    fi
+        if test -L "$base_image_path" ; then
+            # copy into build root
+            cp -L "$base_image_path" "$base_image_path.lnk"
+            mv "$base_image_path.lnk" "$base_image_path"
+        fi
+
+        # Inspect the content of the image to decide if this is a layered image
+        # or a filesystem one. We need to know if we will "docker load" it or
+        # "docker import" it.
+        if tar -tf $base_image_path | grep -q "^manifest.json" ; then
+            echo "Loading Layered image $base_image_path"
+            $DOCKER_TOOL load --input $TOPDIR/SOURCES/$base_image_path
+        else
+            echo "not yet implemented; Cannot load filesystem image $base_image_path without manifest.json"
+            cleanup_and_exit 1
+        fi
+    done
 
     # Prepare the package repository
     rm -rf "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD"
     if chroot $BUILD_ROOT test -x /usr/bin/createrepo ; then
-	chroot $BUILD_ROOT createrepo "$TOPDIR/SOURCES/repos" >/dev/null
+        chroot $BUILD_ROOT createrepo "$TOPDIR/SOURCES/repos" >/dev/null
     fi
     if chroot $BUILD_ROOT test -x /usr/bin/dpkg-scanpackages ; then
-	chroot $BUILD_ROOT bash -c "cd $TOPDIR/SOURCES/repos && dpkg-scanpackages -m . | gzip > Packages.gz"
+	    chroot $BUILD_ROOT bash -c "cd $TOPDIR/SOURCES/repos && dpkg-scanpackages -m . | gzip > Packages.gz"
     fi
     mkdir -p "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD"
 
@@ -155,22 +153,22 @@ recipe_build_docker() {
     # now do the build
     squashopt=--squash
     if test -n "$(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::show -- "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" nosquash)" ; then
-	squashopt=
-	echo "Building image $ALLTAGS (nosquash)"
+	    squashopt=
+        layersopt=
+	    echo "Building image $ALLTAGS (nosquash)"
     else
-	echo "Building image $ALLTAGS"
+        layersopt="--layers=false"
+	    echo "Building image $ALLTAGS"
     fi
 
-
-    if test "$DOCKER_TOOL" = podman ; then
-	test -n "$squashopt" && squashopt="--layers=false"
-	if ! $BUILD_DIR/call-podman --root "$BUILD_ROOT" build $squashopt -v "$TOPDIR/SOURCES/repos:$TOPDIR/SOURCES/repos" --cgroup-manager=cgroupfs --network=host "${tagargs[@]}" "${buildargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
-	    cleanup_and_exit 1 "$DOCKER_TOOL build command failed"
-	fi
+    if test "$BUILDENGINE" = podman ; then
+	    if ! $DOCKER_TOOL build $layersopt --network=host -v "$TOPDIR/SOURCES/repos:$TOPDIR/SOURCES/repos" "${tagargs[@]}" "${buildargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
+            cleanup_and_exit 1 "$BUILDENGINE build command failed"
+        fi
     else
-	if ! chroot $BUILD_ROOT $DOCKER_TOOL build $squashopt --network=host "${tagargs[@]}" "${buildargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
-	    cleanup_and_exit 1 "$DOCKER_TOOL build command failed"
-	fi
+        if ! $DOCKER_TOOL build $squashopt --network=host "${tagargs[@]}" "${buildargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
+	        cleanup_and_exit 1 "$BUILDENGINE build command failed"
+        fi
     fi
 
     # Save the resulting image to a tarball. Use first tag for generating the file name.
@@ -180,10 +178,10 @@ recipe_build_docker() {
     FILENAME="$FILENAME.${BUILD_ARCH%%:*}"
     test -n "$RELEASE" && FILENAME="$FILENAME-$RELEASE"
     echo "Saving image $FIRSTTAG to $FILENAME.tar"
-    if ! chroot $BUILD_ROOT $DOCKER_TOOL save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$FIRSTTAG" ; then
-        cleanup_and_exit 1 "$DOCKER_TOOL save command failed"
+    if ! $DOCKER_TOOL save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$FIRSTTAG" ; then
+        cleanup_and_exit 1 "$BUILDENGINE save command failed"
     fi
-    
+
     # Create containerinfo
     args=()
     test -n "$DISTURL" && args=("${args[@]}" --disturl "$DISTURL")
