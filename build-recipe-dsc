@@ -60,8 +60,8 @@ recipe_prepare_dsc() {
           echo "release: ($RELEASE), release (DEB) ($DEB_RELEASE)"
                  RELEASEARGS="--release $DEB_RELEASE"
           if grep -Eq '^OBS-DCH-RELEASE: 1' $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE \
-          && grep -Eq '^Version:' $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE \
-          ; then
+             && grep -Eq '^Version:' $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE
+          then
             WSCHAR="`printf '\t '`"
             # https://www.debian.org/doc/debian-policy/ch-controlfields.html#s-f-version
             VERSION="`grep -E '^Version:' $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE | sed -e 's,^Version:'"[$WSCHAR][$WSCHAR]"'*,,' -e 's,'"[$WSCHAR]"'*$,,'`"
