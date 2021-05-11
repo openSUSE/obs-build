@@ -34,8 +34,21 @@ vm_verify_options_qemu() {
     vm_kernel=/.build.kernel.kvm
     vm_initrd=/.build.initrd.kvm
 
+    case $qemu_device in
+        virtio*)
+            VM_ROOTDEV=/dev/disk/by-id/virtio-0
+            VM_SWAPDEV=/dev/disk/by-id/virtio-1
+            ;;
+        *)
+            VM_ROOTDEV=/dev/sda
+            VM_SWAPDEV=/dev/sdb
+            ;;
+    esac
+}
+
+vm_startup_qemu() {
     # overwrite some options for specific build architectures
-    case $BUILD_ARCH in
+    case $BUILD_HOST_ARCH in
         armv6l|armv7l)
             qemu_bin="/usr/bin/qemu-system-arm"
             qemu_console=ttyAMA0
@@ -107,17 +120,6 @@ vm_verify_options_qemu() {
             ;;
     esac
 
-    case $qemu_device in
-        virtio*)
-            VM_ROOTDEV=/dev/disk/by-id/virtio-0
-            VM_SWAPDEV=/dev/disk/by-id/virtio-1
-            ;;
-        *)
-            VM_ROOTDEV=/dev/sda
-            VM_SWAPDEV=/dev/sdb
-            ;;
-    esac
-
     if test -n "$VM_NETOPT" -o -n "$VM_NETDEVOPT" ; then
         if test -n "$VM_NETOPT" ; then
            for item in "${VM_NETOPT[@]}" ; do
@@ -135,7 +137,6 @@ vm_verify_options_qemu() {
             qemu_options="$qemu_options -device $item"
         done
     fi
-
     if test -n "$qemu_rng_device" ; then
         if test -c /dev/hwrng &&
             test -w /dev/hwrng &&
@@ -147,9 +148,7 @@ vm_verify_options_qemu() {
         fi
         qemu_options="$qemu_options -object rng-random,filename=$rng_dev,id=rng0 -device $qemu_rng_device,rng=rng0"
     fi
-}
 
-vm_startup_qemu() {
     qemu_args=(-drive file="$VM_ROOT",format=raw,if=none,id=disk,cache=unsafe -device "$qemu_device",drive=disk,serial=0)
     if [ -n "$VM_USER" ] ; then
         getent passwd "$VM_USER" > /dev/null || cleanup_and_exit 3 "cannot find KVM user '$VM_USER'"
