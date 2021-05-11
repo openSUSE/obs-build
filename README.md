@@ -46,7 +46,7 @@ Supported build formats
  - PKGBUILD to pkg       eg Arch Linux
 
  Image formats
- - Dockerfile            Docker container via docker or podman tooling)
+ - Dockerfile            Docker container via docker or podman tooling
  - kiwi appliances       This include a long list of formats supported by the kiwi tool.
                          From live USB stick images, network deployment images, VM images
                          to docker containers
