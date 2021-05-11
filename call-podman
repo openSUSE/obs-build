@@ -77,7 +77,8 @@ fi
 # setup mounts
 test -e "$BUILD_ROOT/proc/self" || mount -n -tproc none $BUILD_ROOT/proc
 
-# use runc if crun is not available (SLE..)
+# If the host kernel defaults to cgroupsv2, podman tries to run `crun` instead, even if not available.
+# As a workaround, force use of runc.
 RUNTIME_OPT=""
 [ -x "$BUILD_ROOT/usr/bin/crun" ] || RUNTIME_OPT="--runtime runc"
 
