@@ -1,11 +1,15 @@
-FROM opensuse:latest
+FROM opensuse/tumbleweed AS tw
 
+# debug
+RUN cat /etc/os-release
+
+FROM opensuse/leap:15.2
 # Make obs_pkg_mgr available
 ARG OBS_REPOSITORY_URL
 ADD obs_pkg_mgr /usr/bin/obs_pkg_mgr
 RUN chmod +x /usr/bin/obs_pkg_mgr
 
-RUN obs_pkg_mgr add_repo http://download.opensuse.org/repositories/Virtualization:/containers/openSUSE_Leap_42.2/ "Virtualization:Containers (openSUSE_Leap_42.2)" && ls ; obs_pkg_mgr add_repo http://example.com/my_project:/mysubproject/my_package/ "My example project" && ls
+RUN obs_pkg_mgr add_repo http://download.opensuse.org/repositories/Virtualization:/containers/openSUSE_Leap_15.2/ "Virtualization:Containers (openSUSE_Leap_15.2)" && ls ; obs_pkg_mgr add_repo http://example.com/my_project:/mysubproject/my_package/ "My example project" && ls
 
 RUN obs_pkg_mgr install util-linux calcurse # amarok
 RUN obs_pkg_mgr install awk gcc \

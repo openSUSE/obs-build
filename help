@@ -1,8 +1,0 @@
-Start the building with this command from the obs-build root directory:
-
-BUILD_DIR=$PWD BUILD_ROOT=/tmp/build/ ./build --cachedir=/tmp/build/cache obs_example/Dockerfile
-
-
-Run the parser with an one liner (against the obs_example/Dockerfile):
-
-perl -e "use Cwd 'abs_path'; use lib abs_path('Build'); use Build::Docker; Build::Docker::parse('', abs_path('obs_example/Dockerfile'))"
