@@ -59,6 +59,25 @@ recipe_prepare_dsc() {
         if [ "$RELEASE" ]; then
           echo "release: ($RELEASE), release (DEB) ($DEB_RELEASE)"
                  RELEASEARGS="--release $DEB_RELEASE"
+          if grep -Eq '^OBS-DCH-RELEASE: 1' $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE \
+          && grep -Eq '^Version:' $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE \
+          ; then
+            WSCHAR="`printf '\t '`"
+            # https://www.debian.org/doc/debian-policy/ch-controlfields.html#s-f-version
+            VERSION="`grep -E '^Version:' $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE | sed -e 's,^Version:'"[$WSCHAR][$WSCHAR]"'*,,' -e 's,'"[$WSCHAR]"'*$,,'`"
+            echo "OBS-DCH-RELEASE: DSC file originally spelled package version as ${VERSION}"
+            case "$VERSION" in
+                *-*) # Got a debver or more already, add a plus-suffix to debver
+                    OBS_DCH_RELEASE="+$DEB_RELEASE" ;;
+                *)   # No debver, add the first such token
+                    OBS_DCH_RELEASE="-$DEB_RELEASE" ;;
+            esac
+            # "OBS_DCH_RELEASE" char offset aligned with "VERSION" in previous echo
+            echo "OBS-DCH-RELEASE: Suffixing DSC file with OBS respin number, to  ${VERSION}${OBS_DCH_RELEASE}"
+            sed -e 's,^\(OBS-DCH-RELEASE:.*\)$,# \1,' \
+                -e 's,^\(Version:\).*$,\1'" ${VERSION}${OBS_DCH_RELEASE}"',' \
+                -i $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE
+          fi
         fi
         if ! debtransform $CHANGELOGARGS $RELEASEARGS $BUILD_ROOT$TOPDIR/SOURCES $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE $BUILD_ROOT$TOPDIR/SOURCES.DEB ; then
 	    cleanup_and_exit 1 "debian transforming failed."
