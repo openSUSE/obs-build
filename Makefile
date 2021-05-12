@@ -24,6 +24,7 @@ all:
 .PHONY:	test
 
 test:
+	[ "$(SCM)" != git ] || git --no-pager diff HEAD~1 --check
 	PERL5LIB=. prove -v
 	# debtransform test suite
 	cd test-debtransform &&	./run.sh
