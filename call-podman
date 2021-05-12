@@ -77,7 +77,10 @@ fi
 # setup mounts
 test -e "$BUILD_ROOT/proc/self" || mount -n -tproc none $BUILD_ROOT/proc
 
+# If the host kernel defaults to cgroupsv2, podman tries to run `crun` instead, even if not available.
+# As a workaround, force use of runc.
+RUNTIME_OPT=""
+[ -x "$BUILD_ROOT/usr/bin/crun" ] || RUNTIME_OPT="--runtime runc"
+
 # run the command
-exec chroot "$BUILD_ROOT" podman --cgroup-manager=cgroupfs "$@"
-
-
+exec chroot "$BUILD_ROOT" podman $RUNTIME_OPT --cgroup-manager=cgroupfs "$@"
