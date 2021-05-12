@@ -62,8 +62,10 @@ recipe_build_docker() {
 
     if test "$BUILDENGINE" = podman; then
         DOCKER_TOOL=podman
+        DOCKER_CMD="$BUILD_DIR/call-podman --root $BUILD_ROOT"
     else
         DOCKER_TOOL=docker
+        DOCKER_CMD="chroot $BUILD_ROOT docker"
         if ! $BUILD_DIR/startdockerd --root "$BUILD_ROOT" --webserver "$TOPDIR/SOURCES/repos" --webserver-upload "$TOPDIR/SOURCES/repos/UPLOAD" ; then
              cleanup_and_exit 1
         fi
@@ -89,11 +91,11 @@ recipe_build_docker() {
 	# or a filesystem one. We need to know if we will "docker load" it or
 	# "docker import" it.
 	if tar -tf $base_image_path | grep -q "^manifest.json" ; then
-	    chroot $BUILD_ROOT $DOCKER_TOOL load --input $TOPDIR/SOURCES/$base_image_path
+	    $DOCKER_CMD load --input $TOPDIR/SOURCES/$base_image_path
 	else
 	    echo "Filesystem image found"
 	    base_image_tag=$(grep "^\s*FROM" "$RECIPEFILE" | head -n 1 | cut -d" " -f2)
-	    chroot $BUILD_ROOT $DOCKER_TOOL import $TOPDIR/SOURCES/$base_image_path "$base_image_tag"
+	    $DOCKER_CMD import $TOPDIR/SOURCES/$base_image_path "$base_image_tag"
 	fi
     done
 
@@ -160,11 +162,11 @@ recipe_build_docker() {
 
     if test "$BUILDENGINE" = podman; then
 	test -n "$squashopt" && squashopt="--layers=false"
-	if ! $BUILD_DIR/call-podman --root "$BUILD_ROOT" build $squashopt -v "$TOPDIR/SOURCES/repos:$TOPDIR/SOURCES/repos" --network=host "${tagargs[@]}" "${buildargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
+	if ! $DOCKER_CMD build $squashopt -v "$TOPDIR/SOURCES/repos:$TOPDIR/SOURCES/repos" --network=host "${tagargs[@]}" "${buildargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
 	    cleanup_and_exit 1 "$DOCKER_TOOL build command failed"
 	fi
     else
-	if ! chroot $BUILD_ROOT $DOCKER_TOOL build $squashopt --network=host "${tagargs[@]}" "${buildargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
+	if ! $DOCKER_CMD build $squashopt --network=host "${tagargs[@]}" "${buildargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
 	    cleanup_and_exit 1 "$DOCKER_TOOL build command failed"
 	fi
     fi
@@ -176,7 +178,7 @@ recipe_build_docker() {
     FILENAME="$FILENAME.${BUILD_ARCH%%:*}"
     test -n "$RELEASE" && FILENAME="$FILENAME-$RELEASE"
     echo "Saving image $FIRSTTAG to $FILENAME.tar"
-    if ! chroot $BUILD_ROOT $DOCKER_TOOL save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$FIRSTTAG" ; then
+    if $DOCKER_CMD save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$FIRSTTAG" ; then
         cleanup_and_exit 1 "$DOCKER_TOOL save command failed"
     fi
     
