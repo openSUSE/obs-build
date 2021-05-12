@@ -24,6 +24,7 @@ all:
 .PHONY:	test test-debtransform doc
 
 test:
+	[ "$(SCM)" != "git" ] || git --no-pager diff --check origin/master..HEAD --
 	PERL5LIB=. prove -v
 
 test-debtransform:
