@@ -109,6 +109,8 @@ RUN_SHELL_AFTER_FAIL=
 RUN_SHELL_CMD=
 CCACHE=
 PKG_CCACHE=
+SCCACHE=
+SCCACHE_URI=
 DLNOSIGNATURE=
 BUILD_FLAVOR=
 OBS_PACKAGE=
@@ -266,6 +268,12 @@ Known Parameters:
   --pkg-ccache /path/to/ccache.tar.gz
               path to archive of ccache directory content.
               Its contents will be extracted to /.ccache
+
+  --sccache
+              Use sccache to speed up rebuilds. Conflicts with --ccache.
+
+  --sccache-uri
+              Optional URI for remote sccache storage. Implies --sccache.
 
   --icecream N
               Use N parallel build jobs with icecream
@@ -542,6 +550,22 @@ setupccache() {
     else
         CCACHE_SETUP_START_TIME=
 	rm -f "$BUILD_ROOT"/var/lib/build/ccache/bin/{gcc,g++,cc,c++,clang,clang++}
+    fi
+}
+
+setupsccache() {
+    if test -n "$SCCACHE" ; then
+        # This first redir clears the file.
+        echo 'export CARGO_INCREMENTAL=false' > "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
+        echo 'export RUSTC_WRAPPER=sccache' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
+        echo 'export CC="sccache cc"' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
+        echo 'export CXX="sccache c++"' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
+        echo "SCCACHE_URI=${SCCACHE_URI}"
+        if [[ ${SCCACHE_URI} = redis* ]] ; then
+            echo "export SCCACHE_REDIS=${SCCACHE_URI}" >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
+        fi
+        # Display sccache status at the start of the build.
+        chroot $BUILD_ROOT su -c "sccache -s" - $BUILD_USER
     fi
 }
 
@@ -1035,6 +1059,16 @@ while test -n "$1"; do
 	shift
 	CCACHE=true
       ;;
+      -sccache-uri)
+    needarg
+    SCCACHE_URI="$ARG"
+    shift
+    SCCACHE=true
+      ;;
+      -sccache)
+    SCCACHE=true
+    shift
+      ;;
       -statistics)
 	DO_STATISTICS=1
       ;;
@@ -1503,6 +1537,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 
     setupicecream
     setupccache
+    setupsccache
 
     test -n "$RUN_SHELL" && run_shell
 
@@ -1684,6 +1719,11 @@ fi
 
 if test \( -n "$RPMS" -o -n "$DEBS" \) -a -n "$CREATE_BASELIBS"; then
     create_baselibs
+fi
+
+if test -n "$SCCACHE" ; then
+    # Display sccache statistics post build.
+    chroot $BUILD_ROOT su -c "sccache -s" - $BUILD_USER
 fi
 
 exitcode=0
