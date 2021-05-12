@@ -56,12 +56,9 @@ recipe_build_docker() {
     touch $BUILD_ROOT/etc/resolv.conf
 
     base_image_path=
-    base_image_tag=$(grep "^\s*FROM" "$RECIPEFILE" | head -n 1 | cut -d" " -f2)
 
-    if test "$base_image_tag" != scratch ; then
-	base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
-	test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
-    fi
+    base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
+    test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
 
     if test "$BUILDENGINE" = podman; then
         DOCKER_TOOL=podman
@@ -80,8 +77,8 @@ recipe_build_docker() {
     fi
     chmod 755 "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
 
-    if test -n "$base_image_path"; then
-	echo "Loading base image"
+    for base_image_path in $(find containers -regextype egrep -regex "containers/.*\.(tgz|tar|tar\.xz|tar\.gz)$" -print) ; do
+	echo "Loading base image ${base_image_path##*/}"
 	if test -L "$base_image_path" ; then
 	    # copy into build root
 	    cp -L "$base_image_path" "$base_image_path.lnk"
@@ -92,13 +89,13 @@ recipe_build_docker() {
 	# or a filesystem one. We need to know if we will "docker load" it or
 	# "docker import" it.
 	if tar -tf $base_image_path | grep -q "^manifest.json" ; then
-	    echo "Layered image found"
 	    chroot $BUILD_ROOT $DOCKER_TOOL load --input $TOPDIR/SOURCES/$base_image_path
 	else
 	    echo "Filesystem image found"
+	    base_image_tag=$(grep "^\s*FROM" "$RECIPEFILE" | head -n 1 | cut -d" " -f2)
 	    chroot $BUILD_ROOT $DOCKER_TOOL import $TOPDIR/SOURCES/$base_image_path "$base_image_tag"
 	fi
-    fi
+    done
 
     # Prepare the package repository
     rm -rf "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD"
