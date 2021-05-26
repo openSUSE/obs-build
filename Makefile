@@ -21,10 +21,12 @@ DESTDIR=
 
 all:
 
-.PHONY:	test
+.PHONY:	test test-debtransform
 
 test:
 	PERL5LIB=. prove -v
+
+test-debtransform:
 	# debtransform test suite
 	cd test-debtransform &&	./run.sh
 
