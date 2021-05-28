@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 9;
+use Test::More tests => 10;
 
 use Build;
 use Build::Rpm;
@@ -347,4 +347,17 @@ $expected = {
 };
 $result = Build::Rpm::parse($conf, [ split("\n", $spec) ]);
 is_deeply($result, $expected, "elif statements");
+
+$spec = q{
+%global foo \
+BuildRequires: bar \
+%nil
+BuildRequires: baz
+};
+$expected = {
+  'deps' => [ 'baz' ],
+  'subpacks' => [],
+};
+$result = Build::Rpm::parse($conf, [ split("\n", $spec) ]);
+is_deeply($result, $expected, "multiline define");
 

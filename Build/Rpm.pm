@@ -508,6 +508,7 @@ sub parse {
   my $obspackage = defined($config->{'obspackage'}) ? $config->{'obspackage'} : '@OBS_PACKAGE@';
   my $buildflavor = defined($config->{'buildflavor'}) ? $config->{'buildflavor'} : '';
   my $remoteasset;
+  my $multilinedefine;
   while (1) {
     my $line;
     my $doxspec = $xspec ? 1 : 0;
@@ -540,6 +541,15 @@ sub parse {
       $hasnfb = $1;
       $nfbline = \$xspec->[-1] if $doxspec;
       next;
+    }
+    if ($multilinedefine || $line =~ /^\s*%(?:define|global)\s/s) {
+      # is this a multi-line macro definition?
+      $line = "$multilinedefine\n$line" if defined $multilinedefine;
+      undef $multilinedefine;
+      if ($line =~ /\\$/s) {
+	$multilinedefine = $line;	# we need another line!
+	next;
+      }
     }
     if ($line =~ /^\s*#/) {
       next unless $line =~ /^#!/;
