@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 45;
+use Test::More tests => 46;
 
 require 't/testlib.pm';
 
@@ -54,6 +54,9 @@ C: (b unless i else c)
 P: wa = 1-1 wx
 P: wb = 1-1 wx wy
 P: wc = 1-1 wy
+P: foo = 1-1
+P: bar = 1-1
+R: (baz if foo)
 EOR
 
 my $config = setuptest($repo, 'Ignore: ign');
@@ -196,3 +199,5 @@ is_deeply(\@r, [undef, 'nothing provides (wa without wa)'], 'install (wa without
 @r = expand($config, '(wa without nnn)');
 is_deeply(\@r, [1, 'wa'], 'install (wa without nnn)');
 
+@r = expand($config, 'foo', 'bar');
+is_deeply(\@r, [undef, 'nothing provides (baz if foo) needed by bar'], 'install foo bar');

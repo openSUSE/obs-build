@@ -1324,6 +1324,14 @@ sub check_conddeps_inst {
       if (@q) {
         push @$todo, $c, $p;
       } elsif (@$cond) {
+	if (!$rtype) {
+	  if (defined($p)) {
+	    push @$error, "nothing provides $r needed by $p";
+	  } else {
+	    push @$error, "nothing provides $r";
+	  }
+	  next;
+	}
 	if (defined($p)) {
 	  push @$error, map {"$p conflicts with $_"} sort(@$cond);
 	} else {
