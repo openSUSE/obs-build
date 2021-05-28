@@ -629,7 +629,7 @@ sub parse {
       }
     }
     if ($main_preamble) {
-      if ($line =~ /^(Name|Version|Disttag|Release)\s*:\s*(\S+)/i) {
+      if ($line =~ /^(Name|Epoch|Version|Release|Disttag)\s*:\s*(\S+)/i) {
 	$ret->{lc $1} = $2;
 	$macros{lc $1} = $2;
       } elsif ($line =~ /^ExclusiveArch\s*:\s*(.*)/i) {

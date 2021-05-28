@@ -18,11 +18,13 @@ $spec = q{
 Name: foo
 Version: 1.0
 Release: 1
+Epoch: 42
 ExclusiveArch: x86_64
 ExcludeArch: i586
 };
 $expected = {
   'name' => 'foo',
+  'epoch' => '42',
   'version' => '1.0',
   'release' => '1',
   'exclarch' => [ 'x86_64' ],
