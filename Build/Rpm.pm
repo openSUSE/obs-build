@@ -546,7 +546,7 @@ sub parse {
       # is this a multi-line macro definition?
       $line = "$multilinedefine\n$line" if defined $multilinedefine;
       undef $multilinedefine;
-      if ($line =~ /\\$/s) {
+      if ($line =~ /\\\z/s) {
 	$multilinedefine = $line;	# we need another line!
 	next;
       }
