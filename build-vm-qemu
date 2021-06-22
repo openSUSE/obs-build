@@ -78,7 +78,13 @@ vm_startup_qemu() {
             qemu_bin="/usr/bin/qemu-system-riscv64"
             qemu_console=ttyS0
             qemu_cpu="-cpu rv64"
-            qemu_options="$qemu_options -M virt -bios /usr/share/qemu/opensbi-riscv64-virt-fw_jump.bin"
+            qemu_options="$qemu_options -M virt -bios"
+            if test -f /usr/share/qemu/opensbi-riscv64-generic-fw_dynamic.bin; then
+                qemu_options="$qemu_options /usr/share/qemu/opensbi-riscv64-generic-fw_dynamic.bin"
+            else
+                # qemu < 5.2.0
+                qemu_options="$qemu_options /usr/share/qemu/opensbi-riscv64-virt-fw_jump.bin"
+            fi
             qemu_device=virtio-blk-device
             qemu_rng_device=virtio-rng-device
             ;;
