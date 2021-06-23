@@ -34,12 +34,14 @@ use PBuild::RepoMgr;
 #
 sub forkjob {
   my ($opts, $args) = @_;
-  my $pid = PBuild::Util::xfork();
-  return $pid if $pid;
-  unless ($opts->{'singlejob'}) {
-    open(STDIN, '<', '/dev/null');
-    open(STDOUT, '>', '/dev/null');
-    open(STDERR, '>&STDOUT');
+  unless ($opts->{'shell'} || $opts->{'shell-after-fail'}) {
+     my $pid = PBuild::Util::xfork();
+     return $pid if $pid;
+     unless ($opts->{'singlejob'}) {
+       open(STDIN, '<', '/dev/null');
+       open(STDOUT, '>', '/dev/null');
+       open(STDERR, '>&STDOUT');
+     };
   };
   exec(@$args);
   die("$args->[0]: $!\n");
@@ -262,7 +264,7 @@ sub createjob {
       }
     }
     push @args, '--statistics';
-    push @args, '--vm-watchdog';
+    push @args, '--vm-watchdog' unless $opts->{'shell'};
   } elsif ($vm eq 'openstack') {
     mkdir("$buildroot/.mount") unless -d "$buildroot/.mount";
     push @args, "--root=$buildroot/.mount";

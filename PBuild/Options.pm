@@ -181,7 +181,6 @@ sub parse_options {
 
   if ($opts{'shell'} || $opts{'shell-after-fail'}) {
     $opts{'noclean'} = 1;
-    $opts{'singlejob'} = 1;
     $opts{'buildjobs'} = 1;
   }
   # enforce the rebuild of the singlejob build
