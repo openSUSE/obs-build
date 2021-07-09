@@ -366,7 +366,7 @@ sub finishjob {
   # 4: fatal build error
   # 9: genbuildreqs
   if ($ret == 4) {
-    die("fatal build error\n");
+    die("fatal build error, see $buildroot/.build.log\n");
   }
   if ($ret == 3) {
     $ret = 1;
