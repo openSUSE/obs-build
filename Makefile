@@ -75,6 +75,7 @@ install:
 	    spec_add_patch \
 	    spectool \
 	    signdummy \
+	    unpackarchive \
 	    unrpm \
 	    telnet_login_wrapper \
 	    startdockerd \

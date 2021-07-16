@@ -276,13 +276,15 @@ preinstall() {
     check_exit
     echo "preinstalling $PKG..."
     preinstall_setup
-    if test -x /usr/bin/bsdtar ; then
+    if test "$UID" = 0 -a -x /usr/bin/bsdtar ; then
 	CPIO="/usr/bin/bsdtar --exclude .build --exclude .init_b_cache -P --chroot -o --numeric-owner -x -f-"
 	TAR="/usr/bin/bsdtar --exclude .build --exclude .init_b_cache -P --chroot -o --numeric-owner -x"
     else
-	unsafe_preinstall_check
-	CPIO="cpio --extract --unconditional --preserve-modification-time --make-directories --no-absolute-filenames --quiet"
-	TAR="tar --exclude .build --exclude .init_b_cache -x"
+#	unsafe_preinstall_check
+#	CPIO="cpio --extract --unconditional --preserve-modification-time --make-directories --no-absolute-filenames --quiet"
+#	TAR="tar --exclude .build --exclude .init_b_cache -x"
+	CPIO="$BUILD_DIR/unpackarchive --cpio ."
+	TAR="$BUILD_DIR/unpackarchive --tar ."
     fi
     pkg_preinstall
     preinstall_integrate
