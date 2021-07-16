@@ -70,7 +70,7 @@ sub find_recipe {
 # Find and parse a recipe file
 #
 sub parse {
-  my ($bconf, $p, $buildtype, $arch) = @_;
+  my ($bconf, $p, $buildtype, $arch, $bconf_host, $arch_host) = @_;
   if ($p->{'pkg'} eq '_product') {
     $p->{'error'} = 'excluded';
     return;
@@ -92,6 +92,13 @@ sub parse {
   eval {
     $d = Build::parse_typed($bconf, "$p->{'dir'}/$recipe", $bt);
     die("can not parse $recipe\n") unless $d;
+    if ($d->{'nativebuild'}) {
+      local $bconf_host->{'buildflavor'} = $p->{'flavor'};
+      $d = Build::parse_typed($bconf_host, "$p->{'dir'}/$recipe", $bt);
+      die("can not parse $recipe\n") unless $d;
+      die("nativebuild mismatch\n") unless $d->{'nativebuild'};
+      $arch = $arch_host;
+    }
     die("can not parse name from $recipe\n") unless $d->{'name'};
   };
   if ($@) {

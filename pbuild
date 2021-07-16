@@ -241,14 +241,6 @@ PBuild::Multibuild::expand_multibuilds(\%pkgsrc);
 
 @pkgs = sort keys %pkgsrc;
 
-# split into target/native packages
-my @pkgs_target = @pkgs;
-my @pkgs_native;
-if ($cross) {
-  @pkgs_target = grep {!$pkgsrc{$_}->{'native'}} @pkgs;
-  @pkgs_native = grep {$pkgsrc{$_}->{'native'}} @pkgs;
-}
-
 # handle onlybuild/excludebuild from the build config
 if (exists $bconf->{'buildflags:excludebuild'}) {
   my %excludebuild;
@@ -280,16 +272,20 @@ my $buildtype = $bconf->{'type'} || '';
 $buildtype = 'spec' if !$buildtype || $buildtype eq 'UNDEFINED';
 for my $pkg (@pkgs) {
   my $p = $pkgsrc{$pkg};
-  if ($p->{'native'}) {
-    PBuild::Recipe::parse($bconf_host, $p, $buildtype, $hostarch);
-  } else {
-    PBuild::Recipe::parse($bconf, $p, $buildtype, $myarch);
-  }
+  PBuild::Recipe::parse($bconf, $p, $buildtype, $myarch, $bconf_host, $hostarch);
   if ($p->{'buildtype'} && ($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker') && !$p->{'error'}) {
     my @containerdeps = grep {/^container:/} @{$p->{'dep'} || []};
     next unless @containerdeps;
     $containertags{substr($_, 10)} = 1 for @containerdeps;
   }
+}
+
+# split into target/native packages
+my @pkgs_target = @pkgs;
+my @pkgs_native;
+if ($cross) {
+  @pkgs_target = grep {!$pkgsrc{$_}->{'native'}} @pkgs;
+  @pkgs_native = grep {$pkgsrc{$_}->{'native'}} @pkgs;
 }
 
 # search for assets
