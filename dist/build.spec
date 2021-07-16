@@ -26,8 +26,13 @@
 
 Name:           %{__pkg_name}
 Summary:        A Script to Build SUSE Linux RPMs
+%if 0%{?mageia}
+License:        GPLv2+
+Group:          Development/Tools
+%else
 License:        GPL-2.0-only OR GPL-3.0-only
 Group:          Development/Tools/Building
+%endif
 Version:        20200131
 Release:        0
 Source:         obs-build-%{version}.tar.gz
@@ -55,6 +60,10 @@ BuildRequires:  perl(Test::More)
 Requires:       perl-MD5
 Requires:       perl-TimeDate
 BuildRequires:  perl-TimeDate
+%endif
+# On Mageia tests need this package to be successful
+%if 0%{?mageia}
+BuildRequires:  perl(YAML::PP)
 %endif
 Conflicts:      bsdtar < 2.5.5
 BuildRequires:  perl(Date::Parse)
