@@ -214,7 +214,11 @@ recheck_package:
 	$error = undef;
 	$error = "on builder $job->{'name'}" if $job->{'nbuilders'} > 1;
         my $bid = ($builder->{'nbuilders'} || 1) > 1 ? "$builder->{'name'}: " : '';
-        print "${bid}building $p->{'pkg'}/$p->{'recipe'}\n";
+	if ($p->{'native'}) {
+          print "${bid}building $p->{'pkg'}/$p->{'recipe'} (native)\n";
+	} else {
+          print "${bid}building $p->{'pkg'}/$p->{'recipe'}\n";
+        }
         $ctx->{'building'}->{$packid} = $builder->{'job'};
       }
       #printf("%s -> %s%s", $packid, $status, $error ? " ($error)" : '');
