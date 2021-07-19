@@ -267,7 +267,10 @@ sub resolve_dir {
   my ($dir, $comp) = ('/', $name);
   ($dir, $comp) = ($1, $2) if $name =~ /\A(.*?)\/+([^\/]*)\z/s;
   my $r = resolve_dir($root, $dir);
-  return $r if $comp eq '.' || $comp eq '';
+  if ($comp eq '.' || $comp eq '') {
+    $cache{$name} = $r;
+    return $r;
+  }
   if ($comp eq '..') {
     $r = '/' unless $r =~ s/\/[^\/]*\/\z/\//s;
     $cache{$name} = $r;
@@ -296,7 +299,7 @@ sub resolve_dir {
 sub resolve_file {
   my ($root, $name) = @_;
   $name =~ s/\/+\z//s;
-  return '/' if $name eq '' || $name eq '/';
+  return '/.' if $name eq '' || $name eq '/';
   my ($dir, $comp) = ('/', $name);
   ($dir, $comp) = ($1, $2) if $name =~ /\A(.*?)\/+([^\/]*)\z/s;
   $dir = $cache{$dir} || resolve_dir($root, $dir);
