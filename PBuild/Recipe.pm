@@ -92,11 +92,11 @@ sub parse {
   eval {
     $d = Build::parse_typed($bconf, "$p->{'dir'}/$recipe", $bt);
     die("can not parse $recipe\n") unless $d;
-    if ($d->{'nativebuild'}) {
+    if ($bconf_host && $d->{'nativebuild'}) {
+      $p->{'native'} = 1;
       local $bconf_host->{'buildflavor'} = $p->{'flavor'};
       $d = Build::parse_typed($bconf_host, "$p->{'dir'}/$recipe", $bt);
       die("can not parse $recipe\n") unless $d;
-      die("nativebuild mismatch\n") unless $d->{'nativebuild'};
       $arch = $arch_host;
     }
     die("can not parse name from $recipe\n") unless $d->{'name'};
@@ -109,7 +109,6 @@ sub parse {
   my $version = defined($d->{'version'}) ? $d->{'version'} : 'unknown';
   $p->{'version'} = $version;
   $p->{'name'} = $d->{'name'};
-  $p->{'native'} = 1 if $d->{'nativebuild'};
   $p->{'dep'} = $d->{'deps'};
   $p->{'onlynative'} = $d->{'onlynative'} if $d->{'onlynative'};
   $p->{'alsonative'} = $d->{'alsonative'} if $d->{'alsonative'};
