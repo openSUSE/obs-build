@@ -61,6 +61,13 @@ $dir =~ s/(.)\/+$/$1/s;
 # set defaults
 my $libbuild = $INC[0];
 $opts->{'libbuild'} = $libbuild;
+if ($<) {
+  $opts->{'vm-type'} ||= 'kvm';
+  if (!$opts->{'root'}) {
+    my $username = $ENV{LOGNAME} || $ENV{USER} || getpwuid($<) || sprintf("%u", $<);
+    $opts->{'root'} = "/var/tmp/build-root-$username";
+  }
+}
 $opts->{'root'} ||= '/var/tmp/build-root';
 $opts->{'root'} = Cwd::abs_path($opts->{'root'}) if $opts->{'root'} !~ /^\//;
 $opts->{'root'} =~ s/(.)\/+$/$1/s;
@@ -97,7 +104,7 @@ my $hostarch = $opts->{'hostarch'};
 $opts->{'arch'} ||= $hostarch;
 my $myarch = $opts->{'arch'};
 
-my $builddir = $reponame ? "$dir/_build.$reponame.$myarch" : "$dir/_build.$myarch";
+my $builddir = $reponame && $reponame ne $myarch ? "$dir/_build.$reponame.$myarch" : "$dir/_build.$myarch";
 
 if ($opts->{'result-code'} || $opts->{'result-pkg'}) {
   PBuild::Result::print_result($opts, $builddir);
