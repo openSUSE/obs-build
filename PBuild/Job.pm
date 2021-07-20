@@ -346,6 +346,22 @@ sub rename_build_result {
   symlink('.', "$buildroot/.build.packages/KIWI");
 }
 
+sub get_last_lines {
+  my ($logfile) = @_;
+  my $fd;
+  open($fd, '<', $logfile) || return '';  
+  if (-s $fd > 8192) {
+    defined(sysseek($fd, -8192, 2)) || return '';
+  }
+  my $buf = '';
+  sysread($fd, $buf, 8192);
+  close $fd;
+  my @buf = split(/\r?\n/, $buf);
+  shift @buf if length($buf) == 8192 && @buf > 1;
+  @buf = splice(@buf, -5) if @buf > 5;
+  return @buf ? join("\n", @buf)."\n" : '';
+}
+
 #
 # Finalize a build job after the build process has finished
 #
@@ -366,7 +382,9 @@ sub finishjob {
   # 4: fatal build error
   # 9: genbuildreqs
   if ($ret == 4) {
-    die("fatal build error, see $buildroot/.build.log\n");
+    my $ll = get_last_lines("$buildroot/.build.log");
+    print $ll if $ll;
+    die("fatal build error, see $buildroot/.build.log for more information\n");
   }
   if ($ret == 3) {
     $ret = 1;
