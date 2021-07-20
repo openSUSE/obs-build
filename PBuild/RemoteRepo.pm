@@ -368,10 +368,10 @@ sub fetchrepo {
 # Expand the special zypp:// repo to all enabled zypp repositories
 #
 sub expand_zypp_repo {
-  my ($opts) = @_;
-  return unless grep {/^zypp:\/{0,2}$/} @{$opts->{'repo'} || []};
+  my ($repos) = @_;
+  return unless grep {/^zypp:\/{0,2}$/} @{$repos || []};
   my @r;
-  for my $url (@{$opts->{'repo'}}) {
+  for my $url (@$repos) {
     if ($url =~ /^zypp:\/{0,2}$/) {
       for my $r (Build::Zypp::parseallrepos()) {
         push @r, "zypp://$r->{'name'}" if $r->{'enabled'};
@@ -380,7 +380,7 @@ sub expand_zypp_repo {
       push @r, $url;
     }
   }
-  @{$opts->{'repo'}} = @r;
+  @$repos = @r;
 }
 
 #

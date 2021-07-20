@@ -50,6 +50,8 @@ use PBuild::Preset;
 use PBuild::Distro;
 use PBuild::Repoquery;
 
+my $libbuild = $INC[0];
+
 # parse options
 my ($opts, @dirs) = PBuild::Options::parse_options(@ARGV);
 PBuild::Options::usage(0) if $opts->{'help'};
@@ -58,8 +60,12 @@ my $dir = @dirs ? $dirs[0] : '.';
 $dir = Cwd::abs_path($dir) if $dir !~ /^\//;
 $dir =~ s/(.)\/+$/$1/s;
 
+if ($opts->{'list-presets'}) {
+  PBuild::Preset::list_presets($dir);
+  exit;
+}
+
 # set defaults
-my $libbuild = $INC[0];
 $opts->{'libbuild'} = $libbuild;
 if ($<) {
   $opts->{'vm-type'} ||= 'kvm';
@@ -81,12 +87,7 @@ if (!$opts->{'hostarch'}) {
 $opts->{'buildjobs'} = 1 unless $opts->{'buildjobs'};
 $opts->{'buildjobs'} = 32 if $opts->{'buildjobs'} > 32;
 
-if ($opts->{'list-presets'}) {
-  PBuild::Preset::list_presets($dir);
-  exit;
-}
-
-# read presets
+# read and apply presets
 my $preset = PBuild::Preset::read_presets($dir, $opts->{'preset'});
 PBuild::Preset::apply_preset($opts, $preset) if $preset;
 print "Using default preset: $preset->{'name'}\n" if $preset && !$opts->{'preset'};
@@ -151,6 +152,7 @@ my $buildconfig = Build::combine_configs(reverse(@baseconfigs), $localconfig);
 my $bconf = Build::read_config($myarch, [ split("\n", $buildconfig) ]);
 my $bconf_host = $cross ? Build::read_config($hostarch, [ split("\n", $buildconfig) ]) : undef;
 
+# make sure our config includes some basic setup
 if (!@{($bconf_host || $bconf)->{'preinstall'} || []}) {
   my @presetnames = PBuild::Preset::known_presets($dir);
   if (@presetnames) {
@@ -190,7 +192,8 @@ if ($cross) {
 }
 
 # expand the zypp:// repo
-PBuild::RemoteRepo::expand_zypp_repo($opts) if $opts->{'repo'};
+PBuild::RemoteRepo::expand_zypp_repo($opts->{'repo'});
+PBuild::RemoteRepo::expand_zypp_repo($opts->{'hostrepo'}) if $cross;
 
 print "starting project builder\n";
 print "    source directory: $dir\n";
@@ -230,13 +233,14 @@ print "getting package information\n";
 my %pkgsrc;
 for my $pkg (@pkgs) {
   my ($files, $asset_files) = PBuild::Source::list_package("$dir/$pkg");
-  $pkgsrc{$pkg} = {
+  my $p = {
     'pkg' => $pkg,
     'dir' => "$dir/$pkg",
     'files' => $files,
     'srcmd5' => PBuild::Source::calc_srcmd5($files),
   };
-  $pkgsrc{$pkg}->{'asset_files'} = $asset_files if %{$asset_files || {}};
+  $p->{'asset_files'} = $asset_files if %{$asset_files || {}};
+  $pkgsrc{$pkg} = $p;
 }
 
 # handle local links and multibuild packages
@@ -353,7 +357,12 @@ if (@{$opts->{'registry'} || []} && %containertags) {
 }
 
 if ($opts->{'repoquery'}) {
-  PBuild::Repoquery::repoquery($bconf, $myarch, \@repos, $opts);
+  PBuild::Repoquery::repoquery($bconf, $myarch, \@repos, $opts->{'repoquery'}, $opts);
+  exit;
+}
+if ($opts->{'repoquery-host'}) {
+  die("No cross building configured\n") unless $cross;
+  PBuild::Repoquery::repoquery($bconf_host, $hostarch, \@hostrepos, $opts->{'repoquery-host'}, $opts);
   exit;
 }
 
@@ -399,13 +408,9 @@ while (1) {
   if (!$ctx) {
     $ctx = PBuild::Checker::create($bconf, $myarch, $buildtype, \%pkgsrc, $builddir, $opts, $repomgr, $assetmgr);
     $ctx->{'hostarch'} = $hostarch;
+    $ctx->{'bconf_host'} = $bconf_host if $cross;
     print "preparing package pool\n" unless $runs;
-    if ($cross) {
-      $ctx->{'bconf_host'} = $bconf_host;
-      $ctx->prepare(\@repos, \@hostrepos);
-    } else {
-      $ctx->prepare(\@repos);
-    }
+    $ctx->prepare(\@repos, \@hostrepos);
     print "expanding dependencies\n" unless $runs;
     $ctx->pkgexpand(@pkgs);
     print "sorting packages\n" unless $runs;

@@ -63,6 +63,7 @@ my %known_options = (
   'rebuild-code' => 'rebuild-code::',
   'buildtrigger' => 'buildtrigger:',
   'repoquery' => 'repoquery::',
+  'repoquery-host' => 'repoquery-host::',
   'xen' => \&vm_type_special,
   'kvm' => \&vm_type_special,
   'uml' => \&vm_type_special,

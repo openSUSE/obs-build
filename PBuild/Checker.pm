@@ -78,7 +78,7 @@ sub prepare {
   $ctx->{'dep2pkg'} = $dep2pkg;
   $ctx->{'subpacks'} = \%subpacks;
   PBuild::Meta::setgenmetaalgo($ctx->{'genmetaalgo'});
-  $ctx->{'dep2pkg_host'} = PBuild::Expand::configure_repos($ctx->{'bconf_host'}, $hostrepos) if $hostrepos;
+  $ctx->{'dep2pkg_host'} = PBuild::Expand::configure_repos($ctx->{'bconf_host'}, $hostrepos) if $ctx->{'bconf_host'};
 }
 
 #
