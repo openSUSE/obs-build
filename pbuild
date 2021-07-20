@@ -221,8 +221,7 @@ if ($cross && @{$opts->{'hostrepo'} || []}) {
 print "searching for packages\n";
 my @pkgs = PBuild::Source::find_packages($dir);
 die("no packages found in '$dir'\n") unless @pkgs;
-my $npkgs = @pkgs;
-print "found $npkgs packages\n";
+print "found ".PBuild::Util::plural(scalar(@pkgs), 'package')."\n";
 
 my $assetmgr = PBuild::AssetMgr::create("$dir/.pbuild/_assets");
 for my $assetsurl (@{$opts->{'assets'} || []}) {
@@ -244,11 +243,17 @@ for my $pkg (@pkgs) {
 }
 
 # handle local links and multibuild packages
-print "expanding package links\n";
-PBuild::Link::expand_links(\%pkgsrc);
+my $nlink = PBuild::Link::count_links(\%pkgsrc);
+if ($nlink) {
+  print "expanding ".PBuild::Util::plural($nlink, 'package link')."\n";
+  PBuild::Link::expand_links(\%pkgsrc);
+}
 
-print "expanding multibuild packages\n";
-PBuild::Multibuild::expand_multibuilds(\%pkgsrc);
+my $nmultibuild = PBuild::Multibuild::count_multibuilds(\%pkgsrc);
+if ($nmultibuild) {
+  print "expanding ".PBuild::Util::plural($nmultibuild, 'multibuild package')."\n";
+  PBuild::Multibuild::expand_multibuilds(\%pkgsrc);
+}
 
 @pkgs = sort keys %pkgsrc;
 
@@ -277,7 +282,7 @@ if (exists $bconf->{'buildflags:onlybuild'}) {
 }
 
 # parse all recipes in the packages to get dependency information
-print "parsing recipe files\n";
+print "parsing ".PBuild::Util::plural(scalar(@pkgs), 'recipe file')."\n";
 my %containertags;
 my $buildtype = $bconf->{'type'} || '';
 $buildtype = 'spec' if !$buildtype || $buildtype eq 'UNDEFINED';
@@ -334,11 +339,11 @@ PBuild::LocalRepo::cleanup_builddir($builddir, \%pkgsrc);
 my $repomgr = PBuild::RepoMgr::create();
 my @repos;
 my @hostrepos;
-print "fetching local repo metadata\n";
+print "fetching metadata of the local ".(@pkgs_native ? 'repos' : 'repo')."\n";
 push @repos, $repomgr->addlocalrepo($bconf, $myarch, $builddir, \%pkgsrc, \@pkgs_target);
 push @hostrepos, $repomgr->addlocalrepo($bconf_host, $hostarch, $builddir, \%pkgsrc, \@pkgs_native) if @pkgs_native;
 
-print "fetching remote repo metadata\n";
+print "fetching metadata of ".PBuild::Util::plural(scalar(@{$opts->{'repo'}}) + ($cross ? scalar(@{$opts->{'hostrepo'}}) : 0), 'remote repo')."\n";
 for my $repourl (@{$opts->{'repo'}}) {
   push @repos, $repomgr->addremoterepo($bconf, $myarch, $builddir, $repourl, $buildtype, $opts);
 }

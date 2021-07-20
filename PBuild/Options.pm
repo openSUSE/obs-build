@@ -64,6 +64,7 @@ my %known_options = (
   'buildtrigger' => 'buildtrigger:',
   'repoquery' => 'repoquery::',
   'repoquery-host' => 'repoquery-host::',
+  'no-repo-refresh' => 'no-repo-refresh',
   'xen' => \&vm_type_special,
   'kvm' => \&vm_type_special,
   'uml' => \&vm_type_special,

@@ -185,4 +185,11 @@ sub urldecode {
   return $str;
 }
 
+sub plural {
+  my ($n, $what) = @_;
+  return "$n $what" if $n == 1;
+  return "$n ${what}ies" if $what =~ s/y$//;
+  return "$n ${what}s";
+}
+
 1;

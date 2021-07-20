@@ -336,6 +336,7 @@ sub fetchrepo {
       undef $oldrepo if join(',', @$modules) ne join(',', @$repomodules);
     }
     undef $oldrepo if $oldrepo && !replace_with_local($repodir, $oldrepo->{'bins'});
+    return $oldrepo->{'bins'} if $oldrepo && $opts->{'no-repo-refresh'};
   }
   my $tmpdir = "$repodir/.tmp";
   PBuild::Util::cleandir($tmpdir) if -e $tmpdir;
