@@ -134,6 +134,7 @@ sub unparse_bool {
 
 sub unparse_number {
   my ($d) = @_;
+  return $1 if $d =~ /\A0*([1-9][0-9]*)\z/s;
   return sprintf("%.f", $d) if $d == int($d);
   return sprintf("%g", $d);
 }
@@ -183,14 +184,14 @@ sub unparse {
       my $type = ($d->{'_type'} || {})->{$k} || ($d->{'_type'} || {})->{'*'};
       $r .= "\n$indent" if $first++;
       $r .= unparse_string($k).":";
-      if (($type && $type =~ /^inline_?/) || (ref($dd) ne 'ARRAY' && ref($dd) ne 'HASH')) {
-        $r .= " ".unparse($dd, %opts, 'indent' => "  $indent", '_type' => $type);
-      } elsif (ref($dd) eq 'HASH') {
-        $r .= "\n$indent  ";
-        $r .= unparse($dd, %opts, 'indent' => "  $indent", '_type' => $type);
-      } elsif (ref($dd) eq 'ARRAY') {
+      if (ref($dd) eq 'ARRAY' && @$dd && !($type && $type =~ /^inline_?/)) {
         $r .= "\n$indent";
         $r .= unparse($dd, %opts, 'indent' => "$indent", '_type' => $type);
+      } elsif (ref($dd) eq 'HASH' && %$dd && !($type && $type =~ /^inline_?/)) {
+        $r .= "\n$indent  ";
+        $r .= unparse($dd, %opts, 'indent' => "  $indent", '_type' => $type);
+      } else {
+        $r .= " ".unparse($dd, %opts, 'indent' => "  $indent", '_type' => $type);
       }
     }
     return $r;
