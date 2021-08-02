@@ -43,7 +43,7 @@ recipe_build_simpleimage() {
 
     echo "creating simple image..."
     cd $BUILD_ROOT || cleanup_and_exit 1
-    export SRCDIR="$TOPDIR/SOURCES"
+    export SRCDIR="$BUILD_ROOT$TOPDIR/SOURCES"
 
     NAME="`sed -n 's|Name:[[:blank:]]*||p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage`"
     [ -n "$NAME" ] || NAME="simpleimage"
