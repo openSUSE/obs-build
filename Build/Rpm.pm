@@ -842,6 +842,7 @@ my %rpmstag = (
   "SUMMARY"        => 1004,
   "DESCRIPTION"    => 1005,
   "BUILDTIME"      => 1006,
+  "LICENSE"        => 1014,
   "ARCH"           => 1022,
   "OLDFILENAMES"   => 1027,
   "SOURCERPM"      => 1044,
@@ -1167,6 +1168,7 @@ sub query {
   push @tags, qw{SUMMARY DESCRIPTION} if $opts{'description'};
   push @tags, qw{DISTURL} if $opts{'disturl'};
   push @tags, qw{BUILDTIME} if $opts{'buildtime'};
+  push @tags, qw{LICENSE} if $opts{'license'};
   push @tags, qw{CONFLICTNAME CONFLICTVERSION CONFLICTFLAGS OBSOLETENAME OBSOLETEVERSION OBSOLETEFLAGS} if $opts{'conflicts'};
   push @tags, qw{RECOMMENDNAME RECOMMENDVERSION RECOMMENDFLAGS SUGGESTNAME SUGGESTVERSION SUGGESTFLAGS SUPPLEMENTNAME SUPPLEMENTVERSION SUPPLEMENTFLAGS ENHANCENAME ENHANCEVERSION ENHANCEFLAGS OLDSUGGESTSNAME OLDSUGGESTSVERSION OLDSUGGESTSFLAGS OLDENHANCESNAME OLDENHANCESVERSION OLDENHANCESFLAGS} if $opts{'weakdeps'};
 
@@ -1248,6 +1250,7 @@ sub query {
   }
   $data->{'buildtime'} = $res{'BUILDTIME'}->[0] if $opts{'buildtime'};
   $data->{'disturl'} = $res{'DISTURL'}->[0] if $opts{'disturl'} && $res{'DISTURL'};
+  $data->{'license'} = $res{'LICENSE'}->[0] if $opts{'license'} && $res{'LICENSE'};
   return $data;
 }
 

@@ -85,6 +85,7 @@ install:
 	    create_container_package_list \
 	    call-podman \
 	    queryobs \
+	    writemodulemd \
 	    $(DESTDIR)$(pkglibdir)
 	install -m644 \
 	    qemu-reg \

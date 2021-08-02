@@ -1,0 +1,102 @@
+#!/usr/bin/perl -w
+
+################################################################
+#
+# Copyright (c) 2021 SUSE Linux GmbH
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+# obs: repo support
+
+BEGIN {
+  unshift @INC, ($::ENV{"BUILD_DIR"} || "/usr/lib/build");
+}
+
+use Build::Rpm;
+use Build::SimpleYAML;
+
+die("usage: writemodulemd <modulemdfile> <rpmmanifestfile>\n") unless @ARGV == 2;
+my ($modulemdfile, $manifestfile) = @ARGV;
+
+my $md;
+if ($modulemdfile =~ /\.pst$/) {
+  require Storable;
+  $md = Storable::retrieve($modulemdfile);
+} elsif ($modulemdfile =~ /\.ya?ml$/) {
+  require YAML::XS;
+  $YAML::XS::LoadBlessed = $YAML::XS::LoadBlessed = 0;
+  $md = YAML::XS::LoadFile($modulemdfile);
+} else {
+  die("unsupported modulemd file: $modulemdfile\n");
+}
+die("bad modulemd data\n") unless $md && ref($md) eq 'HASH' && $md->{'data'};
+die("bad modulemd version \n") unless $md->{'version'} == 2;
+delete $md->{'data'}->{'artifacts'};
+delete $md->{'data'}->{'license'}->{'content'} if $md->{'data'}->{'license'} && $md->{'data'}->{'license'}->{'content'};
+
+if ($manifestfile ne '-') {
+  open(STDIN, '<', $manifestfile) || die("$manifestfile: $!\n");
+}
+
+my %licenses;
+
+while (<STDIN>) {
+  chomp;
+  my $r = Build::Rpm::query($_, 'evra' => 1, 'license' => 1);
+  $r->{'epoch'} ||= 0;
+  my $nevra = "$r->{'name'}-$r->{'epoch'}:$r->{'version'}-$r->{'release'}.$r->{'arch'}";
+  my $license = $r->{'license'};
+  $licenses{$license} = 1;
+  push @{$md->{'data'}->{'artifacts'}->{'rpms'}}, $nevra;
+}
+$md->{'data'}->{'license'}->{'content'} = [ sort keys %licenses ] if %licenses;
+
+$md->{'_order'} = [ 'document', 'version', 'data' ];
+$md->{'_type'}->{'version'} = 'number';
+$md->{'data'}->{'_order'} = [ 'name', 'stream', 'version', 'context', 'arch', 'summary', 'description', 'license', 'xmd', 'dependencies', 'references', 'profiles', 'api', 'filter', 'buildopts', 'components', 'artifacts' ];
+$md->{'data'}->{'_type'}->{'version'} = 'number';
+if ($md->{'data'} && $md->{'data'}->{'license'}) {
+  $md->{'data'}->{'license'}->{'_order'} = [ 'module', 'content' ];
+}
+if ($md->{'data'} && $md->{'data'}->{'components'} && $md->{'data'}->{'components'}->{'rpms'}) {
+  for (values %{$md->{'data'}->{'components'}->{'rpms'}}) {
+    $_->{'_order'} = [ 'rationale', 'ref', 'buildorder', 'arches' ];
+    $_->{'_type'}->{'buildorder'} = 'number';
+  }
+}
+if ($md->{'data'} && $md->{'data'}->{'buildopts'} && $md->{'data'}->{'buildopts'}->{'rpms'}) {
+  $md->{'data'}->{'buildopts'}->{'rpms'}->{'_type'}->{'macros'} = 'literal';
+}
+$md->{'data'}->{'_type'}->{'description'} = 'folded';
+for my $d (@{$md->{'data'}->{'dependencies'} || []}) {
+  for ($d->{'requires'}, $d->{'buildrequires'}) {
+    next if !defined($_) || ref($_) eq 'HASH';
+    my $nd = {};
+    for my $dd (@$_) {
+      my ($n, @v) = split(':', $dd);
+      $nd->{$n} = \@v;
+    }
+    $_ = $nd;
+  }
+  $d->{'requires'}->{'_type'}->{'*'} = 'inline' if $d->{'requires'};
+  $d->{'buildrequires'}->{'_type'}->{'*'} = 'inline' if $d->{'buildrequires'};
+}
+
+print Build::SimpleYAML::unparse($md);
+
+
+
