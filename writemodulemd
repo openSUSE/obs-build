@@ -107,11 +107,29 @@ if (@ARGV && $ARGV[0] eq '--filter') {
   die("usage: writemodulemd --filter <modulemdfile> <primaryfile>\n") unless @ARGV == 2;
   my ($modulemdfile, $primaryfile) = @ARGV;
   my $mds = readmds($modulemdfile);
+  require Build::Rpmmd;
+  if ($primaryfile ne '-' && -d $primaryfile) {
+    die("$primaryfile/repomd.xml: $!\n") unless -e "$primaryfile/repomd.xml";
+    # primaryfile is repomd directory
+    my $files = Build::Rpmmd::parse_repomd("$primaryfile/repomd.xml");
+    my @primaryfiles = grep {$_->{'type'} eq 'primary' && defined($_->{'location'})} @{$files || []};
+    die("no primary files in repodata\n") unless @primaryfiles;
+    @primaryfiles = grep {$_->{'location'} =~ /\.xml(?:\.xz|\.gz)?$/} @primaryfiles;
+    die("cannot decompress primary file\n") unless @primaryfiles;
+    my $loc = $primaryfiles[0]->{'location'};
+    $loc =~ s/.*\///;
+    $primaryfile .= "/$loc";
+  }
   if ($primaryfile ne '-') {
-    open(STDIN, '<', $primaryfile) || die("$primaryfile: $!\n");
+    if ($primaryfile =~ /\.gz$/) {
+      open(STDIN, '-|', 'gunzip', '-dc', '--', $primaryfile) || die("$primaryfile: $!\n");
+    } elsif ($primaryfile =~ /\.xz$/) {
+      open(STDIN, '-|', 'xzdec', '-dc', '--', $primaryfile) || die("$primaryfile: $!\n");
+    } else {
+      open(STDIN, '<', $primaryfile) || die("$primaryfile: $!\n");
+    }
   }
   my %rpms;
-  require Build::Rpmmd;
   Build::Rpmmd::parse(\*STDIN, sub {
     my ($r) = @_;
     my $evr = ($r->{'epoch'} || 0).":$r->{'version'}-$r->{'release'}";
