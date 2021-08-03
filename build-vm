@@ -582,6 +582,10 @@ vm_detect_2nd_stage() {
         # need to remount rw explicitly.
         mount -o remount,rw sysfs /sys
     fi
+    # mount selinuxfs
+    if ! test -e /sys/fs/selinux/status; then
+        mount -orw -n -tselinuxfs selinuxfs /sys/fs/selinux 2>/dev/null || :
+    fi
 # qemu inside of xen does not work, check again with kvm later before enabling this
 #    if test -e /dev/kqemu ; then
 #        # allow abuild user to run qemu
