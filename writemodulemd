@@ -32,6 +32,16 @@ use Build::Rpm;
 use Build::SimpleYAML;
 use Data::Dumper;
 
+sub convertdeps {
+  my ($d) = @_;
+  my $nd = {};
+  for my $dd (@$d) {
+    my ($n, @v) = split(':', $dd);
+    $nd->{$n} = \@v;
+  }
+  return $nd;
+}
+
 sub printmd {
   my ($md) = @_;
   $md->{'_order'} = [ 'document', 'version', 'data' ];
@@ -40,6 +50,7 @@ sub printmd {
   my $mdd = $md->{'data'};
   $mdd->{'_order'} = [ 'module', 'name', 'stream', 'version', 'context', 'arch', 'summary', 'description', 'license', 'xmd', 'dependencies', 'references', 'profiles', 'api', 'filter', 'buildopts', 'components', 'artifacts' ];
   $mdd->{'_type'}->{'version'} = 'number';
+  $mdd->{'_type'}->{'description'} = 'folded';
   if ($mdd->{'license'}) {
     $mdd->{'license'}->{'_order'} = [ 'module', 'content' ];
   }
@@ -53,17 +64,7 @@ sub printmd {
   if ($mdd->{'buildopts'} && $mdd->{'buildopts'}->{'rpms'}) {
     $mdd->{'buildopts'}->{'rpms'}->{'_type'}->{'macros'} = 'literal';
   }
-  $mdd->{'_type'}->{'description'} = 'folded';
   for my $d (@{$mdd->{'dependencies'} || []}) {
-    for ($d->{'requires'}, $d->{'buildrequires'}) {
-      next if !defined($_) || ref($_) eq 'HASH';
-      my $nd = {};
-      for my $dd (@$_) {
-	my ($n, @v) = split(':', $dd);
-	$nd->{$n} = \@v;
-      }
-      $_ = $nd;
-    }
     $d->{'requires'}->{'_type'}->{'*'} = 'inline' if $d->{'requires'};
     $d->{'buildrequires'}->{'_type'}->{'*'} = 'inline' if $d->{'buildrequires'};
   }
@@ -196,6 +197,11 @@ die("need exactly one modulemd document\n") unless @mds_good == 1;
 my $md = $mds_good[0];
 
 my $mdd = $md->{'data'};
+# convert deps if needed (to be removed)
+for my $d (@{$mdd->{'dependencies'} || []}) {
+  $d->{'requires'} = convertdeps($d->{'requires'}) if ref($d->{'requires'}) eq 'ARRAY';
+  $d->{'buildrequires'} = convertdeps($d->{'buildrequires'}) if ref($d->{'buildrequires'}) eq 'ARRAY';
+}
 delete $mdd->{'artifacts'};
 delete $mdd->{'license'}->{'content'} if $mdd->{'license'} && $mdd->{'license'}->{'content'};
 if ($manifestfile ne '-') {
