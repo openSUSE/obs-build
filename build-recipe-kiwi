@@ -390,6 +390,15 @@ build_kiwi_product() {
     if test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/.createrepo_checksums" ; then
 	checksums="CREATEREPO_CHECKSUMS=$TOPDIR/SOURCES/repos/.createrepo_checksums"
     fi
+    # concatenate all modulemd data into a single _modulemd.yaml file
+    if test -d "$BUILD_ROOT/$TOPDIR/SOURCES/repos" ; then
+	local d m
+	for d in $(find "$BUILD_ROOT/$TOPDIR/SOURCES/repos" -type d -name modulemd) ; do
+	    for m in "$d"/*.modulemd.yaml "$d"/*.modulemd-defaults.yaml "$d"/modules.yaml ; do
+		test -s "$m" && cat "$m" >> "$BUILD_ROOT/$TOPDIR/SOURCES/repos/_modulemd.yaml"
+	    done
+	done
+    fi
     if test -x "$BUILD_ROOT/usr/bin/product-builder"; then
        # current implementation of product generation
        chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX BUILD_FLAVOR=$BUILD_FLAVOR $checksums /usr/bin/product-builder --root $TOPDIR/KIWIROOT $VERBOSE_OPTION --logfile terminal --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
