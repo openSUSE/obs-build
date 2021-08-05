@@ -461,9 +461,8 @@ sub fetchbinaries {
   my ($repo, $bins) = @_;
   my $repodir = $repo->{'dir'};
   my $url = $repo->{'url'};
-  my $nbins = @$bins;
   die("bad repo\n") unless $url;
-  print "fetching $nbins binaries from $url\n";
+  print "fetching ".PBuild::Util::plural(scalar(@$bins), 'binary')." from $url\n";
   PBuild::Util::mkdir_p($repodir);
   my $ua = PBuild::Download::create_ua();
   fetchbinaries_obs($repo, $bins, $ua) if $url =~ /^obs:/;

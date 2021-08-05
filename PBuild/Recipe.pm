@@ -136,7 +136,7 @@ sub parse {
       $p->{$_} = $d->{$_} if /^(?:source|md5sums|sha\d+sums)(?:_|$)/;
     }
   }
-  $p->{'remoteassets'} = $d->{'remoteassets'} if $bt eq 'spec' && $d->{'remoteassets'};
+  $p->{'remoteassets'} = $d->{'remoteassets'} if ($bt eq 'spec' || $bt eq 'kiwi') && $d->{'remoteassets'};
   # check if we can build this
   if ($bt eq 'kiwi' && $imagetype eq 'product') {
     $p->{'error'} = 'cannot build kiwi products yet';
