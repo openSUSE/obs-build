@@ -8,6 +8,7 @@ Latest packages for `obs-build` are available from
 
 Supported build environments
 ============================
+
  Unsecure:
  - chroot
  - LXC
@@ -21,13 +22,13 @@ Supported build environments
  - XEN
  - ZVM (S390)
 
- In addition there is currently experimental support for
+ In addition there is currently experimental support for:
  - UML
  - PVM (PowerPC)
  - OpenStack
  - Amazon EC2
 
- For hardware emulation there are
+ For hardware emulation there are:
  - qemu
    which runs a QEMU system emulator inside of KVM. This can
    be considered also secure and reproducible.
@@ -61,7 +62,7 @@ Supported build formats
  - FlatPak
  - Snapcraft
 
- Special modes and formats:
+ Special modes and formats
  - debbuild              building debian debs our of rpm spec file
  - debbootstrap          debian builds using debootstrap as engine
  - mock                  rpm spec file build using mock as engine
