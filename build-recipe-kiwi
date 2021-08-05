@@ -839,6 +839,21 @@ recipe_build_kiwi() {
 	chroot $BUILD_ROOT tar -C $TOPDIR/SOURCES/root -xf "$TOPDIR/SOURCES/${t##*/}"
     done
 
+    # copy requested files to the root directory
+    while read s t ; do
+        test -z "$t" && t="$s"
+	case $s in
+	'' | . | .. | */* | root ) ;;
+	*)
+	    test -e "$BUILD_ROOT/$TOPDIR/SOURCES/$s" || continue
+	    t="root/${t#/}"
+	    echo "copying $s to $t"
+	    chroot $BUILD_ROOT mkdir -p "$TOPDIR/SOURCES/${t%/*}"
+	    chroot $BUILD_ROOT cp -af "$TOPDIR/SOURCES/$s" "$TOPDIR/SOURCES/$t"
+	    ;;
+	esac
+    done < <(kiwi_query_recipe copytoimage)
+
     # fix script permissions
     chmod a+x $BUILD_ROOT/$TOPDIR/SOURCES/*.sh 2>/dev/null
 
