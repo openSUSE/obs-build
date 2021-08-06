@@ -653,6 +653,11 @@ sub parse {
       $remoteasset = {};
       $remoteasset->{'digest'} = $1 if $1;
     }
+    if ($preamble && $line =~ /^\#\!RemoteAssetUrl:\s*(\S+)\s*$/i) {
+      $remoteasset->{'url'} = $1;
+      push @{$ret->{'remoteassets'}}, $remoteasset;
+      $remoteasset = undef;
+    }
     if ($line =~ /^(?:Requires\(pre\)|Requires\(post\)|PreReq)\s*:\s*(\S.*)$/i) {
       my $deps = $1;
       my @deps;
