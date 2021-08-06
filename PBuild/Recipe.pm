@@ -166,11 +166,11 @@ sub split_hostdeps {
       $alsonative{$_} = 1;
     }
   }
-  return unless %onlynative || %alsonative;
-  my @hdep = grep {$onlynative{$_} || $alsonative{$_}} @{$p->{'dep'}};
-  return unless @hdep;
+  my @hdep;
   $p->{'dep_host'} = \@hdep;
-  $p->{'dep'} = [ grep {!$onlynative{$_}} @{$p->{'dep'}}] if %onlynative;
+  return unless %onlynative || %alsonative;
+  @hdep = grep {$onlynative{$_} || $alsonative{$_}} @{$p->{'dep'}};
+  $p->{'dep'} = [ grep {!$onlynative{$_}} @{$p->{'dep'}}] if @hdep && %onlynative;
 }
 
 1;
