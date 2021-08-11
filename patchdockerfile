@@ -39,7 +39,7 @@ print join('', @{shift @sections});
 
 for my $s (@sections) {
   # analyze the section (first line is always FROM)
-  my ($install_idx, $uninstall_idx);
+  my ($install_idx, $uninstall_idx, $from_scratch);
   my $idx = 0;
   for my $line (@$s) {
     if ($line =~ /^[uU][sS][eE][rR]\s+root[\s\n]/) {
@@ -48,12 +48,16 @@ for my $s (@sections) {
     } elsif ($line =~ /^[uU][sS][eE][rR]\s+/) {
       $install_idx = 0 unless defined $install_idx;
       $uninstall_idx = $idx unless defined $uninstall_idx;
+    } elsif ($line =~ /^FROM\s+scratch[\s\n]/) {
+      $from_scratch = $idx
     }
     $idx++;
   }
-  # patch in commands
-  $s->[$install_idx || 0] .= $install_docker_support;
-  substr($s->[$uninstall_idx], 0, 0, $uninstall_docker_support) if defined $uninstall_idx;
-  $s->[-1] .= $uninstall_docker_support unless defined $uninstall_idx;
+  unless (defined $from_scratch) {
+      # patch in commands
+      $s->[$install_idx || 0] .= $install_docker_support;
+      substr($s->[$uninstall_idx], 0, 0, $uninstall_docker_support) if defined $uninstall_idx;
+      $s->[-1] .= $uninstall_docker_support unless defined $uninstall_idx;
+  }
   print join('', @$s);
 }
