@@ -509,6 +509,7 @@ sub parse {
   my $buildflavor = defined($config->{'buildflavor'}) ? $config->{'buildflavor'} : '';
   my $remoteasset;
   my $multilinedefine;
+  my $multilinecondition;
   while (1) {
     my $line;
     my $doxspec = $xspec ? 1 : 0;
@@ -548,6 +549,15 @@ sub parse {
       undef $multilinedefine;
       if ($line =~ /\\\z/s) {
 	$multilinedefine = $line;	# we need another line!
+	next;
+      }
+    }
+    if ($multilinecondition || $line =~ /^\s*\%\{\?.*:\s*$/s) {
+      # is this a multi-line macro definition?
+      $line = "$multilinecondition\n$line" if defined $multilinecondition;
+      undef $multilinecondition;
+      if ($line !~ /\}\s*$/s) {
+	$multilinecondition = $line;	# we need another line!
 	next;
       }
     }
