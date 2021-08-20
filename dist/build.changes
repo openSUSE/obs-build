@@ -1,5 +1,5 @@
 -------------------------------------------------------------------
-Thu Aug 19 09:44:26 UTC 2021 - Adrian Schröter <adrian@suse.de>
+Fri Aug 20 07:44:26 UTC 2021 - Adrian Schröter <adrian@suse.de>
 
 Features:
 - cross architecture build support (for rpm and kiwi)
@@ -14,6 +14,7 @@ Features:
 - allow to disable squashfs in SimpleImage
 - supporting aarch64 kernel on armv?l distributions
 - kiwi: Add support for OBS-RemoteAsset and OBS-CopyToImage directives
+- container: FROM scratch build support
 
 Improvements:
 - supporting kvm builds as non-root user
