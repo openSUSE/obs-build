@@ -43,18 +43,18 @@ recipe_build_simpleimage() {
 
     echo "creating simple image..."
     cd $BUILD_ROOT || cleanup_and_exit 1
-    export SRCDIR="$TOPDIR/SOURCES"
+    export SRCDIR="$BUILD_ROOT$TOPDIR/SOURCES"
 
-    NAME="`sed -n 's|Name:[[:blank:]]*||p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage`"
+    NAME="`sed -n 's|Name:[[:blank:]]*||p' $SRCDIR/simpleimage`"
     [ -n "$NAME" ] || NAME="simpleimage"
-    VERSION="`sed -n 's|Version:[[:blank:]]*||p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage`"
+    VERSION="`sed -n 's|Version:[[:blank:]]*||p' $SRCDIR/simpleimage`"
     [ -n "$VERSION" ] || VERSION="`date -u +%y.%m.%d-%H.%M.%S`"
 
     SHELL="/bin/sh"
     [ -x $BUILD_ROOT/bin/bash ] && SHELL="/bin/bash"
-    if [ "`grep '^%build$' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage`" ]; then
+    if [ "`grep '^%build$' $SRCDIR/simpleimage`" ]; then
       echo "Running integration script..."
-      sed -n '/%build/,$ p' $BUILD_ROOT$TOPDIR/SOURCES/simpleimage | tail -n +2 | chroot $BUILD_ROOT $SHELL -x || cleanup_and_exit 1
+      sed -n '/%build/,$ p' $SRCDIR/simpleimage | tail -n +2 | chroot $BUILD_ROOT $SHELL -x || cleanup_and_exit 1
       echo "Integration script finished."
     fi
 
