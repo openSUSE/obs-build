@@ -508,6 +508,8 @@ sub parse {
   my $obspackage = defined($config->{'obspackage'}) ? $config->{'obspackage'} : '@OBS_PACKAGE@';
   my $buildflavor = defined($config->{'buildflavor'}) ? $config->{'buildflavor'} : '';
   my $remoteasset;
+  my $multilinedefine;
+  my $multilinecondition;
   while (1) {
     my $line;
     my $doxspec = $xspec ? 1 : 0;
@@ -540,6 +542,24 @@ sub parse {
       $hasnfb = $1;
       $nfbline = \$xspec->[-1] if $doxspec;
       next;
+    }
+    if ($multilinedefine || $line =~ /^\s*%(?:define|global)\s/s) {
+      # is this a multi-line macro definition?
+      $line = "$multilinedefine\n$line" if defined $multilinedefine;
+      undef $multilinedefine;
+      if ($line =~ /\\\z/s) {
+	$multilinedefine = $line;	# we need another line!
+	next;
+      }
+    }
+    if ($multilinecondition || $line =~ /^\s*\%\{\?.*:\s*$/s) {
+      # is this a multi-line macro definition?
+      $line = "$multilinecondition\n$line" if defined $multilinecondition;
+      undef $multilinecondition;
+      if ($line !~ /\}\s*$/s) {
+	$multilinecondition = $line;	# we need another line!
+	next;
+      }
     }
     if ($line =~ /^\s*#/) {
       next unless $line =~ /^#!/;
@@ -619,7 +639,7 @@ sub parse {
       }
     }
     if ($main_preamble) {
-      if ($line =~ /^(Name|Version|Disttag|Release)\s*:\s*(\S+)/i) {
+      if ($line =~ /^(Name|Epoch|Version|Release|Disttag)\s*:\s*(\S+)/i) {
 	$ret->{lc $1} = $2;
 	$macros{lc $1} = $2;
       } elsif ($line =~ /^ExclusiveArch\s*:\s*(.*)/i) {
@@ -642,6 +662,11 @@ sub parse {
     if ($preamble && $line =~ /^\#\!RemoteAsset(?::\s*([a-z0-9]+:[0-9a-f]+))?\s*$/i) {
       $remoteasset = {};
       $remoteasset->{'digest'} = $1 if $1;
+    }
+    if ($preamble && $line =~ /^\#\!RemoteAssetUrl:\s*(\S+)\s*$/i) {
+      $remoteasset->{'url'} = $1;
+      push @{$ret->{'remoteassets'}}, $remoteasset;
+      $remoteasset = undef;
     }
     if ($line =~ /^(?:Requires\(pre\)|Requires\(post\)|PreReq)\s*:\s*(\S.*)$/i) {
       my $deps = $1;
@@ -832,6 +857,7 @@ my %rpmstag = (
   "SUMMARY"        => 1004,
   "DESCRIPTION"    => 1005,
   "BUILDTIME"      => 1006,
+  "LICENSE"        => 1014,
   "ARCH"           => 1022,
   "OLDFILENAMES"   => 1027,
   "SOURCERPM"      => 1044,
@@ -1157,6 +1183,7 @@ sub query {
   push @tags, qw{SUMMARY DESCRIPTION} if $opts{'description'};
   push @tags, qw{DISTURL} if $opts{'disturl'};
   push @tags, qw{BUILDTIME} if $opts{'buildtime'};
+  push @tags, qw{LICENSE} if $opts{'license'};
   push @tags, qw{CONFLICTNAME CONFLICTVERSION CONFLICTFLAGS OBSOLETENAME OBSOLETEVERSION OBSOLETEFLAGS} if $opts{'conflicts'};
   push @tags, qw{RECOMMENDNAME RECOMMENDVERSION RECOMMENDFLAGS SUGGESTNAME SUGGESTVERSION SUGGESTFLAGS SUPPLEMENTNAME SUPPLEMENTVERSION SUPPLEMENTFLAGS ENHANCENAME ENHANCEVERSION ENHANCEFLAGS OLDSUGGESTSNAME OLDSUGGESTSVERSION OLDSUGGESTSFLAGS OLDENHANCESNAME OLDENHANCESVERSION OLDENHANCESFLAGS} if $opts{'weakdeps'};
 
@@ -1238,6 +1265,7 @@ sub query {
   }
   $data->{'buildtime'} = $res{'BUILDTIME'}->[0] if $opts{'buildtime'};
   $data->{'disturl'} = $res{'DISTURL'}->[0] if $opts{'disturl'} && $res{'DISTURL'};
+  $data->{'license'} = $res{'LICENSE'}->[0] if $opts{'license'} && $res{'LICENSE'};
   return $data;
 }
 

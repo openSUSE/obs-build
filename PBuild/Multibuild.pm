@@ -80,4 +80,15 @@ sub expand_multibuilds {
   }
 }
 
+sub count_multibuilds {
+  my ($pkgs) = @_;
+  my $c = 0;
+  for (values %$pkgs) {
+    my $files = $_->{'files'} || {};
+    next unless $files->{'_multibuild'} || ($files->{'_service'} && $files->{find_mbname($files)});
+    $c++;
+  }
+  return $c;
+}
+
 1;

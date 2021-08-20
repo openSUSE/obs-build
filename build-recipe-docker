@@ -60,6 +60,7 @@ recipe_build_docker() {
     base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
     test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
 
+    mkdir -p "$BUILD_ROOT/$TOPDIR/SOURCES/repos"
     if test "$BUILDENGINE" = podman; then
         DOCKER_TOOL=podman
         DOCKER_CMD="$BUILD_DIR/call-podman --root $BUILD_ROOT"
@@ -178,7 +179,7 @@ recipe_build_docker() {
     FILENAME="$FILENAME.${BUILD_ARCH%%:*}"
     test -n "$RELEASE" && FILENAME="$FILENAME-$RELEASE"
     echo "Saving image $FIRSTTAG to $FILENAME.tar"
-    if $DOCKER_CMD save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$FIRSTTAG" ; then
+    if ! $DOCKER_CMD save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$FIRSTTAG" ; then
         cleanup_and_exit 1 "$DOCKER_TOOL save command failed"
     fi
     

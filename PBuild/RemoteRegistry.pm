@@ -190,8 +190,7 @@ sub fetchbinaries {
   }
   return unless %tofetch;
   my @tofetch = sort keys %tofetch;
-  my $ntofetch = @tofetch;
-  print "fetching $ntofetch container blobs from $url\n";
+  print "fetching ".PBuild::Util::plural(scalar(@tofetch), 'container blob')." from $url\n";
   my $ua = PBuild::Download::create_ua();
   PBuild::Util::mkdir_p($repodir);
   for my $tofetch (@tofetch) {

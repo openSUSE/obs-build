@@ -1,0 +1,223 @@
+#!/usr/bin/perl -w
+
+################################################################
+#
+# Copyright (c) 2021 SUSE Linux GmbH
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+# modulemd writing support
+
+BEGIN {
+  unshift @INC, ($::ENV{"BUILD_DIR"} || "/usr/lib/build");
+}
+
+use strict;
+
+use Build::Rpm;
+use Build::SimpleYAML;
+use Data::Dumper;
+
+sub convertdeps {
+  my ($d) = @_;
+  my $nd = {};
+  for my $dd (@$d) {
+    my ($n, @v) = split(':', $dd);
+    $nd->{$n} = \@v;
+  }
+  return $nd;
+}
+
+sub printmd {
+  my ($md) = @_;
+  $md->{'_order'} = [ 'document', 'version', 'data' ];
+  $md->{'_type'}->{'version'} = 'number';
+
+  my $mdd = $md->{'data'};
+  $mdd->{'_order'} = [ 'module', 'name', 'stream', 'version', 'context', 'arch', 'summary', 'description', 'license', 'xmd', 'dependencies', 'references', 'profiles', 'api', 'filter', 'buildopts', 'components', 'artifacts' ];
+  $mdd->{'_type'}->{'version'} = 'number';
+  $mdd->{'_type'}->{'description'} = 'folded';
+  if ($mdd->{'license'}) {
+    $mdd->{'license'}->{'_order'} = [ 'module', 'content' ];
+  }
+  if ($mdd->{'components'} && $mdd->{'components'}->{'rpms'}) {
+    for (values %{$mdd->{'components'}->{'rpms'}}) {
+      $_->{'_order'} = [ 'rationale', 'ref', 'buildorder', 'arches' ];
+      $_->{'_type'}->{'buildorder'} = 'number';
+      $_->{'_type'}->{'arches'} = 'inline';
+    }
+  }
+  if ($mdd->{'buildopts'} && $mdd->{'buildopts'}->{'rpms'}) {
+    $mdd->{'buildopts'}->{'rpms'}->{'_type'}->{'macros'} = 'literal';
+  }
+  for my $d (@{$mdd->{'dependencies'} || []}) {
+    $d->{'requires'}->{'_type'}->{'*'} = 'inline' if $d->{'requires'};
+    $d->{'buildrequires'}->{'_type'}->{'*'} = 'inline' if $d->{'buildrequires'};
+  }
+  if ($md->{'document'} eq 'modulemd-defaults' && $mdd->{'profiles'}) {
+    $mdd->{'profiles'}->{'_type'}->{'*'} = 'inline';
+  }
+  print Build::SimpleYAML::unparse($md);
+}
+
+sub readmds {
+  my ($modulemdfile) = @_;
+  my $mds;
+  if ($modulemdfile =~ /\.pst$/) {
+    require Storable;
+    $mds = Storable::retrieve($modulemdfile);
+    $mds = [ $mds ] if ref($mds) eq 'HASH';
+  } elsif ($modulemdfile =~ /\.ya?ml$/) {
+    require YAML::XS;
+    $YAML::XS::LoadBlessed = $YAML::XS::LoadBlessed = 0;
+    $mds = [ YAML::XS::LoadFile($modulemdfile) ];
+  } else {
+    die("unsupported modulemd file: $modulemdfile\n");
+  }
+  die("no modulemd data\n") unless @$mds;
+  for my $md (@$mds) {
+    die("bad modulemd data\n") unless $md && ref($md) eq 'HASH' && $md->{'data'} && $md->{'document'};
+    die("unknown modulemd document\n") if $md->{'document'} ne 'modulemd' && $md->{'document'} ne 'modulemd' && $md->{'document'} ne 'modulemd-defaults';
+    die("bad modulemd version \n") if $md->{'document'} eq 'modulemd' && $md->{'version'} != 2;
+    die("bad modulemd version \n") if $md->{'document'} eq 'modulemd-defaults' && $md->{'version'} != 1;
+  }
+  return $mds;
+}
+
+sub unifyandsort {
+  my %m = map {$_ => 1} @_;
+  return [ sort keys %m ];
+}
+
+if (@ARGV && $ARGV[0] eq '--filter') {
+  shift @ARGV;
+  die("usage: writemodulemd --filter <modulemdfile> <primaryfile>\n") unless @ARGV == 2;
+  my ($modulemdfile, $primaryfile) = @ARGV;
+  my $mds = readmds($modulemdfile);
+  require Build::Rpmmd;
+  if ($primaryfile ne '-' && -d $primaryfile) {
+    die("$primaryfile/repomd.xml: $!\n") unless -e "$primaryfile/repomd.xml";
+    # primaryfile is repomd directory
+    my $files = Build::Rpmmd::parse_repomd("$primaryfile/repomd.xml");
+    my @primaryfiles = grep {$_->{'type'} eq 'primary' && defined($_->{'location'})} @{$files || []};
+    die("no primary files in repodata\n") unless @primaryfiles;
+    @primaryfiles = grep {$_->{'location'} =~ /\.xml(?:\.xz|\.gz)?$/} @primaryfiles;
+    die("cannot decompress primary file\n") unless @primaryfiles;
+    my $loc = $primaryfiles[0]->{'location'};
+    $loc =~ s/.*\///;
+    $primaryfile .= "/$loc";
+  }
+  if ($primaryfile ne '-') {
+    if ($primaryfile =~ /\.gz$/) {
+      open(STDIN, '-|', 'gunzip', '-dc', '--', $primaryfile) || die("$primaryfile: $!\n");
+    } elsif ($primaryfile =~ /\.xz$/) {
+      open(STDIN, '-|', 'xzdec', '-dc', '--', $primaryfile) || die("$primaryfile: $!\n");
+    } else {
+      open(STDIN, '<', $primaryfile) || die("$primaryfile: $!\n");
+    }
+  }
+  my %rpms;
+  Build::Rpmmd::parse(\*STDIN, sub {
+    my ($r) = @_;
+    my $evr = ($r->{'epoch'} || 0).":$r->{'version'}-$r->{'release'}";
+    $rpms{"$r->{'name'}-$evr.$r->{'arch'}"} = $r->{'license'};
+  }, 'withlicense' => 1);
+  my %outmds;
+  my %havens;
+  for my $md (@$mds) {
+    my $mdd = $md->{'data'};
+    if ($md->{'document'} eq 'modulemd-defaults') {
+      my $ns = "$mdd->{'module'}:$mdd->{'stream'}";
+      $outmds{$ns} = $md;
+      next;
+    }
+    # check if we have this md in the rpms
+    next unless $mdd->{'artifacts'};
+    my @have = grep {exists $rpms{$_}} @{$mdd->{'artifacts'} && $mdd->{'artifacts'}->{'rpms'} || []};
+    next unless @have;
+
+    # filter artifacts and licenses
+    my %licenses;
+    for (@have) {
+      $licenses{$rpms{$_}} = 1 if defined $rpms{$_};
+    }
+    $mdd->{'artifacts'}->{'rpms'} = \@have;
+    delete $mdd->{'license'}->{'content'} if $mdd->{'license'} && $mdd->{'license'}->{'content'};
+    $mdd->{'license'}->{'content'} = [ sort keys %licenses ] if %licenses;
+
+    my $ns = "$mdd->{'name'}:$mdd->{'stream'}";
+    $havens{$ns} = 1;
+    my $nsca = "$mdd->{'name'}:$mdd->{'stream'}:$mdd->{'context'}:$mdd->{'arch'}";
+    my $omd = $outmds{$nsca};
+    if ($omd) {
+      # merge with existing entry
+      my $omdd = $omd->{'data'};
+      ($md, $omd, $mdd, $omdd) = ($omd, $md, $omdd, $mdd) if $omdd->{'version'} > $mdd->{'version'};
+      $mdd->{'artifacts'}->{'rpms'} = unifyandsort(@{$mdd->{'artifacts'}->{'rpms'}}, @{$omdd->{'artifacts'}->{'rpms'}});
+      my $licenses = unifyandsort(@{$mdd->{'license'}->{'content'}}, @{$omdd->{'license'}->{'content'}});
+      delete $mdd->{'license'}->{'content'};
+      $mdd->{'license'}->{'content'} = $licenses if @$licenses;
+    }
+    $outmds{$nsca} = $md;
+  }
+  # now dump em all
+  for (sort keys %outmds) {
+    my $md = $outmds{$_};
+    if ($md->{'document'} eq 'modulemd-defaults') {
+      my $mdd = $md->{'data'};
+      my $ns = "$mdd->{'module'}:$mdd->{'stream'}";
+      next unless $havens{$ns};
+    }
+    printmd($md);
+  }
+  exit;
+}
+
+die("usage: writemodulemd <modulemdfile> <rpmmanifestfile>\n") unless @ARGV == 2;
+my ($modulemdfile, $manifestfile) = @ARGV;
+
+my $mds = readmds($modulemdfile);
+
+my @mds_good = grep {$_->{'document'} eq 'modulemd'} @$mds;
+die("need exactly one modulemd document\n") unless @mds_good == 1;
+my $md = $mds_good[0];
+
+my $mdd = $md->{'data'};
+# convert deps if needed (to be removed)
+for my $d (@{$mdd->{'dependencies'} || []}) {
+  $d->{'requires'} = convertdeps($d->{'requires'}) if ref($d->{'requires'}) eq 'ARRAY';
+  $d->{'buildrequires'} = convertdeps($d->{'buildrequires'}) if ref($d->{'buildrequires'}) eq 'ARRAY';
+}
+delete $mdd->{'artifacts'};
+delete $mdd->{'license'}->{'content'} if $mdd->{'license'} && $mdd->{'license'}->{'content'};
+if ($manifestfile ne '-') {
+  open(STDIN, '<', $manifestfile) || die("$manifestfile: $!\n");
+}
+my %licenses;
+while (<STDIN>) {
+  chomp;
+  my $r = Build::Rpm::query($_, 'evra' => 1, 'license' => 1);
+  $r->{'epoch'} ||= 0;
+  my $nevra = "$r->{'name'}-$r->{'epoch'}:$r->{'version'}-$r->{'release'}.$r->{'arch'}";
+  my $license = $r->{'license'};
+  $licenses{$license} = 1;
+  push @{$mdd->{'artifacts'}->{'rpms'}}, $nevra;
+}
+$mdd->{'license'}->{'content'} = [ sort keys %licenses ] if %licenses;
+printmd($_) for @$mds;
+
+

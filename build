@@ -273,7 +273,7 @@ Known Parameters:
               Use sccache to speed up rebuilds. Conflicts with --ccache.
 
   --sccache-uri
-              Optional URI for remote sccache storage. Implies --sccache.
+              Optional URI for remote or archive sccache storage. Implies --sccache.
 
   --icecream N
               Use N parallel build jobs with icecream
@@ -563,6 +563,14 @@ setupsccache() {
         echo "SCCACHE_URI=${SCCACHE_URI}"
         if [[ ${SCCACHE_URI} = redis* ]] ; then
             echo "export SCCACHE_REDIS=${SCCACHE_URI}" >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
+        fi
+        if [[ ${SCCACHE_URI} = file* ]] ; then
+            FILE_URI=${SCCACHE_URI:7}
+            mkdir -p "$BUILD_ROOT/.sccache"
+            test -e ${FILE_URI} && tar -xf ${FILE_URI} -C "$BUILD_ROOT/.sccache"
+            chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.sccache"
+            echo 'export SCCACHE_DIR="/.sccache"' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
+            echo 'export SCCACHE_CACHE_SIZE="8G"' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
         fi
         # Display sccache status at the start of the build.
         chroot $BUILD_ROOT su -c "sccache -s" - $BUILD_USER
@@ -1353,6 +1361,7 @@ fi
 
 test "$BUILD_ARCH" = all && BUILD_ARCH=
 BUILD_USER_ABUILD_USED=
+MODULEMDFILE=
 
 for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 
@@ -1378,6 +1387,11 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	 cleanup_and_exit 1 "$RECIPEFILE is empty.  This should not happen..."
     fi
     MYSRCDIR="$SRCDIR"
+
+    # remember the modulemd file if we have one
+    test -s _modulemd.yml && MODULEMDFILE="$SRCDIR/_modulemd.yml"
+    test -s _modulemd.yaml && MODULEMDFILE="$SRCDIR/_modulemd.yaml"
+    test -s _modulemd.pst && MODULEMDFILE="$SRCDIR/_modulemd.pst"
 
     # special hack to build from a .src.rpm (modifies MYSRCDIR)
     test "$RECIPEFILE" != "${RECIPEFILE%.src.rpm}" && recipe_unpack_srcrpm
@@ -1724,6 +1738,16 @@ fi
 if test -n "$SCCACHE" ; then
     # Display sccache statistics post build.
     chroot $BUILD_ROOT su -c "sccache -s" - $BUILD_USER
+    # wbrown - archive local sccache if file backed.
+    if [[ ${SCCACHE_URI} = file* ]] ; then
+        FILE_URI=${SCCACHE_URI:7}
+        tar -a -cf ${FILE_URI} -C "$BUILD_ROOT/.sccache" .
+    fi
+fi
+
+if test -n "$MODULEMDFILE" ; then
+   mkdir -p "$BUILD_ROOT/$TOPDIR/OTHER"
+   find "$BUILD_ROOT/$TOPDIR/RPMS" "$BUILD_ROOT/$TOPDIR/SRPMS" -type f -name "*.rpm" | $BUILD_DIR/writemodulemd "$MODULEMDFILE" - > "$BUILD_ROOT/$TOPDIR/OTHER/_modulemd.yaml"
 fi
 
 exitcode=0

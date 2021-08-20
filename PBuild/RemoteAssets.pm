@@ -71,13 +71,19 @@ sub archlinux_parse {
 }
 
 #
-# Spec file remote asset handling
+# Recipe file remote asset handling
 #
-sub spec_parse {
+sub recipe_parse {
   my ($p) = @_;
   my @assets;
   for my $s (@{$p->{'remoteassets'} || []}) {
     my $url = $s->{'url'};
+    if ($url && $url =~ /^git(?:-https?)?:.*\/([^\/]+?)(?:.git)?(?:\#[^\#\/]+)?$/) {
+      my $file = $1;
+      next if $p->{'files'}->{$file};
+      push @assets, { 'file' => $file, 'url' => $url, 'type' => 'url', 'isdir' => 1 };
+      next;
+    }
     next unless $s->{'url'} =~ /(?:^|\/)([^\.\/][^\/]+)$/s;
     my $file = $1;
     next if $p->{'files'}->{$file};
@@ -129,8 +135,7 @@ sub fedpkg_fetch {
   die("need a parsed name to download fedpkg assets\n") unless $p->{'name'};
   my @assets = grep {$_->{'digest'}} @$assets;
   return unless @assets;
-  my $nassets = @assets;
-  print "fetching $nassets assets from $url\n";
+  print "fetching ".PBuild::Util::plural(scalar(@assets), 'asset')." from $url\n";
   for my $asset (@assets) {
     my $assetid = $asset->{'assetid'};
     my $adir = "$assetdir/".substr($assetid, 0, 2);
@@ -155,8 +160,7 @@ sub ipfs_fetch {
   my ($p, $assetdir, $assets) = @_;
   my @assets = grep {($_->{'type'} || '') eq 'ipfs'} @$assets;
   return unless @assets;
-  my $nassets = @assets;
-  print "fetching $nassets from the InterPlanetary File System\n";
+  print "fetching ".PBuild::Util::plural(scalar(@assets), 'asset')." from the InterPlanetary File System\n";
   # for now assume /ipfs is mounted...
   die("/ipfs is not available\n") unless -d '/ipfs';
   for my $asset (@assets) {
@@ -167,6 +171,39 @@ sub ipfs_fetch {
     PBuild::Util::cp($asset->{'cid'}, "$adir/.$assetid.$$");
     rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
   }
+}
+
+sub fetch_git_asset {
+  my ($assetdir, $asset) = @_;
+  my $tmpdir = "$assetdir/.tmpdir.$$";
+  if (-e $tmpdir) {
+    PBuild::Util::cleandir($tmpdir);
+    rmdir($tmpdir) || die("rmdir $tmpdir: $!\n");
+  }
+  PBuild::Util::mkdir_p($tmpdir);
+  my $assetid = $asset->{'assetid'};
+  my $adir = "$assetdir/".substr($assetid, 0, 2);
+  my $file = $asset->{'file'};
+  $file =~ s/\.obscpio$//;
+  PBuild::Util::mkdir_p($adir);
+  my $url = $asset->{'url'};
+  die unless $url =~ /^git(?:-https?)?:/;
+  $url =~ s/^git-//;
+  my @cmd = ('git', 'clone', '-q');
+  push @cmd, '-b', $1 if $url =~ s/#([^#]+)$//;
+  push @cmd, '--', $url, "$tmpdir/$file";
+  system(@cmd) && die("git clone failed: $!\n");
+  my $dd = $$;
+  my $pid = PBuild::Util::xfork();
+  if (!$pid) {
+    chdir($tmpdir) || die("chdir $tmpdir: $!\n");
+    open(STDOUT, '>', "$adir/.$assetid.$dd") || die("$adir/.$assetid.$dd: $!");
+    exec('find . | cpio -o --format=newc 2>/dev/null');
+  }
+  waitpid($pid, 0) == $pid || die("waitpid: $!\n");
+  PBuild::Util::cleandir($tmpdir);
+  rmdir($tmpdir) || die("rmdir $tmpdir: $!\n");
+  rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
 }
 
 #
@@ -185,10 +222,13 @@ sub url_fetch {
   }
   for my $hosturl (sort keys %tofetch_host) {
     my $tofetch = $tofetch_host{$hosturl};
-    my $ntofetch = @$tofetch;
-    print "fetching $ntofetch assets from $hosturl\n";
+    print "fetching ".PBuild::Util::plural(scalar(@$tofetch), 'asset')." from $hosturl\n";
     for my $asset (@$tofetch) {
       my $assetid = $asset->{'assetid'};
+      if ($asset->{'url'} =~ /^git(?:-https?)?:/) {
+	fetch_git_asset($assetdir, $asset);
+	next;
+      }
       my $adir = "$assetdir/".substr($assetid, 0, 2);
       PBuild::Util::mkdir_p($adir);
       if (PBuild::Download::download($asset->{'url'}, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1)) {

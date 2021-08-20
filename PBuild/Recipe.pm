@@ -70,7 +70,7 @@ sub find_recipe {
 # Find and parse a recipe file
 #
 sub parse {
-  my ($bconf, $p, $buildtype, $arch) = @_;
+  my ($bconf, $p, $buildtype, $arch, $bconf_host, $arch_host) = @_;
   if ($p->{'pkg'} eq '_product') {
     $p->{'error'} = 'excluded';
     return;
@@ -92,6 +92,13 @@ sub parse {
   eval {
     $d = Build::parse_typed($bconf, "$p->{'dir'}/$recipe", $bt);
     die("can not parse $recipe\n") unless $d;
+    if ($bconf_host && $d->{'nativebuild'}) {
+      $p->{'native'} = 1;
+      local $bconf_host->{'buildflavor'} = $p->{'flavor'};
+      $d = Build::parse_typed($bconf_host, "$p->{'dir'}/$recipe", $bt);
+      die("can not parse $recipe\n") unless $d;
+      $arch = $arch_host;
+    }
     die("can not parse name from $recipe\n") unless $d->{'name'};
   };
   if ($@) {
@@ -102,7 +109,6 @@ sub parse {
   my $version = defined($d->{'version'}) ? $d->{'version'} : 'unknown';
   $p->{'version'} = $version;
   $p->{'name'} = $d->{'name'};
-  $p->{'native'} = 1 if $d->{'nativebuild'};
   $p->{'dep'} = $d->{'deps'};
   $p->{'onlynative'} = $d->{'onlynative'} if $d->{'onlynative'};
   $p->{'alsonative'} = $d->{'alsonative'} if $d->{'alsonative'};
@@ -130,7 +136,7 @@ sub parse {
       $p->{$_} = $d->{$_} if /^(?:source|md5sums|sha\d+sums)(?:_|$)/;
     }
   }
-  $p->{'remoteassets'} = $d->{'remoteassets'} if $bt eq 'spec' && $d->{'remoteassets'};
+  $p->{'remoteassets'} = $d->{'remoteassets'} if ($bt eq 'spec' || $bt eq 'kiwi') && $d->{'remoteassets'};
   # check if we can build this
   if ($bt eq 'kiwi' && $imagetype eq 'product') {
     $p->{'error'} = 'cannot build kiwi products yet';
@@ -160,11 +166,11 @@ sub split_hostdeps {
       $alsonative{$_} = 1;
     }
   }
-  return unless %onlynative || %alsonative;
-  my @hdep = grep {$onlynative{$_} || $alsonative{$_}} @{$p->{'dep'}};
-  return unless @hdep;
+  my @hdep;
   $p->{'dep_host'} = \@hdep;
-  $p->{'dep'} = [ grep {!$onlynative{$_}} @{$p->{'dep'}}] if %onlynative;
+  return unless %onlynative || %alsonative;
+  @hdep = grep {$onlynative{$_} || $alsonative{$_}} @{$p->{'dep'}};
+  $p->{'dep'} = [ grep {!$onlynative{$_}} @{$p->{'dep'}}] if @hdep && %onlynative;
 }
 
 1;

@@ -74,7 +74,7 @@ sub known_presets {
   return @presetnames;
 }
 
-# show resets
+# show presets
 sub list_presets {
   my ($dir) = @_;
   my @presetnames = known_presets($dir);

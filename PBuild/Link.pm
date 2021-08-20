@@ -92,4 +92,9 @@ sub expand_links {
   }
 }
 
+sub count_links {
+  my ($pkgs) = @_;
+  return 0 + (grep {($_->{'files'} || {})->{'_link'}} values %$pkgs);
+}
+
 1;

@@ -50,6 +50,8 @@ use PBuild::Preset;
 use PBuild::Distro;
 use PBuild::Repoquery;
 
+my $libbuild = $INC[0];
+
 # parse options
 my ($opts, @dirs) = PBuild::Options::parse_options(@ARGV);
 PBuild::Options::usage(0) if $opts->{'help'};
@@ -58,9 +60,20 @@ my $dir = @dirs ? $dirs[0] : '.';
 $dir = Cwd::abs_path($dir) if $dir !~ /^\//;
 $dir =~ s/(.)\/+$/$1/s;
 
+if ($opts->{'list-presets'}) {
+  PBuild::Preset::list_presets($dir);
+  exit;
+}
+
 # set defaults
-my $libbuild = $INC[0];
 $opts->{'libbuild'} = $libbuild;
+if ($<) {
+  $opts->{'vm-type'} ||= 'kvm';
+  if (!$opts->{'root'}) {
+    my $username = $ENV{LOGNAME} || $ENV{USER} || getpwuid($<) || sprintf("%u", $<);
+    $opts->{'root'} = "/var/tmp/build-root-$username";
+  }
+}
 $opts->{'root'} ||= '/var/tmp/build-root';
 $opts->{'root'} = Cwd::abs_path($opts->{'root'}) if $opts->{'root'} !~ /^\//;
 $opts->{'root'} =~ s/(.)\/+$/$1/s;
@@ -74,12 +87,7 @@ if (!$opts->{'hostarch'}) {
 $opts->{'buildjobs'} = 1 unless $opts->{'buildjobs'};
 $opts->{'buildjobs'} = 32 if $opts->{'buildjobs'} > 32;
 
-if ($opts->{'list-presets'}) {
-  PBuild::Preset::list_presets($dir);
-  exit;
-}
-
-# read presets
+# read and apply presets
 my $preset = PBuild::Preset::read_presets($dir, $opts->{'preset'});
 PBuild::Preset::apply_preset($opts, $preset) if $preset;
 print "Using default preset: $preset->{'name'}\n" if $preset && !$opts->{'preset'};
@@ -97,7 +105,7 @@ my $hostarch = $opts->{'hostarch'};
 $opts->{'arch'} ||= $hostarch;
 my $myarch = $opts->{'arch'};
 
-my $builddir = $reponame ? "$dir/_build.$reponame.$myarch" : "$dir/_build.$myarch";
+my $builddir = $reponame && $reponame ne $myarch ? "$dir/_build.$reponame.$myarch" : "$dir/_build.$myarch";
 
 if ($opts->{'result-code'} || $opts->{'result-pkg'}) {
   PBuild::Result::print_result($opts, $builddir);
@@ -144,6 +152,7 @@ my $buildconfig = Build::combine_configs(reverse(@baseconfigs), $localconfig);
 my $bconf = Build::read_config($myarch, [ split("\n", $buildconfig) ]);
 my $bconf_host = $cross ? Build::read_config($hostarch, [ split("\n", $buildconfig) ]) : undef;
 
+# make sure our config includes some basic setup
 if (!@{($bconf_host || $bconf)->{'preinstall'} || []}) {
   my @presetnames = PBuild::Preset::known_presets($dir);
   if (@presetnames) {
@@ -183,7 +192,8 @@ if ($cross) {
 }
 
 # expand the zypp:// repo
-PBuild::RemoteRepo::expand_zypp_repo($opts) if $opts->{'repo'};
+PBuild::RemoteRepo::expand_zypp_repo($opts->{'repo'});
+PBuild::RemoteRepo::expand_zypp_repo($opts->{'hostrepo'}) if $cross;
 
 print "starting project builder\n";
 print "    source directory: $dir\n";
@@ -211,8 +221,7 @@ if ($cross && @{$opts->{'hostrepo'} || []}) {
 print "searching for packages\n";
 my @pkgs = PBuild::Source::find_packages($dir);
 die("no packages found in '$dir'\n") unless @pkgs;
-my $npkgs = @pkgs;
-print "found $npkgs packages\n";
+print "found ".PBuild::Util::plural(scalar(@pkgs), 'package')."\n";
 
 my $assetmgr = PBuild::AssetMgr::create("$dir/.pbuild/_assets");
 for my $assetsurl (@{$opts->{'assets'} || []}) {
@@ -223,31 +232,30 @@ print "getting package information\n";
 my %pkgsrc;
 for my $pkg (@pkgs) {
   my ($files, $asset_files) = PBuild::Source::list_package("$dir/$pkg");
-  $pkgsrc{$pkg} = {
+  my $p = {
     'pkg' => $pkg,
     'dir' => "$dir/$pkg",
     'files' => $files,
     'srcmd5' => PBuild::Source::calc_srcmd5($files),
   };
-  $pkgsrc{$pkg}->{'asset_files'} = $asset_files if %{$asset_files || {}};
+  $p->{'asset_files'} = $asset_files if %{$asset_files || {}};
+  $pkgsrc{$pkg} = $p;
 }
 
 # handle local links and multibuild packages
-print "expanding package links\n";
-PBuild::Link::expand_links(\%pkgsrc);
+my $nlink = PBuild::Link::count_links(\%pkgsrc);
+if ($nlink) {
+  print "expanding ".PBuild::Util::plural($nlink, 'package link')."\n";
+  PBuild::Link::expand_links(\%pkgsrc);
+}
 
-print "expanding multibuild packages\n";
-PBuild::Multibuild::expand_multibuilds(\%pkgsrc);
+my $nmultibuild = PBuild::Multibuild::count_multibuilds(\%pkgsrc);
+if ($nmultibuild) {
+  print "expanding ".PBuild::Util::plural($nmultibuild, 'multibuild package')."\n";
+  PBuild::Multibuild::expand_multibuilds(\%pkgsrc);
+}
 
 @pkgs = sort keys %pkgsrc;
-
-# split into target/native packages
-my @pkgs_target = @pkgs;
-my @pkgs_native;
-if ($cross) {
-  @pkgs_target = grep {!$pkgsrc{$_}->{'native'}} @pkgs;
-  @pkgs_native = grep {$pkgsrc{$_}->{'native'}} @pkgs;
-}
 
 # handle onlybuild/excludebuild from the build config
 if (exists $bconf->{'buildflags:excludebuild'}) {
@@ -274,22 +282,26 @@ if (exists $bconf->{'buildflags:onlybuild'}) {
 }
 
 # parse all recipes in the packages to get dependency information
-print "parsing recipe files\n";
+print "parsing ".PBuild::Util::plural(scalar(@pkgs), 'recipe file')."\n";
 my %containertags;
 my $buildtype = $bconf->{'type'} || '';
 $buildtype = 'spec' if !$buildtype || $buildtype eq 'UNDEFINED';
 for my $pkg (@pkgs) {
   my $p = $pkgsrc{$pkg};
-  if ($p->{'native'}) {
-    PBuild::Recipe::parse($bconf_host, $p, $buildtype, $hostarch);
-  } else {
-    PBuild::Recipe::parse($bconf, $p, $buildtype, $myarch);
-  }
+  PBuild::Recipe::parse($bconf, $p, $buildtype, $myarch, $bconf_host, $hostarch);
   if ($p->{'buildtype'} && ($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker') && !$p->{'error'}) {
     my @containerdeps = grep {/^container:/} @{$p->{'dep'} || []};
     next unless @containerdeps;
     $containertags{substr($_, 10)} = 1 for @containerdeps;
   }
+}
+
+# split into target/native packages
+my @pkgs_target = @pkgs;
+my @pkgs_native;
+if ($cross) {
+  @pkgs_target = grep {!$pkgsrc{$_}->{'native'}} @pkgs;
+  @pkgs_native = grep {$pkgsrc{$_}->{'native'}} @pkgs;
 }
 
 # search for assets
@@ -327,11 +339,11 @@ PBuild::LocalRepo::cleanup_builddir($builddir, \%pkgsrc);
 my $repomgr = PBuild::RepoMgr::create();
 my @repos;
 my @hostrepos;
-print "fetching local repo metadata\n";
+print "fetching metadata of the local ".(@pkgs_native ? 'repos' : 'repo')."\n";
 push @repos, $repomgr->addlocalrepo($bconf, $myarch, $builddir, \%pkgsrc, \@pkgs_target);
 push @hostrepos, $repomgr->addlocalrepo($bconf_host, $hostarch, $builddir, \%pkgsrc, \@pkgs_native) if @pkgs_native;
 
-print "fetching remote repo metadata\n";
+print "fetching metadata of ".PBuild::Util::plural(scalar(@{$opts->{'repo'}}) + ($cross ? scalar(@{$opts->{'hostrepo'}}) : 0), 'remote repo')."\n";
 for my $repourl (@{$opts->{'repo'}}) {
   push @repos, $repomgr->addremoterepo($bconf, $myarch, $builddir, $repourl, $buildtype, $opts);
 }
@@ -350,7 +362,12 @@ if (@{$opts->{'registry'} || []} && %containertags) {
 }
 
 if ($opts->{'repoquery'}) {
-  PBuild::Repoquery::repoquery($bconf, $myarch, \@repos, $opts);
+  PBuild::Repoquery::repoquery($bconf, $myarch, \@repos, $opts->{'repoquery'}, $opts);
+  exit;
+}
+if ($opts->{'repoquery-host'}) {
+  die("No cross building configured\n") unless $cross;
+  PBuild::Repoquery::repoquery($bconf_host, $hostarch, \@hostrepos, $opts->{'repoquery-host'}, $opts);
   exit;
 }
 
@@ -396,13 +413,9 @@ while (1) {
   if (!$ctx) {
     $ctx = PBuild::Checker::create($bconf, $myarch, $buildtype, \%pkgsrc, $builddir, $opts, $repomgr, $assetmgr);
     $ctx->{'hostarch'} = $hostarch;
+    $ctx->{'bconf_host'} = $bconf_host if $cross;
     print "preparing package pool\n" unless $runs;
-    if ($cross) {
-      $ctx->{'bconf_host'} = $bconf_host;
-      $ctx->prepare(\@repos, \@hostrepos);
-    } else {
-      $ctx->prepare(\@repos);
-    }
+    $ctx->prepare(\@repos, \@hostrepos);
     print "expanding dependencies\n" unless $runs;
     $ctx->pkgexpand(@pkgs);
     print "sorting packages\n" unless $runs;

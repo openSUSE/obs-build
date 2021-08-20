@@ -79,9 +79,15 @@ rpm_init_cumulate() {
     CUMULATED_PIDS=()
     CUMULATED_HMD5=()
     DO_CUMULATE=
-    typeset -ri suse_version=$(chroot $BUILD_ROOT rpm --eval '%{?suse_version}' 2>/dev/null)
-    if ((suse_version > 1220)) ; then 
-	DO_CUMULATE=true
+    local cumulaterpms=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags cumulaterpms)
+    if test -n "$cumulaterpms" ; then
+	test "$cumulaterpms" != 0 && DO_CUMULATE=true
+    else
+	# compatibility: auto-set cumulate for newer suse distros
+	typeset -ri suse_version=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" eval '%{?suse_version}')
+	if ((suse_version > 1220)) ; then 
+	    DO_CUMULATE=true
+	fi
     fi
 }
 

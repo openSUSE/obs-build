@@ -36,7 +36,7 @@ In addition, there is currently experimental support for
  For hardware emulation there are
  ---
  - `qemu`,
-   which runs a `QEMU` system emulator inside of ``KVM``. This can
+   which runs a `QEMU` system emulator inside of `KVM`. This can
    be considered also secure and reproducible.
  - The "emulator" VM can be used to run builds using any other
    emulator via a wrapper script.
@@ -74,12 +74,12 @@ Supported build formats
 
  Special modes and formats
  ---
- - `debbuild`&mdash;building [debian](http://debian.org) `deb`s our of `rpm` spec file
- - `debbootstrap`&mdash;[debian](http://debian.org) builds using `debootstrap` as engine
- - `mock`&mdash;`rpm` spec file build using `mock` as engine
- - `collax`&mdash;[debian](http://debian.org)package variation
- - `fissile`&mdash;`docker` images based on `BOSH` dev releases
- - `helm`&mdash;`helm` charts
+ - `debbuild`─building [debian](http://debian.org) `deb`s our of `rpm` spec file
+ - `debbootstrap`─[debian](http://debian.org) builds using `debootstrap` as engine
+ - `mock`─`rpm` spec file build using `mock` as engine
+ - `collax`─[debian](http://debian.org)package variation
+ - `fissile`─`docker` images based on `BOSH` dev releases
+ - `helm`─`helm` charts
 
 
 Use the `--help` option for more information.

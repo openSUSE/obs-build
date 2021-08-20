@@ -115,10 +115,11 @@ sub update_srcmd5 {
 #
 sub find_assets {
   my ($assetmgr, $p, $arch) = @_;
+  my $bt = $p->{'buildtype'} || '';
   my @assets;
   push @assets, PBuild::RemoteAssets::fedpkg_parse($p) if $p->{'files'}->{'sources'};
-  push @assets, PBuild::RemoteAssets::archlinux_parse($p, $arch) if ($p->{'buildtype'} || '') eq 'arch';
-  push @assets, PBuild::RemoteAssets::spec_parse($p, $arch) if ($p->{'buildtype'} || '') eq 'spec';
+  push @assets, PBuild::RemoteAssets::archlinux_parse($p, $arch) if $bt eq 'arch';
+  push @assets, PBuild::RemoteAssets::recipe_parse($p, $arch) if $bt eq 'spec' || $bt eq 'kiwi';
   for my $asset (@assets) {
     $asset->{'assetid'} = get_assetid($asset->{'file'}, $asset);
     $p->{'asset_files'}->{$asset->{'file'}} = $asset;
@@ -205,7 +206,7 @@ sub copy_assets {
     my $asset = $asset_files->{$file};
     my $assetid = $asset->{'assetid'};
     my $adir = "$assetdir/".substr($assetid, 0, 2);
-    PBuild::Util::cp("$adir/$assetid", "$srcdir/$file");
+    PBuild::Util::cp("$adir/$assetid", $asset->{'isdir'} ? "$srcdir/$file.obscpio" : "$srcdir/$file");
   }
   if (has_mutable_assets($assetmgr, $p) && update_srcmd5($assetmgr, $p)) {
     copy_assets($assetmgr, $p, $srcdir);	# had a race, copy again

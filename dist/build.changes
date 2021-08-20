@@ -1,4 +1,43 @@
 -------------------------------------------------------------------
+Fri Aug 20 07:44:26 UTC 2021 - Adrian Schröter <adrian@suse.de>
+
+Features:
+- cross architecture build support (for rpm and kiwi)
+- modulemd meta data support
+- pbuild to build multiple source packages
+  (initial release, can not be considered stable yet)
+- supporting external asset stores for source files
+- support multiple post build checks placed in the directory:
+  /usr/lib/build/post-build-checks/
+- sccache support
+- New --shell-after-fail option
+- allow to disable squashfs in SimpleImage
+- supporting aarch64 kernel on armv?l distributions
+- kiwi: Add support for OBS-RemoteAsset and OBS-CopyToImage directives
+- container: FROM scratch build support
+
+Improvements:
+- supporting kvm builds as non-root user
+- Extend stage selection support for rpm builds
+- various distribution config updates
+- Support "BuildFlags: cumulaterpms"
+  (was done only via suse_version before)
+
+Fixes:
+- container builds
+  * support newer podman versions
+  * supporting multiple containers for multi-stage builds
+- Supporting URL's in Flatpak manifests
+- epoch handling in debian builds
+- catch more cases where a failed build is marked as host error
+- fixing wrong status reporting when a job got killed
+- hugetlbfs handling fixes
+- try mounting selinuxfs in VM
+- Also create the /sys dir when preinstalling (to satisfy dracut)
+- various XML parser fixes
+- and many minor ones
+
+-------------------------------------------------------------------
 Wed Jan 20 12:37:53 UTC 2021 - Adrian Schröter <adrian@suse.de>
 
 Features:

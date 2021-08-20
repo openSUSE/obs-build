@@ -78,7 +78,7 @@ sub prepare {
   $ctx->{'dep2pkg'} = $dep2pkg;
   $ctx->{'subpacks'} = \%subpacks;
   PBuild::Meta::setgenmetaalgo($ctx->{'genmetaalgo'});
-  $ctx->{'dep2pkg_host'} = PBuild::Expand::configure_repos($ctx->{'bconf_host'}, $hostrepos) if $hostrepos;
+  $ctx->{'dep2pkg_host'} = PBuild::Expand::configure_repos($ctx->{'bconf_host'}, $hostrepos) if $ctx->{'bconf_host'};
 }
 
 #
@@ -214,7 +214,11 @@ recheck_package:
 	$error = undef;
 	$error = "on builder $job->{'name'}" if $job->{'nbuilders'} > 1;
         my $bid = ($builder->{'nbuilders'} || 1) > 1 ? "$builder->{'name'}: " : '';
-        print "${bid}building $p->{'pkg'}/$p->{'recipe'}\n";
+	if ($p->{'native'}) {
+          print "${bid}building $p->{'pkg'}/$p->{'recipe'} (native)\n";
+	} else {
+          print "${bid}building $p->{'pkg'}/$p->{'recipe'}\n";
+        }
         $ctx->{'building'}->{$packid} = $builder->{'job'};
       }
       #printf("%s -> %s%s", $packid, $status, $error ? " ($error)" : '');

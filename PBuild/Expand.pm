@@ -79,38 +79,39 @@ sub configure_repos {
 }
 
 #
+# expand dependencies of a single package (image case)
+#
+sub expand_deps_image {
+  my ($p, $bconf, $subpacks, $cross) = @_;
+  delete $p->{'dep_experror'};
+  if ($p->{'error'}) {
+    $p->{'dep_expanded'} = [];
+    return;
+  }
+  my @deps = @{$p->{'dep'} || []};
+  push @deps, '--ignoreignore--' unless ($p->{'buildtype'} || '') eq 'preinstallimage';
+  my ($ok, @edeps) = Build::get_build($bconf, [], @deps);
+  if (!$ok) {
+    delete $p->{'dep_expanded'};
+    $p->{'dep_experror'} = join(', ', @edeps);
+  } else {
+    $p->{'dep_expanded'} = \@edeps;
+  }
+}
+
+#
 # expand dependencies of a single package
 #
 sub expand_deps {
   my ($p, $bconf, $subpacks, $cross) = @_;
-  my $buildtype = $p->{'buildtype'} || 'unknown';
+  my $buildtype = $p->{'buildtype'} || '';
+  return expand_deps_image($p, $bconf, $subpacks, $cross) if $buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'fissile' || $buildtype eq 'preinstallimage';
   delete $p->{'dep_experror'};
-  return unless $p->{'name'};
+  if ($p->{'error'}) {
+    $p->{'dep_expanded'} = [];
+    return;
+  }
   my @deps = @{$p->{'dep'} || []};
-  if ($buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'fissile') {
-    if ($p->{'error'}) {
-      $p->{'dep_expanded'} = [];
-      return;
-    }
-    my ($ok, @edeps) = Build::get_build($bconf, [], @deps, '--ignoreignore--');
-    if (!$ok) {
-      delete $p->{'dep_expanded'};
-      $p->{'dep_experror'} = join(', ', @edeps);
-    } else {
-      $p->{'dep_expanded'} = \@edeps;
-    }
-    return;
-  }
-  if ($buildtype eq 'preinstallimage') {
-    my ($ok, @edeps) = Build::get_build($bconf, [], @deps);
-    if (!$ok) {
-      delete $p->{'dep_expanded'};
-      $p->{'dep_experror'} = join(', ', @edeps);
-    } else {
-      $p->{'dep_expanded'} = \@edeps;
-    }
-    return;
-  }
   if ($buildtype eq 'aggregate' || $buildtype eq 'patchinfo') {
     $p->{'dep_expanded'} = \@deps;
     return;

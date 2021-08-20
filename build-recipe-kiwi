@@ -390,6 +390,15 @@ build_kiwi_product() {
     if test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/.createrepo_checksums" ; then
 	checksums="CREATEREPO_CHECKSUMS=$TOPDIR/SOURCES/repos/.createrepo_checksums"
     fi
+    # concatenate all modulemd data into a single _modulemd.yaml file
+    if test -d "$BUILD_ROOT/$TOPDIR/SOURCES/repos" ; then
+	local d m
+	for d in $(find "$BUILD_ROOT/$TOPDIR/SOURCES/repos" -type d -name modulemd) ; do
+	    for m in "$d"/*.modulemd.yaml "$d"/*.modulemd-defaults.yaml "$d"/modules.yaml ; do
+		test -s "$m" && cat "$m" >> "$BUILD_ROOT/$TOPDIR/SOURCES/repos/_modulemd.yaml"
+	    done
+	done
+    fi
     if test -x "$BUILD_ROOT/usr/bin/product-builder"; then
        # current implementation of product generation
        chroot "$BUILD_ROOT" su -c "APPID=- LANG=POSIX BUILD_FLAVOR=$BUILD_FLAVOR $checksums /usr/bin/product-builder --root $TOPDIR/KIWIROOT $VERBOSE_OPTION --logfile terminal --create-instsource $TOPDIR/SOURCES" - abuild < /dev/null && BUILD_SUCCEEDED=true
@@ -829,6 +838,21 @@ recipe_build_kiwi() {
 	mkdir -p $BUILD_ROOT/$TOPDIR/SOURCES/root
 	chroot $BUILD_ROOT tar -C $TOPDIR/SOURCES/root -xf "$TOPDIR/SOURCES/${t##*/}"
     done
+
+    # copy requested files to the root directory
+    while read s t ; do
+        test -z "$t" && t="$s"
+	case $s in
+	'' | . | .. | */* | root ) ;;
+	*)
+	    test -e "$BUILD_ROOT/$TOPDIR/SOURCES/$s" || continue
+	    t="root/${t#/}"
+	    echo "copying $s to $t"
+	    chroot $BUILD_ROOT mkdir -p "$TOPDIR/SOURCES/${t%/*}"
+	    chroot $BUILD_ROOT cp -af "$TOPDIR/SOURCES/$s" "$TOPDIR/SOURCES/$t"
+	    ;;
+	esac
+    done < <(kiwi_query_recipe copytoimage)
 
     # fix script permissions
     chmod a+x $BUILD_ROOT/$TOPDIR/SOURCES/*.sh 2>/dev/null

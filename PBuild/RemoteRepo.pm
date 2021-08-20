@@ -336,6 +336,7 @@ sub fetchrepo {
       undef $oldrepo if join(',', @$modules) ne join(',', @$repomodules);
     }
     undef $oldrepo if $oldrepo && !replace_with_local($repodir, $oldrepo->{'bins'});
+    return $oldrepo->{'bins'} if $oldrepo && $opts->{'no-repo-refresh'};
   }
   my $tmpdir = "$repodir/.tmp";
   PBuild::Util::cleandir($tmpdir) if -e $tmpdir;
@@ -368,10 +369,10 @@ sub fetchrepo {
 # Expand the special zypp:// repo to all enabled zypp repositories
 #
 sub expand_zypp_repo {
-  my ($opts) = @_;
-  return unless grep {/^zypp:\/{0,2}$/} @{$opts->{'repo'} || []};
+  my ($repos) = @_;
+  return unless grep {/^zypp:\/{0,2}$/} @{$repos || []};
   my @r;
-  for my $url (@{$opts->{'repo'}}) {
+  for my $url (@$repos) {
     if ($url =~ /^zypp:\/{0,2}$/) {
       for my $r (Build::Zypp::parseallrepos()) {
         push @r, "zypp://$r->{'name'}" if $r->{'enabled'};
@@ -380,7 +381,7 @@ sub expand_zypp_repo {
       push @r, $url;
     }
   }
-  @{$opts->{'repo'}} = @r;
+  @$repos = @r;
 }
 
 #
@@ -460,9 +461,8 @@ sub fetchbinaries {
   my ($repo, $bins) = @_;
   my $repodir = $repo->{'dir'};
   my $url = $repo->{'url'};
-  my $nbins = @$bins;
   die("bad repo\n") unless $url;
-  print "fetching $nbins binaries from $url\n";
+  print "fetching ".PBuild::Util::plural(scalar(@$bins), 'binary')." from $url\n";
   PBuild::Util::mkdir_p($repodir);
   my $ua = PBuild::Download::create_ua();
   fetchbinaries_obs($repo, $bins, $ua) if $url =~ /^obs:/;

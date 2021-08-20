@@ -110,8 +110,9 @@ sub ispruned {
 # match the available packages against a given query
 #
 sub repoquery {
-  my ($bconf, $myarch, $repos, $opts) = @_;
-  my @query = @{$opts->{'repoquery'} || []};
+  my ($bconf, $myarch, $repos, $query, $opts) = @_;
+  my @query = @{$query || []};
+  die("Please specify a query\n") unless @query;
   for (@query) {
     if (/^(name|requires|provides|conflicts|recommends|supplements|obsoletes):(.*)$/) {
       $_ = [ $1, $2 ];

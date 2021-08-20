@@ -252,6 +252,18 @@ sub kiwiparse {
   for ($xml =~ /^\s*<!--\s+OBS-IgnorePackage:\s+(.*)\s+-->\s*$/img) {
     push @ignorepackages, split(' ', $_);
   }
+  for ($xml =~ /^\s*<!--\s+OBS-RemoteAsset:\s+(.*)\s+-->\s*$/img) {
+    my @s = split(' ', $_);
+    my $remoteasset = { 'url' => $s[0] };
+    $remoteasset->{'digest'} = $s[1] if $s[1] && $s[1] =~ /^[a-z0-9]+:[0-9a-f]+$/;
+    push @{$ret->{'remoteassets'}}, $remoteasset;
+  }
+  for ($xml =~ /^\s*<!--\s+OBS-CopyToImage:\s+(.*)\s+-->\s*$/img) {
+    my @s = split(' ', $_);
+    next if !$s[0] || $s[0] eq '.' || $s[0] eq '..' || $s[0] =~ /\// || $s[0] eq 'root';
+    push @s, $s[0] unless @s > 1;
+    push @{$ret->{'copytoimage'}}, "$s[0] $s[1]";
+  }
 
   my $schemaversion = $kiwi->{'schemaversion'} ? versionstring($kiwi->{'schemaversion'}) : 0;
   $ret->{'name'} = $kiwi->{'name'} if $kiwi->{'name'};
@@ -571,7 +583,11 @@ sub show {
   }
   my $x = $d->{$field};
   $x = [ $x ] unless ref $x;
-  print "@$x\n";
+  if ($field eq 'copytoimage') {
+    print "$_\n" for @$x;
+  } else {
+    print "@$x\n";
+  }
 }
 
 sub showcontainerinfo {

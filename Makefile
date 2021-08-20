@@ -21,10 +21,12 @@ DESTDIR=
 
 all:
 
-.PHONY:	test
+.PHONY:	test test-debtransform
 
 test:
 	PERL5LIB=. prove -v
+
+test-debtransform:
 	# debtransform test suite
 	cd test-debtransform &&	./run.sh
 
@@ -73,6 +75,7 @@ install:
 	    spec_add_patch \
 	    spectool \
 	    signdummy \
+	    unpackarchive \
 	    unrpm \
 	    telnet_login_wrapper \
 	    startdockerd \
@@ -82,6 +85,7 @@ install:
 	    create_container_package_list \
 	    call-podman \
 	    queryobs \
+	    writemodulemd \
 	    $(DESTDIR)$(pkglibdir)
 	install -m644 \
 	    qemu-reg \

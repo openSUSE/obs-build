@@ -34,12 +34,14 @@ use PBuild::RepoMgr;
 #
 sub forkjob {
   my ($opts, $args) = @_;
-  my $pid = PBuild::Util::xfork();
-  return $pid if $pid;
-  unless ($opts->{'singlejob'}) {
-    open(STDIN, '<', '/dev/null');
-    open(STDOUT, '>', '/dev/null');
-    open(STDERR, '>&STDOUT');
+  unless ($opts->{'shell'} || $opts->{'shell-after-fail'}) {
+     my $pid = PBuild::Util::xfork();
+     return $pid if $pid;
+     unless ($opts->{'singlejob'}) {
+       open(STDIN, '<', '/dev/null');
+       open(STDOUT, '>', '/dev/null');
+       open(STDERR, '>&STDOUT');
+     };
   };
   exec(@$args);
   die("$args->[0]: $!\n");
@@ -262,7 +264,7 @@ sub createjob {
       }
     }
     push @args, '--statistics';
-    push @args, '--vm-watchdog';
+    push @args, '--vm-watchdog' unless $opts->{'shell'};
   } elsif ($vm eq 'openstack') {
     mkdir("$buildroot/.mount") unless -d "$buildroot/.mount";
     push @args, "--root=$buildroot/.mount";
@@ -344,6 +346,22 @@ sub rename_build_result {
   symlink('.', "$buildroot/.build.packages/KIWI");
 }
 
+sub get_last_lines {
+  my ($logfile) = @_;
+  my $fd;
+  open($fd, '<', $logfile) || return '';  
+  if (-s $fd > 8192) {
+    defined(sysseek($fd, -8192, 2)) || return '';
+  }
+  my $buf = '';
+  sysread($fd, $buf, 8192);
+  close $fd;
+  my @buf = split(/\r?\n/, $buf);
+  shift @buf if length($buf) == 8192 && @buf > 1;
+  @buf = splice(@buf, -5) if @buf > 5;
+  return @buf ? join("\n", @buf)."\n" : '';
+}
+
 #
 # Finalize a build job after the build process has finished
 #
@@ -364,7 +382,9 @@ sub finishjob {
   # 4: fatal build error
   # 9: genbuildreqs
   if ($ret == 4) {
-    die("fatal build error\n");
+    my $ll = get_last_lines("$buildroot/.build.log");
+    print $ll if $ll;
+    die("fatal build error, see $buildroot/.build.log for more information\n");
   }
   if ($ret == 3) {
     $ret = 1;

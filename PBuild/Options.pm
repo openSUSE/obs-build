@@ -63,6 +63,8 @@ my %known_options = (
   'rebuild-code' => 'rebuild-code::',
   'buildtrigger' => 'buildtrigger:',
   'repoquery' => 'repoquery::',
+  'repoquery-host' => 'repoquery-host::',
+  'no-repo-refresh' => 'no-repo-refresh',
   'xen' => \&vm_type_special,
   'kvm' => \&vm_type_special,
   'uml' => \&vm_type_special,
@@ -176,12 +178,9 @@ sub parse_options {
     }
     die("Option $origopt does not take an argument\n") if @args && ref($args[0]);
   }
-  # default to KVM for builds as non-root user
-  $opts{'vm-type'} = 'kvm' if !$opts{'vm-type'} && $< > 0;
 
   if ($opts{'shell'} || $opts{'shell-after-fail'}) {
     $opts{'noclean'} = 1;
-    $opts{'singlejob'} = 1;
     $opts{'buildjobs'} = 1;
   }
   # enforce the rebuild of the singlejob build

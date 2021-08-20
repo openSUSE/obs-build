@@ -1,0 +1,442 @@
+#!/usr/bin/perl
+################################################################
+#
+# Copyright (c) 2021 SUSE LLC
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+
+use strict;
+use Fcntl;
+use POSIX;
+
+# Slow but secure unpacking of tar/cpio archives.
+# All files we cannot handle (e.g. device nodes) are ignored.
+
+my $default_dirmode = 0700;
+my $add_dirmode = 0700;
+
+#
+# Input/Output
+#
+sub readdata {
+  my ($l, $eofok, $prepend) = @_;
+  my $d = '';
+  if (defined($prepend) && $prepend ne '') {
+    die("prepend data is too big\n") if $l < length($prepend);
+    $d = $prepend;
+    $l -= length($d);
+  }
+  while ($l > 0) {
+    my $r = read(STDIN, $d, $l > 65536 ? 65536 : $l, length($d));
+    next if !defined($r) && $! == POSIX::EINTR;
+    die("read error: $!\n") unless defined $r;
+    return undef if $eofok && !$r && $d eq '';
+    die("unexpected EOF\n") unless $r;
+    $l -= $r;
+  }
+  return $d;
+}
+
+sub skipdata {
+  my ($l) = @_;
+  while ($l > 0) {
+    my $d;
+    my $r = read(STDIN, $d, $l > 65536 ? 65536 : $l);
+    next if !defined($r) && $! == POSIX::EINTR;
+    die("read error: $!\n") unless defined $r;
+    die("unexpected EOF\n") unless $r;
+    $l -= $r;
+  }
+}
+
+sub writedata {
+  my ($fd, $d) = @_;
+  while (length($d)) {
+    my $r = syswrite($fd, $d, length($d) > 65536 ? 65536 : length($d));
+    next if !defined($r) && $! == POSIX::EINTR;
+    die("write error: $!\n") unless defined $r;
+    $d = substr($d, $r) if $r;
+  }
+}
+
+sub copydata {
+  my ($fd, $l) = @_;
+  while ($l > 0) {
+    my $d = readdata($l > 65536 ? 65536 : $l);
+    writedata($fd, $d);
+    $l -= length($d);
+  }
+}
+
+#
+# Cpio handling (newc format only)
+#
+sub cpio_parsehead {
+  my ($cpiohead) = @_;
+  return undef unless substr($cpiohead, 0, 6) eq '070701';
+  my $mode = hex(substr($cpiohead, 14, 8));
+  my $nlink = hex(substr($cpiohead, 38, 8));
+  my $mtime = hex(substr($cpiohead, 46, 8));
+  my $size  = hex(substr($cpiohead, 54, 8));
+  my $pad = (4 - ($size % 4)) % 4;
+  my $namesize = hex(substr($cpiohead, 94, 8));
+  my $namepad = (6 - ($namesize % 4)) % 4;
+  my $ent = { 'size' => $size, 'mtime' => $mtime, 'mode' => $mode, 'cpiotype' => ($mode >> 12 & 0xf), 'nlink' => $nlink };
+  if ($nlink > 1) {
+    my $ino = hex(substr($cpiohead, 6, 8));
+    my $devmaj  = hex(substr($cpiohead, 62, 8));
+    my $devmin  = hex(substr($cpiohead, 70, 8));
+    $ent->{'lnkid'} = "$ino/$devmaj/$devmin";
+  }
+  return ($ent, $namesize, $namepad, $size, $pad);
+}
+
+my %cpiotype2type = (
+  '1' => 'p',
+  '2' => 'c',
+  '4' => 'd',
+  '6' => 'b',
+  '8' => 'f',
+  '10' => 'l',
+  '12' => 's',
+);
+
+sub cpio_readhead {
+  my ($prepend) = @_;
+  my $cpiohead = readdata(110, 0, $prepend);
+  die("cpio: not a 'SVR4 no CRC ascii' cpio\n") unless substr($cpiohead, 0, 6) eq '070701';
+  my ($ent, $namesize, $namepad, $size, $pad) = cpio_parsehead($cpiohead);
+  die("cannot parse cpio header\n") unless $ent;
+  die("ridiculous long filename\n") if $namesize > 8192;
+  my $name = readdata($namesize + $namepad);
+  $name = substr($name, 0, $namesize);
+  $name =~ s/\0.*//s;
+  return undef if !$size && $name eq 'TRAILER!!!';
+  $name =~ s/^\.\///s;
+  $ent->{'name'} = $name;
+  $ent->{'type'} = $cpiotype2type{$ent->{'cpiotype'}} || '?';
+  if ($ent->{'cpiotype'} eq '10') {
+    die("bad symlink size\n") if $size <= 0 || $size >= 65536;
+    my $linkname = readdata($size + $pad);
+    $linkname = substr($linkname, 0, $size);
+    $linkname =~ s/\0.*//s;
+    $ent->{'linkname'} = $linkname;
+    $size = $pad = 0;
+  } elsif ($ent->{'lnkid'}) {
+    cpio_handlehardlink($ent);
+  }
+  return ($ent, $size, $pad);
+}
+
+my %cpio_hardlinks;
+
+sub cpio_handlehardlink {
+  my ($ent) = @_;
+  my $lnkid = $ent->{'lnkid'};
+  my $lnk = $cpio_hardlinks{$lnkid};
+  if ($lnk) {
+    $ent->{'linkname'} = $lnk->{'name'};
+    delete $cpio_hardlinks{$lnkid} if --$lnk->{'nlink'} == 0;
+  } else {
+    $cpio_hardlinks{$lnkid}  = { 'name' => $ent->{'name'}, 'nlink' => $ent->{'nlink'} - 1 };
+  }
+}
+
+#
+# Tar handling (gnu, ustar, pax)
+#
+my @tar_headnames = qw{name mode uid gid size mtime chksum tartype linkname magic version uname gname major minor};
+sub tar_parsehead {
+  my ($tarhead) = @_;
+  my @head = unpack('A100A8A8A8A12A12A8a1A100a6a2A32A32A8A8A155x12', $tarhead);
+  /^([^\0]*)/s && ($_ = $1) for @head;
+  $head[7] = '0' if $head[7] eq '';	# map old \0 type to 0
+  $head[$_] = oct($head[$_]) for (1, 2, 3, 5, 6, 13, 14);
+  my $pad;
+  if (substr($tarhead, 124, 1) eq "\x80") {
+    # not octal, but binary!
+    my @s = unpack('aCSNN', substr($tarhead, 124, 12));
+    $head[4] = $s[4] + (2 ** 32) * $s[3] + (2 ** 64) * $s[2];
+    $pad = (512 - ($s[4] & 511)) & 511;
+  } else {
+    $head[4] = oct($head[4]);
+    $pad = (512 - ($head[4] & 511)) & 511;
+  }
+  $head[7] = '0' if $head[7] eq '' || $head[7] =~ /\W/;
+  $head[7] = '5' if $head[7] eq '0' && $head[0] =~ /\/$/s;	# dir
+  if ($head[9] eq 'ustar' && $head[15] ne '') {		# ustar prefix handling
+    $head[15] =~ s/\/$//s;
+    $head[0] = "$head[15]/$head[0]";
+  }
+  my $ent = { map {$tar_headnames[$_] => $head[$_]} (0..$#tar_headnames) };
+  return ($ent, $head[4], $pad);
+}
+
+sub tar_parseoverride {
+  my ($override, $tartype, $data) = @_;
+  $override ||= {};
+  if ($tartype eq 'L') {
+    $override->{'name'} = $data;
+  } elsif ($tartype eq 'K') {
+    $override->{'linkname'} = $data;
+  } elsif ($tartype eq 'x' || $tartype eq 'X') {
+    $override->{'ispax'} = 1;
+    while ($data =~ /^(\d+) / && $1 > 3) {
+      my $entry = substr($data, length($1) + 1, $1 - length($1) - 2);   # -2 because of space and newline
+      $data = substr($data, $1);
+      $override->{'name'} = substr($entry, 5) if substr($entry, 0, 5) eq 'path=';
+      $override->{'linkname'} = substr($entry, 9) if substr($entry, 0, 9) eq 'linkpath=';
+    }
+  }
+  return $override;
+}
+
+my %tartype2type = (
+  '0' => 'f',
+  '1' => 'L',
+  '2' => 'l',
+  '3' => 'c',
+  '4' => 'b',
+  '5' => 'd',
+  '6' => 'p',
+);
+
+sub tar_readhead {
+  my ($prepend) = @_;
+  my $override;
+  while (1) {
+    my $tarhead = readdata(512, 1, $prepend);
+    undef $prepend;
+    return undef unless defined $tarhead;
+    return undef if $tarhead eq "\0" x 512;
+    next if substr($tarhead, 500, 12) ne "\0" x 12;
+    my ($ent, $size, $pad) = tar_parsehead($tarhead);
+    my $bsize = $size + $pad;
+    my $tartype = $ent->{'tartype'};
+    next if $tartype eq 'V';	# ignore volume lables
+    if ($tartype eq 'L' || $tartype eq 'K' || $tartype eq 'x' || $tartype eq 'X') {
+      die("bad extension block size\n") if $bsize < 1 || $bsize >= 1024 * 1024;
+      $override = tar_parseoverride($override, $tartype, substr(readdata($bsize), 0, $size));
+      next;
+    }
+    if ($override) {
+      $ent->{$_} = $override->{$_} for keys %$override;
+      undef $override;
+    }
+    $size = $pad = 0 if $tartype eq '2' || $tartype eq '3' || $tartype eq '4' || $tartype eq '5' || $tartype eq '6';
+    $size = $pad = 0 if $tartype eq '1' && !$ent->{'ispax'};  # hard link magic
+    $ent->{'type'} = $tartype2type{$tartype} || '?';
+    return ($ent, $size, $pad);
+  }
+}
+
+
+#
+# Path resolving
+#
+my %cache;	# name => resolved_dir
+
+sub flush_dircache {
+  %cache = ();
+}
+
+sub create_dir {
+  my ($root, $r, $mode) = @_;
+  mkdir("$root$r", $mode | $add_dirmode) || die("mkdir $r: $!\n");
+  $cache{$r} = "$r/";
+}
+
+sub resolve_dir {
+  my ($root, $name, $linkdepth) = @_;
+  return '/' if $name eq '' || $name eq '/';
+  my $c = $cache{$name};
+  return $c if defined $c;
+  my ($dir, $comp) = ('/', $name);
+  ($dir, $comp) = ($1, $2) if $name =~ /\A(.*?)\/+([^\/]*)\z/s;
+  my $r = resolve_dir($root, $dir);
+  if ($comp eq '.' || $comp eq '') {
+    $cache{$name} = $r;
+    return $r;
+  }
+  if ($comp eq '..') {
+    $r = '/' unless $r =~ s/\/[^\/]*\/\z/\//s;
+    $cache{$name} = $r;
+    return $r;
+  }
+  my $rcomp = "$r$comp";
+  my @s = lstat("$root$rcomp");
+  if (!@s) {
+    die("$rcomp: $!\n") unless $! == POSIX::ENOENT;
+    create_dir($root, "$rcomp", $default_dirmode);
+    $r = "$rcomp/";
+  } elsif (-l _) {
+    die("$name: Too many levels of symbolic links\n") if ++$linkdepth > 20;
+    my $link = readlink("$root$rcomp");
+    die("readlink $rcomp: $!\n") unless defined $link;
+    $r = resolve_dir($root, "$r$link", ($linkdepth || 0) + 1);
+  } elsif (-d _) {
+    $r = "$rcomp/";
+  } else {
+    die("$rcomp: Not a directory\n");
+  }
+  $cache{$name} = $r;
+  return $r;
+}
+
+sub resolve_file {
+  my ($root, $name) = @_;
+  $name =~ s/\/+\z//s;
+  return '/.' if $name eq '' || $name eq '/';
+  my ($dir, $comp) = ('/', $name);
+  ($dir, $comp) = ($1, $2) if $name =~ /\A(.*?)\/+([^\/]*)\z/s;
+  $dir = $cache{$dir} || resolve_dir($root, $dir);
+  return "$dir$comp";
+}
+
+#
+# Decompression handling
+#
+sub detect_decompressor {
+  my ($first16bytes) = @_;
+  my @sig = unpack('N4', $first16bytes);
+  return qw{gzip -dc} if ($sig[0] & 0xffffffe0) == 0x1f8b0800;
+  return qw{bzip2 -dc} if ($sig[0] & 0xfffffff0) == 0x425a6830 && ($sig[1] == 0x31415926 || $sig[1] == 0x17724538);
+  return qw{xz -dc} if ($sig[0] & 0xffffffff) == 0xfd377a58 && ($sig[1] & 0xffff0000) == 0x5a000000;
+  return qw{zstd -dc} if ($sig[0] & 0xffffff00) == 0x28b52f00;
+  return ();
+}
+
+sub handle_decompression {
+  my $first16bytes = readdata(16);
+  my @decomp = detect_decompressor($first16bytes);
+  return $first16bytes unless @decomp;
+  local *F;
+  open(F, "<&STDIN") || die("stdin dup: $!\n");
+  my $pid = open(STDIN, '-|');
+  die("fork: $!\n") unless defined $pid;
+  if (!$pid) {
+    local *G;
+    my $pid2 = open(G, '|-');
+    die("fork: $!\n") unless defined $pid2;
+    if (!$pid2) {
+      exec(@decomp);
+      die("$decomp[0]: $!\n");
+    }
+    print G $first16bytes;
+    while (1) {
+      my $d = '';
+      my $r = read(F, $d, 8192);
+      next if !defined($r) && $! == POSIX::EINTR;
+      die("read error: $!\n") unless defined $r;
+      exit(0) unless $r;
+      print G $d;
+    }
+    close(G) || die("pipe close: $!\n");
+  }
+  close(F);
+  return undef;
+}
+
+
+#
+# Main
+#
+die("usage: unpackarchive --cpio|--tar <root>\n") unless @ARGV == 2;
+my ($format, $root) = @ARGV;
+
+die("$root: No such file or directory\n") unless -d $root;
+my $readhead;
+$readhead = \&cpio_readhead if $format eq '--cpio';
+$readhead = \&tar_readhead if $format eq '--tar';
+die("unknown format option $format\n") unless $readhead;
+
+umask(0);	# do not mess with the modes
+
+my $prepend = handle_decompression();
+while (1) {
+  my ($ent, $size, $pad) = $readhead->($prepend);
+  undef $prepend;
+  last unless defined $ent;
+  my $name = $ent->{'name'};
+  my $type = $ent->{'type'};
+  $name =~ s/\A\/+//s;
+  $name =~ s/\/+\z//s;
+  $ent->{'name'} = $name;
+  if ($name eq '') {
+    skipdata($size + $pad);
+    next;
+  }
+  if ($type ne 'd' && $type ne 'f' && $type ne 'l' && $type ne 'L') {
+    skipdata($size + $pad);
+    next;
+  }
+  my $linkname = $ent->{'linkname'};
+  #if (defined($linkname) && $linkname ne '') {
+  #  print "$ent->{'type'} $name -> $linkname\n";
+  #} else {
+  #  print "$ent->{'type'} $name\n";
+  #}
+  $name = resolve_file($root, $name);
+
+  my @s = lstat("$root$name");
+  die("$name: $!\n") if !@s && $! != POSIX::ENOENT;
+  if (@s) {
+    # entry already exists. handle conflicts.
+    if (-d _) {
+      die("$name: Is a directory\n") unless $type eq 'd';
+      chmod(($ent->{'mode'} & 07777) | $add_dirmode, "$root$name");
+      utime($ent->{'mtime'}, $ent->{'mtime'}, "$root$name");
+      skipdata($size + $pad);
+      next;
+    } elsif (-f _) {
+      unlink("$root$name") if $type eq 'l' || $type eq 'd';
+    } else {
+      unlink("$root$name") || die("unlink $name: $!\n");
+      flush_dircache();		# start over from scratch
+    }
+  }
+
+  if (defined($linkname) && $linkname ne '') {
+    if ($type eq 'l') {
+      symlink($linkname, "$root$name") || die("symlink $linkname $name: $!\n");
+      skipdata($size + $pad);
+      next;
+    }
+    if ($type ne 'L' && $type ne 'f') {
+      skipdata($size + $pad);
+      next;
+    }
+    $linkname = resolve_file($root, $linkname);
+    my @s2 = lstat("$root$linkname");
+    die("$linkname: $!\n") unless @s2;
+    die("$linkname: Not a regular file\n") unless -f _;
+    link("$root$linkname", "$root$name") || die("link $linkname $name: $!\n");
+    $type = 'f' if $type eq 'L' && $size > 0;
+  }
+  if ($type eq 'd') {
+    create_dir($root, $name, $ent->{'mode'} & 07777);
+    utime($ent->{'mtime'}, $ent->{'mtime'}, "$root$name");
+  } elsif ($type eq 'f') {
+    my $fd;
+    sysopen($fd, "$root$name", O_WRONLY|O_CREAT|O_TRUNC, $ent->{'mode'} & 07777) || die("$root$name: $!\n");
+    copydata($fd, $size);
+    close($fd) || die("close $name: $!\n");
+    utime($ent->{'mtime'}, $ent->{'mtime'}, "$root$name");
+    skipdata($pad);
+  } else {
+    skipdata($size + $pad);
+  }
+}
