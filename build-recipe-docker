@@ -56,9 +56,12 @@ recipe_build_docker() {
     touch $BUILD_ROOT/etc/resolv.conf
 
     base_image_path=
+    base_image_tag=$(grep "^\s*FROM" "$RECIPEFILE" | head -n 1 | cut -d" " -f2)
 
-    base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
-    test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
+    if test "$base_image_tag" != scratch ; then
+        base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
+        test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
+    fi
 
     mkdir -p "$BUILD_ROOT/$TOPDIR/SOURCES/repos"
     if test "$BUILDENGINE" = podman; then
