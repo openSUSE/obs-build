@@ -891,6 +891,13 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
 	rm -rf $BUILD_ROOT/etc/ld.so.conf
 	cp $BUILD_ROOT/etc/ld.so.conf.in $BUILD_ROOT/etc/ld.so.conf
     fi
+    # Make sure usrmerge links exist
+    for i in bin sbin lib lib64; do
+       if [ -d "$BUILD_ROOT/usr/$i" -a ! -e $BUILD_ROOT/$i -a ! -L $BUILD_ROOT/$i ]; then
+	   rm -f $BUILD_ROOT/$i
+	   ln -s usr/$i $BUILD_ROOT/$i
+       fi
+    done
     if test -z "$PREPARE_VM" ; then
 	mount_stuff
 	run_pkg_scripts
