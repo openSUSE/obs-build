@@ -115,6 +115,10 @@ my $std_macros = q{
 %define sparc   sparc sparcv8 sparcv9 sparcv9v sparc64 sparc64v
 %define alpha   alpha alphaev56 alphaev6 alphaev67
 %define power64 ppc64 ppc64p7 ppc64le
+%define riscv32 riscv32
+%define riscv64 riscv64
+%define riscv128 riscv128
+%define riscv   %{riscv32} %{riscv64} %{riscv128}
 };
 my $extra_macros = '';
 
