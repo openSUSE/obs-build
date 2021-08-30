@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 10;
+use Test::More tests => 14;
 
 use Build;
 use Build::Rpm;
@@ -362,4 +362,37 @@ $expected = {
 };
 $result = Build::Rpm::parse($conf, [ split("\n", $spec) ]);
 is_deeply($result, $expected, "multiline define");
+
+$spec = q[
+%{?foo:
+BuildRequires: foo
+%{?!bar:
+BuildRequires: bar
+}
+BuildRequires: baz
+}xxx
+];
+$expected = {
+  'deps' => [],
+  'subpacks' => [],
+};
+$result = Build::Rpm::parse($conf, [ split("\n", "$spec") ]);
+is_deeply($result, $expected, "multiline condition 1");
+
+$result = Build::Rpm::parse($conf, [ split("\n", "%global bar 1\n$spec") ]);
+is_deeply($result, $expected, "multiline condition 2");
+
+$expected = {
+  'deps' => [ 'foo', 'bar', 'baz' ],
+  'subpacks' => [],
+};
+$result = Build::Rpm::parse($conf, [ split("\n", "%global foo 1\n$spec") ]);
+is_deeply($result, $expected, "multiline condition 3");
+
+$expected = {
+  'deps' => [ 'foo', 'baz' ],
+  'subpacks' => [],
+};
+$result = Build::Rpm::parse($conf, [ split("\n", "%global foo 1\n%global bar 1\n$spec") ]);
+is_deeply($result, $expected, "multiline condition 4");
 

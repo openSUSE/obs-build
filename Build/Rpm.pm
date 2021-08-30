@@ -280,7 +280,7 @@ sub expandmacros {
   my $optmacros = {};
   # newer perls: \{((?:(?>[^{}]+)|(?2))*)\}
 reexpand:
-  while ($line =~ /^(.*?)%(\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\*\*?|#|\(|\[)(.*?)$/s) {
+  while ($line =~ /^(.*?)%(\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\*\*?|#|\(|\[)(.*?)\z/s) {
     if ($tries++ > 1000) {
       print STDERR "Warning: spec file parser ",($lineno?" line $lineno":''),": macro too deeply nested\n" if $config->{'warnings'};
       $line = 'MACRO';
@@ -302,10 +302,10 @@ reexpand:
 	$line = substr("%$macorig$line", length($macname));
         $macorig = substr($macname, 1);
 	$macname =~ s/^%\{//s;
-	$macname =~ s/\}$//s;
+	$macname =~ s/\}\z//s;
       }
       $macdata = '';
-      if ($macname =~ /^([^\s:]+)([\s:])(.*)$/) {
+      if ($macname =~ /^([^\s:]+)([\s:])(.*)\z/s) {
 	$macname = $1;
 	if ($2 eq ':') {
 	  $macalt = $3;
@@ -315,12 +315,12 @@ reexpand:
       }
     }
     my $mactest = 0;
-    if ($macname =~ /^\!\?/ || $macname =~ /^\?\!/) {
+    if ($macname =~ /^\!\?/s || $macname =~ /^\?\!/s) {
       $mactest = -1;
-    } elsif ($macname =~ /^\?/) {
+    } elsif ($macname =~ /^\?/s) {
       $mactest = 1;
     }
-    $macname =~ s/^[\!\?]+//;
+    $macname =~ s/^[\!\?]+//s;
     if ($macname eq '(') {
       print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand %(...)\n" if $config->{'warnings'};
       $line = 'MACRO';
@@ -440,6 +440,47 @@ reexpand:
   return $line;
 }
 
+sub splitexpansionresult {
+  my ($line, $includelines) = @_;
+  my @l = split("\n", $line);
+  $line = shift @l;
+  s/%/%%/g for @l;
+  unshift @$includelines, @l;
+  return $line;
+}
+
+# see rpm's copyNextLineFromOFI() function in build/parseSpec.c
+sub needmorelines {
+  my ($line) = @_;
+  my ($bc, $pc, $xc, $nc) = (0, 0, 0, 0);
+  while (1) {
+    $line =~ s/^[^\\\n%\{\}\(\)\[\]]*//s;
+    last if $line eq '';
+    if ($line =~ s/^%\{//s) {
+      $bc++;
+    } elsif ($line =~ s/^%\(//s) {
+      $pc++;
+    } elsif ($line =~ s/^%\[//s) {
+      $xc++;
+    } elsif ($line =~ s/^%%?//s) {
+      next;
+    } elsif ($line =~ s/^\n//s) {
+      $nc = 0;
+    } elsif ($line =~ s/^\\\n//s) {
+      $nc = 1;
+    } elsif ($line =~ s/^\\.?//s) {
+      next;
+    } elsif ($line =~ s/^([\{\}])//s) {
+      $bc += $1 eq '{' ? 1 : -1 if $bc;
+    } elsif ($line =~ s/^([\(\)])//s) {
+      $pc += $1 eq '(' ? 1 : -1 if $pc;
+    } elsif ($line =~ s/^([\[\]])//s) {
+      $xc += $1 eq '[' ? 1 : -1 if $xc;
+    }
+  }
+  return $pc || $bc || $xc || $nc ? 1 : 0;
+}
+
 sub splitdeps {
   my ($d) = @_;
   my @deps;
@@ -552,11 +593,11 @@ sub parse {
 	next;
       }
     }
-    if ($multilinecondition || $line =~ /^\s*\%\{\?.*:\s*$/s) {
-      # is this a multi-line macro definition?
+    if ($multilinecondition || $line =~ /^\s*\%\{[?!]*-?[0-9a-zA-Z_]+:\s*$/s) {
+      # is this a multi-line macro condition?
       $line = "$multilinecondition\n$line" if defined $multilinecondition;
       undef $multilinecondition;
-      if ($line !~ /\}\s*$/s) {
+      if (needmorelines($line)) {
 	$multilinecondition = $line;	# we need another line!
 	next;
       }
@@ -566,6 +607,7 @@ sub parse {
     }
     if (!$skip && ($line =~ /%/)) {
       $line = expandmacros($config, $line, $lineno, \%macros, \%macros_args);
+      $line = splitexpansionresult($line, \@includelines) if $line =~ /\n/s;
     }
     if ($line =~ /^\s*%(?:elif|elifarch|elifos)\b/) {
       $skip = 1 if !$skip;
@@ -573,6 +615,7 @@ sub parse {
       next if $skip;
       $line =~ s/^(\s*%)el/$1/;
       $line = expandmacros($config, $line, $lineno, \%macros, \%macros_args);
+      $line = splitexpansionresult($line, \@includelines) if $line =~ /\n/s;
     }
     if ($line =~ /^\s*%else\b/) {
       $skip = 2 - $skip if $skip <= 2;
