@@ -25,12 +25,12 @@ use strict;
 use Scalar::Util;
 
 sub unparse_keys {
-  my ($d) = @_;
+  my ($d, $order) = @_;
   my @k = grep {$_ ne '_start' && $_ ne '_end' && $_ ne '_order' && $_ ne '_type'} sort keys %$d;
-  return @k unless $d->{'_order'};
+  return @k unless $d->{'_order'} || $order;
   my %k = map {$_ => 1} @k;
   my @ko;
-  for (@{$d->{'_order'}}) {
+  for (@{$d->{'_order'} || $order}) {
     push @ko, $_ if delete $k{$_};
   }
   return (@ko, grep {$k{$_}} @k);
@@ -126,7 +126,6 @@ sub unparse_folded {
   return $r;
 }
 
-
 sub unparse_bool {
   my ($d) = @_;
   return $d ? 'true' : 'false';
@@ -144,8 +143,12 @@ sub unparse {
 
   return "---\n".unparse($d, %opts, 'noheader' => 1)."\n...\n" unless $opts{'noheader'};
   my $r = '';
+  my $template = delete $opts{'template'};
+  $opts{'_type'} ||= $template if $template && !ref($template);
+  undef $template unless ref($template) eq 'HASH';
   if (ref($d) eq 'ARRAY') {
     return '[]' unless @$d;
+    $opts{'template'} = $template if $template;
     $opts{'inline'} = 1 if $opts{'_type'} && $opts{'_type'} =~ s/^inline_?//;
     if ($opts{'inline'}) {
       my $first = 0;
@@ -164,12 +167,13 @@ sub unparse {
     return $r;
   }
   if (ref($d) eq 'HASH') {
-    my @k = unparse_keys($d);
+    my @k = unparse_keys($d, $template ? $template->{'_order'} : undef);
     return '{}' unless @k;
     $opts{'inline'} = 1 if $opts{'_type'} && $opts{'_type'} =~ s/^inline_?//;
     if ($opts{'inline'}) {
       my $first = 0;
       for my $k (@k) {
+        $opts{'template'} = $template->{$k} || $template->{'*'} if $template;
         $r .= ", " if $first++;
         my $dd = $d->{$k};
         my $type = ($d->{'_type'} || {})->{$k};
@@ -180,8 +184,10 @@ sub unparse {
     my $indent = $opts{'indent'} || '';
     my $first = 0;
     for my $k (@k) {
+      $opts{'template'} = $template->{$k} || $template->{'*'} if $template;
       my $dd = $d->{$k};
       my $type = ($d->{'_type'} || {})->{$k} || ($d->{'_type'} || {})->{'*'};
+      $type = $opts{'template'} if !$type && $opts{'template'} && !ref($opts{'template'});
       $r .= "\n$indent" if $first++;
       $r .= unparse_string($k).":";
       if (ref($dd) eq 'ARRAY' && @$dd && !($type && $type =~ /^inline_?/)) {
