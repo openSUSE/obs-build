@@ -29,49 +29,12 @@ BEGIN {
 use strict;
 
 use Build::Rpm;
-use Build::SimpleYAML;
+use Build::Modulemd;
 use Data::Dumper;
-
-sub convertdeps {
-  my ($d) = @_;
-  my $nd = {};
-  for my $dd (@$d) {
-    my ($n, @v) = split(':', $dd);
-    $nd->{$n} = \@v;
-  }
-  return $nd;
-}
 
 sub printmd {
   my ($md) = @_;
-  $md->{'_order'} = [ 'document', 'version', 'data' ];
-  $md->{'_type'}->{'version'} = 'number';
-
-  my $mdd = $md->{'data'};
-  $mdd->{'_order'} = [ 'module', 'name', 'stream', 'version', 'context', 'arch', 'summary', 'description', 'license', 'xmd', 'dependencies', 'references', 'profiles', 'api', 'filter', 'buildopts', 'components', 'artifacts' ];
-  $mdd->{'_type'}->{'version'} = 'number';
-  $mdd->{'_type'}->{'description'} = 'folded';
-  if ($mdd->{'license'}) {
-    $mdd->{'license'}->{'_order'} = [ 'module', 'content' ];
-  }
-  if ($mdd->{'components'} && $mdd->{'components'}->{'rpms'}) {
-    for (values %{$mdd->{'components'}->{'rpms'}}) {
-      $_->{'_order'} = [ 'rationale', 'ref', 'buildorder', 'arches' ];
-      $_->{'_type'}->{'buildorder'} = 'number';
-      $_->{'_type'}->{'arches'} = 'inline';
-    }
-  }
-  if ($mdd->{'buildopts'} && $mdd->{'buildopts'}->{'rpms'}) {
-    $mdd->{'buildopts'}->{'rpms'}->{'_type'}->{'macros'} = 'literal';
-  }
-  for my $d (@{$mdd->{'dependencies'} || []}) {
-    $d->{'requires'}->{'_type'}->{'*'} = 'inline' if $d->{'requires'};
-    $d->{'buildrequires'}->{'_type'}->{'*'} = 'inline' if $d->{'buildrequires'};
-  }
-  if ($md->{'document'} eq 'modulemd-defaults' && $mdd->{'profiles'}) {
-    $mdd->{'profiles'}->{'_type'}->{'*'} = 'inline';
-  }
-  print Build::SimpleYAML::unparse($md);
+  print Build::Modulemd::mdtoyaml($md);
 }
 
 sub readmds {
@@ -96,6 +59,16 @@ sub readmds {
     die("bad modulemd version \n") if $md->{'document'} eq 'modulemd-defaults' && $md->{'version'} != 1;
   }
   return $mds;
+}
+
+sub convertdeps {
+  my ($d) = @_;
+  my $nd = {};
+  for my $dd (@$d) {
+    my ($n, @v) = split(':', $dd);
+    $nd->{$n} = \@v;
+  }
+  return $nd;
 }
 
 sub unifyandsort {
@@ -187,6 +160,15 @@ if (@ARGV && $ARGV[0] eq '--filter') {
   exit;
 }
 
+if (@ARGV && $ARGV[0] eq '--convert') {
+  shift @ARGV;
+  die("usage: writemodulemd --convert <modulemdfile>\n") unless @ARGV == 1;
+  my ($modulemdfile) = @ARGV;
+  my $mds = readmds($modulemdfile);
+  printmd($_) for @$mds;
+  exit;
+}
+
 die("usage: writemodulemd <modulemdfile> <rpmmanifestfile>\n") unless @ARGV == 2;
 my ($modulemdfile, $manifestfile) = @ARGV;
 
@@ -219,5 +201,4 @@ while (<STDIN>) {
 }
 $mdd->{'license'}->{'content'} = [ sort keys %licenses ] if %licenses;
 printmd($_) for @$mds;
-
 
