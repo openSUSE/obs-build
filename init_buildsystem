@@ -512,18 +512,33 @@ downloadpkg() {
     mv "$destfile" "$SRC" || cleanup_and_exit 1
 }
 
+getobslocation() {
+    local url=$1
+    local obsurl="${OBSURL%/}"
+    test -n "$obsurl" || cleanup_and_exit 1 "Please use the --obs option to specify the url of the obs instance"
+    url="${url#obs:/}"
+    url="${url#/}"
+    url="${url#/}"
+    url="${url%/}"
+    url="$obsurl/build/$url/${BUILD_ARCH%%:*}"
+    echo "$url"
+}
+
 getcachedir() {
     local url=$1
+    local repoid dummy
     for repo in "${repos[@]}" ; do
 	case $repo in
 	    arch@* | debian@* | hdlist2@* | rpmmd@* | rpm-md@* | suse@*) repo=${repo#*@} ;;
 	esac
+	test "${repo#obs:/}" != "$repo" && repo=$(getobslocation "$repo")
 	if test "${url:0:${#repo}}" == "$repo" ; then
 	    read repoid dummy < <(echo -n "$repo" | md5sum)
-	    echo "$CACHE_DIR/$repoid"
 	    break
 	fi
     done
+    test -z "$repoid" && cleanup_and_exit 1 "could not determine cachedir for $url"
+    echo "$CACHE_DIR/$repoid"
 }
 
 set_build_arch
