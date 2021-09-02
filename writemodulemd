@@ -30,7 +30,6 @@ use strict;
 
 use Build::Rpm;
 use Build::Modulemd;
-use Data::Dumper;
 
 sub printmd {
   my ($md) = @_;

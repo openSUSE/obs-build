@@ -21,7 +21,6 @@
 package Build::Modules;
 
 use strict;
-use Data::Dumper;
 
 use YAML::XS;
 
