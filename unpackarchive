@@ -335,7 +335,7 @@ sub handle_decompression {
       exec(@decomp);
       die("$decomp[0]: $!\n");
     }
-    print G $first16bytes;
+    print G $first16bytes if $first16bytes ne '';
     while (1) {
       my $d = '';
       my $r = read(F, $d, 8192);
@@ -354,8 +354,22 @@ sub handle_decompression {
 #
 # Main
 #
-die("usage: unpackarchive --cpio|--tar <root>\n") unless @ARGV == 2;
-my ($format, $root) = @ARGV;
+die("usage: unpackarchive --cpio|--tar [-C <root>]\n") unless @ARGV;
+my $format = shift @ARGV;
+my $root = '.';
+while (@ARGV) {
+  if (@ARGV > 1 && $ARGV[0] eq '-C') {
+    (undef, $root) = splice(@ARGV, 0, 2);
+  } elsif (@ARGV && $ARGV[0] eq '-J') {
+    shift @ARGV;
+  } elsif ($ARGV[0] eq '-j' || $ARGV[0] eq '-J' || $ARGV[0] eq '-z') {
+    shift @ARGV;
+  } elsif ($ARGV[0] =~ /^-/) {
+    die("unpackarchive: unsupported option $ARGV[0]\n");
+  } else {
+    die("usage: unpackarchive --cpio|--tar [-C <root>]\n");
+  }
+}
 
 die("$root: No such file or directory\n") unless -d $root;
 my $readhead;
