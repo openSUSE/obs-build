@@ -55,7 +55,7 @@ if (@ARGV && $ARGV[0] eq 'cachecheck') {
 	next unless $bid;
 	if ($bid =~ / 0-/) {
 	  my $buildid2 = $buildid;
-	  $buildid2 =~ s/ .*?-/0-/;
+	  $buildid2 =~ s/ .*?-/ 0-/;
 	  next if $bid ne $buildid2;
 	} else {
 	  next if $bid ne $buildid;
