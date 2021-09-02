@@ -37,7 +37,6 @@ use Build ':rpm';
 use PBuild::Download;
 use PBuild::OBS;
 use PBuild::Cpio;
-use PBuild::BuildConfig;
 
 Getopt::Long::Configure("no_ignore_case");
 
@@ -81,7 +80,7 @@ if ($cmd eq 'config') {
     @$obsconfigs = reverse @$obsconfigs unless $reverse;
     push @configs, @$obsconfigs;
   }
-  my $config = PBuild::BuildConfig::combineconfigs(@configs);
+  my $config = Build::combine_configs(@configs);
   $config =~ s/\n?$/\n/s if $config ne '';
   print $config;
   exit;
@@ -99,7 +98,7 @@ $arch =~ s/:.*//;
 for my $url (@ARGV) {
   die("$url: not a valid  obs: repo") unless $url =~ /^obs:\/{1,3}([^\/]+\/[^\/]+)\/?$/;
   my $prp = $1;
-  my $repoid = Digest::MD5::md5_hex("$obsurl/$prp");
+  my $repoid = Digest::MD5::md5_hex("$obsurl/build/$prp/$arch");
   my $dir = "$cachedir/$repoid";
   File::Path::mkpath($dir);
   PBuild::Download::download("$obsurl/build/$prp/$arch/_repository?view=cache", "$dir/repository.cpio");
