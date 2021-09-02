@@ -168,6 +168,16 @@ if (@ARGV && $ARGV[0] eq '--convert') {
   exit;
 }
 
+if (@ARGV && $ARGV[0] eq '--converttopst') {
+  shift @ARGV;
+  die("usage: writemodulemd --converttopst <modulemdfile>\n") unless @ARGV == 1;
+  my ($modulemdfile) = @ARGV;
+  my $mds = readmds($modulemdfile);
+  require Storable;
+  Storable::nstore_fd($mds, \*STDOUT);
+  exit
+}
+
 die("usage: writemodulemd <modulemdfile> <rpmmanifestfile>\n") unless @ARGV == 2;
 my ($modulemdfile, $manifestfile) = @ARGV;
 

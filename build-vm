@@ -879,6 +879,10 @@ vm_first_stage() {
 	# umount later so step aside
 	cd "$SRCDIR"
     fi
+    # do the conversion now because a yaml reader may be missing in the vm
+    if test -n "$MODULEMDFILE" -a "${MODULEMDFILE##*/}" != _modulemd.pst ; then
+	$BUILD_DIR/writemodulemd --converttopst "$MODULEMDFILE" > "$MYSRCDIR/_modulemd.pst"
+    fi
 
     # some time has passed copying files, lets make sure we should not exit
     check_exit
