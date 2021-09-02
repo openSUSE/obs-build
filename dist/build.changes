@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Thu Sep  2 09:18:33 UTC 2021 - Adrian Schröter <adrian@suse.de>
+
+- Fix unpacking of deb/arch archives without bsdtar
+
+-------------------------------------------------------------------
 Mon Aug 30 12:44:52 UTC 2021 - Adrian Schröter <adrian@suse.de>
 
 - fixed regression in multiline macro evaluation from 20th August release
