@@ -255,7 +255,7 @@ sub combine_configs {
       # flush out macros
       $config .= "\nMacros:\n$macros:Macros\n\n" if $macros ne '';
       $macros = '';
-      my $s1 = '\A(.*^\s*:macros\s*$)(.*?)\Z';  # should always match
+      my $s1 = '\A(.*^\s*:macros\s*$)(.*?)\z';  # should always match
       if ($c =~ /$s1/msi) {
         $config .= $1;
         $c = $2;
