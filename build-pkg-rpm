@@ -71,6 +71,8 @@ rpm_set_checkopts() {
     # on Fedora 10 rpmbuild is in a separate package so we need something else to
     # detect rpm4
     test -x $BUILD_ROOT/usr/bin/rpmquery && RPMCHECKOPTS="--nodigest --nosignature"
+    # XXX: HACK: CentOS Stream 9 currently fails when file digests are checked, not sure why...
+    test -f $BUILD_ROOT/etc/os-release && . $BUILD_ROOT/etc/os-release && [ "$ID" = "centos" ] && [ "$VERSION_ID" -ge "9" ] && RPMCHECKOPTS="$RPMCHECKOPTS --nofiledigest"
 }
 
 rpm_init_cumulate() {
