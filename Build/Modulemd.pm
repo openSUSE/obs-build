@@ -31,25 +31,40 @@ my $mdtemplate = {
   '_order' => [ 'document', 'version', 'data' ],
   'version' => 'number',
   'data' => {
-    '_order' => [ 'name', 'stream', 'version', 'context', 'arch', 'summary', 'description', 'license', 'xmd', 'dependencies', 'references', 'profiles', 'api', 'filter', 'buildopts', 'components', 'artifacts' ],
+    '_order' => [ 'name', 'stream', 'version', 'context', 'arch', 'summary', 'description', 'servicelevels', 'license', 'xmd', 'dependencies', 'references', 'profiles', 'api', 'filter', 'buildopts', 'components', 'artifacts' ],
     'version' => 'number',
     'description' => 'folded',
     'license' => {
       '_order' => [ 'module', 'content' ],
     },
     'components' => {
+      '_order' => [ 'rpms', 'modules' ],
       'rpms' => {
         '*' => {
-          '_order' => [ 'rationale', 'ref', 'buildorder', 'arches' ],
+          '_order' => [ 'rationale', 'name', 'repository', 'cache', 'ref', 'buildroot', 'srpm-buildroot', 'buildorder', 'buildafter', 'buildonly', 'arches', 'multilib' ],
+          'buildroot' => 'bool',
+          'srpm-buildroot' => 'bool',
           'buildorder' => 'number',
+          'buildonly' => 'bool',
           'arches' => 'inline',
+          'multilib' => 'inline',
+        },
+      },
+      'modules' => {
+        '*' => {
+          '_order' => [ 'rationale', 'repository', 'ref', 'buildorder', 'buildafter', 'buildonly' ],
+          'buildorder' => 'number',
+          'buildonly' => 'bool',
         },
       },
     },
     'buildopts' => {
+      '_order' => [ 'rpms', 'arches' ],
       'rpms' => {
+        '_order' => [ 'macros', 'whitelist' ],
         'macros' => 'literal',
       },
+      'arches' => 'inline',
     },
     'dependencies' => {
       'requires' => {
