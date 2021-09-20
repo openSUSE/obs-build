@@ -20,11 +20,50 @@
 
 package PBuild::Depsort;
 
+use strict;
+
+# Tarjan's SCC algorithm using a stack instead of recursion
+sub find_sccs {
+  my ($vert, $edg) = @_;
+  my %low;
+  my @sccs;
+  my $idx = 1;
+  my @todo = map {($_, 0)} @$vert;
+  while (@todo) {
+    my ($node, $myidx) = splice(@todo, 0, 2);
+    if (!$myidx) {
+      next if $low{$node};
+      $low{$node} = $myidx = $idx++;
+    }
+    my @notyet = grep {!$low{$_}} @{$edg->{$node} || []};
+    if (@notyet) {
+      unshift @todo, (map {($_, 0)} @notyet), $node, $myidx;
+      next;
+    }
+    for (map {$low{$_}} @{$edg->{$node} || []}) {
+      $low{$node} = $_ if $_ > 0 && $_ < $low{$node};
+    }
+    if ($low{$node} == $myidx) {
+      my @collect = $node;
+      my @scc;
+      while (@collect) {
+        my $n = shift @collect;
+        next if $low{$n} < 0;
+        $low{$n} = -1;
+        push @scc, $n;
+        unshift @collect, grep {$low{$_} > 0} @{$edg->{$n} || []};
+      }
+      push @sccs, \@scc if @scc > 1;
+    }
+  }
+  return @sccs;
+}
+
 #
 # Sort packages by dependencies
 #
 sub depsort {
-  my ($depsp, $mapp, $cycp, @packs) = @_;
+  my ($depsp, $mapp, $cycp, $sccs, @packs) = @_;
 
   return @packs if @packs < 2;
 
@@ -63,6 +102,10 @@ sub depsort {
     }
     die unless @packs > 1;
     # uh oh, cycle alert. find and remove all cycles.
+    if ($sccs) {
+      push @$sccs, find_sccs(\@packs, \%deps);
+      undef $sccs;
+    }
     my %notdone = map {$_ => 1} @packs;
     $notdone{$_} = 0 for @res;  # already did those
     my @todo = @packs;
@@ -117,7 +160,7 @@ sub depsort {
 # Sort packages by dependencies mapped to source packages
 #
 sub depsort2 {
-  my ($deps, $dep2src, $pkg2src, $cycles, @packs) = @_;
+  my ($deps, $dep2src, $pkg2src, $cycles, $sccs, @packs) = @_;
   my %src2pkg = reverse(%$pkg2src);
   my %pkgdeps;
   my @dups;
@@ -137,7 +180,7 @@ sub depsort2 {
       $pkgdeps{$pkg} = [ map { $src2pkg{$dep2src->{$_} || $_} || $dep2src->{$_} || $_} @{$deps->{$pkg}} ];
     }    
   }
-  return depsort(\%pkgdeps, undef, $cycles, @packs);
+  return depsort(\%pkgdeps, undef, $cycles, $sccs, @packs);
 }
 
 1;

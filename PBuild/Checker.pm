@@ -119,14 +119,19 @@ sub pkgsort {
     $pkg2src{$pkg} = $p->{'name'} || $p->{'pkg'};
   }
   my @cycles;
-  @pkgs = PBuild::Depsort::depsort2(\%pdeps, $ctx->{'dep2src'}, \%pkg2src, \@cycles, @pkgs);
+  my @sccs;
+  @pkgs = PBuild::Depsort::depsort2(\%pdeps, $ctx->{'dep2src'}, \%pkg2src, \@cycles, \@sccs, @pkgs);
   my %cychash;
-  for my $cyc (@cycles) {
+  for my $cyc (@sccs) {
     next if @$cyc < 2;  # just in case
     my @c = map {@{$cychash{$_} || [ $_ ]}} @$cyc;
     @c = PBuild::Util::unify(sort(@c));
     $cychash{$_} = \@c for @c; 
   }
+  #if (@sccs) {
+  #  print "  sccs:\n";
+  #  print "    - @{[sort @$_]}\n" for @sccs;
+  #}
   #if (%cychash) {
   #  print "  cycle components:\n";
   #  for (PBuild::Util::unify(sort(map {$_->[0]} values %cychash))) {
