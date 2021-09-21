@@ -941,6 +941,7 @@ my %rpmstag = (
   "ENHANCENAME"    => 5055,
   "ENHANCEVERSION" => 5056,
   "ENHANCEFLAGS"   => 5057,
+  "MODULARITYLABEL" => 5096,
 );
 
 sub rpmq {
@@ -1229,6 +1230,7 @@ sub query {
   push @tags, qw{LICENSE} if $opts{'license'};
   push @tags, qw{CONFLICTNAME CONFLICTVERSION CONFLICTFLAGS OBSOLETENAME OBSOLETEVERSION OBSOLETEFLAGS} if $opts{'conflicts'};
   push @tags, qw{RECOMMENDNAME RECOMMENDVERSION RECOMMENDFLAGS SUGGESTNAME SUGGESTVERSION SUGGESTFLAGS SUPPLEMENTNAME SUPPLEMENTVERSION SUPPLEMENTFLAGS ENHANCENAME ENHANCEVERSION ENHANCEFLAGS OLDSUGGESTSNAME OLDSUGGESTSVERSION OLDSUGGESTSFLAGS OLDENHANCESNAME OLDENHANCESVERSION OLDENHANCESFLAGS} if $opts{'weakdeps'};
+  push @tags, qw{MODULARITYLABEL} if $opts{'modularitylabel'};
 
   my %res = rpmq($handle, @tags);
   return undef unless %res;
@@ -1309,6 +1311,7 @@ sub query {
   $data->{'buildtime'} = $res{'BUILDTIME'}->[0] if $opts{'buildtime'};
   $data->{'disturl'} = $res{'DISTURL'}->[0] if $opts{'disturl'} && $res{'DISTURL'};
   $data->{'license'} = $res{'LICENSE'}->[0] if $opts{'license'} && $res{'LICENSE'};
+  $data->{'modularitylabel'} = $res{'MODULARITYLABEL'}->[0] if $opts{'modularitylabel'} && $res{'MODULARITYLABEL'};
   return $data;
 }
 
