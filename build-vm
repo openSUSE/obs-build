@@ -650,6 +650,11 @@ vm_detect_2nd_stage() {
     mkdir -p "$BUILD_ROOT/.build/cores"
     echo "/.build/cores/%p" > /proc/sys/kernel/core_pattern
 
+    # Load selinux policy (if a preinstall image is used)
+    if test -s /etc/selinux/config -a -x /usr/sbin/load_policy -a -e /sys/fs/selinux/status -a -e /installed-pkg ; then
+	echo "loading selinux policy"
+	/usr/sbin/load_policy
+    fi
     return 0
 }
 
