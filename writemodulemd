@@ -169,20 +169,24 @@ if (@ARGV && $ARGV[0] eq '--filter') {
 
 if (@ARGV && $ARGV[0] eq '--convert') {
   shift @ARGV;
-  die("usage: writemodulemd --convert <modulemdfile>\n") unless @ARGV == 1;
-  my ($modulemdfile) = @ARGV;
-  my $mds = readmds($modulemdfile);
-  printmd($_) for @$mds;
+  die("usage: writemodulemd --convert <modulemdfile>\n") unless @ARGV;
+  my @mds;
+  for my $modulemdfile (@ARGV) {
+    push @mds, @{readmds($modulemdfile)};
+  }
+  printmd($_) for @mds;
   exit;
 }
 
 if (@ARGV && $ARGV[0] eq '--converttopst') {
   shift @ARGV;
-  die("usage: writemodulemd --converttopst <modulemdfile>\n") unless @ARGV == 1;
-  my ($modulemdfile) = @ARGV;
-  my $mds = readmds($modulemdfile);
+  die("usage: writemodulemd --converttopst <modulemdfile>\n") unless @ARGV;
+  my @mds;
+  for my $modulemdfile (@ARGV) {
+    push @mds, @{readmds($modulemdfile)};
+  }
   require Storable;
-  Storable::nstore_fd($mds, \*STDOUT);
+  Storable::nstore_fd(\@mds, \*STDOUT);
   exit
 }
 
