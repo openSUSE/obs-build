@@ -117,17 +117,19 @@ if (@ARGV && $ARGV[0] eq '--filter') {
       $outmds{$ns} = $md;
       next;
     }
-    # check if we have this md in the rpms
-    next unless $mdd->{'artifacts'};
-    my @have = grep {exists $rpms{$_}} @{$mdd->{'artifacts'} && $mdd->{'artifacts'}->{'rpms'} || []};
-    next unless @have;
+    my @have;
+    if ($mdd->{'artifacts'}) {
+      # check if we have this md in the rpms
+      @have = grep {exists $rpms{$_}} @{$mdd->{'artifacts'} && $mdd->{'artifacts'}->{'rpms'} || []};
+      next unless @have;
+    }
 
     # filter artifacts and licenses
     my %licenses;
     for (@have) {
       $licenses{$rpms{$_}} = 1 if defined $rpms{$_};
     }
-    $mdd->{'artifacts'}->{'rpms'} = \@have;
+    $mdd->{'artifacts'}->{'rpms'} = \@have if @have;
     delete $mdd->{'license'}->{'content'} if $mdd->{'license'} && $mdd->{'license'}->{'content'};
     $mdd->{'license'}->{'content'} = [ sort keys %licenses ] if %licenses;
 
@@ -139,10 +141,16 @@ if (@ARGV && $ARGV[0] eq '--filter') {
       # merge with existing entry
       my $omdd = $omd->{'data'};
       ($md, $omd, $mdd, $omdd) = ($omd, $md, $omdd, $mdd) if $omdd->{'version'} > $mdd->{'version'};
-      $mdd->{'artifacts'}->{'rpms'} = unifyandsort(@{$mdd->{'artifacts'}->{'rpms'}}, @{$omdd->{'artifacts'}->{'rpms'}});
-      my $licenses = unifyandsort(@{$mdd->{'license'}->{'content'}}, @{$omdd->{'license'}->{'content'}});
-      delete $mdd->{'license'}->{'content'};
-      $mdd->{'license'}->{'content'} = $licenses if @$licenses;
+      if ($mdd->{'artifacts'} || $omdd->{'artifacts'}) {
+        my $artifacts = unifyandsort(@{$mdd->{'artifacts'}->{'rpms'} || []}, @{$omdd->{'artifacts'}->{'rpms'} || []});
+        delete $mdd->{'artifacts'}->{'rpms'};
+        $mdd->{'artifacts'}->{'rpms'} = $artifacts if @$artifacts;
+      }
+      if ($mdd->{'license'} || $omdd->{'license'}) {
+        my $licenses = unifyandsort(@{$mdd->{'license'}->{'content'} || []}, @{$omdd->{'license'}->{'content'} || []});
+        delete $mdd->{'license'}->{'content'};
+        $mdd->{'license'}->{'content'} = $licenses if @$licenses;
+      }
     }
     $outmds{$nsca} = $md;
   }
