@@ -120,7 +120,7 @@ if (@ARGV && $ARGV[0] eq '--filter') {
     my @have;
     if ($mdd->{'artifacts'}) {
       # check if we have this md in the rpms
-      @have = grep {exists $rpms{$_}} @{$mdd->{'artifacts'} && $mdd->{'artifacts'}->{'rpms'} || []};
+      @have = grep {exists $rpms{$_}} @{$mdd->{'artifacts'}->{'rpms'} || []};
       next unless @have;
     }
 
