@@ -214,6 +214,7 @@ my %licenses;
 while (<STDIN>) {
   chomp;
   my $r = Build::Rpm::query($_, 'evra' => 1, 'license' => 1);
+  next if $r->{'name'} eq 'empty-modulemd-hack';
   $r->{'epoch'} ||= 0;
   my $nevra = "$r->{'name'}-$r->{'epoch'}:$r->{'version'}-$r->{'release'}.$r->{'arch'}";
   my $license = $r->{'license'};
