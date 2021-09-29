@@ -31,6 +31,8 @@ use strict;
 use Build::Rpm;
 use Build::Modulemd;
 
+my $filter_artifacts = 0;
+
 sub printmd {
   my ($md) = @_;
   print Build::Modulemd::mdtoyaml($md);
@@ -117,21 +119,30 @@ if (@ARGV && $ARGV[0] eq '--filter') {
       $outmds{$ns} = $md;
       next;
     }
-    my @have;
+    # check if we have this md in the rpms
     if ($mdd->{'artifacts'}) {
-      # check if we have this md in the rpms
-      @have = grep {exists $rpms{$_}} @{$mdd->{'artifacts'}->{'rpms'} || []};
-      next unless @have;
+      next unless grep {exists $rpms{$_}} @{$mdd->{'artifacts'}->{'rpms'} || []};
     }
 
     # filter artifacts and licenses
-    my %licenses;
-    for (@have) {
-      $licenses{$rpms{$_}} = 1 if defined $rpms{$_};
+    if ($filter_artifacts && $mdd->{'artifacts'}) {
+      my @have = grep {exists $rpms{$_}} @{$mdd->{'artifacts'}->{'rpms'} || []};
+      my %licenses;
+      for (@have) {
+        $licenses{$rpms{$_}} = 1 if defined $rpms{$_};
+      }
+      if (@have) {
+        $mdd->{'artifacts'}->{'rpms'} = \@have;
+      } else {
+        delete $mdd->{'artifacts'}->{'rpms'};
+        delete $mdd->{'artifacts'} unless %{$mdd->{'artifacts'} || {}};
+      }
+      if (%licenses) {
+        $mdd->{'license'}->{'content'} = [ sort keys %licenses ];
+      } else {
+        delete $mdd->{'license'}->{'content'} if $mdd->{'license'} && $mdd->{'license'}->{'content'};
+      }
     }
-    $mdd->{'artifacts'}->{'rpms'} = \@have if @have;
-    delete $mdd->{'license'}->{'content'} if $mdd->{'license'} && $mdd->{'license'}->{'content'};
-    $mdd->{'license'}->{'content'} = [ sort keys %licenses ] if %licenses;
 
     my $ns = "$mdd->{'name'}:$mdd->{'stream'}";
     $havens{$ns} = 1;
@@ -154,6 +165,7 @@ if (@ARGV && $ARGV[0] eq '--filter') {
     }
     $outmds{$nsca} = $md;
   }
+
   # now dump em all
   for (sort keys %outmds) {
     my $md = $outmds{$_};
