@@ -1240,6 +1240,7 @@ sub query {
   my %res = rpmq($handle, @tags);
   return undef unless %res;
   my $src = $res{'SOURCERPM'}->[0];
+  $res{'sourcerpm'} = $src if $src;
   $src = '' unless defined $src;
   $src =~ s/-[^-]*-[^-]*\.[^\.]*\.rpm//;
   add_flagsvers(\%res, 'PROVIDENAME', 'PROVIDEFLAGS', 'PROVIDEVERSION');
