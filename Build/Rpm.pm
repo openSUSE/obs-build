@@ -910,6 +910,10 @@ my %rpmstag = (
   "REQUIREVERSION" => 1050,
   "NOSOURCE"       => 1051,
   "NOPATCH"        => 1052,
+  "EXCLUDEARCH"    => 1059,
+  "EXCLUDEOS"      => 1060,
+  "EXCLUSIVEARCH"  => 1061,
+  "EXCLUSIVEOS"    => 1062,
   "SOURCEPACKAGE"  => 1106,
   "PROVIDEFLAGS"   => 1112,
   "PROVIDEVERSION" => 1113,
@@ -1231,6 +1235,7 @@ sub query {
   push @tags, qw{CONFLICTNAME CONFLICTVERSION CONFLICTFLAGS OBSOLETENAME OBSOLETEVERSION OBSOLETEFLAGS} if $opts{'conflicts'};
   push @tags, qw{RECOMMENDNAME RECOMMENDVERSION RECOMMENDFLAGS SUGGESTNAME SUGGESTVERSION SUGGESTFLAGS SUPPLEMENTNAME SUPPLEMENTVERSION SUPPLEMENTFLAGS ENHANCENAME ENHANCEVERSION ENHANCEFLAGS OLDSUGGESTSNAME OLDSUGGESTSVERSION OLDSUGGESTSFLAGS OLDENHANCESNAME OLDENHANCESVERSION OLDENHANCESFLAGS} if $opts{'weakdeps'};
   push @tags, qw{MODULARITYLABEL} if $opts{'modularitylabel'};
+  push @tags, qw{EXCLUDEARCH EXCLUDEOS EXCLUSIVEARCH EXCLUSIVEOS} if $opts{'excludearch'};
 
   my %res = rpmq($handle, @tags);
   return undef unless %res;
@@ -1312,6 +1317,11 @@ sub query {
   $data->{'disturl'} = $res{'DISTURL'}->[0] if $opts{'disturl'} && $res{'DISTURL'};
   $data->{'license'} = $res{'LICENSE'}->[0] if $opts{'license'} && $res{'LICENSE'};
   $data->{'modularitylabel'} = $res{'MODULARITYLABEL'}->[0] if $opts{'modularitylabel'} && $res{'MODULARITYLABEL'};
+  if ($opts{'excludearch'}) {
+    for (qw{EXCLUDEARCH EXCLUDEOS EXCLUSIVEARCH EXCLUSIVEOS}) {
+      $data->{lc($_)} = $res{$_} if @{$res{$_} || []};
+    }
+  }
   return $data;
 }
 
