@@ -131,6 +131,9 @@ if (@ARGV && $ARGV[0] eq '--filter') {
 	}
 	next unless /(.*)-[^-]*-[^-]*\.[^\.]+$/;
 	next if $filter{$1};
+	my $n = $1;
+	$n =~ s/-debug(?:info|source)$//;
+	next if $filter{$n};
 	push @{$mdd->{'artifacts'}->{'rpms'}}, $_;
 	$havebinaryrpms = 1;
       }
