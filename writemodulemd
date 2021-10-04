@@ -164,8 +164,8 @@ if (@ARGV && $ARGV[0] eq '--filter') {
 
     my $ns = "$mdd->{'name'}:$mdd->{'stream'}";
     $havens{$ns} = 1;
-    my $nsca = "$mdd->{'name'}:$mdd->{'stream'}:$mdd->{'context'}:$mdd->{'arch'}";
-    my $omd = $outmds{$nsca};
+    my $label = "$mdd->{'name'}:$mdd->{'stream'}:$mdd->{'version'}:$mdd->{'context'}:$mdd->{'arch'}";
+    my $omd = $outmds{$label};
     if ($omd) {
       # merge with existing entry
       my $omdd = $omd->{'data'};
@@ -181,7 +181,7 @@ if (@ARGV && $ARGV[0] eq '--filter') {
         $mdd->{'license'}->{'content'} = $licenses if @$licenses;
       }
     }
-    $outmds{$nsca} = $md;
+    $outmds{$label} = $md;
   }
 
   # now dump em all
