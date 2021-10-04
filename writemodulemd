@@ -119,6 +119,24 @@ if (@ARGV && $ARGV[0] eq '--filter') {
       $outmds{$ns} = $md;
       next;
     }
+
+    # apply rpm name filtering
+    if ($mdd->{'artifacts'} && $mdd->{'artifacts'}->{'rpms'} && $mdd->{'filter'} && $mdd->{'filter'}->{'rpms'}) {
+      my %filter = map {$_ => 1} @{$mdd->{'filter'}->{'rpms'}};
+      my $havebinaryrpms;
+      for (splice @{$mdd->{'artifacts'}->{'rpms'}}) {
+	if (/\.(?:no)?src$/) {
+	  push @{$mdd->{'artifacts'}->{'rpms'}}, $_;
+	  next;
+	}
+	next unless /(.*)-[^-]*-[^-]*\.[^\.]+$/;
+	next if $filter{$1};
+	push @{$mdd->{'artifacts'}->{'rpms'}}, $_;
+	$havebinaryrpms = 1;
+      }
+      @{$mdd->{'artifacts'}->{'rpms'}} = () unless $havebinaryrpms;
+    }
+
     # check if we have this md in the rpms
     if ($mdd->{'artifacts'}) {
       next unless grep {exists $rpms{$_}} @{$mdd->{'artifacts'}->{'rpms'} || []};
@@ -230,7 +248,7 @@ while (<STDIN>) {
   $r->{'epoch'} ||= 0;
   my $nevra = "$r->{'name'}-$r->{'epoch'}:$r->{'version'}-$r->{'release'}.$r->{'arch'}";
   my $license = $r->{'license'};
-  $licenses{$license} = 1;
+  $licenses{$license} = 1 if $license;
   push @{$mdd->{'artifacts'}->{'rpms'}}, $nevra;
 }
 $mdd->{'license'}->{'content'} = [ sort keys %licenses ] if %licenses;
