@@ -191,28 +191,23 @@ if (@ARGV && $ARGV[0] eq '--filter') {
     }
 
     if ($mdd->{'components'} && $mdd->{'components'}->{'rpms'} && $mdd->{'artifacts'} && $mdd->{'artifacts'}->{'rpms'}) {
-      my %domulti;
+      my %havearch;
+      my %havesrc;
       for (@{$mdd->{'artifacts'}->{'rpms'} || []}) {
-	next unless /(.*)-[^-]*-[^-]*\.(?:no)?src$/;
-	my $c = $mdd->{'components'}->{'rpms'}->{$1};
+	next unless /(.*)-[^-]*-[^-]*\.([^\.]+)$/;
+	$havearch{$2} = 1;
+	$havesrc{$1} = 1 if $2 eq 'src' || $2 eq 'nosrc';
+      }
+      my %domulti;
+      for my $sname (sort keys %havesrc) {
+	my $c = $mdd->{'components'}->{'rpms'}->{$sname};
 	next unless $c;
-	for my $march (@{$c->{'multilib' || []}}) {
-	  $domulti{$_}->{$march} = 1 for @{$multilib{$march} || []};
+	for my $march (@{$c->{'multilib'} || []}) {
+	  $domulti{$_}->{$march} = 1 for grep {$havearch{$_}} @{$multilib{$march} || []};
 	}
       }
-      if (%domulti) {
-	my %havemulti;
-	for (@{$mdd->{'artifacts'}->{'rpms'} || []}) {
-	  next unless /.*-[^-]*-[^-]*\.([^\.]+)$/;
-	  $havemulti{$1} = 1 if $domulti{$1};
-	}
-	for (keys %domulti) {
-	  delete $domulti{$_} unless $havemulti{$_};
-	}
-	for my $v (values %domulti) {
-	  $domulti{'src'}->{$_} = 1 for keys %$v;
-	  $domulti{'nosrc'}->{$_} = 1 for keys %$v;
-	}
+      for my $v (values %domulti) {
+        $domulti{'src'}->{$_} = $domulti{'nosrc'}->{$_} = 1 for keys %$v;
       }
       if (%domulti) {
 	for (@{$mdd->{'artifacts'}->{'rpms'} || []}) {
