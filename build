@@ -1748,6 +1748,7 @@ fi
 if test -n "$MODULEMDFILE" ; then
    mkdir -p "$BUILD_ROOT/$TOPDIR/OTHER"
    find "$BUILD_ROOT/$TOPDIR/RPMS" "$BUILD_ROOT/$TOPDIR/SRPMS" -type f -name "*.rpm" | sort | $BUILD_DIR/writemodulemd "$MODULEMDFILE" - > "$BUILD_ROOT/$TOPDIR/OTHER/_modulemd.yaml"
+   test -s "$BUILD_ROOT/$TOPDIR/OTHER/_modulemd.yaml" || rm -f "$BUILD_ROOT/$TOPDIR/OTHER/_modulemd.yaml"
 fi
 
 exitcode=0
