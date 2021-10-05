@@ -33,6 +33,11 @@ use Build::Modulemd;
 
 my $filter_artifacts = 0;
 
+# taken from pungi's multilib definitions
+my %multilib = (
+  'x86_64' => [ 'i686' ],
+);
+
 sub printmd {
   my ($md) = @_;
   print Build::Modulemd::mdtoyaml($md);
@@ -77,6 +82,24 @@ sub unifyandsort {
   return [ sort keys %m ];
 }
 
+sub sortarray {
+  my ($d, @c) = @_;
+  if (@c) {
+    if (ref($d) eq 'ARRAY') {
+      sortarray($_, @c) for @$d;
+    } elsif (ref($d) eq 'HASH') {
+      my $k = shift @c;
+      if ($k eq '*') {
+        sortarray($_, @c) for values %$d;
+      } else {
+        sortarray($d->{$k}, @c) if exists $d->{$k};
+      }
+    }
+  } elsif ($d && ref($d) eq 'ARRAY') {
+    @$d = sort @$d;
+  }
+}
+
 if (@ARGV && $ARGV[0] eq '--filter') {
   shift @ARGV;
   die("usage: writemodulemd --filter <modulemdfile> <primaryfile>\n") unless @ARGV == 2;
@@ -112,6 +135,8 @@ if (@ARGV && $ARGV[0] eq '--filter') {
   }, 'withlicense' => 1);
   my %outmds;
   my %havens;
+  my %multiartifacts;
+  my %multilicenses;
   for my $md (@$mds) {
     my $mdd = $md->{'data'};
     if ($md->{'document'} eq 'modulemd-defaults') {
@@ -165,6 +190,42 @@ if (@ARGV && $ARGV[0] eq '--filter') {
       }
     }
 
+    if ($mdd->{'components'} && $mdd->{'components'}->{'rpms'} && $mdd->{'artifacts'} && $mdd->{'artifacts'}->{'rpms'}) {
+      my %domulti;
+      for (@{$mdd->{'artifacts'}->{'rpms'} || []}) {
+	next unless /(.*)-[^-]*-[^-]*\.(?:no)?src$/;
+	my $c = $mdd->{'components'}->{'rpms'}->{$1};
+	next unless $c;
+	for my $march (@{$c->{'multilib' || []}}) {
+	  $domulti{$_}->{$march} = 1 for @{$multilib{$march} || []};
+	}
+      }
+      if (%domulti) {
+	my %havemulti;
+	for (@{$mdd->{'artifacts'}->{'rpms'} || []}) {
+	  next unless /.*-[^-]*-[^-]*\.([^\.]+)$/;
+	  $havemulti{$1} = 1 if $domulti{$1};
+	}
+	for (keys %domulti) {
+	  delete $domulti{$_} unless $havemulti{$_};
+	}
+	for my $v (values %domulti) {
+	  $domulti{'src'}->{$_} = 1 for keys %$v;
+	  $domulti{'nosrc'}->{$_} = 1 for keys %$v;
+	}
+      }
+      if (%domulti) {
+	for (@{$mdd->{'artifacts'}->{'rpms'} || []}) {
+	  next unless /.*-[^-]*-[^-]*\.([^\.]+)$/;
+          for my $march (sort keys %{$domulti{$1} || {}}) {
+            my $label = "$mdd->{'name'}:$mdd->{'stream'}:$mdd->{'version'}:$mdd->{'context'}:$march";
+	    push @{$multiartifacts{$label}}, $_;
+	    push @{$multilicenses{$label}}, @{$mdd->{'license'}->{'content'}} if $mdd->{'license'} && @{$mdd->{'license'}->{'content'}};
+	  }
+	}
+      }
+    }
+
     my $ns = "$mdd->{'name'}:$mdd->{'stream'}";
     $havens{$ns} = 1;
     my $label = "$mdd->{'name'}:$mdd->{'stream'}:$mdd->{'version'}:$mdd->{'context'}:$mdd->{'arch'}";
@@ -187,6 +248,19 @@ if (@ARGV && $ARGV[0] eq '--filter') {
     $outmds{$label} = $md;
   }
 
+  # merge multilib entries
+  for my $label (sort keys %multiartifacts) {
+    my $md = $outmds{$label};
+    next unless $md;
+    my $mdd = $md->{'data'};
+    my $artifacts = unifyandsort(@{$mdd->{'artifacts'}->{'rpms'} || []}, @{$multiartifacts{$label}});
+    $mdd->{'artifacts'}->{'rpms'} = $artifacts;
+    if ($multilicenses{$label}) {
+      my $licenses = unifyandsort(@{$mdd->{'license'}->{'content'} || []}, @{$multilicenses{$label}});
+      $mdd->{'license'}->{'content'} = $licenses;
+    }
+  }
+
   # now dump em all
   for (sort keys %outmds) {
     my $md = $outmds{$_};
@@ -195,6 +269,13 @@ if (@ARGV && $ARGV[0] eq '--filter') {
       my $ns = "$mdd->{'module'}:$mdd->{'stream'}";
       next unless $havens{$ns};
     }
+    # normalize some entries
+    sortarray($md, 'data', 'profiles', '*', 'rpms');
+    sortarray($md, 'data', 'artifacts', 'rpms');
+    sortarray($md, 'data', 'license', 'content');
+    sortarray($md, 'data', 'buildopts', 'rpms', 'whitelist');
+    sortarray($md, 'data', 'filter', 'rpms');
+    sortarray($md, 'data', 'api', 'rpms');
     printmd($md);
   }
   exit;
