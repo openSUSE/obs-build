@@ -102,7 +102,12 @@ sub sortarray {
 
 if (@ARGV && $ARGV[0] eq '--filter') {
   shift @ARGV;
-  die("usage: writemodulemd --filter <modulemdfile> <primaryfile>\n") unless @ARGV == 2;
+  my %archfilter;
+  while (@ARGV >= 2 && $ARGV[0] eq '--arch') {
+    $archfilter{$ARGV[1]} = 1;
+    splice(@ARGV, 0, 2);
+  }
+  die("usage: writemodulemd --filter [--arch <ARCH>] <modulemdfile> <primaryfile>\n") unless @ARGV == 2;
   my ($modulemdfile, $primaryfile) = @ARGV;
   my $mds = readmds($modulemdfile);
   require Build::Rpmmd;
@@ -220,6 +225,7 @@ if (@ARGV && $ARGV[0] eq '--filter') {
 	}
       }
     }
+    next if %archfilter && !$archfilter{$mdd->{'arch'}};
 
     my $ns = "$mdd->{'name'}:$mdd->{'stream'}";
     $havens{$ns} = 1;
