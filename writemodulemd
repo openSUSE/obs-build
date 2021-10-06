@@ -100,7 +100,7 @@ sub sortarray {
   }
 }
 
-if (@ARGV && $ARGV[0] eq '--filter') {
+if (@ARGV && ($ARGV[0] eq '--filter' || $ARGV[0] eq 'filter')) {
   shift @ARGV;
   my %archfilter;
   while (@ARGV >= 2 && $ARGV[0] eq '--arch') {
@@ -136,7 +136,7 @@ if (@ARGV && $ARGV[0] eq '--filter') {
   Build::Rpmmd::parse(\*STDIN, sub {
     my ($r) = @_;
     my $evr = ($r->{'epoch'} || 0).":$r->{'version'}-$r->{'release'}";
-    $rpms{"$r->{'name'}-$evr.$r->{'arch'}"} = $r->{'license'};
+    $rpms{"$r->{'name'}-$evr.$r->{'arch'}"} = [ $r->{'source'},  $r->{'license'} ];
   }, 'withlicense' => 1);
   my %outmds;
   my %havens;
@@ -172,7 +172,13 @@ if (@ARGV && $ARGV[0] eq '--filter') {
 
     # check if we have this md in the rpms
     if ($mdd->{'artifacts'}) {
-      next unless grep {exists $rpms{$_}} @{$mdd->{'artifacts'}->{'rpms'} || []};
+      my %components;
+      if ($mdd->{'buildopts'} && $mdd->{'buildopts'}->{'whitelist'}) {
+	%components = map {$_ => 1} @{$mdd->{'buildopts'}->{'whitelist'}};
+      } elsif ($mdd->{'components'} && $mdd->{'components'}->{'rpms'}) {
+	%components = map {$_ => 1} keys %{$mdd->{'components'}->{'rpms'}};
+      }
+      next unless grep {exists($rpms{$_}) && $components{$rpms{$_}->[0]}} @{$mdd->{'artifacts'}->{'rpms'} || []};
     }
 
     # filter artifacts and licenses
@@ -180,7 +186,7 @@ if (@ARGV && $ARGV[0] eq '--filter') {
       my @have = grep {exists $rpms{$_}} @{$mdd->{'artifacts'}->{'rpms'} || []};
       my %licenses;
       for (@have) {
-        $licenses{$rpms{$_}} = 1 if defined $rpms{$_};
+        $licenses{$rpms{$_}->[1]} = 1 if $rpms{$_} && defined $rpms{$_}->[1];
       }
       if (@have) {
         $mdd->{'artifacts'}->{'rpms'} = \@have;
@@ -282,7 +288,7 @@ if (@ARGV && $ARGV[0] eq '--filter') {
   exit;
 }
 
-if (@ARGV && $ARGV[0] eq '--convert') {
+if (@ARGV && ($ARGV[0] eq '--convert' || $ARGV[0] eq 'convert')) {
   shift @ARGV;
   die("usage: writemodulemd --convert <modulemdfile>\n") unless @ARGV;
   my @mds;
@@ -293,7 +299,7 @@ if (@ARGV && $ARGV[0] eq '--convert') {
   exit;
 }
 
-if (@ARGV && $ARGV[0] eq '--converttopst') {
+if (@ARGV && ($ARGV[0] eq '--converttopst' || $ARGV[0] eq 'converttopst')) {
   shift @ARGV;
   die("usage: writemodulemd --converttopst <modulemdfile>\n") unless @ARGV;
   my @mds;
