@@ -241,6 +241,26 @@ if (@ARGV && ($ARGV[0] eq '--filter' || $ARGV[0] eq 'filter')) {
       # merge with existing entry
       my $omdd = $omd->{'data'};
       ($md, $omd, $mdd, $omdd) = ($omd, $md, $omdd, $mdd) if $omdd->{'version'} > $mdd->{'version'};
+      my %sources;
+      my %osources;
+      if ($mdd->{'artifacts'} && $mdd->{'artifacts'}->{'rpms'}) {
+	for (@{$mdd->{'artifacts'}->{'rpms'}}) {
+	  $sources{$1} = 1 if /(.*)-[^-]*-[^-]*\.([^\.]+)$/;
+	}
+      }
+      if ($omdd->{'artifacts'} && $omdd->{'artifacts'}->{'rpms'}) {
+	for (@{$omdd->{'artifacts'}->{'rpms'}}) {
+	  $osources{$1} = 1 if /(.*)-[^-]*-[^-]*\.([^\.]+)$/;
+	}
+      }
+      if ($mdd->{'components'} || $omdd->{'components'}) {
+	my $components = $mdd->{'components'}->{'rpms'} || {};
+	for my $s (sort keys %{$omdd->{'components'}->{'rpms'} || {}}) {
+	  $components->{$s} = $omdd->{'components'}->{'rpms'}->{$s} if !$components->{$s} || (!$sources{$s} && $osources{$s});
+	}
+	delete $mdd->{'components'}->{'rpms'};
+        $mdd->{'components'}->{'rpms'} = $components if %$components;
+      }
       if ($mdd->{'artifacts'} || $omdd->{'artifacts'}) {
         my $artifacts = unifyandsort(@{$mdd->{'artifacts'}->{'rpms'} || []}, @{$omdd->{'artifacts'}->{'rpms'} || []});
         delete $mdd->{'artifacts'}->{'rpms'};
@@ -311,7 +331,9 @@ if (@ARGV && ($ARGV[0] eq '--converttopst' || $ARGV[0] eq 'converttopst')) {
   exit
 }
 
-die("usage: writemodulemd <modulemdfile> <rpmmanifestfile>\n") unless @ARGV == 2;
+my $disturl;
+(undef, $disturl) = splice(@ARGV, 0, 2) if @ARGV >= 2 && $ARGV[0] eq '--disturl';
+die("usage: writemodulemd [--disturl <disturl] <modulemdfile> <rpmmanifestfile>\n") unless @ARGV == 2;
 my ($modulemdfile, $manifestfile) = @ARGV;
 
 my $mds = readmds($modulemdfile);
@@ -332,10 +354,12 @@ if ($manifestfile ne '-') {
   open(STDIN, '<', $manifestfile) || die("$manifestfile: $!\n");
 }
 my %licenses;
+my %sources;
 while (<STDIN>) {
   chomp;
   my $r = Build::Rpm::query($_, 'evra' => 1, 'license' => 1);
   next if $r->{'name'} eq 'empty-modulemd-hack';
+  $sources{$r->{'name'}} = 1 if $r->{'arch'} eq 'src' || $r->{'arch'} eq 'nosrc';
   $r->{'epoch'} ||= 0;
   my $nevra = "$r->{'name'}-$r->{'epoch'}:$r->{'version'}-$r->{'release'}.$r->{'arch'}";
   my $license = $r->{'license'};
@@ -343,5 +367,11 @@ while (<STDIN>) {
   push @{$mdd->{'artifacts'}->{'rpms'}}, $nevra;
 }
 $mdd->{'license'}->{'content'} = [ sort keys %licenses ] if %licenses;
+if ($disturl && %sources && $mdd->{'components'} && $mdd->{'components'}->{'rpms'}) {
+  for my $s (sort keys %sources) {
+    my $c = $mdd->{'components'}->{'rpms'}->{$s};
+    $c->{'ref'} = $disturl if $c;
+  }
+}
 printmd($_) for @$mds;
 
