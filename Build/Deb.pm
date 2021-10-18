@@ -282,6 +282,8 @@ sub debq {
     $decompressor = 'gunzip';
   } elsif ($controlname eq 'control.tar.xz  ' || $controlname eq 'control.tar.xz/ ') {
     $decompressor = 'unxz';
+  } elsif ($controlname eq 'control.tar.zst ' || $controlname eq 'control.tar.zst/') {
+    $decompressor = 'unzstd';
   } elsif ($controlname eq 'control.tar     ' || $controlname eq 'control.tar/    ') {
     $decompressor = 'cat';
   } else {
@@ -417,6 +419,7 @@ sub queryhdrmd5 {
   my $controlname = substr($data, 0, 16);
   if ($controlname ne 'control.tar.gz  ' && $controlname ne 'control.tar.gz/ ' &&
       $controlname ne 'control.tar.xz  ' && $controlname ne 'control.tar.xz/ ' &&
+      $controlname ne 'control.tar.zst ' && $controlname ne 'control.tar.zst/' &&
       $controlname ne 'control.tar     ' && $controlname ne 'control.tar/    ') {
     warn("$bin: control.tar is not second ar entry\n");
     close F;
