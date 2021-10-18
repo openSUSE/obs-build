@@ -392,6 +392,11 @@ Known Parameters:
                  telnet 1234
               The telnet server is started after all packages got installed.
 
+  --vm-network
+              Enable network inside of VM with the default qemu SLIRP user network.
+              WARNING: this breaks reproducibility and allows to attack your network
+                       when building untrusted content.
+
   --vm-net OPTION
   --vm-netdev OPTION
   --vm-device OPTION

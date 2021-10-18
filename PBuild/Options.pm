@@ -104,6 +104,7 @@ my %known_options = (
   'vm-enable-console' => 'vm-enable-console',
   'vm-telnet' => 'vm-telnet:',
   'vm-net' => 'vm-net::',
+  'vm-network' => 'vm-network',
   'vm-netdev' => 'vm-netdev::',
   'vm-device' => 'vm-device::',
   'vm-custom-opt' => 'vm-custom-opt:',
