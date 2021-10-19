@@ -180,7 +180,7 @@ sub parse_options {
     die("Option $origopt does not take an argument\n") if @args && ref($args[0]);
   }
 
-  if ($opts{'shell'} || $opts{'shell-after-fail'}) {
+  if ($opts{'shell'}) {
     $opts{'noclean'} = 1;
     $opts{'buildjobs'} = 1;
   }
