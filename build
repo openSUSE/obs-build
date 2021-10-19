@@ -1322,7 +1322,10 @@ if test -n "$LOGFILE" -a -z "$RUN_SHELL" ; then
     # set start time, to be substracted for build log timestamps
     STARTTIME=`perl -e 'print time()'`
 
-    if test -n "$RUNNING_IN_VM" ; then
+    if test -n "$RUN_SHELL_AFTER_FAIL" ; then
+        # we may run a shell, so no stdout wrapper
+	:
+    elif test -n "$RUNNING_IN_VM" ; then
         # no additional timestamps in inner vm build system
 	exec 1> >(exec -a 'build logging' tee -a $LOGFILE) 2>&1
     elif test -n "$VM_ROOT" ; then
