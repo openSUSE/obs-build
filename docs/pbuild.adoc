@@ -1,0 +1,125 @@
+= pbuild Reference Guide
+:toc:
+:icons:
+:numbered:
+:website: https://www.geckito.org/
+
+== Goals
+
+== Design
+
+The pbuild tool is a level above "the build script" called "build". "build" is handling single build jobs, while
+pbuild is managing the dependencies between this build jobs. Both can get executed on any Linux system directly.
+
+pbuild is processing local sources, but may download remote sources and binaries when referenced.
+The local sources can get managed by any source revision management tool (eg. git).
+
+The tasks of the build script are:
+* Building a defined and reproducable environement for one build job
+* Calling the build tool for any supported format (rpm, deb, kiwi image, docker, ...)
+* Calling validations as provided by the build environement
+* Extract build results
+* Parse dependencies in binaries and build description files
+
+The tasks of pbuild are:
+* calculating the dependencies between the build jobs for a build order
+* calculating the need of rebuilds due to changed sources or dependencies
+* manage multiple running build jobs in the background
+* organize build results on the disk
+* download remote assets (sources or binaries)
+
+=== Filesystem Structure
+
+pbuild expects to get call in a directory where it's project configuration files are living. Package sources
+live in directories inside of this project directory:
+
+* Top directory
+** Package A
+*** source files
+** Package B
+*** source files
+** ...
+** _pbuild
+** _config
+** _build.<preset>
+*** _jobhistory
+*** Package A results
+**** Build results
+*** Package B results
+**** Build results
+*** .pbuild
+
+==== _config
+
+Can define build configurations. Usually defaults from a distribution are used, but this file can provide
+additional rules. These define which packages need to become available in the build environment, macro definitions
+and many more. See the build config topic for a detailed list.
+
+==== _pbuild
+
+This file defines one or more presets. A preset defines which 
+
+* distribution configuration
+* repositories
+* hardware architectures
+
+==== _build.<preset>
+
+contains all binaries for the given preset. These are either downloaded or build local. Additional underscore prefixed 
+files contain informations about the build history and current states of the build.
+
+=== Important Options
+
+pbuild does not need any parameters by default. It will build inside of KVM by default which can work
+as user (non-root) in a proper environment. KVM will also ensure that the correct kernel is running
+during build. However, builds in chroot or containern is also possible via
+
+ --vm-type=chroot
+ --vm-type=docker
+
+Define the amount of provided memory in KVM via
+
+ --vm-memory=MEGABYTES
+
+The build environment disk space can get defined via
+
+ --vm-disk-size=MEGABYTES
+
+The KVM is fully isolated by default. This ensures that the build can become fully reproducibile and
+also that no attack by using untrusted sources or binaries can happen. However, one may want to
+use remote resources during build. In that case network access can get enabled via
+
+ --vm-network
+
+Keep in mind that this can get usually avoided by using remote assets instead.
+
+=== Remote Assets
+
+Remote Assets can get defined inside of the build descriptions. These are resources from any remote
+servers which will be downloaded and validated by pbuild.
+
+The format depends on the build description format
+
+==== rpm spec files
+
+==== kiwi build description
+
+include::build_config.adoc[]
+
+== Functionalities
+
+=== package builds
+
+Package builds are supported for rpm, deb, arch and their variations.
+
+=== image builds
+
+=== container builds
+
+include::cross_arch_build.adoc[]
+
+
+
+
+
+

@@ -21,7 +21,7 @@ DESTDIR=
 
 all:
 
-.PHONY:	test test-debtransform
+.PHONY:	test test-debtransform doc
 
 test:
 	PERL5LIB=. prove -v

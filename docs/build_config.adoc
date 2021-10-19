@@ -1,0 +1,415 @@
+== About the Build Configuration
+
+The build configuration syntax is 
+
+Switch on or off certain features during the build.
+
+Decide which package is installed during build if there are circular
+dependencies.
+
+Handle user decisions like package providing the same or special macros,
+packages, or flags in the build environment.
+
+=== Configuration File Syntax
+
+The syntax is basically the same than in RPM spec files. However, it is
+independent of the used packaging format. The project configuration is
+parsed by &obsa;. This means, you can use RPM features like macros or
+conditions in the configuration. All lines have the form:
+
+keyword: arguments
+
+In addition to that rpm macro statement can get used, for example
+to activate some rules only for specific architectures via conditions.
+
+The following list contains a list of allowed keywords in the project
+configuration:
+
+Available Keywords in Project Configuration
+
+==== BinaryType: TYPE
+
+The binary type is the format of the files which will be the result of
+the build jobs. This gets usually set depending on the build recipe
+type. In some situations, for example a &kiwi; build job result gets
+converted into an rpm, it can be used to overwrite it. Possible values
+are: rpm, deb or none.
+
+Sets the binary format used to set up the build environment. For example
+a package with spec build description may use and generate deb packages
+instead of RPMs. If no binary type is specified, OBS deduces it from the
+build recipe type. If the recipe type is also not set, OBS looks at the
+Preinstall package list for a hint.
+
+==== BuildEngine: ENGINE
+  
+Use an alternative build engine. This is still chained inside of the
+build script for security reasons. Alternatives are mock (for Fedora and
+Red Hat) and debootstrap (for Debian). This will avoid differences in
+the build environment setup, but it will also have an effect on speed
+and reduced features. It should only be used when you want to emulate
+the distribution build. debbuild engine will build deb files out of a
+spec file description. It can be used by the following definition inside
+of the project build config:
+  
+  Repotype: debian
+  Type: spec
+  Binarytype: deb
+  BuildEngine: debbuild
+  Support: pax
+  Support: debbuild
+  Keep: debbuild
+  
+==== BuildFlags: FLAG:VALUE
+  
+The BuildFlags keyword defines flags for the build process. The
+following values for FLAG are usable. All flags with a leading colon (:)
+require an additional parameter directly following them.
+
+* vmfstype:
+
+Defines a specific file system when building inside of a VM. Possible
+values are ext2, ext3, ext4, btrfs, xfs, reiserfs (v3).
+
+* vmfsoptions:
+
+There is also an option to disable directory indexing for ext2, ext3,
+and ext4 file systems. This makes file ordering inside of directories
+reproducible but may have a negative performance impact. To apply this,
+specify vmfsoptions:nodirindex
+
+* kiwiprofile:
+
+builds the selected profile in &kiwi; appliance builds.
+
+* logidlelimit:
+
+Build jobs which don’t create any output get aborted after some time.
+This flag can be used to modify the limit. Specify the seconds behind
+flag.
+
+* excludebuild:
+
+Exclude a package from building. _multibuild flavors can be specified
+via package:flavor syntax.
+
+* onlybuild:
+
+DANGER: this may remove many build results when introduced the first
+time! It can be used to maintain a whitelist of packages to be built.
+All other packages will turn to excluded state.
+
+* useccache:
+
+Configure usage of ccache when building packages that match the value of
+this parameter. The ccache package will automatically be installed and
+configured. The directory /.ccache/ will be configured as cache
+directory. To configure ccache, the file /.ccache/ccache.conf can be
+modified as part of the build process by the $BUILD_USER environment
+variable.
+
+In some cases, there is no archive for the current package, such as when
+the package was newly branched or when binaries were deleted. In these
+cases, &obs; will check whether there is a package of the same name
+built for the same architecture within one of the repositories
+configured in the project’s meta configuration. If so, the archive of
+that package will be used. The repositories will be searched in the
+order they are configured in the meta configuration, starting from the
+top.
+
+* obsgendiff
+
+OBS can run an external program that has access to the current build and
+the previously successful result, e.g. to generate a difference or a
+changelog from the diff.
+
+build will run all scripts in /usr/lib/build/obsgendiff.d/ on the build
+host (not in the %buildroot) when this flag is set. If one of the
+scripts fails to run or no scripts are found, then the overall build
+fails. I.e. if BuildFlags: obsgendiff is set, then you must provide at
+least one script in /usr/lib/build/obsgendiff.d/, otherwise your build
+will fail.
+
+A common use case for obsgendiff is to run release-compare after the
+build.
+  
+==== Constraint: SELECTOR STRING
+
+CAUTION: OBS only
+
+Define build constraints for build jobs. The selector is a
+colon-separated list which gets a string assigned. See the build job
+constraints page for details.
+  
+==== ExpandFlags: FLAG
+  
+Flags which modify the behaviour during dependency resolution.
+
+ * unorderedimagerepos (OBS 2.10 or later)
+
+The priority of repositories defined in an image build is usually
+important. This is to avoid switching repositories when the same package
+is available in multiple repositories. However, it might be wanted to
+ignore that and just pick the highest version. This can be achieved by
+defining this flag
+
+ * preinstallexpand
+
+Preinstall also all dependencies of a preinstalled package.
+Instead of manually listing all packages for a working package tool
+one can just install dependencies of it. However, these might be
+more then actually needed depending on the distribution.
+
+ * module:NAME-STREAM
+
+Enable Red Hat-specific module support in repo md repositories. By
+default, modules are not used, but content can be made available by
+specifying the module name. To remove a module, add an exclamation mark
+(!) as prefix.
+  
+==== ExportFilter: REGEX ARCH
+  
+The export filter can be used to export build results from one
+architecture to others. This is required when one architecture needs
+packages from another architecture for building. The REGEX placeholder
+must match the resulting binary name of the package. It will export it
+to all listed scheduler architectures. Using a single dot will export it
+to the architecture which was used to build it. So not using a dot there
+will filter the package.
+  
+==== FileProvides: FILE PACKAGES
+  
+&obsa; ignores dependencies to files (instead of package names) by
+default. This is mostly done to reduce the amount of memory needed, as
+the package file lists take up a considerable amount of repository meta
+data. As a workaround, FileProvides can be used to tell the systems
+which packages contain a file. The File needs to have the full path.
+  
+==== HostArch: HOST_ARCH
+  
+This is used for cross builds. It defines the host architecture used for
+building, while the scheduler architecture remains the target
+architecture.
+  
+==== Ignore: PACKAGES
+  
+Ignore can be used to break dependencies. This can be useful to reduce
+the number of needed packages or to break cyclic dependencies. Be
+careful with this feature, as breaking dependencies can have surprising
+results.
+  
+==== Ignore: PACKAGE_A:PACKAGES
+  
+It is possible to define the ignore only for one package. This package
+must be listed first with a colon.
+  
+==== Keep: PACKAGES
+  
+To eliminate build cycles the to-be-built package is not installed by
+default, even when it is required. Keep can be used to overwrite this
+behavior. It is usually needed for packages like make that are used to
+build itself. Preinstalled packages are automatically kept, as the
+package installation program needs to work all the time.
+  
+==== OptFlags: TARGET_ARCH FLAGS (RPM only)
+  
+Optflags exports compiler flags to the build. They will only have an
+effect when the spec file is using $RPM_OPT_FLAGS. The target
+architecture may be * to affect all architectures.
+  
+==== Order: PACKAGE_A:PACKAGE_B
+  
+The build script takes care about the installation order if they are
+defined via dependencies inside of the packages. However, there might be
+dependency loops (reported during setup of the build system) or missing
+dependencies. The Order statement can be used then to give a hint where
+to break the loop.
+
+The package in PACKAGE_A will get installed before the package in
+PACKAGE_B.
+  
+==== Patterntype: TYPES
+  
+Defines the pattern format. Valid values are: none (default), ymp,
+comps.
+  
+==== Prefer: PACKAGES
+  
+In case multiple packages satisfy a dependency, the OBS system will
+complain about that situation. This is unlike like most package managing
+tools, which just pick one of the package. Because one of OBS’ goal is
+to provide reproducible builds, it reports an error in this case instead
+of choosing a random package. The Prefer: tag lists packages to be
+preferred in case a choice exists. When the package name is prefixed
+with a dash, this is treated as a de-prefer.
+  
+==== Prefer: PACKAGE_A:PACKAGES
+  
+It is possible to define the prefer only when one package is creating
+the choice error. This package must be listed first with a colon.
+  
+==== Preinstall: PACKAGES
+  
+Are needed to run the package installation program. These packages get
+unpacked before the VM gets started. Included scripts are not executed
+during this phase. However, these packages will get installed again
+inside of the VM including script execution.
+  
+==== PublishFlag: FLAG
+
+CAUTION: OBS only
+
+Flags which modify the behaviour during repository generation.
+
+ * create_empty
+
+Create a repository even with no content, but with meta data.
+
+ * noearlykiwipublish
+
+Only publish kiwi build results after entire repository has finished
+building. Without this kiwi build results get published immediately
+after the build is finished.
+
+ * nofailedpackages
+
+Block publishing if any build result was failed, broken, or
+unresolvable. This is evaluated individually for each architecture. That
+means, packages can be published for an architecture on which it builds,
+even if a package fails to build on another architecture.
+
+ * withreports
+
+Also publish internal content tracking files (.report files).
+
+ * ympdist:NAME (OBS 2.11 or later)
+
+Defines the distversion to be used in group element of ymp files. This
+is used by the installer to check if the repository is suitable for the
+installed distribution.
+  
+==== PublishFilter: REGEXP [REGEXP]
+  
+CAUTION: OBS only
+
+Limits the published binary packages in public repositories. Packages
+that match any REGEXP will not be put into the exported repository.
+There can be only one line of PublishFilter for historic reasons.
+However, multiple REGEXP can be defined.
+  
+==== Repotype: TYPE[:OPTIONS]
+  
+Defines the repository format for published repositories. Valid values
+are: none, rpm-md, suse, debian, hdlist2, arch, staticlinks and vagrant.
+The OPTIONS parameter depends on the repository type, for rpm-md the
+known options are `legacy' to create the old rpm-md format, `deltainfo'
+or `prestodelta' to create delta rpm packages, `rsyncable' to use
+rsyncable gzip compression. To split the debug packages in an own
+published repository the option splitdebug:REPOSITORY_SUFFIX can be
+appended, e.g.
+  
+==== Repotype: rpm-md splitdebug:-debuginfo
+  
+(the repository format may even be omitted to use the default type).
+This results in a debuginfo package repository being created in parallel
+to the package repository.
+  
+==== Required: PACKAGES
+  
+Contain one or more packages that always get installed for package
+builds. A change in one of these packages triggers a new build.
+  
+==== Runscripts: PACKAGES
+  
+Defines the scripts of preinstalled packages which needs to be executed
+directly after the preinstall phase, but before installing the remaining
+packages.
+  
+==== Substitute: PACKAGE_A PACKAGES
+  
+It is possible to replace to BuildRequires with other packages. This
+will have only an effect on directly BuildRequired packages, not on
+indirectly required packages.
+  
+==== Support: PACKAGES
+  
+Contain one or more packages which also get installed for package
+builds, but a change in one of the packages does not trigger an
+automatic rebuild.
+
+This is useful for packages that most likely do not influence the build
+result, for example make or coreutils.
+  
+==== Target: TARGET_ARCH (RPM only)
+  
+Defines the target architecture. This can be used to build for i686 on
+i586 schedulers for example.
+  
+==== Type: TYPE
+  
+Build recipe type. This is the format of the file which provides the
+build description. This gets usually autodetected, but in some rare
+cases it can be set here to either one of these: spec, dsc, kiwi,
+livebuild, arch, preinstallimage.
+
+Defines the build recipe format. Valid values are currently: none, spec,
+dsc, arch, kiwi, preinstallimage. If no type is specified, OBS deduces a
+type from the binary type.
+  
+==== VMInstall: PACKAGES
+  
+Like Preinstall, but these packages get only installed when a virtual
+machine like Xen or KVM is used for building. Usually packages like
+mount are listed here.
+
+=== Macros
+
+Macros are defined at the end of the project configuration. The macro
+section is only used on RPM builds.
+
+The project configuration knows two possible definitions:
+
+  %define Macro Definition
+
+Starting with a %define line and are used in the project configuration
+only. These definitions are not available inside the build root.
+These are only needed when these macros are used elsewhere in the build
+config.
+
+For example:
+
+  %define _use_profiler 1
+  %if 0%{?_use_profiler}
+  Require: gprof
+  %endif
+
+Another example doing it by architecture:
+
+  %ifarch x86_64
+  Support: x86_64_only_package
+  %endif
+
+=== Macro Definitions
+
+Starting after the Macros: line and are exported into the .rpmmacros
+file of the build root. As such, these macro definitions can be used in
+a spec file.
+
+For example, you can define
+
+%define _with_pulseaudio 1
+
+Macros Used in Spec Files Only
+
+The macro definition in the project configuration is located at the end
+and has the following structure:
+
+Structure of a Macro Definition
+
+Macros:
+# add your macro definitions here
+%_hardened_build 0
+:Macros
+
+Everything that starts with a hash mark (#) is considered a comment.
+
