@@ -137,6 +137,10 @@ The resulting download file can get copied into the image using
 The source specification is just the file name while the destination is the including the full
 path to the file on the image.
 
+==== Arch Linux PKGBUILD
+
+==== FedPkg "sources" file
+
 include::build_config.adoc[]
 
 == Functionalities
