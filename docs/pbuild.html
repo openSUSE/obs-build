@@ -924,12 +924,62 @@ use remote resources during build. In that case network access can get enabled v
 <h3 id="_remote_assets">2.3. Remote Assets</h3>
 <div class="paragraph"><p>Remote Assets can get defined inside of the build descriptions. These are resources from any remote
 servers which will be downloaded and validated by pbuild.</p></div>
-<div class="paragraph"><p>The format depends on the build description format</p></div>
+<div class="paragraph"><p>Supported protocols are</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+http
+</p>
+</li>
+<li>
+<p>
+https
+</p>
+</li>
+<li>
+<p>
+git-http
+</p>
+</li>
+<li>
+<p>
+git-https
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>The format depends on the build description format as described below.</p></div>
 <div class="sect3">
 <h4 id="_rpm_spec_files">2.3.1. rpm spec files</h4>
+<div class="paragraph"><p>Source lines in spec files can get marked as remote assets. rpm is supporting to use an URL as source
+definition already. A comment before such a line marks it as remote asset for pbuild.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>#!RemoteAsset: &lt;SHA256SUM&gt;
+Source: &lt;URL&gt;</code></pre>
+</div></div>
+<div class="paragraph"><p>The sha256 sum will be used to verify the download, but it is optional.</p></div>
+<div class="paragraph"><p>An alternative is to use the</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>#!RemoteAssetUrl: &lt;URL&gt;</code></pre>
+</div></div>
+<div class="paragraph"><p>marker, when the downloaded file shall not become part of the source rpm.</p></div>
 </div>
 <div class="sect3">
 <h4 id="_kiwi_build_description">2.3.2. kiwi build description</h4>
+<div class="paragraph"><p>The kiwi format is not supporting remote source specifications, but it can get specified via XML
+comments. There needs to be a specification from where to download using</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>&lt;!-- OBS-RemoteAsset: &lt;URL&gt; --&gt;</code></pre>
+</div></div>
+<div class="paragraph"><p>The resulting download file can get copied into the image using</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>&lt;!-- OBS-CopyToImage: &lt;source&gt; &lt;destination&gt; --&gt;</code></pre>
+</div></div>
+<div class="paragraph"><p>The source specification is just the file name while the destination is the including the full
+path to the file on the image.</p></div>
 </div>
 </div>
 </div>
@@ -1514,7 +1564,7 @@ cellspacing="0" cellpadding="4">
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2021-10-19 16:55:04 CEST
+ 2021-10-20 08:44:15 CEST
 </div>
 </div>
 </body>
