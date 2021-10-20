@@ -159,9 +159,10 @@ vm_verify_options_kvm() {
 
     # check if we can run kvm
     if ! test -r /dev/kvm -a -x "$kvm_bin" ; then
-	echo "host does not support kvm"
-	echo "either the kvm kernel-module is not loaded or kvm is not installed or hardware virtualization is deactivated in the BIOS."
-	cleanup_and_exit 4
+	cleanup_and_exit 4 "host does not support kvm: either the kvm kernel-module is not loaded or hardware virtualization is deactivated in the BIOS."
+    fi
+    if ! test -x "$kvm_bin" ; then
+	cleanup_and_exit 4 "$kvm_bin is not installed"
     fi
 
     # check hugepages
