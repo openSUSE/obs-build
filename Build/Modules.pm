@@ -22,9 +22,8 @@ package Build::Modules;
 
 use strict;
 
-use YAML::XS;
-
-$YAML::XS::LoadBlessed = 0;
+eval { require YAML::XS; $YAML::XS::LoadBlessed = 0; };
+*YAML::XS::LoadFile = sub {die("YAML::XS is not available\n")} unless defined &YAML::XS::LoadFile;
 
 #
 # return a hash that maps NEVRA to modules
