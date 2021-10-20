@@ -93,6 +93,35 @@ use remote resources during build. In that case network access can get enabled v
 
 Keep in mind that this can get usually avoided by using remote assets instead.
 
+=== Important Debugging Options
+
+pbuild always creates a consistent state. That means it may not build actually anything, when the
+last build result look current. One can enforce a rebuild by using
+
+  --rebuild <PACKAGE>
+
+The build log is by default only stored on disk. The live build log can become made available by 
+using the
+
+  --singlejob <PACKAGE>
+
+option. This option might get combined with the option
+
+  --singlejob <PACKAGE> --shell-after-fail
+
+to get a shell prompt in case a build failure occurs. 
+
+Alternative one can reuse last build enviroment or create a new one by using
+
+  --shell
+
+option. This will give a prompt after the environment has been initialized. It can be combined
+with 
+
+  -x binary_package
+
+to get further tooling installed (eg. gdb or assumed missing dependencies for testing).
+
 === Remote Assets
 
 Remote Assets can get defined inside of the build descriptions. These are resources from any remote
