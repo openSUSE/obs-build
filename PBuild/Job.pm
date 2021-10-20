@@ -33,16 +33,20 @@ use PBuild::RepoMgr;
 # Fork and exec the build tool
 #
 sub forkjob {
-  my ($opts, $args) = @_;
-  unless ($opts->{'shell'} || $opts->{'shell-after-fail'}) {
-     my $pid = PBuild::Util::xfork();
-     return $pid if $pid;
-     unless ($opts->{'singlejob'}) {
-       open(STDIN, '<', '/dev/null');
-       open(STDOUT, '>', '/dev/null');
-       open(STDERR, '>&STDOUT');
-     };
-  };
+  my ($opts, $args, $stderrfile) = @_;
+  if (!$opts->{'shell'} && !$opts->{'shell-after-fail'}) {
+    my $pid = PBuild::Util::xfork();
+    return $pid if $pid;
+    if (!$opts->{'singlejob'}) {
+      open(STDIN, '<', '/dev/null');
+      open(STDOUT, '>', '/dev/null');
+      if ($stderrfile) {
+        open(STDERR, '>', $stderrfile) || die("$stderrfile: $!\n");
+      } else {
+        open(STDERR, '>&STDOUT');
+      }
+    }
+  }
   exec(@$args);
   die("$args->[0]: $!\n");
 }
@@ -322,7 +326,7 @@ sub createjob {
   unlink("$buildroot/.build.log");
   #print "building $p->{'pkg'}/$p->{'recipe'}\n";
 
-  my $pid = forkjob($opts, \@args);
+  my $pid = forkjob($opts, \@args, "$buildroot/.build.log");
   return { 'name' => $jobname, 'nbuilders' => $nbuilders, 'pid' => $pid, 'buildroot' => $buildroot, 'vm_type' => $vm, 'pdata' => $p, 'logfile' => "$buildroot/.build.log", 'logfile_lines' => 0, 'starttime' => time() };
 }
 
