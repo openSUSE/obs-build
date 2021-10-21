@@ -30,7 +30,6 @@ for i in spec dsc kiwi arch collax preinstallimage simpleimage mock livebuild sn
 done
 
 recipe_setup() {
-    export BUILD_RECEPIE_RUN=1
     recipe_setup_$BUILDTYPE "$@"
 }
 
@@ -48,7 +47,6 @@ recipe_resultdirs () {
 }
 
 recipe_cleanup () {
-    unset BUILD_RECEPIE_RUN
     recipe_cleanup_$BUILDTYPE "$@"
 }
 

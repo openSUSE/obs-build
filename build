@@ -117,6 +117,7 @@ OBS_PACKAGE=
 OBSURL=
 CACHE_DIR=/var/cache/build
 BUILD_DIST_TMP=
+BUILD_SUCCEEDED=
 
 RECIPE_BUILD_START_TIME=
 CCACHE_SETUP_START_TIME=
@@ -456,9 +457,9 @@ cleanup_and_exit () {
     rm -f $BUILD_ROOT/exit
 
     # run a shell in failure case if wanted by user
-    if test -n "$RUN_SHELL_AFTER_FAIL" -a -n "$BUILD_RECEPIE_RUN"  -a "$BUILD_SUCCEEDED" != true -a "$1" = "1"; then
-	unset BUILD_RECEPIE_RUN
-        run_shell
+    if test -n "$RUN_SHELL_AFTER_FAIL" -a "$BUILD_SUCCEEDED" = false -a "$1" = 1 ; then
+	unset BUILD_SUCCEEDED
+	run_shell
     fi
 
     # add build time statistics
@@ -908,11 +909,11 @@ needarg() {
 run_shell() {
     echo "Executing interactive shell..."
     if test -n "$RUN_SHELL_CMD"; then
-      chroot $BUILD_ROOT "${RUN_SHELL_CMD:=/bin/bash}"
-      cleanup_and_exit $?
+	chroot $BUILD_ROOT "$RUN_SHELL_CMD"
+	cleanup_and_exit $?
     else
-      chroot $BUILD_ROOT su - $BUILD_USER
-      cleanup_and_exit $?
+	chroot $BUILD_ROOT su - $BUILD_USER
+	cleanup_and_exit $?
     fi
 }
 
@@ -1663,8 +1664,8 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	cleanup_and_exit 9
     fi
 
-    test -n "$RUN_SHELL_AFTER_FAIL" -a "$BUILD_SUCCEEDED" != true && run_shell
     test "$BUILD_SUCCEEDED" = true || cleanup_and_exit 1
+    BUILD_SUCCEEDED=
 
     recipe_build_time_statistics
     recipe_gendiff
