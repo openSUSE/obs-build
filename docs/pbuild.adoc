@@ -96,79 +96,94 @@ Keep in mind that this can get usually avoided by using remote assets instead.
 === Important Debugging Options
 
 pbuild always creates a consistent state. That means it may not build actually anything, when the
-last build result look current. One can enforce a rebuild by using
+last build result look current. One can enforce a rebuild by using:
 
   --rebuild <PACKAGE>
 
-The build log is by default only stored on disk. The live build log can become made available by 
+The build log is by default only stored on disk. The live build log can be made available by 
 using the
 
-  --singlejob <PACKAGE>
+  --showlog
 
-option. This option might get combined with the option
+option. If you want to debug a problem with a single package, you can use the
 
-  --singlejob <PACKAGE> --shell-after-fail
+  --single <PACKAGE>
+
+option to make pbuild only look at the specified package. This also triggers an rebuild
+of the package. It often makes sense to use
+
+  --single <PACKAGE> --shell-after-fail
 
 to get a shell prompt in case a build failure occurs. 
 
-Alternative one can reuse last build enviroment or create a new one by using
+Alternatively, one can reuse last build enviroment or create a new one by using the
 
   --shell
 
-option. This will give a prompt after the environment has been initialized. It can be combined
-with 
+option. This will give a prompt after the environment has been initialized.
+
+Extra packages needed for debugging can be specified with
 
   -x binary_package
 
-to get further tooling installed (eg. gdb or assumed missing dependencies for testing).
+(eg. gdb, strace, valgrind or assumed missing dependencies for testing).
 
 === Remote Assets
 
-Remote Assets can get defined inside of the build descriptions. These are resources from any remote
-servers which will be downloaded and validated by pbuild.
+Remote Assets can be defined inside of the build descriptions. They are resources from a remote
+servers and will be downloaded and validated by pbuild before the corresponding build is started.
 
-Supported protocols are
+Supported protocols for resources using an url are:
 
  * http
  * https
  * git-http
  * git-https
 
-The format depends on the build description format as described below.
+This depends on the build description format as described below.
 
 ==== rpm spec files
 
-Source lines in spec files can get marked as remote assets. rpm is supporting to use an URL as source
-definition already. A comment before such a line marks it as remote asset for pbuild.
+Source lines in spec files can declare remote assets. Rpm is already supporting to use
+an URL as source definition. A comment before such a line marks it as remote asset for pbuild:
 
- #!RemoteAsset: <SHA256SUM>
+ #!RemoteAsset
  Source: <URL>
 
-The sha256 sum will be used to verify the download, but it is optional.
+It is also possible to specify a checksum to make sure that the asset is correct.
+
+ #!RemoteAsset: <CHECKSUM>
+ Source: <URL>
 
 An alternative is to use the 
 
  #!RemoteAssetUrl: <URL>
 
-marker, when the downloaded file shall not become part of the source rpm.
+marker if the downloaded file should not become part of the source rpm.
 
 ==== kiwi build description
 
-The kiwi format is not supporting remote source specifications, but it can get specified via XML
-comments. There needs to be a specification from where to download using
+The kiwi format is not supporting remote source specifications, but they can be specified via XML
+comments.
 
   <!-- OBS-RemoteAsset: <URL> -->
 
-The resulting download file can get copied into the image using
+The resulting download file can be copied into the image using
 
   <!-- OBS-CopyToImage: <source> <destination> -->
 
-The source specification is just the file name while the destination is the including the full
-path to the file on the image.
 
 ==== Arch Linux PKGBUILD
 
+PKGBuild files already contain the needed URLs and Checksums, so no extra
+treatment is needed.
+
 ==== FedPkg "sources" file
+
+The sources file contains a list of file names with checksums. PBuild will
+automatically download the missing files from a FedPkg Server that needs
+to be configured in the project config via the "AssetsURL:" directive or set
+with the "--assets" option.
 
 include::build_config.adoc[]
 

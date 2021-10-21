@@ -33,9 +33,6 @@ my %known_options = (
   'no-clean' => 'noclean',
   'nochecks' => 'nochecks',
   'no-checks' => 'nochecks',
-  'singlejob' => 'singlejob:',
-  'shell' => 'shell',
-  'shell-after-fail' => 'shell-after-fail',
   'arch' => 'arch:',
   'hostarch' => 'hostarch:',
   'host-arch' => 'hostarch:',
@@ -112,6 +109,10 @@ my %known_options = (
   'openstack-flavor' => 'vm-openstack-flavor:',
   'vm-emulator-script' => 'vm-emulator-script:',
   'emulator-script' => 'vm-emulator-script:',
+  'single' => 'single:',
+  'shell' => 'shell',
+  'shell-after-fail' => 'shell-after-fail',
+  'showlog' => 'showlog',
 );
 
 sub getarg {
@@ -180,12 +181,10 @@ sub parse_options {
     die("Option $origopt does not take an argument\n") if @args && ref($args[0]);
   }
 
-  if ($opts{'shell'}) {
-    $opts{'noclean'} = 1;
-    $opts{'buildjobs'} = 1;
-  }
-  # enforce the rebuild of the singlejob build
-  $opts{'rebuild-pkg'} = $opts{'singlejob'} if $opts{'singlejob'};
+  die("Option --shell only works with --single\n") if $opts{'shell'} && !$opts{'single'};
+  die("Option --shell-after-fail only works with --single\n") if $opts{'shell-after-fail'} && !$opts{'single'};
+  $opts{'showlog'} = 1 if $opts{'shell'} || $opts{'shell-after-fail'} || $opts{'single'};
+  $opts{'buildjobs'} = 1 if $opts{'showlog'} || $opts{'single'};
 
   return (\%opts, @back);
 }

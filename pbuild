@@ -28,6 +28,8 @@ BEGIN {
   unshift @INC, ($::ENV{'BUILD_DIR'} && ! -e '/etc/build.conf' ? $::ENV{'BUILD_DIR'} : '/usr/lib/build');
 }
 
+use strict;
+
 use Data::Dumper;
 use POSIX;
 use Cwd ();
@@ -255,6 +257,9 @@ if ($nmultibuild) {
   PBuild::Multibuild::expand_multibuilds(\%pkgsrc);
 }
 
+# make sure that we know the package if --single is used
+die("--single: unknown package $opts->{'single'}\n") if $opts->{'single'} && !$pkgsrc{$opts->{'single'}};
+
 @pkgs = sort keys %pkgsrc;
 
 # handle onlybuild/excludebuild from the build config
@@ -331,9 +336,14 @@ if ($opts->{'rebuild-code'} || $opts->{'rebuild-pkg'}) {
     $p->{'force_rebuild'} = 1;
   }
 }
+if ($opts->{'single'}) {
+  my $pkg = $opts->{'single'};
+  die("--single: unknown package $pkg\n") unless $pkgsrc{$pkg};
+  $pkgsrc{$pkg}->{'force_rebuild'} = 1;
+}
 
 # delete obsolete entries from builddir
-PBuild::LocalRepo::cleanup_builddir($builddir, \%pkgsrc);
+PBuild::LocalRepo::cleanup_builddir($builddir, \%pkgsrc) unless $opts->{'single'};
 
 # setup the repositories and registries
 my $repomgr = PBuild::RepoMgr::create();
@@ -371,14 +381,6 @@ if ($opts->{'repoquery-host'}) {
   exit;
 }
 
-# split deps if cross building
-if ($cross) {
-  for my $pkg (@pkgs) {
-    my $p = $pkgsrc{$pkg};
-    PBuild::Recipe::split_hostdeps($p, $bconf);
-  }
-}
-
 # load lastcheck cache
 my %lastcheck;
 if (-s "$builddir/.pbuild/_lastcheck") {
@@ -386,6 +388,21 @@ if (-s "$builddir/.pbuild/_lastcheck") {
   for my $pkg (@pkgs) {
     my $old = $oldlastcheck->{$pkg};
     $lastcheck{$pkg} = $old if $old && length($old) > 96;
+  }
+}
+
+# tweak package list if we're just looking at one package
+if ($opts->{'single'}) {
+  my $pkg = $opts->{'single'};
+  @pkgs = ( $pkg );
+  $pkgsrc{$pkg}->{'force_rebuild'} = 1;
+}
+
+# split deps if cross building
+if ($cross) {
+  for my $pkg (@pkgs) {
+    my $p = $pkgsrc{$pkg};
+    PBuild::Recipe::split_hostdeps($p, $bconf);
   }
 }
 
@@ -418,22 +435,31 @@ while (1) {
     $ctx->prepare(\@repos, \@hostrepos);
     print "expanding dependencies\n" unless $runs;
     $ctx->pkgexpand(@pkgs);
-    print "sorting packages\n" unless $runs;
-    if (@pkgs_native) {
-      @pkgs_native = $ctx->pkgsort(@pkgs_native);
-      @pkgs_target = $ctx->pkgsort(@pkgs_target);
-      @pkgs = (@pkgs_native, @pkgs_target);
-    } else {
-      @pkgs = $ctx->pkgsort(@pkgs);
+    if (@pkgs > 1) {
+      print "sorting packages\n" unless $runs;
+      if (@pkgs_native) {
+        @pkgs_native = $ctx->pkgsort(@pkgs_native);
+        @pkgs_target = $ctx->pkgsort(@pkgs_target);
+        @pkgs = (@pkgs_native, @pkgs_target);
+      } else {
+        @pkgs = $ctx->pkgsort(@pkgs);
+      }
     }
   }
   $runs++;
   $ctx->{'buildconfig'} = $buildconfig;
   $ctx->{'lastcheck'} = \%lastcheck;
-  $ctx->{'singlejob'} = $opts->{'singlejob'} if $opts->{'singlejob'};
 
   # check status of all packages
   my $result = $ctx->pkgcheck(\@builders, @pkgs);
+
+  # mix in old result from other packages if in single package mode
+  if ($opts->{'single'}) {
+    my $pkg = $opts->{'single'};
+    my $oldresult = PBuild::Util::retrieve("$builddir/.pbuild/_result", 1) || {};
+    $oldresult->{$pkg} = $result->{$pkg};
+    $result = $oldresult;
+  }
 
   # update on-disk data
   PBuild::Util::mkdir_p("$builddir/.pbuild");
@@ -479,6 +505,8 @@ while (1) {
     }
   }
 }
+
+exit PBuild::Result::has_failed($opts, $builddir, $opts->{'single'}) ? 1 : 0 if $opts->{'single'};
 
 # say goodbye
 print "\npbuild is done:\n";

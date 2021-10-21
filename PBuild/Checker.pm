@@ -201,7 +201,6 @@ recheck_package:
     my ($status, $error) = check($ctx, $p, $incycle);
     #printf("%s -> %s%s", $packid, $status, $error && $status ne 'scheduled' ? " ($error)" : '');
     if ($status eq 'scheduled') {
-      next if $ctx->{'singlejob'} && $ctx->{'singlejob'} ne $packid;
       my $builder;
       for (@$builders) {
 	next if $_->{'job'};

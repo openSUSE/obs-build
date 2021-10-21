@@ -29,8 +29,9 @@ my %code_failures = map {$_ => 1} qw{broken failed unresolvable};
 
 sub print_result {
   my ($opts, $builddir) = @_;
-  my $r = PBuild::Util::retrieve("$builddir/.pbuild/_result");
+  my $r = PBuild::Util::retrieve("$builddir/.pbuild/_result", 1);
   die("pbuild has not run yet for $builddir\n") unless $r;
+  $opts->{'result-pkg'} = [ $opts->{'single'} ] if $opts->{'single'};
   my %codefilter = map {$_ => 1} @{$opts->{'result-code'} || []};
   my %pkgfilter = map {$_ => 1} @{$opts->{'result-pkg'} || []};
   my $found_failures = 0;
@@ -66,6 +67,14 @@ sub print_result {
     }
   }
   return $found_failures;
+}
+
+sub has_failed {
+  my ($opts, $builddir, $pkg) = @_;
+  my $r = PBuild::Util::retrieve("$builddir/.pbuild/_result", 1);
+  die("pbuild has not run yet for $builddir\n") unless $r;
+  my $code = $r->{$pkg}->{'code'} || 'unknown';
+  return $code_failures{$code} ? 1 : 0;
 }
 
 1;

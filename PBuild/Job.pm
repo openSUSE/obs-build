@@ -34,10 +34,10 @@ use PBuild::RepoMgr;
 #
 sub forkjob {
   my ($opts, $args, $stderrfile) = @_;
-  if (!$opts->{'shell'} && !$opts->{'shell-after-fail'}) {
+  if (!$opts->{'shell'}) {
     my $pid = PBuild::Util::xfork();
     return $pid if $pid;
-    if (!$opts->{'singlejob'}) {
+    if (!$opts->{'showlog'}) {
       open(STDIN, '<', '/dev/null');
       open(STDOUT, '>', '/dev/null');
       if ($stderrfile) {
@@ -107,7 +107,7 @@ sub waitjob {
       return $job;
     }
     $msg .= ' ]';
-    print "\r$msg" if !$opts->{'singlejob'} && (!$oldmsg || $oldmsg ne $msg);
+    print "\r$msg" if !$opts->{'showlog'} && (!$oldmsg || $oldmsg ne $msg);
     $oldmsg = $msg;
   }
 }
