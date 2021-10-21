@@ -459,7 +459,7 @@ cleanup_and_exit () {
     # run a shell in failure case if wanted by user
     if test -n "$RUN_SHELL_AFTER_FAIL" -a "$BUILD_SUCCEEDED" = false -a "$1" = 1 ; then
 	unset BUILD_SUCCEEDED
-	run_shell
+	run_shell $1
     fi
 
     # add build time statistics
@@ -907,13 +907,14 @@ needarg() {
 }
 
 run_shell() {
+    local ex="$1"
     echo "Executing interactive shell..."
     if test -n "$RUN_SHELL_CMD"; then
 	chroot $BUILD_ROOT "$RUN_SHELL_CMD"
-	cleanup_and_exit $?
+	cleanup_and_exit ${ex:-$?}
     else
 	chroot $BUILD_ROOT su - $BUILD_USER
-	cleanup_and_exit $?
+	cleanup_and_exit ${ex:-$?}
     fi
 }
 
@@ -1697,6 +1698,10 @@ TIME_RPMLINT=0
 TIME_BUILDCMP=0
 TIME_DELTARPMS=0
 
+# set BUILD_SUCCEEDED to false again so that --shell-after-fail
+# works if there is an check/rpmlint error
+BUILD_SUCCEEDED=false
+
 if test -n "$RPMS" -a -d "$BUILD_ROOT/usr/lib/build/checks" ; then
     export DO_RPM_REMOVE=true
     # workaround for broken 13.1 check scripts which umount /proc
@@ -1734,6 +1739,8 @@ if test -n "$RPMS" -a "$DO_CHECKS" != false ; then
     recipe_run_rpmlint
     TIME_RPMLINT=$(( `date +%s` - $TIME_RPMLINT ))
 fi
+
+BUILD_SUCCEEDED=
 
 if test -n "$CCACHE" ; then
     if test -n "$REMOVE_CCACHE" ; then
