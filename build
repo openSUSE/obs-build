@@ -455,7 +455,11 @@ cleanup_and_exit () {
     fi
     rm -f $BUILD_ROOT/exit
 
-    test -n "$RUN_SHELL_AFTER_FAIL" -a "$BUILD_SUCCEEDED" != true && run_shell
+    # run a shell in failure case if wanted by user
+    if test -n "$RUN_SHELL_AFTER_FAIL" -a -n "$BUILD_RECEPIE_RUN"  -a "$BUILD_SUCCEEDED" != true -a "$1" = "1"; then
+	unset BUILD_RECEPIE_RUN
+        run_shell
+    fi
 
     # add build time statistics
     recipe_build_time_statistics
