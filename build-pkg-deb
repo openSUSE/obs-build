@@ -136,7 +136,7 @@ pkg_finalize_deb() {
 }
 
 pkg_preinstall_deb() {
-    rm -rf control.tar.gz control.tar.xz data.tar.gz data.tar.xz
+    rm -rf control.tar.gz control.tar.xz control.tar.zst data.tar.gz data.tar.xz data.tar.zst
     ar x "$BUILD_INIT_CACHE/rpms/$PKG.deb" control.tar.gz control.tar.xz data.tar.gz data.tar.xz 2>/dev/null
     rm -rf "$BUILD_INIT_CACHE/scripts/control"
     mkdir "$BUILD_INIT_CACHE/scripts/control" || cleanup_and_exit 1
@@ -145,11 +145,15 @@ pkg_preinstall_deb() {
 	$TAR -C "$BUILD_INIT_CACHE/scripts/control" -z < control.tar.gz
     elif test -f "control.tar.xz" -a ! -L "control.tar.xz" ; then
 	$TAR -C "$BUILD_INIT_CACHE/scripts/control" -J < control.tar.xz
+    elif test -f "control.tar.zst" -a ! -L "control.tar.zst" ; then
+	$TAR -C "$BUILD_INIT_CACHE/scripts/control" -J < control.tar.zst
     fi
     if test -f "data.tar.gz" -a ! -L "data.tar.gz" ; then
 	$TAR -z < data.tar.gz
     elif test -f "data.tar.xz" -a ! -L "data.tar.xz" ; then
 	$TAR -J < data.tar.xz
+    elif test -f "data.tar.zst" -a ! -L "data.tar.zst" ; then
+	$TAR -J < data.tar.zst
     fi
     rm -rf "$BUILD_INIT_CACHE/scripts/$PKG.pre" "$BUILD_INIT_CACHE/scripts/$PKG.post"
     if test -e "$BUILD_INIT_CACHE/scripts/$PKG.run" ; then
