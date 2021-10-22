@@ -160,7 +160,7 @@ pkg_preinstall_deb() {
 	test -f "$BUILD_INIT_CACHE/scripts/control/preinst" && mv "$BUILD_INIT_CACHE/scripts/control/preinst" "$BUILD_INIT_CACHE/scripts/$PKG.pre"
 	test -f "$BUILD_INIT_CACHE/scripts/control/postinst" && mv "$BUILD_INIT_CACHE/scripts/control/postinst" "$BUILD_INIT_CACHE/scripts/$PKG.post"
     fi
-    rm -rf "$BUILD_INIT_CACHE/scripts/control" control.tar.{g,x}z data.tar.{g,x}z
+    rm -rf "$BUILD_INIT_CACHE/scripts/control" control.tar.gz control.tar.xz control.tar.zst data.tar.gz data.tar.xz data.tar.zst
 }
 
 pkg_runscripts_deb() {
