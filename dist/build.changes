@@ -1,4 +1,25 @@
 -------------------------------------------------------------------
+Mon Oct 25 09:16:20 UTC 2021 - Adrian Schröter <adrian@suse.de>
+
+Features:
+- deb zstd support (for Ubuntu 21.10)
+- support KVM builds with enabled network
+- modulemd support improvements
+- Support a "Distmacro" directive for recipe parser-only macros
+
+Fixes:
+- Load selinux policy when using a preinstall image
+- Use the pax format for preinstall images if bsdtar is available
+- Add %riscv to std_macros
+- Fix combine_configs dropping newlines
+
+pbuild:
+- Implement SCC calculation
+- Improve --shell-after-build and --single options
+- initial documentation of pbuild
+- Bugfixes
+
+-------------------------------------------------------------------
 Thu Sep  2 09:18:33 UTC 2021 - Adrian Schröter <adrian@suse.de>
 
 - Fix unpacking of deb/arch archives without bsdtar
