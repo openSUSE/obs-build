@@ -254,7 +254,7 @@ fi
 
 %files
 %defattr(-,root,root)
-%doc README.md
+%doc README.md docs
 /usr/bin/build
 /usr/bin/pbuild
 /usr/bin/buildvc
