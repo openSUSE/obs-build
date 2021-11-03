@@ -62,6 +62,15 @@ my $dir = @dirs ? $dirs[0] : '.';
 $dir = Cwd::abs_path($dir) if $dir !~ /^\//;
 $dir =~ s/(.)\/+$/$1/s;
 
+# tweak options
+if (!exists($opts->{'single'}) && PBuild::Recipe::looks_like_packagedir($dir)) {
+  $opts->{'single'} = $1 if $dir =~ s/\/([^\/]+)$//;
+}
+die("Option --shell only works with --single\n") if $opts->{'shell'} && !$opts->{'single'};
+die("Option --shell-after-fail only works with --single\n") if $opts->{'shell-after-fail'} && !$opts->{'single'};
+$opts->{'showlog'} = 1 if $opts->{'shell'} || $opts->{'shell-after-fail'} || $opts->{'single'};
+$opts->{'buildjobs'} = 1 if $opts->{'showlog'} || $opts->{'single'};
+
 if ($opts->{'list-presets'}) {
   PBuild::Preset::list_presets($dir);
   exit;
@@ -459,6 +468,11 @@ while (1) {
     my $oldresult = PBuild::Util::retrieve("$builddir/.pbuild/_result", 1) || {};
     $oldresult->{$pkg} = $result->{$pkg};
     $result = $oldresult;
+    my $code = $result->{$pkg}->{'code'};
+    if ($code ne 'failed' && $code ne 'succeeded') {
+      $code .= ": $result->{$pkg}->{'details'}" if $result->{$pkg}->{'details'};
+      print "$pkg: $code\n";
+    }
   }
 
   # update on-disk data

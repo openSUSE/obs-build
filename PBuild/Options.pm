@@ -181,11 +181,6 @@ sub parse_options {
     die("Option $origopt does not take an argument\n") if @args && ref($args[0]);
   }
 
-  die("Option --shell only works with --single\n") if $opts{'shell'} && !$opts{'single'};
-  die("Option --shell-after-fail only works with --single\n") if $opts{'shell-after-fail'} && !$opts{'single'};
-  $opts{'showlog'} = 1 if $opts{'shell'} || $opts{'shell-after-fail'} || $opts{'single'};
-  $opts{'buildjobs'} = 1 if $opts{'showlog'} || $opts{'single'};
-
   return (\%opts, @back);
 }
 

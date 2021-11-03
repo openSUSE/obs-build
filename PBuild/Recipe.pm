@@ -24,6 +24,7 @@ use strict;
 use Build;
 
 use PBuild::Service;
+use PBuild::Util;
 
 $Build::Kiwi::urlmapper = 0;	# disable url -> prp mapping
 
@@ -171,6 +172,25 @@ sub split_hostdeps {
   return unless %onlynative || %alsonative;
   @hdep = grep {$onlynative{$_} || $alsonative{$_}} @{$p->{'dep'}};
   $p->{'dep'} = [ grep {!$onlynative{$_}} @{$p->{'dep'}}] if @hdep && %onlynative;
+}
+
+sub looks_like_packagedir {
+  my ($dir) = @_;
+  return 0 if -d "$dir/.pbuild";
+  return 0 if -d "$dir/_pbuild";
+  return 0 if -d "$dir/_config";
+  return 1 if -d "$dir/../.pbuild";
+  return 1 if -d "$dir/../_pbuild";
+  return 1 if -d "$dir/../_config";
+  my @files = PBuild::Util::ls($dir);
+  return 0 if grep {/^_build\./} @files;
+  for my $file (@files) {
+    return 1 if $file =~ /\.(?:spec|dsc|kiwi)$/;
+    return 1 if $file eq 'snapcraft.yaml' || $file eq 'appimage.yml';
+    return 1 if $file eq 'Dockerfile' || $file eq 'fissile.yml' || $file eq 'Chart.yml';
+    return 1 if $file eq 'PKGBUILD';
+  }
+  return 0;
 }
 
 1;
