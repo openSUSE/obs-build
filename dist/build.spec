@@ -177,9 +177,13 @@ ln -s sl42.${SLE_V:3:1}.conf default.conf
 # this is SUSE Leap 15 and higher
 ln -s sl${SLE_V:0:2}.${SLE_V:3:1}.conf default.conf
 %endif
-%if !0%{?sle_version} && ( 0%{?suse_version} <= 1310 || 0%{?suse_version} == 1320 || 0%{?suse_version} == 1330 || 0%{?suse_version} == 1550 )
+%if !0%{?sle_version} && ( 0%{?suse_version} <= 1310 || 0%{?suse_version} == 1320 || 0%{?suse_version} == 1330 )
 # this is old openSUSE releases and Factory
 ln -s sl${SUSE_V:0:2}.${SUSE_V:2:1}.conf default.conf
+%endif
+%if !0%{?sle_version} && ( 0%{?suse_version} == 1550 )
+# this is Factory, needs to become suse_version 1599 once it is changed
+ln -s sl16.0.conf default.conf
 %endif
 %if 0%{?sle_version} && !0%{?is_opensuse}
 # this is SUSE SLE 12 and higher
