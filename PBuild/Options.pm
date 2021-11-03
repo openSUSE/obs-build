@@ -110,6 +110,7 @@ my %known_options = (
   'vm-emulator-script' => 'vm-emulator-script:',
   'emulator-script' => 'vm-emulator-script:',
   'single' => 'single:',
+  'single-flavor' => 'single-flavor:',
   'shell' => 'shell',
   'shell-after-fail' => 'shell-after-fail',
   'showlog' => 'showlog',

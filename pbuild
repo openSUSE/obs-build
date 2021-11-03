@@ -267,7 +267,10 @@ if ($nmultibuild) {
 }
 
 # make sure that we know the package if --single is used
-die("--single: unknown package $opts->{'single'}\n") if $opts->{'single'} && !$pkgsrc{$opts->{'single'}};
+if ($opts->{'single'}) {
+  $opts->{'single'} .= ":$opts->{'single-flavor'}" if $opts->{'single-flavor'};
+  die("--single: unknown package $opts->{'single'}\n") if !$pkgsrc{$opts->{'single'}};
+}
 
 @pkgs = sort keys %pkgsrc;
 
@@ -344,11 +347,6 @@ if ($opts->{'rebuild-code'} || $opts->{'rebuild-pkg'}) {
     next if %codefilter && !$codefilter{'all'} && !$codefilter{$code};
     $p->{'force_rebuild'} = 1;
   }
-}
-if ($opts->{'single'}) {
-  my $pkg = $opts->{'single'};
-  die("--single: unknown package $pkg\n") unless $pkgsrc{$pkg};
-  $pkgsrc{$pkg}->{'force_rebuild'} = 1;
 }
 
 # delete obsolete entries from builddir
