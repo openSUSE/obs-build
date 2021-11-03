@@ -41,6 +41,10 @@ The results of the package builds are stored in a directory
 defaults to the name of the base distribution selected with the
 --dist or --preset options.
 
+If Pbuild detects that the specified directory is a package directory, it
+will automatically go into single-build mode and use the parent directory
+as project directory.
+
 .SH COMMON OPTIONS
 .TP
 .BI "\-\-arch " arch
@@ -93,6 +97,10 @@ Short hand form to force a rebuild. If no argument is given,
 all packages are rebuilt. If the argument is a known
 result code, packages with a state matching the specified code are rebuilt.
 Otherwise it is assumed that the argument is a package name.
+.TP
+.BI "\-\-single " packagename
+Only build the specified package. This option also forces a rebuild of
+the package.
 .TP
 .B "\-\-vm-..."
 .PD 0
