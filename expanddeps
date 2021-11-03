@@ -30,6 +30,7 @@ use Build;
 
 my ($dist, $rpmdeps, $archs, $configdir, $useusedforbuild, $installonly, $noinstall, $isvm);
 my ($obspackage, $buildflavor);
+my @distmacros;
 
 $configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
 
@@ -62,19 +63,19 @@ while (@ARGV)  {
   if ($ARGV[0] eq '--define') {
     shift @ARGV;
     my $def = shift @ARGV;
-    Build::define($def);
+    push @distmacros, $def;
     next;
   }
   if ($ARGV[0] eq '--with') {
     shift @ARGV;
     my $def = shift @ARGV;
-    Build::define("_with_$def --with-$def");
+    push @distmacros, "_with_$def --with-$def";
     next;
   }
   if ($ARGV[0] eq '--without') {
     shift @ARGV;
     my $def = shift @ARGV;
-    Build::define("_without_$def --without-$def");
+    push @distmacros, "_without_$def --without-$def";
     next;
   }
   if ($ARGV[0] eq '--vm') {
@@ -246,6 +247,7 @@ $cf->{'warnings'} = 1;
 $cf->{'buildflavor'} = $buildflavor if defined $buildflavor;
 $cf->{'obspackage'} = $obspackage if defined $obspackage;
 $cf->{'no_vminstall_expand'} = 1 unless $isvm;
+Build::add_distmacro($cf, $_) for @distmacros;
 
 my $dofileprovides = %{$cf->{'fileprovides'}};
 $dofileprovides = 1 if ($binarytype || 'rpm') ne 'rpm';
