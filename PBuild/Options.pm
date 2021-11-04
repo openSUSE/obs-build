@@ -177,7 +177,14 @@ sub parse_options {
         $opts{$ko} = $arg;
       }
     } else {
-      $opts{$ko} = 1;
+      my $arg = 1;
+      if (@args && ref($args[0])) {
+        $arg = getarg($origopt, \@args);
+	$arg = 0 if $arg =~ /^(?:0|off|false|no)$/i;
+	$arg = 1 if $arg =~ /^(?:1|on|true|yes)$/i;
+	die("Bad boolean argument for option $origopt: '$arg'\n") unless $arg eq '0' || $arg eq '1';
+      }
+      $opts{$ko} = $arg;
     }
     die("Option $origopt does not take an argument\n") if @args && ref($args[0]);
   }
@@ -224,6 +231,16 @@ Important options (see the man page for a full list):
 
 EOS
   exit($exitstatus) if defined $exitstatus;
+}
+
+sub merge_old_options {
+  my ($opts, $oldopts) = @_;
+  my $newopts = {};
+  for (qw{preset dist repo hostrepo registry assets obs configdir root jobs threads buildjobs}) {
+    $opts->{$_} = $oldopts->{$_} if !exists($opts->{$_}) && exists($oldopts->{$_});
+    $newopts->{$_} = $opts->{$_} if exists($opts->{$_});
+  }
+  return $newopts;
 }
 
 1;

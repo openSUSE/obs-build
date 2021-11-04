@@ -25,8 +25,8 @@ use POSIX;
 use Storable ();
 
 sub unify {
-  my %h = map {$_ => 1} @_; 
-  return grep(delete($h{$_}), @_); 
+  my %h = map {$_ => 1} @_;
+  return grep(delete($h{$_}), @_);
 }
 
 sub clone {
@@ -34,8 +34,8 @@ sub clone {
 }
 
 sub writestr {
-  my ($fn, $fnf, $d) = @_; 
-  my $f; 
+  my ($fn, $fnf, $d) = @_;
+  my $f;
   open($f, '>', $fn) || die("$fn: $!\n");
   if (length($d)) {
     (syswrite($f, $d) || 0) == length($d) || die("$fn write: $!\n");
@@ -46,16 +46,16 @@ sub writestr {
 }
 
 sub readstr {
-  my ($fn, $nonfatal) = @_; 
-  my $f; 
+  my ($fn, $nonfatal) = @_;
+  my $f;
   if (!open($f, '<', $fn)) {
     die("$fn: $!\n") unless $nonfatal;
     return undef;
   }
-  my $d = ''; 
+  my $d = '';
   1 while sysread($f, $d, 8192, length($d));
-  close $f; 
-  return $d; 
+  close $f;
+  return $d;
 }
 
 sub ls {
@@ -159,6 +159,40 @@ sub retrieve {
     }
   }
   return $dd;
+}
+
+sub identical {
+  my ($d1, $d2, $except, $subexcept) = @_;
+
+  if (!defined($d1)) {
+    return defined($d2) ? 0 : 1;
+  }
+  return 0 unless defined($d2);
+  my $r = ref($d1);
+  return 0 if $r ne ref($d2);
+  if ($r eq '') {
+    return 0 if $d1 ne $d2;
+  } elsif ($r eq 'HASH') {
+    my %k = (%$d1, %$d2);
+    for my $k (keys %k) {
+      next if $except && $except->{$k};
+      return 0 unless identical($d1->{$k}, $d2->{$k}, $subexcept, $subexcept);
+    }
+  } elsif ($r eq 'ARRAY') {
+    return 0 unless @$d1 == @$d2;
+    for (my $i = 0; $i < @$d1; $i++) {
+      return 0 unless identical($d1->[$i], $d2->[$i], $subexcept, $subexcept);
+    }
+  } else {
+    return 0;
+  }
+  return 1;
+}
+
+sub store_unless_identical {
+  my ($fn, $fnf, $dd, $olddd) = @_;
+  $olddd ||= retrieve(defined($fnf) ? $fnf : $fn, 1);
+  store($fn, $fnf, $dd) unless identical($dd, $olddd);
 }
 
 sub isotime {

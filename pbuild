@@ -62,19 +62,50 @@ my $dir = @dirs ? $dirs[0] : '.';
 $dir = Cwd::abs_path($dir) if $dir !~ /^\//;
 $dir =~ s/(.)\/+$/$1/s;
 
-# tweak options
+# autodetect single mode
 if (!exists($opts->{'single'}) && PBuild::Recipe::looks_like_packagedir($dir)) {
   $opts->{'single'} = $1 if $dir =~ s/\/([^\/]+)$//;
 }
-die("Option --shell only works with --single\n") if $opts->{'shell'} && !$opts->{'single'};
-die("Option --shell-after-fail only works with --single\n") if $opts->{'shell-after-fail'} && !$opts->{'single'};
-$opts->{'showlog'} = 1 if $opts->{'shell'} || $opts->{'shell-after-fail'} || $opts->{'single'};
-$opts->{'buildjobs'} = 1 if $opts->{'showlog'} || $opts->{'single'};
 
 if ($opts->{'list-presets'}) {
   PBuild::Preset::list_presets($dir);
   exit;
 }
+
+# read preset
+my $preset = PBuild::Preset::read_presets($dir, $opts->{'preset'});
+my $hostarch = $opts->{'hostarch'};
+if (!$hostarch) {
+  $hostarch = (POSIX::uname())[4];
+  die("cannot determine hostarch\n") unless $hostarch;
+  $hostarch = 'armv6hl' if $hostarch eq 'armv6l';
+  $hostarch = 'armv7hl' if $hostarch eq 'armv7l';
+}
+
+# read old options
+my $oldlastdata = PBuild::Util::retrieve("$dir/.pbuild/lastdata", 1) || {};
+my $oldreponame = ($preset || {})->{'name'};
+my $oldmyarch = ($preset || {})->{'arch'} || $hostarch;
+my $olddist = ($preset || {})->{'config'} || $opts->{'dist'};
+if (!$oldreponame && $olddist) {
+  $oldreponame = $olddist->[0];
+  $oldreponame = $1 if $oldreponame =~ /^obs:\/.*?([^\/]+)\/standard\/*$/s;
+  $oldreponame =~ s/.*\///;
+  $oldreponame =~ s/\.conf$//;
+  $oldreponame =~ s/[:\s]+/_/g;
+}
+my $oldbuilddir = $oldlastdata->{'builddir'};
+if ($oldreponame || $olddist) {
+  $oldbuilddir = $oldreponame && $oldreponame ne $oldmyarch ? "$dir/_build.$oldreponame.$oldmyarch" : "$dir/_build.$oldmyarch";
+}
+my $oldlastopts = PBuild::Util::retrieve("$oldbuilddir/.pbuild/lastopts", 1) || {};
+my $newlastopts = PBuild::Options::merge_old_options($opts, $oldlastopts);
+
+# tweak options
+die("Option --shell only works with --single\n") if $opts->{'shell'} && !$opts->{'single'};
+die("Option --shell-after-fail only works with --single\n") if $opts->{'shell-after-fail'} && !$opts->{'single'};
+$opts->{'showlog'} = 1 if $opts->{'shell'} || $opts->{'shell-after-fail'} || $opts->{'single'};
+$opts->{'buildjobs'} = 1 if $opts->{'showlog'} || $opts->{'single'};
 
 # set defaults
 $opts->{'libbuild'} = $libbuild;
@@ -89,17 +120,11 @@ $opts->{'root'} ||= '/var/tmp/build-root';
 $opts->{'root'} = Cwd::abs_path($opts->{'root'}) if $opts->{'root'} !~ /^\//;
 $opts->{'root'} =~ s/(.)\/+$/$1/s;
 $opts->{'configdir'} ||= "$libbuild/configs";
-if (!$opts->{'hostarch'}) {
-  $opts->{'hostarch'} = (POSIX::uname())[4];
-  die("cannot determine hostarch\n") unless $opts->{'hostarch'};
-  $opts->{'hostarch'} = 'armv6hl' if $opts->{'hostarch'} eq 'armv6l';
-  $opts->{'hostarch'} = 'armv7hl' if $opts->{'hostarch'} eq 'armv7l';
-}
+$opts->{'hostarch'} = $hostarch;
 $opts->{'buildjobs'} = 1 unless $opts->{'buildjobs'};
 $opts->{'buildjobs'} = 32 if $opts->{'buildjobs'} > 32;
 
-# read and apply presets
-my $preset = PBuild::Preset::read_presets($dir, $opts->{'preset'});
+# apply presets
 PBuild::Preset::apply_preset($opts, $preset) if $preset;
 print "Using default preset: $preset->{'name'}\n" if $preset && !$opts->{'preset'};
 
@@ -112,11 +137,15 @@ if (!$reponame && $opts->{'dist'}) {
   $reponame =~ s/[:\s]+/_/g;
 }
 
-my $hostarch = $opts->{'hostarch'};
 $opts->{'arch'} ||= $hostarch;
 my $myarch = $opts->{'arch'};
 
 my $builddir = $reponame && $reponame ne $myarch ? "$dir/_build.$reponame.$myarch" : "$dir/_build.$myarch";
+
+# update lastdata and lastopts
+my $newlastdata = { 'builddir' => $builddir };
+eval { PBuild::Util::mkdir_p("$dir/.pbuild") ; PBuild::Util::store_unless_identical("$dir/.pbuild/.lastdata.$$", "$dir/.pbuild/lastdata", $newlastdata, $oldlastdata) };
+eval { PBuild::Util::mkdir_p("$builddir/.pbuild") ; PBuild::Util::store_unless_identical("$builddir/.pbuild/.lastopts.$$", "$builddir/.pbuild/lastopts", $newlastopts, $oldlastopts) };
 
 if ($opts->{'result-code'} || $opts->{'result-pkg'}) {
   PBuild::Result::print_result($opts, $builddir);
@@ -209,6 +238,7 @@ PBuild::RemoteRepo::expand_zypp_repo($opts->{'hostrepo'}) if $cross;
 print "starting project builder\n";
 print "    source directory: $dir\n";
 print "    result directory: $builddir\n";
+print "    single build: $opts->{'single'}\n" if $opts->{'single'};
 print "    build area: $opts->{'root'}\n";
 print "    architecture: $myarch\n";
 print "    host architecture: $hostarch\n" if $cross;
@@ -467,7 +497,7 @@ while (1) {
     $oldresult->{$pkg} = $result->{$pkg};
     $result = $oldresult;
     my $code = $result->{$pkg}->{'code'};
-    if ($code ne 'failed' && $code ne 'succeeded') {
+    if ($code ne 'failed' && $code ne 'succeeded' && $code ne 'building') {
       $code .= ": $result->{$pkg}->{'details'}" if $result->{$pkg}->{'details'};
       print "$pkg: $code\n";
     }
