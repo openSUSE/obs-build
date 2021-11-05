@@ -1223,9 +1223,6 @@ test "$CONFIG_DIR" != "$BUILD_DIR/configs" && validate_param "--configdir" "$CON
 # validate the buildroot
 validate_buildroot "$BUILD_ROOT"
 
-# done option parsing
-BUILD_OPTIONS_PARSED=true
-
 
 if test -n "$VM_TYPE" -a -z "$RUNNING_IN_VM" ; then
     vm_verify_options
@@ -1260,6 +1257,9 @@ if test -n "$SEND_SYSRQ" ; then
     sysrq_running_build "$SEND_SYSRQ"
     cleanup_and_exit
 fi
+
+# done option parsing
+BUILD_OPTIONS_PARSED=true
 
 if test -n "$CLEAN_BUILD" ; then
     DO_INIT=true
