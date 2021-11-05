@@ -193,6 +193,9 @@ Known Parameters:
               Capture build output to logfile. Defaults to
               .build.log in the build root for non-VM builds.
 
+  --hide-timestamps
+              Hide the time prefix in output and logfile.
+
   --repo PATH_OR_URL
 	      Use package repository at PATH_OR_URL. Supported formats
               are rpm-md, yast2, debian, and arch linux.
@@ -1033,6 +1036,9 @@ while test -n "$1"; do
 	LOGFILE="$ARG"
 	shift
       ;;
+      -hide-timestamps)
+	HIDE_TIMESTAMPS=true
+      ;;
       -reason)
 	needarg
 	REASON="$ARG"
@@ -1330,7 +1336,7 @@ if test -n "$LOGFILE" -a -z "$RUN_SHELL" ; then
     # set start time, to be substracted for build log timestamps
     STARTTIME=`perl -e 'print time()'`
 
-    if test -n "$RUN_SHELL_AFTER_FAIL" ; then
+    if test -n "$RUN_SHELL_AFTER_FAIL" -o -n "$HIDE_TIMESTAMPS" ; then
         # we may run a shell, so no stdout wrapper
 	:
     elif test -n "$RUNNING_IN_VM" ; then
