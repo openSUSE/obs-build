@@ -29,18 +29,13 @@ vm_verify_options_docker() {
 
 vm_startup_docker() {
     local name="obsbuild.${BUILD_ROOT##*/}"
-    rm -f "$BUILD_ROOT/.run_docker_build"
-    cat >"$BUILD_ROOT/.run_docker_build" <<EOF
-#!/bin/sh
-mount --bind /proc /mnt/proc
-mount --bind /dev /mnt/dev
-exec chroot /mnt "$vm_init_script"
-EOF
-    chmod 755 "$BUILD_ROOT/.run_docker_build"
     docker rm "$name" >/dev/null 2>&1 || true
     docker run \
         --rm --name "$name" --cap-add=sys_admin --cap-add=MKNOD --net=none \
-        --mount "type=bind,source=$BUILD_ROOT,destination=/mnt" busybox /mnt/.run_docker_build
+        --mount "type=bind,source=$BUILD_ROOT,destination=/mnt" \
+        --mount "type=bind,source=/proc,destination=/mnt/proc" \
+        --mount "type=bind,source=/dev/pts,destination=/mnt/dev/pts" \
+        busybox chroot /mnt "$vm_init_script"
     BUILDSTATUS="$?"
     test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
     cleanup_and_exit "$BUILDSTATUS"
