@@ -113,6 +113,7 @@ my %known_options = (
   'single-flavor' => 'single-flavor:',
   'shell' => 'shell',
   'shell-after-fail' => 'shell-after-fail',
+  'hide-timestamps' => 'hide-timestamps',
   'showlog' => 'showlog',
 );
 

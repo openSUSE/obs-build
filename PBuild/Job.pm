@@ -288,6 +288,7 @@ sub createjob {
   push @args, '--clean' unless $opts->{'noclean'};
   push @args, '--shell' if $opts->{'shell'};
   push @args, '--shell-after-fail' if $opts->{'shell-after-fail'};
+  push @args, '--hide-timestamps' if $opts->{'hide-timestamps'};
   push @args, '--skip-bundle';
   push @args, '--changelog';
   #push @args, '--oldpackages', $oldpkgdir if $oldpkgdir && -d $oldpkgdir;
