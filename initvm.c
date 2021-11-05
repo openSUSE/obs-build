@@ -319,27 +319,34 @@ int main(int argc, char* argv[], char* env[])
 	int retval;
 	char buf[BUFSIZ], *build_dir;
 
-	/* mount proc filesystem if it isn't already */
-	if (mount("proc", "/proc", "proc", MS_MGC_VAL, NULL) == -1) {
-		if (errno != EBUSY) {
-			perror("mount: /proc");
-			exit(1);
+        /* Docker builds get /proc mounted */
+        struct stat sb;
+        if (stat("/proc/1/cgroup", &sb)) {
+	        /* mount proc filesystem if it isn't already. */
+		if (mount("proc", "/proc", "proc", MS_MGC_VAL, NULL) == -1) {
+			if (errno != EBUSY) {
+				perror("mount: /proc");
+				exit(1);
+			}
 		}
-	}
+        }
 
-	/* try to load binfmt module if present, no big deal if it fails */
-	if ((retval = system("/sbin/modprobe binfmt_misc")) != 0) {
-		DBG(fprintf(stderr, "modprobe binfmt_misc exit code %d\n",
-			retval));
-	}
-
-	/* mount binfmt filesystem */
-	if (mount("binfmt_misc", SYSFS_BINFMT_MISC, "binfmt_misc", MS_MGC_VAL,
-		NULL) == -1) {
-		if (errno != EBUSY) {
-			perror("mount: binfmt_misc, " SYSFS_BINFMT_MISC);
+        /* Docker builds need to have binfmt_misc loaded already */
+        if (stat(SYSFS_BINFMT_MISC_STAT, &sb)) {
+		/* try to load binfmt module if present, no big deal if it fails */
+		if ((retval = system("/sbin/modprobe binfmt_misc")) != 0) {
+			DBG(fprintf(stderr, "modprobe binfmt_misc exit code %d\n",
+				retval));
 		}
-	}
+
+		/* mount binfmt filesystem */
+		if (mount("binfmt_misc", SYSFS_BINFMT_MISC, "binfmt_misc", MS_MGC_VAL,
+			NULL) == -1) {
+			if (errno != EBUSY) {
+				perror("mount: binfmt_misc, " SYSFS_BINFMT_MISC);
+			}
+		}
+        }
 
 	/* verify all paths resulting from this are OK */
 	if (!test_access_files(rx_files, R_OK|X_OK, "read/search")) {
