@@ -401,7 +401,7 @@ sub finishjob {
   
   if (!$ret && (-l "$buildroot/.build.log" || ! -s _)) {
     unlink("$buildroot/.build.log");
-    writestr("$buildroot/.build.log", undef, "build created no logfile!\n");
+    PBuild::Util::writestr("$buildroot/.build.log", undef, "build created no logfile!\n");
     $ret = 1;
   }
   if ($ret) {
