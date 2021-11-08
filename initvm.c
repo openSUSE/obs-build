@@ -321,7 +321,7 @@ int main(int argc, char* argv[], char* env[])
 
         /* Docker builds get /proc mounted */
         struct stat sb;
-        if (stat("/proc/1/cgroup", &sb)) {
+        if (stat("/.dockerenv", &sb)) {
 	        /* mount proc filesystem if it isn't already. */
 		if (mount("proc", "/proc", "proc", MS_MGC_VAL, NULL) == -1) {
 			if (errno != EBUSY) {
