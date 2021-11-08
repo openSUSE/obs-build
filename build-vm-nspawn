@@ -30,10 +30,14 @@ vm_startup_nspawn() {
     local name="${BUILD_ROOT##*/}"
     name="obsbuild.${name//_/-}"
     local pipe_opt=
+    local privileged_opt=
     if test -z "$RUN_SHELL" && systemd-nspawn --help | fgrep -q -e --pipe; then
         pipe_opt=--pipe
     fi
-    systemd-nspawn -D "$BUILD_ROOT" -M "$name" --private-network $pipe_opt "$vm_init_script"
+    if test -n "$VM_TYPE_PRIVILEGED"; then
+       privileged_opt=--privileged 
+    fi
+    systemd-nspawn -D "$BUILD_ROOT" -M "$name" --private-network $pipe_opt $privileged_opt "$vm_init_script"
     BUILDSTATUS="$?"
     cleanup_and_exit "$BUILDSTATUS"
 }

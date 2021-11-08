@@ -141,6 +141,10 @@ vm_parse_options() {
 	needarg
 	VM_TYPE="$ARG"
 	case "$VM_TYPE" in
+	    docker:privileged|nspawn:privileged)
+                VM_TYPE_PRIVILEGED=true
+                VM_TYPE=${VM_TYPE%:*}
+            ;;
 	    lxc|docker|nspawn) ;;
 	    ec2|xen|kvm|uml|qemu|emulator|openstack|zvm|pvm)
 		test -z "$VM_ROOT" && VM_ROOT=1
