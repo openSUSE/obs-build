@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 20;
+use Test::More tests => 21;
 
 use Build::Rpm;
 
@@ -61,6 +61,7 @@ q{
 %define bar world
 %{foo:%{bar}}}			=> 'world',
 q{%[1 + %[2 * 3]]}		=> '7',
+q{%[0 && %does_not_exist]}	=> '0',
 );
 
 while (@tests) {

@@ -40,7 +40,7 @@ sub expr_vcmp {
 }
 
 sub expr_dummyexpander {
-  return '';
+  return substr($_[0], 0, 1);
 }
 
 sub expr_expand {
