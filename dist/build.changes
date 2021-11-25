@@ -1,4 +1,20 @@
 -------------------------------------------------------------------
+Thu Nov 25 13:01:00 UTC 2021 - Adrian Schröter <adrian@suse.de>
+
+- renamed tumbleweed config to tumbleweed
+- synced tumbleweed config changes
+- initial config for Leap 15.4
+- docker build environment
+  * Use /.dockerenv as marker for docker environment
+  * support privileged docker/nspawn mode
+  *  move --cap-add=SYS_ADMIN --cap-add=MKNOD to privileged mode
+  * initvm: do not attempt to mount /proc and binfmt_misc handler if present
+- pbuild
+  * rename --hide-timestamps to --no-timestamps
+  * reuse options from older builds
+  * revised --single build mode
+
+-------------------------------------------------------------------
 Mon Oct 25 09:16:20 UTC 2021 - Adrian Schröter <adrian@suse.de>
 
 Features:
