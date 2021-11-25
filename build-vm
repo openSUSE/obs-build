@@ -912,6 +912,16 @@ vm_first_stage() {
 	vm_update_hostarch
     fi
 
+    # copy ccache archive
+    if test -n "$CCACHE" -a -n "$CCACHE_ARCHIVE" -a "$CCACHE_ARCHIVE" = "${CCACHE_ARCHIVE#redis://}"; then
+	mkdir -p "$BUILD_ROOT/.build.oldpackages"
+	if ! test "$BUILD_ROOT/.build.oldpackages/_ccache.tar" -ef "$CCACHE_ARCHIVE" ; then
+	    rm -f "$BUILD_ROOT/.build.oldpackages/_ccache.tar"
+	    cp -a "$CCACHE_ARCHIVE" "$BUILD_ROOT/.build.oldpackages/_ccache.tar"
+	fi
+	CCACHE_ARCHIVE="/.build.oldpackages/_ccache.tar"
+    fi
+
     # the watchdog needs a log file
     test -n "$LOGFILE" || VM_WATCHDOG=
     # put our config into .build/build.data
@@ -972,10 +982,13 @@ vm_first_stage() {
     echo "VM_WATCHDOG='$VM_WATCHDOG'" >> $BUILD_ROOT/.build/build.data
     echo "BUILDENGINE='$BUILDENGINE'" >> $BUILD_ROOT/.build/build.data
     echo "CCACHE='$CCACHE'" >> $BUILD_ROOT/.build/build.data
+    echo "CCACHE_TYPE='$CCACHE_TYPE'" >> $BUILD_ROOT/.build/build.data
+    echo "CCACHE_ARCHIVE='$CCACHE_ARCHIVE'" >> $BUILD_ROOT/.build/build.data
+    echo "CCACHE_CREATE_ARCHIVE='$CCACHE_CREATE_ARCHIVE'" >> $BUILD_ROOT/.build/build.data
+    echo "CCACHE_CLEAN='$CCACHE_CLEAN'" >> $BUILD_ROOT/.build/build.data
     echo "ABUILD_TARGET='$ABUILD_TARGET'" >> $BUILD_ROOT/.build/build.data
     echo "BUILD_FLAVOR='$BUILD_FLAVOR'" >> $BUILD_ROOT/.build/build.data
     echo "OBS_PACKAGE='$OBS_PACKAGE'" >> $BUILD_ROOT/.build/build.data
-    echo "REMOVE_CCACHE='$REMOVE_CCACHE'" >> $BUILD_ROOT/.build/build.data
     echo "BUILD_SKIP_BUNDLE='$BUILD_SKIP_BUNDLE'" >> $BUILD_ROOT/.build/build.data
     # fallback time for broken hosts
     rm -rf $BUILD_ROOT/.build/.date
@@ -993,12 +1006,6 @@ vm_first_stage() {
     if check_use_emulator ; then
         vm_init_script="/.build/$INITVM_NAME"
     fi
-
-    # rsync as source and dest could be same
-    test -L "$BUILD_ROOT/.build.oldpackages/_ccache.tar" && buildroot_rm .build.oldpackages/_ccache.tar
-    test -n "$PKG_CCACHE" && \
-            mkdir -p "$BUILD_ROOT/.build.oldpackages/" && \
-            rsync -av "$PKG_CCACHE" "$BUILD_ROOT/.build.oldpackages/_ccache.tar"
 
     if test -n "$VM_ROOT" ; then
 	# copy out kernel & initrd (if they exist) during unmounting VM image

@@ -73,7 +73,6 @@ DO_INIT_TOPDIR=true
 DO_LINT=
 DO_CHECKS=true
 CLEAN_BUILD=
-REMOVE_CCACHE=
 GENBUILDREQS_CLEAN_BUILD=
 RECIPEFILES=()
 SRCDIR=
@@ -108,9 +107,10 @@ RUN_SHELL=
 RUN_SHELL_AFTER_FAIL=
 RUN_SHELL_CMD=
 CCACHE=
-PKG_CCACHE=
-SCCACHE=
-SCCACHE_URI=
+CCACHE_ARCHIVE=
+CCACHE_CREATE_ARCHIVE=
+CCACHE_TYPE=
+CCACHE_CLEAN=
 DLNOSIGNATURE=
 BUILD_FLAVOR=
 OBS_PACKAGE=
@@ -270,15 +270,13 @@ Known Parameters:
   --ccache
               Use ccache to speed up rebuilds
 
-  --pkg-ccache /path/to/ccache.tar.gz
-              path to archive of ccache directory content.
+  --ccache=sccache
+              Use sccache to speed up rebuilds
+
+  --ccache-archive /path/to/ccache.tar
+              Path to archive of ccache directory content.
               Its contents will be extracted to /.ccache
-
-  --sccache
-              Use sccache to speed up rebuilds. Conflicts with --ccache.
-
-  --sccache-uri
-              Optional URI for remote or archive sccache storage. Implies --sccache.
+              Implies --ccache.
 
   --icecream N
               Use N parallel build jobs with icecream
@@ -533,8 +531,42 @@ toshellscript() {
     echo
 }
 
-setupccache() {
-    if test -n "$CCACHE" ; then
+ccache_unpack() {
+    local dir="$1"
+    local ty="$2"
+    echo "Unpacking $ty archive"
+    tar -xf "$CCACHE_ARCHIVE" -C "$dir/"
+    if test -s "$dir/.build.ccache.type" ; then
+	local t
+	read t < "$dir/.build.ccache.type"
+	if test "$ty" != "$t" ; then
+	    echo "$ty archive is of type $t, cleaning cache"
+	    rm -rf "$dir"
+	    mkdir -p "$dir"
+	fi
+	rm -f "$dir/.build.ccache.type"
+    fi
+}
+
+ccache_pack() {
+    local dir="$1"
+    local ty="$2"
+    echo "... saving $ty archive"
+    rm -rf "$dir/.build.ccache.type"
+    local remove_files
+    test -n "$RUNNING_IN_VM" -a -n "$CCACHE_CLEAN" && remove_files="--remove-files"
+    echo "$ty" > "$dir/.build.ccache.type"
+    tar $remove_files -cf "$BUILD_ROOT/$TOPDIR/OTHER/_ccache.tar" -C "$dir/" .
+    rm -f "$dir/.build.ccache.type"
+}
+
+ccache_setup() {
+    CCACHE_SETUP_START_TIME=
+    if test -n "$CCACHE" -a "$CCACHE_TYPE" = sccache ; then
+	sccache_setup
+	return
+    fi
+    if test -n "$CCACHE" -a "$CCACHE_TYPE" = ccache ; then
         CCACHE_SETUP_START_TIME=`date +%s`
 	if mkdir -p $BUILD_ROOT/var/lib/build/ccache/bin; then
 	    for i in $(ls $BUILD_ROOT/usr/bin | grep -E '^(cc|gcc|[cg][+][+]|clang|clang[+][+])([-]?[.0-9])*$'); do
@@ -549,7 +581,7 @@ setupccache() {
 	    done
 	fi
 	mkdir -p "$BUILD_ROOT/.ccache"
-	echo 'export PATH=/var/lib/build/ccache/bin:$PATH' >> "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
+	echo 'export PATH=/var/lib/build/ccache/bin:$PATH' > "$BUILD_ROOT"/etc/profile.d/build_ccache.sh
 
         local cconf="$BUILD_ROOT"/etc/ccache.conf
         if test -e $cconf; then
@@ -559,37 +591,61 @@ setupccache() {
             echo "compression = true"    >> $cconf
             echo "cache_dir = /.ccache" >> $cconf
         fi
-        local ccachetar="$BUILD_ROOT/.build.oldpackages/_ccache.tar"
-        test -e $ccachetar && tar -xf $ccachetar -C "$BUILD_ROOT/.ccache/"
-        rm -f $ccachetar
-        chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.ccache"
+	test -n "$CCACHE_ARCHIVE" -a -e "$CCACHE_ARCHIVE" && ccache_unpack "$BUILD_ROOT/.ccache" ccache
+	chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.ccache"
     else
-        CCACHE_SETUP_START_TIME=
 	rm -f "$BUILD_ROOT"/var/lib/build/ccache/bin/{gcc,g++,cc,c++,clang,clang++}
     fi
 }
 
-setupsccache() {
-    if test -n "$SCCACHE" ; then
+ccache_wrapup() {
+    if test -n "$CCACHE" -a "$CCACHE_TYPE" = sccache ; then
+	sccache_wrapup
+	return
+    fi
+    if test -n "$CCACHE" -a "$CCACHE_TYPE" = ccache ; then
+	if test -n "$CCACHE_CLEAN" ; then
+	    echo "... cleaning ccache"
+	    test_cmd="ccache -h | grep -c evict-older-than"
+	    clean_cmd="ccache --evict-older-than $(($(date +%s) - $CCACHE_SETUP_START_TIME))s"
+	    chroot $BUILD_ROOT su -c "$test_cmd && $clean_cmd" - $BUILD_USER
+	fi
+	test -n "$CCACHE_CREATE_ARCHIVE" && ccache_pack "$BUILD_ROOT/.ccache" ccache
+    fi
+}
+
+sccache_setup() {
+    if test -n "$CCACHE" -a "$CCACHE_TYPE" = sccache ; then
+        CCACHE_SETUP_START_TIME=`date +%s`
         # This first redir clears the file.
         echo 'export CARGO_INCREMENTAL=false' > "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
         echo 'export RUSTC_WRAPPER=sccache' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
         echo 'export CC="sccache cc"' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
         echo 'export CXX="sccache c++"' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
-        echo "SCCACHE_URI=${SCCACHE_URI}"
-        if [[ ${SCCACHE_URI} = redis* ]] ; then
-            echo "export SCCACHE_REDIS=${SCCACHE_URI}" >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
-        fi
-        if [[ ${SCCACHE_URI} = file* ]] ; then
-            FILE_URI=${SCCACHE_URI:7}
-            mkdir -p "$BUILD_ROOT/.sccache"
-            test -e ${FILE_URI} && tar -xf ${FILE_URI} -C "$BUILD_ROOT/.sccache"
-            chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.sccache"
+	if test "$CCACHE_ARCHIVE" != "${CCACHE_ARCHIVE#redis://}" ; then
+            echo "export SCCACHE_REDIS=${CCACHE_ARCHIVE}" >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
+	else
             echo 'export SCCACHE_DIR="/.sccache"' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
             echo 'export SCCACHE_CACHE_SIZE="8G"' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
+            mkdir -p "$BUILD_ROOT/.sccache"
+	    test -n "$CCACHE_ARCHIVE" -a -e "$CCACHE_ARCHIVE" && ccache_unpack "$BUILD_ROOT/.sccache" sccache
+	    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.sccache"
         fi
         # Display sccache status at the start of the build.
         chroot $BUILD_ROOT su -c "sccache -s" - $BUILD_USER
+    fi
+}
+
+sccache_wrapup() {
+    if test -n "$CCACHE" -a "$CCACHE_TYPE" = sccache ; then
+	# Display sccache statistics post build.
+	chroot $BUILD_ROOT su -c "sccache -s" - $BUILD_USER
+	# Pack archive unless redis was used
+	if test -n "$CCACHE_CREATE_ARCHIVE" ; then
+	    if test "$CCACHE_ARCHIVE" = "${CCACHE_ARCHIVE#redis://}" ; then
+		ccache_pack "$BUILD_ROOT/.sccache" sccache
+	    fi
+	fi
     fi
 }
 
@@ -951,7 +1007,7 @@ while test -n "$1"; do
       -clean)
 	test "$CLEAN_BUILD" = '--clean' && GENBUILDREQS_CLEAN_BUILD='--clean'
 	CLEAN_BUILD='--clean'
-	REMOVE_CCACHE="$CLEAN_BUILD"
+	CCACHE_CLEAN="$CLEAN_BUILD"
       ;;
       -wipe)
 	DO_WIPE=true
@@ -1078,24 +1134,39 @@ while test -n "$1"; do
 	test "$icecream" -gt 0 && BUILD_JOBS="$ARG"
 	shift
       ;;
-      -ccache) # this is initialized after all the parsing is done
+      -ccache)
 	CCACHE=true
+	if test "$1" != "${1#--noarg=}" ; then
+	    needarg
+	    CCACHE_TYPE="$ARG"
+	    shift
+	fi
       ;;
-      -pkg-ccache)
+      -ccache-type)
 	needarg
-	PKG_CCACHE="$ARG"
+	CCACHE_TYPE="$ARG"
+	shift
+      ;;
+      -pkg-ccache|-ccache-archive)
+	needarg
+	CCACHE_ARCHIVE="$ARG"
 	shift
 	CCACHE=true
       ;;
-      -sccache-uri)
-    needarg
-    SCCACHE_URI="$ARG"
-    shift
-    SCCACHE=true
-      ;;
+      -ccache-create-archive)
+	CCACHE_CREATE_ARCHIVE=true
+	;;
       -sccache)
-    SCCACHE=true
-    shift
+	CCACHE=true
+	CCACHE_TYPE=sccache
+	shift
+      ;;
+      -sccache-uri|-sccache-archive)
+	needarg
+	CCACHE_ARCHIVE="$ARG"
+	shift
+	CCACHE=true
+	CCACHE_TYPE=sccache
       ;;
       -statistics)
 	DO_STATISTICS=1
@@ -1267,6 +1338,14 @@ if test -n "$CLEAN_BUILD" ; then
     DO_INIT_TOPDIR=true
 fi
 
+if test -n "$CCACHE" ; then
+    test -z "$CCACHE_TYPE" && CCACHE_TYPE=ccache
+    # automatically use ccache archive from an old build
+    if test -z "$CCACHE_ARCHIVE" -a -n "${old_packages[0]}" -a -e "${old_packages[0]}/_ccache.tar" ; then
+	CCACHE_ARCHIVE="${old_packages[0]}/_ccache.tar"
+    fi
+fi
+
 if test -z "$RPMLIST" -a -z "$RUNNING_IN_VM" ; then
     if test -z "$repos" -a -z "$BUILD_RPMS" -a "$BUILD_DIST" = "${BUILD_DIST#obs:/}"; then
 	repos=(--repository 'zypp://')
@@ -1424,7 +1503,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     ADDITIONAL_PACKS=
     test -z "$BUILD_EXTRA_PACKS" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS $BUILD_EXTRA_PACKS"
     test -z "$CREATE_BASELIBS" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS build"
-    test -z "$CCACHE" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS ccache"
+    test -z "$CCACHE" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS $CCACHE_TYPE"
     test "$icecream" = 0 || ADDITIONAL_PACKS="$ADDITIONAL_PACKS icecream gcc-c++"
     test -z "$DO_LINT" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS rpmlint-Factory"
     test "$VMDISK_FILESYSTEM" = xfs && ADDITIONAL_PACKS="$ADDITIONAL_PACKS libblkid1"
@@ -1470,11 +1549,6 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	    fi
 	fi
 	copy_oldpackages
-        # chroot based builds
-        # rsync as source and dest could be same
-        test -n "$PKG_CCACHE" -a -e "$PKG_CCACHE" && \
-            mkdir -p "$BUILD_ROOT/.build.oldpackages/" && \
-            rsync -v "$PKG_CCACHE" "$BUILD_ROOT/.build.oldpackages/_ccache.tar"
     fi
 
     mount_stuff
@@ -1573,8 +1647,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     fi
 
     setupicecream
-    setupccache
-    setupsccache
+    ccache_setup
 
     test -n "$RUN_SHELL" && run_shell
 
@@ -1750,28 +1823,11 @@ fi
 BUILD_SUCCEEDED=
 
 if test -n "$CCACHE" ; then
-    if test -n "$REMOVE_CCACHE" ; then
-        echo "... cleaning ccache"
-        test_cmd="ccache -h | grep -c evict-older-than"
-        clean_cmd="ccache --evict-older-than $(($(date +%s) - $CCACHE_SETUP_START_TIME))s"
-        chroot $BUILD_ROOT su -c "$test_cmd && $clean_cmd" - $BUILD_USER
-    fi
-    echo "... saving ccache"
-    tar ${REMOVE_CCACHE:+--remove-files} -cf "$BUILD_ROOT/$TOPDIR/OTHER/_ccache.tar" -C "$BUILD_ROOT/.ccache/" .
+    ccache_wrapup
 fi
 
 if test \( -n "$RPMS" -o -n "$DEBS" \) -a -n "$CREATE_BASELIBS"; then
     create_baselibs
-fi
-
-if test -n "$SCCACHE" ; then
-    # Display sccache statistics post build.
-    chroot $BUILD_ROOT su -c "sccache -s" - $BUILD_USER
-    # wbrown - archive local sccache if file backed.
-    if [[ ${SCCACHE_URI} = file* ]] ; then
-        FILE_URI=${SCCACHE_URI:7}
-        tar -a -cf ${FILE_URI} -C "$BUILD_ROOT/.sccache" .
-    fi
 fi
 
 if test -n "$MODULEMDFILE" ; then
