@@ -115,6 +115,8 @@ my %known_options = (
   'shell-after-fail' => 'shell-after-fail',
   'no-timestamps' => 'no-timestamps',
   'showlog' => 'showlog',
+  'ccache' => \&ccache_special,
+  'ccache-type' => 'ccache-type',
 );
 
 sub getarg {
@@ -131,6 +133,15 @@ sub vm_type_special {
   $arg = getarg($origopt, $args, 1) unless $opt eq 'zvm' || $opt eq 'lxc';
   $opts->{'vm-disk'} = $arg if defined $arg;
   $opts->{'vm-type'} = $opt;
+}
+
+sub ccache_special {
+  my ($opts, $origopt, $opt, $args) = @_;
+  my $arg;
+  $arg = getarg($origopt, $args) if 'ccache' && @$args && ref($args->[0]);
+  $arg = 'sccache' if $origopt eq 'sccache';
+  $opts->{'ccache'} = 1;
+  $opts->{'ccache-type'} = $arg if $arg;
 }
 
 my @codes = qw{broken succeeded failed unresolvable blocked scheduled waiting building excluded disabled locked};

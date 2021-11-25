@@ -173,7 +173,7 @@ sub copy_sources {
 # ctx usage: opts hostarch bconf arch repos dep2pkg buildconfig debuginfo
 #
 sub createjob {
-  my ($ctx, $jobname, $nbuilders, $buildroot, $p, $bdeps, $pdeps, $vmdeps, $sysdeps, $tdeps, $nounchanged) = @_;
+  my ($ctx, $jobname, $nbuilders, $buildroot, $p, $bdeps, $pdeps, $vmdeps, $sysdeps, $tdeps, $jobopts) = @_;
   my $opts = { %{$ctx->{'opts'}} };	# create copy so we can modify
   my $hostarch = $opts->{'hostarch'};
   my $arch = $p->{'native'} ? $hostarch : $ctx->{'arch'};
@@ -247,6 +247,8 @@ sub createjob {
     $ctx->{'assetmgr'}->copy_assets($p, $srcdir) if $p->{'asset_files'};
   }
 
+  my $oldresultdir = "$ctx->{'builddir'}/$p->{'pkg'}";
+
   my @args;
   push @args, $helper if $helper;
   push @args, "$opts->{'libbuild'}/build";
@@ -291,7 +293,15 @@ sub createjob {
   push @args, '--no-timestamps' if $opts->{'no-timestamps'};
   push @args, '--skip-bundle';
   push @args, '--changelog';
-  #push @args, '--oldpackages', $oldpkgdir if $oldpkgdir && -d $oldpkgdir;
+  #push @args, '--oldpackages', $oldresultdir if -d $oldresultdir;
+  push @args, '--ccache' if $jobopts->{'ccache'};
+  push @args, '--ccache-create-archive' if $jobopts->{'ccache'};
+  push @args, '--ccache-type', $jobopts->{'ccache-type'} if $jobopts->{'ccache'} && $jobopts->{'ccache-type'};
+  if ($jobopts->{'ccache'} && -s "$oldresultdir/_ccache.tar") {
+    PBuild::Util::mkdir_p("$buildroot/.build.oldpackages");
+    PBuild::Util::cp("$oldresultdir/_ccache.tar", "$buildroot/.build.oldpackages/_ccache.tar");
+    push @args, "--ccache-archive", "$buildroot/.build.oldpackages/_ccache.tar";
+  }
   push @args, '--dist', "$buildroot/.build.config";
   push @args, '--rpmlist', "$buildroot/.build.rpmlist";
   push @args, '--logfile', "$buildroot/.build.log";
@@ -299,7 +309,6 @@ sub createjob {
   push @args, '--debug' if $ctx->{'debuginfo'};
   push @args, "--arch=$arch";
   push @args, '--jobs', $opts->{'jobs'} if $opts->{'jobs'};
-  #push @args, '--ccache' if $useccache && $oldpkgdir;
   push @args, '--threads', $opts->{'threads'} if $opts->{'threads'};
   push @args, "--buildflavor=$p->{'flavor'}" if $p->{'flavor'};
   push @args, "--obspackage=".($p->{'originpackage'} || $p->{'pkg'}) if $needobspackage;

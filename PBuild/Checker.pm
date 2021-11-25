@@ -592,7 +592,8 @@ sub build {
   my $reason = $data->[0];
   my $hdeps = $data->[1];
   #print Dumper($reason);
-  my $nounchanged = 1 if $packid && $ctx->{'cychash'}->{$packid};
+  my %jobopts;
+  $jobopts{'nounchanged'} = 1 if $packid && $ctx->{'cychash'}->{$packid};
   my @btdeps;
   my $edeps = $p->{'dep_expanded'} || [];
   my $bconf = $ctx->{'bconf_host'} || $ctx->{'bconf'};
@@ -632,11 +633,15 @@ sub build {
     unshift @bdeps, @{$p->{'dep'} || []}, @btdeps;
   }
   push @bdeps, '--ignoreignore--' if @sysdeps || $buildtype eq 'simpleimage';
-  if (exists($bconf->{'buildflags:useccache'}) && ($buildtype eq 'arch' || $buildtype eq 'spec' || $buildtype eq 'dsc')) {
+  my $opts = $ctx->{'opts'};
+  if ($opts->{'ccache'} && ($buildtype eq 'arch' || $buildtype eq 'spec' || $buildtype eq 'dsc')) {
     my $opackid = $packid;
     $opackid = $p->{'releasename'} if $p->{'releasename'};
-    if (grep {$_ eq "useccache:$opackid" || $_ eq "useccache:$packid"} @{$bconf->{'buildflags'} || []}) {
-      push @bdeps, @{$bconf->{'substitute'}->{'build-packages:ccache'} || [ 'ccache' ] };
+    if (!exists($bconf->{'buildflags:useccache'}) || grep {$_ eq "useccache:$opackid" || $_ eq "useccache:$packid"} @{$bconf->{'buildflags'} || []}) {
+      my $ccache_type = $opts->{'ccache-type'} || 'ccache';
+      push @bdeps, @{$bconf->{'substitute'}->{"build-packages:$ccache_type"} || [ $ccache_type ] };
+      $jobopts{'ccache'} = 1;
+      $jobopts{'ccache-type'} = $opts->{'ccache-type'};
     }
   }
   if ($kiwimode || $buildtype eq 'buildenv' || $buildtype eq 'preinstallimage') {
@@ -674,7 +679,7 @@ sub build {
   }
   $ctx->{'repomgr'}->getremotebinaries($bins);
   my $readytime = time();
-  my $job = PBuild::Job::createjob($ctx, $builder->{'name'}, $builder->{'nbuilders'}, $builder->{'root'}, $p, \@bdeps, \@pdeps, \@vmdeps, \@sysdeps, $tdeps, $nounchanged);
+  my $job = PBuild::Job::createjob($ctx, $builder->{'name'}, $builder->{'nbuilders'}, $builder->{'root'}, $p, \@bdeps, \@pdeps, \@vmdeps, \@sysdeps, $tdeps, \%jobopts);
   $job->{'readytime'} = $readytime;
   $job->{'reason'} = $reason;
   $job->{'hostarch'} = $ctx->{'hostarch'};
