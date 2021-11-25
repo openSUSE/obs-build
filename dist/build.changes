@@ -13,6 +13,8 @@ Thu Nov 25 13:01:00 UTC 2021 - Adrian Schröter <adrian@suse.de>
   * rename --hide-timestamps to --no-timestamps
   * reuse options from older builds
   * revised --single build mode
+  * support ccache
+- Unify ccache and sccache handling
 
 -------------------------------------------------------------------
 Mon Oct 25 09:16:20 UTC 2021 - Adrian Schröter <adrian@suse.de>
