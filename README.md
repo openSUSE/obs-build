@@ -75,10 +75,10 @@ Desktop Image formats
 
 Special modes and formats
 ---
-- `debbuild`:     building [debian](http://debian.org) `deb`s our of `rpm` spec file
-- `debbootstrap`: [debian](http://debian.org) builds using `debootstrap` as engine
-- `mock`:         `rpm` spec file build using `mock` as engine
-- `collax`:       [debian](http://debian.org)package variation
+- `debbuild`:     build [debian](http://debian.org) `deb`s from `rpm` spec files
+- `debbootstrap`: [debian](http://debian.org) builds using `debootstrap` as the engine
+- `mock`:         `rpm` spec file build using [`mock`](https://github.com/rpm-software-management/mock)
+- `collax`:       [debian](http://debian.org) package variation
 - `fissile`:      `docker` images based on `BOSH` dev releases
 - `helm`:         `helm` charts
 - `modulemd`:     `modulemd` rpm-md extensions
