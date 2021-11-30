@@ -1166,9 +1166,7 @@ cd $BUILD_ROOT || cleanup_and_exit 1
 #
 # setup /etc/mtab
 #
-rm -f $BUILD_ROOT/etc/mtab
-cp /proc/mounts $BUILD_ROOT/etc/mtab
-chmod 644 $BUILD_ROOT/etc/mtab
+ln -sf ../proc/self/mounts $BUILD_ROOT/etc/mtab
 
 #
 # make sure that our nis is not present in the chroot system
