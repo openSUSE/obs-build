@@ -196,11 +196,12 @@ sub fetch_git_asset {
   my $dd = $$;
   my $pid = PBuild::Util::xfork();
   if (!$pid) {
-    chdir($tmpdir) || die("chdir $tmpdir: $!\n");
     open(STDOUT, '>', "$adir/.$assetid.$dd") || die("$adir/.$assetid.$dd: $!");
+    chdir($tmpdir) || die("chdir $tmpdir: $!\n");
     exec('find . | cpio -o --format=newc 2>/dev/null');
   }
   waitpid($pid, 0) == $pid || die("waitpid: $!\n");
+  die("find failed: $?\n") if $?;
   PBuild::Util::cleandir($tmpdir);
   rmdir($tmpdir) || die("rmdir $tmpdir: $!\n");
   rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
