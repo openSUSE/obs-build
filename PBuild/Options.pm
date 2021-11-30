@@ -22,7 +22,7 @@ package PBuild::Options;
 
 use strict;
 
-my %known_options = (
+our $pbuild_options = {
   'h' => 'help',
   'help' => 'help',
   'preset' => 'preset:',
@@ -117,7 +117,7 @@ my %known_options = (
   'showlog' => 'showlog',
   'ccache' => \&ccache_special,
   'ccache-type' => 'ccache-type',
-);
+};
 
 sub getarg {
   my ($origopt, $args, $optional) = @_;
@@ -161,7 +161,7 @@ sub result_rebuild_special {
 }
 
 sub parse_options {
-  my (@args) = @_;
+  my ($known_options, @args) = @_;
   my %opts;
   my @back;
   while (@args) {
@@ -177,7 +177,7 @@ sub parse_options {
     my $origopt = $opt;
     $opt =~ s/^--?//;
     unshift @args, \"$1" if $opt =~ s/=(.*)$//;
-    my $ko = $known_options{$opt};
+    my $ko = $known_options->{$opt};
     die("Unknown option '$origopt'. Exit.\n") unless $ko;
     if (ref($ko)) {
       $ko->(\%opts, $origopt, $opt, \@args);
