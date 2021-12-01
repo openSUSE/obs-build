@@ -137,8 +137,8 @@ Supported protocols for resources using an url are:
 
  * http
  * https
- * git-http
- * git-https
+ * git+http
+ * git+https
 
 This depends on the build description format as described below.
 
