@@ -167,6 +167,32 @@ buildroot_rm() {
     test -e "$BUILD_ROOT/$1" && cleanup_and_exit 1 "could not remove $BUILD_ROOT/$1"
 }
 
+copy_sources_inside() {
+    local include_directories
+    if test "$BUILDTYPE" = kiwi -o "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman ; then
+        include_directories="true"
+    fi
+    if test -e "$1/.git"; then
+        if which git >& /dev/null; then
+            # we have git, so we can check which directory belongs to the git repository
+            # and only copy these inside
+            for i in "$1"/* ; do
+                if git log "$i" | grep -q ^commit; then
+                    cp -pRL "$i" "$2"
+                fi
+            done
+            return
+        else
+            # in doubt yes
+            include_directories="true"
+        fi
+    fi
+    if test -n "$include_directories"; then
+        cp -pRL "$1"/* "$2"
+    else
+        cp -p "$1"/* "$2"
+    fi
+}
 
 assert_dirs() {
     local d rl

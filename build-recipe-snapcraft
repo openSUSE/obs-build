@@ -34,7 +34,7 @@ recipe_setup_snapcraft() {
     if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
 	mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
     else
-	cp -p "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+	copy_sources_inside "$MYSRCDIR" $BUILD_ROOT$TOPDIR/SOURCES/
     fi
 }
 
