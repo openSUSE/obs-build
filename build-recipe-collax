@@ -15,7 +15,7 @@ recipe_setup_collax() {
 	TOPDIR="/usr/src/packages"
 	test "$DO_INIT_TOPDIR" != false && rm -Rf "$BUILD_ROOT/$TOPDIR"
 	mkdir -p "$BUILD_ROOT/$TOPDIR"/{SOURCES,SOURCES.DEB,DEBS,OTHER}
-	cp -p "$MYSRCDIR"/* "$BUILD_ROOT/$TOPDIR/SOURCES/"
+	cp -pRL "$MYSRCDIR"/* "$BUILD_ROOT/$TOPDIR/SOURCES/"
 	chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/$TOPDIR"
 }
 

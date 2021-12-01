@@ -36,7 +36,7 @@ recipe_setup_debbuild() {
     mkdir -p "$BUILD_ROOT$TOPDIR/BUILD"
     test -e "$BUILD_ROOT$TOPDIR/SPECS" || ln -s SOURCES "$BUILD_ROOT$TOPDIR/SPECS"
     chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
-    cp -p "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+    copy_sources_inside "$MYSRCDIR" $BUILD_ROOT$TOPDIR/SOURCES/
 }
 
 recipe_prepare_debbuild() {

@@ -167,6 +167,13 @@ buildroot_rm() {
     test -e "$BUILD_ROOT/$1" && cleanup_and_exit 1 "could not remove $BUILD_ROOT/$1"
 }
 
+copy_sources_inside() {
+    if test -e "$1/.git" -o "$BUILDTYPE" = kiwi -o "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman ; then
+        cp -pRL "$1"/* "$2"
+    else
+        cp -p "$1"/* "$2"
+    fi
+}
 
 assert_dirs() {
     local d rl

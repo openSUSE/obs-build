@@ -33,7 +33,7 @@ recipe_setup_spec() {
     done
     chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
     mkdir -p $BUILD_ROOT$TOPDIR/SOURCES
-    cp -p "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+    copy_sources_inside "$MYSRCDIR" $BUILD_ROOT$TOPDIR/SOURCES/
 }
 
 recipe_prepare_spec() {
