@@ -78,7 +78,7 @@ sub recipe_parse {
   my @assets;
   for my $s (@{$p->{'remoteassets'} || []}) {
     my $url = $s->{'url'};
-    if ($url && $url =~ /^git(?:-https?)?:.*\/([^\/]+?)(?:.git)?(?:\#[^\#\/]+)?$/) {
+    if ($url && $url =~ /^git(?:\+https?)?:.*\/([^\/]+?)(?:.git)?(?:\#[^\#\/]+)?$/) {
       my $file = $1;
       next if $p->{'files'}->{$file};
       push @assets, { 'file' => $file, 'url' => $url, 'type' => 'url', 'isdir' => 1 };
@@ -187,8 +187,8 @@ sub fetch_git_asset {
   $file =~ s/\.obscpio$//;
   PBuild::Util::mkdir_p($adir);
   my $url = $asset->{'url'};
-  die unless $url =~ /^git(?:-https?)?:/;
-  $url =~ s/^git-//;
+  die unless $url =~ /^git(?:\+https?)?:/;
+  $url =~ s/^git\+//;
   my @cmd = ('git', 'clone', '-q');
   push @cmd, '-b', $1 if $url =~ s/#([^#]+)$//;
   push @cmd, '--', $url, "$tmpdir/$file";
@@ -226,7 +226,7 @@ sub url_fetch {
     print "fetching ".PBuild::Util::plural(scalar(@$tofetch), 'asset')." from $hosturl\n";
     for my $asset (@$tofetch) {
       my $assetid = $asset->{'assetid'};
-      if ($asset->{'url'} =~ /^git(?:-https?)?:/) {
+      if ($asset->{'url'} =~ /^git(?:\+https?)?:/) {
 	fetch_git_asset($assetdir, $asset);
 	next;
       }
