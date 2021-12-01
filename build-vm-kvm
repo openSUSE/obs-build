@@ -63,6 +63,7 @@ vm_verify_options_kvm() {
 
     vm_kernel=
     vm_initrd=
+    vm_cmdline=
     
     # newer Ubuntu versions have only kvm executable
     if test -x "/usr/bin/kvm" -a ! -x "$kvm_bin"; then
@@ -177,6 +178,7 @@ vm_verify_options_kvm() {
 
     # set initrd
     test -n "$VM_INITRD" && vm_initrd="$VM_INITRD"
+    test -n "$VM_CMDLINE" && vm_cmdline="$VM_CMDLINE"
     if test -z "$vm_initrd" ; then
 	# find a nice default
 	if test -e /boot/initrd.obs.guest ; then
@@ -295,6 +297,9 @@ vm_startup_kvm() {
             ;;
     esac
 
+    if test -n "$vm_cmdline" ; then
+        vm_linux_kernel_parameter="$vm_cmdline"
+    fi
     if test -n "$BUILD_JOBS" -a "$icecream" = 0 -a -z "$BUILD_THREADS" ; then
 	qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS")
     elif test -n "$BUILD_JOBS" -a -n "$BUILD_THREADS" ; then

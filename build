@@ -382,7 +382,9 @@ Known Parameters:
 
   --vm-kernel FILE
   --vm-initrd FILE
+  --vm-cmdline STRING
               Kernel and initrd to use for VM (kvm and qemu only)
+              Cmdline to specify additional arguments
 
   --vm-user   USERNAME
               User name to run qemu/kvm process
