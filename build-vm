@@ -38,6 +38,7 @@ VM_ROOT_TYPE=
 VM_SWAP_TYPE=
 VM_KERNEL=
 VM_INITRD=
+VM_CMDLINE=
 VM_WORKER=
 VM_SERVER=
 # the qemu default size is not able to run our default kernel anymore
@@ -199,6 +200,11 @@ vm_parse_options() {
       -vm-initrd)
 	needarg
 	VM_INITRD="$ARG"
+	shift
+      ;;
+      -vm-cmdline)
+	needarg
+	VM_CMDLINE="$ARG"
 	shift
       ;;
       -vm-disk-size|-vmdisk-rootsize)
@@ -1013,6 +1019,9 @@ vm_first_stage() {
 	    cp "$BUILD_ROOT/.build.kernel.$vm_type" "$KERNEL_TEMP_DIR/kernel"
 	    if test -f "$BUILD_ROOT/.build.initrd.$vm_type" -a ! -L "$BUILD_ROOT/.build.initrd.$vm_type" ; then
 	        cp "$BUILD_ROOT/.build.initrd.$vm_type" "$KERNEL_TEMP_DIR/initrd"
+	    fi
+	    if test -f "$BUILD_ROOT/.build.cmdline.$vm_type" -a ! -L "$BUILD_ROOT/.build.cmdline.$vm_type" ; then
+	        vm_cmdline="$(cat $BUILD_ROOT/.build.cmdline.$vm_type)"
 	    fi
 	fi
 	check_exit
