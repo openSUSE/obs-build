@@ -25,6 +25,11 @@ use Build::SimpleJSON;
 
 use strict;
 
+sub unify {
+  my %h = map {$_ => 1} @_;
+  return grep(delete($h{$_}), @_);
+}
+
 sub gettargetarch {
   my ($config) = @_;
   my $arch = 'noarch';
@@ -198,6 +203,9 @@ sub parse {
   my $vars = {};
   my $vars_env = {};
 
+  my @requiredarch;
+  my @badarch;
+
   while (@lines) {
     my $line = shift @lines;
     $line =~ s/^\s+//;
@@ -224,6 +232,12 @@ sub parse {
       if ($line =~ /^#!Milestone:\s*(\S+)\s*$/) {
 	$ret->{'milestone'} = $1;
       }
+      if ($line =~ /^#!ExcludeArch:\s*(.*?)$/) {
+        push @badarch, split(' ', $1) ;
+      }
+      if ($line =~ /^#!ExclusiveArch:\s*(.*?)$/) {
+        push @requiredarch, split(' ', $1) ;
+      }
       if ($line =~ /^#!ArchExclusiveLine:\s*(.*?)$/) {
 	my $arch = gettargetarch($cf);
 	$excludedline = (grep {$_ eq $arch} split(' ', $1)) ? undef : 1;
@@ -234,6 +248,8 @@ sub parse {
       }
       next;
     }
+    $ret->{'exclarch'} = [ unify(@requiredarch) ] if @requiredarch;
+    $ret->{'badarch'} = [ unify(@badarch) ] if @badarch;
     # add continuation lines
     while (@lines && $line =~ s/\\[ \t]*$//) {
       shift @lines while @lines && $lines[0] =~ /^\s*#/;
