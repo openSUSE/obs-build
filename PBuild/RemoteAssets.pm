@@ -24,6 +24,7 @@ use POSIX;
 
 use PBuild::Util;
 use PBuild::Download;
+use PBuild::Cpio;
 
 use strict;
 
@@ -132,9 +133,9 @@ sub fedpkg_parse {
 #
 sub fedpkg_fetch {
   my ($p, $assetdir, $assets, $url) = @_;
-  die("need a parsed name to download fedpkg assets\n") unless $p->{'name'};
   my @assets = grep {$_->{'digest'}} @$assets;
   return unless @assets;
+  die("need a parsed name to download fedpkg assets\n") unless $p->{'name'};
   print "fetching ".PBuild::Util::plural(scalar(@assets), 'asset')." from $url\n";
   for my $asset (@assets) {
     my $assetid = $asset->{'assetid'};
@@ -193,15 +194,10 @@ sub fetch_git_asset {
   push @cmd, '-b', $1 if $url =~ s/#([^#]+)$//;
   push @cmd, '--', $url, "$tmpdir/$file";
   system(@cmd) && die("git clone failed: $!\n");
-  my $dd = $$;
-  my $pid = PBuild::Util::xfork();
-  if (!$pid) {
-    open(STDOUT, '>', "$adir/.$assetid.$dd") || die("$adir/.$assetid.$dd: $!");
-    chdir($tmpdir) || die("chdir $tmpdir: $!\n");
-    exec('find . | cpio -o --format=newc 2>/dev/null');
-  }
-  waitpid($pid, 0) == $pid || die("waitpid: $!\n");
-  die("find failed: $?\n") if $?;
+  my $fd;
+  open($fd, '>', "$adir/.$assetid.$$") || die("$adir/.$assetid.$$: $!");
+  PBuild::Cpio::cpio_create($fd, $tmpdir);
+  close($fd) || die("$adir/.$assetid.$$: $!");
   PBuild::Util::cleandir($tmpdir);
   rmdir($tmpdir) || die("rmdir $tmpdir: $!\n");
   rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");

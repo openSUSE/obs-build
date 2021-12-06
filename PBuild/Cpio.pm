@@ -20,7 +20,94 @@
 
 package PBuild::Cpio;
 
+use PBuild::Util;
+
 use strict;
+
+# cpiotype: 1=pipe 2=char 4=dir 6=block 8=file 10=symlink 12=socket
+sub cpio_make {
+  my ($ent, $s) = @_;
+  return ("07070100000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000b00000000TRAILER!!!\0\0\0\0") if !$ent;
+  my $name = $ent->{'name'};
+  my $mode = $ent->{'mode'} || 0x81a4;
+  if (defined($ent->{'cpiotype'})) {
+    $mode = ($mode & ~0xf000) | ($ent->{'cpiotype'} << 12);
+  } else {
+    $mode |= 0x8000 unless $mode & 0xf000;
+  }
+  my $mtime = defined($ent->{'mtime'}) ? $ent->{'mtime'} : $s->[9];
+  my $ino = defined($ent->{'inode'}) ? $ent->{'inode'} : 0;
+  $ino &= 0xffffffff if $ino > 0xffffffff;
+  my $h = sprintf("070701%08x%08x000000000000000000000001%08x", $ino, $mode, $mtime);
+  my $size = $s->[7];
+  if ($size >= 0xffffffff) {
+    # build service extension, size is in rmajor/rminor
+    my $top = int($s->[7] / 4294967296);
+    $size -= $top * 4294967296;
+    $h .= sprintf("ffffffff0000000000000000%08x%08x", $top, $size);
+  } else {
+    $h .= sprintf("%08x00000000000000000000000000000000", $size);
+  }
+  $h .= sprintf("%08x", length($name) + 1);
+  $h .= "00000000$name\0";
+  $h .= substr("\0\0\0\0", (length($h) & 3)) if length($h) & 3;
+  my $pad = $size % 4 ? substr("\0\0\0\0", $size % 4) : '';
+  return ($h, $pad);
+}
+
+sub cpio_create {
+  my ($fd, $dir, $mtime) = @_;
+  my @todo;
+  unshift @todo, sort(PBuild::Util::ls($dir));
+  my $ino = 0;
+  while (@todo) {
+    my $name = shift @todo;
+    my @s;
+    if (!ref($name)) {
+      @s = lstat("$dir/$name");
+      die("$dir/$name: $!\n") unless @s;
+    }
+    my $ent;
+    if (ref($name)) {
+      $ent = { 'cpiotype' => 4 };
+      ($name, @s) = @$name;
+    } elsif (-l _) {
+      my $lnk = readlink("$dir/$name");
+      die("readlink $dir/$name: $!\n") unless defined $lnk;
+      $s[7] = length($lnk);
+      $ent = { 'cpiotype' => 10, 'data' => $lnk };
+    } elsif (-d _) {
+      $s[7] = 0;
+      unshift @todo, [ $name, @s ];
+      unshift @todo, map {"$name/$_"} sort(PBuild::Util::ls("$dir/$name"));
+      next;
+    } elsif (-f _) {
+      $ent = { 'cpiotype' => 8 };
+    } else {
+      die("unsupported file type $s[2]: $dir/$name\n");
+    }
+    $ent->{'name'} = $name;
+    $ent->{'mtime'} = $mtime if defined $mtime;
+    $ent->{'inode'} = $ino++;
+    my ($h, $pad) = cpio_make($ent, \@s);
+    print $fd $h;
+    print $fd $ent->{'data'} if defined $ent->{'data'};
+    if ($ent->{'cpiotype'} == 8 && $s[7]) {
+      my $if;
+      open($if, '<', "$dir/$name") || die("$dir/$name: $!\n");
+      while ($s[7] > 0) {
+	my $d;
+	sysread($if, $d, $s[7] > 8192 ? 8192 : $s[7], 0);
+	die("$dir/$name: unexpected EOF\n") unless length($d);
+	print $fd $d;
+	$s[7] -= length($d);
+      }
+      close($if);
+    }
+    print $fd $pad;
+  }
+  print $fd cpio_make();
+}
 
 sub cpio_read {
   my ($fd, $l) = @_;
