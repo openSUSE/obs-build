@@ -194,9 +194,15 @@ sub fetch_git_asset {
   push @cmd, '-b', $1 if $url =~ s/#([^#]+)$//;
   push @cmd, '--', $url, "$tmpdir/$file";
   system(@cmd) && die("git clone failed: $!\n");
+  my $pfd;
+  open($pfd, '-|', 'git', '-C', "$tmpdir/$file", 'log', '--pretty=format:%ct', '-1') || die("open: $!\n");
+  my $t = <$pfd>;
+  close($pfd);
+  chomp $t;
+  $t = undef unless $t && $t > 0;
   my $fd;
   open($fd, '>', "$adir/.$assetid.$$") || die("$adir/.$assetid.$$: $!");
-  PBuild::Cpio::cpio_create($fd, $tmpdir);
+  PBuild::Cpio::cpio_create($fd, $tmpdir, $t);
   close($fd) || die("$adir/.$assetid.$$: $!");
   PBuild::Util::cleandir($tmpdir);
   rmdir($tmpdir) || die("rmdir $tmpdir: $!\n");
