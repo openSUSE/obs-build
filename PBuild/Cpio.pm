@@ -29,7 +29,7 @@ sub cpio_make {
   my ($ent, $s) = @_;
   return ("07070100000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000b00000000TRAILER!!!\0\0\0\0") if !$ent;
   my $name = $ent->{'name'};
-  my $mode = $ent->{'mode'} || 0x81a4;
+  my $mode = $ent->{'mode'} || (($ent->{'cpiotype'} || 0) == 4 ? 0x41ed : 0x81a4);
   if (defined($ent->{'cpiotype'})) {
     $mode = ($mode & ~0xf000) | ($ent->{'cpiotype'} << 12);
   } else {
@@ -86,6 +86,7 @@ sub cpio_create {
     } else {
       die("unsupported file type $s[2]: $dir/$name\n");
     }
+    $ent->{'mode'} = $s[2] & 0xfff;
     $ent->{'name'} = $name;
     $ent->{'mtime'} = $mtime if defined $mtime;
     $ent->{'inode'} = $ino++;
