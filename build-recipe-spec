@@ -31,9 +31,9 @@ recipe_setup_spec() {
     for i in BUILD RPMS/`uname -m` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS BUILDROOT OTHER ; do
 	mkdir -p $BUILD_ROOT$TOPDIR/$i
     done
-    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
     mkdir -p $BUILD_ROOT$TOPDIR/SOURCES
-    copy_sources_inside "$MYSRCDIR" $BUILD_ROOT$TOPDIR/SOURCES/
+    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+    copy_sources "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"
 }
 
 recipe_prepare_spec() {

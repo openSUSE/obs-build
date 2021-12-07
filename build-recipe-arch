@@ -30,7 +30,7 @@ recipe_setup_arch() {
     mkdir -p "$BUILD_ROOT/$TOPDIR/ARCHPKGS"
     mkdir -p "$BUILD_ROOT/$TOPDIR/BUILD"
     chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
-    copy_sources_inside "$MYSRCDIR" $BUILD_ROOT$TOPDIR/SOURCES/
+    copy_sources "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"
     {
 	echo 'source /etc/makepkg.conf'
 	printf '%s=%s\n' \

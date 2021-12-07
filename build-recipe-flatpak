@@ -36,7 +36,7 @@ recipe_setup_flatpak() {
     if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
 	mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
     else
-	copy_sources_inside "$MYSRCDIR" $BUILD_ROOT$TOPDIR/SOURCES/
+	copy_sources "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"
     fi
 }
 
