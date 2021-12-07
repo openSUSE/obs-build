@@ -202,7 +202,7 @@ sub fetch_git_asset {
   $t = undef unless $t && $t > 0;
   my $fd;
   open($fd, '>', "$adir/.$assetid.$$") || die("$adir/.$assetid.$$: $!");
-  PBuild::Cpio::cpio_create($fd, $tmpdir, $t);
+  PBuild::Cpio::cpio_create($fd, $tmpdir, 'mtime' => $t);
   close($fd) || die("$adir/.$assetid.$$: $!");
   PBuild::Util::cleandir($tmpdir);
   rmdir($tmpdir) || die("rmdir $tmpdir: $!\n");

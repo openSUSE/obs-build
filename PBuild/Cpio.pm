@@ -56,8 +56,15 @@ sub cpio_make {
 }
 
 sub cpio_create {
-  my ($fd, $dir, $mtime) = @_;
+  my ($fd, $dir, %opts) = @_;
   my @todo;
+  my $prefix = defined($opts{'prefix'}) ? $opts{'prefix'} : '';
+  if ($prefix =~ /\/$/) {
+    my @s = stat("$dir/.");
+    die("$dir: $!\n") unless @s;
+    $s[7] = 0;
+    unshift @todo, [ '', @s ];
+  }
   unshift @todo, sort(PBuild::Util::ls($dir));
   my $ino = 0;
   while (@todo) {
@@ -87,8 +94,9 @@ sub cpio_create {
       die("unsupported file type $s[2]: $dir/$name\n");
     }
     $ent->{'mode'} = $s[2] & 0xfff;
-    $ent->{'name'} = $name;
-    $ent->{'mtime'} = $mtime if defined $mtime;
+    $ent->{'name'} = "$prefix$name";
+    $ent->{'name'} =~ s/\/$// if $name eq '';
+    $ent->{'mtime'} = $opts{'mtime'} if $opts{'mtime'};
     $ent->{'inode'} = $ino++;
     my ($h, $pad) = cpio_make($ent, \@s);
     print $fd $h;
