@@ -29,17 +29,18 @@ sub cpio_make {
   my ($ent, $s) = @_;
   return ("07070100000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000b00000000TRAILER!!!\0\0\0\0") if !$ent;
   my $name = $ent->{'name'};
-  my $mode = $ent->{'mode'} || (($ent->{'cpiotype'} || 0) == 4 ? 0x41ed : 0x81a4);
-  if (defined($ent->{'cpiotype'})) {
-    $mode = ($mode & ~0xf000) | ($ent->{'cpiotype'} << 12);
-  } else {
-    $mode |= 0x8000 unless $mode & 0xf000;
-  }
-  my $mtime = defined($ent->{'mtime'}) ? $ent->{'mtime'} : $s->[9];
-  my $ino = defined($ent->{'inode'}) ? $ent->{'inode'} : 0;
-  $ino &= 0xffffffff if $ino > 0xffffffff;
+  my $mode = $ent->{'mode'};
+  my $cpiotype = $ent->{'cpiotype'};
+  my $ino = $ent->{'inode'};
+  my $mtime = $ent->{'mtime'};
+  my $size = $ent->{'size'};
+  $cpiotype = (($mode || 0) >> 12) || 8 unless defined $cpiotype;
+  $mode = $cpiotype == 4 ? 0x1ed : 0x1a4 unless defined $mode;
+  $mode = ($mode & ~0xf000) | ($cpiotype << 12);
+  $mtime = $s ? $s->[9] : time() unless defined $mtime;
+  $size = $s ? $s->[7] : 0 unless defined $size;
+  $ino = ($ino || 0) & 0xffffffff;
   my $h = sprintf("070701%08x%08x000000000000000000000001%08x", $ino, $mode, $mtime);
-  my $size = $s->[7];
   if ($size >= 0xffffffff) {
     # build service extension, size is in rmajor/rminor
     my $top = int($s->[7] / 4294967296);
@@ -53,6 +54,20 @@ sub cpio_make {
   $h .= substr("\0\0\0\0", (length($h) & 3)) if length($h) & 3;
   my $pad = $size % 4 ? substr("\0\0\0\0", $size % 4) : '';
   return ($h, $pad);
+}
+
+sub copyout {
+  my ($ofd, $file, $size) = @_;
+  my $fd;
+  open($fd, '<', $file) || die("$file: $!\n");
+  while ($size > 0) {
+    my $d;
+    sysread($fd, $d, $size > 8192 ? 8192 : $size, 0);
+    die("$file: unexpected EOF\n") unless length($d);
+    print $ofd $d or die("cpio write: $!\n");
+    $size -= length($d);
+  }
+  close($fd);
 }
 
 sub cpio_create {
@@ -76,20 +91,18 @@ sub cpio_create {
     }
     my $ent;
     if (ref($name)) {
-      $ent = { 'cpiotype' => 4 };
+      $ent = { 'cpiotype' => 4, 'size' => 0 };
       ($name, @s) = @$name;
     } elsif (-l _) {
       my $lnk = readlink("$dir/$name");
       die("readlink $dir/$name: $!\n") unless defined $lnk;
-      $s[7] = length($lnk);
-      $ent = { 'cpiotype' => 10, 'data' => $lnk };
+      $ent = { 'cpiotype' => 10, 'size' => length($lnk), 'data' => $lnk };
     } elsif (-d _) {
-      $s[7] = 0;
       unshift @todo, [ $name, @s ];
       unshift @todo, map {"$name/$_"} sort(PBuild::Util::ls("$dir/$name"));
       next;
     } elsif (-f _) {
-      $ent = { 'cpiotype' => 8 };
+      $ent = { 'cpiotype' => 8, 'size' => $s[7] };
     } else {
       die("unsupported file type $s[2]: $dir/$name\n");
     }
@@ -101,21 +114,10 @@ sub cpio_create {
     my ($h, $pad) = cpio_make($ent, \@s);
     print $fd $h;
     print $fd $ent->{'data'} if defined $ent->{'data'};
-    if ($ent->{'cpiotype'} == 8 && $s[7]) {
-      my $if;
-      open($if, '<', "$dir/$name") || die("$dir/$name: $!\n");
-      while ($s[7] > 0) {
-	my $d;
-	sysread($if, $d, $s[7] > 8192 ? 8192 : $s[7], 0);
-	die("$dir/$name: unexpected EOF\n") unless length($d);
-	print $fd $d;
-	$s[7] -= length($d);
-      }
-      close($if);
-    }
-    print $fd $pad;
+    copyout($fd, "$dir/$name", $ent->{'size'}) if $ent->{'cpiotype'} == 8 && $ent->{'size'};
+    print $fd $pad or die("cpio write: $!\n");
   }
-  print $fd cpio_make();
+  print $fd cpio_make() or die("cpio write: $!\n");
 }
 
 sub cpio_read {
