@@ -1,0 +1,110 @@
+#!/usr/bin/perl
+################################################################
+#
+# Copyright (c) 2021 SUSE LLC
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+BEGIN {
+  if (!$::ENV{'BUILD_DIR'} && $0 ne '-' && $0 ne '-e' && -e $0 && ! -e '/etc/build.conf') {
+    use Cwd ();
+    my $p = Cwd::abs_path($0);
+    $::ENV{'BUILD_DIR'} = $p if $p =~ s/\/[^\/]+$// && $p ne '/usr/lib/build' && -d "$p/PBuild";
+  }
+  unshift @INC, ($::ENV{'BUILD_DIR'} && ! -e '/etc/build.conf' ? $::ENV{'BUILD_DIR'} : '/usr/lib/build');
+}
+
+use strict;
+
+use POSIX;
+
+use Build;
+
+use PBuild::AssetMgr;
+use PBuild::Source;
+use PBuild::Options;
+use PBuild::Cpio;
+
+# FIXME: all code should become arch agnostic
+my $arch = 'noarch';
+my $fedpkg = 'fedpkg@https://pkgs.fedoraproject.org/repo/pkgs';
+
+my %known_options = (
+  'help' => '',
+  'assetdir' => ':',
+  'assets' => '::',
+  'create-cpio' => '',
+);
+
+my ($opts, @dirs) = PBuild::Options::parse_options(\%known_options, @ARGV);
+
+if ($opts->{'create-cpio'}) {
+  if ($opts->{'help'}) {
+    print "Usage: download_assets --create-cpio dir\n";
+    exit(0);
+  }
+  die("Please specify one directory\n") unless @dirs == 1;
+  my $prefix = $dirs[0];
+  $prefix =~ s/.*\///;
+  $prefix = '' if $prefix eq '.';
+  PBuild::Cpio::cpio_create(\*STDOUT, $dirs[0], 'prefix' => ($prefix ne '' ? "$prefix/" : ''));
+  exit(0);
+}
+
+if ($opts->{'help'}) {
+  print "Usage: download_assets [--assetdir dir] dir...\n";
+  exit(0);
+}
+die("Please specify at least one directory\n") unless @dirs;
+
+my $bconf = Build::read_config($arch);
+for my $dir (@dirs) {
+  my ($files, $asset_files) = PBuild::Source::list_package($dir);
+  my @assets;
+  my $assetdir = $opts->{'assetdir'} || "$dir/.assets";
+  my $p = {
+    'pkg' => "_me",
+    'dir' => $dir,
+    'files' => $files,
+    'srcmd5' => PBuild::Source::calc_srcmd5($files),
+  };
+  $p->{'asset_files'} = $asset_files if %{$asset_files || {}};
+ 
+  my $assetmgr = PBuild::AssetMgr::create($assetdir);
+  $assetmgr->add_assetshandler($_) for @{$opts->{'assets'} || []};
+  $assetmgr->add_assetshandler($fedpkg) if !$opts->{'assets'} && $files->{'sources'};
+
+  for my $file (sort keys %$files) {
+    if ($file eq 'sources') {
+      $p->{'buildtype'} = '';
+      $assetmgr->find_assets($p, $arch);
+      next;
+    }
+    next unless $file eq 'PKGBUILD' || $file =~ /\.(?:spec|dsc|kiwi)/;
+    my $bt = Build::recipe2buildtype($file);
+    next unless $bt;
+    $p->{'buildtype'} = $bt;
+    my $d;
+    eval { $d = Build::parse_typed($bconf, "$dir/$file", $bt) };
+    $p->{'remoteassets'} = $d->{'remoteassets'} if $d && $d->{'remoteassets'};
+    $p->{'name'} ||= $d->{'name'} if $d->{'name'};
+    $assetmgr->find_assets($p, $arch);
+  }
+  $assetmgr->getremoteassets($p);
+  $assetmgr->copy_assets($p, $dir);
+}
+

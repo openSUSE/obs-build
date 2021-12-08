@@ -86,6 +86,7 @@ install:
 	    call-podman \
 	    queryobs \
 	    writemodulemd \
+	    download_assets \
 	    $(DESTDIR)$(pkglibdir)
 	install -m644 \
 	    qemu-reg \
