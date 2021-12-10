@@ -172,6 +172,9 @@ The resulting download file can be copied into the image using
 
   <!-- OBS-CopyToImage: <source> <destination> -->
 
+==== Dockerfile description
+
+Has no support for assets yet.
 
 ==== Arch Linux PKGBUILD
 
