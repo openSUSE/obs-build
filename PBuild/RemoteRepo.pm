@@ -101,7 +101,7 @@ sub fetchrepo_debian {
       download("$disturl$component/binary-$basearch/Packages.gz", "$tmpdir/Packages.gz");
       die("Packages.gz missing for basearch $basearch, component $component\n") unless -s "$tmpdir/Packages.gz";
     }
-    Build::Debrepo::parse("$tmpdir/Packages.gz", sub { addpkg(\@bins, $_[0], $url) }, 'addselfprovides' => 1, 'withchecksum' => 1, 'normalizedeps' => 1);
+    Build::Debrepo::parse("$tmpdir/Packages.gz", sub { addpkg(\@bins, $_[0], $baseurl) }, 'addselfprovides' => 1, 'withchecksum' => 1, 'normalizedeps' => 1);
   }
   return \@bins;
 }
