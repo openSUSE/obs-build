@@ -32,7 +32,7 @@ recipe_setup_docker() {
         mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
     else
         if test -z "$LINKSOURCES" ; then 
-	    copy_sources "$MYSRCDIR" "BUILD_ROOT$TOPDIR/SOURCES/"
+	    copy_sources "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"
         else
             cp -lR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
         fi
