@@ -156,7 +156,9 @@ vm_verify_options_kvm() {
 	    kvm_serial_device=virtio-serial-ccw
 	    kvm_rng_device=virtio-rng-ccw
 	    ;;
-        x86_64)
+	x86_64)
+	    test ! -x $kvm_bin -a -x /usr/bin/qemu-system-x86_64 && kvm_bin=/usr/bin/qemu-system-x86_64
+
             # build minimal machine - TODO enable sandbox on all architectures
             # options to evaluate: mem-merge=off
             kvm_options="-M pc,accel=kvm,usb=off,dump-guest-core=off,vmport=off -sandbox on"
