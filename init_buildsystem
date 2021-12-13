@@ -435,7 +435,9 @@ create_cache_file() {
 	test -z "$SRC" && SRC=`pwd`
 	if test "${SRC#http://}" != "$SRC" -o "${SRC#https://}" != "$SRC" -o "${SRC#ftp://}" != "$SRC" -o "${SRC#ftps://}" != "$SRC" ; then
 	    # remote repo, cache binary packages
-	    mkdir -p "$(getcachedir "$SRC")"
+	    local cachedir="$(getcachedir "$SRC")"
+	    test -z "$cachedir" && cleanup_and_exit 1 "could not determine cachedir for $SRC"
+	    mkdir -p "$cachedir"
 	    if test "$SRCREPOTYPE" = arch ; then
 		set -- $BUILD_DIR/createarchdeps --cachedir="$CACHE_DIR" "$SRC"
 	    elif test "$SRCREPOTYPE" = debian ; then
@@ -487,6 +489,7 @@ downloadpkg() {
 
     local cachedir="$(getcachedir "$url")"
     local name="$(basename "$url")"
+    test -z "$cachedir" && cleanup_and_exit 1 "could not determine cachedir for $url"
     name=${name/%.pkg.tar.zst/.arch}
     name=${name/%.pkg.tar.?z/.arch}
     SRC="$cachedir/$name"
@@ -524,11 +527,21 @@ getobslocation() {
     echo "$url"
 }
 
+getdebianbaseurl() {
+    local url=$1
+    case $url in
+	*[?]*) url="${url%%[?]*]}" ; echo "${url%/}/" ;;
+	*/./*|*/. ) echo "${url%/.*}/" ;;
+	*) url="${url%/*}"; echo "${url%/*}/" ;;
+    esac
+}
+
 getcachedir() {
     local url=$1
     local repoid dummy
     for repo in "${repos[@]}" ; do
 	case $repo in
+	    debian@http*) repo=$(getdebianbaseurl "${repo#*@}") ;;
 	    arch@* | debian@* | hdlist2@* | rpmmd@* | rpm-md@* | suse@*) repo=${repo#*@} ;;
 	esac
 	test "${repo#obs:/}" != "$repo" && repo=$(getobslocation "$repo")
@@ -537,8 +550,7 @@ getcachedir() {
 	    break
 	fi
     done
-    test -z "$repoid" && cleanup_and_exit 1 "could not determine cachedir for $url"
-    echo "$CACHE_DIR/$repoid"
+    test -n "$repoid" && echo "$CACHE_DIR/$repoid"
 }
 
 set_build_arch
