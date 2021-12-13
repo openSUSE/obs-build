@@ -167,8 +167,8 @@ vm_verify_options_kvm() {
     esac
 
     # check if we can run kvm
-    if ! test -r /dev/kvm -a -x "$kvm_bin" ; then
-	cleanup_and_exit 4 "host does not support kvm: either the kvm kernel-module is not loaded or hardware virtualization is deactivated in the BIOS."
+    if ! test -r /dev/kvm ; then
+	cleanup_and_exit 4 "kvm device not accessible: either the kvm kernel-module is not loaded or hardware virtualization is deactivated in the BIOS."
     fi
     if ! test -x "$kvm_bin" ; then
 	cleanup_and_exit 4 "$kvm_bin is not installed"
