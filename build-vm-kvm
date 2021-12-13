@@ -156,6 +156,14 @@ vm_verify_options_kvm() {
 	    kvm_serial_device=virtio-serial-ccw
 	    kvm_rng_device=virtio-rng-ccw
 	    ;;
+        x86_64)
+            # build minimal machine - TODO enable sandbox on all architectures
+            # options to evaluate: mem-merge=off
+            kvm_options="-M pc,accel=kvm,usb=off,dump-guest-core=off,vmport=off -sandbox on"
+
+            # from qemu-microvm, minified and hardened PC bios (slightly faster than seabios)
+            test -e /usr/share/qemu/qboot.rom && kvm_options="$kvm_options -bios /usr/share/qemu/qboot.rom"
+            ;;
     esac
 
     # check if we can run kvm
@@ -269,7 +277,7 @@ kvm_add_console_args() {
       mkfifo "${VM_ROOT}.qemu/monitor"
       test -n "$VM_USER" && chown "$VM_USER" "${VM_ROOT}.qemu"
     fi
-    qemu_args=("${qemu_args[@]}" -chardev socket,id=monitor,server,nowait,path="${VM_ROOT}.qemu/monitor" -mon chardev=monitor,mode=readline)
+    qemu_args=("${qemu_args[@]}" -chardev socket,id=monitor,server=on,wait=off,path="${VM_ROOT}.qemu/monitor" -mon chardev=monitor,mode=readline)
 }
 
 vm_startup_kvm() {
