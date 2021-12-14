@@ -65,23 +65,18 @@ sub obsarch {
 
 sub parse {
   my ($bconf, $fn) = @_;
-  my $ret;
-  my @control;
 
-  # get arch and os from macros
+  # get arch and os from macros and map to debian names
   my ($arch, $os) = Build::gettargetarchos($bconf);
-  # map to debian names
   $os = 'linux' unless defined $os;
   $arch = basearch($arch);
 
+  my @control;
   if (ref($fn) eq 'ARRAY') {
     @control = @$fn;
   } else {
     local *F;
-    if (!open(F, '<', $fn)) {
-      $ret->{'error'} = "$fn: $!";
-      return $ret;
-    }
+    return { 'error' => "$fn: $!" } unless open(F, '<', $fn);
     @control = <F>;
     close F;
     chomp @control;
@@ -175,6 +170,7 @@ sub parse {
       }
     }
   }
+  my $ret = {};
   $ret->{'name'} = $name;
   $ret->{'version'} = $version;
   $ret->{'deps'} = \@deps;
@@ -335,11 +331,6 @@ sub query {
   my %res = debq($handle);
   return undef unless %res;
   my $name = $res{'PACKAGE'};
-  my $src = $name;
-  if ($res{'SOURCE'}) {
-    $src = $res{'SOURCE'};
-    $src =~ s/\s.*$//;
-  }
   my @provides = split(',\s*', $res{'PROVIDES'} || '');
   if ($opts{'addselfprovides'}) {
     push @provides, "$name (= $res{'VERSION'})";
@@ -352,6 +343,13 @@ sub query {
     provides => \@provides,
     requires => \@depends,
   };
+  my $src = $name;
+  if ($res{'SOURCE'}) {
+    $src = $res{'SOURCE'};
+    $data->{'sourcedep'} = $src;
+    $src =~ s/\s.*$//;
+  }
+  $data->{'source'} = $src if $src ne '';
   if ($opts{'conflicts'}) {
     my @conflicts = split(',\s*', $res{'CONFLICTS'} || '');
     push @conflicts, split(',\s*', $res{'BREAKS'} || '');
@@ -362,7 +360,6 @@ sub query {
       $data->{lc($dep)} = [ split(',\s*', $res{$dep} || '') ] if defined $res{$dep};
     }
   }
-  $data->{'source'} = $src if $src ne '';
   if ($opts{'evra'}) {
     $res{'VERSION'} =~ /^(?:(\d+):)?(.*?)(?:-([^-]*))?$/s;
     $data->{'epoch'} = $1 if defined $1;

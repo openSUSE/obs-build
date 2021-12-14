@@ -54,6 +54,8 @@ sub addpkg {
       $data->{'checksum'} = "$_:$c" if $c;
     }
   }
+  $data->{'sourcedep'} = $data->{'source'} if $data->{'source'};
+  $data->{'source'} =~ s/\s.*// if $data->{'source'};
   if (ref($res) eq 'CODE') {
     $res->($data);
   } else {
