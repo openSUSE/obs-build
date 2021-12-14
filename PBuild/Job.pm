@@ -120,7 +120,7 @@ sub collect_result {
   my @d;
   push @d, map {"RPMS/$_"} sort(PBuild::Util::ls("$buildroot/.build.packages/RPMS"));
   push @d, 'SRPMS';
-  @d = ('DEBS') if $p->{'recipe'} =~ /(?:\.dsc|build\.collax)$/;
+  @d = ('DEBS') if $p->{'recipe'} =~ /(?:\.dsc|build\.collax)$/ || $p->{'recipe'} eq 'debian/control' || $p->{'recipe'} eq 'debian.control';
   if (-d "$buildroot/.build.packages/SDEBS") {
     @d = map {"DEBS/$_"} sort(ls("$buildroot/.build.packages/DEBS"));   # assume debbuild
     push @d, 'SDEBS';
@@ -245,12 +245,17 @@ sub createjob {
   }
 
   my $srcdir = $p->{'dir'};
+  my $copy_sources_asis;
   # for kiwi/docker we need to copy the sources to $buildroot/.build-srcdir
   # so that we can set up the "repos" and "containers" directories
-  if ($kiwimode || $p->{'asset_files'}) {
+  if ($kiwimode || $p->{'asset_files'} || $p->{'recipe'} eq 'debian/control') {
     $srcdir = "$buildroot/.build-srcdir";
     copy_sources($p, $srcdir);
     $ctx->{'assetmgr'}->copy_assets($p, $srcdir) if $p->{'asset_files'};
+    if ($p->{'recipe'} eq 'debian/control') {
+      $copy_sources_asis = 1;
+      system("$opts->{'libbuild'}/export_debian_orig_from_git", $p->{'dir'}, $srcdir) && die("export_orig_from_git $p->{'dir'} $srcdir: $?\n");
+    }
   }
 
   my $oldresultdir = "$ctx->{'builddir'}/$p->{'pkg'}";
@@ -319,6 +324,7 @@ sub createjob {
   push @args, '--threads', $opts->{'threads'} if $opts->{'threads'};
   push @args, "--buildflavor=$p->{'flavor'}" if $p->{'flavor'};
   push @args, "--obspackage=".($p->{'originpackage'} || $p->{'pkg'}) if $needobspackage;
+  push @args, "--copy-sources-asis" if $copy_sources_asis;
   push @args, "$srcdir/$p->{'recipe'}";
 
   if ($kiwimode) {

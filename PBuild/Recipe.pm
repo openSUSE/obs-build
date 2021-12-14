@@ -55,6 +55,8 @@ sub find_recipe {
     @files = sort @files;
     return $files{$files[0]};
   }
+  return $files{'debian.control'} if $type eq 'dsc' && $files{'debian.control'};
+  return $files{'debian/control'} if $type eq 'dsc' && $files{'debian/control'};
   if ($type ne 'kiwi') {
     @files = grep {/\.kiwi$/} keys %files;
     @files = grep {/^\Q$pkg\E/i} @files if @files > 1;
