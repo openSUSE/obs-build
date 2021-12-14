@@ -27,12 +27,13 @@ where it defines the target architecture a from a cross build compiler.
 ===== The compatible terms can be found in the following table:
 
 [width="15%"]
-|================================
-|build | host  | target  |  -/-
-|cmake | HOST  | default |  -/-
-|GNU   | build | host    | target
-|rpm   | build | target  |  -/-
-|================================
+|=================================
+|build || host  | target  |  -/-
+|------||-------|---------|-------
+|cmake || HOST  | default |  -/-
+|GNU   || build | host    | target
+|rpm   || build | target  |  -/-
+|=================================
 
 ==== Example Calls in spec files for cross build
 
