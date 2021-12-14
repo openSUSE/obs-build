@@ -201,6 +201,11 @@ sub fetch_git_asset {
   chomp $t;
   $t = undef unless $t && $t > 0;
   my $fd;
+  if ($asset->{'donotpack'}) {
+    rename("$tmpdir/$file", "$adir/$assetid") || die("rename $tmpdir $adir/$assetid: $!\n");
+    rmdir($tmpdir) || die("rmdir $tmpdir: $!\n");
+    return;
+  }
   open($fd, '>', "$adir/.$assetid.$$") || die("$adir/.$assetid.$$: $!");
   PBuild::Cpio::cpio_create($fd, $tmpdir, 'mtime' => $t);
   close($fd) || die("$adir/.$assetid.$$: $!");
