@@ -105,6 +105,17 @@ sub cleandir {
   return $ret;
 }
 
+sub rm_rf {
+  my ($file) = @_;
+  my @s = lstat($file);
+  if (@s && -d _) {
+    cleandir($file);
+    die("rmdir $file: $!\n") unless rmdir($file);
+  } elsif (@s) {
+    unlink($file) || die("unlink $file: $!\n");
+  }
+}
+
 sub xfork {
   while (1) {
     my $pid = fork();
@@ -125,6 +136,15 @@ sub cp {
   }
   close($f);
   close($t) || die("$to: $!\n");
+  if (defined($tof)) {
+    rename($to, $tof) || die("rename $to $tof: $!\n");
+  }
+}
+
+sub cp_a {
+  my ($from, $to, $tof) = @_;
+  rm_rf($to);
+  system('cp', '-a', '--', $from, $to) && die("cp $from $to: $?\n");
   if (defined($tof)) {
     rename($to, $tof) || die("rename $to $tof: $!\n");
   }
