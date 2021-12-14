@@ -27,6 +27,7 @@ use Digest::MD5 ();
 use PBuild::Util;
 use PBuild::Source;
 use PBuild::RemoteAssets;
+use PBuild::Cpio;
 
 #
 # Create the asset manager
@@ -90,9 +91,10 @@ sub calc_mutable_id {
 #
 sub update_srcmd5 {
   my ($assetmgr, $p) = @_;
+  my $old_srcmd5 = $p->{'srcmd5'};
+  return 0 unless $old_srcmd5;
   my $asset_files = $p->{'asset_files'};
   return 0 unless $asset_files;
-  my $old_srcmd5 = $p->{'srcmd5'};
   my %files = %{$p->{'files'}};
   for my $file (sort keys %$asset_files) {
     my $asset = $asset_files->{$file};
@@ -195,21 +197,63 @@ sub getremoteassets {
   update_srcmd5($assetmgr, $p) if has_mutable_assets($assetmgr, $p);
 }
 
+sub unpack_obscpio_asset {
+  my ($assetmgr, $obscpio, $srcdir, $file) = @_;
+  PBuild::Cpio::cpio_extract($obscpio, sub {
+    my $name = $_[0]->{'name'};
+    !$_[1] && ($name eq $file || $name =~ /^\Q$file\E\//) ? "$srcdir/$name" : undef
+  }, 'postpone_symlinks' => 1, 'set_mode' => 1, 'set_mtime' => 1);
+}
+
 #
 # Copy the assets from our cache to the build root
 #
 sub copy_assets {
-  my ($assetmgr, $p, $srcdir) = @_;
+  my ($assetmgr, $p, $srcdir, $unpack) = @_;
   my $assetdir = $assetmgr->{'asset_dir'};
   my $asset_files = $p->{'asset_files'};
   for my $file (sort keys %{$asset_files || {}}) {
     my $asset = $asset_files->{$file};
     my $assetid = $asset->{'assetid'};
     my $adir = "$assetdir/".substr($assetid, 0, 2);
+    die("asset $assetid is gone\n") unless -e "$adir/$assetid";
+    if ($asset->{'isdir'} && $unpack) {
+      unpack_obscpio_asset($assetmgr, "$adir/$assetid", $srcdir, $file);
+      next;
+    }
     PBuild::Util::cp("$adir/$assetid", $asset->{'isdir'} ? "$srcdir/$file.obscpio" : "$srcdir/$file");
   }
   if (has_mutable_assets($assetmgr, $p) && update_srcmd5($assetmgr, $p)) {
     copy_assets($assetmgr, $p, $srcdir);	# had a race, copy again
+  }
+}
+
+#
+# Move the assets from our cache to the build root, destroying the cache
+#
+sub move_assets {
+  my ($assetmgr, $p, $srcdir, $unpack) = @_;
+  my $assetdir = $assetmgr->{'asset_dir'};
+  my $asset_files = $p->{'asset_files'};
+  for my $file (sort keys %{$asset_files || {}}) {
+    my $asset = $asset_files->{$file};
+    my $assetid = $asset->{'assetid'};
+    my $adir = "$assetdir/".substr($assetid, 0, 2);
+    die("asset $assetid is gone\n") unless -e "$adir/$assetid";
+    if ($asset->{'isdir'}) {
+      if ($unpack && ! -d "$adir/$assetid") {
+	unpack_obscpio_asset($assetmgr, "$adir/$assetid", $srcdir, $file);
+	next;
+      }
+      if (!$unpack && -d "$adir/$assetid") {
+	die("packing of assets is not supported\n");
+      }
+      $file .= ".obscpio" if !$unpack;
+    }
+    rename("$adir/$assetid", "$srcdir/$file") || die("rename $adir/$assetid $srcdir/$file: $!\n");
+  }
+  if (has_mutable_assets($assetmgr, $p) && update_srcmd5($assetmgr, $p)) {
+    die("had a race in move_assets\n");
   }
 }
 
