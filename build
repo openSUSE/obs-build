@@ -119,6 +119,7 @@ NO_TIMESTAMPS=
 CACHE_DIR=/var/cache/build
 BUILD_DIST_TMP=
 BUILD_SUCCEEDED=
+COPY_SOURCES_ASIS=
 
 RECIPE_BUILD_START_TIME=
 CCACHE_SETUP_START_TIME=
@@ -828,7 +829,9 @@ copy_sources() {
     if test -n "$RUNNING_IN_VM" -o "$BUILDTYPE" = kiwi -o "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman ; then
         include_directories=true
     fi
-    if test -n "$include_directories" ; then
+    if test -n "$RUNNING_IN_VM" -o -n "$COPY_SOURCES_ASIS" ; then
+	cp -a "$1"/. "$2"
+    elif test -n "$include_directories" ; then
         cp -pRL "$1"/* "$2"
     elif test -e "$1/.git" ; then
 	# check which directory belongs to the git repository and only copy those
@@ -1283,6 +1286,9 @@ while test -n "$1"; do
 	needarg
 	OBSURL=$ARG
 	shift
+      ;;
+      -copy-sources-asis)
+	COPY_SOURCES_ASIS=true
       ;;
       ---noarg)
 	cleanup_and_exit 1 "$ARG does not take an argument"
