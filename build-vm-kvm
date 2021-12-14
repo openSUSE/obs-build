@@ -32,7 +32,7 @@ kvm_drive_opts="cache=unsafe"
 kvm_serial_device=
 kvm_rng_device=virtio-rng-pci
 kvm_options=
-kvm_clock="no-kvmclock"
+kvm_qemu_append="no-kvmclock"
 kvm_cpu="-cpu host"
 
 kvm_check_ppc970() {
@@ -223,7 +223,7 @@ vm_verify_options_kvm() {
 	virtio*)
 	    VM_ROOTDEV=/dev/disk/by-id/virtio-0
 	    VM_SWAPDEV=/dev/disk/by-id/virtio-1
-	    kvm_clock="kvmclock"
+	    kvm_qemu_append="kvmclock"
 	    ;;
 	*)
 	    VM_ROOTDEV=/dev/sda
@@ -317,9 +317,6 @@ vm_startup_kvm() {
             ;;
     esac
 
-    if test -n "$vm_cmdline" ; then
-        vm_linux_kernel_parameter="$vm_cmdline"
-    fi
     if test -n "$BUILD_JOBS" -a "$icecream" = 0 -a -z "$BUILD_THREADS" ; then
 	qemu_args=("${qemu_args[@]}" "-smp" "$BUILD_JOBS")
     elif test -n "$BUILD_JOBS" -a -n "$BUILD_THREADS" ; then
@@ -335,10 +332,14 @@ vm_startup_kvm() {
     if test -n "$VMDISK_MOUNT_OPTIONS" ; then
         qemu_append="$qemu_append rootflags=${VMDISK_MOUNT_OPTIONS#-o }"
     fi
-    qemu_append="$qemu_append $vm_linux_kernel_parameter"
-    qemu_append="$qemu_append panic=1 quiet $kvm_clock elevator=noop"
-    qemu_append="$qemu_append nmi_watchdog=0 rw rd.driver.pre=binfmt_misc"
-    qemu_append="$qemu_append console=$kvm_console init=$vm_init_script"
+    if test -n "$vm_cmdline" ; then
+        qemu_append="$qemu_append $vm_cmdline"
+    else
+        # Pick sensible defaults
+        qemu_append="$qemu_append quiet $kvm_qemu_append elevator=noop"
+        qemu_append="$qemu_append nmi_watchdog=0 rw rd.driver.pre=binfmt_misc"
+    fi
+    qemu_append="$qemu_append panic=1 console=$kvm_console init=$vm_init_script"
     if test -z "$VM_NETOPT" -a -z "$VM_NETDEVOPT"; then
         kvm_options="$kvm_options -net none"
     fi
@@ -382,7 +383,7 @@ vm_fixup_kvm() {
 	    kvm_device=virtio-blk-pci
 	    VM_ROOTDEV=/dev/disk/by-id/virtio-0
 	    VM_SWAPDEV=/dev/disk/by-id/virtio-1
-	    kvm_clock="kvmclock"
+	    kvm_qemu_append="kvmclock"
 	fi
     fi
     if test "$VM_TYPE" = kvm -a -z "$kvm_serial_device" ; then
