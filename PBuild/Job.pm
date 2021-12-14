@@ -162,9 +162,15 @@ sub copy_sources {
   my ($p, $srcdir) = @_;
   # for kiwi/docker we need to copy the sources to $buildroot/.build-srcdir
   # so that we can set up the "repos" and "containers" directories
+  PBuild::Util::rm_rf($srcdir);
   PBuild::Util::mkdir_p($srcdir);
-  PBuild::Util::cleandir($srcdir);
-  PBuild::Util::cp("$p->{'dir'}/$_", "$srcdir/$_") for sort keys %{$p->{'files'}};
+  for (sort keys %{$p->{'files'}}) {
+    if (/(.*)\/$/) {
+      PBuild::Util::cp_a("$p->{'dir'}/$1", "$srcdir/$1");
+    } else {
+      PBuild::Util::cp("$p->{'dir'}/$_", "$srcdir/$_");
+    }
+  }
 }
 
 #
