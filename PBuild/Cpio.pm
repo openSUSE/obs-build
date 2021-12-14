@@ -70,11 +70,33 @@ sub copyout {
   close($fd);
 }
 
+sub copyin {
+  my ($ifd, $file, $size) = @_;
+  my $fd;
+  open($fd, '>', $file) || die("$file: $!\n");
+  while ($size > 0) {
+    my $chunk = cpio_read($ifd, $size > 65536 ? 65536 : $size);
+    print $fd $chunk or die("$file write: $!\n");
+    $size -= length($chunk);
+  }
+  close($fd) || die("$file: $!\n");
+}
+
+sub skipin {
+  my ($ifd, $size) = @_;
+  while ($size > 0) {
+    my $chunk = cpio_read($ifd, $size > 65536 ? 65536 : $size);
+    $size -= length($chunk);
+  }
+}
+
 sub cpio_create {
   my ($fd, $dir, %opts) = @_;
   my @todo;
   my $prefix = defined($opts{'prefix'}) ? $opts{'prefix'} : '';
-  if ($prefix =~ /\/$/) {
+  my $prefixdir;
+  if ($prefix =~ /(.+)\/$/) {
+    $prefixdir = $1;
     my @s = stat("$dir/.");
     die("$dir: $!\n") unless @s;
     $s[7] = 0;
@@ -107,8 +129,7 @@ sub cpio_create {
       die("unsupported file type $s[2]: $dir/$name\n");
     }
     $ent->{'mode'} = $s[2] & 0xfff;
-    $ent->{'name'} = "$prefix$name";
-    $ent->{'name'} =~ s/\/$// if $name eq '';
+    $ent->{'name'} = $name eq '' ? $prefixdir : "$prefix$name";
     $ent->{'mtime'} = $opts{'mtime'} if $opts{'mtime'};
     $ent->{'inode'} = $ino++;
     my ($h, $pad) = cpio_make($ent, \@s);
@@ -148,46 +169,70 @@ sub cpio_parse {
   return ($ent, $namesize, $namepad, $size, $pad);
 }
 
+sub set_mode_mtime {
+  my ($ent, $outfile, $opts) = @_;
+  if ($opts->{'set_mode'}) {
+    chmod($ent->{'mode'} & 07777, $outfile);
+  }
+  if ($opts->{'set_mtime'}) {
+    utime($ent->{'mtime'}, $ent->{'mtime'}, $outfile);
+  }
+}
+
 sub cpio_extract {
-  my ($cpiofile, $extract, $outfile) = @_;
+  my ($cpiofile, $out, %opts) = @_;
   my $fd;
+  my $extract = $opts{'extract'};
   open($fd, '<', $cpiofile) || die("$cpiofile: $!\n");
+  my %symlinks;
   while (1) {
     my $cpiohead = cpio_read($fd, 110);
     my ($ent, $namesize, $namepad, $size, $pad) = cpio_parse($cpiohead);
     my $name = substr(cpio_read($fd, $namesize + $namepad), 0, $namesize);
     $name =~ s/\0.*//s;
     if (!$size && $name eq 'TRAILER!!!') {
-      die("$cpiofile: no '$extract' entry\n") if defined($extract);
+      die("$cpiofile: no $extract entry\n") if defined $extract;
       last;
     }
     $name =~ s/^\.\///s;
-    my $real_outfile;
-    if (!defined($extract) || $name eq $extract) {
-      $real_outfile = $outfile;
-      $real_outfile = $outfile->($name, undef) if ref($outfile) eq 'CODE';
-    }
-    if (!defined($real_outfile)) {
-      $size += $pad;
-      while ($size > 0) {
-        my $chunk = cpio_read($fd, $size > 65536 ? 65536 : $size);
-        $size -= length($chunk);
-      }
+    $ent->{'name'} = $name;
+    my $outfile = "$out/$name";
+    $outfile = $ent->{'cpiotype'} == 8 && $name eq $extract ? $out : undef if defined $extract;
+    $outfile = $out->($ent, undef) if defined($outfile) && ref($out) eq 'CODE';
+    if (!defined($outfile)) {
+      skipin($fd, $size + $pad);
       next;
     }
-    my $outfd;
-    open ($outfd, '>', $real_outfile) || die("$real_outfile: $!\n");
-    while ($size > 0) {
-      my $chunk = cpio_read($fd, $size > 65536 ? 65536 : $size);
-      print $outfd $chunk or die("$outfile:$!\n");
-      $size -= length($chunk);
+    PBuild::Util::mkdir_p($1) if $name =~ /\// && $outfile =~ /(.*)\//;
+    if ($ent->{'cpiotype'} == 4) {
+      if (-l $outfile || ! -d _) {
+        mkdir($outfile, 0755) || die("mkdir $outfile: $!\n");
+      }
+    } elsif ($ent->{'cpiotype'} == 10) {
+      die("illegal symlink size\n") if $size > 65535;
+      my $lnk = cpio_read($fd, $size);
+      unlink($outfile);
+      if ($opts{'postpone_symlinks'}) {
+	$symlinks{$outfile} = $lnk;
+      } else {
+        symlink($lnk, $outfile) || die("symlink $lnk $outfile: $!\n");
+      }
+    } elsif ($ent->{'cpiotype'} == 8) {
+      unlink($outfile);
+      copyin($fd, $outfile, $size);
+    } else {
+      die("unsupported cpio type $ent->{'cpiotype'}\n");
     }
-    close($outfd) || die("$real_outfile: $!\n");
-    if (ref($outfile) eq 'CODE') {
-      last if $outfile->($name, $real_outfile);
+    set_mode_mtime($ent, $outfile, \%opts) if $ent->{'cpiotype'} != 10;
+    if (ref($out) eq 'CODE') {
+      last if $out->($ent, $outfile);
     }
-    last if defined($extract);		# found the file we wanted
+    last if defined $extract;
     cpio_read($fd, $pad) if $pad;
+  }
+  for my $outfile (sort {$b cmp $a} keys %symlinks) {
+    unlink($outfile);
+    symlink($symlinks{$outfile}, $outfile) || die("symlink $symlinks{$outfile} $outfile: $!\n");
   }
   close($fd);
 }
