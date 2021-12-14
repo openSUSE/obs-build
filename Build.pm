@@ -1228,6 +1228,8 @@ sub recipe2buildtype {
   return 'simpleimage' if $recipe eq 'simpleimage';
   return 'helm' if $recipe eq 'Chart.yaml';
   return 'flatpak' if $recipe =~ m/flatpak\.(?:ya?ml|json)$/;
+  return 'dsc' if $recipe eq 'debian.control';
+  return 'dsc' if $recipe eq 'control' && $_[0] =~ /(?:^|\/)debian\/[^\/]+$/s;
   return undef;
 }
 

@@ -52,6 +52,33 @@ recipe_prepare_dsc() {
     DEB_RELEASE=`sed 's/%.*$//' <<< $RELEASE`
     OBS_DCH_RELEASE=""
 
+
+    if test "$RECIPEFILE" = debian/control ; then
+	DEB_TRANSFORM=
+	local src=$(chroot $BUILD_ROOT su -c "cd $DEB_SOURCEDIR && dpkg-parsechangelog -S Source" - $BUILD_USER)
+	local ver=$(chroot $BUILD_ROOT su -c "cd $DEB_SOURCEDIR && dpkg-parsechangelog -S Version" - $BUILD_USER)
+	test -z "$src" -o -z "$ver" && cleanup_and_exit 1
+	ver="${ver%-*}"
+	local origtar="${src}_$ver.orig.tar"
+	if test -f "$BUILD_ROOT$DEB_SOURCEDIR/$origtar"; then
+	    local pris
+	    for pris in "$origtar" "$origtar.gz" "$origtar.xz" "$origtar.bz2" "" ; do
+		test -n "$pris" -a -f "$BUILD_ROOT$DEB_SOURCEDIR/$pris.delta" && break
+	    done
+	    if test -n "$pris" ; then
+		echo "recreating upstream tarball with pristine-tar"
+		mkdir "$BUILD_ROOT$TOPDIR/pristine_tar_tmp"
+		chroot $BUILD_ROOT bash -c "cd $TOPDIR/pristine_tar_tmp && tar xf - && cd * && pristine-tar gentar $DEB_SOURCEDIR/$pris.delta $TOPDIR/$pris" < "$BUILD_ROOT$DEB_SOURCEDIR/$origtar" || cleanup_and_exit 1 "pristine tar generation failed"
+		rm -rf "$BUILD_ROOT$TOPDIR/pristine_tar_tmp"
+		chown "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR/$pris"
+		rm -f "$BUILD_ROOT$DEB_SOURCEDIR/$pris.delta" "$BUILD_ROOT$DEB_SOURCEDIR/$pris.id" "$BUILD_ROOT$DEB_SOURCEDIR/$pris.asc"
+	    else
+		gzip < "$BUILD_ROOT$DEB_SOURCEDIR/$origtar" > "$BUILD_ROOT$TOPDIR/$origtar.gz"
+	    fi
+	    rm -f "$BUILD_ROOT$DEB_SOURCEDIR/$origtar"
+	fi
+    fi
+
     if test -n "$DEB_TRANSFORM" ; then 
 	CHANGELOGARGS=
 	test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" && CHANGELOGARGS="--changelog $BUILD_ROOT/.build-changelog"
@@ -83,10 +110,16 @@ recipe_prepare_dsc() {
 	    cleanup_and_exit 1 "debian transforming failed."
 	fi
 	DEB_SOURCEDIR=$TOPDIR/SOURCES.DEB
-	for DEB_DSCFILE in $BUILD_ROOT/$DEB_SOURCEDIR/*.dsc ; do : ; done 
+	for DEB_DSCFILE in $BUILD_ROOT$DEB_SOURCEDIR/*.dsc ; do : ; done 
 	DEB_DSCFILE="${DEB_DSCFILE##*/}"
     fi
-    chroot $BUILD_ROOT su -c "dpkg-source -x $DEB_SOURCEDIR/$DEB_DSCFILE $TOPDIR/BUILD" - $BUILD_USER
+
+    # run/copy sources
+    if test "$RECIPEFILE" = debian/control ; then
+	mv $BUILD_ROOT$DEB_SOURCEDIR $BUILD_ROOT$TOPDIR/BUILD
+    else
+	chroot $BUILD_ROOT su -c "dpkg-source -x $DEB_SOURCEDIR/$DEB_DSCFILE $TOPDIR/BUILD" - $BUILD_USER
+    fi
 
     # Alternative to debtransform: apply OBS release number if tag OBS-DCH-RELEASE is set.
     if test -z "$DEB_TRANSFORM" && grep -Eq '^OBS-DCH-RELEASE: 1' $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE; then
@@ -138,11 +171,13 @@ dsc_move_build_result() {
 	mv "$changes" "$BUILD_ROOT/$TOPDIR/DEBS"
     done
 
-    # link used sources over to DEB directory
-    ln $BUILD_ROOT/$DEB_SOURCEDIR/$DEB_DSCFILE $BUILD_ROOT/$TOPDIR/DEBS/
-    while read f ; do
-	ln $BUILD_ROOT/$DEB_SOURCEDIR/$f $BUILD_ROOT/$TOPDIR/DEBS/
-    done < <(sed -ne '/^Files:/,$s/^ ................................ [0-9][0-9]* //p' < $BUILD_ROOT/$DEB_SOURCEDIR/$DEB_DSCFILE)
+    if test "$RECIPEFILE" != "debian/control" ; then
+	# link used sources over to DEB directory
+	ln $BUILD_ROOT/$DEB_SOURCEDIR/$DEB_DSCFILE $BUILD_ROOT/$TOPDIR/DEBS/
+	while read f ; do
+	    ln $BUILD_ROOT/$DEB_SOURCEDIR/$f $BUILD_ROOT/$TOPDIR/DEBS/
+	done < <(sed -ne '/^Files:/,$s/^ ................................ [0-9][0-9]* //p' < $BUILD_ROOT/$DEB_SOURCEDIR/$DEB_DSCFILE)
+    fi
 }
 
 

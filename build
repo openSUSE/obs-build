@@ -1499,8 +1499,13 @@ MODULEMDFILE=
 
 for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 
-    SRCDIR="${RECIPEFILE%/*}"
-    RECIPEFILE="${RECIPEFILE##*/}"
+    if test "$RECIPEFILE" != "${RECIPEFILE%/debian/control}" ; then
+	SRCDIR="${RECIPEFILE%/debian/control}"
+	RECIPEFILE="debian/control"
+    else
+	SRCDIR="${RECIPEFILE%/*}"
+	RECIPEFILE="${RECIPEFILE##*/}"
+    fi
 
     recipe_set_buildtype
 

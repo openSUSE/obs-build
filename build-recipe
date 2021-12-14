@@ -93,6 +93,8 @@ recipe_set_buildtype() {
         flatpak.yaml) BUILDTYPE=flatpak ;;
         flatpak.yml) BUILDTYPE=flatpak ;;
         flatpak.json) BUILDTYPE=flatpak ;;
+        debian.control) BUILDTYPE=dsc ;;
+        debian/control) BUILDTYPE=dsc ;;
     esac
     if test -z "$BUILDTYPE" ; then
        cleanup_and_exit 1 "I don't know how to build $RECIPEFILE"
@@ -155,6 +157,14 @@ expand_recipe_directories() {
 		    found=true
 		done
 		test -n "$found" && break
+		if test "$t" = .dsc -a -f "$f/debian.control" ; then
+		    RECIPEFILES=("${RECIPEFILES[@]}" "$f/debian.control")
+		    break
+		fi
+		if test "$t" = .dsc -a -f "$f/debian/control" ; then
+		    RECIPEFILES=("${RECIPEFILES[@]}" "$f/debian/control")
+		    break
+		fi
 	    done
 	else
 	    RECIPEFILES[${#RECIPEFILES[@]}]="$f"
