@@ -1,0 +1,99 @@
+#!/usr/bin/perl
+
+use strict;
+use Data::Dumper;
+
+sub get_name_version {
+  my $fd;
+  open($fd, '<', 'debian/changelog') || die("debian/changelog: $!\n");
+  while (<$fd>) {
+    chomp;
+    return ($1, $2) if /^(\S+)\s+\(([^\)]+)\)/;
+  }
+}
+
+sub has_git_branch {
+  my ($branch) = @_;
+  system('git', 'show-ref', '-q', '--verify', $branch);
+  return $? == 0 ? 1 : 0
+}
+
+sub get_pristine_commit {
+  my ($tarfile) = @_;
+  my $pristine_branch;
+  $pristine_branch = 'pristine-tar' if !$pristine_branch && has_git_branch('refs/heads/pristine-tar');
+  $pristine_branch = 'origin/pristine-tar' if !$pristine_branch && has_git_branch('refs/remotes/origin/pristine-tar');
+  return unless $pristine_branch;
+  my $pristine_commit;
+  my $fd;
+  my $found;
+  open ($fd, '-|', 'git', 'log', '--pretty=format:%H:%s', $pristine_branch);
+  while (<$fd>) {
+    next if $found;
+    chomp;
+    next unless /^([0-9a-f]+):.* data for (.*)/;
+    my ($id, $tar) = ($1, $2);
+    next unless $tar =~ /^\Q$tarfile\E(\.(gz|xz|bz2))?$/s;
+    1 while <$fd>;
+    return ($id, $tar);
+  }
+  close($fd) || die("git log: $?\n");
+}
+
+sub get_pristine_file {
+  my ($blob, $out) = @_;
+  my $fd;
+  my $pid = open($fd, '|-');
+  die("fork: $!\n") unless defined $pid;
+  if (!$pid) {
+    open(STDIN, '<', '/dev/null') || die("/dev/null: $!\n");
+    open(STDOUT, '>', $out) || die("$out: $!\n");
+    exec 'git', 'cat-file', 'blob', $blob;
+  }
+  close($fd) || die("git cat-file: $?\n");
+}
+
+my ($from, $to) = @ARGV;
+
+if ($from) {
+  chdir($from) || die("chdir $from: $!\n");
+}
+$to = '.' unless $to;
+
+die("debian: $!\n") unless -e "debian";
+die("debian: Not a directory\n") unless -d "debian";
+
+# get version from changelog
+my ($name, $version) = get_name_version();
+die("Could not determine name and version\n") unless defined $version;
+$version =~ s/-.*?$//;	# strip release
+
+my $tarfile = "${name}_$version.orig.tar";
+
+my $tag = $version;
+$tag =~ s/~/_/g;
+$tag =~ s/:/%/g;
+$tag = "upstream/$tag";
+
+system('git', 'archive', '--format=tar', "--prefix=$name-$version/", "--output=$to/$tarfile", $tag) && die("git archive failed: $?\n");
+
+# check for a pristine-tar entry
+my ($pristine_commit, $pristine_tar) = get_pristine_commit($tarfile);
+if ($pristine_commit) {
+  my %files;
+  my $fd;
+  open ($fd, '-|', 'git', 'ls-tree', $pristine_commit) || die("git: $!\n");
+  while (<$fd>) {
+    chomp;
+    my @s = split(' ', $_, 4);
+    next unless @s == 4 && $s[2] =~ /^[0-9a-f]+/;
+    $files{$s[3]} = $s[2];
+  }
+  close($fd) || die("git: $?\n");
+  for my $f ('.delta', '.id', '.asc') {
+    my $blob = $files{"$pristine_tar$f"};
+    next unless $blob;
+    get_pristine_file($blob, "$to/$pristine_tar$f");
+  }
+}
+

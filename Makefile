@@ -87,6 +87,7 @@ install:
 	    queryobs \
 	    writemodulemd \
 	    download_assets \
+	    export_debian_orig_from_git \
 	    $(DESTDIR)$(pkglibdir)
 	install -m644 \
 	    qemu-reg \
