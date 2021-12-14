@@ -47,6 +47,9 @@ my %known_options = (
   'help' => '',
   'assetdir' => ':',
   'assets' => '::',
+  'noassetdir' => '',
+  'unpack' => '',
+
   'create-cpio' => '',
 );
 
@@ -70,6 +73,7 @@ if ($opts->{'help'}) {
   exit(0);
 }
 die("Please specify at least one directory\n") unless @dirs;
+die("The --assetdir option conflicts with --noassetdir\n") if $opts->{'assetdir'} && $opts->{'noassetdir'};
 
 my $bconf = Build::read_config($arch);
 for my $dir (@dirs) {
@@ -80,7 +84,6 @@ for my $dir (@dirs) {
     'pkg' => "_me",
     'dir' => $dir,
     'files' => $files,
-    'srcmd5' => PBuild::Source::calc_srcmd5($files),
   };
   $p->{'asset_files'} = $asset_files if %{$asset_files || {}};
  
@@ -104,7 +107,27 @@ for my $dir (@dirs) {
     $p->{'name'} ||= $d->{'name'} if $d->{'name'};
     $assetmgr->find_assets($p, $arch);
   }
+  if ($opts->{'unpack'} && $opts->{'noassetdir'}) {
+    my $af = $p->{'asset_files'} || {};
+    for (values %$af) {
+      $_->{'donotpack'} = 1 if $_->{'isdir'};
+    }
+  }
+  # remove directory assets that we already have
+  if ($opts->{'unpack'}) {
+    my $af = $p->{'asset_files'} || {};
+    # delete directory assets that we already have
+    for (keys %$af) {
+      delete $af->{$_} if $af->{$_}->{'isdir'} && -d "$dir/$_";
+    }
+  }
   $assetmgr->getremoteassets($p);
-  $assetmgr->copy_assets($p, $dir);
+  if ($opts->{'noassetdir'}) {
+    $assetmgr->move_assets($p, $dir, $opts->{'unpack'});
+    PBuild::Util::cleandir($assetdir);
+    rmdir("$dir/.assets");
+  } else {
+    $assetmgr->copy_assets($p, $dir, $opts->{'unpack'});
+  }
 }
 
