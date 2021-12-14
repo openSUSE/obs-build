@@ -679,7 +679,14 @@ sub build {
   }
   $ctx->{'repomgr'}->getremotebinaries($bins);
   my $readytime = time();
-  my $job = PBuild::Job::createjob($ctx, $builder->{'name'}, $builder->{'nbuilders'}, $builder->{'root'}, $p, \@bdeps, \@pdeps, \@vmdeps, \@sysdeps, $tdeps, \%jobopts);
+  my $job;
+  eval {
+    $job = PBuild::Job::createjob($ctx, $builder->{'name'}, $builder->{'nbuilders'}, $builder->{'root'}, $p, \@bdeps, \@pdeps, \@vmdeps, \@sysdeps, $tdeps, \%jobopts);
+  };
+  if ($@) {
+    chomp $@;
+    return ('broken', $@);
+  }
   $job->{'readytime'} = $readytime;
   $job->{'reason'} = $reason;
   $job->{'hostarch'} = $ctx->{'hostarch'};
