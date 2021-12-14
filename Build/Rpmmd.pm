@@ -143,8 +143,8 @@ sub primary_handle_sourcerpm {
   my ($h, $c, $p, $el, %attr) = @_;
   my $data = $c->[0]->[4];
   return unless defined $c->[-1]->[2];
-  $c->[-1]->[2] =~ s/-[^-]*-[^-]*\.[^\.]*\.rpm$//;
-  $data->{$h->{'_tag'}} = $c->[-1]->[2];
+  $data->{'sourcerpm'} = $data->{'source'} = $c->[-1]->[2];
+  $data->{'source'} =~ s/-[^-]*-[^-]*\.[^\.]*\.rpm$//;
 }
 
 sub primary_handle_version {
