@@ -76,9 +76,15 @@ recipe_prepare_dsc() {
     OBS_DCH_RELEASE=""
 
 
-    if test "$RECIPEFILE" = debian/control ; then
+    if test "$RECIPEFILE" = debian/control -o "$RECIPEFILE" = debian.control ; then
 	dsc_export_origtar
 	mv $BUILD_ROOT$DEB_SOURCEDIR $BUILD_ROOT$TOPDIR/BUILD
+	if test -d $BUILD_ROOT$TOPDIR/BUILD/debian ; then
+	    for f in debian.control debian.changelog ; do
+		test -f $BUILD_ROOT$TOPDIR/BUILD/$f || continue
+		mv $BUILD_ROOT$TOPDIR/BUILD/$f $BUILD_ROOT$TOPDIR/BUILD/debian/${f#debian.}
+	    done
+	fi
 	return
     fi
 
