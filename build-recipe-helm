@@ -34,14 +34,14 @@ recipe_setup_helm() {
 	    cleanup_and_exit 1 "source copy failed"
 	fi
     fi
-    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+    chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
 }
 
 recipe_prepare_helm() {
     rm -rf "$BUILD_ROOT$TOPDIR/BUILD"
     mkdir -p "$BUILD_ROOT$TOPDIR/BUILD"
     cp -dLR "$BUILD_ROOT$TOPDIR/SOURCES/"* "$BUILD_ROOT$TOPDIR/BUILD"
-    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR/BUILD"
+    chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR/BUILD"
     cd "$BUILD_ROOT$TOPDIR/BUILD"
     for i in *.tar *.tgz *.tar.gz *.tar.xz ; do
 	test -e "$i" || continue

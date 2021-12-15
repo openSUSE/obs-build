@@ -16,7 +16,7 @@ recipe_setup_collax() {
 	test "$DO_INIT_TOPDIR" != false && rm -Rf "$BUILD_ROOT/$TOPDIR"
 	mkdir -p "$BUILD_ROOT/$TOPDIR"/{SOURCES,SOURCES.DEB,DEBS,OTHER}
 	copy_sources "$MYSRCDIR" "$BUILD_ROOT/$TOPDIR/SOURCES/"
-	chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/$TOPDIR"
+	chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/$TOPDIR"
 }
 
 recipe_prepare_collax() {
