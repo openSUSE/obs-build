@@ -836,15 +836,22 @@ copy_sources() {
     elif test -e "$1/.git" ; then
 	# check which directory belongs to the git repository and only copy those
 	type -p git >& /dev/null || cleanup_and_exit 1 "need git to check file status"
-	for i in "$1"/* ; do
-	    if test -d "$i" ; then
-		if git -C "$1" --noglob-pathspecs ls-files --error-unmatch -- "${i##*/}" >& /dev/null ; then
-		    cp -pRL "$i" "$2"
+	for i in "$1/".* "$1"/* ; do
+	    local ii="${i##*/}"
+	    test "$ii" = . -o "$ii" = .. -o "$ii" = .git && continue
+	    if test -L "$i" -o -d "$i" -o "${ii#.}" != "$ii" ; then
+		if git -C "$1" --noglob-pathspecs ls-files --error-unmatch -- "$ii" >& /dev/null ; then
+		    cp -pRd "$i" "$2"
 		    continue
 		fi
+		test "${ii#.}" != "$ii" && continue
 	    fi
 	    cp -p "$i" "$2"
 	done
+	if test -f "$1/debian/control" ; then
+	    echo "exporting debian orig tarballs"
+	    $BUILD_DIR/export_debian_orig_from_git "$1" "$2/build.origtar" || cleanup_and_exit 1 "export_debian_orig_from_git failed"
+	fi
     else
 	cp -p "$1"/* "$2"
     fi
