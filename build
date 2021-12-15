@@ -595,7 +595,7 @@ ccache_setup() {
             echo "cache_dir = /.ccache" >> $cconf
         fi
 	test -n "$CCACHE_ARCHIVE" -a -e "$CCACHE_ARCHIVE" && ccache_unpack "$BUILD_ROOT/.ccache" ccache
-	chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.ccache"
+	chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.ccache"
     else
 	rm -f "$BUILD_ROOT"/var/lib/build/ccache/bin/{gcc,g++,cc,c++,clang,clang++}
     fi
@@ -632,7 +632,7 @@ sccache_setup() {
             echo 'export SCCACHE_CACHE_SIZE="8G"' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
             mkdir -p "$BUILD_ROOT/.sccache"
 	    test -n "$CCACHE_ARCHIVE" -a -e "$CCACHE_ARCHIVE" && ccache_unpack "$BUILD_ROOT/.sccache" sccache
-	    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.sccache"
+	    chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.sccache"
         fi
         # Display sccache status at the start of the build.
         chroot $BUILD_ROOT su -c "sccache -s" - $BUILD_USER
@@ -897,7 +897,7 @@ run_rsync() {
 	    fi
 	    echo "Running rsync ..."
 	    rsync -av $RSYNCSRC/* $BUILD_ROOT/$RSYNCDEST/
-	    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/$RSYNCDEST"
+	    chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/$RSYNCDEST"
 	    RSYNCDONE=true
 	    echo "... done"
 	else
@@ -1737,7 +1737,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     recipe_prepare
 
     # hmmm
-    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+    chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
 
     echo -----------------------------------------------------------------
     if test "$BUILD_USER" = root ; then

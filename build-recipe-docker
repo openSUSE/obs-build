@@ -40,6 +40,7 @@ recipe_setup_docker() {
             cleanup_and_exit 1 "source copy failed"
         fi
     fi  
+    chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
 }
 
 recipe_prepare_docker() {

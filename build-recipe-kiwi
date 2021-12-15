@@ -312,7 +312,6 @@ recipe_setup_kiwi() {
     mkdir -p "$BUILD_ROOT$TOPDIR/RPMS"
     mkdir -p "$BUILD_ROOT$TOPDIR/SRPMS"
     
-    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
     if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then 
 	mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
     else
@@ -325,6 +324,7 @@ recipe_setup_kiwi() {
 	    cleanup_and_exit 1 "source copy failed"
 	fi
     fi
+    chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
 
     # extract macros from configuration
     # some post scripts might call rpm-build and rely on the macros

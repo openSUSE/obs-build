@@ -29,12 +29,12 @@ recipe_setup_livebuild() {
     for i in OTHER SOURCES LIVEBUILD_ROOT ; do
 	mkdir -p "$BUILD_ROOT$TOPDIR/$i"
     done
-    chown -R "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
     if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
 	mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
     else
 	copy_sources "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"
     fi
+    chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
 }
 
 recipe_prepare_livebuild() {
