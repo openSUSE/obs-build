@@ -174,6 +174,14 @@ sub copy_sources {
 }
 
 #
+# Export upstream tarballs for git-buildpackage
+#
+sub export_origtar {
+  my ($p, $srcdir, $opts) = @_;
+  system("$opts->{'libbuild'}/export_debian_orig_from_git", $p->{'dir'}, "$srcdir/build.origtar") && die("export_orig_from_git $p->{'dir'} $srcdir/build.origtar: $?\n");
+}
+
+#
 # Create a new build job
 #
 # ctx usage: opts hostarch bconf arch repos dep2pkg buildconfig debuginfo
@@ -254,7 +262,7 @@ sub createjob {
     $ctx->{'assetmgr'}->copy_assets($p, $srcdir) if $p->{'asset_files'};
     if ($p->{'recipe'} eq 'debian/control') {
       $copy_sources_asis = 1;
-      system("$opts->{'libbuild'}/export_debian_orig_from_git", $p->{'dir'}, $srcdir) && die("export_orig_from_git $p->{'dir'} $srcdir: $?\n");
+      export_origtar($p, $srcdir, $opts);
     }
   }
 

@@ -1,7 +1,6 @@
 #!/usr/bin/perl
 
 use strict;
-use Data::Dumper;
 
 sub get_name_version {
   my $fd;
@@ -40,7 +39,7 @@ sub get_pristine_commit {
   close($fd) || die("git log: $?\n");
 }
 
-sub get_pristine_file {
+sub export_pristine_file {
   my ($blob, $out) = @_;
   my $fd;
   my $pid = open($fd, '|-');
@@ -53,15 +52,32 @@ sub get_pristine_file {
   close($fd) || die("git cat-file: $?\n");
 }
 
-my ($from, $to) = @ARGV;
-
-if ($from) {
-  chdir($from) || die("chdir $from: $!\n");
+sub export_pristine_commit {
+  my ($commit, $tarfile, $dir) = @_;
+  my %files;
+  my $fd;
+  open ($fd, '-|', 'git', 'ls-tree', $commit) || die("git: $!\n");
+  while (<$fd>) {
+    chomp;
+    my @s = split(' ', $_, 4);
+    next unless @s == 4 && $s[2] =~ /^[0-9a-f]+/;
+    $files{$s[3]} = $s[2];
+  }
+  close($fd) || die("git ls-tree $commit: $?\n");
+  for my $f ('.delta', '.id', '.asc') {
+    my $blob = $files{"$tarfile$f"};
+    export_pristine_file($blob, "$dir/$tarfile$f") if $blob;
+  }
 }
-$to = '.' unless $to;
 
-die("debian: $!\n") unless -e "debian";
-die("debian: Not a directory\n") unless -d "debian";
+my ($from, $to) = @ARGV;
+$from ||= '.';
+$to ||= 'build.origtar';
+
+$from eq '.' || chdir($from) || die("chdir $from: $!\n");
+die("$from/debian: $!\n") unless -e "debian";
+die("$from/debian: Not a directory\n") unless -d "debian";
+-d $to || mkdir($to) || die("mkdir $to: $!\n");
 
 # get version from changelog
 my ($name, $version) = get_name_version();
@@ -75,25 +91,10 @@ $tag =~ s/~/_/g;
 $tag =~ s/:/%/g;
 $tag = "upstream/$tag";
 
-system('git', 'archive', '--format=tar', "--prefix=$name-$version/", "--output=$to/$tarfile", $tag) && die("git archive failed: $?\n");
+# export the (uncompressed) tar archive
+system('git', 'archive', '--format=tar', "--prefix=$name-$version/", "--output=$to/$tarfile", $tag) && die("git archive $tag failed: $?\n");
 
-# check for a pristine-tar entry
+# export pristine-tar entries if present
 my ($pristine_commit, $pristine_tar) = get_pristine_commit($tarfile);
-if ($pristine_commit) {
-  my %files;
-  my $fd;
-  open ($fd, '-|', 'git', 'ls-tree', $pristine_commit) || die("git: $!\n");
-  while (<$fd>) {
-    chomp;
-    my @s = split(' ', $_, 4);
-    next unless @s == 4 && $s[2] =~ /^[0-9a-f]+/;
-    $files{$s[3]} = $s[2];
-  }
-  close($fd) || die("git: $?\n");
-  for my $f ('.delta', '.id', '.asc') {
-    my $blob = $files{"$pristine_tar$f"};
-    next unless $blob;
-    get_pristine_file($blob, "$to/$pristine_tar$f");
-  }
-}
+export_pristine_commit($pristine_commit, $pristine_tar, $to) if $pristine_commit;
 

@@ -98,22 +98,29 @@ sub list_package {
     next if $file =~ /\n/;
     my @s = lstat("$dir/$file");
     die("$dir/$file: $!\n") unless @s;
+    my $lnk;
     if (-l _) {
-      my $lnk = readlink("$dir/$file");
-      if ($lnk && $lnk =~ /^(\/ipfs\/.*)$/s) {
+      $lnk = readlink("$dir/$file");
+      die("readlink $dir/$file: $!\n") unless defined $lnk;
+      if ($lnk =~ /^(\/ipfs\/.*)$/s) {
 	$asset_files{$file} = { 'cid' => $1, 'type' => 'ipfs' };
 	next;
       }
     }
     if (-l _ || -d _ || $file =~ /^\./) {
       if (!$controlled) {
-        $controlled ||= get_scm_controlled($dir);
+        $controlled = get_scm_controlled($dir);
+	# redo stat because get_scm_controlled changed it
 	lstat("$dir/$file") || die("$dir/$file: $!\n");
       }
-      next unless $controlled->{$file};
+      if (!$controlled->{$file}) {
+	next if -d _ || $file =~ /^\./;
+	@s = stat("$dir/$file");
+	next unless @s && -f _;		# follow links to files
+      }
     }
     if (-l _) {
-      $files{$file} = genlnkdigest("$dir/$file");
+      $files{"$file/"} = genlnkdigest("$dir/$file");
     } elsif (-d _) {
       $files{"$file/"} = gendirdigest("$dir/$file");
     } elsif (-f _) {

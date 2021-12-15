@@ -37,6 +37,29 @@ recipe_setup_dsc() {
     fi
 }
 
+dsc_export_origtar() {
+    test -d "$BUILD_ROOT$TOPDIR/SOURCES/build.origtar" || return
+    local origtar delta
+    for origtar in "$BUILD_ROOT$TOPDIR/SOURCES/build.origtar"/*.tar ; do
+	for delta in "$origtar"*.delta "" ; do
+	    test -n "$delta" -a -f "$delta" && break
+	done
+	delta="${delta##*/}"
+	delta="${delta%.delta}"
+	if test -n "$delta" ; then
+	    echo "recreating upstream $delta with pristine-tar"
+	    mkdir "$BUILD_ROOT$TOPDIR/pristine_tar_tmp"
+	    chroot $BUILD_ROOT bash -c "cd $TOPDIR/pristine_tar_tmp && tar xf - && cd * && pristine-tar gentar $TOPDIR/SOURCES/build.origtar/$delta.delta $TOPDIR/$delta" < "$origtar" || cleanup_and_exit 1 "pristine tar generation failed"
+	    rm -rf "$BUILD_ROOT$TOPDIR/pristine_tar_tmp"
+	else
+	    echo "creating upstream ${origtar##*/}.gz"
+	    gzip < "$origtar" > "$BUILD_ROOT$TOPDIR/${origtar##*/}.gz" || cleanup_and_exit 1 "tarball compression failed"
+	fi
+    done
+    rm -rf "$BUILD_ROOT$TOPDIR/SOURCES/build.origtar"
+}
+
+
 recipe_prepare_dsc() {
     rm -rf "$BUILD_ROOT$TOPDIR/BUILD"
     mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES.DEB"
@@ -54,29 +77,9 @@ recipe_prepare_dsc() {
 
 
     if test "$RECIPEFILE" = debian/control ; then
-	DEB_TRANSFORM=
-	local src=$(chroot $BUILD_ROOT su -c "cd $DEB_SOURCEDIR && dpkg-parsechangelog -S Source" - $BUILD_USER)
-	local ver=$(chroot $BUILD_ROOT su -c "cd $DEB_SOURCEDIR && dpkg-parsechangelog -S Version" - $BUILD_USER)
-	test -z "$src" -o -z "$ver" && cleanup_and_exit 1
-	ver="${ver%-*}"
-	local origtar="${src}_$ver.orig.tar"
-	if test -f "$BUILD_ROOT$DEB_SOURCEDIR/$origtar"; then
-	    local pris
-	    for pris in "$origtar" "$origtar.gz" "$origtar.xz" "$origtar.bz2" "" ; do
-		test -n "$pris" -a -f "$BUILD_ROOT$DEB_SOURCEDIR/$pris.delta" && break
-	    done
-	    if test -n "$pris" ; then
-		echo "recreating upstream tarball with pristine-tar"
-		mkdir "$BUILD_ROOT$TOPDIR/pristine_tar_tmp"
-		chroot $BUILD_ROOT bash -c "cd $TOPDIR/pristine_tar_tmp && tar xf - && cd * && pristine-tar gentar $DEB_SOURCEDIR/$pris.delta $TOPDIR/$pris" < "$BUILD_ROOT$DEB_SOURCEDIR/$origtar" || cleanup_and_exit 1 "pristine tar generation failed"
-		rm -rf "$BUILD_ROOT$TOPDIR/pristine_tar_tmp"
-		chown "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR/$pris"
-		rm -f "$BUILD_ROOT$DEB_SOURCEDIR/$pris.delta" "$BUILD_ROOT$DEB_SOURCEDIR/$pris.id" "$BUILD_ROOT$DEB_SOURCEDIR/$pris.asc"
-	    else
-		gzip < "$BUILD_ROOT$DEB_SOURCEDIR/$origtar" > "$BUILD_ROOT$TOPDIR/$origtar.gz"
-	    fi
-	    rm -f "$BUILD_ROOT$DEB_SOURCEDIR/$origtar"
-	fi
+	dsc_export_origtar
+	mv $BUILD_ROOT$DEB_SOURCEDIR $BUILD_ROOT$TOPDIR/BUILD
+	return
     fi
 
     if test -n "$DEB_TRANSFORM" ; then 
@@ -115,11 +118,7 @@ recipe_prepare_dsc() {
     fi
 
     # run/copy sources
-    if test "$RECIPEFILE" = debian/control ; then
-	mv $BUILD_ROOT$DEB_SOURCEDIR $BUILD_ROOT$TOPDIR/BUILD
-    else
-	chroot $BUILD_ROOT su -c "dpkg-source -x $DEB_SOURCEDIR/$DEB_DSCFILE $TOPDIR/BUILD" - $BUILD_USER
-    fi
+    chroot $BUILD_ROOT su -c "dpkg-source -x $DEB_SOURCEDIR/$DEB_DSCFILE $TOPDIR/BUILD" - $BUILD_USER
 
     # Alternative to debtransform: apply OBS release number if tag OBS-DCH-RELEASE is set.
     if test -z "$DEB_TRANSFORM" && grep -Eq '^OBS-DCH-RELEASE: 1' $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE; then
