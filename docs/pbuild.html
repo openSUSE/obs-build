@@ -1024,12 +1024,16 @@ comments.</p></div>
 </div></div>
 </div>
 <div class="sect3">
-<h4 id="_arch_linux_pkgbuild">2.4.3. Arch Linux PKGBUILD</h4>
+<h4 id="_dockerfile_description">2.4.3. Dockerfile description</h4>
+<div class="paragraph"><p>Has no support for assets yet.</p></div>
+</div>
+<div class="sect3">
+<h4 id="_arch_linux_pkgbuild">2.4.4. Arch Linux PKGBUILD</h4>
 <div class="paragraph"><p>PKGBuild files already contain the needed URLs and Checksums, so no extra
 treatment is needed.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_fedpkg_sources_file">2.4.4. FedPkg "sources" file</h4>
+<h4 id="_fedpkg_sources_file">2.4.5. FedPkg "sources" file</h4>
 <div class="paragraph"><p>The sources file contains a list of file names with checksums. PBuild will
 automatically download the missing files from a FedPkg Server that needs
 to be configured in the project config via the "AssetsURL:" directive or set
@@ -1561,31 +1565,43 @@ where it defines the target architecture a from a cross build compiler.</p></div
 width="15%"
 frame="border"
 cellspacing="0" cellpadding="4">
-<col width="25%" />
-<col width="25%" />
-<col width="25%" />
-<col width="25%" />
+<col width="20%" />
+<col width="20%" />
+<col width="20%" />
+<col width="20%" />
+<col width="20%" />
 <tbody>
 <tr>
 <td align="left" valign="top"><p class="table">build</p></td>
+<td align="left" valign="top"><p class="table"></p></td>
 <td align="left" valign="top"><p class="table">host</p></td>
 <td align="left" valign="top"><p class="table">target</p></td>
 <td align="left" valign="top"><p class="table">-/-</p></td>
 </tr>
 <tr>
+<td align="left" valign="top"><p class="table">------</p></td>
+<td align="left" valign="top"><p class="table"></p></td>
+<td align="left" valign="top"><p class="table">-------</p></td>
+<td align="left" valign="top"><p class="table">---------</p></td>
+<td align="left" valign="top"><p class="table">-------</p></td>
+</tr>
+<tr>
 <td align="left" valign="top"><p class="table">cmake</p></td>
+<td align="left" valign="top"><p class="table"></p></td>
 <td align="left" valign="top"><p class="table">HOST</p></td>
 <td align="left" valign="top"><p class="table">default</p></td>
 <td align="left" valign="top"><p class="table">-/-</p></td>
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">GNU</p></td>
+<td align="left" valign="top"><p class="table"></p></td>
 <td align="left" valign="top"><p class="table">build</p></td>
 <td align="left" valign="top"><p class="table">host</p></td>
 <td align="left" valign="top"><p class="table">target</p></td>
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">rpm</p></td>
+<td align="left" valign="top"><p class="table"></p></td>
 <td align="left" valign="top"><p class="table">build</p></td>
 <td align="left" valign="top"><p class="table">target</p></td>
 <td align="left" valign="top"><p class="table">-/-</p></td>
@@ -1618,7 +1634,7 @@ cellspacing="0" cellpadding="4">
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2021-12-01 15:00:53 CET
+ 2021-12-10 09:29:27 CET
 </div>
 </div>
 </body>
