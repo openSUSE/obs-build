@@ -101,36 +101,37 @@ die("you must specfiy a depfile!\n") unless defined $rpmdeps;
 
 # split args in recipe and pkgnames
 my $recipe;
+my $buildtype = '';
 my @extradeps;
+
 for my $arg (@ARGV) {
-  my $buildtype = Build::recipe2buildtype($arg);
-  if ($buildtype) {
+  my $bt = Build::recipe2buildtype($arg);
+  if ($bt) {
     die("can only work with at most one recipe file\n") if defined $recipe;
     $recipe = $arg;
+    $buildtype = $bt;
   } else {
     push @extradeps, $arg;
   }
 }
 
-my $binarytype;
 my @archs = split(':', $archs);
-if ($recipe && $recipe =~ /(^|\/)PKGBUILD$/) {
-  push @archs, 'any' unless grep {$_ eq 'any'} @archs;
-  $binarytype = 'arch';
-} elsif ($recipe && $recipe =~ /\.dsc$/) {
-  push @archs, 'all' unless grep {$_ eq 'noarch'} @archs;
-  $binarytype = 'deb';
-} else {
-  push @archs, 'noarch' unless grep {$_ eq 'noarch'} @archs;
-  $binarytype = 'rpm';
-}
+my $binarytype;
+$binarytype = 'arch' if $buildtype eq 'arch';
+$binarytype = 'deb' if $buildtype eq 'dsc';
+$binarytype ||= 'rpm';
 
 # read dist if we can
 my $cf;
-if (defined($dist) && $dist ne '') {
-  $cf = Build::read_config_dist($dist, $archs[0], $configdir);
-  $binarytype = $cf->{'binarytype'} if $cf->{'binarytype'} && $cf->{'binarytype'} ne 'UNDEFINED';
-}
+$cf = Build::read_config_dist($dist, $archs[0] || 'noarch', $configdir) if defined($dist) && $dist ne '';
+$binarytype = $cf->{'binarytype'} if $cf && $cf->{'binarytype'} && $cf->{'binarytype'} ne 'UNDEFINED';
+
+my $noarch;
+$noarch = 'any' if $binarytype eq 'arch';
+$noarch = 'all' if $binarytype eq 'deb';
+$noarch ||= 'noarch';
+push @archs, $noarch unless grep {$_ eq $noarch} @archs;
+
 
 my (%fn, %prov, %req, %con, %obs, %rec, %sup);
 
@@ -341,7 +342,6 @@ if ($useusedforbuild) {
 
 my $subpacks = [];
 
-my $buildtype = '';
 my $extrasysdeps;
 
 sub includecallback {
@@ -362,7 +362,6 @@ sub includecallback {
 if ($recipe) {
   local $Build::Rpm::includecallback = sub { includecallback($recipe, @_) };
   my $d = Build::parse($cf, $recipe) || {};
-  $buildtype = Build::recipe2buildtype($recipe) || '';
   $cf->{'type'} = $buildtype if $buildtype;
   if ($buildtype eq 'kiwi') {
     # lets see if this is a product or image build
