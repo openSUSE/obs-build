@@ -102,7 +102,11 @@ sub cpio_create {
     $s[7] = 0;
     unshift @todo, [ '', @s ];
   }
-  unshift @todo, sort(PBuild::Util::ls($dir));
+  if ($opts{'dircontent'}) {
+    unshift @todo, @{$opts{'dircontent'}};
+  } else {
+    unshift @todo, sort(PBuild::Util::ls($dir));
+  }
   my $ino = 0;
   while (@todo) {
     my $name = shift @todo;

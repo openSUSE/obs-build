@@ -60,11 +60,17 @@ if ($opts->{'create-cpio'}) {
     print "Usage: download_assets --create-cpio dir\n";
     exit(0);
   }
-  die("Please specify one directory\n") unless @dirs == 1;
-  my $prefix = $dirs[0];
-  $prefix =~ s/.*\///;
-  $prefix = '' if $prefix eq '.';
-  PBuild::Cpio::cpio_create(\*STDOUT, $dirs[0], 'prefix' => ($prefix ne '' ? "$prefix/" : ''));
+  die("Please specify a directory\n") unless @dirs >= 1;
+  my $dir = shift @dirs;
+  if (!@dirs) {
+    my $prefix = $dir;
+    $prefix =~ s/.*\///;
+    $prefix = '' if $prefix eq '.';
+    PBuild::Cpio::cpio_create(\*STDOUT, $dir, 'prefix' => ($prefix ne '' ? "$prefix/" : ''));
+  } else {
+    s/^\/// for @dirs;
+    PBuild::Cpio::cpio_create(\*STDOUT, $dir, 'dircontent' => \@dirs);
+  }
   exit(0);
 }
 
