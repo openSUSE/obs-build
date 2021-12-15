@@ -830,7 +830,7 @@ copy_sources() {
         include_directories=true
     fi
     if test -n "$RUNNING_IN_VM" -o -n "$COPY_SOURCES_ASIS" ; then
-	cp -a "$1"/. "$2"
+	( shopt -s nullglob ; cp -pRd "$1/".[^.]* "$1/"..?* "$1"/* "$2" )
     elif test -n "$include_directories" ; then
         cp -pRL "$1"/* "$2"
     elif test -e "$1/.git" ; then
