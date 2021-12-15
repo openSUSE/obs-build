@@ -170,8 +170,11 @@ vm_verify_options_kvm() {
             test -e /usr/share/qemu/qboot.rom && kvm_options="$kvm_options -bios /usr/share/qemu/qboot.rom"
 
             # move IO into separate I/O thread
-	    kvm_options="$kvm_options -object iothread,id=io0"
-	    kvm_device_opts=",iothread=io0"
+	    if test "${kvm_device%%-*}" = "virtio" ; then
+                    kvm_options="$kvm_options -object iothread,id=io0"
+		    kvm_device_opts=",iothread=io0"
+            fi
+
             # TODO appears to be unstable
 	    # $kvm_bin --help | grep -q io_uring && kvm_drive_opts="$kvm_drive_opts,aio=io_uring"
             ;;
