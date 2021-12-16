@@ -29,7 +29,7 @@ vm_verify_options_uml() {
 }
 
 vm_startup_uml() {
-    set -- $uml_kernel initrd=$uml_initrd root=ubda init="$vm_init_script" panic=1 elevator=noop quiet ubda=$VM_ROOT ubdb=$VM_SWAP ${VM_MEMSIZE:+mem=$VM_MEMSIZE}
+    set -- $uml_kernel initrd=$uml_initrd root=ubda init="$vm_init_script" $vm_linux_always_append elevator=noop ubda=$VM_ROOT ubdb=$VM_SWAP ${VM_MEMSIZE:+mem=$VM_MEMSIZE}
     echo "$@"
     "$@"
 }
