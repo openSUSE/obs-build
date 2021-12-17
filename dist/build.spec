@@ -57,6 +57,9 @@ Requires:       perl-TimeDate
 BuildRequires:  perl-TimeDate
 %endif
 Conflicts:      bsdtar < 2.5.5
+%if 0%{?suse_version}
+Conflicts:      qemu < 2.5.0
+%endif
 BuildRequires:  perl(Date::Parse)
 BuildRequires:  perl(Test::Harness)
 BuildRequires:  perl(Test::More)
