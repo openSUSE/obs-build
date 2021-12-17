@@ -490,12 +490,11 @@ background_watchdog() {
     while sleep 5 ; do
 	WATCH=$(grep -a "### VM INTERACTION" "$LOGFILE" | tr '\0' a | tail -n 1)
 	case $WATCH in
-	    *VM\ INTERACTION\ START*) test -n "$WATCHDOG_START" || WATCHDOG_START=`date +%s` ;;
+	    *VM\ INTERACTION\ START*) test -n "$WATCHDOG_START" || WATCHDOG_START=$SECONDS ;;
 	    *VM\ INTERACTION\ END*) WATCHDOG_START= ;;
 	esac
 	if test -n "$WATCHDOG_START" ; then
-	    NOW=`date +%s`
-	    ELAPSED=$((NOW-WATCHDOG_START))
+	    ELAPSED=$(( $SECONDS - $WATCHDOG_START ))
 	    if test $ELAPSED -gt $WATCHDOG_TIMEOUT ; then
 		# kill the VM
 		echo
@@ -876,10 +875,10 @@ vm_first_stage() {
 	rm -f $BUILD_ROOT/.build.success
 	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS
 	echo "$* ..."
-	start_time=`date +%s`
+	start_time=$SECONDS
 	"$@" || cleanup_and_exit 1
 	check_exit
-	TIME_PREINSTALL=$(( `date +%s` - $start_time ))
+	TIME_PREINSTALL=$(( $SECONDS - $start_time ))
 	unset start_time
 	if test ! -w /root ; then
 	    # remove setuid bit if files belong to user to make e.g. mount work
@@ -1079,7 +1078,7 @@ vm_first_stage() {
 	    extractbuild --disk "$VM_ROOT" --input "$VM_SWAP" --skip 512 -v || cleanup_and_exit 3
 	    if test "$DO_STATISTICS" = 1 ; then
 		mkdir -p OTHER
-		TIME_TOTAL=$(( `date +%s` - $TIME_START_TIME ))
+		TIME_TOTAL=$(( $SECONDS - $TIME_START_TIME ))
 		echo "TIME_total: $TIME_TOTAL"  >> OTHER/_statistics
 	    fi
 	    cleanup_and_exit ${BUILDSTATUS#BUILDSTATUS}
