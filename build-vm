@@ -662,7 +662,7 @@ vm_detect_2nd_stage() {
     # set date to build start on broken systems (now < build start)
     if test $(date '+%s') -lt $(date -r /.build/.date '+%s') ; then
         echo -n "WARNING: system has a broken clock, setting it to a newer time: "
-        date -s `cat /.build/.date`
+        date -s $(</.build/.date)
     fi
 
     # Enable Core dump generation
