@@ -25,6 +25,8 @@
 # Only protecting nonroot from root inside guest -> but anyone can be root inside guest
 # so disabling spectre/meltdown mitigations doesn't hurt security and gains performance
 vm_linux_kernel_parameter="ext4.allow_unsupported=1 mitigations=off"
+# Make sure that dodgy kernels fail quickly and early
+vm_linux_always_append="oops=panic panic=1 quiet"
 
 # guest visible devices
 VM_ROOTDEV=/dev/hda1
