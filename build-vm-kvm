@@ -126,6 +126,14 @@ vm_verify_options_kvm() {
 		kvm_options="-enable-kvm -M pseries,cap-ccf-assist=off"
 		fi
 	    fi
+	    if grep -q "POWER9" /proc/cpuinfo; then
+		# This option has been added in QEMU 2.10
+		if $kvm_bin -machine 'pseries,?' 2>&1 | grep -q max-cpu-compat; then
+		    kvm_options="-enable-kvm -M pseries,max-cpu-compat=power8"
+		else
+		    kvm_cpu="-cpu host,compat=power8"
+		fi
+	    fi
 	    grep -q PPC970MP /proc/cpuinfo && kvm_check_ppc970
 	    vm_kernel=/boot/vmlinux
 	    vm_initrd=/boot/initrd
@@ -143,7 +151,6 @@ vm_verify_options_kvm() {
 	    fi
 	    grep -q "pSeries" /proc/cpuinfo && kvm_device=scsi-hd	# no virtio on pSeries
 	    grep -q "PowerNV" /proc/cpuinfo || kvm_device=scsi-hd	# no virtio on ppc != power7 yet
-	    grep -q "POWER9" /proc/cpuinfo && kvm_cpu="-cpu host,compat=power8"
 	    ;;
 	s390|s390x)
 	    kvm_bin="/usr/bin/qemu-system-s390x"
