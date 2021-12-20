@@ -232,8 +232,8 @@ preinstall_setup() {
 	    .build.kernel.*|.build.hostarch.*|.build.initrd.*|.build.console.*) ;;
 	    .build*|.init_b_cache|.preinstallimage*|.srcfiles*|.pkgs|.rpm-cache|installed-pkg|proc|sys) continue ;;
 	esac
-	mv "./$i" build-preinstall || cleanup_and_exit 1
-    done
+	echo "./$i"
+    done | xargs -r mv -t build-preinstall || cleanup_and_exit 1
     cd build-preinstall || cleanup_and_exit 1
 }
 
@@ -245,8 +245,8 @@ preinstall_integrate() {
 	    .build.kernel.*|.build.hostarch.*|.build.initrd.*|.build.console.*) ;;
 	    .build*|.init_b_cache|.preinstallimage*|.srcfiles*|.pkgs|.rpm-cache|installed-pkg|proc|sys) continue ;;
 	esac
-	mv "./$i" .. || cleanup_and_exit 1
-    done
+	echo "./$i"
+    done | xargs -r mv -t .. || cleanup_and_exit 1
     cd "$BUILD_ROOT" || cleanup_and_exit 1
     assert_dirs
 }
@@ -850,12 +850,9 @@ else
     pkg_set_type
 
     if test -n "$PREINSTALL_IMAGE" ; then
-	for PKG in $PACKAGES_FROM_PREINSTALLIMAGE ; do
-	    # touch the file so that the copying works
-	    touch $BUILD_ROOT/.init_b_cache/rpms/"$PKG.$PSUF"
-	done
+       # touch the file so that the copying works
+       for PKG in $PACKAGES_FROM_PREINSTALLIMAGE; do echo "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF"; done | xargs -r touch
     fi
-
 fi
 
 # XXX: should use an option instead of looking at the recipe?
@@ -935,12 +932,14 @@ fi
 
 if test -n "$PREPARE_VM" ; then
     echo "copying packages..."
-    for PKG in $PACKAGES_TO_ALL $PACKAGES_TO_SYSROOTINSTALL ; do
-	rm -rf $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
-	cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
-	ln -s -f ../$PKG.$PSUF $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF
-	check_exit
-    done
+
+    PKGS="$PACKAGES_TO_ALL $PACKAGES_TO_SYSROOTINSTALL"
+    rm -f $(for P in $PKGS; do echo $BUILD_ROOT/.init_b_cache/$P.$PSUF; done)
+    for P in $PKGS; do echo $BUILD_ROOT/.init_b_cache/rpms/$P.$PSUF; done | \
+        xargs -r cp -L -p -t $BUILD_ROOT/.init_b_cache || cleanup_and_exit 1
+    ln -s -f $(for P in $PKGS ; do echo "../$P.$PSUF"; done) -t $BUILD_ROOT/.init_b_cache/rpms
+    check_exit
+
     # alreadyinstalled check will not work, but we have to live with that...
     echo -n 'reordering...'
     PACKAGES_TO_INSTALL=`reorder $PACKAGES_TO_INSTALL`
