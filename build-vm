@@ -920,8 +920,7 @@ vm_first_stage() {
     if test -n "$CCACHE" -a -n "$CCACHE_ARCHIVE" -a "$CCACHE_ARCHIVE" = "${CCACHE_ARCHIVE#redis://}"; then
 	mkdir -p "$BUILD_ROOT/.build.oldpackages"
 	if ! test "$BUILD_ROOT/.build.oldpackages/_ccache.tar" -ef "$CCACHE_ARCHIVE" ; then
-	    rm -f "$BUILD_ROOT/.build.oldpackages/_ccache.tar"
-	    cp -a "$CCACHE_ARCHIVE" "$BUILD_ROOT/.build.oldpackages/_ccache.tar"
+	    cp --remove-destination -a "$CCACHE_ARCHIVE" "$BUILD_ROOT/.build.oldpackages/_ccache.tar"
 	fi
 	CCACHE_ARCHIVE="/.build.oldpackages/_ccache.tar"
     fi

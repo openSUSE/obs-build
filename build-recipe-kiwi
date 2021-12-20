@@ -709,8 +709,7 @@ postprocess_kiwi_containers() {
 	    for rr in $r*.containerinfo ; do
 		test -e "$rr" || continue
 		echo "creating base package information"
-		rm -f "$BUILD_ROOT/tmp/create_derived_package_list"
-		cp "$BUILD_DIR/create_container_package_list" "$BUILD_ROOT/tmp/create_container_package_list"
+		cp --remove-destination "$BUILD_DIR/create_container_package_list" "$BUILD_ROOT/tmp/create_container_package_list"
 		chroot "$BUILD_ROOT" /bin/bash /tmp/create_container_package_list "${KIWI_DERIVED_CONTAINER#$BUILD_ROOT}" > "$r.basepackages"
 		rm -f "$BUILD_ROOT/tmp/create_derived_package_list"
 		break
