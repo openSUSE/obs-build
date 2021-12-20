@@ -37,7 +37,6 @@ BuildArch:      noarch
 # Keep the following dependencies in sync with obs-worker package
 Requires:       bash
 Requires:       binutils
-Requires:       findutils
 Requires:       perl
 Requires:       tar
 # needed for fuser
