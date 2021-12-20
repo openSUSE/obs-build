@@ -69,7 +69,7 @@ if ($opts->{'create-cpio'}) {
 }
 
 if ($opts->{'help'}) {
-  print "Usage: download_assets [--assetdir dir] dir...\n";
+  print "Usage: download_assets [--assetdir dir] [--noassetdir] [--unpack] dir...\n";
   exit(0);
 }
 die("Please specify at least one directory\n") unless @dirs;
