@@ -378,8 +378,7 @@ vm_fixup_zvm() {
     vm_initrd="${vm_initrd}-${kernel_version}"
     # copy initrd to build worker:
     echo "copy $vm_initrd to $BUILD_ROOT"
-    rm -rf "${BUILD_ROOT}/boot/${vm_initrd}"
-    cp -a "${vm_initrd}" "${BUILD_ROOT}/boot"
+    cp --remove-destination -a "${vm_initrd}" "${BUILD_ROOT}/boot/${vm_initrd}"
     # finally, install bootloader to the worker disk
     # XXX/TODO: does zipl read or write ${BUILD_ROOT}${vm_initrd}? Either
     # rm -rf the file or check for a symlink

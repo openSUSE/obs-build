@@ -66,8 +66,7 @@ pkg_initdb_deb() {
     deb_setup
     # force dpkg into database to make epoch test work
     if ! test "$BUILD_ROOT/.init_b_cache/rpms/dpkg.deb" -ef "$BUILD_ROOT/.init_b_cache/dpkg.deb" ; then
-	rm -f $BUILD_ROOT/.init_b_cache/dpkg.deb
-	cp $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb $BUILD_ROOT/.init_b_cache/dpkg.deb || cleanup_and_exit 1
+	cp --remove-destination $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb $BUILD_ROOT/.init_b_cache/dpkg.deb || cleanup_and_exit 1
     fi
     DEB_UNSAFE_IO=
     chroot $BUILD_ROOT dpkg --force-unsafe-io --version >/dev/null 2>&1 && DEB_UNSAFE_IO="--force-unsafe-io"
