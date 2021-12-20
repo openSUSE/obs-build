@@ -51,6 +51,8 @@ my %known_options = (
   'unpack' => '',
 
   'create-cpio' => '',
+
+  'show-dir-srcmd5' => '',
 );
 
 my ($opts, @dirs) = PBuild::Options::parse_options(\%known_options, @ARGV);
@@ -71,6 +73,15 @@ if ($opts->{'create-cpio'}) {
     s/^\/// for @dirs;
     PBuild::Cpio::cpio_create(\*STDOUT, $dir, 'dircontent' => \@dirs);
   }
+  exit(0);
+}
+
+if ($opts->{'show-dir-srcmd5'}) {
+  die("Please specify a directory\n") unless @dirs == 1;
+  my $dir = shift @dirs;
+  die("$dir: $!\n") unless -e $dir;
+  die("$dir: Not a directory\n") unless -d _;
+  print PBuild::Source::gendirdigest($dir)."\n";
   exit(0);
 }
 
