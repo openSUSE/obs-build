@@ -158,16 +158,17 @@ pkg_finalize_rpm() {
 	echo "now installing cumulated packages"
 	for ((num=0; num<=cumulate; num++)) ; do
 	    echo ${CUMULATED_LIST[$num]}
+	done > $BUILD_ROOT/.init_b_cache/manifest
+	for ((num=0; num<=cumulate; num++)) ; do
 	    PKG=${CUMULATED_LIST[$num]##*/}
 	    test "$BUILD_ROOT/.init_b_cache/rpms/$PKG" -ef "$BUILD_ROOT/${CUMULATED_LIST[$num]}" && continue
-	    rm -f $BUILD_ROOT/${CUMULATED_LIST[$num]}
-	    cp $BUILD_ROOT/.init_b_cache/rpms/$PKG $BUILD_ROOT/${CUMULATED_LIST[$num]} || cleanup_and_exit 1
-	done > $BUILD_ROOT/.init_b_cache/manifest
-	( cd $BUILD_ROOT && chroot $BUILD_ROOT rpm --ignorearch --nodeps -Uh --oldpackage --ignoresize --verbose $RPMCHECKOPTS \
+	    cp --remove-destination $BUILD_ROOT/.init_b_cache/rpms/$PKG $BUILD_ROOT/${CUMULATED_LIST[$num]} || cleanup_and_exit 1
+	done
+	( cd $BUILD_ROOT && chroot $BUILD_ROOT rpm --ignorearch --nodeps -Uvh --oldpackage --ignoresize $RPMCHECKOPTS \
 		$ADDITIONAL_PARAMS .init_b_cache/manifest 2>&1 || touch $BUILD_ROOT/exit )
 	for ((num=0; num<=cumulate; num++)) ; do
-	    rm -f $BUILD_ROOT/${CUMULATED_LIST[$num]}
-	done
+            echo "$BUILD_ROOT/${CUMULATED_LIST[$num]}"
+        done | xargs -r rm -f
 	rm -f $BUILD_ROOT/.init_b_cache/manifest
 	check_exit
 	for ((num=0; num<=cumulate; num++)) ; do
