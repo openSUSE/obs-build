@@ -128,7 +128,7 @@ vm_verify_options_kvm() {
 	    fi
 	    if grep -q "POWER9" /proc/cpuinfo; then
 		# This option has been added in QEMU 2.10
-		if $kvm_bin -machine 'pseries,?' 2>&1 | grep -q max-cpu-compat; then
+		if $kvm_bin -machine 'help' 2>&1 | grep -q ^pseries-6; then
 		    kvm_options="-enable-kvm -M pseries,max-cpu-compat=power8"
 		else
 		    kvm_cpu="-cpu host,compat=power8"
