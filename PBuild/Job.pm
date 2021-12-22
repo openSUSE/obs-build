@@ -52,7 +52,7 @@ sub forkjob {
 }
 
 #
-# Update the logile_lines element by counting lines in the logfile
+# Update the logfile_lines element by counting lines in the logfile
 #
 sub updatelines {
   my ($job) = @_;
@@ -178,6 +178,7 @@ sub copy_sources {
 #
 sub export_origtar {
   my ($p, $srcdir, $opts) = @_;
+  return unless -d "$p->{'dir'}/.git";
   system("$opts->{'libbuild'}/export_debian_orig_from_git", $p->{'dir'}, "$srcdir/build.origtar") && die("export_orig_from_git $p->{'dir'} $srcdir/build.origtar: $?\n");
 }
 
@@ -256,14 +257,12 @@ sub createjob {
   my $copy_sources_asis;
   # for kiwi/docker we need to copy the sources to $buildroot/.build-srcdir
   # so that we can set up the "repos" and "containers" directories
-  if ($kiwimode || $p->{'asset_files'} || $p->{'recipe'} eq 'debian/control') {
+  if ($kiwimode || $p->{'asset_files'} || grep {/\/$/} @{$p->{'files'} || []}) {
     $srcdir = "$buildroot/.build-srcdir";
     copy_sources($p, $srcdir);
     $ctx->{'assetmgr'}->copy_assets($p, $srcdir) if $p->{'asset_files'};
-    if ($p->{'recipe'} eq 'debian/control') {
-      $copy_sources_asis = 1;
-      export_origtar($p, $srcdir, $opts);
-    }
+    export_origtar($p, $srcdir, $opts) if $p->{'recipe'} eq 'debian/control';
+    $copy_sources_asis = 1;
   }
 
   my $oldresultdir = "$ctx->{'builddir'}/$p->{'pkg'}";
@@ -362,7 +361,7 @@ sub createjob {
 }
 
 #
-# move the build result into the correct place if we used a
+# Move the build result into the correct place if we used a
 # subdirectory for building
 #
 sub rename_build_result {
@@ -381,6 +380,9 @@ sub rename_build_result {
   symlink('.', "$buildroot/.build.packages/KIWI");
 }
 
+#
+# Return the last lines of a logfile
+#
 sub get_last_lines {
   my ($logfile) = @_;
   my $fd;
