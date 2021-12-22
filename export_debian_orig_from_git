@@ -23,12 +23,9 @@ sub get_pristine_commit {
   $pristine_branch = 'pristine-tar' if !$pristine_branch && has_git_branch('refs/heads/pristine-tar');
   $pristine_branch = 'origin/pristine-tar' if !$pristine_branch && has_git_branch('refs/remotes/origin/pristine-tar');
   return unless $pristine_branch;
-  my $pristine_commit;
   my $fd;
-  my $found;
   open ($fd, '-|', 'git', 'log', '--pretty=format:%H:%s', $pristine_branch);
   while (<$fd>) {
-    next if $found;
     chomp;
     next unless /^([0-9a-f]+):.* data for (.*)/;
     my ($id, $tar) = ($1, $2);
@@ -39,7 +36,7 @@ sub get_pristine_commit {
   close($fd) || die("git log: $?\n");
 }
 
-sub export_pristine_file {
+sub export_blob {
   my ($blob, $out) = @_;
   my $fd;
   my $pid = open($fd, '|-');
@@ -52,21 +49,26 @@ sub export_pristine_file {
   close($fd) || die("git cat-file: $?\n");
 }
 
-sub export_pristine_commit {
-  my ($commit, $tarfile, $dir) = @_;
+sub list_commit {
+  my ($commit) = @_;
   my %files;
   my $fd;
   open ($fd, '-|', 'git', 'ls-tree', $commit) || die("git: $!\n");
   while (<$fd>) {
     chomp;
     my @s = split(' ', $_, 4);
-    next unless @s == 4 && $s[2] =~ /^[0-9a-f]+/;
-    $files{$s[3]} = $s[2];
+    $files{$s[3]} = $s[2] if @s == 4 && $s[2] =~ /^[0-9a-f]+/;
   }
   close($fd) || die("git ls-tree $commit: $?\n");
+  return \%files;
+}
+
+sub export_pristine_commit {
+  my ($commit, $tarfile, $dir) = @_;
+  my $files = list_commit($commit);
   for my $f ('.delta', '.id', '.asc') {
-    my $blob = $files{"$tarfile$f"};
-    export_pristine_file($blob, "$dir/$tarfile$f") if $blob;
+    my $blob = $files->{"$tarfile$f"};
+    export_blob($blob, "$dir/$tarfile$f") if $blob;
   }
 }
 
