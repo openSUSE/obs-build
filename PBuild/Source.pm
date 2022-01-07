@@ -91,7 +91,7 @@ sub get_scm_controlled {
 sub list_package {
   my ($dir) = @_;
   my %files;
-  my %asset_files;
+  my @assets;
   my $controlled;
   for my $file (sort(PBuild::Util::ls($dir))) {
     next if $file eq '_meta' || $file eq '.git';
@@ -102,8 +102,8 @@ sub list_package {
     if (-l _) {
       $lnk = readlink("$dir/$file");
       die("readlink $dir/$file: $!\n") unless defined $lnk;
-      if ($lnk =~ /^(\/ipfs\/.*)$/s) {
-	$asset_files{$file} = { 'cid' => $1, 'type' => 'ipfs' };
+      if ($lnk =~ /^(\/ipfs\/.+)$/s) {
+	push @assets, { 'file' => $file, 'cid' => $1, 'type' => 'ipfs' };
 	next;
       }
     }
@@ -128,7 +128,7 @@ sub list_package {
     }
   }
   $files{"debian/control"} = gendigest("$dir/debian/control") if $files{'debian/'} && -s "$dir/debian/control";
-  return \%files, \%asset_files;
+  return \%files, \@assets;
 }
 
 sub calc_srcmd5 {

@@ -94,7 +94,7 @@ sub update_srcmd5 {
   my $old_srcmd5 = $p->{'srcmd5'};
   return 0 unless $old_srcmd5;
   my $asset_files = $p->{'asset_files'};
-  return 0 unless $asset_files;
+  return 0 unless %{$asset_files || {}};
   my %files = %{$p->{'files'}};
   for my $file (sort keys %$asset_files) {
     my $asset = $asset_files->{$file};
@@ -113,19 +113,27 @@ sub update_srcmd5 {
 }
 
 #
-# Generate asset information from the package source
+# Merge assets into the asset_files hash
 #
-sub find_assets {
-  my ($assetmgr, $p, $arch) = @_;
-  my $bt = $p->{'buildtype'} || '';
-  my @assets;
-  push @assets, PBuild::RemoteAssets::fedpkg_parse($p) if $p->{'files'}->{'sources'};
-  push @assets, PBuild::RemoteAssets::archlinux_parse($p, $arch) if $bt eq 'arch';
-  push @assets, PBuild::RemoteAssets::recipe_parse($p, $arch) if $bt eq 'spec' || $bt eq 'kiwi';
-  for my $asset (@assets) {
+sub merge_assets {
+  my ($assetmgr, $p, $assets) = @_;
+  for my $asset (@{$assets || []}) {
     $asset->{'assetid'} = get_assetid($asset->{'file'}, $asset);
     $p->{'asset_files'}->{$asset->{'file'}} = $asset;
   }
+}
+
+#
+# Generate asset information from the package source
+#
+sub find_assets {
+  my ($assetmgr, $p) = @_;
+  my $bt = $p->{'buildtype'} || '';
+  my @assets;
+  push @assets, @{$p->{'source_assets'} || []};
+  push @assets, PBuild::RemoteAssets::fedpkg_parse($p) if $p->{'files'}->{'sources'};
+  push @assets, PBuild::RemoteAssets::recipe_parse($p) if $bt eq 'spec' || $bt eq 'kiwi' || $bt eq 'arch';
+  merge_assets($assetmgr, $p, \@assets);
   update_srcmd5($assetmgr, $p) if $p->{'asset_files'};
 }
 

@@ -38,40 +38,6 @@ sub rename_unless_present {
 }
 
 #
-# Arch linux remote asset handling
-#
-sub archlinux_parse {
-  my ($p, $arch) = @_;
-  $arch = 'i686' if $arch =~ /^i[345]86$/;
-  my @assets;
-  for my $asuf ('', "_$arch") {
-    my $sources = $p->{"source$asuf"};
-    next unless @{$sources || []};
-    my @digests;
-    for my $digesttype ('sha512', 'sha256', 'sha1', 'md5') {
-      @digests = map {$_ eq 'SKIP' ? $_ : "$digesttype:$_"} @{$p->{"${_}sums$asuf"} || []};
-      last if @digests;
-    }
-    # work around bug in source parser
-    my @sources;
-    for (@$sources) {
-      push @sources, $_;
-      splice(@sources, -1, 1, $1, "$1.sig") if /(.*)\{,\.sig\}$/;
-    }
-    for my $s (@sources) {
-      my $digest = shift @digests;
-      next unless $s =~ /^https?:\/\/.*\/([^\.\/][^\/]+)$/s;
-      my $file = $1;
-      next if $p->{'files'}->{$file};
-      my $asset = { 'file' => $file, 'url' => $s, 'type' => 'url' };
-      $asset->{'digest'} = $digest if $digest && $digest ne 'SKIP';
-      push @assets, $asset;
-    }
-  }
-  return @assets;
-}
-
-#
 # Recipe file remote asset handling
 #
 sub recipe_parse {

@@ -60,6 +60,30 @@ sub unquotesplit {
   return @args;
 }
 
+sub get_assets {
+  my ($vars, $asuf) = @_;
+  my @digests;
+  for my $digesttype ('sha512', 'sha256', 'sha1', 'md5') {
+    @digests = map {$_ eq 'SKIP' ? $_ : "$digesttype:$_"} @{$vars->{"${digesttype}sums$asuf"} || []};
+    last if @digests;
+  }
+  # work around bug in source parser
+  my @sources;
+  for (@{$vars->{"source$asuf"} || []}) {
+    push @sources, $_;
+    splice(@sources, -1, 1, $1, "$1.sig") if /(.*)\{,\.sig\}$/;
+  }
+  my @assets;
+  for my $s (@sources) {
+    my $digest = shift @digests;
+    next unless $s =~ /^https?:\/\/.*\/([^\.\/][^\/]+)$/s;
+    my $asset = { 'url' => $s };
+    $asset->{'digest'} = $digest if $digest && $digest ne 'SKIP';
+    push @assets, $asset;
+  }
+  return @assets;
+}
+
 sub parse {
   my ($config, $pkgbuild) = @_;
   my $ret;
@@ -128,6 +152,12 @@ sub parse {
   # Maintain architecture-specific sources for officially supported architectures
   for my $asuf ('', '_i686', '_x86_64') {
     $ret->{"source$asuf"} = $vars{"source$asuf"} if $vars{"source$asuf"};
+  }
+  # find remote assets
+  for my $asuf ('', "_$arch") {
+    next unless @{$vars{"source$asuf"} || []};
+    my @assets = get_assets(\%vars, $asuf);
+    push @{$ret->{'remoteassets'}}, @assets if @assets;
   }
   return $ret;
 }

@@ -272,14 +272,15 @@ for my $assetsurl (@{$opts->{'assets'} || []}) {
 print "getting package information\n";
 my %pkgsrc;
 for my $pkg (@pkgs) {
-  my ($files, $asset_files) = PBuild::Source::list_package("$dir/$pkg");
+  my ($files, $source_assets) = PBuild::Source::list_package("$dir/$pkg");
   my $p = {
     'pkg' => $pkg,
     'dir' => "$dir/$pkg",
     'files' => $files,
     'srcmd5' => PBuild::Source::calc_srcmd5($files),
+    'srcmd5' => PBuild::Source::calc_srcmd5($files),
   };
-  $p->{'asset_files'} = $asset_files if %{$asset_files || {}};
+  $p->{'source_assets'} = $source_assets if @{$source_assets || []};
   $pkgsrc{$pkg} = $p;
 }
 
@@ -353,7 +354,7 @@ if ($cross) {
 
 # search for assets
 for my $pkg (@pkgs) {
-  $assetmgr->find_assets($pkgsrc{$pkg}, $myarch);
+  $assetmgr->find_assets($pkgsrc{$pkg});
 }
 
 #FIXME
