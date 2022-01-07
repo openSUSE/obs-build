@@ -48,6 +48,7 @@ my %known_options = (
   'assetdir' => ':',
   'assets' => '::',
   'noassetdir' => '',
+  'clean' => '',
   'unpack' => '',
 
   'create-cpio' => '',
@@ -102,6 +103,8 @@ for my $dir (@dirs) {
     'dir' => $dir,
     'files' => $files,
   };
+  $p->{'keep_all_assets'} = 1 if $opts->{'clean'};
+
   my $assetmgr = PBuild::AssetMgr::create($assetdir);
   $assetmgr->add_assetshandler($_) for @{$opts->{'assets'} || []};
   $assetmgr->add_assetshandler($fedpkg) if !$opts->{'assets'} && $files->{'sources'};
@@ -122,6 +125,18 @@ for my $dir (@dirs) {
     $p->{'remoteassets'} = $d->{'remoteassets'} if $d && $d->{'remoteassets'};
     $p->{'name'} ||= $d->{'name'} if $d->{'name'};
     $assetmgr->find_assets($p);
+  }
+  if ($opts->{'clean'}) {
+    my $af = $p->{'asset_files'} || {};
+    for (values %$af) {
+      if ($_->{'isdir'}) {
+        PBuild::Util::rm_rf("$dir/$_->{'file'}") if -d "$dir/$_->{'file'}";
+        unlink "$dir/$_->{'file'}.obscpio" if -e "$dir/$_->{'file'}.obscpio";
+      } else {
+        unlink "$dir/$_->{'file'}" if -e "$dir/$_->{'file'}";
+      }
+    }
+    next;
   }
   if ($opts->{'unpack'} && $opts->{'noassetdir'}) {
     my $af = $p->{'asset_files'} || {};
