@@ -907,13 +907,13 @@ vm_first_stage() {
     # some time has passed copying files, lets make sure we should not exit
     check_exit
 
-    # do vm specific fixups
-    vm_fixup
-
     # update the hostarch
     if test -n "$VM_ROOT" ; then
 	vm_update_hostarch
     fi
+
+    # do vm specific fixups
+    vm_fixup
 
     # copy ccache archive
     if test -n "$CCACHE" -a -n "$CCACHE_ARCHIVE" -a "$CCACHE_ARCHIVE" = "${CCACHE_ARCHIVE#redis://}"; then
