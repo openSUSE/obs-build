@@ -202,6 +202,7 @@ sub parse {
   my $excludedline;
   my $vars = {};
   my $vars_env = {};
+  my %as_container;
 
   my @requiredarch;
   my @badarch;
@@ -282,6 +283,8 @@ sub parse {
     if ($cmd eq 'FROM') {
       shift @args if @args && $args[0] =~ /^--platform=/;
       if (@args) {
+        next if $as_container{$args[0]};
+        $as_container{$args[2]} = $args[0] if @args > 2 && lc($args[1]) eq 'as';
         my $container = $args[0];
         if ($container ne 'scratch') {
           $container .= ':latest' unless $container =~ /:[^:\/]+$/;
