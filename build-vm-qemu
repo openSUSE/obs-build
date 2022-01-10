@@ -33,17 +33,6 @@ vm_verify_options_qemu() {
 
     vm_kernel=/.build.kernel.kvm
     vm_initrd=/.build.initrd.kvm
-
-    case $qemu_device in
-        virtio*)
-            VM_ROOTDEV=/dev/disk/by-id/virtio-0
-            VM_SWAPDEV=/dev/disk/by-id/virtio-1
-            ;;
-        *)
-            VM_ROOTDEV=/dev/sda
-            VM_SWAPDEV=/dev/sdb
-            ;;
-    esac
 }
 
 vm_startup_qemu() {
@@ -224,6 +213,17 @@ vm_kill_qemu() {
 vm_fixup_qemu() {
     vm_fixup_kvm
 
+    case $qemu_device in
+        virtio*)
+            VM_ROOTDEV=/dev/disk/by-id/virtio-0
+            VM_SWAPDEV=/dev/disk/by-id/virtio-1
+            ;;
+        *)
+            VM_ROOTDEV=/dev/sda
+            VM_SWAPDEV=/dev/sdb
+            ;;
+    esac
+
     if test -z "$qemu_serial_device" ; then
         if test -e "$BUILD_ROOT/.build.console.kvm" -a ! -L "$BUILD_ROOT/.build.console.kvm" && grep -q '^virtio$' "$BUILD_ROOT/.build.console.kvm" ; then
             echo "Detected virtio-serial support"
@@ -231,7 +231,6 @@ vm_fixup_qemu() {
             qemu_console=hvc0
         fi
     fi
-
 }
 
 vm_attach_root_qemu() {
