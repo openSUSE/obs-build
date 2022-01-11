@@ -179,29 +179,37 @@ pkg_finalize_rpm() {
     fi
 }
 
-LZMA_PAYLOADDECOMPRESS=cat
-t=$(mktemp)
-rpm --showrc > $t
-grep -q -E 'PayloadIsLzma|_lzma' < $t || PAYLOADDECOMPRESS="lzma -d"
-XZ_PAYLOADDECOMPRESS=cat
-grep -q -E 'PayloadIsXz|_xz' < $t || PAYLOADDECOMPRESS="xz -d"
-ZSTD_PAYLOADDECOMPRESS=cat
-grep -q -F 'PayloadIsZstd' < $t || PAYLOADDECOMPRESS="zstd -d"
-rm -f $t
+RPM_PAYLOADDECOMPRESS_PROBED=
+
+probe_rpm_payloaddecompress() {
+    local l
+    RPM_PAYLOADDECOMPRESS_PROBED=true
+    RPM_PAYLOADDECOMPRESS_LZMA="lzma -d"
+    RPM_PAYLOADDECOMPRESS_XZ="xz -d"
+    RPM_PAYLOADDECOMPRESS_ZSTD="zstd -d"
+    while read l ; do
+	case "$l" in
+	    *rpmlib\(PayloadIsLzma\)*) RPM_PAYLOADDECOMPRESS_LZMA=cat ;;
+	    *rpmlib\(PayloadIsXz\)*)   RPM_PAYLOADDECOMPRESS_XZ=cat ;;
+	    *rpmlib\(PayloadIsZstd\)*) RPM_PAYLOADDECOMPRESS_ZSTD=cat ;;
+	esac
+    done < <(rpm --showrc)
+}
 
 pkg_preinstall_rpm() {
     test -d "$BUILD_INIT_CACHE/scripts" || mkdir -p "$BUILD_INIT_CACHE/scripts"
 
-    # if our rpm(1) can decompress everything, we don't need to probe what compression
+    test -z "$RPM_PAYLOADDECOMPRESS_PROBED" && probe_rpm_payloaddecompress
+    # if our rpm can decompress everything, we don't need to probe what compression
     # we actually have
-    if test "$LZMA_PAYLOADDECOMPRESS" = "cat" -a "$XZ_PAYLOADDECOMPRESS" = "cat" -a "$ZSTD_PAYLOADDECOMPRESS" = "cat"; then
+    if test "$RPM_PAYLOADDECOMPRESS_LZMA" = "cat" -a "$RPM_PAYLOADDECOMPRESS_XZ" = "cat" -a "$RPM_PAYLOADDECOMPRESS_ZSTD" = "cat"; then
         rpm2cpio "$BUILD_INIT_CACHE/rpms/$PKG.rpm" | $CPIO || cleanup_and_exit 1
     else
         PAYLOADDECOMPRESS=cat
         case $(rpm -qp --nodigest --nosignature --qf "%{PAYLOADCOMPRESSOR}\n" "$BUILD_INIT_CACHE/rpms/$PKG.rpm") in
-            lzma) PAYLOADCOMPRESSOR="$LZMA_PAYLOADDECOMPRESS" ;;
-            xz) PAYLOADDECOMPRESSOR="$XZ_PAYLOADDECOMPRESS" ;;
-            zstd) PAYLOADDECOMPRESSOR="$ZSTD_PAYLOADDECOMPRESS" ;;
+            lzma) PAYLOADCOMPRESS="$RPM_PAYLOADDECOMPRESS_LZMA" ;;
+            xz) PAYLOADDECOMPRESS="$RPM_PAYLOADDECOMPRESS_XZ" ;;
+            zstd) PAYLOADDECOMPRESS="$RPM_PAYLOADDECOMPRESS_ZSTD" ;;
         esac
         if test "$PAYLOADDECOMPRESS" = "lzma -d" ; then
             if ! lzma </dev/null >/dev/null 2>&1 ; then
