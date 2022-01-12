@@ -38,7 +38,7 @@ sub find_recipe {
   return $files{'simpleimage'} if $files{'simpleimage'};
   return $files{'snapcraft.yaml'} if $type eq 'snapcraft' && $files{'snapcraft.yaml'};
   return $files{'appimage.yml'} if $type eq 'appimage' && $files{'appimage.yml'};
-  return $files{'Dockerfile'} if $files{'Dockerfile'};
+  return $files{'Dockerfile'} if $type eq 'docker' && $files{'Dockerfile'};
   return $files{'fissile.yml'} if $type eq 'fissile' && $files{'fissile.yml'};
   return $files{'Chart.yaml'} if $type eq 'helm' && $files{'Chart.yaml'};
   return (grep {/flatpak\.(?:ya?ml|json)$/} sort keys %files)[0] if $type eq 'flatpak';
@@ -57,6 +57,10 @@ sub find_recipe {
   }
   return $files{'debian.control'} if $type eq 'dsc' && $files{'debian.control'};
   return $files{'debian/control'} if $type eq 'dsc' && $files{'debian/control'};
+  # as last resort ignore the type for image/container building
+  if ($type ne 'docker') {
+    return $files{'Dockerfile'} if $files{'Dockerfile'};
+  }
   if ($type ne 'kiwi') {
     @files = grep {/\.kiwi$/} keys %files;
     @files = grep {/^\Q$pkg\E/i} @files if @files > 1;
