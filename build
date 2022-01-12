@@ -124,6 +124,9 @@ COPY_SOURCES_ASIS=
 RECIPE_BUILD_START_TIME=
 CCACHE_SETUP_START_TIME=
 
+# set all verbose modes to off by default
+BUILD_VERBOSE_VM=
+
 # This is for insserv
 export YAST_IS_RUNNING=instsys
 # https://github.com/systemd/systemd/blob/master/docs/ENVIRONMENT.md
@@ -332,6 +335,10 @@ Known Parameters:
 
   --emulator-script SCRIPT
               specify another emulator instead of emulator.sh
+
+  --verbose CLASS
+              Verbose output, CLASS can be 'all' or a specific one:
+                vm: includes kernel and initrd messages
 
   --vm-type TYPE
               Use virtual machine instead of chroot
@@ -1238,6 +1245,21 @@ while test -n "$1"; do
       -rsync-dest)
 	needarg
 	RSYNCDEST=$ARG
+	shift
+      ;;
+      -verbose)
+	needarg
+        case "$ARGS" in
+        all)
+            BUILD_VERBOSE_VM=true
+            ;;
+        vm)
+            BUILD_VERBOSE_VM=true
+            ;;
+        *)
+            echo "WARNING: unknown verbose option $ARGS"
+            ;;
+        esac
 	shift
       ;;
       -uid)
