@@ -160,8 +160,7 @@ pkg_finalize_rpm() {
 	    echo ${CUMULATED_LIST[$num]}
 	    PKG=${CUMULATED_LIST[$num]##*/}
 	    test "$BUILD_ROOT/.init_b_cache/rpms/$PKG" -ef "$BUILD_ROOT/${CUMULATED_LIST[$num]}" && continue
-	    rm -f $BUILD_ROOT/${CUMULATED_LIST[$num]}
-	    cp $BUILD_ROOT/.init_b_cache/rpms/$PKG $BUILD_ROOT/${CUMULATED_LIST[$num]} || cleanup_and_exit 1
+	    cp --remove-destination $BUILD_ROOT/.init_b_cache/rpms/$PKG $BUILD_ROOT/${CUMULATED_LIST[$num]} || cleanup_and_exit 1
 	done > $BUILD_ROOT/.init_b_cache/manifest
 	( cd $BUILD_ROOT && chroot $BUILD_ROOT rpm --ignorearch --nodeps -Uh --oldpackage --ignoresize --verbose $RPMCHECKOPTS \
 		$ADDITIONAL_PARAMS .init_b_cache/manifest 2>&1 || touch $BUILD_ROOT/exit )
