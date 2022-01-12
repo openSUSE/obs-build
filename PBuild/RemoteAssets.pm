@@ -21,10 +21,13 @@
 package PBuild::RemoteAssets;
 
 use POSIX;
+use Digest::MD5 ();
+use MIME::Base64 ();
 
 use PBuild::Util;
 use PBuild::Download;
 use PBuild::Cpio;
+use PBuild::Zip;
 
 use strict;
 
@@ -36,6 +39,22 @@ sub rename_unless_present {
   die("link $old $new: $!\n") if !link($old, $new) && $! != POSIX::EEXIST;
   unlink($old);
 }
+
+#
+# create a obscpio asset from a directory
+#
+sub create_asset_from_dir {
+  my ($assetdir, $asset, $dir, $mtime) = @_;
+  my $assetid = $asset->{'assetid'};
+  my $adir = "$assetdir/".substr($assetid, 0, 2);
+  PBuild::Util::mkdir_p($adir);
+  my $fd;
+  open($fd, '>', "$adir/.$assetid.$$") || die("$adir/.$assetid.$$: $!");
+  PBuild::Cpio::cpio_create($fd, $dir, 'mtime' => $mtime);
+  close($fd) || die("$adir/.$assetid.$$: $!");
+  rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
+}
+
 
 #
 # Recipe file remote asset handling
@@ -64,6 +83,116 @@ sub recipe_parse {
     push @assets, $asset;
   }
   return @assets;
+}
+
+# Go module proxy support
+
+#
+# Parse the go.sum file to find module information
+#
+sub golang_parse {
+  my ($p) = @_;
+  return unless $p->{'files'}->{'go.sum'};
+  my $fd;
+  my @assets;
+  open ($fd, '<', "$p->{'dir'}/go.sum") || die("$p->{'dir'}/go.sum: $!\n");
+  my %mods;
+  while (<$fd>) {
+    chomp;
+    my @s = split(' ', $_);
+    next unless @s >= 3;
+    next unless $s[1] =~ /^v./;
+    next unless $s[2] =~ /^h1:[a-zA-Z0-9\+\/=]+/;
+    if ($s[1] =~ s/\/go.mod$//) {
+      $mods{"$s[0]/$s[1]"}->{'mod'} = $s[2];
+    } else {
+      $mods{"$s[0]/$s[1]"}->{'zip'} = $s[2];
+      $mods{"$s[0]/$s[1]"}->{'info'} = undef;	# not protected by a checksum
+    }
+  }
+  for my $mod (sort keys %mods) {
+    my $l = $mods{$mod};
+    next unless $l->{'mod'};	# need at least the go.mod file
+    my $k = "$mod";
+    $k .= " $_ $mods{$mod}->{$_}" for sort keys %{$mods{$mod}};
+    my $file = "build-gomodcache/$mod";
+    $file =~ s/\//:/g;
+    my $assetid = Digest::MD5::md5_hex($k);
+    my $asset = { 'type' => 'golang', 'file' => $file, 'mod' => $mod, 'parts' => $mods{$mod}, 'isdir' => 1, 'immutable' => 1, 'assetid' => $assetid };
+    push @assets, $asset;
+  }
+  close $fd;
+  return @assets;
+}
+
+#
+# Verify a file with the go module h1 checksum
+#
+sub verify_golang_h1 {
+  my ($file, $part, $h1) = @_;
+  my $fd;
+  open($fd, '<', $file) || die("file: $!\n");
+  my %content;
+  if ($part eq 'mod') {
+    $content{'go.mod'} = {};
+  } elsif ($part eq 'zip') {
+    my $l = PBuild::Zip::zip_list($fd);
+    for (@$l) {
+      next if $_->{'ziptype'} != 8;	# only plain files
+      die("file $_->{'name'} exceeds size limit\n") if $_->{'size'} >= 500000000;
+      $content{$_->{'name'}} = $_;
+    }
+  }
+  die("$file: no content\n") unless %content;
+  my $data = '';
+  for my $file (sort keys %content) {
+    my $ctx = PBuild::Download::digest2ctx("sha256:");
+    if ($part eq 'zip') {
+      PBuild::Zip::zip_extract($fd, $content{$file}, 'writer' => sub {$ctx->add($_[0])});
+    } else {
+      my $chunk;
+      $ctx->add($chunk) while read($fd, $chunk, 65536);
+    }
+    $data .= $ctx->hexdigest()."  $file\n";
+  }
+  close($fd);
+  die("not a h1 checksum: $h1\n") unless $h1 =~ /^h1:/;
+  my $digest = "sha256:".unpack("H*", MIME::Base64::decode_base64(substr($h1, 3)));
+  PBuild::Download::checkdigest($data, $digest);
+}
+
+#
+# Fetch golang assets from a go module proxy
+#
+sub golang_fetch {
+  my ($p, $assetdir, $assets, $url) = @_;
+  my @assets = grep {$_->{'type'} eq 'golang'} @$assets;
+  return unless @assets;
+  print "fetching ".PBuild::Util::plural(scalar(@assets), 'asset')." from $url\n";
+  for my $asset (@assets) {
+    my $tmpdir = "$assetdir/.tmpdir.$$";
+    PBuild::Util::rm_rf($tmpdir);
+    my $mod = $asset->{'mod'};
+    my $moddir = $mod;
+    $moddir =~ s/\/[^\/]+$//;
+    $moddir =~ s/([A-Z])/'!'.lc($1)/ge;
+    my $vers = $mod;
+    $vers =~ s/.*\///;
+    $vers =~ s/([A-Z])/'!'.lc($1)/ge;
+    my $cname = "build-gomodcache";
+    PBuild::Util::mkdir_p("$tmpdir/$cname/$moddir/\@v");
+    my $parts = $asset->{'parts'};
+    for my $part (sort keys %$parts) {
+      my $proxyurl = "$url/$moddir/\@v/$vers.$part";
+      my $maxsize = $part eq 'zip' ? 500000000 : 16000000;
+      PBuild::Download::download($proxyurl, "$tmpdir/$cname/$moddir/\@v/$vers.$part", undef, 'retry' => 3, 'maxsize' => $maxsize);
+      my $h1 = $parts->{$part};
+      verify_golang_h1("$tmpdir/$cname/$moddir/\@v/$vers.$part", $part, $h1) if defined $h1;
+    }
+    my $mtime = 0;	# we want reproducible cpio archives
+    create_asset_from_dir($assetdir, $asset, $tmpdir, $mtime);
+    PBuild::Util::rm_rf($tmpdir);
+  }
 }
 
 # Fedora FedPkg / lookaside cache support
@@ -121,6 +250,8 @@ sub fedpkg_fetch {
   }
 }
 
+# IPFS asset support (parsing is done in the source handler)
+
 #
 # Get missing assets from the InterPlanetary File System
 #
@@ -141,18 +272,16 @@ sub ipfs_fetch {
   }
 }
 
+# Generic url asset support
+
 sub fetch_git_asset {
   my ($assetdir, $asset) = @_;
   my $tmpdir = "$assetdir/.tmpdir.$$";
-  if (-e $tmpdir) {
-    PBuild::Util::cleandir($tmpdir);
-    rmdir($tmpdir) || die("rmdir $tmpdir: $!\n");
-  }
+  PBuild::Util::rm_rf($tmpdir);
   PBuild::Util::mkdir_p($tmpdir);
   my $assetid = $asset->{'assetid'};
   my $adir = "$assetdir/".substr($assetid, 0, 2);
   my $file = $asset->{'file'};
-  $file =~ s/\.obscpio$//;
   PBuild::Util::mkdir_p($adir);
   my $url = $asset->{'url'};
   die unless $url =~ /^git(?:\+https?)?:/;
@@ -161,24 +290,19 @@ sub fetch_git_asset {
   push @cmd, '-b', $1 if $url =~ s/#([^#]+)$//;
   push @cmd, '--', $url, "$tmpdir/$file";
   system(@cmd) && die("git clone failed: $!\n");
+  # get timestamp of last commit
   my $pfd;
   open($pfd, '-|', 'git', '-C', "$tmpdir/$file", 'log', '--pretty=format:%ct', '-1') || die("open: $!\n");
   my $t = <$pfd>;
   close($pfd);
   chomp $t;
   $t = undef unless $t && $t > 0;
-  my $fd;
   if ($asset->{'donotpack'}) {
     rename("$tmpdir/$file", "$adir/$assetid") || die("rename $tmpdir $adir/$assetid: $!\n");
-    rmdir($tmpdir) || die("rmdir $tmpdir: $!\n");
-    return;
+  } else {
+    create_asset_from_dir($assetdir, $asset, $tmpdir, $t);
   }
-  open($fd, '>', "$adir/.$assetid.$$") || die("$adir/.$assetid.$$: $!");
-  PBuild::Cpio::cpio_create($fd, $tmpdir, 'mtime' => $t);
-  close($fd) || die("$adir/.$assetid.$$: $!");
-  PBuild::Util::cleandir($tmpdir);
-  rmdir($tmpdir) || die("rmdir $tmpdir: $!\n");
-  rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
+  PBuild::Util::rm_rf($tmpdir);
 }
 
 #
@@ -199,11 +323,11 @@ sub url_fetch {
     my $tofetch = $tofetch_host{$hosturl};
     print "fetching ".PBuild::Util::plural(scalar(@$tofetch), 'asset')." from $hosturl\n";
     for my $asset (@$tofetch) {
-      my $assetid = $asset->{'assetid'};
       if ($asset->{'url'} =~ /^git(?:\+https?)?:/) {
 	fetch_git_asset($assetdir, $asset);
 	next;
       }
+      my $assetid = $asset->{'assetid'};
       my $adir = "$assetdir/".substr($assetid, 0, 2);
       PBuild::Util::mkdir_p($adir);
       if (PBuild::Download::download($asset->{'url'}, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1)) {

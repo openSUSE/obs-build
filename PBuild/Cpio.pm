@@ -134,7 +134,7 @@ sub cpio_create {
     }
     $ent->{'mode'} = $s[2] & 0xfff;
     $ent->{'name'} = $name eq '' ? $prefixdir : "$prefix$name";
-    $ent->{'mtime'} = $opts{'mtime'} if $opts{'mtime'};
+    $ent->{'mtime'} = $opts{'mtime'} if defined $opts{'mtime'};
     $ent->{'inode'} = $ino++;
     my ($h, $pad) = cpio_make($ent, \@s);
     print $fd $h;

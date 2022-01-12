@@ -29,6 +29,8 @@ use PBuild::Source;
 use PBuild::RemoteAssets;
 use PBuild::Cpio;
 
+our $goproxy_default = 'https://proxy.golang.org';
+
 #
 # Create the asset manager
 #
@@ -45,7 +47,9 @@ sub add_assetshandler {
   my $type = '';
   $type = $1 if $assetsurl =~ s/^([a-zA-Z0-9_]+)\@//;
   if ($type eq 'fedpkg') {
-    push @{$assetmgr->{'handlers'}}, { 'url' => $assetsurl, 'type' => $type , 'asset_dir' => $assetmgr->{'asset_dir'}};
+    push @{$assetmgr->{'handlers'}}, { 'url' => $assetsurl, 'type' => $type };
+  } elsif ($type eq 'goproxy') {
+    push @{$assetmgr->{'handlers'}}, { 'url' => $assetsurl, 'type' => $type };
   } else {
     die("unsupported assets url '$assetsurl'\n");
   }
@@ -132,6 +136,7 @@ sub find_assets {
   my @assets;
   push @assets, @{$p->{'source_assets'} || []};
   push @assets, PBuild::RemoteAssets::fedpkg_parse($p) if $p->{'files'}->{'sources'};
+  push @assets, PBuild::RemoteAssets::golang_parse($p) if $p->{'files'}->{'go.sum'};
   push @assets, PBuild::RemoteAssets::recipe_parse($p) if $bt eq 'spec' || $bt eq 'kiwi' || $bt eq 'arch';
   merge_assets($assetmgr, $p, \@assets);
   update_srcmd5($assetmgr, $p) if $p->{'asset_files'};
@@ -183,6 +188,8 @@ sub getremoteassets {
     last unless @assets;
     if ($handler->{'type'} eq 'fedpkg') {
       PBuild::RemoteAssets::fedpkg_fetch($p, $assetdir, \@assets, $handler->{'url'});
+    } elsif ($handler->{'type'} eq 'goproxy') {
+      PBuild::RemoteAssets::golang_fetch($p, $assetdir, \@assets, $handler->{'url'});
     } else {
       die("unsupported assets type $handler->{'type'}\n");
     }
@@ -191,6 +198,12 @@ sub getremoteassets {
   if (grep {($_->{'type'} || '') eq 'ipfs'} @assets) {
     PBuild::RemoteAssets::ipfs_fetch($p, $assetdir, \@assets);
     @assets = prune_cached_assets($assetmgr, @assets);
+  }
+  if (grep {($_->{'type'} || '') eq 'golang'} @assets) {
+    if (!grep {$_->{'type'} eq 'goproxy'} (@{$assetmgr->{'handlers'}})) {
+      PBuild::RemoteAssets::golang_fetch($p, $assetdir, \@assets, $goproxy_default);
+      @assets = prune_cached_assets($assetmgr, @assets);
+    }
   }
   if (grep {($_->{'type'} || '') eq 'url'} @assets) {
     PBuild::RemoteAssets::url_fetch($p, $assetdir, \@assets);
