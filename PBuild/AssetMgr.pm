@@ -60,6 +60,7 @@ sub add_assetshandler {
 #
 sub get_assetid {
   my ($file, $asset) = @_;
+  return $asset->{'assetid'} if $asset->{'assetid'};
   my $digest = $asset->{'digest'};
   if ($digest) {
     return Digest::MD5::md5_hex("$digest  $file");
@@ -85,7 +86,8 @@ sub calc_mutable_id {
     close $fd;
     return $ctx->hexdigest();
   }
-  return 'd0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0';	# download on demand
+  # not available yet, use "download on demand" placeholder
+  return 'd0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0';
 }
 
 #
@@ -102,10 +104,8 @@ sub update_srcmd5 {
     my $asset = $asset_files->{$file};
     die unless $asset->{'assetid'};
     # use first part of digest if we have one
-    my $digest = $asset->{'digest'};
-    $digest =~ s/^.*:// if $digest;
-    if ($digest && length($digest) >= 32) {
-      $files{$file} = substr($digest, 0, 32);
+    if ($asset->{'digest'} && $asset->{'digest'} =~ /:([a-f0-9]{32})/) {
+      $files{$file} = $1;
     } elsif ($asset->{'immutable'}) {
       $files{$file} = substr($asset->{'assetid'}, 0, 32);
     } else {
@@ -121,9 +121,15 @@ sub update_srcmd5 {
 #
 sub merge_assets {
   my ($assetmgr, $p, $assets) = @_;
+  my $files = $p->{'files'};
   for my $asset (@{$assets || []}) {
-    $asset->{'assetid'} ||= get_assetid($asset->{'file'}, $asset);
-    $p->{'asset_files'}->{$asset->{'file'}} = $asset;
+    my $file = $asset->{'file'};
+    if (!$assetmgr->{'keep_all_assets'}) {
+      # ignore asset if present in source list
+      next if $files->{$file} || $files->{"$file/"};
+    }
+    $asset->{'assetid'} ||= get_assetid($file, $asset);
+    $p->{'asset_files'}->{$file} = $asset;
   }
 }
 

@@ -72,7 +72,6 @@ sub recipe_parse {
     }
     next unless $s->{'url'} =~ /(?:^|\/)([^\.\/][^\/]+)$/s;
     my $file = $1;
-    next if $p->{'files'}->{$file} && !$p->{'keep_all_assets'};
     undef $url unless $url =~ /^https?:\/\/.*\/([^\.\/][^\/]+)$/s;
     my $digest = $s->{'digest'};
     next unless $digest || $url;
@@ -217,7 +216,6 @@ sub fedpkg_parse {
       warn("unparsable line in 'sources' file: $_\n");
       next;
     }
-    next if $p->{'files'}->{$asset->{'file'}} && !$p->{'keep_all_assets'};
     push @assets, $asset if $asset->{'file'} =~ /^[^\.\/][^\/]*$/s;
   }
   close $fd;

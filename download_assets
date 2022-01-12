@@ -103,9 +103,9 @@ for my $dir (@dirs) {
     'dir' => $dir,
     'files' => $files,
   };
-  $p->{'keep_all_assets'} = 1 if $opts->{'clean'};
 
   my $assetmgr = PBuild::AssetMgr::create($assetdir);
+  $assetmgr->{'keep_all_assets'} = 1 if $opts->{'clean'};
   $assetmgr->add_assetshandler($_) for @{$opts->{'assets'} || []};
   $assetmgr->add_assetshandler($fedpkg) if !$opts->{'assets'} && $files->{'sources'};
   $assetmgr->merge_assets($p, $source_assets);
