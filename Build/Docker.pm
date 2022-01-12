@@ -306,6 +306,7 @@ sub parse {
 	s/%([a-fA-F0-9]{2})/chr(hex($1))/ge for @args;
 	next unless @args;
 	my $rcmd = shift @args;
+	$rcmd = shift @args if $rcmd eq 'then' || $rcmd eq 'else';
 	if ($rcmd eq 'zypper') {
 	  cmd_zypper($ret, @args);
 	} elsif ($rcmd eq 'yum' || $rcmd eq 'dnf') {
