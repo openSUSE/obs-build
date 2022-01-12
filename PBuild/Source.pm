@@ -103,7 +103,8 @@ sub list_package {
       $lnk = readlink("$dir/$file");
       die("readlink $dir/$file: $!\n") unless defined $lnk;
       if ($lnk =~ /^(\/ipfs\/.+)$/s) {
-	push @assets, { 'file' => $file, 'cid' => $1, 'type' => 'ipfs' };
+	my $assetid = Digest::MD5::md5_hex($1);
+	push @assets, { 'file' => $file, 'cid' => $1, 'assetid' => $assetid, 'immutable' => 1, 'type' => 'ipfs' };
 	next;
       }
     }

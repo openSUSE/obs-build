@@ -59,12 +59,10 @@ sub get_assetid {
   my $digest = $asset->{'digest'};
   if ($digest) {
     return Digest::MD5::md5_hex("$digest  $file");
-  } elsif ($asset->{'cid'}) {
-    return Digest::MD5::md5_hex("$asset->{'cid'}  $file");
   } elsif ($asset->{'url'}) {
     return Digest::MD5::md5_hex("$asset->{'url'}  $file");
   } else {
-    die("$file: asset must either have a digest, cid, or an url\n");
+    die("$file: asset must either have a digest or an url\n");
   }
 }
 
@@ -98,12 +96,14 @@ sub update_srcmd5 {
   my %files = %{$p->{'files'}};
   for my $file (sort keys %$asset_files) {
     my $asset = $asset_files->{$file};
-    # use digest if we have one
+    die unless $asset->{'assetid'};
+    # use first part of digest if we have one
     my $digest = $asset->{'digest'};
-    if (length($digest || '') >= 32) {
+    $digest =~ s/^.*:// if $digest;
+    if ($digest && length($digest) >= 32) {
       $files{$file} = substr($digest, 0, 32);
-    } elsif ($asset->{'cid'}) {
-      $files{$file} = Digest::MD5::md5_hex("$asset->{'cid'}  $file");
+    } elsif ($asset->{'immutable'}) {
+      $files{$file} = substr($asset->{'assetid'}, 0, 32);
     } else {
       $files{$file} = calc_mutable_id($assetmgr, $asset);
     }
@@ -118,7 +118,7 @@ sub update_srcmd5 {
 sub merge_assets {
   my ($assetmgr, $p, $assets) = @_;
   for my $asset (@{$assets || []}) {
-    $asset->{'assetid'} = get_assetid($asset->{'file'}, $asset);
+    $asset->{'assetid'} ||= get_assetid($asset->{'file'}, $asset);
     $p->{'asset_files'}->{$asset->{'file'}} = $asset;
   }
 }
@@ -143,7 +143,7 @@ sub find_assets {
 sub has_mutable_assets {
   my ($assetmgr, $p) = @_;
   for my $asset (values %{$p->{'asset_files'} || {}}) {
-    return 1 unless $asset->{'digest'} || $asset->{'cid'};
+    return 1 unless $asset->{'digest'} || $asset->{'immutable'};
   }
   return 0;
 }
