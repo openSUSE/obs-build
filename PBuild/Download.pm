@@ -61,6 +61,40 @@ sub checkdigest {
 }
 
 #
+# Call the get method with the correct max size setting
+#
+sub ua_get {
+  my ($ua, $url, $maxsize, @hdrs) = @_;
+  my $res;
+  if (defined($maxsize)) {
+    my $oldmaxsize = $ua->max_size($maxsize);
+    $res = $ua->get($url, @hdrs);
+    $ua->max_size($oldmaxsize);
+    die("download of $url failed: ".$res->header('X-Died')) if $res->header('Client-Aborted') && $res->header('X-Died');
+    die("download of $url failed: max size exceeded\n") if $res->header('Client-Aborted');
+  } else {
+    $res = $ua->get($url, @hdrs);
+  }
+  return $res;
+}
+
+#
+# Download a file with the correct max size setting
+#
+sub ua_mirror {
+  my ($ua, $url, $dest, $maxsize, @hdrs) = @_;
+  my $res = ua_get($ua, $url, $maxsize, ':content_file', $dest, @hdrs);
+  die("download of $url failed: ".$res->header('X-Died')) if $res->header('X-Died');
+  if ($res->is_success) {
+    my @s = stat($dest);
+    die("download of $url did not create $dest: $!\n") unless @s;
+    my ($cl) = $res->header('Content-length');
+    die("download of $url size mismatch: $cl != $s[7]\n") if defined($cl) && $cl != $s[7];
+  }
+  return $res;
+}
+
+#
 # Download data from a server
 #
 sub fetch {
@@ -71,7 +105,7 @@ sub fetch {
   my @accept;
   @accept = ('Accept', join(', ', @{$opt{'accept'}})) if $opt{'accept'};
   while (1) {
-    $res = $ua->get($url, @accept, @{$opt{'headers'} || []});
+    $res = ua_get($ua, $url, $opt{'maxsize'}, @accept, @{$opt{'headers'} || []});
     last if $res->is_success;
     return undef if $opt{'missingok'} && $res->code == 404;
     my $status = $res->status_line;
@@ -109,8 +143,12 @@ sub download {
   my $ua = $opt{'ua'} || create_ua();
   my $retry = $opt{'retry'} || 0;
   while (1) {
-    unlink($dest);        # disable last-modified handling, always download
-    my $res = $ua->mirror($url, $dest);
+    unlink($dest);        # just in case
+    my $res = eval { ua_mirror($ua, $url, $dest, $opt{'maxsize'}, @{$opt{'headers'} || []}) };
+    if ($@) {
+      unlink($dest);
+      die($@);
+    }
     last if $res->is_success;
     return undef if $opt{'missingok'} && $res->code == 404;
     my $status = $res->status_line;
