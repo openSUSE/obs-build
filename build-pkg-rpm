@@ -195,39 +195,33 @@ probe_rpm_payloaddecompress() {
     done < <(rpm --showrc)
 }
 
+check_rpm_decompressor() {
+    if ! "$1" </dev/null >/dev/null 2>&1 ; then
+	test -f "$BUILD_DIR/${1}dec.sh" || cleanup_and_exit 3 "no $1 decoder available in host system"
+	PAYLOADDECOMPRESS="bash $BUILD_DIR/${1}dec.sh"
+    fi
+}
+
 pkg_preinstall_rpm() {
     test -d "$BUILD_INIT_CACHE/scripts" || mkdir -p "$BUILD_INIT_CACHE/scripts"
 
     test -z "$RPM_PAYLOADDECOMPRESS_PROBED" && probe_rpm_payloaddecompress
+    PAYLOADDECOMPRESS=cat
     # if our rpm can decompress everything, we don't need to probe what compression
     # we actually have
-    if test "$RPM_PAYLOADDECOMPRESS_LZMA" = "cat" -a "$RPM_PAYLOADDECOMPRESS_XZ" = "cat" -a "$RPM_PAYLOADDECOMPRESS_ZSTD" = "cat"; then
-        rpm2cpio "$BUILD_INIT_CACHE/rpms/$PKG.rpm" | $CPIO || cleanup_and_exit 1
-    else
-        PAYLOADDECOMPRESS=cat
+    if test "$RPM_PAYLOADDECOMPRESS_LZMA" != "cat" -o "$RPM_PAYLOADDECOMPRESS_XZ" != "cat" -o "$RPM_PAYLOADDECOMPRESS_ZSTD" != "cat"; then
         case $(rpm -qp --nodigest --nosignature --qf "%{PAYLOADCOMPRESSOR}\n" "$BUILD_INIT_CACHE/rpms/$PKG.rpm") in
-            lzma) PAYLOADCOMPRESS="$RPM_PAYLOADDECOMPRESS_LZMA" ;;
-            xz) PAYLOADDECOMPRESS="$RPM_PAYLOADDECOMPRESS_XZ" ;;
+            lzma) PAYLOADDECOMPRESS="$RPM_PAYLOADDECOMPRESS_LZMA" ;;
+            xz)   PAYLOADDECOMPRESS="$RPM_PAYLOADDECOMPRESS_XZ" ;;
             zstd) PAYLOADDECOMPRESS="$RPM_PAYLOADDECOMPRESS_ZSTD" ;;
         esac
-        if test "$PAYLOADDECOMPRESS" = "lzma -d" ; then
-            if ! lzma </dev/null >/dev/null 2>&1 ; then
-                test -f "$BUILD_DIR/lzmadec.sh" || cleanup_and_exit 3 "no lzma decoder available in host system"
-                PAYLOADDECOMPRESS="bash $BUILD_DIR/lzmadec.sh"
-            fi
-        fi
-        if test "$PAYLOADDECOMPRESS" = "xz -d" ; then
-            if ! xz </dev/null >/dev/null 2>&1 ; then
-                test -f "$BUILD_DIR/xzdec.sh" || cleanup_and_exit 3 "no xz decoder available in host system"
-                PAYLOADDECOMPRESS="bash $BUILD_DIR/xzdec.sh"
-            fi
-        fi
-        if test "$PAYLOADDECOMPRESS" = "zstd -d" ; then
-            if ! zstd </dev/null >/dev/null 2>&1 ; then
-                test -f "$BUILD_DIR/zstddec.sh" || cleanup_and_exit 3 "no zstd decoder available in host system"
-                PAYLOADDECOMPRESS="bash $BUILD_DIR/zstddec.sh"
-            fi
-        fi
+    fi
+    if test "$PAYLOADDECOMPRESS" = "cat" ; then
+        rpm2cpio "$BUILD_INIT_CACHE/rpms/$PKG.rpm" | $CPIO || cleanup_and_exit 1
+    else
+	test "$PAYLOADDECOMPRESS" = "lzma -d" && check_rpm_decompressor lzma
+	test "$PAYLOADDECOMPRESS" = "xz -d"   && check_rpm_decompressor xz
+	test "$PAYLOADDECOMPRESS" = "zstd -d" && check_rpm_decompressor zstd
         rpm2cpio "$BUILD_INIT_CACHE/rpms/$PKG.rpm" | $PAYLOADDECOMPRESS | $CPIO || cleanup_and_exit 1
     fi
     test -L "$BUILD_INIT_CACHE/scripts" && cleanup_and_exit 1
