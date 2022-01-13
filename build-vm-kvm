@@ -110,10 +110,8 @@ vm_verify_options_kvm() {
 	    # We want to use the host gic version in order to make use
 	    # of all available features (e.g. more than 8 CPUs) and avoid
 	    # the emulation overhead of vGICv2 on a GICv3 host.
-            # move IO into separate I/O thread
-	    kvm_options="$kvm_options -M virt,accel=kvm,usb=off,gic-version=host -sandbox on -object iothread,id=io0"
+	    kvm_options="$kvm_options -M virt,accel=kvm,usb=off,gic-version=host -sandbox on"
 	    kvm_device=virtio-blk-device
-	    kvm_device_opts=",iothread=io0"
 	    kvm_rng_device=virtio-rng-device
 	    ;;
 	ppc|ppcle|ppc64|ppc64le)
@@ -173,12 +171,6 @@ vm_verify_options_kvm() {
 
             # from qemu-microvm, minified and hardened PC bios (slightly faster than seabios)
             test -e /usr/share/qemu/qboot.rom && kvm_options="$kvm_options -bios /usr/share/qemu/qboot.rom"
-
-            # move IO into separate I/O thread
-	    if test "${kvm_device%%-*}" = "virtio" ; then
-                    kvm_options="$kvm_options -object iothread,id=io0"
-		    kvm_device_opts=",iothread=io0"
-            fi
 
             # TODO appears to be unstable
 	    # $kvm_bin --help | grep -q io_uring && kvm_drive_opts="$kvm_drive_opts,aio=io_uring"
@@ -401,6 +393,14 @@ vm_fixup_kvm() {
 	    kvm_console=hvc0
 	fi
     fi
+    # move IO into separate I/O thread for some architectures
+    case `uname -m` in
+	armv8l|aarch64|i586|i686|x86_64)
+	    if test "${kvm_device%%-*}" = "virtio" ; then
+		kvm_options="$kvm_options -object iothread,id=io0"
+		kvm_device_opts=",iothread=io0"
+	    fi
+    esac
 }
 
 vm_attach_root_kvm() {
