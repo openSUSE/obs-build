@@ -96,14 +96,13 @@ die("The --assetdir option conflicts with --noassetdir\n") if $opts->{'assetdir'
 my $bconf = Build::read_config($arch);
 for my $dir (@dirs) {
   my ($files, $source_assets) = PBuild::Source::list_package($dir);
-  my @assets;
-  my $assetdir = $opts->{'assetdir'} || "$dir/.assets";
   my $p = {
     'pkg' => "_me",
     'dir' => $dir,
     'files' => $files,
   };
 
+  my $assetdir = $opts->{'assetdir'} || "$dir/.assets";
   my $assetmgr = PBuild::AssetMgr::create($assetdir);
   $assetmgr->{'keep_all_assets'} = 1 if $opts->{'clean'};
   $assetmgr->add_assetshandler($_) for @{$opts->{'assets'} || []};
@@ -111,7 +110,7 @@ for my $dir (@dirs) {
   $assetmgr->merge_assets($p, $source_assets);
 
   for my $file (sort keys %$files) {
-    if ($file eq 'sources') {
+    if ($file eq 'sources' || $file eq 'go.sum') {
       $p->{'buildtype'} = '';
       $assetmgr->find_assets($p);
       next;
