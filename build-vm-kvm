@@ -26,8 +26,8 @@ kvm_bin=/usr/bin/qemu-kvm
 test ! -x $kvm_bin  -a -x /usr/bin/kvm && kvm_bin=/usr/bin/kvm
 kvm_console=ttyS0
 
-# assume virtio support by default
-kvm_device=virtio-blk-pci
+# assume ide support by default
+kvm_device=ide-hd
 kvm_device_opts=
 kvm_drive_opts="cache=unsafe"
 kvm_serial_device=
@@ -175,9 +175,9 @@ vm_verify_options_kvm() {
             test -e /usr/share/qemu/qboot.rom && kvm_options="$kvm_options -bios /usr/share/qemu/qboot.rom"
 
             # move IO into separate I/O thread
-	    if test "${kvm_device%%-*}" = "virtio" ; then
-                    kvm_options="$kvm_options -object iothread,id=io0"
-		    kvm_device_opts=",iothread=io0"
+            if test "${kvm_device%%-*}" = "virtio" ; then
+                kvm_options="$kvm_options -object iothread,id=io0"
+                kvm_device_opts=",iothread=io0"
             fi
 
             # TODO appears to be unstable
@@ -210,10 +210,13 @@ vm_verify_options_kvm() {
 	# find a nice default
 	if test -e /boot/initrd.obs.guest ; then
 	    vm_initrd=/boot/initrd.obs.guest
+           # a special obs initrd should always have virtio support
+            kvm_device=virtio-blk-pci
 	elif test -e "/boot/initrd-build" ; then
 	    vm_initrd="/boot/initrd-build"
 	elif test -e "/boot/initrd-virtio" ; then
 	    vm_initrd="/boot/initrd-virtio"
+            kvm_device=virtio-blk-pci
 	else
 	    vm_initrd="/boot/initrd"
 	    kvm_device=ide-hd
