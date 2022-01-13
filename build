@@ -1249,7 +1249,7 @@ while test -n "$1"; do
       ;;
       -verbose)
 	needarg
-        case "$ARGS" in
+        case "$ARG" in
         all)
             BUILD_VERBOSE_VM=true
             ;;
