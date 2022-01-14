@@ -224,16 +224,14 @@ preinstall_image_filter() {
 # call with cmd [OPTIONS] -- ARGS...
 run_cmd_with_xargs()
 {
-    local cmd=()
-    while [ "${#@}" -gt 1 ]; do
-	cmd[${#cmd[@]}]="$1"
-        shift
-        if [ "$1" = "--" ]; then
-            shift
-            break
-        fi
+    local i cmd=()
+    for i ; do
+        test "$i" = "--" && break
+	cmd[${#cmd[@]}]="$i"
     done
-    for i in "$@"; do
+    shift ${#cmd[@]}
+    test "$1" = "--" && shift
+    for i ; do
         printf "%s\0" "$i"
     done | xargs -0 --no-run-if-empty "${cmd[@]}" --
 }
