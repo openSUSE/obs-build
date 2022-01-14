@@ -222,8 +222,7 @@ preinstall_image_filter() {
 }
 
 # call with cmd [OPTIONS] -- ARGS...
-run_cmd_with_xargs()
-{
+run_cmd_with_xargs() {
     local i cmd=()
     for i ; do
         test "$i" = "--" && break
