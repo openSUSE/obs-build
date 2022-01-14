@@ -65,31 +65,6 @@ recipe_prepare_spec() {
 	sed -e 's/^buildarchtranslate: athlon.*/buildarchtranslate: athlon: i686/' -e 's/^buildarchtranslate: i686.*/buildarchtranslate: i686: i686/' < $BUILD_ROOT/usr/lib/rpm/rpmrc_i586 > $BUILD_ROOT/usr/lib/rpm/rpmrc
     fi
 
-    # extract macros from configuration
-    rawcfgmacros=.rpmmacros
-    test "$BUILDTYPE" = debbuild && rawcfgmacros=.debmacros
-    queryconfig rawmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" > $BUILD_ROOT/root/$rawcfgmacros
-    if test -n "$BUILD_DEBUG" && test "$BUILDTYPE" != debbuild ; then
-	echo '
-%prep %{?!__debug_package:%{?_build_create_debug:%?_build_insert_debug_package}}%%prep
-%package %{?!__debug_package:%{?_build_create_debug:%?_build_insert_debug_package}}%%package
-%_build_insert_debug_package \
-%global __debug_package 1 \
-%undefine _enable_debug_packages \
-%debug_package
-
-' >> $BUILD_ROOT/root/$rawcfgmacros
-    fi
-
-    if test -n "$BUILD_JOBS" ; then
-	cat >> $BUILD_ROOT/root/$rawcfgmacros <<-EOF
-		### from obs-build
-		%jobs $BUILD_JOBS
-		%_smp_mflags -j$BUILD_JOBS
-		EOF
-    fi
-    test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/$rawcfgmacros $BUILD_ROOT/home/abuild/$rawcfgmacros
-
     # extract optflags from configuration
     queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" optflags ${BUILD_DEBUG:+debug} > $BUILD_ROOT/root/.rpmrc
     test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/.rpmrc $BUILD_ROOT/home/abuild/.rpmrc

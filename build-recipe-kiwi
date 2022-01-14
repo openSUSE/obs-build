@@ -326,10 +326,6 @@ recipe_setup_kiwi() {
     fi
     chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
 
-    # extract macros from configuration
-    # some post scripts might call rpm-build and rely on the macros
-    queryconfig rawmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" > $BUILD_ROOT/root/.rpmmacros
-
     if test -z "$ABUILD_TARGET"; then
         ABUILD_TARGET=$(queryconfig target --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" )
         test -z "$ABUILD_TARGET" || echo "build target is $ABUILD_TARGET"

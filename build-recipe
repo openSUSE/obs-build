@@ -33,6 +33,33 @@ recipe_setup() {
     recipe_setup_$BUILDTYPE "$@"
 }
 
+recipe_setup_macros() {
+    # extract rpm macros from configuration
+    # these are potentialy also used in non-rpm builds
+    local rawcfgmacros=.rpmmacros
+    test "$BUILDTYPE" = debbuild && rawcfgmacros=.debmacros
+    queryconfig rawmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" > $BUILD_ROOT/root/$rawcfgmacros
+    if test -n "$BUILD_DEBUG" && test "$BUILDTYPE" != debbuild ; then
+	echo '
+%prep %{?!__debug_package:%{?_build_create_debug:%?_build_insert_debug_package}}%%prep
+%package %{?!__debug_package:%{?_build_create_debug:%?_build_insert_debug_package}}%%package
+%_build_insert_debug_package \
+%global __debug_package 1 \
+%undefine _enable_debug_packages \
+%debug_package
+
+' >> $BUILD_ROOT/root/$rawcfgmacros
+    fi
+
+    if test -n "$BUILD_JOBS" ; then
+	cat >> $BUILD_ROOT/root/$rawcfgmacros <<-EOF
+		%jobs $BUILD_JOBS
+		%_smp_mflags -j$BUILD_JOBS
+		EOF
+    fi
+    test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/$rawcfgmacros $BUILD_ROOT/home/abuild/$rawcfgmacros
+}
+
 recipe_prepare() {
     recipe_prepare_$BUILDTYPE "$@"
 }
