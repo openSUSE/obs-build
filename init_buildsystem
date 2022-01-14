@@ -221,10 +221,28 @@ preinstall_image_filter() {
     done
 }
 
+# call with cmd [OPTIONS] -- ARGS...
+run_cmd_with_xargs()
+{
+    local cmd=()
+    while [ "${#@}" -gt 1 ]; do
+	cmd[${#cmd[@]}]="$1"
+        shift
+        if [ "$1" = "--" ]; then
+            shift
+            break
+        fi
+    done
+    for i in "$@"; do
+        printf "%s\0" "$i"
+    done | xargs -0 --no-run-if-empty "${cmd[@]}" --
+}
+
 preinstall_setup() {
     cd "$BUILD_ROOT" || cleanup_and_exit 1
     rm -rf build-preinstall
     mkdir build-preinstall || cleanup_and_exit 1
+    local mv_args=()
     for i in * .* ; do
 	# please keep in sync with recipe_build_preinstallimage
 	case "$i" in
@@ -232,21 +250,24 @@ preinstall_setup() {
 	    .build.kernel.*|.build.hostarch.*|.build.initrd.*|.build.console.*) ;;
 	    .build*|.init_b_cache|.preinstallimage*|.srcfiles*|.pkgs|.rpm-cache|installed-pkg|proc|sys) continue ;;
 	esac
-	mv "./$i" build-preinstall || cleanup_and_exit 1
+        mv_args[${#mv_args[@]}]="$i"
     done
+    run_cmd_with_xargs mv -t build-preinstall -- "${mv_args[@]}" || cleanup_and_exit 1
     cd build-preinstall || cleanup_and_exit 1
 }
 
 preinstall_integrate() {
     cd "$BUILD_ROOT/build-preinstall" || cleanup_and_exit 1
+    local mv_args=()
     for i in * .* ; do
 	case "$i" in
 	    .|..|build-preinstall) continue ;;
 	    .build.kernel.*|.build.hostarch.*|.build.initrd.*|.build.console.*) ;;
 	    .build*|.init_b_cache|.preinstallimage*|.srcfiles*|.pkgs|.rpm-cache|installed-pkg|proc|sys) continue ;;
 	esac
-	mv "./$i" .. || cleanup_and_exit 1
+        mv_args[${#mv_args[@]}]="$i"
     done
+    run_cmd_with_xargs mv -t .. -- "${mv_args[@]}" || cleanup_and_exit 1
     cd "$BUILD_ROOT" || cleanup_and_exit 1
     assert_dirs
 }
@@ -850,10 +871,12 @@ else
     pkg_set_type
 
     if test -n "$PREINSTALL_IMAGE" ; then
-	for PKG in $PACKAGES_FROM_PREINSTALLIMAGE ; do
-	    # touch the file so that the copying works
-	    touch $BUILD_ROOT/.init_b_cache/rpms/"$PKG.$PSUF"
-	done
+       # touch the file so that the copying works
+       touch_args=()
+       for PKG in $PACKAGES_FROM_PREINSTALLIMAGE; do
+           touch_args[${#touch_args[@]}]="$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF"
+       done
+       run_cmd_with_xargs touch -- "${touch_args[@]}"
     fi
 
 fi
@@ -935,12 +958,16 @@ fi
 
 if test -n "$PREPARE_VM" ; then
     echo "copying packages..."
+
+    cp_args=()
+    ln_args=()
     for PKG in $PACKAGES_TO_ALL $PACKAGES_TO_SYSROOTINSTALL ; do
-	rm -rf $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
-	cp $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
-	ln -s -f ../$PKG.$PSUF $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF
-	check_exit
+        cp_args[${#cp_args[@]}]="$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF"
+        ln_args[${#ln_args[@]}]="../$PKG.$PSUF"
     done
+    run_cmd_with_xargs cp --remove-destination -t $BUILD_ROOT/.init_b_cache -- "${cp_args[@]}" || cleanup_and_exit 1
+    run_cmd_with_xargs ln -s -f -t $BUILD_ROOT/.init_b_cache/rpms -- "${ln_args[@]}"
+    check_exit
     # alreadyinstalled check will not work, but we have to live with that...
     echo -n 'reordering...'
     PACKAGES_TO_INSTALL=`reorder $PACKAGES_TO_INSTALL`
