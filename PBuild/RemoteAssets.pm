@@ -91,7 +91,7 @@ sub recipe_parse {
 #
 sub golang_parse {
   my ($p) = @_;
-  return unless $p->{'files'}->{'go.sum'};
+  return unless $p->{'files'}->{'go.sum'} && !$p->{'files'}->{'vendor/'};
   my $fd;
   my @assets;
   open ($fd, '<', "$p->{'dir'}/go.sum") || die("$p->{'dir'}/go.sum: $!\n");
