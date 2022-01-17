@@ -206,6 +206,7 @@ sub parse {
 
   my @requiredarch;
   my @badarch;
+  my @containerrepos;
 
   while (@lines) {
     my $line = shift @lines;
@@ -282,11 +283,17 @@ sub parse {
     # process commands
     if ($cmd eq 'FROM') {
       shift @args if @args && $args[0] =~ /^--platform=/;
-      if (@args) {
-        next if $as_container{$args[0]};
+      if (@args && !$as_container{$args[0]}) {
         $as_container{$args[2]} = $args[0] if @args > 2 && lc($args[1]) eq 'as';
         my $container = $args[0];
         if ($container ne 'scratch') {
+	  if ($Build::Kiwi::urlmapper && $container =~ /^([^\/]+\.[^\/]+)\/[a-zA-Z0-9]/) {
+	    my $prp = $Build::Kiwi::urlmapper->("registry://$1/");
+	    if ($prp) {
+	      $container =~ s/^[^\/]+\///;	# strip domain
+	      push @containerrepos, $prp;
+	    }
+	  }
           $container .= ':latest' unless $container =~ /:[^:\/]+$/;
           $container = "container:$container";
           if ($container && !grep {$_ eq $container} @{$ret->{'deps'}}) {
@@ -341,6 +348,12 @@ sub parse {
   $ret->{'name'} = 'docker' if !defined($ret->{'name'}) && !$cf->{'__dockernoname'};
   $ret->{'path'} = [ { 'project' => '_obsrepositories', 'repository' => '' } ] if $useobsrepositories;
   $ret->{'nosquash'} = 1 if $nosquash;
+  if (@containerrepos) {
+    for (unify(@containerrepos)) {
+      my @s = split('/', $_, 2);
+      push @{$ret->{'containerpath'}}, {'project' => $s[0], 'repository' => $s[1] };
+    }
+  }
   return $ret;
 }
 
