@@ -499,7 +499,7 @@ if ($version =~ s/^\d+://) {
 }
 
 my $quilt_debian_file = "$out/${name}_${version}.debian.tar";
-unlink($quilt_debian_file);
+unlink($quilt_debian_file) if -e $quilt_debian_file;
 
 my @files;
 my @checksums_sha1;
