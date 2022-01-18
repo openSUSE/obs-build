@@ -21,6 +21,7 @@ function run
 	    NAME="`basename "$a"`"
 	    case $NAME in
 		*.dsc)
+			echo "Checking by debdiff that generated 'out/$NAME' is equaling to expected '$4/$NAME'"
 		    debdiff $4/$NAME out/$NAME
 		    RES=$?
 		    if [ $RES != 0 ]; then
@@ -37,3 +38,7 @@ export SOURCE_DATE_EPOCH=1591490034
 run 1 grandorgue.dsc 0 1-out
 run 2 grandorgue.dsc 0 2-out
 run 3 grandorgue.dsc 0 3-out
+run 4 grandorgue.dsc 0 4-out
+
+# check with absolute paths too
+run "$(realpath 4)" grandorgue.dsc 0 "$(realpath 4-out)"

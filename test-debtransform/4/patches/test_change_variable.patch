@@ -1,0 +1,11 @@
+--- grandorgue-0.3.0.6.1026/GrandOrgue.desktop	2012-06-16 15:13:25.000000000 +0400
++++ "grandorgue-0.3.0.6.1026/GrandOrgue.desktop"	2022-01-12 00:43:43.363190982 +0300
+@@ -4,7 +4,7 @@
+ Comment=GrandOrgue - virtual pipe organ sample player
+ Exec=GrandOrgue %f
+ Icon=GrandOrgue
+-Terminal=false
++Terminal=true
+ Type=Application
+ Categories=Audio;AudioVideo;Music;Education;
+ MimeType=application/x-grandorgue-odf;

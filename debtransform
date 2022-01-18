@@ -172,6 +172,17 @@ sub dodiff {
   print DIFF "+$_\n" for @content;
 }
 
+sub dorelativepath {
+  use Cwd qw(cwd);
+  use File::Spec;
+  my $dir = cwd;
+
+  my ($path_a, $path_b) = @_;
+
+  my $relative_path = File::Spec->abs2rel ($path_a,  $path_b);
+  return $relative_path
+}
+
 sub dotar {
   my ($tar, $tardir, $origin, $origtarfile, @c) = @_;
   local *F;
@@ -191,6 +202,32 @@ sub dotar {
   close(F);
 }
 
+sub dotar_quilt {
+  my ($input_file_path, $output_file_path) = @_;
+
+  my $input_file_path_relative = dorelativepath($input_file_path);
+  my $output_file_path_relative = dorelativepath($output_file_path);
+
+  print "Add tar file contents '$input_file_path_relative'\n";
+  print "    to debian quilt tar file '$output_file_path_relative'\n";
+
+  my @list = $input_file_path =~ /(.*)((\.tgz$)|(\.tar(?:\.gz|\.bz2|\.xz)?$))/g;
+  my $input_file_path_without_ext = $list[0];
+  my $ext = $list[1];
+
+  if (($ext eq ".tgz") or ($ext eq ".tar.gz")) {
+      system("gzip -dk \"$input_file_path\"") == 0 || die("Can not unpack gzip archive '$input_file_path': $!\n");
+  } elsif (($ext eq ".tar.xz")) {
+      system("xz -dk \"$input_file_path\"") == 0 || die("Can not unpack xz archive '$input_file_path': $!\n");
+  } elsif (($ext eq ".tar.bz2")) {
+      system("bzip2 -dk \"$input_file_path\"") == 0 || die("Can not unpack bzip2 archive '$input_file_path': $!\n");
+  }
+
+  system("tar --concatenate -f $output_file_path ${input_file_path_without_ext}.tar");
+
+  unlink("${input_file_path_without_ext}.tar");
+}
+
 sub dofile {
   my ($file, $tardir, $dfile, $origtarfile) = @_;
   local *F;
@@ -200,6 +237,23 @@ sub dofile {
   close F;
   chomp(@file);
   dodiff("$tardir.orig/$dfile", "$tardir/$dfile", $origtarfile, @file);
+}
+
+sub dofile_quilt {
+  use Cwd qw(cwd);
+  use File::Spec;
+  my $dir = cwd;
+
+  my ($input_file_path, $output_file_path, $rename_file_path) = @_;
+
+  my $input_file_path_relative = dorelativepath($input_file_path);
+  my $output_file_path_relative = dorelativepath($output_file_path);
+
+  print "Add file '$input_file_path_relative'\n";
+  print "    to debian quilt tar file '$output_file_path_relative'\n";
+  print "    with internal path       '$rename_file_path'\n";
+
+  system("tar --transform='flags=r;s|$input_file_path|$rename_file_path|' -Prf $output_file_path $input_file_path");
 }
 
 sub doseries {
@@ -245,6 +299,36 @@ sub doseries {
   }
 }
 
+sub doseries_quilt {
+  use File::Basename;
+
+  my ($series, $tardir, $quilt_debian_file) = @_;
+  my $dir = $series;
+  $dir =~ s/[^\/]+$//;
+  $dir =~ s/\/+$//;
+  $dir = '.' if $dir eq '';
+  local *F;
+  open(F, '<', $series) || die("$series: $!\n");
+  my @series = <F>;
+  close F;
+  chomp(@series);
+
+  my $series_relative = dorelativepath($series);
+
+  print "Processing series file \"$series_relative\"...\n";
+  for my $patch (@series) {
+    $patch =~ s/(^|\s+)#.*//;
+    next if $patch =~ /^\s*$/;
+    my $level = 1;
+    $level = $1 if $patch =~ /\s.*-p\s*(\d+)/;
+    $patch =~ s/\s.*//;
+    my $patch_relative = dorelativepath($patch);
+    print "Processing patch $patch_relative...\n";
+    my $patch_name = basename($patch);
+    dofile_quilt("$dir/$patch", $quilt_debian_file, "debian/patches/$patch_name");
+  }
+}
+
 sub addfile {
   my ($file, $algorithm) = @_;
   my $base = $file;
@@ -264,6 +348,11 @@ sub addfile {
   close F;
   my $md5 = $ctx->hexdigest();
   return "$md5 $size $base";
+}
+
+sub is_quilt {
+  my ($format) = @_;
+  return $format =~ /3\.0 \(quilt\)/;
 }
 
 print "** Started: debtransform @ARGV\n";
@@ -341,10 +430,17 @@ my $name = $tags->{'SOURCE'};
 die("dsc file contains no Source: line\n") unless defined($name);
 my $version = $tags->{'VERSION'};
 die("dsc file contains no Version: line\n") unless defined($version);
+my $format = $tags->{"FORMAT"};
+die("dsc file contains no Format: line\n") unless defined($format);
 
-
-# debtransform generates source package in 1.0 (non-native) format
-print "Transforming into source package 1.0 (non-native) format\n";
+if (is_quilt($format)) {
+  # debtransform generates source package in 3.0 (non-native) format
+  print "Transforming into source package '$format' format\n";
+}
+else {
+  # debtransform generates source package in 1.0 (non-native) format
+  print "Transforming into source package 1.0 (non-native) format\n";
+}
 
 # non-native sources should always contain Debian revision
 if ($version !~ /-/) {
@@ -402,6 +498,9 @@ if ($version =~ s/^\d+://) {
   print "Stripped epoch from $version for filenames.\n";
 }
 
+my $quilt_debian_file = "$out/${name}_${version}.debian.tar";
+unlink($quilt_debian_file);
+
 my @files;
 my @checksums_sha1;
 my @checksums_sha256;
@@ -430,10 +529,15 @@ $tardir =~ s/\.tar.*?$//;
 my @tarfilecontent = listtar($tarpath, 0);
 my $origtarfile = {'name' => $tarpath, 'content' => \@tarfilecontent, 'version' => $tags->{'VERSION'}, 'tardir' => $tardir};
 
-print "Generating $out/${name}_$version.diff\n";
 # Since we are generating a unitary diff, we must re-set Format:.
-$tags->{"FORMAT"} = "1.0";
-open(DIFF, '>', "$out/${name}_$version.diff") || die("Cannot open $out/${name}_$version.diff for write: $!\n");
+if (not is_quilt($format)){
+  print "Generating $out/${name}_$version.diff\n";
+  $tags->{"FORMAT"} = "1.0";
+}
+
+if (not is_quilt($format)) {
+  open(DIFF, '>', "$out/${name}_$version.diff") || die("Cannot open $out/${name}_$version.diff for write: $!\n");
+}
 
 undef $changelog if $dir{'debian.changelog'};
 
@@ -449,49 +553,95 @@ for my $debtarfile (@debtarfiles) {
   }
 }
 
-dofile($changelog, $tardir, 'debian/changelog', $origtarfile) if defined $changelog;
+if (not is_quilt($format)){
+  dofile($changelog, $tardir, 'debian/changelog', $origtarfile) if defined $changelog;
+} else {
+  dofile_quilt($changelog, $quilt_debian_file, 'debian/changelog') if defined $changelog
+}
 
 if ($tags->{'DEBTRANSFORM-FILES'}) {
   for my $file (split(' ', $tags->{'DEBTRANSFORM-FILES'})) {
-    dofile("$dir/$file", $tardir, $file, $origtarfile);
+    if (not is_quilt($format)){
+      dofile("$dir/$file", $tardir, $file, $origtarfile);
+    } else {
+      dofile_quilt("$dir/$file", $quilt_debian_file, $file);
+    }
   }
 }
 
 for my $debtarfile (@debtarfiles) {
-  dotar("$dir/$debtarfile", $tardir, \%debtarorigin, $origtarfile, @{$debtarcontent{$debtarfile} });
+  if (not is_quilt($format)) {
+    dotar("$dir/$debtarfile", $tardir, \%debtarorigin, $origtarfile, @{$debtarcontent{$debtarfile} });
+  } else {
+    dotar_quilt("$dir/$debtarfile", $quilt_debian_file)
+  }
 }
 
 for my $file (grep {/^debian\./} @dir) {
   next if $file eq 'debian.series';
   next if $file =~ /\.tar$/;
   next if $file =~ /\.tar\./;
-  dofile("$dir/$file", $tardir, 'debian/'.substr($file, 7), $origtarfile);
-}
-
-if ($tags->{'DEBTRANSFORM-SERIES'}) {
-  doseries("$dir/$tags->{'DEBTRANSFORM-SERIES'}", $tardir);
-} elsif ($dir{"debian.series"}) {
-  doseries("$dir/debian.series", $tardir);
-} elsif ($dir{"patches.series"}) {
-  doseries("$dir/patches.series", $tardir);
-}
-
-close(DIFF);
-
-if (! -s "$out/${name}_$version.diff") {
-  unlink("$out/${name}_$version.diff");
-} else {
-  system('gzip', '-n9', "$out/${name}_$version.diff");
-  if (-f "$out/${name}_$version.diff.gz") {
-    push @files, addfile("$out/${name}_$version.diff.gz", "MD5");
-    push @checksums_sha1, addfile("$out/${name}_$version.diff.gz", "SHA1");
-    push @checksums_sha256, addfile("$out/${name}_$version.diff.gz", "SHA256");
+  if (not is_quilt($format)){
+    dofile("$dir/$file", $tardir, 'debian/'.substr($file, 7), $origtarfile);
   } else {
-    push @files, addfile("$out/${name}_$version.diff", "MD5");
-    push @checksums_sha1, addfile("$out/${name}_$version.diff", "SHA1");
-    push @checksums_sha256, addfile("$out/${name}_$version.diff", "SHA256");
+    my $in_tar_path = 'debian/'.substr($file, 7);
+    dofile_quilt("$dir/$file", $quilt_debian_file, $in_tar_path);
   }
 }
+
+if (not is_quilt($format)){
+  if ($tags->{'DEBTRANSFORM-SERIES'}) {
+    doseries("$dir/$tags->{'DEBTRANSFORM-SERIES'}", $tardir);
+  } elsif ($dir{"debian.series"}) {
+    doseries("$dir/debian.series", $tardir);
+  } elsif ($dir{"patches.series"}) {
+    doseries("$dir/patches.series", $tardir);
+  }
+} else {
+  if ($tags->{'DEBTRANSFORM-SERIES'}) {
+    doseries_quilt("$dir/$tags->{'DEBTRANSFORM-SERIES'}", $tardir, $quilt_debian_file);
+  } elsif ($dir{"debian.series"}) {
+    doseries_quilt("$dir/debian.series", $tardir, $quilt_debian_file);
+  } elsif ($dir{"patches.series"}) {
+    doseries_quilt("$dir/patches.series", $tardir, $quilt_debian_file);
+  }
+}
+
+if (not is_quilt($format)) {
+  close(DIFF);
+}
+
+# Add file which indicate dpkg-source 3.0 (quilt) format
+if (is_quilt($format)) {
+  open my $fh, '>', "$dir/debian_source_format";
+  print {$fh} $format . "\n";
+  close $fh;
+  dofile_quilt("$dir/debian_source_format", $quilt_debian_file, 'debian/source/format');
+  unlink "$dir/debian_source_format";
+}
+
+if (not is_quilt($format)){
+  if (! -s "$out/${name}_$version.diff") {
+    unlink("$out/${name}_$version.diff");
+  } else {
+    system('gzip', '-n9', "$out/${name}_$version.diff");
+    if (-f "$out/${name}_$version.diff.gz") {
+      push @files, addfile("$out/${name}_$version.diff.gz", "MD5");
+      push @checksums_sha1, addfile("$out/${name}_$version.diff.gz", "SHA1");
+      push @checksums_sha256, addfile("$out/${name}_$version.diff.gz", "SHA256");
+    } else {
+      push @files, addfile("$out/${name}_$version.diff", "MD5");
+      push @checksums_sha1, addfile("$out/${name}_$version.diff", "SHA1");
+      push @checksums_sha256, addfile("$out/${name}_$version.diff", "SHA256");
+    }
+  }
+} else {
+  system('gzip', '-n9', $quilt_debian_file);
+  push @files, addfile("${quilt_debian_file}.gz", "MD5");
+  push @checksums_sha1, addfile("${quilt_debian_file}.gz", "SHA1");
+  push @checksums_sha256, addfile("${quilt_debian_file}.gz", "SHA256");
+}
+
 
 $tags->{'CHECKSUMS-SHA1'} = "\n".join("\n", @checksums_sha1);
 $tags->{'CHECKSUMS-SHA256'} = "\n".join("\n", @checksums_sha256);
