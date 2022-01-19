@@ -246,6 +246,7 @@ sub kiwiparse {
     $obsprofiles = [ grep {defined($_)} map {$_ eq '@BUILD_FLAVOR@' ? $buildflavor : $_} split(' ', $obsprofiles) ];
   }
   $unorderedrepos = 1 if $xml =~ /^\s*<!--\s+OBS-UnorderedRepos\s+-->\s*$/im;
+  $ret->{'appendprofiletocontainername'} = 1 if $xml =~ /^\s*<!--\s+OBS-AppendProfileToContainername\s+-->\s*$/im;
   for ($xml =~ /^\s*<!--\s+OBS-Imagerepo:\s+(.*)\s+-->\s*$/img) {
     push @imagerepos, { 'url' => $_ };
   }
@@ -625,6 +626,10 @@ sub showcontainerinfo {
     'buildtime' => $buildtime,
     '_type' => {'buildtime' => 'number'},
   };
+  if ($d->{'appendprofiletocontainername'} && @{$d->{'profiles'} || []}) {
+    # we can currently only handle one profile
+    $containerinfo->{'name'} .= "-$d->{'profiles'}->[0]";
+  }
   $containerinfo->{'version'} = $d->{'version'} if defined $d->{'version'};
   $containerinfo->{'release'} = $release if defined $release;
   $containerinfo->{'tags'} = $d->{'container_tags'} if @{$d->{'container_tags'} || []};
