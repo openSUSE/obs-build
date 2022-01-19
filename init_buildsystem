@@ -49,6 +49,8 @@ repos=()
 
 . $BUILD_DIR/common_functions || exit 1
 
+detect_cache_dir
+
 # should RPMs be installed with --force ?
 USE_FORCE=false
 PREPARE_VM=
@@ -58,7 +60,6 @@ RPMLIST=
 CLEAN_BUILD=
 CREATE_BUILD_BINARIES=
 DLNOSIGNATURE=
-CACHE_DIR=/var/cache/build
 OBSURL=
 BUILD_SYSROOT=
 test -z "$CONFIG_DIR" && CONFIG_DIR="$BUILD_DIR/configs"

@@ -116,7 +116,6 @@ BUILD_FLAVOR=
 OBS_PACKAGE=
 OBSURL=
 NO_TIMESTAMPS=
-CACHE_DIR=/var/cache/build
 BUILD_DIST_TMP=
 BUILD_SUCCEEDED=
 COPY_SOURCES_ASIS=
@@ -990,6 +989,8 @@ umount_stuff() {
 trap fail_exit EXIT
 
 . $BUILD_DIR/common_functions || exit 1
+
+detect_cache_dir
 
 shopt -s nullglob
 
