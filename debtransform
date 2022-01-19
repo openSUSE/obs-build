@@ -301,6 +301,7 @@ sub doseries {
 
 sub doseries_quilt {
   use File::Basename;
+  use File::Temp qw(tempfile);
 
   my ($series, $tardir, $quilt_debian_file) = @_;
   my $dir = $series;
@@ -315,6 +316,9 @@ sub doseries_quilt {
 
   my $series_relative = dorelativepath($series);
 
+  my $tmp_patches = new File::Temp( UNLINK => 1 );
+  open(tmp_patches,'>',$tmp_patches) or die $!;
+
   print "Processing series file \"$series_relative\"...\n";
   for my $patch (@series) {
     $patch =~ s/(^|\s+)#.*//;
@@ -326,7 +330,11 @@ sub doseries_quilt {
     print "Processing patch $patch_relative...\n";
     my $patch_name = basename($patch);
     dofile_quilt("$dir/$patch", $quilt_debian_file, "debian/patches/$patch_name");
+    print tmp_patches "$patch_name\n";
   }
+
+  close($tmp_patches);
+  dofile_quilt($tmp_patches, $quilt_debian_file, "debian/patches/series");
 }
 
 sub addfile {
@@ -605,6 +613,7 @@ if (not is_quilt($format)){
   } elsif ($dir{"patches.series"}) {
     doseries_quilt("$dir/patches.series", $tardir, $quilt_debian_file);
   }
+
 }
 
 if (not is_quilt($format)) {
