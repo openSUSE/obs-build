@@ -58,6 +58,19 @@ sub readstr {
   return $d;
 }
 
+sub touch($) {
+  my ($file) = @_;
+  if (-e $file) {
+    my $t = time();
+    utime($t, $t, $file);
+  } else {
+    # create new file, mtime is anyway current
+    my $f;
+    open($f, '>>', $file) || die("$file: $!\n");
+    close($f) || die("$file close: $!\n");
+  }
+}
+
 sub ls {
   my $d;
   opendir($d, $_[0]) || return ();
