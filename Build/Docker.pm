@@ -346,6 +346,7 @@ sub parse {
     s/<RELEASE>/$release/g if defined $release;
   }
   $ret->{'name'} = 'docker' if !defined($ret->{'name'}) && !$cf->{'__dockernoname'};
+  $ret->{'name'} =~ s/\@BUILD_FLAVOR\@/$cf->{'buildflavor'}/g;
   $ret->{'path'} = [ { 'project' => '_obsrepositories', 'repository' => '' } ] if $useobsrepositories;
   $ret->{'nosquash'} = 1 if $nosquash;
   if (@containerrepos) {

@@ -74,11 +74,13 @@ sub kiwiparse_product {
   $ret->{'milestone'} = $1 if $xml =~ /^\s*<!--\s+OBS-Milestone:\s+(.*)\s+-->\s*$/im;
 
   $ret->{'name'} = $kiwi->{'name'} if $kiwi->{'name'};
+  $ret->{'name'} = $1 if $xml =~ /^\s*<!--\s+OBS-BuildName:\s+(.*)\s+-->\s*$/im;
   $ret->{'filename'} = $kiwi->{'name'} if $kiwi->{'name'};
   my $description = (($kiwi->{'description'} || [])->[0]) || {};
   if (!$ret->{'name'} && $description->{'specification'}) {
     $ret->{'name'} = $description->{'specification'}->[0]->{'_content'};
   }
+  $ret->{'name'} =~ s/\@BUILD_FLAVOR\@/$buildflavor/g;
 
   # parse the preferences section
   my $preferences = $kiwi->{'preferences'} || [];
@@ -267,11 +269,13 @@ sub kiwiparse {
 
   my $schemaversion = $kiwi->{'schemaversion'} ? versionstring($kiwi->{'schemaversion'}) : 0;
   $ret->{'name'} = $kiwi->{'name'} if $kiwi->{'name'};
+  $ret->{'name'} = $1 if $xml =~ /^\s*<!--\s+OBS-BuildName:\s+(.*)\s+-->\s*$/im;
   $ret->{'filename'} = $kiwi->{'name'} if $kiwi->{'name'};
   my $description = (($kiwi->{'description'} || [])->[0]) || {};
   if (!$ret->{'name'} && $description->{'specification'}) {
     $ret->{'name'} = $description->{'specification'}->[0]->{'_content'};
   }
+  $ret->{'name'} =~ s/\@BUILD_FLAVOR\@/$buildflavor/g;
 
   # usedprofiles also include direct wanted profile targets and indirect required profiles
   my %usedprofiles;
