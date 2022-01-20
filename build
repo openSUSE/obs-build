@@ -1415,15 +1415,23 @@ if test -n "$CCACHE" ; then
     fi
 fi
 
+set_build_arch
+
 if test -z "$RPMLIST" -a -z "$RUNNING_IN_VM" ; then
     if test -z "$repos" -a -z "$BUILD_RPMS" -a "$BUILD_DIST" = "${BUILD_DIST#obs:/}"; then
-	repos=(--repository 'zypp://')
+	repos=(--repository)
+	if test -n "$BUILD_DIST"; then
+		# distro explicitly specified, check config first
+		repos+=(`"$BUILD_DIR/queryconfig" repourl --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`)
+	fi
+	if test "${#repos[@]}" = 1; then
+		# config provides no default, use system repos
+		repos+=('zypp://')
+	fi
     fi
 else
     repos=()
 fi
-
-set_build_arch
 
 if test "$DO_INIT" = false -a -n "$RUN_SHELL" -a -z "$VM_TYPE"; then
     mount_stuff
