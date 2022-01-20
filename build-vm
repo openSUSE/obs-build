@@ -118,6 +118,10 @@ vm_kill() {
     vm_kill_$VM_TYPE "$@"
 }
 
+vm_mount_sources() {
+    vm_mount_sources_$VM_TYPE "$@"
+}
+
 vm_cleanup() {
     kill_watchdog
     vm_cleanup_$VM_TYPE "$@"
@@ -936,8 +940,12 @@ vm_first_stage() {
     if ! test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
 	rm -rf "$BUILD_ROOT/.build-srcdir"
 	mkdir "$BUILD_ROOT/.build-srcdir" || cleanup_and_exit 1
-	copy_sources "$MYSRCDIR" "$BUILD_ROOT/.build-srcdir"
-	MYSRCDIR=$BUILD_ROOT/.build-srcdir
+	if test -z "$NO_SOURCE_COPY"; then
+	    copy_sources "$MYSRCDIR" "$BUILD_ROOT/.build-srcdir"
+	    MYSRCDIR=$BUILD_ROOT/.build-srcdir
+	else
+	    type -t vm_mount_sources_$VM_TYPE > /dev/null || cleanup_and_exit 1 "ERROR: --no-source-copy not implemented in $VM_TYPE"
+	fi
     else
 	# cwd is at $BUILD_ROOT/.build-srcdir which we want to
 	# umount later so step aside
@@ -1039,6 +1047,7 @@ vm_first_stage() {
     echo "BUILD_RPM_BUILD_STAGE='$BUILD_RPM_BUILD_STAGE'" >> $BUILD_ROOT/.build/build.data
     echo "RPM_BUILD_IN_PLACE='$RPM_BUILD_IN_PLACE'" >> $BUILD_ROOT/.build/build.data
     echo "RPM_NOPREP='$RPM_NOPREP'" >> $BUILD_ROOT/.build/build.data
+    echo "NO_SOURCE_COPY='$NO_SOURCE_COPY'" >> $BUILD_ROOT/.build/build.data
     # fallback time for broken hosts
     rm -rf $BUILD_ROOT/.build/.date
     date '+@%s' > $BUILD_ROOT/.build/.date
@@ -1272,3 +1281,5 @@ vm_setup_network() {
 	fi
     fi
 }
+
+# vim: syntax=sh

@@ -192,7 +192,7 @@ Known Parameters:
   --wipe      Completely removes build environment and exits.
 
   --no-init   Skip initialization of build root and start with build
-              immediately.
+              immediately. Repeat to also keep previous build files.
 
   --no-checks Do not run checks (postbuild and %check)
 
@@ -311,6 +311,10 @@ Known Parameters:
               Specify the uid and gid to use for the abuild user.
               This is useful if you are hacking in the buildroot.
               This must be set to the same value if the buildroot is re-used.
+
+  --no-source-copy
+              Mount source directory instead of copying. Only works
+              with chroot builds that are not on NFS.
 
   --statistics
               monitor used resources during build inside VM
@@ -843,7 +847,9 @@ copy_sources() {
     if test -n "$RUNNING_IN_VM" -o "$BUILDTYPE" = kiwi -o "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman ; then
         include_directories=true
     fi
-    if test -n "$RUNNING_IN_VM" -o -n "$COPY_SOURCES_ASIS" -o -n "$RPM_BUILD_IN_PLACE" ; then
+    if test -n "$NO_SOURCE_COPY"; then
+	mount --bind "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"
+    elif test -n "$RUNNING_IN_VM" -o -n "$COPY_SOURCES_ASIS" -o -n "$RPM_BUILD_IN_PLACE" ; then
 	( shopt -s nullglob ; cp -pRd "$1/".[^.]* "$1/"..?* "$1"/* "$2" )
     elif test -n "$include_directories" ; then
         cp -pRL "$1"/* "$2"
@@ -869,7 +875,9 @@ copy_sources() {
     else
 	cp -p "$1"/* "$2"
     fi
-    test -n "$RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" && cp -f "$RECIPEPATH" "$2"
+    if test -n "$RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" -a -z "$NO_SOURCE_COPY"; then
+	cp -f "$RECIPEPATH" "$2"
+    fi
 }
 
 mkdir_build_root() {
@@ -1007,7 +1015,14 @@ shopt -s nullglob
 export PATH=$BUILD_DIR:/sbin:/usr/sbin:/bin:/usr/bin:$PATH
 
 if vm_detect_2nd_stage ; then
-    set "/.build-srcdir/$RECIPEFILE"
+    vm_mount_sources "/.build-srcdir" || cleanup_and_exit 1
+    if test -z "$NO_SOURCE_COPY"; then
+	set "/.build-srcdir/$RECIPEFILE"
+    else
+	# receipt has to be relative for this to work
+	RECIPEFILES=("$RECIPEFILE")
+	cd /.build-srcdir
+    fi
     export PATH=/.build:$PATH
 fi
 
@@ -1546,14 +1561,18 @@ MODULEMDFILE=
 
 for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 
-    if test -n "$RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" ; then
+    if test -n "$RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" -a -z "$NO_SOURCE_COPY" ; then
 	SRCDIR="$PWD"
 	RECIPEFILE="${RECIPEPATH##*/}"
+    elif test -n "$NO_SOURCE_COPY" ; then
+	SRCDIR="$PWD"
+	RECIPEFILE="$RECIPEPATH"
     elif test "$RECIPEPATH" != "${RECIPEPATH%/debian/control}" ; then
 	SRCDIR="${RECIPEPATH%/debian/control}"
 	RECIPEFILE="debian/control"
     else
 	SRCDIR="${RECIPEPATH%/*}"
+	test "$SRCDIR" = "$RECIPEPATH" && SRCDIR="$PWD"
 	RECIPEFILE="${RECIPEPATH##*/}"
     fi
 
@@ -1578,6 +1597,13 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	BUILD_RPMS=
 	BUILD_DIST="$SRCDIR/.build.config"
 	repos=()
+    fi
+
+    # Need to make sure VM/chroot can access the files. So
+    # So use spec file as reference for build user.
+    # Obviously crazy ownership combos won't work here.
+    if test -n "$NO_SOURCE_COPY"; then
+	read ABUILD_UID ABUILD_GID < <(stat -c "%u %g" "$RECIPEPATH")
     fi
 
     recipe_set_buildtype

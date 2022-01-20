@@ -30,9 +30,10 @@ recipe_setup_spec() {
     fi
     test "$DO_INIT_TOPDIR" = false || spec_init_topdir
     mkdir -p $BUILD_ROOT$TOPDIR/{BUILD,SOURCES,SPECS,SRPMS,BUILDROOT,OTHER,RPMS/noarch,RPMS/i386,RPMS/$(uname -m)}
+    chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
     SPECDIR="$TOPDIR/SOURCES"
     copy_sources "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"
-    chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+    test -n "$NO_SOURCE_COPY" || chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR/SOURCES"
 }
 
 recipe_prepare_spec() {
@@ -111,7 +112,12 @@ spec_init_topdir() {
 	done
 	for d in "$BUILD_ROOT$TOPDIR"/* "$BUILD_ROOT$TOPDIR"/.[^.]* ; do
 	    test "$d" = "$BUILD_ROOT$TOPDIR/$keepbuild" -o "$d" = "$BUILD_ROOT$TOPDIR/$keepbuildroot" && continue
-	    rm -rf "$d"
+	    # safeguard in case umount from RPM_BUILD_IN_PLACE failed
+	    if mountpoint -q "$d"; then
+		    cleanup_and_exit 1 "ERROR: $d is a mountpoint!?"
+	    else
+		    rm -rf "$d"
+	    fi
 	done
     else
 	rm -rf "$BUILD_ROOT$TOPDIR"
@@ -276,7 +282,10 @@ recipe_resultdirs_spec() {
 }
 
 recipe_cleanup_spec() {
-    :
+    if [ -n "$NO_SOURCE_COPY" ] && mountpoint -q "$BUILD_ROOT$TOPDIR/SOURCES/"; then
+	cd /
+	umount "$BUILD_ROOT$TOPDIR/SOURCES/"
+    fi
 }
 
 recipe_unpack_srcrpm() {
@@ -361,3 +370,4 @@ recipe_create_deltarpms() {
     fi
 }
 
+# vim: syntax=bash

@@ -346,6 +346,10 @@ vm_startup_kvm() {
     if test -n "$VM_CUSTOMOPT"; then
         kvm_options="$kvm_options $VM_CUSTOMOPT"
     fi
+    if test -n "$NO_SOURCE_COPY" -a -n "$MYSRCDIR"; then
+	# https://wiki.qemu.org/Documentation/9psetup
+	qemu_args+=(-fsdev local,security_model=none,id=fsdev0,path="$MYSRCDIR" -device virtio-9p-pci,id=fs0,fsdev=fsdev0,mount_tag=build-srcdir)
+    fi
     set -- $qemu_bin -nodefaults -no-reboot -nographic -vga none $kvm_cpu $kvm_options \
 	-kernel $vm_kernel \
 	-initrd $vm_initrd \
@@ -450,3 +454,10 @@ vm_sysrq_kvm() {
 vm_wipe_kvm() {
     :
 }
+
+vm_mount_sources_kvm() {
+    test -n "$NO_SOURCE_COPY" || return 0
+    mount -t 9p -o trans=virtio,version=9p2000.L build-srcdir "$1"
+}
+
+# vim: syntax=sh

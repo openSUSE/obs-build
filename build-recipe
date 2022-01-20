@@ -27,6 +27,7 @@ KIWI_PARAMETERS=
 BUILD_SKIP_BUNDLE=
 RPM_BUILD_IN_PLACE=
 RPM_NOPREP=
+NO_SOURCE_COPY=
 
 for i in spec dsc kiwi arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild appimage docker podman fissile helm flatpak mkosi; do
     . "$BUILD_DIR/build-recipe-$i"
@@ -77,6 +78,9 @@ recipe_parse_options() {
         ;;
       -rpm-noprep)
 	RPM_NOPREP=1
+        ;;
+      -no-source-copy)
+	NO_SOURCE_COPY=true
         ;;
       -*)
 	return 1
@@ -139,14 +143,14 @@ recipe_set_buildtype() {
 expand_recipe_directories() {
     local f t ff found types
     if test -z "$RECIPEFILES" ; then
-	set -- "`pwd`"
+	set -- "$PWD"
     else
 	set -- "${RECIPEFILES[@]}"
     fi
     RECIPEFILES=()
     for f in "$@" ; do
 	if test "$f" = "${f#/}" ; then
-	    f="`pwd`/$f"
+	    f="$PWD/$f"
 	fi
 	if test -d "$f" ; then
 	    if test -z "$types" ; then
@@ -168,13 +172,13 @@ expand_recipe_directories() {
 		if test $t = mkosi. ; then
 		    for ff in "$f"/$t* ; do
 			test -f "$ff" || continue
-			RECIPEFILES=("${RECIPEFILES[@]}" "$ff")
+			RECIPEFILES=("${RECIPEFILES[@]}" "${ff#$PWD/}")
 			found=true
 		    done
 		else
 		    for ff in "$f"/*$t ; do
 			test -f "$ff" || continue
-			RECIPEFILES=("${RECIPEFILES[@]}" "$ff")
+			RECIPEFILES=("${RECIPEFILES[@]}" "${ff#$PWD/}")
 			found=true
 		    done
 		fi
@@ -189,7 +193,7 @@ expand_recipe_directories() {
 		fi
 	    done
 	else
-	    RECIPEFILES[${#RECIPEFILES[@]}]="$f"
+	    RECIPEFILES[${#RECIPEFILES[@]}]="${f#$PWD/}"
 	fi
     done
     if test -z "$RECIPEFILES" ; then
