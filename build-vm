@@ -789,7 +789,7 @@ vm_setup() {
 	find "$BUILD_ROOT" -mindepth 1 -maxdepth 1 -print0 | xargs -0 --no-run-if-empty rm -rf
         if test -z "$CLEAN_BUILD" -a -e "$VM_ROOT" ; then
            echo "Recovering former build root"
-           debugfs -f <(echo rdump / "$BUILD_ROOT") "$VM_ROOT"
+           debugfs -f <(echo rdump / "$BUILD_ROOT") "$VM_ROOT" 2>/dev/null
         fi
     fi
     local clean_build="$CLEAN_BUILD"
