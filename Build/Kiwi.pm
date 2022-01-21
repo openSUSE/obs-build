@@ -246,7 +246,7 @@ sub kiwiparse {
     $obsprofiles = [ grep {defined($_)} map {$_ eq '@BUILD_FLAVOR@' ? $buildflavor : $_} split(' ', $obsprofiles) ];
   }
   $unorderedrepos = 1 if $xml =~ /^\s*<!--\s+OBS-UnorderedRepos\s+-->\s*$/im;
-  $ret->{'appendprofiletocontainername'} = 1 if $xml =~ /^\s*<!--\s+OBS-AppendProfileToContainername\s+-->\s*$/im;
+  $ret->{'donotappendprofiletocontainername'} = 1 if $xml =~ /^\s*<!--\s+OBS-DoNotAppendProfileToContainername\s+-->\s*$/im;
   for ($xml =~ /^\s*<!--\s+OBS-Imagerepo:\s+(.*)\s+-->\s*$/img) {
     push @imagerepos, { 'url' => $_ };
   }
@@ -615,6 +615,20 @@ sub showcontainerinfo {
   my $d = parse($cf, $fn);
   die("$d->{'error'}\n") if $d->{'error'};
   $image =~ s/.*\/// if defined $image;
+
+  my $profile;
+  if (@{$d->{'profiles'} || []} > 1 && $image) {
+    # try to figure out the used profile from the image name
+    my @matches = grep {$image =~ /-\Q$_\E-/} @{$d->{'profiles'}};
+    if (@matches) {
+      $profile = $matches[0];
+      # XXX: should re-parse with the correct profile now
+    }
+  }
+  if (!defined($profile) && @{$d->{'profiles'} || []}) {
+    $profile = $d->{'profiles'}->[0];
+  }
+
   my @repos;
   for my $repo (@{$d->{'imagerepos'} || []}) {
     push @repos, { 'url' => $repo->{'url'}, '_type' => {'priority' => 'number'} };
@@ -626,10 +640,7 @@ sub showcontainerinfo {
     'buildtime' => $buildtime,
     '_type' => {'buildtime' => 'number'},
   };
-  if ($d->{'appendprofiletocontainername'} && @{$d->{'profiles'} || []}) {
-    # we can currently only handle one profile
-    $containerinfo->{'name'} .= "-$d->{'profiles'}->[0]";
-  }
+  $containerinfo->{'name'} .= "-$profile" if !$d->{'donotappendprofiletocontainername'} && defined($profile) && $profile ne '';
   $containerinfo->{'version'} = $d->{'version'} if defined $d->{'version'};
   $containerinfo->{'release'} = $release if defined $release;
   $containerinfo->{'tags'} = $d->{'container_tags'} if @{$d->{'container_tags'} || []};
