@@ -176,7 +176,7 @@ dsc_move_build_result() {
 	mv "$changes" "$BUILD_ROOT/$TOPDIR/DEBS"
     done
 
-    if test "$RECIPEFILE" != "debian/control" ; then
+    if test "$RECIPEFILE" != "debian/control" -a "$RECIPEFILE" != "debian.control" ; then
 	# link used sources over to DEB directory
 	ln $BUILD_ROOT/$DEB_SOURCEDIR/$DEB_DSCFILE $BUILD_ROOT/$TOPDIR/DEBS/
 	while read f ; do
