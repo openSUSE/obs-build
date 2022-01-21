@@ -26,14 +26,26 @@ where it defines the target architecture a from a cross build compiler.
 
 ===== The compatible terms can be found in the following table:
 
+Unfortunatly the naming of architecture areas is not consistent via the various build 
+tooling. Please find the terminilogy mapping from our "build" script and other toolings
+in the list below.
+
 [width="15%"]
 |=================================
 |build || host  | target  |  -/-
-|------||-------|---------|-------
 |cmake || HOST  | default |  -/-
 |GNU   || build | host    | target
 |rpm   || build | target  |  -/-
 |=================================
+
+Our build script just knows the host and target definition as described above.
+
+cmake is similar, just uses different namings.
+
+GNU (esp. in automake and autoconf) has actually three definitions, mainly for compiler
+toolchain. "build" is the environment which creates binaries. Host are the resulting
+binaries. And target is important when these binaries can build binaries as well for
+another target.
 
 ==== Example Calls in spec files for cross build
 

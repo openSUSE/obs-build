@@ -155,20 +155,21 @@ It is also possible to specify a checksum to make sure that the asset is correct
  #!RemoteAsset: <CHECKSUM>
  Source: <URL>
 
-An alternative is to use the 
+An alternative is just to use the
 
  #!RemoteAssetUrl: <URL>
 
-marker if the downloaded file should not become part of the source rpm.
+marker without any Source: tag when the downloaded file should not become
+part of the source rpm.
 
 ==== kiwi build description
 
-The kiwi format is not supporting remote source specifications, but they can be specified via XML
-comments.
+The kiwi format is not supporting remote source specifications, but they can be
+specified via XML comments.
 
   <!-- OBS-RemoteAsset: <URL> -->
 
-The resulting download file can be copied into the image using
+The resulting downloaded file can be copied into the image using
 
   <!-- OBS-CopyToImage: <source> <destination> -->
 
@@ -201,9 +202,4 @@ Package builds are supported for rpm, deb, arch and their variations.
 === container builds
 
 include::cross_arch_build.adoc[]
-
-
-
-
-
 

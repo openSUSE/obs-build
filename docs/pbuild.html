@@ -1002,22 +1002,23 @@ Source: &lt;URL&gt;</code></pre>
 <pre><code>#!RemoteAsset: &lt;CHECKSUM&gt;
 Source: &lt;URL&gt;</code></pre>
 </div></div>
-<div class="paragraph"><p>An alternative is to use the</p></div>
+<div class="paragraph"><p>An alternative is just to use the</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><code>#!RemoteAssetUrl: &lt;URL&gt;</code></pre>
 </div></div>
-<div class="paragraph"><p>marker if the downloaded file should not become part of the source rpm.</p></div>
+<div class="paragraph"><p>marker without any Source: tag when the downloaded file should not become
+part of the source rpm.</p></div>
 </div>
 <div class="sect3">
 <h4 id="_kiwi_build_description">2.4.2. kiwi build description</h4>
-<div class="paragraph"><p>The kiwi format is not supporting remote source specifications, but they can be specified via XML
-comments.</p></div>
+<div class="paragraph"><p>The kiwi format is not supporting remote source specifications, but they can be
+specified via XML comments.</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><code>&lt;!-- OBS-RemoteAsset: &lt;URL&gt; --&gt;</code></pre>
 </div></div>
-<div class="paragraph"><p>The resulting download file can be copied into the image using</p></div>
+<div class="paragraph"><p>The resulting downloaded file can be copied into the image using</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><code>&lt;!-- OBS-CopyToImage: &lt;source&gt; &lt;destination&gt; --&gt;</code></pre>
@@ -1560,6 +1561,9 @@ where it defines the target architecture a from a cross build compiler.</p></div
 </div>
 <div class="sect4">
 <h5 id="_the_compatible_terms_can_be_found_in_the_following_table">The compatible terms can be found in the following table:</h5>
+<div class="paragraph"><p>Unfortunatly the naming of architecture areas is not consistent via the various build
+tooling. Please find the terminilogy mapping from our "build" script and other toolings
+in the list below.</p></div>
 <div class="tableblock">
 <table rules="all"
 width="15%"
@@ -1577,13 +1581,6 @@ cellspacing="0" cellpadding="4">
 <td align="left" valign="top"><p class="table">host</p></td>
 <td align="left" valign="top"><p class="table">target</p></td>
 <td align="left" valign="top"><p class="table">-/-</p></td>
-</tr>
-<tr>
-<td align="left" valign="top"><p class="table">------</p></td>
-<td align="left" valign="top"><p class="table"></p></td>
-<td align="left" valign="top"><p class="table">-------</p></td>
-<td align="left" valign="top"><p class="table">---------</p></td>
-<td align="left" valign="top"><p class="table">-------</p></td>
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">cmake</p></td>
@@ -1609,6 +1606,12 @@ cellspacing="0" cellpadding="4">
 </tbody>
 </table>
 </div>
+<div class="paragraph"><p>Our build script just knows the host and target definition as described above.</p></div>
+<div class="paragraph"><p>cmake is similar, just uses different namings.</p></div>
+<div class="paragraph"><p>GNU (esp. in automake and autoconf) has actually three definitions, mainly for compiler
+toolchain. "build" is the environment which creates binaries. Host are the resulting
+binaries. And target is important when these binaries can build binaries as well for
+another target.</p></div>
 </div>
 </div>
 <div class="sect3">
@@ -1634,7 +1637,7 @@ cellspacing="0" cellpadding="4">
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2021-12-10 09:29:27 CET
+ 2022-01-21 14:43:16 CET
 </div>
 </div>
 </body>
