@@ -189,3 +189,11 @@ assert_dir_path() {
     test "$1" != "${1%/*}" && assert_dir_path "${1%/*}"
     assert_dirs "$1"
 }
+
+detect_cache_dir() {
+    if test -w /; then
+	CACHE_DIR=/var/cache/build
+    else
+	CACHE_DIR=${XDG_CACHE_HOME:-~/.cache}/opensuse.org/build/cache
+    fi
+}
