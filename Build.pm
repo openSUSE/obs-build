@@ -558,7 +558,7 @@ sub read_config {
 	} else {
 	  push @macros, '...';
 	}
-      } elsif ($rm !~ /^%/) {
+      } elsif ($rm !~ /^%/ || $rm =~ /^%(if|endif|else|elif)(\s|$)/) {
 	push @macros, $rm;
       } else {
 	push @macros, "%define ".substr($rm, 1);
