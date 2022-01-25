@@ -39,8 +39,8 @@ use PBuild::Source;
 use PBuild::Options;
 use PBuild::Cpio;
 
-# FIXME: all code should become arch agnostic
-my $arch = 'noarch';
+$Build::Kiwi::urlmapper = 0;    # disable url -> prp mapping
+
 my $fedpkg = 'fedpkg@https://pkgs.fedoraproject.org/repo/pkgs';
 
 my %known_options = (
@@ -49,7 +49,13 @@ my %known_options = (
   'assets' => '::',
   'noassetdir' => '',
   'clean' => '',
+  'list' => '',
   'unpack' => '',
+
+  'arch' => '',
+  'dist' => '',
+  'configdir' => '',
+  'recipe' => '',
 
   'create-cpio' => '',
 
@@ -93,7 +99,14 @@ if ($opts->{'help'}) {
 die("Please specify at least one directory\n") unless @dirs;
 die("The --assetdir option conflicts with --noassetdir\n") if $opts->{'assetdir'} && $opts->{'noassetdir'};
 
-my $bconf = Build::read_config($arch);
+my $arch = $opts->{'arch'} || 'noarch';
+my $bconf;
+if ($opts->{'dist'}) {
+  my $configdir = $opts->{'configdir'} || (($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs');
+  $bconf = Build::read_config_dist($opts->{'dist'}, $arch, $configdir);
+} else {
+  $bconf = Build::read_config($arch);
+}
 for my $dir (@dirs) {
   my ($files, $source_assets) = PBuild::Source::list_package($dir);
   my $p = {
@@ -109,21 +122,31 @@ for my $dir (@dirs) {
   $assetmgr->add_assetshandler($fedpkg) if !$opts->{'assets'} && $files->{'sources'};
   $assetmgr->merge_assets($p, $source_assets);
 
-  for my $file (sort keys %$files) {
-    if ($file eq 'sources' || $file eq 'go.sum') {
-      $p->{'buildtype'} = '';
-      $assetmgr->find_assets($p);
-      next;
-    }
-    next unless $file eq 'PKGBUILD' || $file =~ /\.(?:spec|dsc|kiwi)/;
-    my $bt = Build::recipe2buildtype($file);
-    next unless $bt;
+  if ($opts->{'recipe'}) {
+    my $bt = Build::recipe2buildtype($opts->{'recipe'});
     $p->{'buildtype'} = $bt;
     my $d;
-    eval { $d = Build::parse_typed($bconf, "$dir/$file", $bt) };
+    eval { $d = Build::parse_typed($bconf, "$dir/$opts->{'recipe'}", $bt) };
     $p->{'remoteassets'} = $d->{'remoteassets'} if $d && $d->{'remoteassets'};
-    $p->{'name'} ||= $d->{'name'} if $d->{'name'};
+    $p->{'name'} = $d->{'name'};
     $assetmgr->find_assets($p);
+  } else {
+    for my $file (sort keys %$files) {
+      if ($file eq 'sources' || $file eq 'go.sum') {
+	$p->{'buildtype'} = '';
+	$assetmgr->find_assets($p);
+	next;
+      }
+      next unless $file eq 'PKGBUILD' || $file =~ /\.(?:spec|dsc|kiwi)/;
+      my $bt = Build::recipe2buildtype($file);
+      next unless $bt;
+      $p->{'buildtype'} = $bt;
+      my $d;
+      eval { $d = Build::parse_typed($bconf, "$dir/$file", $bt) };
+      $p->{'remoteassets'} = $d->{'remoteassets'} if $d && $d->{'remoteassets'};
+      $p->{'name'} ||= $d->{'name'} if $d->{'name'};
+      $assetmgr->find_assets($p);
+    }
   }
   if ($opts->{'clean'}) {
     my $af = $p->{'asset_files'} || {};
@@ -134,6 +157,18 @@ for my $dir (@dirs) {
       } else {
         unlink "$dir/$_->{'file'}" if -e "$dir/$_->{'file'}";
       }
+    }
+    next;
+  }
+  if ($opts->{'list'}) {
+    my $af = $p->{'asset_files'} || {};
+    for my $file (sort keys %$af) {
+      my $asset = $af->{$file};
+      print $asset->{'isdir'} ? "$file/" : $file;
+      print " $asset->{'type'}";
+      print " $asset->{'url'}" if $asset->{'url'};
+      print " $asset->{'digest'}" if $asset->{'digest'};
+      print "\n";
     }
     next;
   }
