@@ -786,7 +786,7 @@ vm_setup() {
 	if test ! -w /root ; then
 	    find "$BUILD_ROOT" -type d -not -perm /200 -print0 | xargs -0 --no-run-if-empty chmod +w
 	fi
-	find "$BUILD_ROOT" -mindepth 1 -maxdepth 1 -print0 | xargs -0 --no-run-if-empty rm -rf
+	rm -rf "$BUILD_ROOT"/* "$BUILD_ROOT"/.[^.]* 
         if test -z "$CLEAN_BUILD" -a -e "$VM_ROOT" ; then
            echo "Recovering former build root"
            debugfs -f <(echo rdump / "$BUILD_ROOT") "$VM_ROOT" 2>/dev/null

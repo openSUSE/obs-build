@@ -49,8 +49,6 @@ repos=()
 
 . $BUILD_DIR/common_functions || exit 1
 
-detect_cache_dir
-
 # should RPMs be installed with --force ?
 USE_FORCE=false
 PREPARE_VM=
@@ -60,6 +58,7 @@ RPMLIST=
 CLEAN_BUILD=
 CREATE_BUILD_BINARIES=
 DLNOSIGNATURE=
+CACHE_DIR=
 OBSURL=
 BUILD_SYSROOT=
 test -z "$CONFIG_DIR" && CONFIG_DIR="$BUILD_DIR/configs"
@@ -139,6 +138,7 @@ if test -z "$BUILD_ROOT" ; then
     echo "Please specify a build root!"
     exit 1
 fi
+test -z "$CACHE_DIR" && detect_cache_dir
 
 BUILD_IS_RUNNING=$BUILD_ROOT/not-ready
 TMPFILE=$BUILD_ROOT/tmpfile
