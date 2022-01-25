@@ -141,6 +141,7 @@ for my $dir (@dirs) {
       my $bt = Build::recipe2buildtype($file);
       next unless $bt;
       $p->{'buildtype'} = $bt;
+      delete $p->{'remoteassets'};
       my $d;
       eval { $d = Build::parse_typed($bconf, "$dir/$file", $bt) };
       $p->{'remoteassets'} = $d->{'remoteassets'} if $d && $d->{'remoteassets'};
