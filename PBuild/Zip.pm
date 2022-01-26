@@ -32,8 +32,8 @@ sub readbytes {
   seek($handle, $pos, 0) || die("seek: $!\n") if defined($pos);
   my $d;
   my $r = read($handle, $d, $size);
-  die("read: $!\n") unless defined $r;
-  die("read: unexpeced EOF\n") unless $r == $size;
+  die("zip read: $!\n") unless defined $r;
+  die("zip read: unexpeced EOF ($r != $size)\n") unless $r == $size;
   return $d;
 }
 
@@ -61,6 +61,7 @@ sub extract_inflate {
     die("unexpected EOF\n") unless $csize > 0;
     my $chunksize = $csize > 65536 ? 65536 : $csize;
     my $chunk = readbytes($handle, $chunksize);
+    $csize -= $chunksize;
     my $infchunk = '';
     ($status) = $decomp->inflate($chunk, $infchunk);
     die("decompression error\n") unless $status == Compress::Raw::Zlib::Z_OK() || $status == Compress::Raw::Zlib::Z_STREAM_END();
