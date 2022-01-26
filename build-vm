@@ -780,13 +780,13 @@ vm_setup_swap() {
 	# delete old swap to get rid of the old blocks
 	if test -n "$VM_SWAP" -a "$VM_SWAP_TYPE" = file -a -f "$VM_SWAP" ; then
 	    echo "Deleting old $VM_SWAP"
-        rm -f "$VM_SWAP"
+	    rm -f "$VM_SWAP"
 	fi
     fi
-    if test -n "$VM_SWAP" -a "$VM_SWAP_TYPE" = file ; then
-	vm_img_create "$VM_SWAP" "$VMDISK_SWAPSIZE"
-    fi
-    if test -n "$VM_SWAP" ; then
+    if test -n "$VM_SWAP" && test "$DO_INIT" = true ; then
+	if test "$VM_SWAP_TYPE" = file ; then
+	    vm_img_create "$VM_SWAP" "$VMDISK_SWAPSIZE"
+	fi
 	vm_attach_swap
 	dd if=/dev/zero of="$VM_SWAP" bs=1024 count=1 conv=notrunc status=none || cleanup_and_exit 4
 	if test "$VM_SWAPDEV" != "${VM_SWAPDEV#LABEL=}"; then
@@ -818,7 +818,7 @@ vm_setup() {
 	fi
     fi
     # Check for populating filesystem during mkfs
-    if test -n "$VM_USE_MKFS_COPYIN" ; then
+    if test -n "$VM_USE_MKFS_COPYIN" && test "$DO_INIT" = true; then
 	echo "Using mkfs copyin mode to populate the root filesystem"
 	mkdir_build_root
 	if test ! -w /root ; then
@@ -837,6 +837,9 @@ vm_setup() {
 	    test -e "$VM_ROOT" -a -e "${VM_ROOT}.size" && origrootsize=$(cat "${VM_ROOT}.size" 2>/dev/null)
 	    if test -z "$origrootsize" -o "$origrootsize" != "$VMDISK_ROOTSIZE" ; then
 		# the size has changed, re-create file system
+		if test "$DO_INIT" = false; then
+		    cleanup_and_exit 1 "size change requires re-init"
+		fi
 		clean_build=true
 	    fi
 	fi
@@ -1069,8 +1072,10 @@ vm_first_stage() {
 	    fi
 	fi
 	check_exit
-	if test -n "$VM_USE_MKFS_COPYIN" ; then
-	    vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" "$VMDISK_FILESYSTEM_OPTIONS" "$BUILD_ROOT" || cleanup_and_exit 4
+	if test -n "$VM_USE_MKFS_COPYIN"; then
+	    if test "$DO_INIT" = true; then
+		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" "$VMDISK_FILESYSTEM_OPTIONS" "$BUILD_ROOT" || cleanup_and_exit 4
+	    fi
         else
 	    # needs to work otherwise we have a corrupted file system
 	    if ! umount $BUILD_ROOT; then
