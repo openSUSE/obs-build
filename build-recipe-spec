@@ -29,6 +29,7 @@ recipe_setup_spec() {
     fi
     test "$DO_INIT_TOPDIR" = false || spec_init_topdir
     mkdir -p $BUILD_ROOT$TOPDIR/{BUILD,SOURCES,SPECS,SRPMS,BUILDROOT,OTHER,RPMS/noarch,RPMS/i386,RPMS/$(uname -m)}
+    SPECDIR="$TOPDIR/SOURCES"
     copy_sources "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"
     chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
 }
@@ -80,7 +81,8 @@ recipe_prepare_spec() {
 	    sed -e "/^%changelog/q" $BUILD_ROOT/.spec.new > $BUILD_ROOT/.spec.t2
 	    diff $BUILD_ROOT/.spec.t1 $BUILD_ROOT/.spec.t2
 	    rm -f $BUILD_ROOT/.spec.t1 $BUILD_ROOT/.spec.t2
-	    mv $BUILD_ROOT/.spec.new $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE
+	    SPECDIR="$TOPDIR/SPECS"
+	    mv $BUILD_ROOT/.spec.new $BUILD_ROOT$SPECDIR/$RECIPEFILE
 	else
 	    rm -f $BUILD_ROOT/.spec.new
 	fi
@@ -221,7 +223,7 @@ recipe_build_spec() {
 		"${definesnstuff[@]}" \
 		-br \
 		"${rpmbopts[@]}" \
-		"$TOPDIR/SOURCES/$RECIPEFILE" \
+		"$SPECDIR/$RECIPEFILE" \
 		> $BUILD_ROOT/.build.command
 	chmod 755 $BUILD_ROOT/.build.command
 	chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null
@@ -237,7 +239,7 @@ recipe_build_spec() {
 	    done
 	    test -n "$reqsfile" || cleanup_and_exit 1 "no buildreqs.nosrc.rpm file?"
 	    chroot $BUILD_ROOT rpm -qp --requires "$TOPDIR/SRPMS/$reqsfile" | grep -v '^rpmlib(' | sort -u > $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp
-	    chroot $BUILD_ROOT rpmspec -q --srpm --requires "$TOPDIR/SOURCES/$RECIPEFILE" >> $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp || cleanup_and_exit 1 "rpm -q --spec failed"
+	    chroot $BUILD_ROOT rpmspec -q --srpm --requires "$SPECDIR/$RECIPEFILE" >> $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp || cleanup_and_exit 1 "rpm -q --spec failed"
 	    sort < $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp | uniq -u > $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs
 	    rm -f $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp
 	    while read db ; do
@@ -254,7 +256,7 @@ recipe_build_spec() {
 		"${definesnstuff[@]}" \
 		$rpmstage \
 		"${rpmbopts[@]}" \
-		"$TOPDIR/SOURCES/$RECIPEFILE" \
+		"$SPECDIR/$RECIPEFILE" \
 		> $BUILD_ROOT/.build.command
 	chmod 755 $BUILD_ROOT/.build.command
 	check_exit
