@@ -289,10 +289,7 @@ sub parse {
         if ($container ne 'scratch') {
 	  if ($Build::Kiwi::urlmapper && $container =~ /^([^\/]+\.[^\/]+)\/[a-zA-Z0-9]/) {
 	    my $prp = $Build::Kiwi::urlmapper->("registry://$1/");
-	    if ($prp) {
-	      $container =~ s/^[^\/]+\///;	# strip domain
-	      push @containerrepos, $prp;
-	    }
+	    push @containerrepos, $prp if $prp;
 	  }
           $container .= ':latest' unless $container =~ /:[^:\/]+$/;
           $container = "container:$container";
