@@ -52,10 +52,10 @@ my %known_options = (
   'list' => '',
   'unpack' => '',
 
-  'arch' => '',
-  'dist' => '',
-  'configdir' => '',
-  'recipe' => '',
+  'arch' => ':',
+  'dist' => ':',
+  'configdir' => ':',
+  'recipe' => ':',
 
   'create-cpio' => '',
 
