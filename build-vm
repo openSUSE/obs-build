@@ -1079,6 +1079,9 @@ vm_first_stage() {
 	    cd $BUILD_ROOT/.build.packages || cleanup_and_exit 1
 	    echo "build: extracting built packages..."
 	    extractbuild --disk "$VM_ROOT" --input "$VM_SWAP" --skip 512 -v || cleanup_and_exit 3
+            if test "$BUILDTYPE" = "preinstallimage" ; then
+                preinstallimage_compress OTHER
+            fi
 	    if test "$DO_STATISTICS" = 1 ; then
 		mkdir -p OTHER
 		TIME_TOTAL=$(( $SECONDS - $TIME_START_TIME ))

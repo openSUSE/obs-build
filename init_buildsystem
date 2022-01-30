@@ -280,8 +280,8 @@ preinstall_image() {
 	unsafe_preinstall_check
 	TAR="tar --exclude .build --exclude .init_b_cache -x"
     fi
-    # pipe output through perl to print a dot every 1000 lines
-    if ! $TAR -z -f "$BUILD_INIT_CACHE/rpms/$1" -v > >(tee "$BUILD_INIT_CACHE/.preinstallimage.unpack" | perl -e '$|=1; my $done=0; $done++ % 1000 or print "." while <STDIN>; print "\n";')  2>&1 ; then
+    local progress='z=0; while read; do let z++; test $((z % 1000)) = 0 && printf "."; done'
+    if ! $TAR -f "$BUILD_INIT_CACHE/rpms/$1" -v > >(tee "$BUILD_INIT_CACHE/.preinstallimage.unpack" | eval $progress ) 2>&1 ; then
 	echo "unpack failed."
 	test -f "$BUILD_INIT_CACHE/.preinstallimage.unpack" && cat "$BUILD_INIT_CACHE/.preinstallimage.unpack"
 	cleanup_and_exit 1
