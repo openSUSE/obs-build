@@ -45,6 +45,8 @@ my $mt_oci_index           = 'application/vnd.oci.image.index.v1+json';
 # 
 sub bearer_authenticate {
   my($class, $ua, $proxy, $auth_param, $response, $request, $arg, $size) = @_;
+  return $response if $ua->{'bearer_authenticate_norecurse'};
+  local $ua->{'bearer_authenticate_norecurse'} = 1;
   my $realm = $auth_param->{'realm'};
   die("bearer auth did not provide a realm\n") unless $realm;
   die("bearer realm is not http/https\n") unless $realm =~ /^https?:\/\//i;
@@ -56,10 +58,10 @@ sub bearer_authenticate {
   print "requesting bearer auth from $realm [@afields]\n";
   $auri->query_form($auri->query_form, @afields);
   my $ares = $ua->get($auri);
-  return $request unless $ares->is_success;
+  return $response unless $ares->is_success;
   my $reply = JSON::XS::decode_json($ares->decoded_content);
   my $token = $reply->{'token'} || $reply->{'access_token'};
-  return $request unless $token;
+  return $response unless $token;
   my $url = $proxy ? $request->{proxy} : $request->uri_canonical;
   my $host_port = $url->host_port;
   my $h = $ua->get_my_handler('request_prepare', 'm_host_port' => $host_port, sub {
@@ -99,18 +101,45 @@ sub select_manifest {
   return undef;
 }
 
+sub fetch_manifest {
+  my ($repodir, $registry, @args) = @_;
+  return PBuild::Download::fetch(@args) if $registry !~ /docker.io\/?$/;
+  my ($data, $ct);
+  eval { ($data, $ct) = PBuild::Download::head(@args) };
+  die($@) if $@ && $@ !~ /401 Unauthorized/;	# sigh, docker returns 401 for not-existing repositories
+  return undef unless $data;
+  my $digest = $data->{'docker-content-digest'};
+  return PBuild::Download::fetch(@args) unless $digest;
+  my $content = PBuild::Util::readstr("$repodir/manifest.$digest", 1);
+  if ($content) {
+    PBuild::Download::checkdigest($content, $digest);
+    return ($content, $ct);
+  }
+  ($content, $ct) = PBuild::Download::fetch(@args);
+  return undef unless $content;
+  PBuild::Download::checkdigest($content, $digest);
+  PBuild::Util::mkdir_p($repodir);
+  PBuild::Util::writestr("$repodir/.manifest.$digest.$$", "$repodir/manifest.$digest", $content);
+  return ($content, $ct);
+}
+
 #
 # query a registry about a container
 #
 sub queryremotecontainer {
-  my ($ua, $arch, $registry, $repotag) = @_;
+  my ($ua, $arch, $repodir, $registry, $repotag) = @_;
   $repotag .= ":latest" unless $repotag =~ /:[^\/:]+$/;
   die unless $repotag =~ /^(.*):([^\/:]+)$/;
   my ($repository, $tag) = ($1, $2);
   $repository = "library/$repository" if $repository !~ /\// && $registry =~ /docker.io\/?$/;
+  # strip domain part if it matches the registry url
+  my $registrydomain = $registry;
+  $registrydomain =~ s/^[^\/]+\/\///;
+  $registrydomain =~ s/\/.*//;
+  $repository = $2 if $repository =~ /^([^\/]+)\/(.+)$/s && $1 eq $registrydomain;
 
   my @accept = ($mt_docker_manifestlist, $mt_docker_manifest, $mt_oci_index, $mt_oci_manifest);
-  my ($data, $ct) = PBuild::Download::fetch("$registry/v2/$repository/manifests/$tag",
+  my ($data, $ct) = fetch_manifest($repodir, $registry, "$registry/v2/$repository/manifests/$tag",
 	'ua' => $ua, 'accept' => \@accept, 'missingok' => 1);
   return undef unless defined $data;
   die("no content type set in answer\n") unless $ct;
@@ -120,7 +149,7 @@ sub queryremotecontainer {
     my $manifest = select_manifest($arch, $r->{'manifests'} || []);
     return undef unless $manifest;
     @accept = ($mt_docker_manifest, $mt_oci_manifest);
-    ($data, $ct) = PBuild::Download::fetch("$registry/v2/$repository/manifests/$manifest->{'digest'}",
+    ($data, $ct) = fetch_manifest($repodir, $registry, "$registry/v2/$repository/manifests/$manifest->{'digest'}",
 	'ua' => $ua, 'accept' => \@accept);
     die("no content type set in answer\n") unless $ct;
   }
@@ -162,7 +191,7 @@ sub fetchrepo {
   my @bins;
   my $ua = PBuild::Download::create_ua();
   for my $repotag (@{$repotags || []}) {
-    my $bin = queryremotecontainer($ua, $arch, $url, $repotag);
+    my $bin = queryremotecontainer($ua, $arch, $repodir, $url, $repotag);
     push @bins, $bin if $bin;
   }
   return \@bins;

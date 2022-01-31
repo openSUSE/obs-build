@@ -78,6 +78,11 @@ sub ua_get {
   return $res;
 }
 
+sub ua_head {
+  my ($ua, $url, $maxsize, @hdrs) = @_;
+  return $ua->head($url, @hdrs);
+}
+
 #
 # Download a file with the correct max size setting
 #
@@ -115,6 +120,30 @@ sub fetch {
   my $data = $res->decoded_content;
   my $ct = $res->header('content_type');
   checkdigest($data, $opt{'digest'}) if $opt{'digest'};
+  return ($data, $ct);
+}
+
+#
+# Do a HEAD request
+#
+sub head {
+  my ($url, %opt) = @_;
+  my $ua = $opt{'ua'} || create_ua();
+  my $retry = $opt{'retry'} || 0;
+  my $res;
+  my @accept;
+  @accept = ('Accept', join(', ', @{$opt{'accept'}})) if $opt{'accept'};
+  while (1) {
+    $res = ua_head($ua, $url, $opt{'maxsize'}, @accept, @{$opt{'headers'} || []});
+    last if $res->is_success;
+    return undef if $opt{'missingok'} && $res->code == 404;
+    my $status = $res->status_line;
+    die("head request of $url failed: $status\n") unless $retry-- > 0 && $res->previous;
+    warn("retrying $url\n");
+  }
+  my $data = { $res->flatten() };
+  $data = { map {lc($_) => $data->{$_}} sort keys %$data };
+  my $ct = $res->header('content_type');
   return ($data, $ct);
 }
 
