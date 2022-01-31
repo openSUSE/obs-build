@@ -337,12 +337,12 @@ $buildtype = 'spec' if !$buildtype || $buildtype eq 'UNDEFINED';
 for my $pkg (@pkgs) {
   my $p = $pkgsrc{$pkg};
   PBuild::Recipe::parse($bconf, $p, $buildtype, $myarch, $bconf_host, $hostarch);
+  next if $opts->{'single'} && $pkg ne $opts->{'single'};
   if ($p->{'buildtype'} && ($p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker') && !$p->{'error'}) {
-    my @containerdeps = grep {/^container:/} @{$p->{'dep'} || []};
-    next unless @containerdeps;
-    $containertags{substr($_, 10)} = 1 for @containerdeps;
+    $containertags{substr($_, 10)} = 1 for grep {/^container:/} @{$p->{'dep'} || []};
   }
 }
+my @containertags = sort keys %containertags;
 
 # split into target/native packages
 my @pkgs_target = @pkgs;
@@ -354,6 +354,7 @@ if ($cross) {
 
 # search for assets
 for my $pkg (@pkgs) {
+  next if $opts->{'single'} && $pkg ne $opts->{'single'};
   $assetmgr->find_assets($pkgsrc{$pkg});
 }
 
@@ -393,7 +394,11 @@ push @hostrepos, $repomgr->addlocalrepo($bconf_host, $hostarch, $builddir, \%pkg
 
 print "fetching metadata of ".PBuild::Util::plural(scalar(@{$opts->{'repo'}}) + ($cross ? scalar(@{$opts->{'hostrepo'}}) : 0), 'remote repo')."\n";
 for my $repourl (@{$opts->{'repo'}}) {
-  push @repos, $repomgr->addremoterepo($bconf, $myarch, $builddir, $repourl, $buildtype, $opts);
+  if ($repourl =~ /^registry@(.+)/) {
+    push @repos, $repomgr->addremoteregistry($bconf, $myarch, $builddir, $1, \@containertags);
+  } else {
+    push @repos, $repomgr->addremoterepo($bconf, $myarch, $builddir, $repourl, $buildtype, $opts);
+  }
 }
 if ($cross) {
   for my $repourl (@{$opts->{'hostrepo'}}) {
@@ -401,9 +406,8 @@ if ($cross) {
   }
 }
 
-if (@{$opts->{'registry'} || []} && %containertags) {
+if (@{$opts->{'registry'} || []} && @containertags) {
   print "fetching remote registry metadata\n";
-  my @containertags = sort keys %containertags;
   for my $registry (@{$opts->{'registry'} || []}) {
     push @repos, $repomgr->addremoteregistry($bconf, $myarch, $builddir, $registry, \@containertags);
   }
