@@ -143,7 +143,7 @@ sub find_assets {
   push @assets, @{$p->{'source_assets'} || []};
   push @assets, PBuild::RemoteAssets::fedpkg_parse($p) if $p->{'files'}->{'sources'};
   push @assets, PBuild::RemoteAssets::golang_parse($p) if $p->{'files'}->{'go.sum'};
-  push @assets, PBuild::RemoteAssets::recipe_parse($p) if $bt eq 'spec' || $bt eq 'kiwi' || $bt eq 'arch';
+  push @assets, PBuild::RemoteAssets::recipe_parse($p) if $bt eq 'spec' || $bt eq 'kiwi' || $bt eq 'arch' || $bt eq 'docker';
   merge_assets($assetmgr, $p, \@assets);
   update_srcmd5($assetmgr, $p) if $p->{'asset_files'};
 }

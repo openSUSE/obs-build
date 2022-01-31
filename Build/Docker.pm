@@ -50,7 +50,14 @@ sub slurp {
 }
 
 sub expandvar_cplx {
-  my ($n, $m, $v, $vars) = @_;
+  my ($cplx, $vars) = @_;
+  if ($cplx =~ /^\!([a-zA-Z0-9_]+)/) {
+    return [] unless @{$vars->{$1} || []};
+    my $n = $vars->{$1}->[0];
+    return $vars->{$n} || [];
+  }
+  return [] unless $cplx =~ /^([^\}:]+):([-+])([^}]*)$/s;
+  my ($n, $m, $v) = ($1, $2, $3);
   $v = expandvars($v, $vars) if $v =~ /\$/;
   my $o = join(' ', @{$vars->{$n} || []});
   return $o ne '' ? $vars->{$n} : [ $v ] if $m eq '-';
@@ -60,7 +67,7 @@ sub expandvar_cplx {
 
 sub expandvars {
   my ($str, $vars) = @_;
-  $str =~ s/\$([a-zA-Z0-9_]+)|\$\{([^\}:]+)\}|\$\{([^\}:]+):([-+])([^}]*)\}/join(' ', @{$3 ? expandvar_cplx($3, $4, $5, $vars) : $vars->{$2 || $1} || []})/ge;
+  $str =~ s/\$([a-zA-Z0-9_]+)|\$\{([^\}:\!]+)\}|\$\{([^}]+)\}/join(' ', @{$3 ? expandvar_cplx($3, $vars) : $vars->{$2 || $1} || []})/ge;
   return $str;
 }
 
@@ -168,6 +175,26 @@ sub cmd_apt_get {
   if ($args[0] eq 'install') {
     shift @args;
     push @{$ret->{'deps'}}, grep {/^[a-zA-Z_0-9]/} @args;
+  }
+}
+
+sub cmd_curl {
+  my ($ret, @args) = @_;
+  my @urls;
+  while (@args) {
+    my $arg = shift @args;
+    if ($arg eq '--url') {
+      $arg = shift @args;
+      push @urls, $arg if $arg =~ /^https?:\/\//;
+    } elsif ($arg =~ /^-/) {
+      shift @args if $arg eq '-d' || $arg =~ /^--data/ || $arg eq '-F' || $arg =~ /^--form/ || $arg eq '-m' || $arg =~ /^--max/ || $arg eq '-o' || $arg eq '--output' || $arg =~ /^--retry/ || $arg eq '-u' || $arg eq '--user' || $arg eq '-A' || $arg eq '--user-agent' || $arg eq '-H' || $arg eq '--header';
+    } else {
+      push @urls, $arg if $arg =~ /^https?:\/\//;
+    }
+  }
+  for my $url (@urls) {
+    my $asset = { 'url' => $url, 'type' => 'webcache' };
+    push @{$ret->{'remoteassets'}}, $asset;
   }
 }
 
@@ -317,13 +344,16 @@ sub parse {
 	  cmd_dnf($ret, @args);
 	} elsif ($rcmd eq 'apt-get') {
 	  cmd_apt_get($ret, @args);
+	} elsif ($rcmd eq 'curl') {
+	  cmd_curl($ret, @args);
 	} elsif ($rcmd eq 'obs_pkg_mgr') {
 	  cmd_obs_pkg_mgr($ret, @args);
 	}
       }
     } elsif ($cmd eq 'ENV') {
+      @args=("$args[0]=$args[1]") if @args == 2 && $args[0] !~ /=/;
       for (@args) {
-        next unless /^(.*?)=(.*)#/;
+        next unless /^(.*?)=(.*)$/;
 	$vars->{$1} = [ $2 ];
 	$vars_env->{$1} = [ $2 ];
       }

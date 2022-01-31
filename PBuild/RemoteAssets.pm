@@ -22,6 +22,7 @@ package PBuild::RemoteAssets;
 
 use POSIX;
 use Digest::MD5 ();
+use Digest::SHA ();
 use MIME::Base64 ();
 
 use PBuild::Util;
@@ -70,11 +71,17 @@ sub recipe_parse {
       push @assets, { 'file' => $file, 'url' => $url, 'type' => 'url', 'isdir' => 1 };
       next;
     }
+    my $file = $s->{'file'};
+    if (($s->{'type'} || '' eq 'webcache')) {
+      next unless $s->{'url'};
+      $file = 'build-webcache-'.Digest::SHA::sha256_hex($s->{'url'});
+    }
     next unless $s->{'url'} =~ /(?:^|\/)([^\.\/][^\/]+)$/s;
-    my $file = $1;
+    $file = $1 unless defined $file;
     undef $url unless $url =~ /^https?:\/\/.*\/([^\.\/][^\/]+)$/s;
     my $digest = $s->{'digest'};
     next unless $digest || $url;
+    next unless $file =~ /^([^\.\/][^\/]+)$/s;
     my $asset = { 'file' => $file };
     $asset->{'digest'} = $digest if $digest;
     $asset->{'url'} = $url if $url;

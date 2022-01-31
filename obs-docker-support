@@ -48,7 +48,10 @@ zypper() {
     done
     case $cmd in
     in|install|rm|remove|up|update|if|info)
-	exec /usr/bin/zypper -D $LOCAL_REPOS_D "${globalopts[@]}" "$cmd" "$@"
+	/usr/bin/zypper -D $LOCAL_REPOS_D "${globalopts[@]}" "$cmd" "$@"
+	s=$?
+	setup_links
+	exit $s
 	;;
     ar|addrepo)
 	exec /usr/bin/zypper "${globalopts[@]}" "$cmd" -C "${@%/*.repo}"
@@ -67,7 +70,10 @@ obs_pkg_mgr() {
     case "$1" in
     install|remove)
 	shift
-	exec /usr/bin/zypper -D $LOCAL_REPOS_D --no-gpg-checks -n in "$@"
+	/usr/bin/zypper -D $LOCAL_REPOS_D --no-gpg-checks -n in "$@"
+	s=$?
+	setup_links
+	exit $s
 	;;
     add_repo)
 	shift
@@ -102,7 +108,10 @@ apt_get() {
 	exit 0
 	;;
     install|upgrade)
-	exec /usr/bin/apt-get -o Dir::Etc::SourceList=$LOCAL_APTREPOS_D/obssource -o Dir::Etc::SourceParts=$LOCAL_APTREPOS_D --allow-unauthenticated "${globalopts[@]}" "$cmd" "$@"
+	/usr/bin/apt-get -o Dir::Etc::SourceList=$LOCAL_APTREPOS_D/obssource -o Dir::Etc::SourceParts=$LOCAL_APTREPOS_D --allow-unauthenticated "${globalopts[@]}" "$cmd" "$@"
+	s=$?
+	setup_links
+	exit $s
 	;;
     *)
 	exec /usr/bin/apt-get "${globalopts[@]}" "$cmd" "$@"
@@ -128,7 +137,10 @@ dnf() {
     done
     case $cmd in
     in|install|up|update)
-	exec /usr/bin/dnf --setopt=reposdir=$LOCAL_REPOS_D "${globalopts[@]}" "$cmd" "$@"
+	/usr/bin/dnf --setopt=reposdir=$LOCAL_REPOS_D "${globalopts[@]}" "$cmd" "$@"
+	s=$?
+	setup_links
+	exit $s
 	;;
     *)
 	exec /usr/bin/dnf "${globalopts[@]}" "$cmd" "$@"
@@ -154,12 +166,50 @@ yum() {
     done
     case $cmd in
     in|install|up|update)
-	exec /usr/bin/yum --setopt=reposdir=$LOCAL_REPOS_D "${globalopts[@]}" "$cmd" "$@"
+	/usr/bin/yum --setopt=reposdir=$LOCAL_REPOS_D "${globalopts[@]}" "$cmd" "$@"
+	s=$?
+	setup_links
+	exit $s
 	;;
     *)
 	exec /usr/bin/yum "${globalopts[@]}" "$cmd" "$@"
 	;;
     esac
+}
+
+curl() {
+    local cmd=()
+    local oopt
+    local oname
+    while test -n "$1" ; do
+	case "$1" in
+	http://* | https://*)
+	    url=$1
+	    urlsha256=$(echo -n $url | sha256sum -)
+	    urlsha256="${urlsha256%% *}"
+	    if test -n "$DATA_DIR" ; then
+		cmd[${#cmd[@]}]="file:$DATA_DIR/build-webcache/$urlsha256"
+	    else
+		cmd[${#cmd[@]}]="localhost:80/build-webcache/$urlsha256"
+	    fi
+	    oname="${url%%\?*}"
+	    oname="${url##*/}"
+	    shift
+	    ;;
+	-O)
+	    oopt=true
+	    ;;
+	*)
+	    cmd[${#cmd[@]}]="$1"
+	    shift
+	    ;;
+	esac
+    done
+    if test -n "$oopt" -a -n "$oname" ; then
+	cmd[${#cmd[@]}]="-o"
+	cmd[${#cmd[@]}]="$oname"
+    fi
+    exec /usr/bin/curl "${cmd[@]}"
 }
 
 upload_with_perl='
@@ -184,9 +234,9 @@ upload_packages() {
 	if test -n "$DATA_DIR" ; then
 	    cp /tmp/packages "$DATA_DIR/UPLOAD/$n"
 	elif test -x /usr/bin/curl ; then
-	    curl "http://localhost:80/$n" -T /tmp/packages > /dev/null
+	    /usr/bin/curl "http://localhost:80/$n" -T /tmp/packages > /dev/null
 	elif test -x /usr/bin/perl ; then
-	    perl -e "$upload_with_perl" "/$n" < /tmp/packages
+	    /usr/bin/perl -e "$upload_with_perl" "/$n" < /tmp/packages
         else
 	    (echo -n -e "PUT /$n HTTP/1.1\r\nContent-Length: $(wc -c < /tmp/packages)\r\n\r\n" | cat - /tmp/packages && read -t 600 ans ; case "$ans" in *\ 200\ *) ;; *) echo "$ans" >&2 ;; esac) <>/dev/tcp/localhost/80 1>&0
 	fi
@@ -194,15 +244,28 @@ upload_packages() {
     fi
 }
 
+setup_links() {
+    test -e /usr/bin/zypper -a ! -e /usr/local/sbin/zypper && ln -s obs-docker-support /usr/local/sbin/zypper
+    test -e /usr/bin/yum -a ! -e /usr/local/sbin/yum && ln -s obs-docker-support /usr/local/sbin/yum
+    test -e /usr/bin/dnf -a ! -e /usr/local/sbin/dnf && ln -s obs-docker-support /usr/local/sbin/dnf
+    test -e /usr/bin/apt-get -a ! -e /usr/local/sbin/apt-get && ln -s obs-docker-support /usr/local/sbin/apt-get
+    test -e /usr/bin/curl -a ! -e /usr/local/sbin/curl && ln -s obs-docker-support /usr/local/sbin/curl
+}
+
+remove_links() {
+    rm -f /usr/local/sbin/zypper
+    rm -f /usr/local/sbin/yum
+    rm -f /usr/local/sbin/dnf
+    rm -f /usr/local/sbin/apt-get
+    rm -f /usr/local/sbin/curl
+}
+
 obs_docker_support() {
     case "$1" in
     --install|-i)
 	data_url=http://localhost:80
 	test -n "$DATA_DIR" && data_url="file:$DATA_DIR"
-	test -e /usr/bin/zypper && ln -s obs-docker-support /usr/local/sbin/zypper
-	test -e /usr/bin/yum && ln -s obs-docker-support /usr/local/sbin/yum
-	test -e /usr/bin/dnf && ln -s obs-docker-support /usr/local/sbin/dnf
-	test -e /usr/bin/apt-get && ln -s obs-docker-support /usr/local/sbin/apt-get
+	setup_links
 	ln -s obs-docker-support /usr/local/sbin/obs_pkg_mgr
 	if test -e /usr/bin/zypper -o -e /usr/bin/yum -o -e /usr/bin/dnf ; then
 	    mkdir -p "$LOCAL_REPOS_D"
@@ -228,10 +291,7 @@ EOF
     --uninstall|-u)
 	rm -rf "$LOCAL_REPOS_D"
 	rm -rf "$LOCAL_APTREPOS_D"
-	rm -f /usr/local/sbin/zypper
-	rm -f /usr/local/sbin/yum
-	rm -f /usr/local/sbin/dnf
-	rm -f /usr/local/sbin/apt-get
+	remove_links
 	rm -f /usr/local/sbin/obs_pkg_mgr
 	if test -e /var/lib/apt.obssave ; then
 	    rm -rf /var/lib/apt
@@ -260,6 +320,9 @@ zypper)
     ;;
 apt-get)
     apt_get "$@"
+    ;;
+curl)
+    curl "$@"
     ;;
 *)
     echo "obs-docker-support: unsupported mode ${0##*/}" >&2

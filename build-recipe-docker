@@ -115,6 +115,15 @@ recipe_build_docker() {
     fi
     mkdir -p "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD"
 
+    # Prepare the webcache
+    mkdir -p "$BUILD_ROOT/$TOPDIR/SOURCES/repos/build-webcache"
+    for i in "$BUILD_ROOT/$TOPDIR/SOURCES/build-webcache"-* ; do
+	test -e "$i" && ln -f "$i" "$BUILD_ROOT/$TOPDIR/SOURCES/repos/build-webcache/${i##*/build-webcache-}"
+    done
+
+    # exclude repos directory
+    echo repos >> "$BUILD_ROOT/$TOPDIR/SOURCES/.dockerignore"
+
     # find tags, first look into recipe file
     FIRSTTAG=
     ALLTAGS=
@@ -132,7 +141,7 @@ recipe_build_docker() {
 	done
     fi
     if test -z "$FIRSTTAG" ; then
-        cleanup_and_exit 1 "please specify a tag for the container"
+        cleanup_and_exit 1 "Please specify a tag for the container"
     fi
     ALLTAGS="${ALLTAGS# }"
 
