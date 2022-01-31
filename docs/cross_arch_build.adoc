@@ -26,7 +26,7 @@ where it defines the target architecture a from a cross build compiler.
 
 ===== The compatible terms can be found in the following table:
 
-Unfortunatly the naming of architecture areas is not consistent via the various build 
+Unfortunatly the naming of architecture areas is not consistent via the various build
 tooling. Please find the terminilogy mapping from our "build" script and other toolings
 in the list below.
 
