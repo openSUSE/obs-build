@@ -184,6 +184,11 @@ recipe_build_spec() {
 	rpmbopts[${#rpmbopts[@]}]='--define'
 	rpmbopts[${#rpmbopts[@]}]="_build_create_debug 1"
     fi
+    # OBS Debuginfo flag support for Red Hat family
+    if test -z "$BUILD_DEBUG" ; then
+	rpmbopts[${#rpmbopts[@]}]='--undefine'
+	rpmbopts[${#rpmbopts[@]}]="_enable_debug_packages"
+    fi
     if test -n "$DISTURL" ; then
 	rpmbopts[${#rpmbopts[@]}]='--define'
 	rpmbopts[${#rpmbopts[@]}]="disturl $DISTURL"
