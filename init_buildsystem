@@ -1275,7 +1275,10 @@ if test -d $BUILD_ROOT/usr/lib/build/finalize-system ; then
     for PROG in $BUILD_ROOT/usr/lib/build/finalize-system/* ; do
 	test -e "$PROG" || continue
 	echo "... running ${PROG##*/}"
-	chroot $BUILD_ROOT "/usr/lib/build/finalize-system/${PROG##*/}" || cleanup_and_exit 1
+	(
+	    export ABUILD_UID ABUILD_GID
+	    chroot $BUILD_ROOT "/usr/lib/build/finalize-system/${PROG##*/}"
+	) || cleanup_and_exit 1
     done
 fi
 
