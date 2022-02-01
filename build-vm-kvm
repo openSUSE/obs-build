@@ -350,6 +350,7 @@ vm_startup_kvm() {
 	# https://wiki.qemu.org/Documentation/9psetup
 	qemu_args+=(-fsdev local,security_model=none,id=fsdev0,path="$MYSRCDIR" -device virtio-9p-pci,id=fs0,fsdev=fsdev0,mount_tag=build-srcdir)
     fi
+    qemu_args+=(-fw_cfg name=opt/org.opensuse.obs-build/data,file="$BUILD_ROOT/.build/build.data")
     set -- $qemu_bin -nodefaults -no-reboot -nographic -vga none $kvm_cpu $kvm_options \
 	-kernel $vm_kernel \
 	-initrd $vm_initrd \

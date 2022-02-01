@@ -590,6 +590,9 @@ vm_detect_2nd_stage() {
     if test ! -e /.build/build.data -o -n "$BUILD_IGNORE_2ND_STAGE" ; then
 	return 1
     fi
+    if test -e /sys/firmware/qemu_fw_cfg/by_name/opt/org.opensuse.obs-build/data/raw; then
+	cat /sys/firmware/qemu_fw_cfg/by_name/opt/org.opensuse.obs-build/data/raw > /.build/build.data
+    fi
     . /.build/build.data
     if test -z "$VM_TYPE" ; then
 	return 1
