@@ -52,7 +52,7 @@ my %known_options = (
   'list' => '',
   'unpack' => '',
 
-  'arch' => ':',
+  'arch' => '::',
   'dist' => ':',
   'configdir' => ':',
   'recipe' => ':',
@@ -61,6 +61,33 @@ my %known_options = (
 
   'show-dir-srcmd5' => '',
 );
+
+sub find_assets {
+  my ($assetmgr, $bconf, $p, $file) = @_;
+  delete $p->{'remoteassets'};
+  if ($file eq 'sources' || $file eq 'go.sum') {
+    $p->{'buildtype'} = '';
+    $assetmgr->find_assets($p);
+    return;
+  }
+  my $bt = Build::recipe2buildtype($file);
+  return unless $bt;
+  $p->{'buildtype'} = $bt;
+  my $d;
+  eval { $d = Build::parse_typed($bconf, "$p->{'dir'}/$file", $bt) };
+  $p->{'remoteassets'} = $d->{'remoteassets'} if $d && $d->{'remoteassets'};
+  $p->{'name'} ||= $d->{'name'} if $d->{'name'};
+  $assetmgr->find_assets($p);
+}
+
+sub read_config {
+  my ($dist, $arch, $configdir) = @_;
+  if ($dist) {
+    $configdir ||= ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
+    return Build::read_config_dist($dist, $arch, $configdir);
+  }
+  return Build::read_config($arch);
+}
 
 my ($opts, @dirs) = PBuild::Options::parse_options(\%known_options, @ARGV);
 
@@ -99,14 +126,9 @@ if ($opts->{'help'}) {
 die("Please specify at least one directory\n") unless @dirs;
 die("The --assetdir option conflicts with --noassetdir\n") if $opts->{'assetdir'} && $opts->{'noassetdir'};
 
-my $arch = $opts->{'arch'} || 'noarch';
-my $bconf;
-if ($opts->{'dist'}) {
-  my $configdir = $opts->{'configdir'} || (($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs');
-  $bconf = Build::read_config_dist($opts->{'dist'}, $arch, $configdir);
-} else {
-  $bconf = Build::read_config($arch);
-}
+my @arch = @{$opts->{'arch'} || []};
+push @arch, 'noarch' unless @arch;
+
 for my $dir (@dirs) {
   my ($files, $source_assets) = PBuild::Source::list_package($dir);
   my $p = {
@@ -122,31 +144,15 @@ for my $dir (@dirs) {
   $assetmgr->add_assetshandler($fedpkg) if !$opts->{'assets'} && $files->{'sources'};
   $assetmgr->merge_assets($p, $source_assets);
 
-  if ($opts->{'recipe'}) {
-    my $bt = Build::recipe2buildtype($opts->{'recipe'});
-    $p->{'buildtype'} = $bt;
-    my $d;
-    eval { $d = Build::parse_typed($bconf, "$dir/$opts->{'recipe'}", $bt) };
-    $p->{'remoteassets'} = $d->{'remoteassets'} if $d && $d->{'remoteassets'};
-    $p->{'name'} = $d->{'name'};
-    $assetmgr->find_assets($p);
-  } else {
-    for my $file (sort keys %$files) {
-      if ($file eq 'sources' || $file eq 'go.sum') {
-	$p->{'buildtype'} = '';
-	$assetmgr->find_assets($p);
-	next;
+  for my $arch (@arch) {
+    my $bconf = read_config($opts->{'dist'}, $arch, $opts->{'configdir'});
+    if ($opts->{'recipe'}) {
+      find_assets($assetmgr, $bconf, $p, $opts->{'recipe'});
+    } else {
+      for my $file (sort keys %$files) {
+	next unless $file eq 'sources' || $file eq 'go.sum' || $file eq 'PKGBUILD' || $file =~ /\.(?:spec|dsc|kiwi)/;
+        find_assets($assetmgr, $bconf, $p, $file);
       }
-      next unless $file eq 'PKGBUILD' || $file =~ /\.(?:spec|dsc|kiwi)/;
-      my $bt = Build::recipe2buildtype($file);
-      next unless $bt;
-      $p->{'buildtype'} = $bt;
-      delete $p->{'remoteassets'};
-      my $d;
-      eval { $d = Build::parse_typed($bconf, "$dir/$file", $bt) };
-      $p->{'remoteassets'} = $d->{'remoteassets'} if $d && $d->{'remoteassets'};
-      $p->{'name'} ||= $d->{'name'} if $d->{'name'};
-      $assetmgr->find_assets($p);
     }
   }
   if ($opts->{'clean'}) {
