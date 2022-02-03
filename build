@@ -75,6 +75,7 @@ DO_CHECKS=true
 CLEAN_BUILD=
 GENBUILDREQS_CLEAN_BUILD=
 RECIPEFILES=()
+RECIPEPATH=
 SRCDIR=
 BUILD_JOBS=
 BUILD_THREADS=
@@ -835,7 +836,7 @@ copy_sources() {
     if test -n "$RUNNING_IN_VM" -o "$BUILDTYPE" = kiwi -o "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman ; then
         include_directories=true
     fi
-    if test -n "$RUNNING_IN_VM" -o -n "$COPY_SOURCES_ASIS" ; then
+    if test -n "$RUNNING_IN_VM" -o -n "$COPY_SOURCES_ASIS" -o -n "$RPM_BUILD_IN_PLACE" ; then
 	( shopt -s nullglob ; cp -pRd "$1/".[^.]* "$1/"..?* "$1"/* "$2" )
     elif test -n "$include_directories" ; then
         cp -pRL "$1"/* "$2"
@@ -861,6 +862,7 @@ copy_sources() {
     else
 	cp -p "$1"/* "$2"
     fi
+    test -n "$RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" && cp -f "$RECIPEPATH" "$2"
 }
 
 mkdir_build_root() {
@@ -1431,13 +1433,11 @@ expand_recipe_directories
 if test -n "$LIST_STATE" ; then
     BUILD_ROOT=`mktemp -d /var/tmp/build-list-state-XXXXXX`
     test -d "$BUILD_ROOT" || cleanup_and_exit 3
-    RECIPEFILE=$RECIPEFILES # only one specified anyways
-    if test "$RECIPEFILE" != "${RECIPEFILE%.src.rpm}" ; then
-	MYSRCDIR="$BUILD_ROOT/usr/src/packages/SOURCES"
-	recipe_unpack_srcrpm
-	RECIPEFILE="$MYSRCDIR/$RECIPEFILE"
+    RECIPEPATH=$RECIPEFILES # only one specified anyways
+    if test "$RECIPEPATH" != "${RECIPEPATH%.src.rpm}" ; then
+	recipe_unpack_srcrpm "$RECIPEPATH"
     fi
-    init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --list-state "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $DLNOSIGNATURE $USEUSEDFORBUILD $RECIPEFILE $BUILD_EXTRA_PACKS
+    init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --list-state "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $DLNOSIGNATURE $USEUSEDFORBUILD $RECIPEPATH $BUILD_EXTRA_PACKS
     ERR=$?
     rm -rf "$BUILD_ROOT"
     cleanup_and_exit $ERR
@@ -1527,14 +1527,17 @@ test "$BUILD_ARCH" = all && BUILD_ARCH=
 BUILD_USER_ABUILD_USED=
 MODULEMDFILE=
 
-for RECIPEFILE in "${RECIPEFILES[@]}" ; do
+for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 
-    if test "$RECIPEFILE" != "${RECIPEFILE%/debian/control}" ; then
-	SRCDIR="${RECIPEFILE%/debian/control}"
+    if test -n "$RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" ; then
+	SRCDIR="$PWD"
+	RECIPEFILE="${RECIPEPATH##*/}"
+    elif test "$RECIPEPATH" != "${RECIPEPATH%/debian/control}" ; then
+	SRCDIR="${RECIPEPATH%/debian/control}"
 	RECIPEFILE="debian/control"
     else
-	SRCDIR="${RECIPEFILE%/*}"
-	RECIPEFILE="${RECIPEFILE##*/}"
+	SRCDIR="${RECIPEPATH%/*}"
+	RECIPEFILE="${RECIPEPATH##*/}"
     fi
 
     recipe_set_buildtype
@@ -1552,7 +1555,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     # first setup building directory...
     #
     cd "$SRCDIR"
-    if ! test -s "$RECIPEFILE" ; then
+    if ! test -s "$RECIPEPATH" ; then
 	 cleanup_and_exit 1 "$RECIPEFILE is empty.  This should not happen..."
     fi
     MYSRCDIR="$SRCDIR"
@@ -1563,9 +1566,9 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
     test -s _modulemd.pst && MODULEMDFILE="$SRCDIR/_modulemd.pst"
 
     # special hack to build from a .src.rpm (modifies MYSRCDIR)
-    test "$RECIPEFILE" != "${RECIPEFILE%.src.rpm}" && recipe_unpack_srcrpm
+    test "$RECIPEFILE" != "${RECIPEFILE%.src.rpm}" && recipe_unpack_srcrpm "$RECIPEPATH"
 
-    echo "processing recipe $MYSRCDIR/$RECIPEFILE ..."
+    echo "processing recipe $RECIPEPATH ..."
 
     ADDITIONAL_PACKS=
     test -z "$BUILD_EXTRA_PACKS" || ADDITIONAL_PACKS="$ADDITIONAL_PACKS $BUILD_EXTRA_PACKS"
@@ -1578,7 +1581,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 
     # we need to do this before the vm is started
     if test -n "$CHANGELOG" -a -z "$RUNNING_IN_VM" -a -z "$RUN_SHELL" ; then
-        recipe_create_changelog "$MYSRCDIR/$RECIPEFILE"
+        recipe_create_changelog "$RECIPEPATH"
     fi
 
     if test -n "$VM_TYPE" -a -z "$RUNNING_IN_VM" ; then
@@ -1597,10 +1600,10 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	test -n "$DISTURL" && echo "BUILD_DISTURL='${DISTURL//"'"/$Q}'" >> $BUILD_ROOT/.buildenv
 	test "$BUILDTYPE" = preinstallimage && mkdir -p $BUILD_ROOT/.preinstall_image
 	CREATE_BUILD_BINARIES=
-	if recipe_needs_build_binaries "$MYSRCDIR/$RECIPEFILE" ; then
+	if recipe_needs_build_binaries "$RECIPEPATH" ; then
 	    CREATE_BUILD_BINARIES=--create-build-binaries
 	fi
-	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $DLNOSIGNATURE $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS
+	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $DLNOSIGNATURE $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$RECIPEPATH" $ADDITIONAL_PACKS
 	echo "$* ..."
         start_time=$SECONDS
 	"$@" || cleanup_and_exit 1
@@ -1649,15 +1652,15 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 	test -n "$SUSE_VERSION" -a "${SUSE_VERSION:-0}" -le 1020 && BUILD_USER=root
     fi
     if test "$BUILD_USER" = abuild ; then
-	egrep '^#[[:blank:]]*needsrootforbuild[[:blank:]]*$' >/dev/null <$RECIPEFILE && BUILD_USER=root
+	egrep '^#[[:blank:]]*needsrootforbuild[[:blank:]]*$' >/dev/null <$RECIPEPATH && BUILD_USER=root
     else
-	egrep '^#[[:blank:]]*norootforbuild[[:blank:]]*$' >/dev/null <$RECIPEFILE && BUILD_USER=abuild
+	egrep '^#[[:blank:]]*norootforbuild[[:blank:]]*$' >/dev/null <$RECIPEPATH && BUILD_USER=abuild
     fi
     test -n "$NOROOTFORBUILD" && BUILD_USER=abuild
 
     # appliance builds must run as root
     if test "$BUILDTYPE" = kiwi ; then
-	imagetype=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $RECIPEFILE imagetype)
+	imagetype=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $RECIPEPATH imagetype)
 	test "$imagetype" = product || BUILD_USER=root
     fi
     # same with docker and fissile builds
@@ -1720,6 +1723,7 @@ for RECIPEFILE in "${RECIPEFILES[@]}" ; do
 
     # fill build directories with sources. Also sets TOPDIR
     recipe_setup
+    RECIPEPATH=
     
     # strip prefix from autogenerated files of source services.
     # sorted by line length to let the latest run service win
@@ -1863,6 +1867,12 @@ if test -n "$RPMS" -a -d "$BUILD_ROOT/usr/lib/build/checks" ; then
     for SRPM in $BUILD_ROOT/$TOPDIR/SRPMS/*src.rpm ; do
 	test -f "$SRPM" && PNAME=`rpm --nodigest --nosignature -qp --qf "%{NAME}" $SRPM`
     done
+    if test -z "$PNAME" ; then
+	for SRPM in $RPMS ; do
+	    test -f "$SRPM" && PNAME=`rpm --nodigest --nosignature -qp --qf "%{SOURCERPM}" $SRPM`
+	done
+	PNAME="${PNAME%-*-*.*.rpm}"
+    fi
     TIME_POSTCHECKS=$SECONDS
     for CHECKSCRIPT in $BUILD_ROOT/usr/lib/build/checks/* ; do
 	echo "... running ${CHECKSCRIPT##*/}"

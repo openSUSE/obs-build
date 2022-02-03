@@ -24,6 +24,8 @@
 
 BUILDTYPE=
 KIWI_PARAMETERS=
+BUILD_SKIP_BUNDLE=
+RPM_BUILD_IN_PLACE=
 
 for i in spec dsc kiwi arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild appimage docker podman fissile helm flatpak; do
     . "$BUILD_DIR/build-recipe-$i"
@@ -64,7 +66,10 @@ recipe_parse_options() {
 	;;
       -skip-bundle)
 	BUILD_SKIP_BUNDLE=1
-      ;;
+        ;;
+      -rpm-build-in-place)
+	RPM_BUILD_IN_PLACE=1
+        ;;
       -*)
 	return 1
 	;;

@@ -120,7 +120,7 @@ spec_init_topdir() {
 spec_setup_stages() {
     local stage="$1"
     test "$stage#-b[a-z]" != "$stage" && stage="${stage#-b}"        # compat
-    local xstage=pciba
+    local xstage=pciba origstage="$stage"
     case $stage in
 	"")	     stage=pciba ;;
 	[lr])        ;;
@@ -131,9 +131,13 @@ spec_setup_stages() {
 	*)           cleanup_and_exit 1 "unknown stage '$stage'" ;;
     esac
     stage=${stage//s/a}
+    # drop p/a stages in build-in-place mode unless requested
+    test -n "$RPM_BUILD_IN_PLACE" -a "$stage" != p -a "$origstage" = "${origstage/p/}" && stage="${stage#p}"
+    test -n "$RPM_BUILD_IN_PLACE" -a "$stage" != a -a "$origstage" = "${origstage/[as]/}" && stage="${stage%a}"
     rpmstages=()
     case $stage in
 	p | pc | pci | pcib | pciba) rpmstages[${#rpmstages[@]}]="-b${stage: -1}" ; stage= ;;
+	c | ci | cib | ciba) rpmstages[${#rpmstages[@]}]="--noprep -b${stage: -1}" ; stage= ;;
     esac
     while test -n "$stage" ; do
 	local opt="-b${stage:0:1}"
@@ -171,6 +175,9 @@ recipe_build_spec() {
     if test "$rpmbuild" == "rpmbuild" ; then
 	    # use only --nosignature for rpm v4
 	rpmbopts[${#rpmbopts[@]}]="--nosignature"
+    fi
+    if test -n "$RPM_BUILD_IN_PLACE" ; then
+	rpmbopts[${#rpmbopts[@]}]="--build-in-place"
     fi
     if test -n "$ABUILD_TARGET" ; then
 	rpmbopts[${#rpmbopts[@]}]="--target=$ABUILD_TARGET"
@@ -250,7 +257,7 @@ recipe_build_spec() {
 		> $BUILD_ROOT/.build.command
 	chmod 755 $BUILD_ROOT/.build.command
 	check_exit
-	chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null
+	chroot $BUILD_ROOT su -c "cd /.build.packages/SOURCES && /.build.command" - $BUILD_USER < /dev/null
 	st=$?
 	test "$st" = 0 || break
     done
@@ -267,15 +274,17 @@ recipe_cleanup_spec() {
 }
 
 recipe_unpack_srcrpm() {
-    test -n "$LIST_STATE" || echo "processing src rpm $SRCDIR/$RECIPEFILE ..."
+    local srpm="$1"
+    test -n "$LIST_STATE" || echo "processing src rpm $srpm ..."
     MYSRCDIR="$BUILD_ROOT/.build-srcdir"
     rm -rf "$MYSRCDIR"
     mkdir -p "$MYSRCDIR"
-    cd $MYSRCDIR || cleanup_and_exit 1
-    $BUILD_DIR/unrpm -q $SRCDIR/$RECIPEFILE || {
-	cleanup_and_exit 1 "could not unpack $RECIPEFILE."
+    cd "$MYSRCDIR" || cleanup_and_exit 1
+    $BUILD_DIR/unrpm -q "$srpm" || {
+	cleanup_and_exit 1 "could not unpack $srpm."
     }
     for RECIPEFILE in *.spec ; do : ; done
+    RECIPEPATH="$MYSRCDIR/$RECIPEFILE"
 }
 
 # post build functions... move somewhere else?
