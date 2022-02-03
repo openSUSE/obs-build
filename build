@@ -1434,9 +1434,7 @@ if test -n "$LIST_STATE" ; then
     BUILD_ROOT=`mktemp -d /var/tmp/build-list-state-XXXXXX`
     test -d "$BUILD_ROOT" || cleanup_and_exit 3
     RECIPEPATH=$RECIPEFILES # only one specified anyways
-    if test "$RECIPEPATH" != "${RECIPEPATH%.src.rpm}" ; then
-	recipe_unpack_srcrpm "$RECIPEPATH"
-    fi
+    test "$RECIPEPATH" != "${RECIPEPATH%.src.rpm}" && recipe_unpack_srcrpm "$RECIPEPATH"
     init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --list-state "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $DLNOSIGNATURE $USEUSEDFORBUILD $RECIPEPATH $BUILD_EXTRA_PACKS
     ERR=$?
     rm -rf "$BUILD_ROOT"

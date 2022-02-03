@@ -280,9 +280,7 @@ recipe_unpack_srcrpm() {
     rm -rf "$MYSRCDIR"
     mkdir -p "$MYSRCDIR"
     cd "$MYSRCDIR" || cleanup_and_exit 1
-    $BUILD_DIR/unrpm -q "$srpm" || {
-	cleanup_and_exit 1 "could not unpack $srpm."
-    }
+    $BUILD_DIR/unrpm -q "$srpm" || cleanup_and_exit 1 "Could not unpack $srpm."
     for RECIPEFILE in *.spec ; do : ; done
     RECIPEPATH="$MYSRCDIR/$RECIPEFILE"
 }
