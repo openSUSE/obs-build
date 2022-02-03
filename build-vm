@@ -1108,6 +1108,8 @@ vm_save_statistics() {
     test -n "$TIME_RPMLINT" && echo "TIME_rpmlint: $TIME_RPMLINT"  >> $otherdir/_statistics
     test -n "$TIME_BUILDCMP" && echo "TIME_buildcmp: $TIME_BUILDCMP"  >> $otherdir/_statistics
     test -n "$TIME_DELTARPMS" && echo "TIME_deltarpms: $TIME_DELTARPMS"  >> $otherdir/_statistics
+    local cpustat=($(head -n 1 /proc/stat))
+    test "${cpustat[8]}" -gt 0 && echo "TIME_cpusteal: $(( ${cpustat[8]} / 100 ))" >> $otherdir/_statistics
     if test -e /.build/_statistics.df ; then
 	echo -n "MAX_mb_used_on_disk: " >> $otherdir/_statistics
 	cat /.build/_statistics.df >> $otherdir/_statistics
