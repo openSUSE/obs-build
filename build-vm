@@ -700,7 +700,7 @@ vm_set_mount_options() {
 	if test "$VMDISK_FILESYSTEM" = reiserfs ; then
 	    VMDISK_MOUNT_OPTIONS='-o data=writeback,commit=150,noatime'
 	elif test "$VMDISK_FILESYSTEM" = btrfs ; then
-	    VMDISK_MOUNT_OPTIONS='-o nobarrier,noatime'
+	    VMDISK_MOUNT_OPTIONS='-o nobarrier,noatime,nodatacow'
 	elif test "$VMDISK_FILESYSTEM" = "ext4" ; then
 	    VMDISK_MOUNT_OPTIONS='-o noatime'
 	elif test "$VMDISK_FILESYSTEM" = "ext3" ; then
