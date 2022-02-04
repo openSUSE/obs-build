@@ -332,8 +332,7 @@ create_devs() {
 
     test -d $BUILD_ROOT/dev/pts -a ! -L $BUILD_ROOT/dev/pts || rm -f $BUILD_ROOT/dev/pts
     test -d $BUILD_ROOT/dev/shm -a ! -L $BUILD_ROOT/dev/shm || rm -f $BUILD_ROOT/dev/shm
-    mkdir -m 755 -p $BUILD_ROOT/dev/pts
-    mkdir -m 755 -p $BUILD_ROOT/dev/shm
+    mkdir -m 755 -p -- $BUILD_ROOT/dev/pts $BUILD_ROOT/dev/shm
     while read com file mode arg ; do
 	rm -f $BUILD_ROOT/dev/$file
 	if test $com = ln ; then
@@ -625,11 +624,7 @@ fi
 #
 # store that we start to build the system
 #
-mkdir -p "$BUILD_ROOT" || cleanup_and_exit 4
-mkdir -p "$BUILD_ROOT/.build" || cleanup_and_exit 4
-mkdir -p "$BUILD_ROOT/proc" || cleanup_and_exit 4
-mkdir -p "$BUILD_ROOT/sys" || cleanup_and_exit 4
-mkdir -p "$BUILD_ROOT/dev/pts" || cleanup_and_exit 4
+mkdir -p -- "$BUILD_ROOT" "$BUILD_ROOT/.build" "$BUILD_ROOT/proc" "$BUILD_ROOT/sys" "$BUILD_ROOT/dev/pts" || cleanup_and_exit 4
 touch $BUILD_IS_RUNNING
 
 if test -n "$PREPARE_VM" ; then
@@ -893,9 +888,7 @@ esac
 # test if we need to preinstall
 #
 if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsystem.data ; then
-    mkdir -p $BUILD_ROOT/.init_b_cache/rpms || cleanup_and_exit 1
-    mkdir -p $BUILD_ROOT/etc || cleanup_and_exit 1
-    mkdir -p $BUILD_ROOT/proc || cleanup_and_exit 1
+    mkdir -p -- $BUILD_ROOT/.init_b_cache/rpms $BUILD_ROOT/etc $BUILD_ROOT/proc || cleanup_and_exit 1
     test -L $BUILD_ROOT/etc/HOSTNAME && buildroot_rm etc/HOSTNAME
     test -f $BUILD_ROOT/etc/HOSTNAME || hostname -f > $BUILD_ROOT/etc/HOSTNAME
     for PKG in $PACKAGES_TO_RUNSCRIPTS ; do
@@ -1074,9 +1067,9 @@ rm -rf "$BUILD_ROOT/.init_b_cache/todelete"
 
 rm -rf "$BUILD_ROOT/.init_b_cache/preinstalls"
 mkdir -p "$BUILD_ROOT/.init_b_cache/preinstalls"
-for PKG in $PACKAGES_TO_PREINSTALL; do
-    touch "$BUILD_ROOT/.init_b_cache/preinstalls/$PKG"
-done
+if test -n "$PACKAGES_TO_PREINSTALL"; then
+    touch -- $(for PKG in $PACKAGES_TO_PREINSTALL; do echo "$BUILD_ROOT/.init_b_cache/preinstalls/$PKG"; done)
+fi
 
 rm -rf "$BUILD_ROOT/installed-pkg"
 mkdir -p "$BUILD_ROOT/installed-pkg"
@@ -1213,15 +1206,14 @@ fi
 #
 # create some default directories and files
 #
-for DIR in /usr/share/doc/packages \
-	   /usr/X11R6/include/X11/pixmaps \
-	   /usr/X11R6/include/X11/bitmaps ; do
-    mkdir -p $BUILD_ROOT/$DIR
-done
-for FILE in /var/run/utmp /var/log/wtmp /etc/fstab ; do
-    mkdir -p $BUILD_ROOT/${FILE%/*}
-    touch $BUILD_ROOT/$FILE
-done
+mkdir -p -- \
+    $BUILD_ROOT/usr/share/doc/packages \
+    $BUILD_ROOT/usr/X11R6/include/X11/pixmaps \
+    $BUILD_ROOT/usr/X11R6/include/X11/bitmaps \
+    $BUILD_ROOT/var/run \
+    $BUILD_ROOT/var/log \
+    $BUILD_ROOT/etc
+touch -- $BUILD_ROOT/var/run/utmp $BUILD_ROOT/var/log/wtmp $BUILD_ROOT/etc/fstab
 
 echo now finalizing build dir...
 if test -x $BUILD_ROOT/sbin/ldconfig ; then
