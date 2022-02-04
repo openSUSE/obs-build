@@ -23,6 +23,7 @@
 build_host_arch() {
     : ${BUILD_HOST_ARCH:=`uname -m`}
     # the linux kernel only knows armv7l, armv7hl is a userland definition
+    test armv8l == "$BUILD_HOST_ARCH" && BUILD_HOST_ARCH=armv8hl
     test armv7l == "$BUILD_HOST_ARCH" && BUILD_HOST_ARCH=armv7hl
     test armv6l == "$BUILD_HOST_ARCH" && BUILD_HOST_ARCH=armv6hl
 
@@ -35,7 +36,8 @@ extend_build_arch() {
     case $BUILD_ARCH in
       aarch64) BUILD_ARCH="aarch64:aarch64_ilp32:armv8l" ;;
       aarch64_ilp32) BUILD_ARCH="aarch64_ilp32:aarch64:armv8l" ;;
-      armv8l) BUILD_ARCH="armv8l" ;; # armv8l is aarch64 in 32bit mode. not a superset of armv7
+      armv8hl) BUILD_ARCH="armv8hl:armv8l:armv7hl:armv7l:armv6hl:armv6l:armv5tel" ;;
+      armv8l) BUILD_ARCH="armv8l:armv7hl:armv7l:armv6hl:armv6l:armv5tel" ;;
       armv7hl) BUILD_ARCH="armv7hl:armv7l:armv6hl:armv6l:armv5tel" ;;
       armv7l) BUILD_ARCH="armv7l:armv6l:armv5tel" ;;
       armv6hl) BUILD_ARCH="armv6hl:armv6l:armv5tel" ;;

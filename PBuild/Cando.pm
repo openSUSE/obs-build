@@ -32,8 +32,8 @@ our %cando = (
   'armv4l'  => [ 'armv4l'                                                                                                 ],
   'armv5l'  => [ 'armv4l', 'armv5l'                    , 'armv5el'                                                        ],
   'armv6l'  => [ 'armv4l', 'armv5l', 'armv6l'          , 'armv5el', 'armv6el'                                             ],
-  'armv7l'  => [ 'armv4l', 'armv5l', 'armv6l', 'armv7l', 'armv5el', 'armv6el', 'armv6hl', 'armv7el', 'armv7hl', 'armv8el' ], # armv8el is invented by MeeGo, it does not exist for real
-  'armv8l'  => [ 'armv8l' ],
+  'armv7l'  => [ 'armv4l', 'armv5l', 'armv6l', 'armv7l', 'armv5el', 'armv6el', 'armv6hl', 'armv7el', 'armv7hl', 'armv8el', 'armv8hl', 'armv8l' ], # armv8* is a subset of armv7hl
+  'armv8l'  => [ 'armv4l', 'armv5l', 'armv6l', 'armv7l', 'armv5el', 'armv6el', 'armv6hl', 'armv7el', 'armv7hl', 'armv8el', 'armv8hl', 'armv8l' ], # armv8l & armv7l are considered to be identical on rpm level
 
   'sh4'     => [ 'sh4' ],
 
@@ -85,6 +85,8 @@ for my $harch (keys %cando) {
 my %archfilter_extra = (
   'aarch64' => [ 'aarch64_ilp32', 'armv8l' ],
   'aarch64_ilp32' => [ 'aarch64', 'armv8l' ],
+  'armv8hl' => [ 'armv8l', 'armv7hl', 'armv7l', 'armv6hl', 'armv6l', 'armv5tel' ],
+  'armv8l' => [ 'armv7hl', 'armv7l', 'armv6hl', 'armv6l', 'armv5tel' ],
   'armv7hl' => [ 'armv7l', 'armv6hl', 'armv6l', 'armv5tel' ],
   'armv7l' => [ 'armv6l', 'armv5tel' ],
   'armv6hl' => [ 'armv6l', 'armv5tel' ],
