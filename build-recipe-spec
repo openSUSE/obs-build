@@ -257,7 +257,9 @@ recipe_build_spec() {
 		> $BUILD_ROOT/.build.command
 	chmod 755 $BUILD_ROOT/.build.command
 	check_exit
-	chroot $BUILD_ROOT su -c "cd /.build.packages/SOURCES && /.build.command" - $BUILD_USER < /dev/null
+	local build_command="/.build.command"
+	test -n "$RPM_BUILD_IN_PLACE" && build_command="cd /.build.packages/SOURCES && $build_command"
+	chroot $BUILD_ROOT su -c "$build_command" - $BUILD_USER < /dev/null
 	st=$?
 	test "$st" = 0 || break
     done
