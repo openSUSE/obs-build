@@ -525,10 +525,10 @@ fail_exit() {
 
 shellquote() {
     for arg ; do
-	arg=${arg/\\/\\\\}
-	arg=${arg/\$/\\\$}
-	arg=${arg/\"/\\\"}
-	arg=${arg/\`/\\\`}
+	arg=${arg//\\/\\\\}
+	arg=${arg//\$/\\\$}
+	arg=${arg//\"/\\\"}
+	arg=${arg//\`/\\\`}
 	echo -n " \"$arg\""
     done
 }
