@@ -358,8 +358,9 @@ vm_img_create() {
 
     mkdir -p "${img%/*}" || cleanup_and_exit 4
     # truncate file to the desired size
-    dd if=/dev/zero of="$img" bs=1M count=0 seek="$size" status=noxfer || cleanup_and_exit 4
+    dd if=/dev/zero of="$img" bs=1M count=0 seek="$size" status=none || cleanup_and_exit 4
     echo "$size" > "${img}.size"
+
     # allocate blocks
     if type -p fallocate > /dev/null ; then
         fallocate -p -l "${size}M" "$img" 2> /dev/null
@@ -750,7 +751,7 @@ vm_setup_swap() {
     fi
     if test -n "$VM_SWAP" ; then
 	vm_attach_swap
-	dd if=/dev/zero of="$VM_SWAP" bs=1024 count=1 conv=notrunc status=noxfer || cleanup_and_exit 4
+	dd if=/dev/zero of="$VM_SWAP" bs=1024 count=1 conv=notrunc status=none || cleanup_and_exit 4
 	if test "$VM_SWAPDEV" != "${VM_SWAPDEV#LABEL=}"; then
 	    # call mkswap to set a label
 	    mkswap -L "${VM_SWAPDEV#LABEL=}" "$VM_SWAP" || cleanup_and_exit 4
@@ -1071,7 +1072,7 @@ vm_first_stage() {
     vm_attach_root
     if test -n "$VM_SWAP" -a -z "$RUN_SHELL" ; then
 	vm_attach_swap
-	BUILDSTATUS=$(dd if="$VM_SWAP" bs=12 count=1 status=noxfer | tr '\0' a)
+	BUILDSTATUS=$(dd if="$VM_SWAP" bs=12 count=1 status=none | tr '\0' a)
 	case $BUILDSTATUS in
 	  BUILDSTATUS[029])
 	    mkdir -p $BUILD_ROOT/.build.packages
