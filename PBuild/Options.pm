@@ -122,7 +122,7 @@ my $pbuild_options = {
 };
 
 sub vm_type_special {
-  my ($opts, $origopt, $opt, $args) = @_;
+  my ($opts, $opt, $origopt, $args) = @_;
   my $arg;
   $arg = Build::Options::getarg($origopt, $args, 1) unless $opt eq 'zvm' || $opt eq 'lxc';
   $opts->{'vm-disk'} = $arg if defined $arg;
@@ -130,10 +130,9 @@ sub vm_type_special {
 }
 
 sub ccache_special {
-  my ($opts, $origopt, $opt, $args) = @_;
+  my ($opts, $opt, $origopt, $args) = @_;
   my $arg;
-  $arg = Build::Options::getarg($origopt, $args) if 'ccache' && @$args && ref($args->[0]);
-  $arg = 'sccache' if $origopt eq 'sccache';
+  $arg = Build::Options::getarg($origopt, $args) if @$args && ref($args->[0]);
   $opts->{'ccache'} = 1;
   $opts->{'ccache-type'} = $arg if $arg;
 }
@@ -142,7 +141,7 @@ my @codes = qw{broken succeeded failed unresolvable blocked scheduled waiting bu
 my %known_codes = map {$_ => 1} @codes;
 
 sub result_rebuild_special {
-  my ($opts, $origopt, $opt, $args) = @_;
+  my ($opts, $opt, $origopt, $args) = @_;
   my $arg;
   $arg = Build::Options::getarg($origopt, $args, 1) if @$args && (ref($args->[0]) || $args->[0] !~ /\//);
   if (!defined($arg) || $arg eq 'all') {

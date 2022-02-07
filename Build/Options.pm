@@ -51,7 +51,7 @@ sub parse_options {
     die("Unknown option '$origopt'. Exit.\n") unless defined $ko;
     $ko = "$opt$ko" if !ref($ko) && ($ko eq '' || $ko =~ /^:/);
     if (ref($ko)) {
-      $ko->(\%opts, $origopt, $opt, \@args);
+      $ko->(\%opts, $opt, $origopt, \@args);
     } elsif ($ko =~ s/(:.*)//) {
       my $arg = getarg($origopt, \@args);
       if ($1 eq '::') {
