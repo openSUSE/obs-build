@@ -33,10 +33,10 @@ use strict;
 use POSIX;
 
 use Build;
+use Build::Options;
 
 use PBuild::AssetMgr;
 use PBuild::Source;
-use PBuild::Options;
 use PBuild::Cpio;
 
 $Build::Kiwi::urlmapper = 0;    # disable url -> prp mapping
@@ -44,6 +44,7 @@ $Build::Kiwi::urlmapper = 0;    # disable url -> prp mapping
 my $fedpkg = 'fedpkg@https://pkgs.fedoraproject.org/repo/pkgs';
 
 my %known_options = (
+  'h' => 'help',
   'help' => '',
   'assetdir' => ':',
   'assets' => '::',
@@ -89,7 +90,7 @@ sub read_config {
   return Build::read_config($arch);
 }
 
-my ($opts, @dirs) = PBuild::Options::parse_options(\%known_options, @ARGV);
+my ($opts, @dirs) = Build::Options::parse_options(\%known_options, @ARGV);
 
 if ($opts->{'create-cpio'}) {
   if ($opts->{'help'}) {
@@ -150,7 +151,7 @@ for my $dir (@dirs) {
       find_assets($assetmgr, $bconf, $p, $opts->{'recipe'});
     } else {
       for my $file (sort keys %$files) {
-	next unless $file eq 'sources' || $file eq 'go.sum' || $file eq 'PKGBUILD' || $file =~ /\.(?:spec|dsc|kiwi)/;
+	next unless $file eq 'sources' || $file eq 'go.sum' || $file eq 'PKGBUILD' || $file eq 'Dockerfile' || $file =~ /\.(?:spec|dsc|kiwi)/;
         find_assets($assetmgr, $bconf, $p, $file);
       }
     }

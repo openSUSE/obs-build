@@ -55,7 +55,7 @@ use PBuild::Repoquery;
 my $libbuild = $INC[0];
 
 # parse options
-my ($opts, @dirs) = PBuild::Options::parse_options($PBuild::Options::pbuild_options, @ARGV);
+my ($opts, @dirs) = PBuild::Options::parse_options(@ARGV);
 PBuild::Options::usage(0) if $opts->{'help'};
 die("Usage: pbuild [options] [dir]\n") if @dirs > 1;
 my $dir = @dirs ? $dirs[0] : '.';

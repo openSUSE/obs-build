@@ -20,9 +20,11 @@
 
 package PBuild::Options;
 
+use Build::Options;
+
 use strict;
 
-our $pbuild_options = {
+my $pbuild_options = {
   'h' => 'help',
   'help' => '',
   'preset' => ':',
@@ -119,18 +121,10 @@ our $pbuild_options = {
   'ccache-type' => '',
 };
 
-sub getarg {
-  my ($origopt, $args, $optional) = @_;
-  return ${shift @$args} if @$args && ref($args->[0]);
-  return shift @$args if @$args && $args->[0] !~ /^-/;
-  die("Option $origopt needs an argument\n") unless $optional;
-  return undef;
-}
-
 sub vm_type_special {
   my ($opts, $origopt, $opt, $args) = @_;
   my $arg;
-  $arg = getarg($origopt, $args, 1) unless $opt eq 'zvm' || $opt eq 'lxc';
+  $arg = Build::Options::getarg($origopt, $args, 1) unless $opt eq 'zvm' || $opt eq 'lxc';
   $opts->{'vm-disk'} = $arg if defined $arg;
   $opts->{'vm-type'} = $opt;
 }
@@ -138,7 +132,7 @@ sub vm_type_special {
 sub ccache_special {
   my ($opts, $origopt, $opt, $args) = @_;
   my $arg;
-  $arg = getarg($origopt, $args) if 'ccache' && @$args && ref($args->[0]);
+  $arg = Build::Options::getarg($origopt, $args) if 'ccache' && @$args && ref($args->[0]);
   $arg = 'sccache' if $origopt eq 'sccache';
   $opts->{'ccache'} = 1;
   $opts->{'ccache-type'} = $arg if $arg;
@@ -150,7 +144,7 @@ my %known_codes = map {$_ => 1} @codes;
 sub result_rebuild_special {
   my ($opts, $origopt, $opt, $args) = @_;
   my $arg;
-  $arg = getarg($origopt, $args, 1) if @$args && (ref($args->[0]) || $args->[0] !~ /\//);
+  $arg = Build::Options::getarg($origopt, $args, 1) if @$args && (ref($args->[0]) || $args->[0] !~ /\//);
   if (!defined($arg) || $arg eq 'all') {
     push @{$opts->{"$opt-code"}}, 'all';
   } elsif ($known_codes{$arg}) {
@@ -161,48 +155,7 @@ sub result_rebuild_special {
 }
 
 sub parse_options {
-  my ($known_options, @args) = @_;
-  my %opts;
-  my @back;
-  while (@args) {
-    my $opt = shift @args;
-    if ($opt !~ /^-/) {
-      push @back, $opt;
-      next;
-    }
-    if ($opt eq '--') {
-      push @back, @args;
-      last;
-    }
-    my $origopt = $opt;
-    $opt =~ s/^--?//;
-    unshift @args, \"$1" if $opt =~ s/=(.*)$//;
-    my $ko = $known_options->{$opt};
-    die("Unknown option '$origopt'. Exit.\n") unless defined $ko;
-    $ko = "$opt$ko" if !ref($ko) && ($ko eq '' || $ko =~ /^:/);
-    if (ref($ko)) {
-      $ko->(\%opts, $origopt, $opt, \@args);
-    } elsif ($ko =~ s/(:.*)//) {
-      my $arg = getarg($origopt, \@args);
-      if ($1 eq '::') {
-        push @{$opts{$ko}}, $arg;
-      } else {
-        $opts{$ko} = $arg;
-      }
-    } else {
-      my $arg = 1;
-      if (@args && ref($args[0])) {
-        $arg = getarg($origopt, \@args);
-	$arg = 0 if $arg =~ /^(?:0|off|false|no)$/i;
-	$arg = 1 if $arg =~ /^(?:1|on|true|yes)$/i;
-	die("Bad boolean argument for option $origopt: '$arg'\n") unless $arg eq '0' || $arg eq '1';
-      }
-      $opts{$ko} = $arg;
-    }
-    die("Option $origopt does not take an argument\n") if @args && ref($args[0]);
-  }
-
-  return (\%opts, @back);
+  return Build::Options::parse_options($pbuild_options, @_);
 }
 
 sub usage {
