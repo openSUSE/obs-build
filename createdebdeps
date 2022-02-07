@@ -25,14 +25,20 @@ BEGIN {
 }
 
 use strict;
-use Digest::MD5;
-use File::Path;
-use Getopt::Long;
+
+use Digest::MD5 ();
+use File::Path ();
+
 use Build ':deb';
+use Build::Options;
 use Build::Deb;
 use Build::Debrepo;
 
-Getopt::Long::Configure("no_ignore_case");
+my $cachedir = "/var/cache/build";
+my $options = { 
+  'cachedir' => ':',
+  'archpath' => ':',
+};
 
 #
 # supported urls
@@ -40,21 +46,20 @@ Getopt::Long::Configure("no_ignore_case");
 # distribution:   <baseurl>/<dist>/[components]
 # flat repo:      <baseurl>/.
 
-my $cachedir = "/var/cache/build";
-my $archpath;
-
-GetOptions('cachedir=s'  => \$cachedir, 'archpath=s' => \$archpath) or exit(1);
-
+my ($opts, @args) = Build::Options::parse_options($options, @ARGV);
+$cachedir = $opts->{'cachedir'} if $opts->{'cachedir'};
+my $archpath = $opts->{'archpath'};
 if (!$archpath) {
   $archpath = `uname -p` || 'unknown';
   chomp $archpath;
 }
+
 my $basearch = $archpath;
 $basearch =~ s/:.*//;
 $basearch = Build::Deb::basearch($basearch);
 my $pkgnum = 0;
 
-for my $url (@ARGV) {
+for my $url (@args) {
   die("$url: not an remote debian repo\n") unless $url =~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/;
   my $repoid = Digest::MD5::md5_hex($url);
   my $dir = "$cachedir/$repoid";

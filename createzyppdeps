@@ -27,27 +27,27 @@ BEGIN {
 use strict;
 
 use Build::Zypp;
-use Getopt::Long;
-
-Getopt::Long::Configure("no_ignore_case");
+use Build::Options;
 
 my $cachedir = "/var/cache/build";
-my $opt_listrepos;
 
-GetOptions(
-    "cachedir=s"  => \$cachedir,
-    "listrepos" => \$opt_listrepos,
-    ) or exit(1);
+my $options = {
+  'listrepos' => '',
+  'cachedir' => ':'
+};
 
-if ($opt_listrepos) {
-  die("createzyppdeps --listrepos does not take an argument\n") if @ARGV;
+my ($opts, @args) = Build::Options::parse_options($options, @ARGV);
+$cachedir = $opts->{'cachedir'} if $opts->{'cachedir'};
+
+if ($opts->{'listrepos'}) {
+  die("createzyppdeps --listrepos does not take arguments\n") if @args;
   for my $r (Build::Zypp::parseallrepos()) {
     print "$r->{'name'}\n" if $r->{'enabled'};
   }
   exit 0;
 }
-die("createzyppdeps needs exactly one argument\n") if @ARGV != 1;
-my $url = $ARGV[0];
+die("createzyppdeps needs exactly one argument\n") if @args != 1;
+my $url = $args[0];
 
 die("createzyppdeps argument must start with 'zypp://'\n") unless $url =~ /^zypp:\/\/([^\/]*)/;
 my $repo = Build::Zypp::parserepo($1);

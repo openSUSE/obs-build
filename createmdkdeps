@@ -27,19 +27,24 @@ BEGIN {
 }
 
 use strict;
-use Build ':mdk';
-use Build::Mdkrepo;
-use Digest::MD5 ();
-use File::Path;
-use Getopt::Long;
 
-Getopt::Long::Configure("no_ignore_case");
+use Digest::MD5 ();
+use File::Path ();
+
+use Build ':mdk';
+use Build::Options;
+use Build::Mdkrepo;
 
 my $cachedir = "/var/cache/build";
 
-GetOptions("cachedir=s"  => \$cachedir) or exit(1);
+my $options = {
+  'cachedir' => ':',
+};
 
-for my $url (@ARGV) {
+my ($opts, @args) = Build::Options::parse_options($options, @ARGV);
+$cachedir = $opts->{'cachedir'} if $opts->{'cachedir'};
+
+for my $url (@args) {
   die("$url: not an remote mandriva/mageia repo") unless $url =~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/;
   my $repoid = Digest::MD5::md5_hex($url);
   my $dir = "$cachedir/$repoid";

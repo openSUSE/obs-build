@@ -29,13 +29,15 @@ BEGIN {
 use strict;
 use Build ':arch';
 use Build::Archrepo;
+use Build::Options;
 use Digest::MD5 ();
-use File::Path;
-use Getopt::Long;
-
-Getopt::Long::Configure("no_ignore_case");
+use File::Path ();
 
 my $cachedir = "/var/cache/build";
+
+my $options = {
+  'cachedir' => ':',
+};
 
 sub getreponame {
   my ($url) = @_;
@@ -43,9 +45,11 @@ sub getreponame {
   return undef;
 }
 
-GetOptions("cachedir=s"  => \$cachedir) or exit(1);
 
-for my $url (@ARGV) {
+my ($opts, @args) = Build::Options::parse_options($options, @ARGV);
+$cachedir = $opts->{'cachedir'} if $opts->{'cachedir'};
+
+for my $url (@args) {
   die("$url: not an remote Archlinux repo") unless $url =~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/;
   my $reponame = getreponame($url);
   die("could not determine reponame from url $url\n") unless defined $reponame;

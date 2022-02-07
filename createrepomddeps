@@ -25,68 +25,61 @@ BEGIN {
 }
 
 use strict;
+
+use Digest::MD5 ();
+use File::Path ();
 use Data::Dumper;
-use Getopt::Long;
+
 use Build ':rpm';
 use Build::Rpm;
 use Build::Rpmmd;
-use Digest::MD5 ();
-use File::Path qw(mkpath rmtree);
-use File::Basename;
+use Build::Options;
 
-Getopt::Long::Configure("no_ignore_case");
-
-my $opt_dump;
-my $opt_old;
-my $opt_nosrc;
-my $opt_bc;
-my $opt_zypp;
 my $cachedir = "/var/cache/build";
+
+my $options = {
+  'nosrc' => '',
+  'dump' => '',
+  'old' => '',
+  'zypp' => ':',
+  'cachedir' => ':',
+};
+
 
 sub printold {
   my ($pkg, $baseurl, $old_seen) = @_;
 
-  my $arch = $pkg->{'arch'};
-  $arch = 'src' if $pkg->{'arch'} eq 'nosrc';
-  return if $arch eq 'src' && $opt_nosrc;
   my $evr = $pkg->{'version'}.'-'.$pkg->{'release'};
   $evr = "$pkg->{'epoch'}:$evr" if $pkg->{'epoch'};
   my $loc = $baseurl . $pkg->{'location'};
-  if ($old_seen->{$pkg->{'name'}}->{$arch}) {
-    my $vv = Build::Rpm::verscmp($old_seen->{$pkg->{'name'}}->{$arch}->{'evr'}, $evr, 0);
+  my $k = "$pkg->{'name'}.$pkg->{'arch'}";
+  if ($old_seen->{$k}) {
+    my $vv = Build::Rpm::verscmp($old_seen->{$k}->[0], $evr, 0);
     if ($vv >= 0) {
       print "$loc\n";
       return;
     }
-    print $old_seen->{$pkg->{'name'}}->{$arch}->{'loc'}."\n";
+    print $old_seen->{$k}->[1]."\n";
   }
-  $old_seen->{$pkg->{'name'}}->{$arch}->{'evr'} = $evr;
-  $old_seen->{$pkg->{'name'}}->{$arch}->{'loc'} = $loc;
+  $old_seen->{$k} = [ $evr, $loc ];
 }
 
-GetOptions (
-  "nosrc"   => \$opt_nosrc,
-  "dump"   => \$opt_dump,
-  "old"   => \$opt_old,
-  "zypp=s"   => \$opt_zypp,
-  "cachedir=s"  => \$cachedir,
-  ) or exit(1);
+my ($opts, @args) = Build::Options::parse_options($options, @ARGV);
+$cachedir = $opts->{'cachedir'} if $opts->{'cachedir'};
 
-$opt_bc = 1 unless $opt_dump || $opt_old;
+my $old_seen = {};	# for --old
+my @packages;		# for --dump
 
-my $old_seen = {};	# for opt_old
-my @packages;		# for opt_dump
-
-for my $url (@ARGV) {
+for my $url (@args) {
   my $dir;
   my $baseurl = $url;
-  if ($opt_zypp) {
-    $dir = $opt_zypp;
+  if ($opts->{'zypp'}) {
+    $dir = $opts->{'zypp'};
   } elsif ($url =~ /^(?:ftps?|https?):\/\/([^\/]*)\/?/) {
     my $repoid = Digest::MD5::md5_hex($url);
     $dir = "$cachedir/$repoid/";
     $baseurl .= '/' unless $baseurl =~ /\/$/;
-    mkpath("${dir}repodata");
+    File::Path::mkpath("${dir}repodata");
     system($INC[0].'/download', "${dir}repodata", "${baseurl}repodata/repomd.xml");
   } else {
     $dir = $url;
@@ -95,7 +88,7 @@ for my $url (@ARGV) {
   $baseurl .= '/' unless $baseurl =~ /\/$/;
 
   if (! -s "${dir}repodata/repomd.xml") {
-    die("zypp repo $url is not up to date, please refresh first\n") if $opt_zypp;
+    die("zypp repo $url is not up to date, please refresh first\n") if $opts->{'zypp'};
     die("repo $url does not contain a repomd.xml file\n");
   }
 
@@ -105,21 +98,22 @@ for my $url (@ARGV) {
 #  print Dumper(\@primaryfiles);
 
   for my $f (@primaryfiles) {
-    my $u = "$dir$f->{'location'}";
+    my $u = $f->{'location'};
     if ($] > 5.007) {
       require Encode;
       utf8::downgrade($u);
     }
+    $u =~ s/.*\///;	# strip "repodata" part
     my $cached;
-    if (-e $u) {
+    if (-e "${dir}repodata/$u") {
       $cached = 1;
       $cached = 0 if exists($f->{'size'}) && $f->{'size'} != (-s _);
-      $cached = 0 if !$opt_zypp && !exists($f->{'size'}) && $u !~ /[0-9a-f]{32}-primary/;
+      $cached = 0 if !$opts->{'zypp'} && !exists($f->{'size'}) && $u !~ /[0-9a-f]{32}-primary/;
     }
     if (!$cached) {
-      die("zypp repo $url is not up to date, please refresh first\n") if $opt_zypp;
+      die("zypp repo $url is not up to date, please refresh first\n") if $opts->{'zypp'};
       if ($url =~ /^(?:ftps?|https?):\/\/([^\/]*)\/?/) {
-	if (system("$INC[0]/download", "${dir}repodata/", "${baseurl}repodata/" . basename($u))) {
+	if (system("$INC[0]/download", "${dir}repodata/", "${baseurl}repodata/$u")) {
 	  die("download failed\n");
 	}
       } else {
@@ -127,28 +121,36 @@ for my $url (@ARGV) {
       }
     }
     my $fh;
-    open($fh, '<', $u) or die "Error opening $u: $!\n";
+    open($fh, '<', "${dir}repodata/$u") or die "Error opening ${dir}repodata/$u: $!\n";
     if ($u =~ /\.gz$/) {
       use IO::Uncompress::Gunzip qw($GunzipError);
       $fh = new IO::Uncompress::Gunzip $fh or die "Error opening $u: $GunzipError\n";
     }
-    Build::Rpmmd::parse($fh, sub {
-      if ($opt_dump) {
+    my $parsefn;
+    if ($opts->{'dump'}) {
+      $parsefn = sub {
+	return if $opts->{'nosrc'} && ($_[0]->{'arch'} eq 'src' || $_[0]->{'arch'} eq 'nosrc');
         $_[0]->{'baseurl'} = $baseurl;
-        push @packages, $_[0] if $opt_dump;
-      }
-      if ($opt_bc) {
-        binmode STDOUT, ":utf8";
-	Build::writedeps(\*STDOUT, $_[0], $baseurl);
-      } elsif ($opt_old) {
+        push @packages, $_[0];
+      };
+    } elsif ($opts->{'old'}) {
+      $parsefn = sub {
+	return if $opts->{'nosrc'} && ($_[0]->{'arch'} eq 'src' || $_[0]->{'arch'} eq 'nosrc');
 	printold($_[0], $baseurl, $old_seen);
-      }
-    }, 'addselfprovides' => 1);
+      };
+    } else {
+      $parsefn = sub {
+	return if $opts->{'nosrc'} && ($_[0]->{'arch'} eq 'src' || $_[0]->{'arch'} eq 'nosrc');
+        binmode STDOUT, ":utf8";
+        Build::writedeps(\*STDOUT, $_[0], $baseurl)
+      };
+    }
+    Build::Rpmmd::parse($fh, $parsefn, 'addselfprovides' => 1);
     close($fh);
   }
 }
 
-if ($opt_dump) {
+if ($opts->{'dump'}) {
   print Data::Dumper->Dump([\@packages], ['packages']); # caution: excessive memory consumption!
 }
 

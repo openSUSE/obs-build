@@ -24,34 +24,39 @@ BEGIN {
   unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
 }
 
-use Build ':rpm';
-use Build::Susetags;
-use Getopt::Long;
-use File::Path qw(mkpath);
-
 use strict;
 
-Getopt::Long::Configure("no_ignore_case");
+use Digest::MD5();
+use File::Path ();
 
-my $opt_zypp;
+use Build ':rpm';
+use Build::Susetags;
+use Build::Options;
+
 my $cachedir = "/var/cache/build";
 
-GetOptions ("zypp=s" => \$opt_zypp, "cachedir=s" => \$cachedir) or exit(1);
+my $options = {
+  'cachedir' => ':',
+  'zypp' => ':',
+};
 
-for my $url (@ARGV) {
+my ($opts, @args) = Build::Options::parse_options($options, @ARGV);
+$cachedir = $opts->{'cachedir'} if $opts->{'cachedir'};
+
+for my $url (@args) {
   # XXX: use descrdir/datadir from content file
   my $descrdir = 'suse/setup/descr';
   my $datadir = 'suse';
 
   my $dir;
   my $baseurl = $url;
-  if ($opt_zypp) {
-    $dir =  $opt_zypp;
+  if ($opts->{'zypp'}) {
+    $dir =  $opts->{'zypp'};
   } elsif ($url =~ /^(?:ftps?|https?):\/\/([^\/]*)\/?/) {
     my $repoid = Digest::MD5::md5_hex($url);
     $dir = "$cachedir/$repoid/";
     $baseurl .= '/' unless $baseurl =~ /\/$/;
-    mkpath($dir);
+    File::Path::mkpath($dir);
     system("$INC[0]/download", "$dir/", "${baseurl}$descrdir/packages.gz");
     $descrdir = '.';
   } else {

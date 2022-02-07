@@ -24,23 +24,22 @@ BEGIN {
   unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
 }
 
-use Getopt::Long;
 use Build;
+use Build::Options;
 
 use strict;
 
-Getopt::Long::Configure("no_ignore_case");
+my $options = {
+  'root' => ':',
+  'type' => ':',
+  'extraname' => '',
+};
 
-my $opt_root;
-my $opt_type;
-my $opt_extraname;
+my ($opts) = Build::Options::parse_options($options, @ARGV);
 
-GetOptions ("root=s" => \$opt_root, "type=s" => \$opt_type, "extraname" => \$opt_extraname) or exit(1);
-
-$opt_type ||= 'rpm';
-
-my $ql = Build::queryinstalled($opt_type, $opt_root);
-die("cannot get list of installed packages for type $opt_type\n") unless $ql;
+$opts->{'type'} ||= 'rpm';
+my $ql = Build::queryinstalled($opts->{'type'}, $opts->{'root'});
+die("cannot get list of installed packages for type $opts->{'type'}\n") unless $ql;
 
 for my $q (@$ql) {
   next unless defined($q->{'name'}) && defined($q->{'arch'});
@@ -50,7 +49,7 @@ for my $q (@$ql) {
   $evr = "$q->{'epoch'}:$evr" if $q->{'epoch'};
   $evr .= "-$q->{'release'}" if defined $q->{'release'};
   my $buildtime = $q->{'buildtime'} || 0;
-  if ($opt_extraname) {
+  if ($opts->{'extraname'}) {
     print "I:$id$q->{'name'} $q->{'name'}-$evr $buildtime-$q->{'arch'}\n";
   } else {
     print "I:$id$q->{'name'}-$evr $buildtime-$q->{'arch'}\n";

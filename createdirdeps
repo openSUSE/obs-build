@@ -24,16 +24,14 @@ BEGIN {
   unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
 }
 
-use Build;
-use Getopt::Long;
-
 use strict;
 
-Getopt::Long::Configure("no_ignore_case");
+use Build;
+use Build::Options;
 
-my $oldfile;
-
-GetOptions ("oldfile=s" => \$oldfile) or exit(1);
+my $options = {
+  'oldfile' => ':',
+};
 
 sub queryfromfilename {
   my ($fn) = @_;
@@ -47,8 +45,10 @@ sub queryfromfilename {
 
 ######################################################################
 
+my ($opts, @args) = Build::Options::parse_options($options, @ARGV);
+
 my %old;
-if (defined($oldfile) && open(F, '<', $oldfile)) {
+if (defined($opts->{'oldfile'}) && open(F, '<', $opts->{'oldfile'})) {
   while (<F>) {
     chomp;
     $old{$1} = $_ if /^([PRrCOI]:[^ ]+): /;
@@ -58,7 +58,7 @@ if (defined($oldfile) && open(F, '<', $oldfile)) {
 
 my %seen;
 
-for my $dir (@ARGV) {
+for my $dir (@args) {
   my $cmd = "find $dir -follow -type f \\( -name \"*.rpm\" -o -name \"*.deb\" -o -name \"*.pkg.tar.gz\" -o -name \"*.pkg.tar.xz\" \\) -a ! -name \"*src.rpm\" -printf '\%T@/\%s/\%i \%p\\n'";
   open(F, '-|', $cmd) or next;
   while (<F>) {
