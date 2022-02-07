@@ -22,8 +22,9 @@ package PBuild::OBS;
 
 use strict;
 
+use Build::Download;
+
 use PBuild::Util;
-use PBuild::Download;
 use PBuild::Cpio;
 use PBuild::Structured;
 
@@ -81,7 +82,7 @@ my $dtd_proj = [
 sub fetch_proj {
   my ($projid, $baseurl) = @_;
   my $projid2 = PBuild::Util::urlencode($projid);
-  my ($projxml) = PBuild::Download::fetch("${baseurl}source/$projid2/_meta");
+  my ($projxml) = Build::Download::fetch("${baseurl}source/$projid2/_meta");
   return PBuild::Structured::fromxml($projxml, $dtd_proj, 0, 1);
 }
 
@@ -92,7 +93,7 @@ sub fetch_config {
   my ($prp, $baseurl) = @_;
   my ($projid, $repoid) = split('/', $prp, 2);
   my $projid2 = PBuild::Util::urlencode($projid);
-  my ($config) = PBuild::Download::fetch("${baseurl}source/$projid2/_config", 'missingok' => 1);
+  my ($config) = Build::Download::fetch("${baseurl}source/$projid2/_config", 'missingok' => 1);
   $config = '' unless defined $config;
   $config = "\n### from $projid\n%define _repository $repoid\n$config" if $config;
   return $config;
@@ -265,12 +266,12 @@ sub fetch_binaries {
   my ($url, $repodir, $names, $callback, $ua) = @_;
   my @names = sort keys %$names;
   while (@names) {
-    $ua ||= PBuild::Download::create_ua();
+    $ua ||= Build::Download::create_ua();
     my @nchunk = splice(@names, 0, 100);
     my $chunkurl = "$url/_repository?view=cpio";
     $chunkurl .= "&binary=".PBuild::Util::urlencode($_) for @nchunk;
     my $tmpcpio = "$repodir/.$$.binaries.cpio";
-    PBuild::Download::download($chunkurl, $tmpcpio, undef, 'ua' => $ua, 'retry' => 3);
+    Build::Download::download($chunkurl, $tmpcpio, undef, 'ua' => $ua, 'retry' => 3);
     PBuild::Cpio::cpio_extract($tmpcpio, sub {fetch_binaries_cpioextract($_[0], $_[1], $repodir, $names, $callback)});
     unlink($tmpcpio);
   }
@@ -289,7 +290,7 @@ sub fetch_repodata {
   $baseurl .= '/' unless $baseurl =~ /\/$/;
   my $requrl .= "${baseurl}build/$prp/$arch/_repository?view=cache";
   $requrl .= "&module=".PBuild::Util::urlencode($_) for @{$modules || []};
-  PBuild::Download::download($requrl, "$tmpdir/repository.cpio", undef, 'retry' => 3);
+  Build::Download::download($requrl, "$tmpdir/repository.cpio", undef, 'retry' => 3);
   PBuild::Cpio::cpio_extract("$tmpdir/repository.cpio", "$tmpdir/repository.data", 'extract' => 'repositorycache');
   my $rdata = PBuild::Util::retrieve("$tmpdir/repository.data");
   my @bins = grep {ref($_) eq 'HASH' && defined($_->{'name'})} values %{$rdata || {}};

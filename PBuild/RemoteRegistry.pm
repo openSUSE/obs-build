@@ -25,9 +25,10 @@ use strict;
 use LWP::UserAgent;
 use URI;
 
-use PBuild::Verify;
-use PBuild::Download;
+use Build::Download;
 use Build::SimpleJSON;
+
+use PBuild::Verify;
 
 eval { require JSON::XS };
 *JSON::XS::decode_json = sub {die("JSON::XS is not available\n")} unless defined &JSON::XS::decode_json;
@@ -103,21 +104,21 @@ sub select_manifest {
 
 sub fetch_manifest {
   my ($repodir, $registry, @args) = @_;
-  return PBuild::Download::fetch(@args) if $registry !~ /docker.io\/?$/;
+  return Build::Download::fetch(@args) if $registry !~ /docker.io\/?$/;
   my ($data, $ct);
-  eval { ($data, $ct) = PBuild::Download::head(@args) };
+  eval { ($data, $ct) = Build::Download::head(@args) };
   die($@) if $@ && $@ !~ /401 Unauthorized/;	# sigh, docker returns 401 for not-existing repositories
   return undef unless $data;
   my $digest = $data->{'docker-content-digest'};
-  return PBuild::Download::fetch(@args) unless $digest;
+  return Build::Download::fetch(@args) unless $digest;
   my $content = PBuild::Util::readstr("$repodir/manifest.$digest", 1);
   if ($content) {
-    PBuild::Download::checkdigest($content, $digest);
+    Build::Download::checkdigest($content, $digest);
     return ($content, $ct);
   }
-  ($content, $ct) = PBuild::Download::fetch(@args);
+  ($content, $ct) = Build::Download::fetch(@args);
   return undef unless $content;
-  PBuild::Download::checkdigest($content, $digest);
+  Build::Download::checkdigest($content, $digest);
   PBuild::Util::mkdir_p($repodir);
   PBuild::Util::writestr("$repodir/.manifest.$digest.$$", "$repodir/manifest.$digest", $content);
   return ($content, $ct);
@@ -189,7 +190,7 @@ sub queryremotecontainer {
 sub fetchrepo {
   my ($bconf, $arch, $repodir, $url, $repotags) = @_;
   my @bins;
-  my $ua = PBuild::Download::create_ua();
+  my $ua = Build::Download::create_ua();
   for my $repotag (@{$repotags || []}) {
     my $bin = queryremotecontainer($ua, $arch, $repodir, $url, $repotag);
     push @bins, $bin if $bin;
@@ -220,13 +221,13 @@ sub fetchbinaries {
   return unless %tofetch;
   my @tofetch = sort keys %tofetch;
   print "fetching ".PBuild::Util::plural(scalar(@tofetch), 'container blob')." from $url\n";
-  my $ua = PBuild::Download::create_ua();
+  my $ua = Build::Download::create_ua();
   PBuild::Util::mkdir_p($repodir);
   for my $tofetch (@tofetch) {
     next unless $tofetch =~ /^(.*)\/(.*)?$/;
     my ($repository, $digest) = ($1, $2);
     next if -s "$repodir/blob.$digest";
-    PBuild::Download::download("$url/v2/$repository/blobs/$digest", "$repodir/.blob.$digest.$$", "$repodir/blob.$digest", 'digest' => $digest, 'ua' => $ua);
+    Build::Download::download("$url/v2/$repository/blobs/$digest", "$repodir/.blob.$digest.$$", "$repodir/blob.$digest", 'digest' => $digest, 'ua' => $ua);
   }
 }
 

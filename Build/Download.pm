@@ -18,7 +18,7 @@
 #
 ################################################################
 
-package PBuild::Download;
+package Build::Download;
 
 use strict;
 
@@ -30,7 +30,11 @@ use Digest::SHA ();
 # Create a user agent used to access remote servers
 #
 sub create_ua {
-  my $ua = LWP::UserAgent->new(agent => "openSUSE build script", timeout => 42, ssl_opts => { verify_hostname => 1 });
+  my (%opt) = @_;
+  my $agent = $opt{'agent'} || 'openSUSE build script';
+  my $timeout = $opt{'timeout'} || 60;
+  my $ssl_opts = $opt{'ssl_opts'} || { verify_hostname => 1 };
+  my $ua = LWP::UserAgent->new(agent => $agent, timeout => $timeout, ssl_opts => $ssl_opts);
   $ua->env_proxy;
   return $ua;
 }

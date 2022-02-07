@@ -25,8 +25,9 @@ use Digest::MD5 ();
 use Digest::SHA ();
 use MIME::Base64 ();
 
+use Build::Download;
+
 use PBuild::Util;
-use PBuild::Download;
 use PBuild::Cpio;
 use PBuild::Zip;
 
@@ -152,7 +153,7 @@ sub verify_golang_h1 {
   die("$file: no content\n") unless %content;
   my $data = '';
   for my $file (sort keys %content) {
-    my $ctx = PBuild::Download::digest2ctx("sha256:");
+    my $ctx = Build::Download::digest2ctx("sha256:");
     if ($part eq 'zip') {
       PBuild::Zip::zip_extract($fd, $content{$file}, 'writer' => sub {$ctx->add($_[0])});
     } else {
@@ -164,7 +165,7 @@ sub verify_golang_h1 {
   close($fd);
   die("not a h1 checksum: $h1\n") unless $h1 =~ /^h1:/;
   my $digest = "sha256:".unpack("H*", MIME::Base64::decode_base64(substr($h1, 3)));
-  PBuild::Download::checkdigest($data, $digest);
+  Build::Download::checkdigest($data, $digest);
 }
 
 #
@@ -191,7 +192,7 @@ sub golang_fetch {
     for my $part (sort keys %$parts) {
       my $proxyurl = "$url/$moddir/\@v/$vers.$part";
       my $maxsize = $part eq 'zip' ? 500000000 : 16000000;
-      PBuild::Download::download($proxyurl, "$tmpdir/$cname/$moddir/\@v/$vers.$part", undef, 'retry' => 3, 'maxsize' => $maxsize);
+      Build::Download::download($proxyurl, "$tmpdir/$cname/$moddir/\@v/$vers.$part", undef, 'retry' => 3, 'maxsize' => $maxsize);
       my $h1 = $parts->{$part};
       verify_golang_h1("$tmpdir/$cname/$moddir/\@v/$vers.$part", $part, $h1) if defined $h1;
     }
@@ -249,7 +250,7 @@ sub fedpkg_fetch {
     $path = PBuild::Util::urlencode($path);
     my $fedpkg_url = $url;
     $fedpkg_url =~ s/\/?$/\/$path/;
-    if (PBuild::Download::download($fedpkg_url, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1)) {
+    if (Build::Download::download($fedpkg_url, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1)) {
       rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
     }
   }
@@ -335,7 +336,7 @@ sub url_fetch {
       my $assetid = $asset->{'assetid'};
       my $adir = "$assetdir/".substr($assetid, 0, 2);
       PBuild::Util::mkdir_p($adir);
-      if (PBuild::Download::download($asset->{'url'}, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1)) {
+      if (Build::Download::download($asset->{'url'}, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1)) {
         rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
       }
     }

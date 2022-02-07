@@ -34,9 +34,9 @@ use Build::Deb;
 use Build::Susetags;
 use Build::Zypp;
 use Build::Modules;
+use Build::Download;
 
 use PBuild::Util;
-use PBuild::Download;
 use PBuild::Verify;
 use PBuild::OBS;
 use PBuild::Cando;
@@ -53,14 +53,14 @@ sub download_zypp {
   system('/usr/bin/zypper', '--no-refresh', '-q', '--pkg-cache-dir', $dir, 'download', '-r', $repo, $pkg)
       && die("zypper download $pkg failed\n");
   die("zypper download of $pkg did not create $dir/$repo/$path\n") unless -f "$dir/$repo/$path";
-  PBuild::Download::checkfiledigest("$dir/$repo/$path", $digest) if $digest;
+  Build::Download::checkfiledigest("$dir/$repo/$path", $digest) if $digest;
   rename("$dir/$repo/$path", $dest) || die("rename $dir/$repo/$path $dest: $!\n");
 }
 
 sub download {
   my ($url, $dest, $destfinal, $digest, $ua) = @_;
   return download_zypp($url, $destfinal || $dest, $digest) if $url =~ /^zypp:\/\//;
-  PBuild::Download::download($url, $dest, $destfinal, 'digest' => $digest, 'ua' => $ua, 'retry' => 3);
+  Build::Download::download($url, $dest, $destfinal, 'digest' => $digest, 'ua' => $ua, 'retry' => 3);
 }
 
 sub addpkg {
@@ -422,7 +422,7 @@ sub querybinary {
 #
 sub fetchbinaries_replace {
   my ($repodir, $tmpname, $binname, $bin) = @_;
-  PBuild::Download::checkfiledigest("$repodir/$tmpname", $bin->{'checksum'}) if $bin->{'checksum'};
+  Build::Download::checkfiledigest("$repodir/$tmpname", $bin->{'checksum'}) if $bin->{'checksum'};
   my $q = querybinary($repodir, $tmpname);
   die("downloaded binary $binname does not match repository metadata\n") unless is_matching_binary($bin, $q);
   rename("$repodir/$tmpname", "$repodir/$binname") || die("rename $repodir/$tmpname $repodir/$binname\n");
@@ -464,7 +464,7 @@ sub fetchbinaries {
   die("bad repo\n") unless $url;
   print "fetching ".PBuild::Util::plural(scalar(@$bins), 'binary')." from $url\n";
   PBuild::Util::mkdir_p($repodir);
-  my $ua = PBuild::Download::create_ua();
+  my $ua = Build::Download::create_ua();
   fetchbinaries_obs($repo, $bins, $ua) if $url =~ /^obs:/;
   for my $bin (@$bins) {
     next if $bin->{'filename'};
