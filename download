@@ -24,32 +24,17 @@ BEGIN {
   unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
 }
 
-use LWP::UserAgent;
 use URI;
-use File::Path;
-use File::Basename;
+
+use Build::Download;
 
 use strict;
-
-sub get_zypp_baseurl {
-  my ($reponame) = @_;
-  require Build::Zypp;
-  my $repo = Build::Zypp::parserepo($reponame);
-  die("can't parse $reponame\n") unless $repo;
-  die "missing url in repo $repo->{'name'}\n" unless $repo->{'baseurl'};
-  return $repo->{'baseurl'};
-}
 
 die "USAGE: $0 DIR URLS..." unless $#ARGV >= 1;
 
 my $dir = shift @ARGV;
 
-my $ua = LWP::UserAgent->new(
-  agent => "openSUSE build script",
-  timeout => 42,
-  ssl_opts => {
-    verify_hostname => 1
-  });
+my $ua = Build::Download::create_ua();
 
 for my $url (@ARGV) {
   if ($url =~ m#^zypp://#) {
@@ -59,21 +44,15 @@ for my $url (@ARGV) {
     system('/usr/bin/zypper', '--no-refresh', '-q', '--pkg-cache-dir', $dir,
            'download', '-r', $repo, $pkg)
 	&& die("zypper download $pkg failed\n");
-    rename("$dir/$repo/$path", "$dest") || die("rename $dir/$repo/$path $dest: $!\n");
+    rename("$dir/$repo/$path", $dest) || die("rename $dir/$repo/$path $dest: $!\n");
     next;
   }
   $url = URI->new($url);
-  $ua->env_proxy;
-  my $dest = "$dir/".basename($url->path);
+  my $dest = $url->path;
+  $dest =~ s/.*\///;
+  $dest = "$dir/$dest";
   unlink($dest);	# just in case
-  my $retry = 3;
-  while ($retry--) {
-    my $res = $ua->mirror($url, $dest);
-    last if $res->is_success;
-    # if it's a redirect we probably got a bad mirror and should just retry
-    die "requesting $url failed: ".$res->status_line."\n" unless $retry && $res->previous;
-    warn "retrying $url\n";
-  }
+  Build::Download::download($url, $dest, undef, 'ua' => $ua, 'retry' => 3);
 }
 
 # vim:sw=2

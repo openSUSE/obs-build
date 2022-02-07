@@ -27,11 +27,14 @@ BEGIN {
 }
 
 use strict;
+
+use Digest::MD5 ();
+use File::Path ();
+
 use Build ':arch';
 use Build::Archrepo;
 use Build::Options;
-use Digest::MD5 ();
-use File::Path ();
+use Build::Download;
 
 my $cachedir = "/var/cache/build";
 
@@ -49,6 +52,8 @@ sub getreponame {
 my ($opts, @args) = Build::Options::parse_options($options, @ARGV);
 $cachedir = $opts->{'cachedir'} if $opts->{'cachedir'};
 
+my $ua = Build::Download::create_ua();
+
 for my $url (@args) {
   die("$url: not an remote Archlinux repo") unless $url =~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/;
   my $reponame = getreponame($url);
@@ -57,6 +62,6 @@ for my $url (@args) {
   my $dir = "$cachedir/$repoid";
   $url .= '/' unless $url =~ /\/$/;
   File::Path::mkpath($dir);
-  system("$INC[0]/download", $dir, "$url$reponame.db");
+  Build::Download::download("$url$reponame.db", "$dir/.$reponame.db.$$", "$dir/$reponame.db", 'ua' => $ua, 'retry' => 3);
   Build::Archrepo::parse("$dir/$reponame.db", sub { Build::writedeps(\*STDOUT, $_[0], $url) }, 'addselfprovides' => 1);
 }

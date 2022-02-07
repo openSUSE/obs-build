@@ -34,6 +34,7 @@ use Build ':rpm';
 use Build::Rpm;
 use Build::Rpmmd;
 use Build::Options;
+use Build::Download;
 
 my $cachedir = "/var/cache/build";
 
@@ -70,6 +71,8 @@ $cachedir = $opts->{'cachedir'} if $opts->{'cachedir'};
 my $old_seen = {};	# for --old
 my @packages;		# for --dump
 
+my $ua = Build::Download::create_ua();
+
 for my $url (@args) {
   my $dir;
   my $baseurl = $url;
@@ -80,7 +83,7 @@ for my $url (@args) {
     $dir = "$cachedir/$repoid/";
     $baseurl .= '/' unless $baseurl =~ /\/$/;
     File::Path::mkpath("${dir}repodata");
-    system($INC[0].'/download', "${dir}repodata", "${baseurl}repodata/repomd.xml");
+    Build::Download::download("${baseurl}repodata/repomd.xml", "${dir}repodata/.repomd.xml.$$", "${dir}repodata/repomd.xml", 'ua' => $ua, 'retry' => 3);
   } else {
     $dir = $url;
   }
@@ -95,7 +98,6 @@ for my $url (@args) {
   my @primaryfiles;
   Build::Rpmmd::parse_repomd("${dir}repodata/repomd.xml", \@primaryfiles);
   @primaryfiles = grep {$_->{'type'} eq 'primary' && defined($_->{'location'})} @primaryfiles;
-#  print Dumper(\@primaryfiles);
 
   for my $f (@primaryfiles) {
     my $u = $f->{'location'};
@@ -112,13 +114,8 @@ for my $url (@args) {
     }
     if (!$cached) {
       die("zypp repo $url is not up to date, please refresh first\n") if $opts->{'zypp'};
-      if ($url =~ /^(?:ftps?|https?):\/\/([^\/]*)\/?/) {
-	if (system("$INC[0]/download", "${dir}repodata/", "${baseurl}repodata/$u")) {
-	  die("download failed\n");
-	}
-      } else {
-	die("inconsistent repodata in $url\n");
-      }
+      die("inconsistent repodata in $url\n") unless $url =~ /^(?:ftps?|https?):\/\/([^\/]*)\/?/;
+      Build::Download::download("${baseurl}repodata/$u", "${dir}repodata/.$u.$$", "${dir}repodata/$u", 'ua' => $ua, 'retry' => 3, 'digest' => $f->{'checksum'});
     }
     my $fh;
     open($fh, '<', "${dir}repodata/$u") or die "Error opening ${dir}repodata/$u: $!\n";
