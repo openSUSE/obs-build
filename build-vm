@@ -187,7 +187,6 @@ vm_parse_options() {
       ;;
       -vm-use-mkfs-copyin)
 	VM_USE_MKFS_COPYIN="true"
-	shift
       ;;
       -vm-memory|-xenmemory|-memory)
 	needarg
