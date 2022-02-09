@@ -1248,10 +1248,6 @@ if test -x $BUILD_ROOT/sbin/SuSEconfig ; then
     fi
 fi
 
-if test -x $BUILD_ROOT/usr/X11R6/bin/switch2mesasoft ; then
-    chroot $BUILD_ROOT /usr/X11R6/bin/switch2mesasoft
-fi
-
 for PROG in /usr/bin/TeX/texhash /usr/bin/texhash ; do
     test -x $BUILD_ROOT/$PROG && \
 	chroot $BUILD_ROOT bash -c ". /etc/profile ; $PROG"
