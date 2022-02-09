@@ -104,6 +104,7 @@ spec_init_topdir() {
 	-b[ci]\ --short-circuit) keepbuild=BUILD ;;
 	-bb\ --short-circuit | -bl) keepbuild=BUILD keepbuildroot=BUILDROOT ;;
     esac
+    [ -n "$RPM_BUILD_IN_PLACE" ] && unset keepbuild
     if test -n "$keepbuild$keepbuildroot" ; then
 	for d in $keepbuild $keepbuildroot ; do
 	    spec_is_empty_dir "$BUILD_ROOT$TOPDIR/$d" && cleanup_and_exit 1 "need files in $TOPDIR/$d for '${rpmstages[0]}'"
@@ -131,13 +132,11 @@ spec_setup_stages() {
 	*)           cleanup_and_exit 1 "unknown stage '$stage'" ;;
     esac
     stage=${stage//s/a}
-    # drop p/a stages in build-in-place mode unless requested
-    test -n "$RPM_BUILD_IN_PLACE" -a "$stage" != p -a "$origstage" = "${origstage/p/}" && stage="${stage#p}"
+    # drop a stage in build-in-place mode unless requested
     test -n "$RPM_BUILD_IN_PLACE" -a "$stage" != a -a "$origstage" = "${origstage/[as]/}" && stage="${stage%a}"
     rpmstages=()
     case $stage in
 	p | pc | pci | pcib | pciba) rpmstages[${#rpmstages[@]}]="-b${stage: -1}" ; stage= ;;
-	c | ci | cib | ciba) rpmstages[${#rpmstages[@]}]="--noprep -b${stage: -1}" ; stage= ;;
     esac
     while test -n "$stage" ; do
 	local opt="-b${stage:0:1}"
