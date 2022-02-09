@@ -1932,6 +1932,10 @@ fi
 
 if test -n "$RUNNING_IN_VM" ; then
     vm_wrapup_build $(recipe_resultdirs) OTHER
+else
+    if test "$BUILDTYPE" = "preinstallimage" ; then
+        preinstallimage_compress "$BUILD_ROOT/$TOPDIR/OTHER"
+    fi
 fi
 
 echo

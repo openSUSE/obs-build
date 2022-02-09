@@ -57,9 +57,7 @@ recipe_build_preinstallimage() {
       esac
       TOPDIRS="$TOPDIRS $DIR"
     done
-    if ! $TAR -czf .preinstallimage.$$.tar.gz --one-file-system $TOPDIRS ; then
-	cleanup_and_exit 1
-    fi
+    $TAR -cf .preinstallimage.tar --one-file-system $TOPDIRS || cleanup_and_exit 1
     echo "image created."
     TOPDIR=/usr/src/packages
     mkdir -p $BUILD_ROOT$TOPDIR/OTHER
@@ -70,7 +68,7 @@ recipe_build_preinstallimage() {
 	test -n "$PKG_HDRMD5" || cleanup_and_exit 1
 	echo "$PKG_HDRMD5  $PKG" >> $BUILD_ROOT$TOPDIR/OTHER/preinstallimage.info
     done
-    mv $BUILD_ROOT/.preinstallimage.$$.tar.gz $BUILD_ROOT$TOPDIR/OTHER/preinstallimage.tar.gz
+    mv $BUILD_ROOT/.preinstallimage.tar $BUILD_ROOT$TOPDIR/OTHER/preinstallimage.tar || cleanup_and_exit 1
     rm -f $BUILD_ROOT/.build.packages
     ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
     test -d "$SRCDIR" && cd "$SRCDIR"
@@ -84,3 +82,21 @@ recipe_cleanup_preinstallimage() {
     :
 }
 
+
+preinstallimage_compress() {
+    local otherdir="$1"
+    local pimage="$otherdir/preinstallimage.tar"
+
+    if test ! -d "$otherdir" -o -L "$otherdir" -o ! -f "$pimage" -o -L "$pimage" ; then
+        return
+    fi
+
+    rm -f "$pimage".*
+    if test -n "$(type -p zstd)" ; then
+        echo "Compressing preinstallimage using 'zstd'."
+        zstd --rm -19 -T0 "$pimage"
+    else
+        echo "Compressing preinstallimage using 'gzip'."
+        gzip "$pimage"
+    fi
+}
