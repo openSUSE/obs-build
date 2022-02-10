@@ -282,8 +282,12 @@ preinstall_image() {
     fi
     local progress='z=0; while read; do let z++; test $((z % 1000)) = 0 && printf "."; done'
     if ! $TAR -f "$BUILD_INIT_CACHE/rpms/$1" -v > >(tee "$BUILD_INIT_CACHE/.preinstallimage.unpack" | eval $progress ) 2>&1 ; then
-	echo "unpack failed."
+	echo "ERROR: unpack failed."
 	test -f "$BUILD_INIT_CACHE/.preinstallimage.unpack" && cat "$BUILD_INIT_CACHE/.preinstallimage.unpack"
+        if test "x$(od -t x4 -A n -N 4 "$BUILD_INIT_CACHE/rpms/$1")" = "x fd2fb528" ; then
+            echo "ERROR: This is a .zst compressed preinstallimage and $TAR failed to unpack."
+            echo "Try to enable zst in $TAR or disable preinstallimage."
+        fi
 	cleanup_and_exit 1
     fi
     rm -rf "$BUILD_INIT_CACHE/.preinstallimage.unpack"
