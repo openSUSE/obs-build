@@ -1378,6 +1378,10 @@ if test -n "$OBSURL" ; then
     initbuildsysstuff[${#initbuildsysstuff[@]}]="--obs"
     initbuildsysstuff[${#initbuildsysstuff[@]}]="$OBSURL"
 fi
+if test -n "$RPM_BUILD_IN_PLACE"; then
+    initbuildsysstuff[${#initbuildsysstuff[@]}]="--define"
+    initbuildsysstuff[${#initbuildsysstuff[@]}]="_build_in_place 1"
+fi
 
 if test -n "$DO_WIPE" ; then
     wipe_build_environment
