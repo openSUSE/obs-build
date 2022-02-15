@@ -47,7 +47,7 @@ use PBuild::Link;
 use PBuild::Checker;
 use PBuild::Options;
 use PBuild::Result;
-use PBuild::Download;
+use Build::Download;
 use PBuild::Preset;
 use PBuild::Distro;
 use PBuild::Repoquery;
@@ -164,7 +164,7 @@ for my $dist (@{$opts->{'dist'} || []}) {
     push @{$opts->{'repo'}}, 'zypp:/' unless @{$opts->{'repo'} || []};
   }
   if ($dist =~ /^https?:\/\//) {
-    my ($config) = PBuild::Download::fetch($dist);
+    my ($config) = Build::Download::fetch($dist);
     push @baseconfigs, $config;
   } elsif ($dist =~ /^obs:\//) {
     my $islast = $distcnt == @{$opts->{'dist'} || []} ? 1 : 0;
