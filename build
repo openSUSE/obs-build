@@ -463,7 +463,7 @@ cleanup_and_exit () {
     fi
     test -n "$BUILD_DIST_TMP" && rm -f "$BUILD_DIST_TMP"
     if test -z "$BUILD_OPTIONS_PARSED" ; then
-	# if we haven't parsed the options yet we do
+	# if we have not yet parsed the options we do
 	# not know the correct build root. just exit.
 	exit $1
     fi
