@@ -181,6 +181,7 @@ sub parse_testcasedep_rec {
     return ($d, undef) if $d eq '' || $d =~ /^\)/;
     return ($d, undef) unless $d =~ s/([^\s\)]+)//;
     $r = $1;
+    $r .= ')' if $d =~ /^\)/ && $r =~ /\([^\)]+$/ && $d =~ s/^\)//;
     $r = "$r$1" if $d =~ s/^( (?:<|<=|>|>=|<=>|=) [^\s\)]+)//;
     $r =~ s/\\([A-Fa-f2-9][A-Fa-f0-9])/chr(hex($1))/sge;
     $r = [0, $r];
