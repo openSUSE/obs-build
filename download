@@ -50,9 +50,8 @@ for my $url (@ARGV) {
   $url = URI->new($url);
   my $dest = $url->path;
   $dest =~ s/.*\///;
-  $dest = "$dir/$dest";
-  unlink($dest);	# just in case
-  Build::Download::download($url, $dest, undef, 'ua' => $ua, 'retry' => 3);
+  unlink("$dir/$dest");	# just in case
+  Build::Download::download($url, "$dir/.$dest.$$", "$dir/$dest", 'ua' => $ua, 'retry' => 3);
 }
 
 # vim:sw=2
