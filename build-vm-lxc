@@ -62,7 +62,7 @@ vm_startup_lxc_standalone() {
 	lxc.hook.pre-mount = $LXCHOOK
 	EOF
     case "$LXCVERSION" in
-        3.*)
+        [34].*)
             sed -i \
                 -e 's/lxc\.aa_profile = /lxc.apparmor.profile = /' \
                 -e 's/lxc\.console = /lxc.console.path = /' \
@@ -81,7 +81,7 @@ vm_startup_lxc_standalone() {
 	EOF
     chmod a+x "$LXCHOOK"
     case "$LXCVERSION" in
-        1.0.8|1.1.*|[23].*)
+        1.0.8|1.1.*|[234].*)
            lxc-create -n "$LXCID" -f "$LXCCONF" -t none || cleanup_and_exit 1
            lxc-start -n "$LXCID" -F "$vm_init_script"
            ;;
