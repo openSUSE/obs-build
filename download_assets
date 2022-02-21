@@ -49,6 +49,7 @@ my %known_options = (
   'assetdir' => ':',
   'assets' => '::',
   'noassetdir' => '',
+  'outdir' => ':', # for source service
   'clean' => '',
   'list' => '',
   'unpack' => '',
@@ -139,6 +140,7 @@ for my $dir (@dirs) {
   };
 
   my $assetdir = $opts->{'assetdir'} || "$dir/.assets";
+  my $outdir = $opts->{'outdir'} || $dir;
   my $assetmgr = PBuild::AssetMgr::create($assetdir);
   $assetmgr->{'keep_all_assets'} = 1 if $opts->{'clean'};
   $assetmgr->add_assetshandler($_) for @{$opts->{'assets'} || []};
@@ -196,16 +198,16 @@ for my $dir (@dirs) {
   }
   $assetmgr->getremoteassets($p);
   if ($opts->{'noassetdir'}) {
-    $assetmgr->move_assets($p, $dir, $opts->{'unpack'});
+    $assetmgr->move_assets($p, $outdir, $opts->{'unpack'});
     PBuild::Util::rm_rf($assetdir);
   } else {
-    $assetmgr->copy_assets($p, $dir, $opts->{'unpack'});
+    $assetmgr->copy_assets($p, $outdir, $opts->{'unpack'});
   }
   # mark directories as assets for build script
   if ($opts->{'unpack'}) {
     my $af = $p->{'asset_files'} || {};
     for (keys %$af) {
-      PBuild::Util::touch("$dir/$_/.build.asset") if $af->{$_}->{'isdir'};
+      PBuild::Util::touch("$outdir/$_/.build.asset") if $af->{$_}->{'isdir'};
     }
   }
 }
