@@ -357,9 +357,9 @@ vm_shutdown() {
             sleep 0.1
         done
     fi
-    # if out ppid is < 2 we were called from vm_detect_2nd_stage, so just exit and
-    # let the parent process to the shutdown
-    test $PPID -le 2 && exit $1
+    # if VM_EXTRA_FORK is set we were called from vm_detect_2nd_stage, so just exit and
+    # let the parent process to the shutdown call
+    test -n "$VM_EXTRA_FORK" && exit $1
     vm_shutdown_halt $1
 }
 
@@ -587,6 +587,7 @@ vm_detect_2nd_stage() {
 	# we're using ' ' instead of '' so that the signal handlers
 	# are reset in the child processes
 	test $$ -eq 1 && trap ' ' HUP TERM
+	export VM_EXTRA_FORK=true
 	$0 "$@"
 	vm_shutdown_halt $?
     fi
@@ -1084,6 +1085,7 @@ vm_first_stage() {
     vm_detach_root
 
     echo "booting $VM_TYPE..."
+    unset VM_EXTRA_FORK
 
     # start watchdog if requested
     if test -n "$VM_WATCHDOG" ; then
