@@ -309,34 +309,48 @@ vm_set_buildstatus() {
 }
 
 #
+# Helper for vm_shutdown() to do the actual system halt
+#
+vm_shutdown_halt() {
+    kill -9 -1        # goodbye cruel world
+    mount -o remount,ro / || {
+        echo "Warning: 'remount -o ro /' failed. Triple Syncing.."
+        sync ; sync ; sync
+    }
+    sync	# halt from systemd is not syncing anymore.
+    if ! test -x /sbin/halt ; then
+	test -e /proc/sysrq-trigger || mount -n -tproc none /proc
+	echo o > /proc/sysrq-trigger
+	sleep 5 # wait for sysrq to take effect
+	echo "Warning: VM doesn't support sysrq and /sbin/halt not installed"
+    else
+	halt -f -p
+    fi
+}
+
+#
 # shutdown the system from inside the VM
 #
 vm_shutdown() {
     test -n "$VM_WATCHDOG" && echo "### VM INTERACTION START ###"
+    exec >&0 2>&0	# so that the logging tee finishes
     cd /
     test -n "$1" || set 1
     if test -n "$VM_SWAP" -a -e "$VM_SWAP" ; then
 	swapoff "$VM_SWAP" 2>/dev/null
 	echo -n "BUILDSTATUS$1" >"$VM_SWAP"
     fi
-    exec >&0 2>&0	# so that the logging tee finishes
-    sleep 1		# wait till tee terminates
     test "$VM_TYPE" = lxc -o "$VM_TYPE" = docker -o "$VM_TYPE" = nspawn && exit $1
-    kill -9 -1        # goodbye cruel world
-    if ! test -x /sbin/halt ; then
-	test -e /proc/sysrq-trigger || mount -n -tproc none /proc
-	sync
-	sleep 2	# like halt does
-	if test -e /proc/sysrq-trigger; then
-	    echo o > /proc/sysrq-trigger
-	    sleep 5 # wait for sysrq to take effect
-	else
-	    echo "Warning: VM doesn't support sysrq and /sbin/halt not installed"
-	fi
-    else
-	sync	# halt from systemd is not syncing anymore.
-	halt -f -p
+
+    # Wait for logging tee to finish
+    test -f "$LOGFILE.pid" && . "$LOGFILE.pid"
+    if test -n "$LOGGING_TEE_PID"; then
+        while kill -0 "$LOGGING_TEE_PID" 2>/dev/null; do
+            sleep 0.1
+        done
     fi
+    # shutdown from fresh shell to close out deleted inodes
+    exec -a "build: halt" -- $BASH -c "$(declare -f vm_shutdown_halt); vm_shutdown_halt"
     echo "Warning: clean shut down of the VM didn't work"
     exit $1	# init died...
 }
@@ -560,7 +574,7 @@ vm_detect_2nd_stage() {
 	return 1
     fi
     BUILD_OPTIONS_PARSED=true
-    if test $$ -eq 1 || test $$ -eq 2 ; then
+    if test $$ -le 2 ; then
 	# ignore special init signals if we're init
 	# we're using ' ' instead of '' so that the signal handlers
 	# are reset in the child processes

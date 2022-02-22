@@ -463,7 +463,7 @@ cleanup_and_exit () {
     fi
     test -n "$BUILD_DIST_TMP" && rm -f "$BUILD_DIST_TMP"
     if test -z "$BUILD_OPTIONS_PARSED" ; then
-	# if we haven't parsed the options yet we do
+	# if we have not yet parsed the options we do
 	# not know the correct build root. just exit.
 	exit $1
     fi
@@ -506,7 +506,6 @@ cleanup_and_exit () {
     if test -n "$RUNNING_IN_VM" ; then
 	echo "$1" >  /.build/_exitcode
 	test -n "$browner" && chown "$browner" $BUILD_ROOT
-	vm_shutdown "$1"
     else
 	buildroot_umount /proc/sys/fs/binfmt_misc
 	buildroot_umount /proc
@@ -515,6 +514,9 @@ cleanup_and_exit () {
 	buildroot_umount /dev/shm
 	test -n "$VM_ROOT" -a "$VM_ROOT" != 1 && umount $BUILD_ROOT 2>/dev/null || true
 	test -n "$VM_TYPE" && vm_cleanup
+    fi
+    if test $$ -le 2 ; then
+        vm_shutdown "$1"
     fi
     exit $1
 }
@@ -1485,7 +1487,7 @@ if test -n "$LOGFILE" -a -z "$RUN_SHELL" ; then
 	:
     elif test -n "$RUNNING_IN_VM" -o -n "$NO_TIMESTAMPS" ; then
         # no additional timestamps in inner vm build system
-	exec 1> >(exec -a 'build logging' tee -a $LOGFILE) 2>&1
+	exec 1> >(echo "LOGGING_TEE_PID=$BASHPID" > $LOGFILE.pid ; exec -a 'build logging' tee -a $LOGFILE) 2>&1
     elif test -n "$VM_ROOT" ; then
         # external run of virtualization build
 	exec 1> >(exec -a 'build logging' perl -e 'open(F,">>",$ARGV[0])||die("$ARGV[0]: $!\n");$|=1;select(F);$|=1;while(<STDIN>){my $p=sprintf("[%5ds] ", time()-'$STARTTIME');print STDOUT $p.$_;s/^\r//s;s/\r\n/\n/gs;print F $p.$_}' $LOGFILE) 2>&1
