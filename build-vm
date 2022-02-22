@@ -311,12 +311,12 @@ vm_set_buildstatus() {
 #
 # Helper for vm_shutdown() to do the actual system halt
 #
-vm_shutdown_halt() {
+vm_shutdown_halt_helper() {
     kill -9 -1        # goodbye cruel world
-    mount -o remount,ro / || {
+    if ! mount -o remount,ro / ; then
         echo "Warning: 'remount -o ro /' failed. Triple Syncing.."
         sync ; sync ; sync
-    }
+    fi
     sync	# halt from systemd is not syncing anymore.
     if ! test -x /sbin/halt ; then
 	test -e /proc/sysrq-trigger || mount -n -tproc none /proc
@@ -326,6 +326,14 @@ vm_shutdown_halt() {
     else
 	halt -f -p
     fi
+    exit $1
+}
+
+vm_shutdown_halt() {
+    # shutdown from fresh shell to close out deleted inodes
+    exec -a "build: halt" -- $BASH -c "$(declare -f vm_shutdown_halt_helper); vm_shutdown_halt_helper $1"
+    echo "Warning: clean shut down of the VM didn't work"
+    exit $1
 }
 
 #
@@ -349,10 +357,10 @@ vm_shutdown() {
             sleep 0.1
         done
     fi
-    # shutdown from fresh shell to close out deleted inodes
-    exec -a "build: halt" -- $BASH -c "$(declare -f vm_shutdown_halt); vm_shutdown_halt"
-    echo "Warning: clean shut down of the VM didn't work"
-    exit $1	# init died...
+    # if out ppid is < 2 we were called from vm_detect_2nd_stage, so just exit and
+    # let the parent process to the shutdown
+    test $PPID -le 2 && exit $1
+    vm_shutdown_halt $1
 }
 
 vm_img_create() {
@@ -578,9 +586,9 @@ vm_detect_2nd_stage() {
 	# ignore special init signals if we're init
 	# we're using ' ' instead of '' so that the signal handlers
 	# are reset in the child processes
-	trap ' ' HUP TERM
+	test $$ -eq 1 && trap ' ' HUP TERM
 	$0 "$@"
-	cleanup_and_exit $?
+	vm_shutdown_halt $?
     fi
 
     test -n "$VM_WATCHDOG" -a -z "$PERSONALITY_SET" && echo "### VM INTERACTION END ###"

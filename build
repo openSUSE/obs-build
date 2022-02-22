@@ -506,6 +506,7 @@ cleanup_and_exit () {
     if test -n "$RUNNING_IN_VM" ; then
 	echo "$1" >  /.build/_exitcode
 	test -n "$browner" && chown "$browner" $BUILD_ROOT
+	vm_shutdown "$1"
     else
 	buildroot_umount /proc/sys/fs/binfmt_misc
 	buildroot_umount /proc
@@ -514,9 +515,6 @@ cleanup_and_exit () {
 	buildroot_umount /dev/shm
 	test -n "$VM_ROOT" -a "$VM_ROOT" != 1 && umount $BUILD_ROOT 2>/dev/null || true
 	test -n "$VM_TYPE" && vm_cleanup
-    fi
-    if test $$ -le 2 ; then
-        vm_shutdown "$1"
     fi
     exit $1
 }
