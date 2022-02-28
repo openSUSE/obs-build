@@ -257,7 +257,7 @@ sub createjob {
   my $copy_sources_asis;
   # for kiwi/docker we need to copy the sources to $buildroot/.build-srcdir
   # so that we can set up the "repos" and "containers" directories
-  if ($kiwimode || $p->{'asset_files'} || grep {/\/$/} @{$p->{'files'} || []}) {
+  if ($kiwimode || $p->{'asset_files'} || grep {/\/$/} keys %{$p->{'files'} || {}}) {
     $srcdir = "$buildroot/.build-srcdir";
     copy_sources($p, $srcdir);
     $ctx->{'assetmgr'}->copy_assets($p, $srcdir) if $p->{'asset_files'};
