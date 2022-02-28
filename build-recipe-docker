@@ -45,6 +45,72 @@ recipe_prepare_docker() {
     :
 }
 
+dapper_read_env() {
+    local tag="$1"
+    DAPPER_SOURCE=
+    DAPPER_CP=
+    DAPPER_OUTPUT=
+    DAPPER_DOCKER_SOCKET=
+    DAPPER_RUN_ARGS=
+    DAPPER_ENV=
+    local e
+    while read e ; do
+	case "$e" in
+	    DAPPER_SOURCE=*) DAPPER_SOURCE="${e#*=}" ;;
+	    DAPPER_CP=*) DAPPER_CP="${e#*=}" ;;
+	    DAPPER_OUTPUT=*) DAPPER_OUTPUT="${e#*=}" ;;
+	    DAPPER_DOCKER_SOCKET=*) DAPPER_DOCKER_SOCKET="${e#*=}" ;;
+	    DAPPER_RUN_ARGS=*) DAPPER_RUN_ARGS="${e#*=}" ;;
+	    DAPPER_ENV=*) DAPPER_ENV="${e#*=}" ;;
+	esac
+    done < <($DOCKER_CMD inspect --format='{{range .Config.Env}}{{println .}}{{end}}' "$tag")
+    test -z "$DAPPER_SOURCE" && DAPPER_SOURCE=/source/
+    test -z "$DAPPER_CP" && DAPPER_CP=.
+    test -z "$DAPPER_OUTPUT" && DAPPER_OUTPUT=.
+    DAPPER_SOURCE="${DAPPER_SOURCE%/}/"
+    DAPPER_MODE=cp
+}
+
+dapper_run() {
+    local tag="$1"
+    dapper_read_env "$tag"
+    # copyin
+    mkdir -p "$BUILD_ROOT$TOPDIR/BUILD"
+    echo "FROM $tag" > "$BUILD_ROOT$TOPDIR/BUILD/Dockerfile.copyin"
+    echo "COPY $DAPPER_CP $DAPPER_SOURCE" >> "$BUILD_ROOT$TOPDIR/BUILD/Dockerfile.copyin"
+    $DOCKER_CMD build -f "$TOPDIR/BUILD/Dockerfile.copyin" -t "$tag" "$TOPDIR/SOURCES/" || cleanup_and_exit 1 "dapper source copyin failed"
+    # run
+    local args=(-i --name build-dapper-run)
+    if test "$DAPPER_DOCKER_SOCKET" = true ; then
+	args=("${args[@]}" -v "/var/run/docker.sock:/var/run/docker.sock")
+    fi
+    args=("${args[@]}" -e "DAPPER_UID=0")
+    args=("${args[@]}" -e "DAPPER_GID=0")
+    local e
+    set -f
+    for e in $DAPPER_ENV ; do
+	args=("${args[@]}" -e "$e")
+    done
+    for e in $DAPPER_RUN_ARGS ; do
+	args=("${args[@]}" "$e")
+    done
+    set +f
+    if ! $DOCKER_CMD run --network=host "${args[@]}" "$tag" ; then
+	cleanup_and_exit 1 "$DOCKER_TOOL run command failed"
+    fi
+    # copyout
+    mkdir -p "$BUILD_ROOT$TOPDIR/DOCKER"
+    local out
+    for out in $DAPPER_OUTPUT ; do
+	local f="$out"
+	test "${f#/}" = "$f" && f="$DAPPER_SOURCE$f"
+	local outdir="$TOPDIR/DOCKER/${out#/}"
+	outdir="${outdir%/*}"
+	mkdir -p "$BUILD_ROOT$outdir"
+	$DOCKER_CMD cp "build-dapper-run:$f" "$outdir"
+    done
+}
+
 # Variables:
 # $BUILD_ROOT is the chroot
 # $TOPDIR/SOURCES includes the docker sources
@@ -137,6 +203,10 @@ recipe_build_docker() {
 	    ALLTAGS="$ALLTAGS $t"
 	done
     fi
+    if test "$RECIPEFILE" = Dockerfile.dapper ; then
+	FIRSTTAG=build-dapper
+	ALLTAGS=build-dapper
+    fi
     if test -z "$FIRSTTAG" ; then
         cleanup_and_exit 1 "Please specify a tag for the container"
     fi
@@ -181,6 +251,13 @@ recipe_build_docker() {
 	if ! $DOCKER_CMD build $squashopt --network=host "${tagargs[@]}" "${buildargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
 	    cleanup_and_exit 1 "$DOCKER_TOOL build command failed"
 	fi
+    fi
+
+    if test "$RECIPEFILE" = Dockerfile.dapper ; then
+	dapper_run "$FIRSTTAG"
+	recipe_cleanup_docker
+	BUILD_SUCCEEDED=true
+	return
     fi
 
     # Save the resulting image to a tarball. Use first tag for generating the file name.
