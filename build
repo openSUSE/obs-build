@@ -637,7 +637,7 @@ sccache_setup() {
             echo "export SCCACHE_REDIS=${CCACHE_ARCHIVE}" >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
 	else
             echo 'export SCCACHE_DIR="/.sccache"' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
-            echo 'export SCCACHE_CACHE_SIZE="8G"' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
+            echo 'export SCCACHE_CACHE_SIZE="1280M"' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
             mkdir -p "$BUILD_ROOT/.sccache"
 	    test -n "$CCACHE_ARCHIVE" -a -e "$CCACHE_ARCHIVE" && ccache_unpack "$BUILD_ROOT/.sccache" sccache
 	    chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.sccache"
