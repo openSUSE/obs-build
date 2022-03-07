@@ -1,4 +1,53 @@
 -------------------------------------------------------------------
+Mon Mar  7 08:41:07 UTC 2022 - Adrian Schröter <adrian@suse.de>
+
+Features:
+  * download_assets: add --outdir --clean --show-dir-srcmd5 parameters
+                     support multiple --arch arguments
+  * asset support for golang modules
+  * add support for LXC 4.
+  * new shortcuts for rpm building:
+    --rpm-noprep, --rpm-build-in-place, --rpm-build-in-place-noprep
+    for building directly from upstream git repositories without
+    any tar ball.
+  * mount securityfs if not mounted by kernel-obs-build
+  * collect steal time during VM builds in statistics.
+  * declare armv8 and armv7 compatible
+  * support OBS Debuginfo build flag for Red Hat variants
+  * setup rpmmacros for all build types and earlier
+  * Kiwi builds
+    - Always append the profile name to kiwi container names
+  * Dockerfile build
+    - improve registry handling
+    - initial Dockerfile.dapper support
+    - support 'curl' commands in docker builds
+    - strip known domains from container name
+    - support container alias names
+  * introducing --verbose option, currently only showing kernel
+    messages.
+  * support cpio creation for special files
+  * handle QEMU >= 6.0 on POWER9
+
+Changes:
+  * Use git+https instead of git-https as url schema
+  * add oops=panic kernel parameter
+  * Updated distribution configurations (esp. Leap 15.4 and Tumbleweed)
+  * new preinstallimages are using zstd by default
+  * source subdirectories are used in git managed sources
+
+Minor improvements
+  * change sccache default size limit
+  * speed up improvements in
+    - vm shutdown
+    - rpm preinstall
+    - avoid calling external commands in a loop
+    - using zstd for preinstallimages
+    - no more unpacking progress indicators to avoid slowdown
+    - virtio handling
+  * fixed vm-type=qemu 
+  * multiple smaller bugfixes and speed improvements
+
+-------------------------------------------------------------------
 Thu Nov 25 13:01:00 UTC 2021 - Adrian Schröter <adrian@suse.de>
 
 - renamed tumbleweed config to tumbleweed
