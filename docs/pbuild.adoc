@@ -173,6 +173,11 @@ The resulting downloaded file can be copied into the image using
 
   <!-- OBS-CopyToImage: <source> <destination> -->
 
+The kiwi profile name is added to container names by default. This can be
+disabled via
+
+  <!-- OBS-DoNotAppendProfileToContainername -->
+
 ==== Dockerfile description
 
 Has no support for assets yet.

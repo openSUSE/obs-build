@@ -1023,6 +1023,12 @@ specified via XML comments.</p></div>
 <div class="content">
 <pre><code>&lt;!-- OBS-CopyToImage: &lt;source&gt; &lt;destination&gt; --&gt;</code></pre>
 </div></div>
+<div class="paragraph"><p>The kiwi profile name is added to container names by default. This can be
+disabled via</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>&lt;!-- OBS-DoNotAppendProfileToContainername --&gt;</code></pre>
+</div></div>
 </div>
 <div class="sect3">
 <h4 id="_dockerfile_description">2.4.3. Dockerfile description</h4>
@@ -1181,6 +1187,14 @@ configured in the project’s meta configuration. If so, the archive of
 that package will be used. The repositories will be searched in the
 order they are configured in the meta configuration, starting from the
 top.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+ccachetype:
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Defines the ccache implementation, possible values are: ccache, sccache</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
@@ -1637,7 +1651,7 @@ another target.</p></div>
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2022-01-21 14:43:16 CET
+ 2022-03-07 10:46:30 CET
 </div>
 </div>
 </body>

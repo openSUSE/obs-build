@@ -117,6 +117,10 @@ that package will be used. The repositories will be searched in the
 order they are configured in the meta configuration, starting from the
 top.
 
+* ccachetype:
+
+Defines the ccache implementation, possible values are: ccache, sccache
+
 * obsgendiff
 
 OBS can run an external program that has access to the current build and
