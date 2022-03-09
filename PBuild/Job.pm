@@ -307,7 +307,6 @@ sub createjob {
 
   push @args, '--clean' unless $opts->{'noclean'};
   push @args, '--nochecks' if $opts->{'nochecks'};
-  push @args, '--debug' if $opts->{'debug'};
   push @args, '--shell' if $opts->{'shell'};
   push @args, '--shell-after-fail' if $opts->{'shell-after-fail'};
   push @args, '--no-timestamps' if $opts->{'no-timestamps'};
@@ -326,7 +325,7 @@ sub createjob {
   push @args, '--rpmlist', "$buildroot/.build.rpmlist";
   push @args, '--logfile', "$buildroot/.build.log";
   #push @args, '--release', "$release" if defined $release;
-  push @args, '--debug' if $ctx->{'debuginfo'};
+  push @args, '--debuginfo' if $ctx->{'debuginfo'} || $opts->{'debuginfo'};
   push @args, "--arch=$arch";
   push @args, '--jobs', $opts->{'jobs'} if $opts->{'jobs'};
   push @args, '--threads', $opts->{'threads'} if $opts->{'threads'};

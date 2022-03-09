@@ -418,8 +418,8 @@ Known Parameters:
               Available options are -net, -netdev, -device
 	      (This options in kvm can not guarantee reproducible builds)
 
-  --debug
-              Enable creation of a debuginfo package
+  --debuginfo
+              Enable creation of debuginfo packages
 
   --buildflavor FLAVOR
               Specify the flavor to build. For rpm builds, it replaces 
@@ -1217,7 +1217,7 @@ while test -n "$1"; do
       -statistics)
 	DO_STATISTICS=1
       ;;
-      -debug)
+      -debug|-debuginfo)
 	BUILD_DEBUG=1
       ;;
       -incarnation)
