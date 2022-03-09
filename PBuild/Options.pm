@@ -110,6 +110,7 @@ my $pbuild_options = {
   'vm-openstack-flavor' => ':',
   'openstack-flavor' => 'vm-openstack-flavor:',
   'vm-emulator-script' => ':',
+  'debug' => '',
   'emulator-script' => 'vm-emulator-script:',
   'single' => ':',
   'single-flavor' => ':',
