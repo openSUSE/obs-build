@@ -688,14 +688,11 @@ sub get_build {
   }
   my $buildtype = $config->{'type'} || '';
   my $nobasepackages;
-  if (grep {$_ eq $buildtype} qw{livebuild docker kiwi fissile helm flatpak}) {
-    push @deps, @{$config->{'substitute'}->{"build-packages:$buildtype"}
-		  || $subst_defaults{"build-packages:$buildtype"} || []};
-    if ($buildtype eq 'docker' || $buildtype eq 'kiwi') {
-      $nobasepackages = 1 if $config->{"expandflags:$buildtype-nobasepackages"};
-      @deps = grep {!/^kiwi-image:/} @deps if $buildtype eq 'kiwi';	# only needed for sysdeps
-      @deps = grep {!/^kiwi-packagemanager:/} @deps if $buildtype eq 'kiwi' && $nobasepackages;	# only needed for sysdeps
-    }
+  push @deps, @{$config->{'substitute'}->{"build-packages:$buildtype"} || $subst_defaults{"build-packages:$buildtype"} || []};
+   if ($buildtype eq 'docker' || $buildtype eq 'kiwi') {
+    $nobasepackages = 1 if $config->{"expandflags:$buildtype-nobasepackages"};
+    @deps = grep {!/^kiwi-image:/} @deps if $buildtype eq 'kiwi';	# only needed for sysdeps
+    @deps = grep {!/^kiwi-packagemanager:/} @deps if $buildtype eq 'kiwi' && $nobasepackages;	# only needed for sysdeps
   }
   my @ndeps = grep {/^-/} @deps;
   my %ndeps = map {$_ => 1} @ndeps;
