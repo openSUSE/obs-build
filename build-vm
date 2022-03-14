@@ -330,6 +330,7 @@ vm_shutdown_halt_helper() {
 }
 
 vm_shutdown_halt() {
+    test "$VM_TYPE" = lxc -o "$VM_TYPE" = docker -o "$VM_TYPE" = nspawn && exit $1
     # shutdown from fresh shell to close out deleted inodes
     exec -a "build: halt" -- $BASH -c "$(declare -f vm_shutdown_halt_helper); vm_shutdown_halt_helper $1"
     echo "Warning: clean shut down of the VM didn't work"
@@ -348,10 +349,10 @@ vm_shutdown() {
 	swapoff "$VM_SWAP" 2>/dev/null
 	echo -n "BUILDSTATUS$1" >"$VM_SWAP"
     fi
-    test "$VM_TYPE" = lxc -o "$VM_TYPE" = docker -o "$VM_TYPE" = nspawn && exit $1
 
     # Wait for logging tee to finish
-    test -f "$LOGFILE.pid" && . "$LOGFILE.pid"
+    LOGGING_TEE_PID=
+    test -f "$LOGFILE.pid" -a ! -L "$LOGFILE.pid" && read LOGGING_TEE_PID < "$LOGFILE.pid"
     if test -n "$LOGGING_TEE_PID"; then
         while kill -0 "$LOGGING_TEE_PID" 2>/dev/null; do
             sleep 0.1
