@@ -1,4 +1,15 @@
 -------------------------------------------------------------------
+Mon Mar 14 15:56:04 UTC 2022 - Adrian Schröter <adrian@suse.de>
+
+Changes:
+ * pbuild: add --debug option for building debuginfo packages
+ * rename --debug to --debuginfo to be more exact.
+ * docu: add buildflags:ccachtype and OBS-DoNotAppendProfileToContainername
+
+Fixes:
+ * Avoid shutdown of host when using nspawn
+
+-------------------------------------------------------------------
 Mon Mar  7 08:41:07 UTC 2022 - Adrian Schröter <adrian@suse.de>
 
 Features:
