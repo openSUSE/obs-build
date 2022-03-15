@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Tue Mar 15 15:55:55 UTC 2022 - Adrian Schröter <adrian@suse.de>
+
+- regression fix from last release, avoid calling shutdown handler
+  twice when building in vm
+
+-------------------------------------------------------------------
 Mon Mar 14 15:56:04 UTC 2022 - Adrian Schröter <adrian@suse.de>
 
 Changes:
