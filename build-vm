@@ -330,6 +330,8 @@ vm_shutdown_halt_helper() {
 }
 
 vm_shutdown_halt() {
+    # get rid of the exit handler
+    trap EXIT
     test "$VM_TYPE" = lxc -o "$VM_TYPE" = docker -o "$VM_TYPE" = nspawn && exit $1
     # shutdown from fresh shell to close out deleted inodes
     exec -a "build: halt" -- $BASH -c "$(declare -f vm_shutdown_halt_helper); vm_shutdown_halt_helper $1"
