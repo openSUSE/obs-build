@@ -1424,7 +1424,7 @@ fi
 
 set_build_arch
 
-if test "$DO_INIT" = false -a -n "$RUN_SHELL"; then
+if test "$DO_INIT" = false -a -n "$RUN_SHELL" -a -z "$VM_TYPE"; then
     mount_stuff
     BUILD_USER=root
     test -n "$NOROOTFORBUILD" && BUILD_USER=abuild
