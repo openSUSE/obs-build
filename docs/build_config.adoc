@@ -349,6 +349,11 @@ result, for example make or coreutils.
 Defines the target architecture. This can be used to build for i686 on
 i586 schedulers for example.
   
+==== Target: GNU_TRIPLET (DEB only)
+  
+Defines the target architecture via a gnu triplet (not the debian 
+architecture!). For example arm-linux-gnueabihf for armv7hl builds.
+  
 ==== Type: TYPE
   
 Build recipe type. This is the format of the file which provides the
