@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ################################################################
 #
 # Enable docker build support in container.
@@ -30,9 +30,10 @@ LOCAL_APTREPOS_D="/etc/aptrepos_obs_dockersupport.d/"
 DATA_DIR=
 
 zypper() {
-    cmd=
+    local cmd
     # try to find the command
-    globalopts=()
+    local globalopts
+    typeset -a globalopts
     while test -n "$1"; do
         case $1 in
         -*)
@@ -87,9 +88,10 @@ obs_pkg_mgr() {
 }
 
 apt_get() {
-    cmd=
+    local cmd
     # try to find the command
-    globalopts=()
+    local globalopts
+    typeset -a globalopts
     while test -n "$1"; do
         case $1 in
         -*)
@@ -121,7 +123,8 @@ apt_get() {
 
 dnf() {
     # try to find command
-    globalopts=()
+    local globalopts
+    typeset -a globalopts
     while test -n "$1"; do
         case $1 in
         -*)
@@ -150,7 +153,8 @@ dnf() {
 
 yum() {
     # try to find command
-    globalopts=()
+    global globalopts
+    typeset -a globalopts
     while test -n "$1"; do
         case $1 in
         -*)
@@ -178,7 +182,8 @@ yum() {
 }
 
 curl() {
-    local cmd=()
+    local cmd
+    typeset -a cmd
     local oopt
     local oname
     while test -n "$1" ; do
