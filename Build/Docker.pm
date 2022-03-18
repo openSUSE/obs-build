@@ -111,7 +111,10 @@ sub addrepo {
 sub cmd_zypper {
   my ($ret, @args) = @_;
   # skip global options
-  shift @args while @args && $args[0] =~ /^-/;
+  while (@args && $args[0] =~ /^-/) {
+    shift @args if $args[0] eq '-R' || $args[0] eq '--root' || $args[0] eq '--installroot';
+    shift @args;
+  }
   return unless @args;
   if ($args[0] eq 'in' || $args[0] eq 'install') {
     shift @args;

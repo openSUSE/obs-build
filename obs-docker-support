@@ -36,6 +36,11 @@ zypper() {
     typeset -a globalopts
     while test -n "$1"; do
         case $1 in
+        -R|--root|--installroot)
+	    globalopts[${#globalopts[@]}]="$1"
+	    globalopts[${#globalopts[@]}]="$2"
+	    shift 2
+	    ;;
         -*)
 	    globalopts[${#globalopts[@]}]="$1"
 	    shift
