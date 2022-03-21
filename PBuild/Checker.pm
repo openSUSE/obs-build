@@ -395,7 +395,7 @@ sub check {
   my $hdeps;
   if ($ctx->{'bconf_host'} && !$p->{'native'}) {
     my $subpacks = $ctx->{'subpacks'};
-    $hdeps = [ @{$p->{'dep_host'} || $p->{'dep'} || []} ];
+    $hdeps = [ @{$p->{'dep_host'} || $p->{'dep'} || []}, @{$p->{'dep_native'} || []} ];
     @$hdeps = Build::get_deps($ctx->{'bconf_host'}, $subpacks->{$p->{'name'}}, @$hdeps);
     if (!shift @$hdeps) {
       return ('unresolvable', 'host: '.join(', ', @$hdeps));
@@ -626,6 +626,7 @@ sub build {
   my $genbuildreqs = $p->{'genbuildreqs'};
   my @bdeps = grep {!/^\// || $bconf->{'fileprovides'}->{$_}} @{$p->{'prereq'} || []};
   unshift @bdeps, '--directdepsend--' if @bdeps;
+  unshift @bdeps, @{$p->{'dep_native'} || []};
   unshift @bdeps, @{$genbuildreqs->[1]} if $genbuildreqs;
   if (!$kiwimode && $ctx->{'bconf_host'}) {
     unshift @bdeps, @{$p->{'dep_host'} || $p->{'dep'} || []}, @btdeps;

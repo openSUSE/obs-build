@@ -737,6 +737,8 @@ sub get_build {
 # Delivers all packages which get used for the cross building sysroot
 sub get_sysroot {
   my ($config, $subpacks, @deps) = @_;
+  my @extractnative;
+  (@extractnative) = splice(@deps, 0, 2) if @deps > 1 && $deps[0] eq '--extractnative--' && ref($deps[1]);
   my @ndeps = grep {/^-/} @deps;
   my %ndeps = map {$_ => 1} @ndeps;
   my @directdepsend;
@@ -757,7 +759,7 @@ sub get_sysroot {
     @directdepsend = grep {!$ndeps{"-$_"}} @directdepsend;
     unshift @directdepsend, '--directdepsend--' if @directdepsend;
   }
-  @deps = expand($config, @deps, @ndeps, @directdepsend);
+  @deps = expand($config, @extractnative, @deps, @ndeps, @directdepsend);
   return @deps;
 }
 
@@ -911,6 +913,7 @@ sub readdeps {
   my %pkgobsoletes;
   my %recommends;
   my %supplements;
+  my %multiarch;
   for my $pkgid (sort keys %$pkginfo) {
     my $pkg = $pkginfo->{$pkgid};
     $provides{$pkgid} = $pkg->{'provides'} if $pkg->{'provides'};
@@ -919,6 +922,7 @@ sub readdeps {
     $pkgobsoletes{$pkgid} = $pkg->{'obsoletes'} if $pkg->{'obsoletes'};
     $recommends{$pkgid} = $pkg->{'recommends'} if $pkg->{'recommends'};
     $supplements{$pkgid} = $pkg->{'supplements'} if $pkg->{'supplements'};
+    $multiarch{$pkgid} = $pkg->{'multiarch'} if $pkg->{'multiarch'};
   }
   $config->{'providesh'} = \%provides;
   $config->{'requiresh'} = \%requires;
@@ -926,6 +930,7 @@ sub readdeps {
   $config->{'pkgobsoletesh'} = \%pkgobsoletes;
   $config->{'recommendsh'} = \%recommends;
   $config->{'supplementsh'} = \%supplements;
+  $config->{'multiarchh'} = \%multiarch;
   makewhatprovidesh($config);
 }
 

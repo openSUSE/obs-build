@@ -308,6 +308,19 @@ sub check_conddeps_notinst {
   return $ret;
 }
 
+sub extractnative {
+  my ($config, $r, $p, $foreign) = @_;
+  my $ma = $config->{'multiarchh'}->{$p} || '';
+  if ($ma eq 'foreign' || ($ma eq 'allowed' && $r =~ /:any/)) {
+    if ($expand_dbg && !grep {$r eq $_} @$foreign) {
+      print "added $r to foreign dependencies\n";
+    }
+    push @$foreign, $r;
+    return 1;
+  }
+  return 0;
+}
+
 sub expand {
   my ($config, @p) = @_;
 
@@ -341,6 +354,10 @@ sub expand {
     @directdepsend = grep {!/^-/} splice(@directdepsend, @p + 1);
   }
 
+  my $extractnative;
+  (undef, $extractnative) = splice(@p, 0, 2) if @p > 1 && $p[0] eq '--extractnative--' && ref($p[1]);
+  undef $extractnative if $extractnative && !%{$config->{'multiarchh'} || {}};
+
   my %p;		# expanded packages
   my @todo;		# dependencies to install
   my @todo_inst;	# packages we decided to install
@@ -349,6 +366,7 @@ sub expand {
   my @rec_todo;		# installed todo
   my @error;
   my %aconflicts;	# packages we are conflicting with
+  my @native;
 
   # handle direct conflicts
   for (grep {/^!/} @p) {
@@ -383,6 +401,7 @@ sub expand {
       next;
     }
     my $p = $q[0];
+    next if $extractnative && extractnative($config, $r, $p, \@native);
     print "added $p because of $r (direct dep)\n" if $expand_dbg;
     push @todo_inst, $p;
   }
@@ -530,8 +549,9 @@ sub expand {
 	  next;
 	}
         if (@q == 1) {
-	  push @todo_inst, $q[0];
+	  next if $extractnative && extractnative($config, $r, $q[0], \@native);
 	  print "added $q[0] because of $pp$r\n" if $expand_dbg;
+	  push @todo_inst, $q[0];
           next;
         }
 
@@ -548,6 +568,7 @@ sub expand {
 	  @q = @pq if @pq == 1;
 	}
         if (@q == 1) {
+	  next if $extractnative && extractnative($config, $r, $q[0], \@native);
 	  push @todo_inst, $q[0];
 	  print "added $q[0] because of $pp$r\n" if $expand_dbg;
           next;
@@ -579,6 +600,7 @@ sub expand {
 	  }
 	}
         if (@q == 1) {
+	  next if $extractnative && extractnative($config, $r, $q[0], \@native);
 	  push @todo_inst, $q[0];
 	  print "added $q[0] because of $pp$r\n" if $expand_dbg;
           next;
@@ -594,6 +616,7 @@ sub expand {
 	print "recommended [@pq] among [@q]\n" if $expand_dbg;
 	@q = @pq if @pq;
         if (@q == 1) {
+	  next if $extractnative && extractnative($config, $r, $q[0], \@native);
 	  push @todo_inst, $q[0];
 	  print "added $q[0] because of $pp$r\n" if $expand_dbg;
           next;
@@ -615,6 +638,21 @@ sub expand {
       last if @todo_inst;
     }
     return undef, @error if @error;
+  }
+
+  if ($extractnative && @native) {
+    my %rdone;
+    for my $r (splice @native) {
+      next if $rdone{$r}++;
+      if ($r eq '--directdepsend--') {
+ 	push @native, $r;
+	next;
+      }
+      my @q = @{$whatprovides->{$r} || Build::addproviders($config, $r)};
+      push @native, $r unless grep {$p{$_}} @q;
+    }
+    pop @native if @native && $native[-1] eq '--directdepsend--';
+    push @$extractnative, @native;
   }
 
   return 1, (sort keys %p);

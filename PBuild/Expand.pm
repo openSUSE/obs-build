@@ -121,7 +121,9 @@ sub expand_deps {
   }
   my @edeps;
   if ($cross) {
-    @edeps = Build::get_sysroot($bconf, $subpacks->{$p->{'name'}}, @deps);
+    my @native;
+    @edeps = Build::get_sysroot($bconf, $subpacks->{$p->{'name'}}, '--extractnative--', \@native, @deps);
+    $p->{'dep_native'} = \@native;
   } else {
     @edeps = Build::get_deps($bconf, $subpacks->{$p->{'name'}}, @deps);
   }
