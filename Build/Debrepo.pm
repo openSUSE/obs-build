@@ -77,6 +77,7 @@ my %tmap = (
   'enhances' => 'enhances',
   'filename' => 'location',
   'source' => 'source',
+  'multi-arch' => 'multiarch',
 );
 
 my %tmap_checksums = (

@@ -366,6 +366,7 @@ sub query {
     $data->{'version'} = $2;
     $data->{'release'} = $3 if defined $3;
     $data->{'arch'} = $res{'ARCHITECTURE'};
+    $data->{'multiarch'} = $res{'MULTI-ARCH'} if $res{'MULTI-ARCH'};
   }
   if ($opts{'description'}) {
     $data->{'description'} = $res{'DESCRIPTION'};
