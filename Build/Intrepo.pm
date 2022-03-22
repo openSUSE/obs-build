@@ -111,6 +111,12 @@ sub parse {
       $pkg->{'location'} = $loc if defined $loc;
       next;
     }
+    if ($tag eq 'M') {
+      chomp;
+      my $multiarch = (split(' ', $_, 2))[1];
+      $pkg->{'multiarch'} = $multiarch if $multiarch;
+      next;
+    }
     my @ss;
     while (@s) {
       if ($nofiledeps && $s[0] =~ /^\//) {
@@ -178,6 +184,7 @@ sub writepkg {
   print $fh "O:$id".join(' ', @{$pkg->{'obsoletes'}})."\n" if $pkg->{'obsoletes'};
   print $fh "r:$id".join(' ', @{$pkg->{'recommends'}})."\n" if $pkg->{'recommends'};
   print $fh "s:$id".join(' ', @{$pkg->{'supplements'}})."\n" if $pkg->{'supplements'};
+  print $fh "M:$id$pkg->{'multiarch'}\n" if $pkg->{'multiarch'};
   print $fh "I:$id".getbuildid($pkg)."\n";
 }
 
