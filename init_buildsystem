@@ -671,7 +671,6 @@ else
 	while read PKG SRC ; do
 	   test "$PKG" = "preinstall:" && continue
 	   test "$PKG" = "runscripts:" && continue
-	   test "$PKG" = "cbpreinstall:" && continue
 	   test "$PKG" = "vminstall:" && continue
 	   test "$PKG" = "dist:" && continue
 	   test "$PKG" = "rpmid:" && continue

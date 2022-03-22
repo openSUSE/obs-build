@@ -369,8 +369,6 @@ sub read_config {
   delete $config->{'save_expanded'};
   $config->{'preinstall'} = [];
   $config->{'vminstall'} = [];
-  $config->{'cbpreinstall'} = [];
-  $config->{'cbinstall'} = [];
   $config->{'runscripts'} = [];
   $config->{'required'} = [];
   $config->{'support'} = [];
@@ -881,10 +879,6 @@ sub get_runscripts {
   my ($config) = @_;
   return @{$config->{'runscripts'}};
 }
-
-### just for API compability
-sub get_cbpreinstalls { return (); }
-sub get_cbinstalls { return (); }
 
 ###########################################################################
 
