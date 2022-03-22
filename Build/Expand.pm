@@ -423,6 +423,8 @@ sub expand {
   }
   return (undef, @error) if @error;
 
+  push @native, '--directdepsend--' if $extractnative;
+
   while (@todo || @todo_inst) {
     # install a set of chosen packages
     # ($aconficts must not be set for any of them)
