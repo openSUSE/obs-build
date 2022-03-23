@@ -118,11 +118,11 @@ if test -n "$IS_UNSHARED" ; then
     mount --make-rprivate /
 
     # create loopback interface
-    if test -x /sbin/ip ; then 
+    if test -x /sbin/ip ; then
 	ip addr add 127.0.0.1/8 dev lo
 	ip addr add ::1/128 dev lo
 	ip link set lo up
-    else 
+    elif test -x /sbin/ifconfig ; then
 	ifconfig lo 127.0.0.1 up
 	ifconfig lo add ::1/128
     fi   
