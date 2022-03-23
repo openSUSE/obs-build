@@ -117,6 +117,14 @@ that package will be used. The repositories will be searched in the
 order they are configured in the meta configuration, starting from the
 top.
 
+An alternative way to enable caching based on build dependencies is to
+add "--enable-cache" as dependency, for example via a Substitute rule:
+
+  Substitute: gcc-c++ gcc-c++ --enable-ccache
+
+This will always enable ccache when a direct build depdency to gcc-c++
+is required.
+
 * ccachetype:
 
 Defines the ccache implementation, possible values are: ccache, sccache

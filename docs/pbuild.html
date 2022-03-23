@@ -1187,6 +1187,14 @@ configured in the project’s meta configuration. If so, the archive of
 that package will be used. The repositories will be searched in the
 order they are configured in the meta configuration, starting from the
 top.</p></div>
+<div class="paragraph"><p>An alternative way to enable caching based on build dependencies is to
+add "--enable-cache" as dependency, for example via a Substitute rule:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>Substitute: gcc-c++ gcc-c++ --enable-ccache</code></pre>
+</div></div>
+<div class="paragraph"><p>This will always enable ccache when a direct build depdency to gcc-c++
+is required.</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
@@ -1475,7 +1483,12 @@ result, for example make or coreutils.</p></div>
 i586 schedulers for example.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_type_type">3.1.27. Type: TYPE</h4>
+<h4 id="_target_gnu_triplet_deb_only">3.1.27. Target: GNU_TRIPLET (DEB only)</h4>
+<div class="paragraph"><p>Defines the target architecture via a gnu triplet (not the debian
+architecture!). For example arm-linux-gnueabihf for armv7hl builds.</p></div>
+</div>
+<div class="sect3">
+<h4 id="_type_type">3.1.28. Type: TYPE</h4>
 <div class="paragraph"><p>Build recipe type. This is the format of the file which provides the
 build description. This gets usually autodetected, but in some rare
 cases it can be set here to either one of these: spec, dsc, kiwi,
@@ -1485,7 +1498,7 @@ dsc, arch, kiwi, preinstallimage. If no type is specified, OBS deduces a
 type from the binary type.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_vminstall_packages">3.1.28. VMInstall: PACKAGES</h4>
+<h4 id="_vminstall_packages">3.1.29. VMInstall: PACKAGES</h4>
 <div class="paragraph"><p>Like Preinstall, but these packages get only installed when a virtual
 machine like Xen or KVM is used for building. Usually packages like
 mount are listed here.</p></div>
