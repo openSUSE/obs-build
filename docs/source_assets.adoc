@@ -1,0 +1,65 @@
+=== Remote Assets
+
+Remote Assets can be defined inside of the build descriptions. They are resources from a remote
+servers and will be downloaded and validated by pbuild before the corresponding build is started.
+
+Supported protocols for resources using an url are:
+
+ * http
+ * https
+ * git+http
+ * git+https
+
+This depends on the build description format as described below.
+
+==== rpm spec files
+
+Source lines in spec files can declare remote assets. Rpm is already supporting to use
+an URL as source definition. A comment before such a line marks it as remote asset for pbuild:
+
+ #!RemoteAsset
+ Source: <URL>
+
+It is also possible to specify a checksum to make sure that the asset is correct.
+
+ #!RemoteAsset: <CHECKSUM>
+ Source: <URL>
+
+An alternative is just to use the
+
+ #!RemoteAssetUrl: <URL>
+
+marker without any Source: tag when the downloaded file should not become
+part of the source rpm.
+
+==== kiwi build description
+
+The kiwi format is not supporting remote source specifications, but they can be
+specified via XML comments.
+
+  <!-- OBS-RemoteAsset: <URL> -->
+
+The resulting downloaded file can be copied into the image using
+
+  <!-- OBS-CopyToImage: <source> <destination> -->
+
+The kiwi profile name is added to container names by default. This can be
+disabled via
+
+  <!-- OBS-DoNotAppendProfileToContainername -->
+
+==== Dockerfile description
+
+Has no support for assets yet.
+
+==== Arch Linux PKGBUILD
+
+PKGBuild files already contain the needed URLs and Checksums, so no extra
+treatment is needed.
+
+==== FedPkg "sources" file
+
+The sources file contains a list of file names with checksums. PBuild will
+automatically download the missing files from a FedPkg Server that needs
+to be configured in the project config via the "AssetsURL:" directive or set
+with the "--assets" option.
