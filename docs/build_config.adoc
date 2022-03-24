@@ -66,40 +66,40 @@ The BuildFlags keyword defines flags for the build process. The
 following values for FLAG are usable. All flags with a leading colon (:)
 require an additional parameter directly following them.
 
-* vmfstype:
+* vmfstype:TYPE
 
 Defines a specific file system when building inside of a VM. Possible
 values are ext2, ext3, ext4, btrfs, xfs, reiserfs (v3).
 
-* vmfsoptions:
+* vmfsoptions:OPTIONS
 
 There is also an option to disable directory indexing for ext2, ext3,
 and ext4 file systems. This makes file ordering inside of directories
 reproducible but may have a negative performance impact. To apply this,
 specify vmfsoptions:nodirindex
 
-* kiwiprofile:
+* kiwiprofile:PROFILE
 
 builds the selected profile in &kiwi; appliance builds.
 
-* logidlelimit:
+* logidlelimit:SECONDS
 
 Build jobs which don’t create any output get aborted after some time.
 This flag can be used to modify the limit. Specify the seconds behind
 flag.
 
-* excludebuild:
+* excludebuild:PACKAGE
 
 Exclude a package from building. _multibuild flavors can be specified
 via package:flavor syntax.
 
-* onlybuild:
+* onlybuild:PACKAGE
 
 DANGER: this may remove many build results when introduced the first
 time! It can be used to maintain a whitelist of packages to be built.
 All other packages will turn to excluded state.
 
-* useccache:
+* useccache:PACKAGE
 
 Configure usage of ccache when building packages that match the value of
 this parameter. The ccache package will automatically be installed and
@@ -125,7 +125,7 @@ add "--enable-cache" as dependency, for example via a Substitute rule:
 This will always enable ccache when a direct build depdency to gcc-c++
 is required.
 
-* ccachetype:
+* ccachetype:TYPE
 
 Defines the ccache implementation, possible values are: ccache, sccache
 
