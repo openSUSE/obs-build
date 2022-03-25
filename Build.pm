@@ -100,12 +100,13 @@ package Build::Features;
 our $preinstallimage = 1;	# on sale now
 package Build;
 
-# this is synced with rpm 4.13.0. The additional architectures of arm behind the spaces are
+# this is synced with rpm 4.17.0. The additional architectures of arm behind the spaces are
 # from MeeGo project. They don't exist elsewhere, but don't conflict either luckily
 my $std_macros = q{
 %define nil
 %define ix86    i386 i486 i586 i686 pentium3 pentium4 athlon geode
-%define arm     armv3l armv4b armv4l armv4tl armv5b armv5l armv5teb armv5tel armv5tejl armv6l armv6hl armv7l armv7hl armv7hnl       armv5el armv5eb armv6el armv6eb armv7el armv7eb armv7nhl armv8el
+%define arm32   armv3l armv4b armv4l armv4tl armv5tl armv5tel armv5tejl armv6l armv6hl armv7l armv7hl armv7hnl armv8l armv8hl armv8hnl armv8hcnl
+%define arm     %{arm32}
 %define arml    armv3l armv4l armv5l armv5tel armv6l armv6hl armv7l armv7hl armv7hnl
 %define armb    armv4b armv5b armv5teb
 %define arm64   aarch64
@@ -114,6 +115,7 @@ my $std_macros = q{
 %define mipseb  mips mipsr6 mips64 mips64r6
 %define mipsel  mipsel mipsr6el mips64el mips64r6el
 %define mips    %{mips32} %{mips64}
+%define loongarch64    loongarch64
 %define sparc   sparc sparcv8 sparcv9 sparcv9v sparc64 sparc64v
 %define alpha   alpha alphaev56 alphaev6 alphaev67
 %define power64 ppc64 ppc64p7 ppc64le
