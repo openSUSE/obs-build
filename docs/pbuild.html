@@ -1169,6 +1169,14 @@ All other packages will turn to excluded state.</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
+ccachetype:TYPE
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Defines the ccache implementation, possible values are: ccache, sccache</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
 useccache:PACKAGE
 </p>
 </li>
@@ -1195,14 +1203,11 @@ add "--enable-cache" as dependency, for example via a Substitute rule:</p></div>
 </div></div>
 <div class="paragraph"><p>This will always enable ccache when a direct build depdency to gcc-c++
 is required.</p></div>
-<div class="ulist"><ul>
-<li>
-<p>
-ccachetype:TYPE
-</p>
-</li>
-</ul></div>
-<div class="paragraph"><p>Defines the ccache implementation, possible values are: ccache, sccache</p></div>
+<div class="paragraph"><p>It is also possible to set the type, eg:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>Substitute: cargo cargo --enable-ccache=sccache</code></pre>
+</div></div>
 <div class="ulist"><ul>
 <li>
 <p>

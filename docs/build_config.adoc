@@ -99,6 +99,10 @@ DANGER: this may remove many build results when introduced the first
 time! It can be used to maintain a whitelist of packages to be built.
 All other packages will turn to excluded state.
 
+* ccachetype:TYPE
+
+Defines the ccache implementation, possible values are: ccache, sccache
+
 * useccache:PACKAGE
 
 Configure usage of ccache when building packages that match the value of
@@ -125,9 +129,9 @@ add "--enable-cache" as dependency, for example via a Substitute rule:
 This will always enable ccache when a direct build depdency to gcc-c++
 is required.
 
-* ccachetype:TYPE
+It is also possible to set the type, eg:
 
-Defines the ccache implementation, possible values are: ccache, sccache
+  Substitute: cargo cargo --enable-ccache=sccache
 
 * obsgendiff
 
