@@ -6,6 +6,9 @@ a safe and reproducible way. It can be used standalone or within the
 Latest packages for `obs-build` are available from
 [openSUSE:Tools downloads](https://software.opensuse.org/download/package?package=obs-build&project=openSUSE%3ATools).
 
+[Documentation is available here](http://opensuse.github.io/obs-build/pbuild.html)
+
+
 Supported build environments
 ============================
 
