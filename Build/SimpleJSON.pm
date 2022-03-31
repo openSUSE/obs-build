@@ -23,12 +23,16 @@ package Build::SimpleJSON;
 use strict;
 
 sub unparse_keys {
-  my ($d) = @_;
-  my @k = grep {$_ ne '_start' && $_ ne '_end' && $_ ne '_order' && $_ ne '_type'} sort keys %$d;
-  return @k unless $d->{'_order'};
+  my ($d, $order, $keepspecial) = @_;
+  my @k = sort keys %$d;
+  if (!$keepspecial) {
+    @k = grep {$_ ne '_start' && $_ ne '_end' && $_ ne '_order' && $_ ne '_type'} @k;
+    $order = $d->{'_order'} if $d->{'_order'};
+  }
+  return @k unless $order;
   my %k = map {$_ => 1} @k;
   my @ko;
-  for (@{$d->{'_order'}}) {
+  for (@$order) {
     push @ko, $_ if delete $k{$_};
   }
   return (@ko, grep {$k{$_}} @k);
@@ -66,8 +70,12 @@ sub unparse {
   my ($d, %opts) = @_;
 
   my $r = '';
+  my $template = delete $opts{'template'};
+  $opts{'_type'} ||= $template if $template && !ref($template);
+  undef $template unless ref($template) eq 'HASH';
   if (ref($d) eq 'ARRAY') {
     return '[]' unless @$d;
+    $opts{'template'} = $template if $template;
     my $indent = $opts{'ugly'} ? '' : $opts{'indent'} || '';
     my $nl = $opts{'ugly'} ? '' : "\n";
     my $sp = $opts{'ugly'} ? '' : " ";
@@ -79,16 +87,19 @@ sub unparse {
     return "\[$nl$r$nl$indent\]";
   }
   if (ref($d) eq 'HASH') {
-    my @k = unparse_keys($d);
+    my $keepspecial = $opts{'keepspecial'};
+    my @k = unparse_keys($d, $template ? $template->{'_order'} : undef, $keepspecial);
     return '{}' unless @k;
     my $indent = $opts{'ugly'} ? '' : $opts{'indent'} || '';
     my $nl = $opts{'ugly'} ? '' : "\n";
     my $sp = $opts{'ugly'} ? '' : " ";
     my $first = 0;
     for my $k (@k) {
+      $opts{'template'} = $template->{$k} || $template->{'*'} if $template;
       $r .= ",$nl" if $first++;
       my $dd = $d->{$k};
-      $r .= "$indent$sp$sp$sp".unparse_string($k)."$sp:$sp".unparse($dd, %opts, 'indent' => "   $indent", '_type' => ($d->{'_type'} || {})->{$k});
+      my $type = $keepspecial ? undef : $d->{'type'};
+      $r .= "$indent$sp$sp$sp".unparse_string($k)."$sp:$sp".unparse($dd, %opts, 'indent' => "   $indent", '_type' => ($type || {})->{$k});
     }
     return "\{$nl$r$nl$indent\}";
   }
