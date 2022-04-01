@@ -173,7 +173,7 @@ enum okfail dump_file(char *path)
 /* parse datafile and register (to regfile) all binary formats found */
 enum okfail binfmt_register(char *datafile, char *regfile)
 {
-	char buf[BUFSIZ];
+	char buf[BUFSIZ + 7];	/* extra room for -binfmt */
 	FILE *fp;
 	int line;
 	struct utsname myuname;
@@ -186,7 +186,7 @@ enum okfail binfmt_register(char *datafile, char *regfile)
 		return FAIL;
 	}
 
-	for (line = 1; fgets(buf, sizeof(buf), fp) != NULL; line++)
+	for (line = 1; fgets(buf, sizeof(buf) - 7, fp) != NULL; line++)
 	{
 		char tokens[BUFSIZ];
 		char *s = tokens;
@@ -274,8 +274,19 @@ enum okfail binfmt_register(char *datafile, char *regfile)
 			f[name]);
 #endif /* DEBUG */
 
-                /* Does the interpreter exists? */
-		ret=access(f[interpreter], X_OK);
+		/* check if a special -binfmt interpreter version exists */
+		snprintf(path, sizeof(path), "%s-binfmt", f[interpreter]);
+		ret=access(path, X_OK);
+		if (ret == 0) {
+		    /* special -binfmt interpreter exists, patch buf */
+		    size_t off = f[interpreter] + strlen(f[interpreter]) - tokens;
+		    size_t len = strlen(buf) + 1;
+		    memmove(buf + off + 7, buf + off, len - off);
+		    memcpy(buf + off, "-binfmt", 7);
+		} else {
+		    /* Does the interpreter exists? */
+		    ret=access(f[interpreter], X_OK);
+		}
 		if (ret != 0) {
 #ifdef DEBUG
 			fprintf(stderr, 
