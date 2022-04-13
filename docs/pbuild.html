@@ -1647,7 +1647,33 @@ another target.</p></div>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_example_calls_in_spec_files_for_cross_build">4.4.2. Example Calls in spec files for cross build</h4>
+<h4 id="_dependency_handling">4.4.2. Dependency handling</h4>
+<div class="paragraph"><p>Dependencies need to be resolved always twice during a cross build. One time for the host
+architecture and one time for the target architecture. Build dependencies of a package
+get only installed for the target architecture by default.</p></div>
+<div class="paragraph"><p>However, global rules in the build configuration can get created to modify this behaviour.</p></div>
+<div class="sect4">
+<h5 id="_alsonative_packages">AlsoNative: PACKAGES</h5>
+<div class="paragraph"><p>Can be used to mark a package to get installed into the target and in the host system.</p></div>
+</div>
+<div class="sect4">
+<h5 id="_onlynative_packages">OnlyNative: PACKAGES</h5>
+<div class="paragraph"><p>Can be used to to install a package in the hostsystem, but not in the target system. Eg.
+for build tooling or code generators.</p></div>
+</div>
+<div class="sect4">
+<h5 id="_the_target_base_system">The target base system</h5>
+<div class="paragraph"><p>All packages for a host system which are configured as "Requrired" get installed only in
+the host system, but not in the target system. The reason behind is that this packages
+are only supposed to be able to execute commands and therefore they are not needed in
+the target environment. Only the build dependencies get installed there.</p></div>
+<div class="paragraph"><p>However, some distributions may lack a complete set of dependencies (esp. debian based).
+In this case the base system for the target system can manually get configured via</p></div>
+<div class="paragraph"><p>Substitute: sysroot-packages PACKAGES</p></div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_example_calls_in_spec_files_for_cross_build">4.4.3. Example Calls in spec files for cross build</h4>
 <div class="paragraph"><p>Note: the basic design of rpm was the GNU style, but it changed in the way that you have to
       specify the host architecture via %target macro on most distributions:</p></div>
 <div class="literalblock">

@@ -47,6 +47,35 @@ toolchain. "build" is the environment which creates binaries. Host are the resul
 binaries. And target is important when these binaries can build binaries as well for
 another target.
 
+==== Dependency handling
+
+Dependencies need to be resolved always twice during a cross build. One time for the host
+architecture and one time for the target architecture. Build dependencies of a package
+get only installed for the target architecture by default.
+
+However, global rules in the build configuration can get created to modify this behaviour.
+
+===== AlsoNative: PACKAGES
+
+Can be used to mark a package to get installed into the target and in the host system.
+
+===== OnlyNative: PACKAGES
+
+Can be used to to install a package in the hostsystem, but not in the target system. Eg.
+for build tooling or code generators.
+
+===== The target base system
+
+All packages for a host system which are configured as "Requrired" get installed only in
+the host system, but not in the target system. The reason behind is that this packages
+are only supposed to be able to execute commands and therefore they are not needed in
+the target environment. Only the build dependencies get installed there.
+
+However, some distributions may lack a complete set of dependencies (esp. debian based).
+In this case the base system for the target system can manually get configured via
+
+Substitute: sysroot-packages PACKAGES
+
 ==== Example Calls in spec files for cross build
 
 Note: the basic design of rpm was the GNU style, but it changed in the way that you have to
