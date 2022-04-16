@@ -1686,8 +1686,10 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 		egrep "^abuild:" <$BUILD_ROOT/etc/passwd
 		echo "build script attempting to use:"
 		echo "abuild::${ABUILD_UID}:${ABUILD_GID}:..."
-		echo "build aborting"
-		cleanup_and_exit 1
+		echo "fixing..."
+		sed -i -e "/^abuild:/d;iabuild:x:${ABUILD_UID}:${ABUILD_GID}:Autobuild:/home/abuild:/bin/bash" $BUILD_ROOT/etc/passwd
+		sed -i -e "/^abuild:/d;iabuild:x:${ABUILD_GID}:" $BUILD_ROOT/etc/group
+		chown "$ABUILD_UID:$ABUILD_GID" $BUILD_ROOT/home/abuild
 	    fi
 	fi
 	if test -f $BUILD_ROOT/etc/shadow ; then
