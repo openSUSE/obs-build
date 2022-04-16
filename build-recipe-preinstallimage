@@ -57,6 +57,11 @@ recipe_build_preinstallimage() {
       esac
       TOPDIRS="$TOPDIRS $DIR"
     done
+    # remove abuild user/group from passwd, will be recreated by build script anyway
+    for FILE in etc/passwd etc/shadow etc/gshadow etc/group; do
+	[ -e $FILE ] && sed -i -e '/^abuild:/d' $FILE
+    done
+    rm -fr home/abuild
     $TAR -cf .preinstallimage.tar --one-file-system $TOPDIRS || cleanup_and_exit 1
     echo "image created."
     TOPDIR=/usr/src/packages
