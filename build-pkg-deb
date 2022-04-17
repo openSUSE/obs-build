@@ -61,6 +61,17 @@ deb_setup() {
 exit 101
 EOF
     chmod 755 $BUILD_ROOT/usr/sbin/policy-rc.d
+
+    # Manpages database trigger takes a lot of time and is not useful in a build chroot
+    mkdir -p $BUILD_ROOT/var/cache/debconf/
+    cat >> $BUILD_ROOT/var/cache/debconf/config.dat <<EOF
+Name: man-db/auto-update
+Template: man-db/auto-update
+Value: false
+Owners: man-db
+Flags: seen
+
+EOF
 }
 
 pkg_initdb_deb() {
