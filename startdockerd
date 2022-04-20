@@ -145,6 +145,9 @@ if test "$BUILD_ROOT" != '/' ; then
     mount --rbind /sys/fs/cgroup "$BUILD_ROOT/sys/fs/cgroup"
     mount --make-rslave "$BUILD_ROOT/sys/fs/cgroup"
     export DOCKER_RAMDISK=true
+elif ! test -e /sys/fs/cgroup/unified -o -e /sys/fs/cgroup/cpu.stat ; then
+    # workaround for kernel-obs-build bsc#1198484 
+    mount -t cgroup cgroup /sys/fs/cgroup 
 fi
 
 # setup mounts
