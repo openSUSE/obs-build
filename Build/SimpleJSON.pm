@@ -98,7 +98,7 @@ sub unparse {
       $opts{'template'} = $template->{$k} || $template->{'*'} if $template;
       $r .= ",$nl" if $first++;
       my $dd = $d->{$k};
-      my $type = $keepspecial ? undef : $d->{'type'};
+      my $type = $keepspecial ? undef : $d->{'_type'};
       $r .= "$indent$sp$sp$sp".unparse_string($k)."$sp:$sp".unparse($dd, %opts, 'indent' => "   $indent", '_type' => ($type || {})->{$k});
     }
     return "\{$nl$r$nl$indent\}";
