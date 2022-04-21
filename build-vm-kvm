@@ -396,7 +396,7 @@ vm_fixup_kvm() {
 	    if test "${kvm_device%%-*}" = "virtio" ; then
 		kvm_options="$kvm_options -object iothread,id=io0"
 		kvm_device_opts=",iothread=io0"
-                if ldd $kvm_bin | grep -q liburing.so ; then
+                if ldd $kvm_bin | grep -E -q liburing.so.[2-9] ; then
                     kvm_drive_opts="$kvm_drive_opts,aio=io_uring"
                 fi
 	    fi
