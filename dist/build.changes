@@ -1,4 +1,15 @@
 -------------------------------------------------------------------
+Fri Apr 22 06:59:20 UTC 2022 - Adrian Schröter <adrian@suse.de>
+
+- Update SLE 15 SP4 and Leap 15.4 build config (bsc#1198740)
+- Use aio=io_uring if available (bsc#1197699) (build#814)
+- Add arm32 and loongarch definitions (build#808)
+- Add compatibility code to initvm
+- Use upstream way of binfmt argv0 preservation (bsc#1197298) (build#809)
+- Add template support for Build::SimpleJSON
+- minor documentation updates
+
+-------------------------------------------------------------------
 Tue Mar 29 08:46:07 UTC 2022 - Adrian Schröter <adrian@suse.de>
 
 - docker: Add support for --root and --installroot global zypper options
