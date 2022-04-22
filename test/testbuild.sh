@@ -16,4 +16,4 @@ fi
 
 repo "$REPO"
 
-run_build "$@"
+run_build --dist default "$@"
