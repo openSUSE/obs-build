@@ -40,11 +40,6 @@ Requires:       binutils
 Requires:       findutils
 Requires:       perl
 Requires:       tar
-# needed for vc
-# dnsdomainname
-Requires:       hostname
-# rpmdev-packager
-Requires:       rpmdevtools
 # needed for fuser
 Requires:       psmisc
 # just to verify existence of packages
