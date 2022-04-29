@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Apr 29 11:53:59 UTC 2022 - Adrian Schröter <adrian@suse.de>
+
+- Stop building aarch64_ilp32 baselibs for aarch64
+- avod aio=io_uring for now on SLE15-SP4 workers
+
+-------------------------------------------------------------------
 Fri Apr 22 06:59:20 UTC 2022 - Adrian Schröter <adrian@suse.de>
 
 - Update SLE 15 SP4 and Leap 15.4 build config (bsc#1198740)
