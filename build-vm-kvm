@@ -396,7 +396,8 @@ vm_fixup_kvm() {
 	    if test "${kvm_device%%-*}" = "virtio" ; then
 		kvm_options="$kvm_options -object iothread,id=io0"
 		kvm_device_opts=",iothread=io0"
-                if ldd $kvm_bin | grep -E -q 'liburing.so.[2-9]' ; then
+                # avoid SLE15-SP4 kernel as it is broken (bsc#1199011)
+                if ldd $kvm_bin | grep -E -q 'liburing.so.[2-9]' && test "$(uname -r | cut -d. -f1-2)" != "5.14" ; then
                     kvm_drive_opts="$kvm_drive_opts,aio=io_uring"
                 fi
 	    fi
