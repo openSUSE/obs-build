@@ -660,6 +660,7 @@ delete $tags->{'DEBTRANSFORM-TAR'};
 delete $tags->{'DEBTRANSFORM-FILES-TAR'};
 delete $tags->{'DEBTRANSFORM-FILES'};
 delete $tags->{'DEBTRANSFORM-RELEASE'};
+delete $tags->{'OBS-DCH-RELEASE'};
 writedsc("$out/${name}_$version.dsc", $tags);
 
 if( $debug ) {
