@@ -22,6 +22,7 @@
 ################################################################
 
 DEB_UNSAFE_IO=
+DEB_NO_TRIGGERS=
 
 #
 # A wrapper around chroot to set the environment correctly for dpkg and
@@ -60,6 +61,17 @@ deb_setup() {
 exit 101
 EOF
     chmod 755 $BUILD_ROOT/usr/sbin/policy-rc.d
+
+    # Manpages database trigger takes a lot of time and is not useful in a build chroot
+    mkdir -p $BUILD_ROOT/var/cache/debconf/
+    cat >> $BUILD_ROOT/var/cache/debconf/config.dat <<EOF
+Name: man-db/auto-update
+Template: man-db/auto-update
+Value: false
+Owners: man-db
+Flags: seen
+
+EOF
 }
 
 pkg_initdb_deb() {
@@ -74,13 +86,15 @@ pkg_initdb_deb() {
 }
 
 pkg_prepare_deb() {
-    # test if dpkg knows --force-unsafe-io
+    # test if dpkg knows --force-unsafe-io and --no-triggers
     DEB_UNSAFE_IO=
+    DEB_NO_TRIGGERS=
     chroot $BUILD_ROOT dpkg --force-unsafe-io --version >/dev/null 2>&1 && DEB_UNSAFE_IO="--force-unsafe-io"
+    chroot $BUILD_ROOT dpkg --no-triggers --version >/dev/null 2>&1 && DEB_NO_TRIGGERS="--no-triggers"
 }
 
 pkg_install_deb() {
-    ( deb_chroot $BUILD_ROOT dpkg --install $DEB_UNSAFE_IO --force-depends .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
+    ( deb_chroot $BUILD_ROOT dpkg --install $DEB_UNSAFE_IO $DEB_NO_TRIGGERS --force-depends .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
 	perl -ne '$|=1;/^(Configuration file|Installing new config file|Selecting previously deselected|Selecting previously unselected|\(Reading database|Unpacking |Setting up|Creating config file|Preparing to replace dpkg|Preparing to unpack )/||/^$/||print'
     # ugly workaround for upstart system. some packages (procps) try
     # to start a service in their configure phase. As we don't have
@@ -198,7 +212,7 @@ pkg_sysrootinstall_deb() {
 	return
     fi
 
-    ( deb_chroot $BUILD_ROOT dpkg --install $DEB_UNSAFE_IO --force-depends .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
+    ( deb_chroot $BUILD_ROOT dpkg --install $DEB_UNSAFE_IO $DEB_NO_TRIGGERS --force-depends .init_b_cache/$PKG.deb 2>&1 || touch $BUILD_ROOT/exit ) | \
 	perl -ne '$|=1;/^(Configuration file|Installing new config file|Selecting previously deselected|Selecting previously unselected|\(Reading database|Unpacking |Setting up|Creating config file|Preparing to replace dpkg|Preparing to unpack )/||/^$/||print'
 }
 
