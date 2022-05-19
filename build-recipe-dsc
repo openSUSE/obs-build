@@ -108,11 +108,6 @@ recipe_prepare_dsc() {
                 *)   # No debver, add the first such token
                     OBS_DCH_RELEASE="-$DEB_RELEASE" ;;
             esac
-            # "OBS_DCH_RELEASE" char offset aligned with "VERSION" in previous echo
-            echo "OBS-DCH-RELEASE: Suffixing DSC file with OBS respin number, to  ${VERSION}${OBS_DCH_RELEASE}"
-            sed -e 's,^\(OBS-DCH-RELEASE:.*\)$,# \1,' \
-                -e 's,^\(Version:\).*$,\1'" ${VERSION}${OBS_DCH_RELEASE}"',' \
-                -i $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE
           fi
         fi
         if ! debtransform $CHANGELOGARGS $RELEASEARGS $BUILD_ROOT$TOPDIR/SOURCES $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE $BUILD_ROOT$TOPDIR/SOURCES.DEB ; then

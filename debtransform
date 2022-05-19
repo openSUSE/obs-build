@@ -488,7 +488,7 @@ if ($tarfile =~ /\.tgz$/) {
     system ( ("mv",  "$dir/$old",  "$tmptar" ) ) == 0 || die("cannot rename .tgz to .tar.gz");
 }
 
-if ($tags->{'DEBTRANSFORM-RELEASE'} && $release) {
+if (($tags->{'DEBTRANSFORM-RELEASE'} || $tags->{'OBS-DCH-RELEASE'}) && $release) {
     # the tag DEBTRANSFORM-RELEASE in .dsc file instructs
     # to append OBS build number to package version. The
     # number is passed in "release" command line parameter.
