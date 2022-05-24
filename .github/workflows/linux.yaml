@@ -16,6 +16,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Update packages repository
+        run: |
+          sudo apt-get update
+
       - name: Install libyaml-libyaml-perl
         run: |
           sudo apt-get install libyaml-libyaml-perl
