@@ -1542,6 +1542,29 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	RECIPEFILE="${RECIPEPATH##*/}"
     fi
 
+    if test "$RECIPEFILE" != "${RECIPEFILE%.slsa_provenance.json}" ; then
+	MYSRCDIR="$BUILD_ROOT/.build-srcdir"
+	rm -rf "$MYSRCDIR"
+	mkdir -p "$MYSRCDIR"
+	cd "$MYSRCDIR" || cleanup_and_exit 1
+	$BUILD_DIR/unpack_slsa_provenance "$RECIPEPATH" "$MYSRCDIR" || cleanup_and_exit 1 "Could not unpack slsa provenance file"
+	SRCDIR="$MYSRCDIR"
+	RECIPEFILE=
+	while read k ; do
+	    case $k in
+		recipe=*) RECIPEFILE="${k#*=}" ;;
+		release=*) test -z "$RELEASE" && RELEASE="${k#*=}" ;;
+		debuginfo=*) BUILD_DEBUG=1 ;;
+	    esac
+	done < .build.params
+	test -z "$RECIPEFILE" && cleanup_and_exit 1 "recipe not set in build parameters"
+	RECIPEPATH="$SRCDIR/$RECIPEFILE"
+	RPMLIST="--rpmlist $MYSRCDIR/.build.rpmlist"
+	BUILD_RPMS=
+	BUILD_DIST="$SRCDIR/.build.config"
+	repos=()
+    fi
+
     recipe_set_buildtype
 
     if test -z "$RUNNING_IN_VM" ; then

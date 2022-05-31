@@ -89,6 +89,7 @@ install:
 	    writemodulemd \
 	    download_assets \
 	    export_debian_orig_from_git \
+	    unpack_slsa_provenance \
 	    $(DESTDIR)$(pkglibdir)
 	install -m644 \
 	    qemu-reg \

@@ -1,0 +1,173 @@
+#!/usr/bin/perl
+
+BEGIN {
+  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+}
+
+use JSON::XS ();
+use MIME::Base64 ();
+use Data::Dumper;
+
+use Build;
+use Build::Download;
+
+use strict;
+
+sub readstr {
+  my ($fn) = @_;
+  my $f;
+  open($f, '<', $fn) || die("$fn: $!\n");
+  my $d = '';
+  1 while sysread($f, $d, 8192, length($d));
+  close $f;
+  return $d;
+}
+
+sub writestr {
+  my ($fn, $fnf, $d) = @_;
+  my $f;
+  open($f, '>', $fn) || die("$fn: $!\n");
+  if (length($d)) {
+    (syswrite($f, $d) || 0) == length($d) || die("$fn write: $!\n");
+  }
+  close($f) || die("$fn close: $!\n");
+  return unless defined $fnf;
+  rename($fn, $fnf) || die("rename $fn $fnf: $!\n");
+}
+
+
+sub material2digest {
+  my ($material) = @_;
+  my $digests = $material->{'digest'};
+  return undef unless ref($digests) eq 'HASH';
+  my $digest;
+  my $digest_t;
+  for my $t (sort keys %$digests) {
+    my $v = $digests->{$t};
+    next if $digest && length($v) < length($digest);
+    $digest = $v;
+    $digest_t = $t;
+  }
+  return undef unless $digest;
+  return lc($digest_t).":$digest";
+}
+
+sub check_existing {
+  my ($fn, $digest) = @_;
+  if (-l $fn || -e _) {
+    if ($digest) {
+      eval { Build::Download::checkfiledigest($fn, $digest) };
+      return 1 unless $@;
+    }
+    unlink($fn) || die("unlink $fn: $!\n");
+  }
+  return 0;
+}
+
+die("usage: unpack_slsa_provenance <provenance.json> <dir>\n") unless @ARGV == 2;
+my ($provenance_file, $dir) = @ARGV;
+
+die("$provenance_file: $!\n") unless -e $provenance_file;
+die("$dir: $!\n") unless -e $dir;
+die("$dir: Not a directory\n") unless -d $dir;
+
+my $provenance = readstr($provenance_file);
+$provenance = JSON::XS::decode_json($provenance);
+if ($provenance->{'payload'}) {
+  $provenance = MIME::Base64::decode_base64($provenance->{'payload'});
+  $provenance = JSON::XS::decode_json($provenance);
+}
+my $predicate = $provenance->{'predicate'};
+die("no predicate in provenance?\n") unless ref($predicate) eq 'HASH';
+
+my $materials = $predicate->{'materials'};
+die("no materials in predicate?\n") unless ref($materials) eq 'ARRAY';
+
+my $invocation = $predicate->{'invocation'};
+die("no invocation in predicate?\n") unless ref($invocation) eq 'HASH';
+
+my $configsource = $invocation->{'configSource'};
+die("no configSource in invocation?\n") unless ref($configsource) eq 'HASH';
+
+my $recipefile = $configsource->{'entryPoint'};
+die("no entryPoint in configSource?\n") unless defined($recipefile) && ref($recipefile) eq '';
+
+my @rpmlist;
+
+$| = 1;
+
+print "fetching sources\n";
+my $recipe_found;
+for my $material (@$materials) {
+  my $uri = $material->{'uri'};
+  next if $uri =~ /\/_slsa\//;
+  my $digest = material2digest($material);
+  my $fn = $uri;
+  $fn =~ s/%([a-fA-F0-9]{2})/chr(hex($1))/sge;
+  $fn =~ s/.*\///;
+  die("bad file name $fn\n") if $fn eq '.' || $fn eq '..' || $fn eq '';
+  die("bad file name $fn\n") if $fn =~ /^\.build\./;
+  $recipe_found = 1 if $fn eq $recipefile;
+  next if check_existing("$dir/$fn", $digest);
+  Build::Download::download($uri, "$dir/$fn", undef, 'digest' => $digest);
+}
+die("recipefile $recipefile is missing from source\n") unless $recipe_found;
+
+print "fetching build environment\n";
+mkdir("$dir/.build.binaries") || die("mkdir $dir/.build.binaries: $!\n") unless -d "$dir/.build.binaries";
+for my $material (@$materials) {
+  my $uri = $material->{'uri'};
+  next unless $uri =~ /\/_slsa\//;
+  next if $uri =~ /\/_config\/[^\/]+$/;
+  my $digest = material2digest($material);
+  my $fn = $uri;
+  $fn =~ s/%([a-fA-F0-9]{2})/chr(hex($1))/sge;
+  $fn =~ s/\/[^\/]+$//;
+  $fn =~ s/.*\///;
+  die("bad file name $fn\n") if $fn eq '.' || $fn eq '..' || $fn eq '';
+  if ($fn =~ /^(.*)\.rpm$/) {
+    push @rpmlist, "$1 $dir/.build.binaries/$fn";
+  }
+  next if check_existing("$dir/.build.binaries/$fn", $digest);
+  Build::Download::download($uri, "$dir/.build.binaries/$fn", undef, 'digest' => $digest);
+}
+
+print "fetching build config\n";
+for my $material (@$materials) {
+  my $uri = $material->{'uri'};
+  next unless $uri =~ /\/_slsa\//;
+  next unless $uri =~ /\/_config\/[^\/]+$/;
+  my $digest = material2digest($material);
+  next if check_existing("$dir/.build.config", $digest);
+  Build::Download::download($uri, "$dir/.build.config", undef, 'digest' => $digest);
+}
+
+# parse the config to get preinstall/vminstall/runscripts information
+my $bconf = Build::read_config('noarch', "$dir/.build.config");
+die("cannot expand preinstalls\n") if $bconf->{'expandflags:preinstallexpand'};
+my @preinstalls = Build::get_preinstalls($bconf);
+my @vminstalls = Build::get_vminstalls($bconf);
+my @runscripts = Build::get_runscripts($bconf);
+push @rpmlist, "preinstall: @preinstalls";
+push @rpmlist, "vminstall: @vminstalls";
+push @rpmlist, "runscripts: @runscripts";
+
+writestr("$dir/.build.rpmlist", undef, join("\n", @rpmlist)."\n");
+
+my @params;
+if (ref($invocation->{'parameters'}) eq 'HASH') {
+  my $parameters = $invocation->{'parameters'};
+  for my $k (sort keys %$parameters) {
+    next unless defined $parameters->{$k} && !ref($parameters->{$k});
+    push @params, 'release', $parameters->{$k} if $k eq 'release';
+    push @params, 'debuginfo', 1 if $k eq 'debuginfo' && $parameters->{$k};
+  }
+}
+push @params, 'recipe', $recipefile;
+my $params = '';
+while (@params) {
+  my ($k, $v) = splice(@params, 0, 2);
+  $v =~ s/[\r\n].*\z//s;
+  $params .= "$k=$v\n";
+}
+writestr("$dir/.build.params", undef, $params);
