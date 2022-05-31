@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Tue May 31 09:10:07 UTC 2022 - Adrian Schröter <adrian@suse.de>
+
+- Revert "avod aio=io_uring for now on SLE15-SP4 workers"
+- deb: defer dpkg triggers until all packages are installed, and disable man-db altogether
+- Add support of Debian Source format 3.0 (quilt) 
+
+-------------------------------------------------------------------
 Fri Apr 29 11:53:59 UTC 2022 - Adrian Schröter <adrian@suse.de>
 
 - Stop building aarch64_ilp32 baselibs for aarch64
