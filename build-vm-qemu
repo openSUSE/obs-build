@@ -144,7 +144,7 @@ vm_startup_qemu() {
         qemu_options="$qemu_options -object rng-random,filename=$rng_dev,id=rng0 -device $qemu_rng_device,rng=rng0"
     fi
 
-    qemu_args=(-drive file="$VM_ROOT",format=raw,if=none,id=disk,cache=unsafe -device "$qemu_device",drive=disk,serial=0)
+    qemu_args=($@ -drive file="$VM_ROOT",format=raw,if=none,id=disk,cache=unsafe -device "$qemu_device",drive=disk,serial=0)
     if [ -n "$VM_USER" ] ; then
         getent passwd "$VM_USER" > /dev/null || cleanup_and_exit 3 "cannot find KVM user '$VM_USER'"
     elif test $UID = 0 ; then

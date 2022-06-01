@@ -36,7 +36,7 @@ vm_startup_emulator() {
     elif test "${EMULATOR_SCRIPT:0:1}" != / ; then
        EMULATOR_SCRIPT="./$EMULATOR_SCRIPT"
     fi
-    set -- "$EMULATOR_SCRIPT" "$VM_ROOT" "$VM_SWAP"
+    set -- "$EMULATOR_SCRIPT" "$@" "$VM_ROOT" "$VM_SWAP"
     echo "$@"
     if ! "$@"; then
 	 popd

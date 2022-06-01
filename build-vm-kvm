@@ -291,7 +291,7 @@ kvm_add_console_args() {
 
 vm_startup_kvm() {
     qemu_bin="$kvm_bin"
-    qemu_args=(-drive file="$VM_ROOT",format=raw,if=none,id=disk,$kvm_drive_opts -device "$kvm_device$kvm_device_opts",drive=disk,serial=0)
+    qemu_args=("$@" -drive file="$VM_ROOT",format=raw,if=none,id=disk,$kvm_drive_opts -device "$kvm_device$kvm_device_opts",drive=disk,serial=0)
     if [ -n "$VM_USER" ] ; then
 	getent passwd "$VM_USER" > /dev/null || cleanup_and_exit 3 "cannot find KVM user '$VM_USER'"
     elif test $UID = 0 ; then
