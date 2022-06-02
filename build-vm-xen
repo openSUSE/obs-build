@@ -88,6 +88,8 @@ vm_startup_xen() {
 	# have to switch back to PER_LINUX to make xm work
 	set -- linux64 "$@"
     fi
+    # Allow overcommit, the total memory will already be constrained by Xen.
+    ulimit -v 'unlimited'
     echo "$@"
     "$@" || cleanup_and_exit 3
     rm -f "$XEN_CONF_FILE"

@@ -200,6 +200,8 @@ vm_startup_qemu() {
         set -- linux64 "$@"
     fi
     export QEMU_AUDIO_DRV=none          # we do not want to have sound inside the VMs
+    # Allow overcommit, the total memory will already be constrained by qemu.
+    ulimit -v 'unlimited'
     echo "$@"
     "$@"
     qemu_ret=$?
