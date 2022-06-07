@@ -390,18 +390,22 @@ vm_fixup_kvm() {
 	    kvm_console=hvc0
 	fi
     fi
+
     # move IO into separate I/O thread for some architectures
-    # PowerPC currently not reliably working
-    case `uname -m` in
-	armv8l|aarch64|i586|i686|x86_64|s390|s390x)
-	    if test "${kvm_device%%-*}" = "virtio" ; then
-		kvm_options="$kvm_options -object iothread,id=io0"
-		kvm_device_opts=",iothread=io0"
+    if test "${kvm_device%%-*}" = "virtio" ; then
+        kvm_options="$kvm_options -object iothread,id=io0"
+        kvm_device_opts=",iothread=io0"
+        case $(uname -m) in
+            ppc64le)
+                # PowerPC currently not reliably working
+                ;;
+            *)
                 if ldd $kvm_bin | grep -E -q 'liburing.so.[2-9]' ; then
                     kvm_drive_opts="$kvm_drive_opts,aio=io_uring"
                 fi
-	    fi
-    esac
+            ;;
+        esac
+    fi
 }
 
 vm_attach_root_kvm() {
