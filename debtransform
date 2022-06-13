@@ -119,6 +119,27 @@ sub listtar {
   return @c;
 }
 
+sub dopatch_changelog {
+    my ($version_new, @content) = @_;
+    my $firstline = $content[0];
+    my $version = $firstline;
+    $version =~ s/.*\((.*)\).*/$1/g;
+    if ($version ne $version_new) {
+      print "Found changelog with the last entry version not equal to build package version ($version).\n";
+      $firstline =~ s/\(.*\)/($version_new)/g;
+      my $date = `date -R`;
+      if (defined($ENV{SOURCE_DATE_EPOCH})) {
+        $date = strftime("%a, %d %b %Y %T +0000", gmtime($ENV{SOURCE_DATE_EPOCH}));
+      }
+      chomp($date);
+      my @newcontent = ($firstline, "", "  * version number update by debtransform", "", " -- debtransform <build\@opensuse.org>  ".$date, "");
+      push(@newcontent, @content);
+      print "New entry with updated version number added ($version_new).\n";
+      @content = @newcontent;
+    }
+    return @content;
+}
+
 sub extracttar {
   my ($tar, $filename, $s) = @_;
   local *F;
@@ -145,20 +166,7 @@ sub dodiff {
       }
   }
   if ($newname eq $origtarfile->{'tardir'}."/debian/changelog") {
-    my $firstline = $content[0];
-    my $version = $firstline;
-    $version =~ s/.*\((.*)\).*/$1/g;
-    if ($version ne $origtarfile->{'version'}) {
-      $firstline =~ s/\(.*\)/($origtarfile->{'version'})/g;
-      my $date = `date -R`;
-      if (defined($ENV{SOURCE_DATE_EPOCH})) {
-        $date = strftime("%a, %d %b %Y %T +0000", gmtime($ENV{SOURCE_DATE_EPOCH}));
-      }
-      chomp($date);
-      my @newcontent = ($firstline, "", "  * version number update by debtransform", "", " -- debtransform <build\@opensuse.org>  ".$date, "");
-      push(@newcontent, @content);
-      @content = @newcontent;
-    }
+    @content = dopatch_changelog($origtarfile->{'version'}, @content);
   }
   return unless @content;
   print DIFF "--- $oldname\n";
@@ -203,7 +211,13 @@ sub dotar {
 }
 
 sub dotar_quilt {
-  my ($input_file_path, $output_file_path) = @_;
+  use File::Temp qw(tempdir);
+  use File::Basename;
+
+  my $tmpdir = File::Temp->newdir();
+  my $tempdirname = $tmpdir->dirname;
+
+  my ($input_file_path, $output_file_path, $origtarfile) = @_;
 
   my $input_file_path_relative = dorelativepath($input_file_path);
   my $output_file_path_relative = dorelativepath($output_file_path);
@@ -215,17 +229,57 @@ sub dotar_quilt {
   my $input_file_path_without_ext = $list[0];
   my $ext = $list[1];
 
+  my $decompress_src = "$input_file_path";
+  my $input_file_name = basename($input_file_path_without_ext);
+  my $decompress_dst = "${tempdirname}/${input_file_name}.tar";
+
+  # print "Decompress '$decompress_src' to '$decompress_dst' for concatenation\n";
+
   if (($ext eq ".tgz") or ($ext eq ".tar.gz")) {
-      system("gzip -dk \"$input_file_path\"") == 0 || die("Can not unpack gzip archive '$input_file_path': $!\n");
+      system("gzip -dck \"$decompress_src\" > \"$decompress_dst\"") == 0 || die("Can not unpack gzip archive '$decompress_src': $!\n");
   } elsif (($ext eq ".tar.xz")) {
-      system("xz -dk \"$input_file_path\"") == 0 || die("Can not unpack xz archive '$input_file_path': $!\n");
+      system("xz -dck \"$decompress_src\" > \"$decompress_dst\"") == 0 || die("Can not unpack xz archive '$decompress_src': $!\n");
   } elsif (($ext eq ".tar.bz2")) {
-      system("bzip2 -dk \"$input_file_path\"") == 0 || die("Can not unpack bzip2 archive '$input_file_path': $!\n");
+      system("bzip2 -dck \"$decompress_src\" > \"$decompress_dst\"") == 0 || die("Can not unpack bzip2 archive '$decompress_src': $!\n");
   }
 
-  system("tar --concatenate -f $output_file_path ${input_file_path_without_ext}.tar");
+  my $tar_for_concatination_path = $decompress_dst;
 
-  unlink("${input_file_path_without_ext}.tar");
+  # Looking for changelog in tar
+  my $changelog_path_in_tar = 'debian/changelog';
+  my $is_changelog_in_tar = (system("tar -tf \"${tar_for_concatination_path}\" $changelog_path_in_tar > /dev/null 2>&1") == 0);
+
+  if ($is_changelog_in_tar){
+    print "Found '$changelog_path_in_tar' in '${tar_for_concatination_path}', extract to '$tempdirname'.\n";
+    system("tar xf \"$input_file_path\" --directory $tempdirname $changelog_path_in_tar") == 0
+      || die("Can not extract file '$changelog_path_in_tar' from tar '$input_file_path': $!\n");
+
+    # Patch changelog
+    my $changelog_file_path = "$tempdirname/$changelog_path_in_tar";
+    my $changelog_file_path_patched = "${changelog_file_path}.patched";
+    open my $in,  '<',  $changelog_file_path         or die "Can't read original changelog file: $!\n";
+    open my $out, '>',  $changelog_file_path_patched or die "Can't write patched changelog file: $!\n";
+
+    chomp(my @lines = <$in>);
+    my @new_lines = dopatch_changelog($origtarfile->{'version'}, @lines);
+
+    print $out "$_\n" for @new_lines;
+    close $out;
+
+    # Replace original changelog with patched
+    unlink($changelog_file_path);
+    rename($changelog_file_path_patched, $changelog_file_path);
+
+    print "Update tar '$tar_for_concatination_path' due to changelog '$changelog_file_path' patched.\n";
+    # Add changelog file to tar relative to tempdirname
+    system("tar -C \"$tempdirname\" -uf \"$tar_for_concatination_path\" \"$changelog_path_in_tar\"") == 0
+      || die("Can not update tar '$tar_for_concatination_path' with file '$changelog_file_path': $!\n");
+
+    unlink($changelog_file_path);
+  }
+
+  system("tar --concatenate -f \"$output_file_path\" \"${tar_for_concatination_path}\"");
+  unlink("${tar_for_concatination_path}");
 }
 
 sub dofile {
@@ -242,14 +296,40 @@ sub dofile {
 sub dofile_quilt {
   use Cwd qw(cwd);
   use File::Spec;
+  use File::Basename;
+  use File::Temp qw(tempdir);
+
+  my $tmpdir = File::Temp->newdir();
+  my $tempdirname = $tmpdir->dirname;
+
   my $dir = cwd;
 
-  my ($input_file_path, $output_file_path, $rename_file_path) = @_;
+  my ($input_file_path, $output_file_path, $rename_file_path, $origtarfile) = @_;
 
   my $input_file_path_relative = dorelativepath($input_file_path);
   my $output_file_path_relative = dorelativepath($output_file_path);
 
-  print "Add file '$input_file_path_relative'\n";
+  my $path_for_logging = $input_file_path_relative;
+
+  # Catch and patch changelog
+  if (basename($input_file_path_relative) eq 'debian.changelog') {
+    my $input_file_path_patched = "${tempdirname}/debian.changelog.patched";
+
+    open my $in,  '<',  $input_file_path         or die "Can't read original changelog file: $!\n";
+    open my $out, '>',  $input_file_path_patched or die "Can't write patched changelog file: $!\n";
+
+    chomp(my @lines = <$in>);
+    my @new_lines = dopatch_changelog($origtarfile->{'version'}, @lines);
+
+    print $out "$_\n" for @new_lines;
+    close $out;
+
+    $input_file_path = $input_file_path_patched;
+    $input_file_path_relative = dorelativepath($input_file_path);
+    $path_for_logging = $input_file_path;
+  }
+
+  print "Add file '$path_for_logging'\n";
   print "    to debian quilt tar file '$output_file_path_relative'\n";
   print "    with internal path       '$rename_file_path'\n";
 
@@ -303,7 +383,7 @@ sub doseries_quilt {
   use File::Basename;
   use File::Temp qw(tempfile);
 
-  my ($series, $tardir, $quilt_debian_file) = @_;
+  my ($series, $tardir, $quilt_debian_file, $origtarfile) = @_;
   my $dir = $series;
   $dir =~ s/[^\/]+$//;
   $dir =~ s/\/+$//;
@@ -329,12 +409,12 @@ sub doseries_quilt {
     my $patch_relative = dorelativepath($patch);
     print "Processing patch $patch_relative...\n";
     my $patch_name = basename($patch);
-    dofile_quilt("$dir/$patch", $quilt_debian_file, "debian/patches/$patch_name");
+    dofile_quilt("$dir/$patch", $quilt_debian_file, "debian/patches/$patch_name", $origtarfile);
     print tmp_patches "$patch_name\n";
   }
 
   close($tmp_patches);
-  dofile_quilt($tmp_patches, $quilt_debian_file, "debian/patches/series");
+  dofile_quilt($tmp_patches, $quilt_debian_file, "debian/patches/series", $origtarfile);
 }
 
 sub addfile {
@@ -564,7 +644,7 @@ for my $debtarfile (@debtarfiles) {
 if (not is_quilt($format)){
   dofile($changelog, $tardir, 'debian/changelog', $origtarfile) if defined $changelog;
 } else {
-  dofile_quilt($changelog, $quilt_debian_file, 'debian/changelog') if defined $changelog
+  dofile_quilt($changelog, $quilt_debian_file, 'debian/changelog', $origtarfile) if defined $changelog
 }
 
 if ($tags->{'DEBTRANSFORM-FILES'}) {
@@ -572,7 +652,7 @@ if ($tags->{'DEBTRANSFORM-FILES'}) {
     if (not is_quilt($format)){
       dofile("$dir/$file", $tardir, $file, $origtarfile);
     } else {
-      dofile_quilt("$dir/$file", $quilt_debian_file, $file);
+      dofile_quilt("$dir/$file", $quilt_debian_file, $file, $origtarfile);
     }
   }
 }
@@ -581,7 +661,7 @@ for my $debtarfile (@debtarfiles) {
   if (not is_quilt($format)) {
     dotar("$dir/$debtarfile", $tardir, \%debtarorigin, $origtarfile, @{$debtarcontent{$debtarfile} });
   } else {
-    dotar_quilt("$dir/$debtarfile", $quilt_debian_file)
+    dotar_quilt("$dir/$debtarfile", $quilt_debian_file, $origtarfile)
   }
 }
 
@@ -593,7 +673,7 @@ for my $file (grep {/^debian\./} @dir) {
     dofile("$dir/$file", $tardir, 'debian/'.substr($file, 7), $origtarfile);
   } else {
     my $in_tar_path = 'debian/'.substr($file, 7);
-    dofile_quilt("$dir/$file", $quilt_debian_file, $in_tar_path);
+    dofile_quilt("$dir/$file", $quilt_debian_file, $in_tar_path, $origtarfile);
   }
 }
 
@@ -607,11 +687,11 @@ if (not is_quilt($format)){
   }
 } else {
   if ($tags->{'DEBTRANSFORM-SERIES'}) {
-    doseries_quilt("$dir/$tags->{'DEBTRANSFORM-SERIES'}", $tardir, $quilt_debian_file);
+    doseries_quilt("$dir/$tags->{'DEBTRANSFORM-SERIES'}", $tardir, $quilt_debian_file, $origtarfile);
   } elsif ($dir{"debian.series"}) {
-    doseries_quilt("$dir/debian.series", $tardir, $quilt_debian_file);
+    doseries_quilt("$dir/debian.series", $tardir, $quilt_debian_file, $origtarfile);
   } elsif ($dir{"patches.series"}) {
-    doseries_quilt("$dir/patches.series", $tardir, $quilt_debian_file);
+    doseries_quilt("$dir/patches.series", $tardir, $quilt_debian_file, $origtarfile);
   }
 
 }
@@ -625,7 +705,7 @@ if (is_quilt($format)) {
   open my $fh, '>', "$dir/debian_source_format";
   print {$fh} $format . "\n";
   close $fh;
-  dofile_quilt("$dir/debian_source_format", $quilt_debian_file, 'debian/source/format');
+  dofile_quilt("$dir/debian_source_format", $quilt_debian_file, 'debian/source/format', $origtarfile);
   unlink "$dir/debian_source_format";
 }
 
