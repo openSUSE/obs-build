@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Mon Jun 13 12:39:58 UTC 2022 - Adrian Schröter <adrian@suse.de>
+
+- regression fix for Debian Source format 3.0 (quilt), also adding
+  changelog modification now
+
+-------------------------------------------------------------------
 Tue May 31 09:10:07 UTC 2022 - Adrian Schröter <adrian@suse.de>
 
 - Revert "avod aio=io_uring for now on SLE15-SP4 workers"
