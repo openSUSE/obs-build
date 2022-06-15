@@ -396,7 +396,7 @@ vm_fixup_kvm() {
         kvm_options="$kvm_options -object iothread,id=io0"
         kvm_device_opts=",iothread=io0"
         case $(uname -m) in
-            ppc|ppc64|ppc64le)
+            ppc|ppcle|ppc64|ppc64le)
                 # PowerPC currently not reliably working
                 ;;
             *)
