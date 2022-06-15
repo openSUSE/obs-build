@@ -398,6 +398,8 @@ vm_fixup_kvm() {
         case $(uname -m) in
             ppc|ppcle|ppc64|ppc64le)
                 # PowerPC currently not reliably working
+                # https://bugzilla.suse.com/show_bug.cgi?id=1200564
+                echo "Skipping io_uring on PowerPC because of bsc#1200564"
                 ;;
             *)
                 if ldd $kvm_bin | grep -E -q 'liburing.so.[2-9]' ; then
