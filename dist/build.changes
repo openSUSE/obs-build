@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Mon Jun 20 09:33:55 UTC 2022 - Adrian Schröter <adrian@suse.de>
+
+- kvm: exclude powerpc from io_uring, enable iothreads always (#829)
+- kvm: enable more performant I/O also for s390(x) (#828)
+- Changelog patching when building DSC format 3.0. (#831)
+- support for building from slsa provenance files
+
+-------------------------------------------------------------------
 Tue May 31 09:10:07 UTC 2022 - Adrian Schröter <adrian@suse.de>
 
 - Revert "avod aio=io_uring for now on SLE15-SP4 workers"
