@@ -121,7 +121,7 @@ vm_verify_options_kvm() {
 	    if grep -q POWER8 /proc/cpuinfo ; then
 	        # This option only exists with QEMU 5.0 or newer
 		if $kvm_bin -machine 'pseries,?' 2>&1 | grep -q cap-ccf-assist ; then
-		kvm_options="-enable-kvm -M pseries,cap-ccf-assist=off"
+		    kvm_options="-enable-kvm -M pseries,cap-ccf-assist=off"
 		fi
 	    fi
 	    if grep -q "POWER9" /proc/cpuinfo; then
