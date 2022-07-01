@@ -28,10 +28,7 @@ recipe_setup_spec() {
 	cleanup_and_exit 1 "Error: TOPDIR empty"
     fi
     test "$DO_INIT_TOPDIR" = false || spec_init_topdir
-    for i in BUILD RPMS/`uname -m` RPMS/i386 RPMS/noarch SOURCES SPECS SRPMS BUILDROOT OTHER ; do
-	mkdir -p $BUILD_ROOT$TOPDIR/$i
-    done
-    mkdir -p $BUILD_ROOT$TOPDIR/SOURCES
+    mkdir -p $BUILD_ROOT$TOPDIR/{BUILD,SOURCES,SPECS,SRPMS,BUILDROOT,OTHER,RPMS/noarch,RPMS/i386,RPMS/$(uname -m)}
     copy_sources "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"
     chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
 }
