@@ -320,12 +320,9 @@ run_pkg_scripts() {
 
 reorder() {
     test -z "$*" && return
-    rm -f $BUILD_ROOT/.init_b_cache/order.manifest
-    for PKG in "$@" ; do
-	echo "$PKG" >> $BUILD_ROOT/.init_b_cache/order.manifest
-    done
-    $BUILD_DIR/order --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir $CONFIG_DIR --manifest $BUILD_ROOT/.init_b_cache/order.manifest $BUILD_ROOT/.init_b_cache/rpms || touch $BUILD_ROOT/exit
-    rm -f $BUILD_ROOT/.init_b_cache/order.manifest
+    printf "%s\n" "$@" > $BUILD_INIT_CACHE/order.manifest
+    $BUILD_DIR/order --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir $CONFIG_DIR --manifest $BUILD_INIT_CACHE/order.manifest $BUILD_INIT_CACHE/rpms || touch $BUILD_ROOT/exit
+    rm -f $BUILD_INIT_CACHE/order.manifest
 }
 
 create_devs() {
