@@ -198,7 +198,7 @@ clean_build_root() {
 	rm -rf -- "$BUILD_ROOT"/.build.initrd.*
 	rm -rf -- "$BUILD_ROOT"/.build.sysroot
 	rm -rf -- "$BUILD_ROOT/.root"
-	rm -rf -- "$BUILD_ROOT/.init_b_cache"
+	rm -rf -- "$BUILD_INIT_CACHE"
 	test -L "$BUILD_ROOT/.preinstall_image" && rm -f -- "$BUILD_ROOT/.preinstall_image"
 	rm -rf -- "$BUILD_ROOT"/.preinstall_image/*
 	rm -rf -- "$BUILD_ROOT"/.preinstallimage*
@@ -643,8 +643,8 @@ else
     #
     # now make sure that all the packages are installed.
     #
-    rm -rf "$BUILD_ROOT/.init_b_cache"
-    mkdir -p "$BUILD_ROOT/.init_b_cache/scripts"
+    rm -rf "$BUILD_INIT_CACHE"
+    mkdir -p "$BUILD_INIT_CACHE/scripts"
 
     if test -z "$RPMLIST" ; then
 	#
@@ -656,7 +656,7 @@ else
 	#
 	# select and expand packages
 	#
-	RPMLIST=$BUILD_ROOT/.init_b_cache/rpmlist
+	RPMLIST=$BUILD_INIT_CACHE/rpmlist
 	test -z "$LIST_STATE" && echo "expanding package dependencies..."
 	VMOPT=
 	test -z "$PREPARE_VM" || VMOPT=--vm
@@ -675,8 +675,8 @@ else
 	   test "$PKG" = "dist:" && continue
 	   test "$PKG" = "rpmid:" && continue
 	   echo "${SRC##*/}"
-	done < $BUILD_ROOT/.init_b_cache/rpmlist
-	rm -rf "$BUILD_ROOT/.init_b_cache"
+	done < $BUILD_INIT_CACHE/rpmlist
+	rm -rf "$BUILD_INIT_CACHE"
 	cleanup_and_exit 0
     fi
 
@@ -711,8 +711,8 @@ else
     RUNSCRIPTS_SEEN=
     PACKAGES_FROM_PREINSTALLIMAGE=
     GUESSED_DIST=unknown
-    mkdir -p $BUILD_ROOT/.init_b_cache/rpms
-    rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download
+    mkdir -p $BUILD_INIT_CACHE/rpms
+    rm -f $BUILD_INIT_CACHE/rpmlist.download
     while read PKG SRC ; do
 	if test "$PKG" = "preinstall:" ; then
 	    PACKAGES_TO_PREINSTALL=$SRC
@@ -732,7 +732,7 @@ else
 	fi
 	if test "$PKG" = "preinstallimage:" ; then
 	    PREINSTALL_IMAGE=${SRC##*/}
-	    ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/${SRC##*/}"
+	    ln -s "$SRC" "$BUILD_INIT_CACHE/rpms/${SRC##*/}"
 	    continue
 	fi
 	if test "$PKG" = "preinstallimagesource:" ; then
@@ -749,7 +749,7 @@ else
 	    continue
 	fi
 	if test "$PKG" = "rpmid:" ; then
-	    echo "${SRC#*:}" > $BUILD_ROOT/.init_b_cache/rpms/${SRC%%:*}.id
+	    echo "${SRC#*:}" > $BUILD_INIT_CACHE/rpms/${SRC%%:*}.id
 	    continue
 	fi
 	if test "$PKG" = "sysroot:" ; then
@@ -773,7 +773,7 @@ else
 	if test "${SRC#/}" = "$SRC" ; then
 	    case "$SRC" in
 		zypp://* | http://* | https://* | ftp://* | ftps://*)
-		    echo "$PKG $SRC" >>$BUILD_ROOT/.init_b_cache/rpmlist.download
+		    echo "$PKG $SRC" >>$BUILD_INIT_CACHE/rpmlist.download
 		    continue
 		    ;;
 		*)
@@ -783,7 +783,7 @@ else
 	fi
 	SRCSUF=${SRC/%.pkg.tar.zst/.arch}
 	SRCSUF=${SRCSUF/%.pkg.tar.?z/.arch}
-	ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
+	ln -s "$SRC" "$BUILD_INIT_CACHE/rpms/$PKG.${SRCSUF##*.}"
     done < $RPMLIST
 
     PACKAGES_TO_ALL="$PACKAGES_TO_INSTALL"
@@ -807,18 +807,18 @@ else
     fi
 
     # use cached packages where possible
-    if test -s $BUILD_ROOT/.init_b_cache/rpmlist.download ; then
+    if test -s $BUILD_INIT_CACHE/rpmlist.download ; then
 	echo "calculating packages to download..."
         while read PKG SRC ; do
 	    SRCSUF=${SRC/%.pkg.tar.zst/.arch}
 	    SRCSUF=${SRCSUF/%.pkg.tar.?z/.arch}
-	    if test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.id" ; then
-		read cachepkgid < $BUILD_ROOT/.init_b_cache/rpms/$PKG.id
+	    if test -s "$BUILD_INIT_CACHE/rpms/$PKG.id" ; then
+		read cachepkgid < $BUILD_INIT_CACHE/rpms/$PKG.id
 		echo "PKG $PKG $cachepkgid"
 	    else
 		echo "PKG $PKG"
 	    fi
-	    echo "DST $BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
+	    echo "DST $BUILD_INIT_CACHE/rpms/$PKG.${SRCSUF##*.}"
 	    if test "$SRC" != "${SRC#zypp://}" ; then
 		# for zypp packages also look in the zypp cache
 		cachedir="/var/cache/zypp/packages/${SRC#zypp://}"
@@ -826,21 +826,21 @@ else
 	    fi
 	    cachedir="$(getcachedir "$SRC")"
 	    echo "CACHE $cachedir/${SRCSUF##*/}"
-	done < $BUILD_ROOT/.init_b_cache/rpmlist.download | "$BUILD_DIR/getbuildids" cachecheck
+	done < $BUILD_INIT_CACHE/rpmlist.download | "$BUILD_DIR/getbuildids" cachecheck
         # remove found packages from download list
-        rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download2
+        rm -f $BUILD_INIT_CACHE/rpmlist.download2
         while read PKG SRC ; do
 	    SRCSUF=${SRC/%.pkg.tar.zst/.arch}
 	    SRCSUF=${SRCSUF/%.pkg.tar.?z/.arch}
-	    test -L "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}" || echo "$PKG $SRC" >>$BUILD_ROOT/.init_b_cache/rpmlist.download2
-	done < $BUILD_ROOT/.init_b_cache/rpmlist.download
-        rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download
-	test -s $BUILD_ROOT/.init_b_cache/rpmlist.download2 && mv $BUILD_ROOT/.init_b_cache/rpmlist.download2 $BUILD_ROOT/.init_b_cache/rpmlist.download
+	    test -L "$BUILD_INIT_CACHE/rpms/$PKG.${SRCSUF##*.}" || echo "$PKG $SRC" >>$BUILD_INIT_CACHE/rpmlist.download2
+	done < $BUILD_INIT_CACHE/rpmlist.download
+        rm -f $BUILD_INIT_CACHE/rpmlist.download
+	test -s $BUILD_INIT_CACHE/rpmlist.download2 && mv $BUILD_INIT_CACHE/rpmlist.download2 $BUILD_INIT_CACHE/rpmlist.download
     fi
 
     # now do the download of missing packages
-    if test -s $BUILD_ROOT/.init_b_cache/rpmlist.download ; then
-        PACKAGES_TO_DOWNLOAD=`awk '{print $2}' < "$BUILD_ROOT/.init_b_cache/rpmlist.download"`
+    if test -s $BUILD_INIT_CACHE/rpmlist.download ; then
+        PACKAGES_TO_DOWNLOAD=`awk '{print $2}' < "$BUILD_INIT_CACHE/rpmlist.download"`
         progress_setup PACKAGES_TO_DOWNLOAD
         while read PKG SRC ; do
             progress_step PACKAGES_TO_DOWNLOAD
@@ -848,9 +848,9 @@ else
 	    # downloadpkg modified $SRC, so it has a right name for use
 	    SRCSUF=${SRC/%.pkg.tar.zst/.arch}
 	    SRCSUF=${SRCSUF/%.pkg.tar.?z/.arch}
-	    ln -s "$SRC" "$BUILD_ROOT/.init_b_cache/rpms/$PKG.${SRCSUF##*.}"
-        done < $BUILD_ROOT/.init_b_cache/rpmlist.download
-        rm -f $BUILD_ROOT/.init_b_cache/rpmlist.download
+	    ln -s "$SRC" "$BUILD_INIT_CACHE/rpms/$PKG.${SRCSUF##*.}"
+        done < $BUILD_INIT_CACHE/rpmlist.download
+        rm -f $BUILD_INIT_CACHE/rpmlist.download
         echo
     fi
 
@@ -867,7 +867,7 @@ else
        # touch the file so that the copying works
        touch_args=()
        for PKG in $PACKAGES_FROM_PREINSTALLIMAGE; do
-           touch_args[${#touch_args[@]}]="$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF"
+           touch_args[${#touch_args[@]}]="$BUILD_INIT_CACHE/rpms/$PKG.$PSUF"
        done
        run_cmd_with_xargs touch -- "${touch_args[@]}"
     fi
@@ -888,11 +888,11 @@ esac
 # test if we need to preinstall
 #
 if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsystem.data ; then
-    mkdir -p -- $BUILD_ROOT/.init_b_cache/rpms $BUILD_ROOT/etc $BUILD_ROOT/proc || cleanup_and_exit 1
+    mkdir -p -- $BUILD_INIT_CACHE/rpms $BUILD_ROOT/etc $BUILD_ROOT/proc || cleanup_and_exit 1
     test -L $BUILD_ROOT/etc/HOSTNAME && buildroot_rm etc/HOSTNAME
     test -f $BUILD_ROOT/etc/HOSTNAME || hostname -f > $BUILD_ROOT/etc/HOSTNAME
     for PKG in $PACKAGES_TO_RUNSCRIPTS ; do
-	: > $BUILD_ROOT/.init_b_cache/scripts/$PKG.run
+	: > $BUILD_INIT_CACHE/scripts/$PKG.run
     done
     PACKAGES_TO_PREINSTALL_FILTERED="$PACKAGES_TO_PREINSTALL"
     PACKAGES_TO_VMINSTALL_FILTERED="$PACKAGES_TO_VMINSTALL"
@@ -935,7 +935,7 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
 	mount_stuff
 	run_pkg_scripts
 	pkg_initdb
-	touch $BUILD_ROOT/.init_b_cache/preinstall_finished
+	touch $BUILD_INIT_CACHE/preinstall_finished
     fi
     # mark as preinstalled no longer needed
     rm -rf "$BUILD_ROOT/installed-pkg"
@@ -953,11 +953,11 @@ if test -n "$PREPARE_VM" ; then
     cp_args=()
     ln_args=()
     for PKG in $PACKAGES_TO_ALL $PACKAGES_TO_SYSROOTINSTALL ; do
-        cp_args[${#cp_args[@]}]="$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF"
+        cp_args[${#cp_args[@]}]="$BUILD_INIT_CACHE/rpms/$PKG.$PSUF"
         ln_args[${#ln_args[@]}]="../$PKG.$PSUF"
     done
-    run_cmd_with_xargs cp --remove-destination -t $BUILD_ROOT/.init_b_cache -- "${cp_args[@]}" || cleanup_and_exit 1
-    run_cmd_with_xargs ln -s -f -t $BUILD_ROOT/.init_b_cache/rpms -- "${ln_args[@]}"
+    run_cmd_with_xargs cp --remove-destination -t $BUILD_INIT_CACHE -- "${cp_args[@]}" || cleanup_and_exit 1
+    run_cmd_with_xargs ln -s -f -t $BUILD_INIT_CACHE/rpms -- "${ln_args[@]}"
     check_exit
     # alreadyinstalled check will not work, but we have to live with that...
     echo -n 'reordering...'
@@ -980,10 +980,10 @@ fi
 #
 # finish preinstall if this is a vm continuation
 #
-if test -e "$BUILD_ROOT/.build/init_buildsystem.data" -a ! -e "$BUILD_ROOT/.init_b_cache/preinstall_finished" ; then
+if test -e "$BUILD_ROOT/.build/init_buildsystem.data" -a ! -e "$BUILD_INIT_CACHE/preinstall_finished" ; then
     run_pkg_scripts
     pkg_initdb
-    touch "$BUILD_ROOT/.init_b_cache/preinstall_finished"
+    : > "$BUILD_INIT_CACHE/preinstall_finished"
 fi
 
 #
@@ -994,8 +994,8 @@ if test -n "$CREATE_BUILD_BINARIES" ; then
     echo "creating .build.binaries directory..."
     mkdir -p "$BUILD_ROOT/.build.binaries"
     for PKG in $PACKAGES_TO_AVAILABLE ; do
-	test -L "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" || continue
-	LPKG=`readlink -f "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF"`
+	test -L "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF" || continue
+	LPKG=`readlink -f "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF"`
 	ln "$LPKG" "$BUILD_ROOT/.build.binaries/$PKG.$PSUF" 2>/dev/null
 	test -f "$BUILD_ROOT/.build.binaries/$PKG.$PSUF" && continue
 	cp "$LPKG" "$BUILD_ROOT/.build.binaries/$PKG.$PSUF"
@@ -1026,18 +1026,18 @@ fi
 
 echo "querying package ids..."
 for PKG in $PACKAGES_TO_INSTALL ; do
-    test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" || continue
-    test -L "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" || continue
-    echo "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF"
+    test -s "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF" || continue
+    test -L "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF" || continue
+    echo "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF"
 done | "$BUILD_DIR/getbuildids" 
 
 #
 # get list and ids of already installed packages
 #
-mkdir -p $BUILD_ROOT/.init_b_cache/alreadyinstalled
+mkdir -p $BUILD_INIT_CACHE/alreadyinstalled
 listinstalled --root "$BUILD_ROOT" --type "$PSUF" --extraname | (
     while read id name buildid; do
-	echo "$buildid" > "$BUILD_ROOT/.init_b_cache/alreadyinstalled/$name"
+	echo "$buildid" > "$BUILD_INIT_CACHE/alreadyinstalled/$name"
     done
 )
 
@@ -1047,28 +1047,28 @@ pkg_prepare
 #
 # delete all packages we don't want
 #
-mkdir -p $BUILD_ROOT/.init_b_cache/todelete
-for PKG in $BUILD_ROOT/.init_b_cache/alreadyinstalled/* ; do
+mkdir -p $BUILD_INIT_CACHE/todelete
+for PKG in $BUILD_INIT_CACHE/alreadyinstalled/* ; do
     PKG=${PKG##*/}
     test "$PKG" = "*" && continue
-    ln $BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG $BUILD_ROOT/.init_b_cache/todelete/$PKG
+    ln $BUILD_INIT_CACHE/alreadyinstalled/$PKG $BUILD_INIT_CACHE/todelete/$PKG
 done
 for PKG in $PACKAGES_TO_INSTALL; do
-    rm -f $BUILD_ROOT/.init_b_cache/todelete/$PKG
+    rm -f $BUILD_INIT_CACHE/todelete/$PKG
 done
-for PKG in $BUILD_ROOT/.init_b_cache/todelete/* ; do
+for PKG in $BUILD_INIT_CACHE/todelete/* ; do
     PKG=${PKG##*/}
     test "$PKG" = "*" && continue
     echo "deleting $PKG"
     pkg_erase
     check_exit
 done
-rm -rf "$BUILD_ROOT/.init_b_cache/todelete"
+rm -rf "$BUILD_INIT_CACHE/todelete"
 
-rm -rf "$BUILD_ROOT/.init_b_cache/preinstalls"
-mkdir -p "$BUILD_ROOT/.init_b_cache/preinstalls"
+rm -rf "$BUILD_INIT_CACHE/preinstalls"
+mkdir -p "$BUILD_INIT_CACHE/preinstalls"
 if test -n "$PACKAGES_TO_PREINSTALL"; then
-    touch -- $(for PKG in $PACKAGES_TO_PREINSTALL; do echo "$BUILD_ROOT/.init_b_cache/preinstalls/$PKG"; done)
+    touch -- $(for PKG in $PACKAGES_TO_PREINSTALL; do echo "$BUILD_INIT_CACHE/preinstalls/$PKG"; done)
 fi
 
 rm -rf "$BUILD_ROOT/installed-pkg"
@@ -1089,7 +1089,7 @@ for PKG in $MAIN_LIST ; do
     test -f $BUILD_ROOT/installed-pkg/$PKG && continue
     progress_step MAIN_LIST
 
-    if test -e "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" -a ! -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" ; then
+    if test -e "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF" -a ! -s "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF" ; then
 	# preinstallimage package, make sure it's in the image
 	if ! test -e $BUILD_ROOT/.preinstall_image/$PKG ; then
 	    cleanup_and_exit 1 "Package $PKG is missing from the preinstall image"
@@ -1103,21 +1103,21 @@ for PKG in $MAIN_LIST ; do
     # get the hdrmd5 if we want to create a preinstall image
     PKG_HDRMD5=
     if test -n "$CREATE_PREINSTALL_DATA" -a ! -e $BUILD_ROOT/.preinstall_image/$PKG ; then
-	PKG_HDRMD5=`perl -I$BUILD_DIR -MBuild -e 'print Build::queryhdrmd5($ARGV[0])' $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF`
+	PKG_HDRMD5=`perl -I$BUILD_DIR -MBuild -e 'print Build::queryhdrmd5($ARGV[0])' $BUILD_INIT_CACHE/rpms/$PKG.$PSUF`
 	test -n "$PKG_HDRMD5" || cleanup_and_exit 1
     fi
 
-    test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF || continue
+    test -L $BUILD_INIT_CACHE/rpms/$PKG.$PSUF || continue
 
-    if test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF.buildid" ; then
-	read PKGID < "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF.buildid"
+    if test -s "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF.buildid" ; then
+	read PKGID < "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF.buildid"
     else
-	PKGID=$(perl -I$BUILD_DIR -MBuild -e Build::showquery "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" buildid)
+	PKGID=$(perl -I$BUILD_DIR -MBuild -e Build::showquery "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF" buildid)
     fi
 
-    if test -f "$BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG" ; then
-	read OLDPKGID < "$BUILD_ROOT/.init_b_cache/alreadyinstalled/$PKG"
-	if test "$PKGID" != "$OLDPKGID" && ! test -e "$BUILD_ROOT/.init_b_cache/preinstalls/$PKG" ; then
+    if test -f "$BUILD_INIT_CACHE/alreadyinstalled/$PKG" ; then
+	read OLDPKGID < "$BUILD_INIT_CACHE/alreadyinstalled/$PKG"
+	if test "$PKGID" != "$OLDPKGID" && ! test -e "$BUILD_INIT_CACHE/preinstalls/$PKG" ; then
 	    echo "deleting unwanted ${OLDPKGID%% *}"
 	    pkg_erase
 	else
@@ -1130,7 +1130,7 @@ for PKG in $MAIN_LIST ; do
 	    echo "deleting incomplete ${OLDPKGID%% *}"
 	    pkg_erase
 	fi
-	if test -e "$BUILD_ROOT/.init_b_cache/preinstalls/$PKG" ; then
+	if test -e "$BUILD_INIT_CACHE/preinstalls/$PKG" ; then
 	    preinstall "$PKG"
 	fi
 	check_exit
@@ -1143,12 +1143,12 @@ for PKG in $MAIN_LIST ; do
     
     # install the package
     echo "installing ${PKGID%% *}"
-    if ! test "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" -ef "$BUILD_ROOT/.init_b_cache/$PKG.$PSUF" ; then
-	cp --remove-destination $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
+    if ! test "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF" -ef "$BUILD_INIT_CACHE/$PKG.$PSUF" ; then
+	cp --remove-destination $BUILD_INIT_CACHE/rpms/$PKG.$PSUF $BUILD_INIT_CACHE/$PKG.$PSUF || cleanup_and_exit 1
     fi
     pkg_install
     check_exit
-    rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
+    rm -f $BUILD_INIT_CACHE/$PKG.$PSUF
     echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
     test -n "$PKG_HDRMD5" && echo "$PKG_HDRMD5 $PKGID" > $BUILD_ROOT/.preinstall_image/$PKG
 
@@ -1164,20 +1164,20 @@ if test -n "$PACKAGES_TO_SYSROOTINSTALL" ; then
     progress_setup MAIN_LIST
     for PKG in $MAIN_LIST ; do
 	progress_step MAIN_LIST
-	test -L $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF || continue
+	test -L $BUILD_INIT_CACHE/rpms/$PKG.$PSUF || continue
 
-	if test -s "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF.buildid" ; then
-	    read PKGID < "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF.buildid"
+	if test -s "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF.buildid" ; then
+	    read PKGID < "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF.buildid"
 	else
-	    PKGID=$(perl -I$BUILD_DIR -MBuild -e Build::showquery "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" buildid)
+	    PKGID=$(perl -I$BUILD_DIR -MBuild -e Build::showquery "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF" buildid)
 	fi
 	echo "installing ${PKGID%% *}"
-	if ! test "$BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF" -ef "$BUILD_ROOT/.init_b_cache/$PKG.$PSUF" ; then
-	    cp --remove-destination $BUILD_ROOT/.init_b_cache/rpms/$PKG.$PSUF $BUILD_ROOT/.init_b_cache/$PKG.$PSUF || cleanup_and_exit 1
+	if ! test "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF" -ef "$BUILD_INIT_CACHE/$PKG.$PSUF" ; then
+	    cp --remove-destination $BUILD_INIT_CACHE/rpms/$PKG.$PSUF $BUILD_INIT_CACHE/$PKG.$PSUF || cleanup_and_exit 1
 	fi
 	pkg_sysrootinstall
 	check_exit
-	rm -f $BUILD_ROOT/.init_b_cache/$PKG.$PSUF
+	rm -f $BUILD_INIT_CACHE/$PKG.$PSUF
 	echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
     done
     pkg_sysrootinstall --finalize
@@ -1281,7 +1281,7 @@ if ! grep -F "127.0.0.1 $HOST" $BUILD_ROOT/etc/hosts > /dev/null ; then
 fi
 
 rm -f $BUILD_ROOT/.rpmmacros $BUILD_ROOT/root/.rpmmacros
-rm -rf "$BUILD_ROOT/.init_b_cache"
+rm -rf "$BUILD_INIT_CACHE"
 rm -f $BUILD_IS_RUNNING
 rm -f $TMPFILE
 
