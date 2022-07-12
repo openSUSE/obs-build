@@ -1905,8 +1905,8 @@ if test -n "$RPMS" -a -d "$BUILD_ROOT/usr/lib/build/checks" ; then
 	PNAME="${PNAME%-*-*.*.rpm}"
     fi
     for CHECKSCRIPT in $BUILD_ROOT/usr/lib/build/checks/* ; do
-	echo "... running ${CHECKSCRIPT##*/}"
-	BUILD_ROOT=/ chroot "$BUILD_ROOT" "/usr/lib/build/checks/${CHECKSCRIPT##*/}" || cleanup_and_exit 1
+	    echo "... running ${CHECKSCRIPT##*/}"
+	    BUILD_ROOT=/ HOME=/root chroot "$BUILD_ROOT" "/usr/lib/build/checks/${CHECKSCRIPT##*/}" || cleanup_and_exit 1
     done
     # workaround for broken 13.1 check scripts which umount /proc
     test -e "$BUILD_ROOT/proc/self" || mount -n -tproc none $BUILD_ROOT/proc
@@ -1916,7 +1916,7 @@ fi
 for CHECKSCRIPT in $BUILD_ROOT/usr/lib/build/post-build-checks/* ; do
     if test -x "$CHECKSCRIPT"; then
        echo "... running ${CHECKSCRIPT##*/}"
-       BUILD_ROOT=/ chroot "$BUILD_ROOT" "/usr/lib/build/post-build-checks/${CHECKSCRIPT##*/}" || cleanup_and_exit 1
+       BUILD_ROOT=/ HOME=/root chroot "$BUILD_ROOT" "/usr/lib/build/post-build-checks/${CHECKSCRIPT##*/}" || cleanup_and_exit 1
     fi
 done
 
