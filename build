@@ -1890,7 +1890,7 @@ if test -n "$RPMS" -a -d "$BUILD_ROOT/usr/lib/build/checks" ; then
     # find package name
     export PNAME=
     for SRPM in $BUILD_ROOT/$TOPDIR/SRPMS/*src.rpm ; do
-	test -f "$SRPM" && PNAME=`rpm --nodigest --nosignature -qp --qf "%{NAME}" $SRPM`
+        test -f "$SRPM" && PNAME=`env LC_ALL=C rpm --macros=/dev/null --nodigest --nosignature -qp --qf "%{NAME}" $SRPM`
     done
     if test -z "$PNAME" ; then
 	for SRPM in $RPMS ; do
