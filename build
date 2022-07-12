@@ -1881,6 +1881,12 @@ TIME_DELTARPMS=0
 # works if there is an check/rpmlint error
 BUILD_SUCCEEDED=false
 
+
+###### Post build checks
+
+TIME_POSTCHECKS=$SECONDS
+
+# RPM specific post checks are in /usr/lib/build/checks
 if test -n "$RPMS" -a -d "$BUILD_ROOT/usr/lib/build/checks" ; then
     export DO_RPM_REMOVE=true
     # workaround for broken 13.1 check scripts which umount /proc
@@ -1898,22 +1904,25 @@ if test -n "$RPMS" -a -d "$BUILD_ROOT/usr/lib/build/checks" ; then
 	done
 	PNAME="${PNAME%-*-*.*.rpm}"
     fi
-    TIME_POSTCHECKS=$SECONDS
     for CHECKSCRIPT in $BUILD_ROOT/usr/lib/build/checks/* ; do
 	echo "... running ${CHECKSCRIPT##*/}"
 	BUILD_ROOT=/ chroot "$BUILD_ROOT" "/usr/lib/build/checks/${CHECKSCRIPT##*/}" || cleanup_and_exit 1
     done
-    TIME_POSTCHECKS=$(( $SECONDS - $TIME_POSTCHECKS ))
     # workaround for broken 13.1 check scripts which umount /proc
     test -e "$BUILD_ROOT/proc/self" || mount -n -tproc none $BUILD_ROOT/proc
 fi
 
+# Generic post-build-checks are in /usr/lib/build/post-build-checks
 for CHECKSCRIPT in $BUILD_ROOT/usr/lib/build/post-build-checks/* ; do
     if test -x "$CHECKSCRIPT"; then
        echo "... running ${CHECKSCRIPT##*/}"
        BUILD_ROOT=/ chroot "$BUILD_ROOT" "/usr/lib/build/post-build-checks/${CHECKSCRIPT##*/}" || cleanup_and_exit 1
     fi
 done
+
+###### End Post build checks
+
+TIME_POSTCHECKS=$(( $SECONDS - $TIME_POSTCHECKS ))
 
 # checkscripts may have deleted some binaries
 RPMS=`find $BUILD_ROOT/$TOPDIR/RPMS -type f -name "*.rpm" 2>/dev/null || true`
