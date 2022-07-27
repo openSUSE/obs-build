@@ -69,6 +69,7 @@ BuildRequires:  perl(YAML::LibYAML)
 # None of them are actually required for core features.
 # Perl helper scripts use them.
 Recommends:     perl(Archive::Tar)
+Recommends:     perl(Config::IniFiles)
 Recommends:     perl(Date::Language)
 Recommends:     perl(Date::Parse)
 Recommends:     perl(LWP::UserAgent)
