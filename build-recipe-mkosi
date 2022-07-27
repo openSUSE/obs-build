@@ -1,0 +1,126 @@
+#
+# mkosi specific functions.
+#
+################################################################
+#
+# Copyright (c) 2022 Luca Boccassi <bluca@debian.org>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+recipe_setup_mkosi() {
+    TOPDIR=/usr/src/packages
+    test "$DO_INIT_TOPDIR" = false || rm -rf "$BUILD_ROOT$TOPDIR"
+    for i in OTHER SOURCES ; do
+        mkdir -p "$BUILD_ROOT$TOPDIR/$i"
+    done
+    if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
+        mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+    else
+        copy_sources "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"
+        #cp -r "$MYSRCDIR/mkosi.cache" "$BUILD_ROOT$TOPDIR/SOURCES/"
+    fi
+    chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+}
+
+recipe_prepare_mkosi() {
+    :
+}
+
+recipe_build_mkosi() {
+    local ARCH DIST RELEASE_ARG
+    if [ -x "$BUILD_ROOT/bin/rpm" ]; then
+        ARCH=$(chroot $BUILD_ROOT sh -c "rpm --eval '%{_target_cpu}'")
+    elif [ -x "$BUILD_ROOT/usr/bin/dpkg-architecture" ]; then
+        ARCH=$(chroot $BUILD_ROOT sh -c "dpkg-architecture -qDEB_BUILD_ARCH")
+        # The distro release is usually specified in the recipe, but it is not mandatory.
+        DIST=$(grep Release= "${RECIPEFILE}" | sed "s/\s*Release\s*=\s*\(.*\)\s*/\1/")
+        if [ -z "$DIST" ]; then
+            DIST=$(chroot $BUILD_ROOT sh -c "lsb_release --codename" | awk '{ print $2 }')
+        fi
+
+        # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=845651
+        # For our use case it makes sense to always return the testing codename. In
+        # the example cited in the above bug, the metadata for sid would be incorrect
+        # anyway, and we would want the ones for potato.
+        if test "${DIST}" = "n/a" ; then
+            DIST=$(chroot $BUILD_ROOT sh -c "sed 's/\(.*\)\/.*/\1/' /etc/debian_version")
+        fi
+
+        # Pass it to mkosi, so that the configured mirror is the same as the repository created below
+        RELEASE_ARG="--release ${DIST}"
+
+        test -z "${ARCH}" -o -z "${DIST}" && cleanup_and_exit 1
+    elif [ ! -x "$BUILD_ROOT/usr/bin/repo-add" ]; then
+        cleanup_and_exit 1
+    fi
+
+    test -d $BUILD_ROOT/.build.binaries || cleanup_and_exit 1 "missing $BUILD_ROOT/.build.binaries"
+
+    if test "$DO_INIT" = true; then
+        if [ -x "$BUILD_ROOT/usr/bin/dpkg-architecture" ] && [ ! -d "$BUILD_ROOT/.build.binaries/dists" ]; then
+            echo "creating debian repository metadata..."
+            createrepo_debian $BUILD_ROOT/.build.binaries ${ARCH} ${DIST}
+        elif [ -x "$BUILD_ROOT/bin/rpm" ] && [ ! -d "$BUILD_ROOT/.build.binaries/repodata" ]; then
+            echo "creating rpm repository metadata..."
+            if chroot "$BUILD_ROOT" test -x /usr/bin/createrepo_c; then
+                chroot "$BUILD_ROOT" /usr/bin/createrepo_c /.build.binaries
+            elif chroot "$BUILD_ROOT" test -x /usr/bin/createrepo; then
+                chroot "$BUILD_ROOT" /usr/bin/createrepo /.build.binaries
+            else
+                cleanup_and_exit 1 "No createrepo found in build root"
+            fi
+        elif [ -x "$BUILD_ROOT/usr/bin/repo-add" ]; then
+            echo "creating Arch Linux repository metadata..."
+            chroot $BUILD_ROOT sh -c "repo-add /.build.binaries/core.db.tar.gz /.build.binaries/*"
+        fi
+    fi
+
+    local image_version=""
+    if [ -n "$RELEASE" ]; then
+        image_version="--image-version=${RELEASE}"
+    fi
+    chroot $BUILD_ROOT sh -c \
+        "cd $TOPDIR/SOURCES && mkosi --default $RECIPEFILE $RELEASE_ARG $image_version --nspawn-keep-unit --output-dir $TOPDIR/OTHER --checksum --repository-key-check=no --with-network=never --local-mirror file:///.build.binaries/ --cache /.build.binaries/ build" \
+        || cleanup_and_exit 1
+
+    # move the output files from the subdirectory, as only files in the OTHER/ directory
+    # are published, but they get deposited in OTHER/$DIST~$RELEASE/
+    for d in "$BUILD_ROOT/$TOPDIR"/OTHER/*/; do
+        if [ ! -d "$d" ]; then
+            continue
+        fi
+        mv "$d"/* "$BUILD_ROOT/$TOPDIR/OTHER/"
+        rmdir "$d"
+    done
+
+    # copy recipe source file so that it can be published
+    cp "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" \
+        "$BUILD_ROOT/$TOPDIR/OTHER/"
+
+    # compress the manifest file which can be quite large
+    gzip -9 -f "$BUILD_ROOT/$TOPDIR/OTHER/"*.manifest
+
+    BUILD_SUCCEEDED=true
+}
+
+recipe_resultdirs_mkosi() {
+    :
+}
+
+recipe_cleanup_mkosi() {
+    :
+}
