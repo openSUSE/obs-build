@@ -292,7 +292,7 @@ sub fetch_git_asset {
   my $url = $asset->{'url'};
   die unless $url =~ /^git(?:\+https?)?:/;
   $url =~ s/^git\+//;
-  my @cmd = ('git', 'clone', '-q');
+  my @cmd = ('git', 'clone', '-q', '--recurse-submodules');
   push @cmd, '-b', $1 if $url =~ s/#([^#]+)$//;
   push @cmd, '--', $url, "$tmpdir/$file";
   system(@cmd) && die("git clone failed: $!\n");
