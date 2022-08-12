@@ -82,7 +82,7 @@ vm_startup_xen() {
 	XLDISK=
 	XLDISK="\"${XMROOT#disk=}\""
 	test -n "$XMSWAP" && XLDISK="$XLDISK, \"${XMSWAP#disk=}\""
-	set -- xl create -c $XEN_CONF_FILE name="\"build_$XENID\"" "disk=[ $XLDISK ]" extra=\""$vm_linux_always_append init="$vm_init_script" rd.driver.pre=binfmt_misc $vm_linux_kernel_parameter console=$VM_CONSOLE"\"
+	set -- xl create -c $XEN_CONF_FILE "$@" name="\"build_$XENID\"" "disk=[ $XLDISK ]" extra=\""$vm_linux_always_append init="$vm_init_script" rd.driver.pre=binfmt_misc $vm_linux_kernel_parameter console=$VM_CONSOLE"\"
     fi
     if test "$PERSONALITY" != 0 ; then
 	# have to switch back to PER_LINUX to make xm work

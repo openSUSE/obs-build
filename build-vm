@@ -32,6 +32,7 @@ VM_ROOTDEV=/dev/hda1
 VM_SWAPDEV=/dev/hda2
 
 VM_TYPE=
+declare -a VM_ARGS
 VM_TYPE_PRIVILEGED=
 VM_ROOT=
 VM_SWAP=
@@ -159,6 +160,11 @@ vm_parse_options() {
 	    ;;
 	esac
 	shift
+      ;;
+      -vm-args)
+	needarg
+	eval "VM_ARGS=($ARG)"
+        shift
       ;;
       -vm-worker)
         needarg
@@ -1096,7 +1102,7 @@ vm_first_stage() {
 	echo "### VM INTERACTION START ###"
     fi
 
-    vm_startup
+    vm_startup "${VM_ARGS[@]}"
 
     # kill watchdog again
     if test -n "$VM_WATCHDOG" ; then
