@@ -32,6 +32,9 @@ vm_startup_docker() {
     docker rm "$name" >/dev/null 2>&1 || true
     local docker_opts=
     test -n "$VM_TYPE_PRIVILEGED" && docker_opts="--privileged --cap-add=SYS_ADMIN --cap-add=MKNOD"
+    # Override memory restriction set by stage1. Docker does not support
+    # --ulimit as=... for some reason.
+    ulimit -v 'unlimited'
     docker run \
         --rm --name "$name" --net=none $docker_opts \
         --mount "type=bind,source=$BUILD_ROOT,destination=/mnt" \

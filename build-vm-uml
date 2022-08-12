@@ -30,6 +30,9 @@ vm_verify_options_uml() {
 
 vm_startup_uml() {
     set -- $uml_kernel initrd=$uml_initrd root=ubda init="$vm_init_script" $vm_linux_always_append elevator=noop ubda=$VM_ROOT ubdb=$VM_SWAP ${VM_MEMSIZE:+mem=$VM_MEMSIZE}
+    # Allow overcommit, the total memory will (most of the time?) already be
+    # constrained by UML.
+    ulimit -v 'unlimited'
     echo "$@"
     "$@"
 }
