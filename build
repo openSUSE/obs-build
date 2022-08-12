@@ -740,7 +740,7 @@ setmemorylimit() {
 	esac
     done < <(cat /proc/meminfo) # cat for proc stuff
 
-    ulimit -v $limit
+    ulimit -d $limit
     echo "Memory limit set to ${limit}KB"
 }
 
