@@ -168,6 +168,7 @@ vm_verify_options_kvm() {
             # build minimal machine - TODO enable sandbox on all architectures
             # options to evaluate: mem-merge=off
             kvm_options="-M pc,accel=kvm,usb=off,dump-guest-core=off,vmport=off -sandbox on"
+            kvm_cpu="-cpu host,l3-cache=on"
 
             # from qemu-microvm, minified and hardened PC bios (slightly faster than seabios)
             test -e /usr/share/qemu/qboot.rom && kvm_options="$kvm_options -bios /usr/share/qemu/qboot.rom"
