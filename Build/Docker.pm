@@ -20,10 +20,14 @@
 
 package Build::Docker;
 
+
 use Build::SimpleXML;	# to parse the annotation
 use Build::SimpleJSON;
 
 use strict;
+
+eval { require JSON; };
+*JSON::decode_json = sub {die("JSON::decode_json is not available\n")} unless defined &JSON::decode_json;
 
 sub unify {
   my %h = map {$_ => 1} @_;
@@ -76,6 +80,94 @@ sub quote {
   $str = expandvars($str, $vars) if $vars && $q ne "'" && $str =~ /\$/;
   $str =~ s/([ \t\"\'\$\(\)])/sprintf("%%%02X", ord($1))/ge;
   return $str;
+}
+
+sub query {
+    my ($handle, %opts) = @_;
+
+    $handle =~ s/\.tar$/\.containerinfo/;
+
+    my $json_text = do {
+        open(my $json_fh, "<:encoding(UTF-8)", $handle) or die("Can't open \"$handle\": $!\n");
+        local $/;
+        <$json_fh>
+    };
+    # close $json_fh;
+
+    my $data = JSON::decode_json($json_text);
+
+    my @prov;
+    foreach (@{$data->{'tags'}}) {
+        push @prov, "container:$_";
+    }
+    # try to guess the package name & arch
+    # - for kiwi builds we're lucky as the containerinfo contains the property
+    #   'name' and just about everything else that we need
+    # - with dockerfiles we're a bit screwed, as the package name is "lost" in
+    #   the build process and the archive filename is picked from the first tag...
+    #   So we just pick that as the name and hope things don't break
+    my $name = $data->{'name'};
+    my $version = $data->{'version'};
+    my $release = $data->{'release'};
+
+    my $arch;
+    if ($data->{'file'} =~ /\.docker\.tar$/) {
+        # kiwi image, the file name looks like this:
+        # - minimal-image.x86_64-15.4.0-Build10.2.docker.tar (with release)
+        # - sles15-image.x86_64-15.0.0.docker.tar (without release)
+        # i.e.:
+        # $name.$arch-$version(-Build$release).docker.tar
+        my $re;
+        if ($data->{'release'}) {
+            $re = qr/^$name\.([^\s\.]+)-$version-Build$release\.docker\.tar/;
+        } else {
+            $re = qr/^$name\.([^\s\.]+)-$version\.docker\.tar/;
+        }
+        $data->{'file'} =~ /$re/;
+        $arch = $1;
+    } else {
+        # docker image, file names have this form:
+        # - bci-rust-1.61.x86_64-5.1.tar (with release)
+        # - bci-openjdk-11.x86_64.tar (without release)
+        # i.e.:
+        # $firsttag.$arch(-$release).tar
+        my $re;
+        if ($release) {
+            $re = qr/([^\s\.]+)-$release\.tar$/;
+        } else {
+            $re = qr/([^\s\.]+)\.tar$/;
+        }
+        $data->{'file'} =~ /$re/;
+        $arch = $1;
+
+        my $name_re = qr/^(.*)\.$arch/;
+        $data->{'file'} =~ /$name_re/;
+        $name = $1;
+    }
+
+    return {
+        'provides' => \@prov,
+            'version' => $version,
+            'arch' => $arch,
+            # need to have the prefix 'container:' otherwise pbuild's
+            # repobuilder will not recognize this as a container
+            'name' => 'container:' . $name,
+            'release' => $release // '0',
+            'source' => $name,
+            # 'requires' => \@(),
+    };
+}
+
+sub queryhdrmd5 {
+    my ($handle) = @_;
+
+    open(my $fh, '<', $handle) or croak("could not open $handle");
+    my $md5 = Digest::MD5->new;
+    $md5->addfile($fh);
+
+    close($fh);
+
+    return $md5->hexdigest();
 }
 
 sub addrepo {

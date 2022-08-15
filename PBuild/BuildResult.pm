@@ -28,7 +28,7 @@ use Build::SimpleXML;
 use PBuild::Util;
 use PBuild::Verify;
 
-my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst};
+my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst tar};
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
 
 #
