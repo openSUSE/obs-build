@@ -77,6 +77,8 @@ Recommends:     perl(URI)
 Recommends:     perl(XML::Parser)
 Recommends:     perl(Net::SSL)
 Recommends:     perl(YAML::LibYAML)
+# for querying docker & kiwi builds
+Recommends:     perl(JSON)
 Recommends:     bsdtar
 Recommends:     qemu-linux-user
 Recommends:     zstd
