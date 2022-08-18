@@ -82,6 +82,9 @@ Recommends:     qemu-linux-user
 Recommends:     zstd
 Recommends:     /usr/bin/qemu-kvm
 Recommends:     /sbin/mkfs.ext3
+# for vc:
+Recommends:     /usr/bin/dnsdomainname
+Recommends:     /usr/bin/rpmdev-packager
 %endif
 
 %if 0%{?suse_version} > 1120 || ! 0%{?suse_version}
