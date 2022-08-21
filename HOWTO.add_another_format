@@ -97,3 +97,10 @@ Special notes for image formats
 Image formats can usually skip 2) 3) and 4) from the items above. At least as long
 as they do not want to build new images based on former created ones.
 
+Special notes for new recipe types to the backend
+=================================================
+
+Note that in order to find the new recipe type on the backend when scheduling jobs,
+it will most likely be necessary to teach the scheduler implementation how to match
+on it. Check the expandandsort() and findfile() functions in OBS' backend:
+https://github.com/openSUSE/open-build-service/tree/master/src/backend
