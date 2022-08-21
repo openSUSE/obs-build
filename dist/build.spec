@@ -68,6 +68,7 @@ BuildRequires:  perl(YAML::LibYAML)
 %if 0%{?suse_version} > 1000 || 0%{?centos_version} >= 800 || 0%{?rhel_version} >= 800 || 0%{?fedora_version} >= 21
 # None of them are actually required for core features.
 # Perl helper scripts use them.
+Recommends:     perl(Archive::Tar)
 Recommends:     perl(Date::Language)
 Recommends:     perl(Date::Parse)
 Recommends:     perl(LWP::UserAgent)
