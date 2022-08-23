@@ -460,6 +460,12 @@ vm_img_mkfs() {
     if test -n "$populate"; then
       if test "$fs" = "ext2" -o "$fs" = "ext3" -o "$fs" = "ext4"; then
         mkfs_extra_options="$mkfs_extra_options -d $populate"
+        # mkfs needs to see the files it copies into the fs as owned by root.
+        # Otherwise the whole fs tree would be owned by the calling user.
+        # Doesn't matter too much when setting up the build root initially as
+        # rpm is called inside anway to fix everything. However, when reusing
+        # an image suddenly all ownerships would change.
+        [ -x "/usr/bin/unshare" ] && mkfs="unshare --user --map-root-user $mkfs"
       else
         print "ERROR: populating filesystem is only supported with ext file systems"
         cleanup_and_exit 1
