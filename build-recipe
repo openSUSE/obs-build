@@ -158,22 +158,26 @@ expand_recipe_directories() {
 			collax) types="build.collax" ;;
 			livebuild) types=".livebuild" ;;
 			snapcraft) types="snapcraft.yaml" ;;
+			mkosi) types="mkosi." ;;
 		    esac
 		fi
-		types="$types .spec .dsc PKGBUILD Dockerfile build.collax .kiwi .src.rpm .nosrc.rpm simpleimage snapcraft.yaml Chart.yaml flatpak.yaml flatpak.json"
+		types="$types .spec .dsc PKGBUILD Dockerfile build.collax .kiwi .src.rpm .nosrc.rpm simpleimage snapcraft.yaml Chart.yaml flatpak.yaml flatpak.json mkosi."
 	    fi
 	    for t in $types ; do
 		found=
-		for ff in "$f"/*$t ; do
-		    test -f "$ff" || continue
-		    RECIPEFILES=("${RECIPEFILES[@]}" "$ff")
-		    found=true
-		done
-		for ff in "$f"/mkosi.* ; do
-		    test -f "$ff" || continue
-		    RECIPEFILES=("${RECIPEFILES[@]}" "$ff")
-		    found=true
-		done
+		if test $t = mkosi. ; then
+		    for ff in "$f"/$t* ; do
+			test -f "$ff" || continue
+			RECIPEFILES=("${RECIPEFILES[@]}" "$ff")
+			found=true
+		    done
+		else
+		    for ff in "$f"/*$t ; do
+			test -f "$ff" || continue
+			RECIPEFILES=("${RECIPEFILES[@]}" "$ff")
+			found=true
+		    done
+		fi
 		test -n "$found" && break
 		if test "$t" = .dsc -a -f "$f/debian.control" ; then
 		    RECIPEFILES=("${RECIPEFILES[@]}" "$f/debian.control")
