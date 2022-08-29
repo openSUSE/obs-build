@@ -120,10 +120,11 @@ sub integrate_build_result {
   for my $file (sort keys %$result) {
     next if $file =~ /\.obsbinlnk$/s;
     if ($file =~ /(.*)\.containerinfo$/) {
+      # create an obsbinlnk file from the containerinfo
       my $prefix = $1;
       die unless $result->{$file} =~ /^(.*)\/([^\/]+)$/;
       my $obsbinlnk = PBuild::Container::containerinfo2obsbinlnk($1, $2, $p->{'pkg'});
-      PBuild::Util::store("$dst/$prefix.obsbinlnk", undef, $obsbinlnk);
+      PBuild::Util::store("$dst/$prefix.obsbinlnk", undef, $obsbinlnk) if $obsbinlnk;
     }
     PBuild::Util::cp($result->{$file}, "$dst/$file");
   }
