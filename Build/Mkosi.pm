@@ -74,15 +74,4 @@ sub parse {
   return $ret;
 }
 
-# not implemented yet.
-sub queryiso {
-  my ($handle, %opts) = @_;
-  return {};
-}
-
-sub queryhdrmd5 {
-  my ($bin) = @_;
-  die("Build::Mkosi::queryhdrmd5 unimplemented.\n");
-}
-
 1;

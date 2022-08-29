@@ -1384,7 +1384,6 @@ sub queryhdrmd5 {
   return Build::Kiwi::queryhdrmd5(@_) if $do_kiwi && $binname =~ /\.raw.install$/;
   return Build::Arch::queryhdrmd5(@_) if $do_arch && $binname =~ /\.pkg\.tar(?:\.gz|\.xz|\.zst)?$/;
   return Build::Arch::queryhdrmd5(@_) if $do_arch && $binname =~ /\.arch$/;
-  return Build::Mkosi::queryhdrmd5(@_) if $do_mkosi && $binname =~ /\.(raw|tar|cpio|qcow2)(?:\.gz|\.xz|\.zstd)?$/;
   return undef;
 }
 
