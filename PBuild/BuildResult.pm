@@ -27,6 +27,7 @@ use Build;
 use Build::SimpleXML;
 use PBuild::Util;
 use PBuild::Verify;
+use PBuild::Container;
 
 my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst};
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
@@ -61,7 +62,6 @@ sub read_bininfo {
         my $d = PBuild::Util::retrieve("$dir/$file", 1);
         next unless @s && $d;
         my $r = {%$d, 'filename' => $file, 'id' => "$s[9]/$s[7]/$s[1]"};
-        delete $r->{'path'};
         $bininfo->{$file} = $r;
       } elsif ($file =~ /[-.]appdata\.xml$/) {
         local *F;
@@ -118,6 +118,13 @@ sub integrate_build_result {
   }
   # copy new stuff over
   for my $file (sort keys %$result) {
+    next if $file =~ /\.obsbinlnk$/s;
+    if ($file =~ /(.*)\.containerinfo$/) {
+      my $prefix = $1;
+      die unless $result->{$file} =~ /^(.*)\/([^\/]+)$/;
+      my $obsbinlnk = PBuild::Container::containerinfo2obsbinlnk($1, $2, $p->{'pkg'});
+      PBuild::Util::store("$dst/$prefix.obsbinlnk", undef, $obsbinlnk);
+    }
     PBuild::Util::cp($result->{$file}, "$dst/$file");
   }
   # create new bininfo
