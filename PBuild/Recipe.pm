@@ -70,6 +70,14 @@ sub find_recipe {
       return $files{$files[0]};
     }
   }
+  if (1) {
+    @files = grep {/mkosi\.$/} keys %files;
+    return $files{$files[0]} if @files == 1;
+    if (@files > 1) {
+      @files = sort @files;
+      return $files{$files[0]};
+    }
+  }
   return undef;
 }
 
@@ -186,6 +194,7 @@ sub looks_like_packagedir {
   return 0 if grep {/^_build\./} @files;
   for my $file (@files) {
     return 1 if $file =~ /\.(?:spec|dsc|kiwi)$/;
+    return 1 if $file =~ /^mkosi\./;
     return 1 if $file eq 'snapcraft.yaml' || $file eq 'appimage.yml';
     return 1 if $file eq 'Dockerfile' || $file eq 'fissile.yml' || $file eq 'Chart.yml';
     return 1 if $file eq 'PKGBUILD';
