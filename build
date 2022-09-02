@@ -956,7 +956,7 @@ sysrq_running_build() {
 
 kill_running_build() {
     test -z "$SRCDIR" || usage
-    (set -C; > "$BUILD_ROOT/exit" 2>/dev/null || true)
+    (set -C; > "$BUILD_ROOT/exit" || true) 2>/dev/null
     if test -n "$VM_TYPE" ; then
 	# mark job as failed so that we don't extract packages
 	vm_set_buildstatus 1
