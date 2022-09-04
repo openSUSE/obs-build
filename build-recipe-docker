@@ -6,6 +6,7 @@
 #
 # Copyright (c) 2017 SUSE Linux Products GmbH
 # Copyright (c) 2021 SUSE LLC
+# Copyright (c) 2022 Andreas Stieger <Andreas.Stieger@gmx.de>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 or 3 as
@@ -198,7 +199,7 @@ recipe_build_docker() {
     done
     # if we did not find a tag, look info a file called TAG
     if test -z "$FIRSTTAG" -a -f TAG ; then
-	for t in $(egrep -v '^#' TAG) ; do
+	for t in $(grep -E -v '^#' TAG) ; do
 	    test -n "$FIRSTTAG" || FIRSTTAG="$t"
 	    ALLTAGS="$ALLTAGS $t"
 	done
