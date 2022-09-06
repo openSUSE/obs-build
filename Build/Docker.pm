@@ -208,6 +208,7 @@ sub parse {
   my $useobsrepositories;
   my $nosquash;
   my $dockerfile_data;
+  my $remoteasset;
   if (ref($fn) eq 'SCALAR') {
     $dockerfile_data = $$fn;
   } else {
@@ -277,6 +278,11 @@ sub parse {
       if ($line =~ /^#!ArchExcludedLine:\s*(.*?)$/) {
 	my $arch = gettargetarch($cf);
 	$excludedline = (grep {$_ eq $arch} split(' ', $1)) ? 1 : undef;
+      }
+      if ($line =~ /^\#\!RemoteAssetUrl:\s*(\S+)\s*$/i) {
+        $remoteasset->{'url'} = $1;
+        push @{$ret->{'remoteassets'}}, $remoteasset;
+        $remoteasset = undef;
       }
       next;
     }
