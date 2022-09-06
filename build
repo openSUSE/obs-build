@@ -8,6 +8,7 @@
 ################################################################
 #
 # Copyright (c) 1995-2014 SUSE Linux Products GmbH
+# Copyright (c) 2022 Andreas Stieger <Andreas.Stieger@gmx.de>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 or 3 as
@@ -1682,9 +1683,9 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	test -n "$SUSE_VERSION" -a "${SUSE_VERSION:-0}" -le 1020 && BUILD_USER=root
     fi
     if test "$BUILD_USER" = abuild ; then
-	egrep '^#[[:blank:]]*needsrootforbuild[[:blank:]]*$' >/dev/null <$RECIPEPATH && BUILD_USER=root
+	grep -E '^#[[:blank:]]*needsrootforbuild[[:blank:]]*$' >/dev/null <$RECIPEPATH && BUILD_USER=root
     else
-	egrep '^#[[:blank:]]*norootforbuild[[:blank:]]*$' >/dev/null <$RECIPEPATH && BUILD_USER=abuild
+	grep -E '^#[[:blank:]]*norootforbuild[[:blank:]]*$' >/dev/null <$RECIPEPATH && BUILD_USER=abuild
     fi
     test -n "$NOROOTFORBUILD" && BUILD_USER=abuild
 
@@ -1700,7 +1701,7 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 
     # fixup passwd/group
     if test $BUILD_USER = abuild ; then
-	if ! egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
+	if ! grep -E '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
 	    echo "abuild:x:${ABUILD_UID}:${ABUILD_GID}:Autobuild:/home/abuild:/bin/bash" >>$BUILD_ROOT/etc/passwd
 	    echo 'abuild:*:::::::' >>$BUILD_ROOT/etc/shadow # This is needed on Mandriva 2009
 	    echo 'abuild:*::' >>$BUILD_ROOT/etc/gshadow # This is needed on Ubuntu
@@ -1708,10 +1709,10 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	    mkdir -p $BUILD_ROOT/home/abuild
 	    chown "$ABUILD_UID:$ABUILD_GID" $BUILD_ROOT/home/abuild
 	else
-	    if ! egrep "^abuild:x?:${ABUILD_UID}:${ABUILD_GID}" >/dev/null <$BUILD_ROOT/etc/passwd ; then
+	    if ! grep -E "^abuild:x?:${ABUILD_UID}:${ABUILD_GID}" >/dev/null <$BUILD_ROOT/etc/passwd ; then
 		echo "abuild user present in the buildroot ($BUILD_ROOT) but uid:gid does not match"
 		echo "buildroot currently using:"
-		egrep "^abuild:" <$BUILD_ROOT/etc/passwd
+		grep -E "^abuild:" <$BUILD_ROOT/etc/passwd
 		echo "build script attempting to use:"
 		echo "abuild::${ABUILD_UID}:${ABUILD_GID}:..."
 		echo "build aborting"
@@ -1729,7 +1730,7 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	# building as root
 	ABUILD_UID=0
 	ABUILD_GID=0
-	if egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
+	if grep -E '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
 	    rm -rf "$BUILD_ROOT/home/abuild"
 	    sed -i -e '/^abuild:/d' $BUILD_ROOT/etc/passwd
 	    sed -i -e '/^abuild:/d' $BUILD_ROOT/etc/group
