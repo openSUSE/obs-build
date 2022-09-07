@@ -126,6 +126,13 @@ sub integrate_build_result {
       my $obsbinlnk = PBuild::Container::containerinfo2obsbinlnk($1, $2, $p->{'pkg'});
       PBuild::Util::store("$dst/$prefix.obsbinlnk", undef, $obsbinlnk) if $obsbinlnk;
     }
+    if ($file =~ /(.*)\.manifest(?:\.(?:gz|bz2|xz|zst|zstd))?$/) {
+      # create an obsbinlnk file from the mkosi manifest
+      my $prefix = $1;
+      die unless $result->{$file} =~ /^(.*)\/([^\/]+)$/;
+      my $obsbinlnk = PBuild::Container::manifest2obsbinlnk($1, $2, $prefix, $p->{'pkg'});
+      PBuild::Util::store("$dst/$prefix.obsbinlnk", undef, $obsbinlnk) if $obsbinlnk;
+    }
     PBuild::Util::cp($result->{$file}, "$dst/$file");
   }
   # create new bininfo

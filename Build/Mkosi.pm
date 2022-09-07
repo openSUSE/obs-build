@@ -67,6 +67,9 @@ sub parse {
   if (length $cfg->val('Content', 'BuildPackages')) {
     push(@packages, split /\s+/, $cfg->val('Content', 'BuildPackages'));
   }
+  if (length $cfg->val('Partitions', 'BaseImage')) {
+    push(@packages, $cfg->val('Partitions', 'BaseImage'));
+  }
 
   $ret->{'name'} = $fn;
   $ret->{'deps'} = \@packages;
