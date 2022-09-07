@@ -20,8 +20,6 @@
 
 package PBuild::Zip;
 
-use PBuild::Util;
-
 use strict;
 
 sub readbytes {
