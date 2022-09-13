@@ -195,7 +195,7 @@ sub cpio_extract {
     my $name = substr(cpio_read($fd, $namesize + $namepad), 0, $namesize);
     $name =~ s/\0.*//s;
     if (!$size && $name eq 'TRAILER!!!') {
-      die("$cpiofile: no $extract entry\n") if defined $extract;
+      die("$cpiofile: no $extract entry\n") if defined($extract) && !$opts{'missingok'};
       last;
     }
     $name =~ s/^\.\///s;
