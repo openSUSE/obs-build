@@ -368,7 +368,15 @@ vm_startup_kvm() {
 vm_kill_kvm() {
     if ! fuser -k -TERM "$VM_ROOT" ; then
 	echo "could not kill build in $VM_ROOT, kvm instance is dead already"
+	return
     fi
+    local tries=0
+    while test $tries -lt 1800 ; do
+	sleep .1
+	fuser -s "$VM_ROOT" || return
+	tries=$(( $tries + 1 ))
+    done
+    fuser -k "$VM_ROOT"
 }
 
 vm_fixup_kvm() {
