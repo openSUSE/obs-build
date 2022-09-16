@@ -324,13 +324,13 @@ vm_shutdown_halt_helper() {
         sync ; sync ; sync
     fi
     sync	# halt from systemd is not syncing anymore.
-    if ! test -x /sbin/halt ; then
+    if ! test -x /sbin/poweroff ; then
 	test -e /proc/sysrq-trigger || mount -n -tproc none /proc
 	echo o > /proc/sysrq-trigger
 	sleep 5 # wait for sysrq to take effect
-	echo "Warning: VM doesn't support sysrq and /sbin/halt not installed"
+	echo "Warning: VM doesn't support sysrq and /sbin/poweroff not installed"
     else
-	halt -f -p
+	poweroff -f
     fi
     exit $1
 }
