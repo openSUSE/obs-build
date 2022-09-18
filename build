@@ -1694,8 +1694,8 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	imagetype=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $RECIPEPATH imagetype)
 	test "$imagetype" = product || BUILD_USER=root
     fi
-    # same with docker and fissile builds
-    if test "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman ; then
+    # same with docker, fissile and livebuild builds
+    if test "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman -o "$BUILDTYPE" = livebuild ; then
 	BUILD_USER=root
     fi
 
