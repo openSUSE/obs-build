@@ -169,7 +169,7 @@ my %subst_defaults = (
     'veritysetup', 'tar', 'xz', 'xfsprogs', 'zstd', 'zypper',
   ],
   'system-packages:mkosi:deb' => [
-    'mkosi', 'btrfs-progs', 'cpio', 'cryptsetup-bin', 'dctrl-tools',
+    'mkosi', 'apt', 'btrfs-progs', 'cpio', 'cryptsetup-bin', 'dctrl-tools',
     'debootstrap', 'debconf', 'dosfstools', 'dpkg-dev', 'e2fsprogs', 'fdisk',
     'gnupg', 'linux-base', 'lsb-release', 'python3-cryptography',
     'squashfs-tools', 'systemd-container', 'tar', 'xz-utils', 'xfsprogs',

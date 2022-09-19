@@ -27,8 +27,8 @@ recipe_setup_mkosi() {
     for i in OTHER SOURCES ; do
         mkdir -p "$BUILD_ROOT$TOPDIR/$i"
     done
-    if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
-        mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+    if test "$MYSRCDIR" = "$BUILD_ROOT/.build-srcdir" ; then
+        mv "$MYSRCDIR"/* "$BUILD_ROOT$TOPDIR/SOURCES/"
     else
         copy_sources "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"
         #cp -r "$MYSRCDIR/mkosi.cache" "$BUILD_ROOT$TOPDIR/SOURCES/"
@@ -43,13 +43,13 @@ recipe_prepare_mkosi() {
 recipe_build_mkosi() {
     local ARCH DIST RELEASE_ARG
     if [ -x "$BUILD_ROOT/bin/rpm" ]; then
-        ARCH=$(chroot $BUILD_ROOT sh -c "rpm --eval '%{_target_cpu}'")
+        ARCH=$(chroot "$BUILD_ROOT" sh -c "rpm --eval '%{_target_cpu}'")
     elif [ -x "$BUILD_ROOT/usr/bin/dpkg-architecture" ]; then
-        ARCH=$(chroot $BUILD_ROOT sh -c "dpkg-architecture -qDEB_BUILD_ARCH")
+        ARCH=$(chroot "$BUILD_ROOT" sh -c "dpkg-architecture -qDEB_BUILD_ARCH")
         # The distro release is usually specified in the recipe, but it is not mandatory.
         DIST=$(grep Release= "${RECIPEFILE}" | sed "s/\s*Release\s*=\s*\(.*\)\s*/\1/")
         if [ -z "$DIST" ]; then
-            DIST=$(chroot $BUILD_ROOT sh -c "lsb_release --codename" | awk '{ print $2 }')
+            DIST=$(chroot "$BUILD_ROOT" sh -c "lsb_release --codename" | awk '{ print $2 }')
         fi
 
         # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=845651
@@ -57,7 +57,7 @@ recipe_build_mkosi() {
         # the example cited in the above bug, the metadata for sid would be incorrect
         # anyway, and we would want the ones for potato.
         if test "${DIST}" = "n/a" ; then
-            DIST=$(chroot $BUILD_ROOT sh -c "sed 's/\(.*\)\/.*/\1/' /etc/debian_version")
+            DIST=$(chroot "$BUILD_ROOT" sh -c "sed 's/\(.*\)\/.*/\1/' /etc/debian_version")
         fi
 
         # Pass it to mkosi, so that the configured mirror is the same as the repository created below
@@ -68,12 +68,12 @@ recipe_build_mkosi() {
         cleanup_and_exit 1
     fi
 
-    test -d $BUILD_ROOT/.build.binaries || cleanup_and_exit 1 "missing $BUILD_ROOT/.build.binaries"
+    test -d "$BUILD_ROOT/.build.binaries" || cleanup_and_exit 1 "missing $BUILD_ROOT/.build.binaries"
 
     if test "$DO_INIT" = true; then
         if [ -x "$BUILD_ROOT/usr/bin/dpkg-architecture" ] && [ ! -d "$BUILD_ROOT/.build.binaries/dists" ]; then
             echo "creating debian repository metadata..."
-            createrepo_debian $BUILD_ROOT/.build.binaries ${ARCH} ${DIST}
+            createrepo_debian "$BUILD_ROOT/.build.binaries" "${ARCH}" "${DIST}"
         elif [ -x "$BUILD_ROOT/bin/rpm" ] && [ ! -d "$BUILD_ROOT/.build.binaries/repodata" ]; then
             echo "creating rpm repository metadata..."
             if chroot "$BUILD_ROOT" test -x /usr/bin/createrepo_c; then
@@ -85,7 +85,7 @@ recipe_build_mkosi() {
             fi
         elif [ -x "$BUILD_ROOT/usr/bin/repo-add" ]; then
             echo "creating Arch Linux repository metadata..."
-            chroot $BUILD_ROOT sh -c "repo-add /.build.binaries/core.db.tar.gz /.build.binaries/*"
+            chroot "$BUILD_ROOT" sh -c "repo-add /.build.binaries/core.db.tar.gz /.build.binaries/*"
         fi
     fi
 
@@ -93,7 +93,7 @@ recipe_build_mkosi() {
     if [ -n "$RELEASE" ]; then
         image_version="--image-version=${RELEASE}"
     fi
-    chroot $BUILD_ROOT sh -c \
+    chroot "$BUILD_ROOT" sh -c \
         "cd $TOPDIR/SOURCES && mkosi --default $RECIPEFILE $RELEASE_ARG $image_version --nspawn-keep-unit --output-dir $TOPDIR/OTHER --checksum --repository-key-check=no --with-network=never --local-mirror file:///.build.binaries/ --cache /.build.binaries/ build" \
         || cleanup_and_exit 1
 
@@ -114,6 +114,7 @@ recipe_build_mkosi() {
     # compress the manifest file which can be quite large
     gzip -9 -f "$BUILD_ROOT/$TOPDIR/OTHER/"*.manifest
 
+    # shellcheck disable=SC2034
     BUILD_SUCCEEDED=true
 }
 
