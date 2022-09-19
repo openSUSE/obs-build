@@ -914,7 +914,8 @@ vm_first_stage() {
     if test "$DO_INIT" = true ; then
 	# do first stage of init_buildsystem
 	rm -f $BUILD_ROOT/.build.success
-	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$RECIPEPATH" $ADDITIONAL_PACKS
+	compute_recipe_args "$RECIPEPATH"
+	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${initbuildsysstuff[@]}" "${definesnstuff[@]}"  "${initbuildsys_recipeargs[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$RECIPEPATH" $ADDITIONAL_PACKS
 	echo "$* ..."
 	start_time=$SECONDS
 	"$@" || cleanup_and_exit 1
