@@ -46,6 +46,7 @@ export BUILD_DIST ABUILD_UID ABUILD_GID
 
 icecream=0
 definesnstuff=()
+initbuildsys_recipeargs=()
 repos=()
 old_packages=()
 
@@ -849,7 +850,7 @@ copy_sources() {
     fi
     if test -n "$NO_SOURCE_COPY"; then
 	mount --bind "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"
-    elif test -n "$RUNNING_IN_VM" -o -n "$COPY_SOURCES_ASIS" -o -n "$RPM_BUILD_IN_PLACE" ; then
+    elif test -n "$RUNNING_IN_VM" -o -n "$COPY_SOURCES_ASIS" -o -n "$RECIPE_RPM_BUILD_IN_PLACE" ; then
 	( shopt -s nullglob ; cp -pRd "$1/".[^.]* "$1/"..?* "$1"/* "$2" )
     elif test -n "$include_directories" ; then
         cp -pRL "$1"/* "$2"
@@ -875,7 +876,7 @@ copy_sources() {
     else
 	cp -p "$1"/* "$2"
     fi
-    if test -n "$RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" -a -z "$NO_SOURCE_COPY"; then
+    if test -n "$RECIPE_RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" -a -z "$NO_SOURCE_COPY"; then
 	cp -f "$RECIPEPATH" "$2"
     fi
 }
@@ -1400,10 +1401,6 @@ if test -n "$OBSURL" ; then
     initbuildsysstuff[${#initbuildsysstuff[@]}]="--obs"
     initbuildsysstuff[${#initbuildsysstuff[@]}]="$OBSURL"
 fi
-if test -n "$RPM_BUILD_IN_PLACE"; then
-    initbuildsysstuff[${#initbuildsysstuff[@]}]="--define"
-    initbuildsysstuff[${#initbuildsysstuff[@]}]="_build_in_place 1"
-fi
 
 if test -n "$DO_WIPE" ; then
     wipe_build_environment
@@ -1469,7 +1466,8 @@ if test -n "$LIST_STATE" ; then
     test -d "$BUILD_ROOT" || cleanup_and_exit 3
     RECIPEPATH=$RECIPEFILES # only one specified anyways
     test "$RECIPEPATH" != "${RECIPEPATH%.src.rpm}" && recipe_unpack_srcrpm "$RECIPEPATH"
-    init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --list-state "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $DLNOSIGNATURE $USEUSEDFORBUILD $RECIPEPATH $BUILD_EXTRA_PACKS
+    compute_recipe_args "$RECIPEPATH"
+    init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --list-state "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${initbuildsys_recipeargs[@]}" "${repos[@]}" $DLNOSIGNATURE $RECIPEPATH $BUILD_EXTRA_PACKS
     ERR=$?
     rm -rf "$BUILD_ROOT"
     cleanup_and_exit $ERR
@@ -1561,7 +1559,12 @@ MODULEMDFILE=
 
 for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 
-    if test -n "$RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" -a -z "$NO_SOURCE_COPY" ; then
+    RECIPE_RPM_BUILD_IN_PLACE=
+    if recipe_is_build_in_place "$RECIPEPATH"; then
+	RECIPE_RPM_BUILD_IN_PLACE=1
+    fi
+
+    if test -n "$RECIPE_RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" -a -z "$NO_SOURCE_COPY" ; then
 	SRCDIR="$PWD"
 	RECIPEFILE="${RECIPEPATH##*/}"
     elif test -n "$NO_SOURCE_COPY" ; then
@@ -1665,11 +1668,8 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	Q="'\''"
 	test -n "$DISTURL" && echo "BUILD_DISTURL='${DISTURL//"'"/$Q}'" >> $BUILD_ROOT/.buildenv
 	test "$BUILDTYPE" = preinstallimage && mkdir -p $BUILD_ROOT/.preinstall_image
-	CREATE_BUILD_BINARIES=
-	if recipe_needs_build_binaries "$RECIPEPATH" ; then
-	    CREATE_BUILD_BINARIES=--create-build-binaries
-	fi
-	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $DLNOSIGNATURE $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$RECIPEPATH" $ADDITIONAL_PACKS
+	compute_recipe_args "$RECIPEPATH"
+	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${initbuildsys_recipeargs[@]}" "${repos[@]}" $CLEAN_BUILD $DLNOSIGNATURE $USEUSEDFORBUILD $RPMLIST "$RECIPEPATH" $ADDITIONAL_PACKS
 	echo "$* ..."
         start_time=$SECONDS
 	"$@" || cleanup_and_exit 1
@@ -1867,7 +1867,8 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
     if test "$BUILD_SUCCEEDED" = genbuildreqs -a "$DO_INIT" = true -a -z "$RPMLIST" -a -z "$RUNNING_IN_VM" -a -n "${GEN_BUILDREQS_PACKS[*]}" ; then
 	# re-expand deps with GEN_BUILDREQS_PACKS extra packages
 	umount_stuff
-	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $DLNOSIGNATURE $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS "${GEN_BUILDREQS_PACKS[@]}"
+	compute_recipe_args "$RECIPEPATH"
+	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${initbuildsys_recipeargs[@]}" "${repos[@]}" $DLNOSIGNATURE $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS "${GEN_BUILDREQS_PACKS[@]}"
 	echo "$* ..."
 	"$@" || cleanup_and_exit 1
 	check_exit

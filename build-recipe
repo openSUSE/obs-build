@@ -260,6 +260,24 @@ recipe_needs_build_binaries() {
     return 1
 }
 
+recipe_is_build_in_place() {
+    local file="${1:?}"
+    test "$file" != "${file%.spec}" || return 1
+    test -n "$RPM_BUILD_IN_PLACE" || grep -E '^#[[:blank:]]*build-in-place[[:blank:]]*$' >/dev/null <"$file"
+}
+
+compute_recipe_args() {
+    local file="${1:?}"
+    initbuildsys_recipeargs=()
+    if recipe_needs_build_binaries "$file" ; then
+	initbuildsys_recipeargs+=('--create-build-binaries')
+    fi
+    if recipe_is_build_in_place "$file"; then
+	initbuildsys_recipeargs+=('--define')
+	initbuildsys_recipeargs+=('_build_in_place 1')
+    fi
+}
+
 recipe_build_time_statistics() {
     if test "$DO_STATISTICS" = 1 -a -n "$RECIPE_BUILD_START_TIME" -a -n "$TOPDIR" -a -n "$RUNNING_IN_VM" ; then
 	mkdir -p "$TOPDIR/OTHER"
@@ -286,4 +304,3 @@ recipe_gendiff() {
          fi
     fi
 }
-
