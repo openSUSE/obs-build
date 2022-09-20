@@ -73,7 +73,7 @@ EMULATOR_SCRIPT=
 # openstack specific
 VM_OPENSTACK_FLAVOR=
 
-for i in ec2 emulator kvm lxc openstack qemu uml xen zvm docker pvm nspawn; do
+for i in gcloud ec2 emulator kvm lxc openstack qemu uml xen zvm docker pvm nspawn; do
     . "$BUILD_DIR/build-vm-$i"
 done
 
@@ -151,7 +151,7 @@ vm_parse_options() {
                 VM_TYPE=${VM_TYPE%:*}
             ;;
 	    lxc|docker|nspawn) ;;
-	    ec2|xen|kvm|uml|qemu|emulator|openstack|zvm|pvm)
+	    gcloud|ec2|xen|kvm|uml|qemu|emulator|openstack|zvm|pvm)
 		test -z "$VM_ROOT" && VM_ROOT=1
 	    ;;
 	    none|chroot) VM_TYPE= ;;

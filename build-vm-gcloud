@@ -1,0 +1,204 @@
+#
+# Google Cloud specific functions
+#
+################################################################
+#
+# Copyright (c) 2022 SUSE Linux Products GmbH
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+#
+# prepare with
+# gcloud config set account ACCOUNT
+# gcloud auth login
+
+# issues to fix before merge
+# - detect disk device on attach and adapt CLI for it
+# - fix hardcoded names (vm-2 and friends)
+# - cleanup
+#
+# issues to fix for becoming productive
+# - look into a way how to use disk encryption
+# - look into a way to setup bootloader without possible conflicts in build environment
+# - fix random build failures
+# - improve serial log behaviour
+# - looking for speedups .... we need currently 3 minutes on new hardware of gcloud versus 20 seconds on old hardware with kvm
+# - add support to inject sysrq events ... how? 
+# - find a way to avoid the need of a 10GB storage device even for the smallest build
+
+GCLOUD_MACHINE_TYPE="n2d-standard-4"
+GCLOUD_PROJECT=it-support-51de
+GCLOUD_ZONE=europe-west1-b
+GCLOUD_ATTACHED=
+
+GCLOUD_LOCAL_SSD=/dev/nvme0n1
+
+[ -e /etc/google_instance_id ] && GCLOUD_MY_HOST_INSTANCE=$(</etc/google_instance_id)
+
+vm_wipe_gcloud() {
+    vm_cleanup_gcloud
+}
+
+vm_verify_options_gcloud() {
+echo "XXX vm_verify_options_gcloud"
+   gcloud compute disks create disk-1  --size 10GB --zone $GCLOUD_ZONE --type projects/$GCLOUD_PROJECT/zones/$GCLOUD_ZONE/diskTypes/pd-balanced || cleanup_and_exit 3 "ERROR: gcloud disk create failed"
+   VM_SWAP=/dev/sdX3
+   VM_ROOT=/dev/sdX4
+   VM_ROOT_TYPE=cloud
+   VM_SWAP_TYPE=cloud
+   VM_SWAPDEV=/dev/sda3
+   VM_ROOTDEV=/dev/sda4
+}
+    
+
+vm_attach_root_gcloud() {
+echo "XXX vm_attach_root_gcloud"
+GCLOUD_ATTACHED=true
+
+   gcloud compute instances attach-disk $GCLOUD_MY_HOST_INSTANCE --disk disk-1 --zone $GCLOUD_ZONE || cleanup_and_exit 3 "ERROR: gcloud attached failed"
+
+   VM_DEVICE=`ls -1 /dev/sd? | tail -n 1`
+   VM_SWAP=${VM_DEVICE}3
+   VM_ROOT=${VM_DEVICE}4
+
+   [ -e "$VM_ROOT" ] && return
+
+   sgdisk --zap-all $VM_DEVICE || cleanup_and_exit 3 "ERROR: partition table setup failed"
+   sgdisk -n 1:2048:+2M -c 1:p.legacy $VM_DEVICE || cleanup_and_exit 3 "ERROR: partition table setup failed"
+   sgdisk -t 1:EF02 $VM_DEVICE || cleanup_and_exit 3 "ERROR: partition table setup failed"
+   sgdisk -n 2:0:+20M -c 2:p.UEFI $VM_DEVICE || cleanup_and_exit 3 "ERROR: partition table setup failed"
+   sgdisk -t 2:EF00 $VM_DEVICE || cleanup_and_exit 3 "ERROR: partition table setup failed"
+   sgdisk -n 3:0:+20M -c 3:p.lxswap $VM_DEVICE || cleanup_and_exit 3 "ERROR: partition table setup failed"
+   sgdisk -t 3:8200 $VM_DEVICE || cleanup_and_exit 3 "ERROR: partition table setup failed"
+   sgdisk -n 4:0:0 -c 4:p.lxroot $VM_DEVICE || cleanup_and_exit 3 "ERROR: partition table setup failed"
+   sgdisk -t 4:8300 $VM_DEVICE || cleanup_and_exit 3 "ERROR: partition table setup failed"
+   sgdisk -p $VM_DEVICE
+
+   mkdosfs -F16 -I -n EFI ${VM_DEVICE}2 || cleanup_and_exit 3 "ERROR: efi partition setup failed"
+}
+
+vm_attach_swap_gcloud() {
+echo "XXX vm_attach_swap_gcloud"
+  if [ -z "$GCLOUD_ATTACHED" ]; then
+    gcloud compute instances attach-disk instance-1 --disk disk-1 --zone $GCLOUD_ZONE || cleanup_and_exit 3 "Unable to detach disk"
+    GCLOUD_ATTACHED=true
+  fi
+}
+
+vm_detach_root_gcloud() {
+echo "XXX vm_detach_root_gcloud"
+  if [ -n "$GCLOUD_ATTACHED" ]; then
+    gcloud compute instances detach-disk instance-1 --disk disk-1 --zone $GCLOUD_ZONE || cleanup_and_exit 3 "Unable to detach disk"
+    GCLOUD_ATTACHED=
+  fi
+}
+
+vm_detach_swap_gcloud() {
+  # noop on purpose since we must keep root device
+  :
+}
+
+vm_fixup_gcloud() {
+echo "XXX vm_fixup_gcloud"
+    # use the instance kernel if no kernel got installed via preinstall
+    assert_dirs boot
+    if ! test -e "$BUILD_ROOT/boot/vmlinuz"; then
+        [ -e "$BUILD_ROOT/.build.kernel.kvm" ] && cp "$BUILD_ROOT/.build.kernel.kvm" "$BUILD_ROOT/boot/vmlinuz"
+        [ -e "$BUILD_ROOT/.build.initrd.kvm" ] && cp "$BUILD_ROOT/.build.initrd.kvm" "$BUILD_ROOT/boot/initrd"
+        # in doubt take the kernel/initrd from the host system
+	[ -e "$BUILD_ROOT/boot/vmlinuz" ] || cp /boot/vmlinuz "$BUILD_ROOT/boot/vmlinuz"
+	[ -e "$BUILD_ROOT/boot/initrd" ]  || cp /boot/initrd "$BUILD_ROOT/boot/initrd"
+    fi
+
+    # init parameter is not used
+#    ln -s /.build/build "$BUILD_ROOT/init"
+
+    mkdir "$BUILD_ROOT/boot/efi/" || cleanup_and_exit 3 "ERROR: /boot/efi creation failed"
+    mount ${VM_ROOT%4}2  "$BUILD_ROOT/boot/efi/" || cleanup_and_exit 3 "ERROR: unable to mount EFI partition"
+    mkdir "$BUILD_ROOT/boot/efi/EFI/"
+    cp -a /boot/efi/EFI/BOOT "$BUILD_ROOT/boot/efi/EFI/"
+
+    blkid ${VM_DEVICE}4 -s UUID -o value
+    blkid ${VM_DEVICE}4 -s LABEL -o value
+
+    cp /etc/default/grub $BUILD_ROOT/etc/default/grub || cleanup_and_exit 3 "ERROR: grub install failed"
+    grub2-install --skip-fs-probe --directory /usr/share/grub2/i386-pc --boot-directory="$BUILD_ROOT/boot/" --root-directory="$BUILD_ROOT/"  --efi-directory="$BUILD_ROOT/boot/efi" --target i386-pc --modules "ext2 iso9660 linux echo configfile search_label search_fs_file search search_fs_uuid ls normal gzio png fat gettext font minicmd gfxterm gfxmenu all_video xfs btrfs lvm luks gcry_rijndael gcry_sha256 gcry_sha512 crypto cryptodisk test true loadenv multiboot part_gpt part_msdos biosdisk vga vbe chain boot" ${VM_DEVICE} || cleanup_and_exit 3 "ERROR: grub install failed"
+#    grub-mkimage -d grub-core -O i386-pc -o  core.img --prefix=/boot/x86_64/grub2-efi 
+
+    grub2-editenv $BUILD_ROOT/boot/grub2/grubenv set root='(hd0,gpt4)' || cleanup_and_exit 3 "ERROR: grub editenv failed"
+
+    # kiwi is renaming grub2-install before calling this
+    #    shim-install --removable ${VM_DEVICE}
+
+    GRUB_CONFIG_DIR="$BUILD_ROOT/boot/grub2"
+    mkdir -p "$GRUB_CONFIG_DIR"
+    echo "insmod part_gpt"               >  "$GRUB_CONFIG_DIR/grub.cfg"
+    echo "insmod ext2"                   >> "$GRUB_CONFIG_DIR/grub.cfg"
+    echo "set timeout=0"                 >> "$GRUB_CONFIG_DIR/grub.cfg"
+    echo "serial"                        >> "$GRUB_CONFIG_DIR/grub.cfg"
+    echo "terminal_input serial"         >> "$GRUB_CONFIG_DIR/grub.cfg"
+    echo "terminal_output serial"        >> "$GRUB_CONFIG_DIR/grub.cfg"
+    echo "linux (hd0,gpt4)/boot/vmlinuz root=/dev/sda4 console=ttyS0,38400n8 init=/.build/build splash=silent $vm_linux_kernel_parameter" >> "$GRUB_CONFIG_DIR/grub.cfg"
+    echo "initrd (hd0,gpt4)/boot/initrd" >> "$GRUB_CONFIG_DIR/grub.cfg"
+    echo "boot"                          >> "$GRUB_CONFIG_DIR/grub.cfg"
+
+    umount ${VM_DEVICE}2 || cleanup_and_exit 3 "ERROR: grub install failed"
+}
+
+vm_cleanup_gcloud() {
+echo "XXX vm_cleanup_gcloud"
+    gcloud compute instances detach-disk instance-1 --disk disk-1 --zone $GCLOUD_ZONE
+#    gcloud compute instances delete vm-2 --zone=$GCLOUD_ZONE || cleanup_and_exit 3 "Unable to delete VM"
+    gcloud compute disks delete disk-1 --zone $GCLOUD_ZONE --quiet ||  :
+#    gcloud compute networks delete vm-2-build-subnet || :
+#    gcloud compute networks delete vm-2-build-network || :
+}
+
+vm_sysrq_gcloud() {
+echo "XXX not yet implemented"
+    :
+}
+
+vm_kill_gcloud() {
+echo "XXX vm_kill_gcloud"
+    gcloud compute instances delete vm-2 --zone=$GCLOUD_ZONE
+}
+
+vm_startup_gcloud() {
+set +x
+    # Create a custom network with no access 
+    gcloud compute networks create vm-2-build-network --subnet-mode=custom
+    gcloud compute networks subnets create vm-2-build-subnet --network=vm-2-build-network --range=10.0.0.0/29 --region=${GCLOUD_ZONE%-*}
+    gcloud compute instances create vm-2 \
+	--zone=$GCLOUD_ZONE --machine-type=$GCLOUD_MACHINE_TYPE \
+	--network-interface=subnet=vm-2-build-subnet,no-address \
+	--no-service-account --no-scopes \
+	--metadata=startup-script="/.build/build" \
+	--disk=auto-delete=no,boot=yes,device-name=disk-1,name=disk-1 || cleanup_and_exit 3 "Unable to start build VM"
+#	--no-shielded-secure-boot --no-shielded-vtpm --no-shielded-integrity-monitoring 
+    echo "Reading stdout..."
+    gcloud compute instances get-serial-port-output vm-2 --zone=$GCLOUD_ZONE
+    temp_file=`mktemp`
+    start=
+    while gcloud compute instances get-serial-port-output vm-2 --zone=$GCLOUD_ZONE $start > $temp_file; do
+      cp $temp_file /tmp/test
+      start=`tail -n 3 "$temp_file" | sed -n -e 's,.*Specify \(--start=\d\) in the next.*,\1,p'`
+      sed '/^Specify --start=.*/d' $temp_file
+    done
+    rm -f "$temp_file"
+    gcloud compute instances delete vm-2 --zone=$GCLOUD_ZONE --quiet
+}
