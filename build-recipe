@@ -170,18 +170,15 @@ expand_recipe_directories() {
 	    for t in $types ; do
 		found=
 		if test $t = mkosi. ; then
-		    for ff in "$f"/$t* ; do
-			test -f "$ff" || continue
-			RECIPEFILES=("${RECIPEFILES[@]}" "${ff#$PWD/}")
-			found=true
-		    done
+		    files=("$f"/$t*)
 		else
-		    for ff in "$f"/*$t ; do
-			test -f "$ff" || continue
-			RECIPEFILES=("${RECIPEFILES[@]}" "${ff#$PWD/}")
-			found=true
-		    done
+		    files=("$f"/*$t)
 		fi
+		for ff in "${files[@]}" ; do
+		    test -f "$ff" || continue
+		    RECIPEFILES=("${RECIPEFILES[@]}" "${ff#$PWD/}")
+		    found=true
+		done
 		test -n "$found" && break
 		if test "$t" = .dsc -a -f "$f/debian.control" ; then
 		    RECIPEFILES=("${RECIPEFILES[@]}" "$f/debian.control")
