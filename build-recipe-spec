@@ -30,8 +30,10 @@ recipe_setup_spec() {
     fi
     test "$DO_INIT_TOPDIR" = false || spec_init_topdir
     mkdir -p $BUILD_ROOT$TOPDIR/{BUILD,SOURCES,SPECS,SRPMS,BUILDROOT,OTHER,RPMS/noarch,RPMS/i386,RPMS/$(uname -m)}
-    copy_sources "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"
     chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+    SPECDIR="$TOPDIR/SOURCES"
+    copy_sources "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"
+    test -n "$NO_SOURCE_COPY" || chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR/SOURCES"
 }
 
 recipe_prepare_spec() {
@@ -81,7 +83,8 @@ recipe_prepare_spec() {
 	    sed -e "/^%changelog/q" $BUILD_ROOT/.spec.new > $BUILD_ROOT/.spec.t2
 	    diff $BUILD_ROOT/.spec.t1 $BUILD_ROOT/.spec.t2
 	    rm -f $BUILD_ROOT/.spec.t1 $BUILD_ROOT/.spec.t2
-	    mv $BUILD_ROOT/.spec.new $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE
+	    SPECDIR="$TOPDIR/SPECS"
+	    mv $BUILD_ROOT/.spec.new $BUILD_ROOT$SPECDIR/$RECIPEFILE
 	else
 	    rm -f $BUILD_ROOT/.spec.new
 	fi
@@ -102,14 +105,19 @@ spec_init_topdir() {
 	-b[ci]\ --short-circuit) keepbuild=BUILD ;;
 	-bb\ --short-circuit | -bl) keepbuild=BUILD keepbuildroot=BUILDROOT ;;
     esac
-    test -n "$RPM_BUILD_IN_PLACE" && unset keepbuild
+    test -n "$RECIPE_RPM_BUILD_IN_PLACE" && unset keepbuild
     if test -n "$keepbuild$keepbuildroot" ; then
 	for d in $keepbuild $keepbuildroot ; do
 	    spec_is_empty_dir "$BUILD_ROOT$TOPDIR/$d" && cleanup_and_exit 1 "need files in $TOPDIR/$d for '${rpmstages[0]}'"
 	done
 	for d in "$BUILD_ROOT$TOPDIR"/* "$BUILD_ROOT$TOPDIR"/.[^.]* ; do
 	    test "$d" = "$BUILD_ROOT$TOPDIR/$keepbuild" -o "$d" = "$BUILD_ROOT$TOPDIR/$keepbuildroot" && continue
-	    rm -rf "$d"
+	    # safeguard in case umount from RECIPE_RPM_BUILD_IN_PLACE failed
+	    if mountpoint -q "$d"; then
+		    cleanup_and_exit 1 "ERROR: $d is a mountpoint!?"
+	    else
+		    rm -rf "$d"
+	    fi
 	done
     else
 	rm -rf "$BUILD_ROOT$TOPDIR"
@@ -132,7 +140,7 @@ spec_setup_stages() {
     stage=${stage//s/a}
     # drop p/a stages in build-in-place mode unless requested
     test -n "$RPM_NOPREP" -a "$stage" != p -a "$origstage" = "${origstage/p/}" && stage="${stage#p}"
-    test -n "$RPM_BUILD_IN_PLACE" -a "$stage" != a -a "$origstage" = "${origstage/[as]/}" && stage="${stage%a}"
+    test -n "$RECIPE_RPM_BUILD_IN_PLACE" -a "$stage" != a -a "$origstage" = "${origstage/[as]/}" && stage="${stage%a}"
     rpmstages=()
     case $stage in
 	p | pc | pci | pcib | pciba) rpmstages[${#rpmstages[@]}]="-b${stage: -1}" ; stage= ;;
@@ -175,7 +183,7 @@ recipe_build_spec() {
 	    # use only --nosignature for rpm v4
 	rpmbopts[${#rpmbopts[@]}]="--nosignature"
     fi
-    if test -n "$RPM_BUILD_IN_PLACE" ; then
+    if test -n "$RECIPE_RPM_BUILD_IN_PLACE" ; then
 	rpmbopts[${#rpmbopts[@]}]="--build-in-place"
     fi
     if test -n "$ABUILD_TARGET" ; then
@@ -222,7 +230,7 @@ recipe_build_spec() {
 		"${definesnstuff[@]}" \
 		-br \
 		"${rpmbopts[@]}" \
-		"$TOPDIR/SOURCES/$RECIPEFILE" \
+		"$SPECDIR/$RECIPEFILE" \
 		> $BUILD_ROOT/.build.command
 	chmod 755 $BUILD_ROOT/.build.command
 	chroot $BUILD_ROOT su -c /.build.command - $BUILD_USER < /dev/null
@@ -238,7 +246,7 @@ recipe_build_spec() {
 	    done
 	    test -n "$reqsfile" || cleanup_and_exit 1 "no buildreqs.nosrc.rpm file?"
 	    chroot $BUILD_ROOT rpm -qp --requires "$TOPDIR/SRPMS/$reqsfile" | grep -v '^rpmlib(' | sort -u > $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp
-	    chroot $BUILD_ROOT rpmspec -q --srpm --requires "$TOPDIR/SOURCES/$RECIPEFILE" >> $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp || cleanup_and_exit 1 "rpm -q --spec failed"
+	    chroot $BUILD_ROOT rpmspec -q --srpm --requires "$SPECDIR/$RECIPEFILE" >> $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp || cleanup_and_exit 1 "rpm -q --spec failed"
 	    sort < $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp | uniq -u > $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs
 	    rm -f $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp
 	    while read db ; do
@@ -255,12 +263,12 @@ recipe_build_spec() {
 		"${definesnstuff[@]}" \
 		$rpmstage \
 		"${rpmbopts[@]}" \
-		"$TOPDIR/SOURCES/$RECIPEFILE" \
+		"$SPECDIR/$RECIPEFILE" \
 		> $BUILD_ROOT/.build.command
 	chmod 755 $BUILD_ROOT/.build.command
 	check_exit
 	local build_command="/.build.command"
-	test -n "$RPM_BUILD_IN_PLACE" && build_command="cd /.build.packages/SOURCES && $build_command"
+	test -n "$RECIPE_RPM_BUILD_IN_PLACE" && build_command="cd /.build.packages/SOURCES && $build_command"
 	chroot $BUILD_ROOT su -c "$build_command" - $BUILD_USER < /dev/null
 	st=$?
 	test "$st" = 0 || break
@@ -274,7 +282,10 @@ recipe_resultdirs_spec() {
 }
 
 recipe_cleanup_spec() {
-    :
+    if [ -n "$NO_SOURCE_COPY" ] && mountpoint -q "$BUILD_ROOT$TOPDIR/SOURCES/"; then
+	cd /
+	umount "$BUILD_ROOT$TOPDIR/SOURCES/"
+    fi
 }
 
 recipe_unpack_srcrpm() {
@@ -359,3 +370,4 @@ recipe_create_deltarpms() {
     fi
 }
 
+# vim: syntax=bash

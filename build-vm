@@ -118,6 +118,10 @@ vm_kill() {
     vm_kill_$VM_TYPE "$@"
 }
 
+vm_mount_sources() {
+    vm_mount_sources_$VM_TYPE "$@"
+}
+
 vm_cleanup() {
     kill_watchdog
     vm_cleanup_$VM_TYPE "$@"
@@ -456,6 +460,12 @@ vm_img_mkfs() {
     if test -n "$populate"; then
       if test "$fs" = "ext2" -o "$fs" = "ext3" -o "$fs" = "ext4"; then
         mkfs_extra_options="$mkfs_extra_options -d $populate"
+        # mkfs needs to see the files it copies into the fs as owned by root.
+        # Otherwise the whole fs tree would be owned by the calling user.
+        # Doesn't matter too much when setting up the build root initially as
+        # rpm is called inside anway to fix everything. However, when reusing
+        # an image suddenly all ownerships would change.
+        [ -x "/usr/bin/unshare" ] && mkfs="unshare --user --map-root-user $mkfs"
       else
         print "ERROR: populating filesystem is only supported with ext file systems"
         cleanup_and_exit 1
@@ -585,6 +595,9 @@ vm_exit_statistics() {
 vm_detect_2nd_stage() {
     if test ! -e /.build/build.data -o -n "$BUILD_IGNORE_2ND_STAGE" ; then
 	return 1
+    fi
+    if test -e /sys/firmware/qemu_fw_cfg/by_name/opt/org.opensuse.obs-build/data/raw; then
+	cat /sys/firmware/qemu_fw_cfg/by_name/opt/org.opensuse.obs-build/data/raw > /.build/build.data
     fi
     . /.build/build.data
     if test -z "$VM_TYPE" ; then
@@ -780,13 +793,13 @@ vm_setup_swap() {
 	# delete old swap to get rid of the old blocks
 	if test -n "$VM_SWAP" -a "$VM_SWAP_TYPE" = file -a -f "$VM_SWAP" ; then
 	    echo "Deleting old $VM_SWAP"
-        rm -f "$VM_SWAP"
+	    rm -f "$VM_SWAP"
 	fi
     fi
-    if test -n "$VM_SWAP" -a "$VM_SWAP_TYPE" = file ; then
-	vm_img_create "$VM_SWAP" "$VMDISK_SWAPSIZE"
-    fi
-    if test -n "$VM_SWAP" ; then
+    if test -n "$VM_SWAP" && test "$DO_INIT" = true ; then
+	if test "$VM_SWAP_TYPE" = file ; then
+	    vm_img_create "$VM_SWAP" "$VMDISK_SWAPSIZE"
+	fi
 	vm_attach_swap
 	dd if=/dev/zero of="$VM_SWAP" bs=1024 count=1 conv=notrunc status=none || cleanup_and_exit 4
 	if test "$VM_SWAPDEV" != "${VM_SWAPDEV#LABEL=}"; then
@@ -818,7 +831,7 @@ vm_setup() {
 	fi
     fi
     # Check for populating filesystem during mkfs
-    if test -n "$VM_USE_MKFS_COPYIN" ; then
+    if test -n "$VM_USE_MKFS_COPYIN" && test "$DO_INIT" = true; then
 	echo "Using mkfs copyin mode to populate the root filesystem"
 	mkdir_build_root
 	if test ! -w /root ; then
@@ -837,6 +850,9 @@ vm_setup() {
 	    test -e "$VM_ROOT" -a -e "${VM_ROOT}.size" && origrootsize=$(cat "${VM_ROOT}.size" 2>/dev/null)
 	    if test -z "$origrootsize" -o "$origrootsize" != "$VMDISK_ROOTSIZE" ; then
 		# the size has changed, re-create file system
+		if test "$DO_INIT" = false; then
+		    cleanup_and_exit 1 "size change requires re-init"
+		fi
 		clean_build=true
 	    fi
 	fi
@@ -914,7 +930,8 @@ vm_first_stage() {
     if test "$DO_INIT" = true ; then
 	# do first stage of init_buildsystem
 	rm -f $BUILD_ROOT/.build.success
-	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$RECIPEPATH" $ADDITIONAL_PACKS
+	compute_recipe_args "$RECIPEPATH"
+	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${initbuildsysstuff[@]}" "${definesnstuff[@]}"  "${initbuildsys_recipeargs[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$RECIPEPATH" $ADDITIONAL_PACKS
 	echo "$* ..."
 	start_time=$SECONDS
 	"$@" || cleanup_and_exit 1
@@ -933,8 +950,12 @@ vm_first_stage() {
     if ! test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
 	rm -rf "$BUILD_ROOT/.build-srcdir"
 	mkdir "$BUILD_ROOT/.build-srcdir" || cleanup_and_exit 1
-	copy_sources "$MYSRCDIR" "$BUILD_ROOT/.build-srcdir"
-	MYSRCDIR=$BUILD_ROOT/.build-srcdir
+	if test -z "$NO_SOURCE_COPY"; then
+	    copy_sources "$MYSRCDIR" "$BUILD_ROOT/.build-srcdir"
+	    MYSRCDIR=$BUILD_ROOT/.build-srcdir
+	else
+	    type -t vm_mount_sources_$VM_TYPE > /dev/null || cleanup_and_exit 1 "ERROR: --no-source-copy not implemented in $VM_TYPE"
+	fi
     else
 	# cwd is at $BUILD_ROOT/.build-srcdir which we want to
 	# umount later so step aside
@@ -1036,6 +1057,7 @@ vm_first_stage() {
     echo "BUILD_RPM_BUILD_STAGE='$BUILD_RPM_BUILD_STAGE'" >> $BUILD_ROOT/.build/build.data
     echo "RPM_BUILD_IN_PLACE='$RPM_BUILD_IN_PLACE'" >> $BUILD_ROOT/.build/build.data
     echo "RPM_NOPREP='$RPM_NOPREP'" >> $BUILD_ROOT/.build/build.data
+    echo "NO_SOURCE_COPY='$NO_SOURCE_COPY'" >> $BUILD_ROOT/.build/build.data
     # fallback time for broken hosts
     rm -rf $BUILD_ROOT/.build/.date
     date '+@%s' > $BUILD_ROOT/.build/.date
@@ -1069,8 +1091,10 @@ vm_first_stage() {
 	    fi
 	fi
 	check_exit
-	if test -n "$VM_USE_MKFS_COPYIN" ; then
-	    vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" "$VMDISK_FILESYSTEM_OPTIONS" "$BUILD_ROOT" || cleanup_and_exit 4
+	if test -n "$VM_USE_MKFS_COPYIN"; then
+	    if test "$DO_INIT" = true; then
+		vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" "$VMDISK_FILESYSTEM_OPTIONS" "$BUILD_ROOT" || cleanup_and_exit 4
+	    fi
         else
 	    # needs to work otherwise we have a corrupted file system
 	    if ! umount $BUILD_ROOT; then
@@ -1267,3 +1291,5 @@ vm_setup_network() {
 	fi
     fi
 }
+
+# vim: syntax=sh

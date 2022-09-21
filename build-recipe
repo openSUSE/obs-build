@@ -27,6 +27,7 @@ KIWI_PARAMETERS=
 BUILD_SKIP_BUNDLE=
 RPM_BUILD_IN_PLACE=
 RPM_NOPREP=
+NO_SOURCE_COPY=
 
 for i in spec dsc kiwi arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild appimage docker podman fissile helm flatpak mkosi; do
     . "$BUILD_DIR/build-recipe-$i"
@@ -77,6 +78,9 @@ recipe_parse_options() {
         ;;
       -rpm-noprep)
 	RPM_NOPREP=1
+        ;;
+      -no-source-copy)
+	NO_SOURCE_COPY=true
         ;;
       -*)
 	return 1
@@ -139,14 +143,14 @@ recipe_set_buildtype() {
 expand_recipe_directories() {
     local f t ff found types
     if test -z "$RECIPEFILES" ; then
-	set -- "`pwd`"
+	set -- "$PWD"
     else
 	set -- "${RECIPEFILES[@]}"
     fi
     RECIPEFILES=()
     for f in "$@" ; do
 	if test "$f" = "${f#/}" ; then
-	    f="`pwd`/$f"
+	    f="$PWD/$f"
 	fi
 	if test -d "$f" ; then
 	    if test -z "$types" ; then
@@ -166,19 +170,26 @@ expand_recipe_directories() {
 	    for t in $types ; do
 		found=
 		if test $t = mkosi. ; then
-		    for ff in "$f"/$t* ; do
-			test -f "$ff" || continue
-			RECIPEFILES=("${RECIPEFILES[@]}" "$ff")
-			found=true
-		    done
+		    files=("$f"/$t*)
 		else
-		    for ff in "$f"/*$t ; do
+		    files=("$f"/*$t)
+		fi
+		for ff in "${files[@]}" ; do
+		    test -f "$ff" || continue
+		    RECIPEFILES=("${RECIPEFILES[@]}" "${ff#$PWD/}")
+		    found=true
+		done
+		test -n "$found" && break
+		# find spec files in subdirectories to switch on build-in-place mode automatically
+		if test $t = .spec ; then
+		    files=("$f"/{package,dist}/*$t)
+		    for ff in "${files[@]}" ; do
 			test -f "$ff" || continue
-			RECIPEFILES=("${RECIPEFILES[@]}" "$ff")
-			found=true
+			RPM_BUILD_IN_PLACE=1
+			echo "spec file found in sub directory, enabling build-in-place mode"
+			RECIPEFILES=("${RECIPEFILES[@]}" "${ff#$PWD/}")
 		    done
 		fi
-		test -n "$found" && break
 		if test "$t" = .dsc -a -f "$f/debian.control" ; then
 		    RECIPEFILES=("${RECIPEFILES[@]}" "$f/debian.control")
 		    break
@@ -189,7 +200,7 @@ expand_recipe_directories() {
 		fi
 	    done
 	else
-	    RECIPEFILES[${#RECIPEFILES[@]}]="$f"
+	    RECIPEFILES[${#RECIPEFILES[@]}]="${f#$PWD/}"
 	fi
     done
     if test -z "$RECIPEFILES" ; then
@@ -259,6 +270,24 @@ recipe_needs_build_binaries() {
     return 1
 }
 
+recipe_is_build_in_place() {
+    local file="${1:?}"
+    test "$file" != "${file%.spec}" || return 1
+    test -n "$RPM_BUILD_IN_PLACE" || grep -E '^#[[:blank:]]*build-in-place[[:blank:]]*$' >/dev/null <"$file"
+}
+
+compute_recipe_args() {
+    local file="${1:?}"
+    initbuildsys_recipeargs=()
+    if recipe_needs_build_binaries "$file" ; then
+	initbuildsys_recipeargs+=('--create-build-binaries')
+    fi
+    if recipe_is_build_in_place "$file"; then
+	initbuildsys_recipeargs+=('--define')
+	initbuildsys_recipeargs+=('_build_in_place 1')
+    fi
+}
+
 recipe_build_time_statistics() {
     if test "$DO_STATISTICS" = 1 -a -n "$RECIPE_BUILD_START_TIME" -a -n "$TOPDIR" -a -n "$RUNNING_IN_VM" ; then
 	mkdir -p "$TOPDIR/OTHER"
@@ -285,4 +314,3 @@ recipe_gendiff() {
          fi
     fi
 }
-

@@ -46,6 +46,7 @@ export BUILD_DIST ABUILD_UID ABUILD_GID
 
 icecream=0
 definesnstuff=()
+initbuildsys_recipeargs=()
 repos=()
 old_packages=()
 
@@ -192,7 +193,7 @@ Known Parameters:
   --wipe      Completely removes build environment and exits.
 
   --no-init   Skip initialization of build root and start with build
-              immediately.
+              immediately. Repeat to also keep previous build files.
 
   --no-checks Do not run checks (postbuild and %check)
 
@@ -311,6 +312,10 @@ Known Parameters:
               Specify the uid and gid to use for the abuild user.
               This is useful if you are hacking in the buildroot.
               This must be set to the same value if the buildroot is re-used.
+
+  --no-source-copy
+              Mount source directory instead of copying. Only works
+              with chroot builds that are not on NFS.
 
   --statistics
               monitor used resources during build inside VM
@@ -578,6 +583,7 @@ ccache_pack() {
 }
 
 ccache_setup() {
+    test "$DO_INIT" = "true" || return
     CCACHE_SETUP_START_TIME=
     if test -n "$CCACHE" -a "$CCACHE_TYPE" = sccache ; then
 	sccache_setup
@@ -842,7 +848,9 @@ copy_sources() {
     if test -n "$RUNNING_IN_VM" -o "$BUILDTYPE" = kiwi -o "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman ; then
         include_directories=true
     fi
-    if test -n "$RUNNING_IN_VM" -o -n "$COPY_SOURCES_ASIS" -o -n "$RPM_BUILD_IN_PLACE" ; then
+    if test -n "$NO_SOURCE_COPY"; then
+	mount --bind "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"
+    elif test -n "$RUNNING_IN_VM" -o -n "$COPY_SOURCES_ASIS" -o -n "$RECIPE_RPM_BUILD_IN_PLACE" ; then
 	( shopt -s nullglob ; cp -pRd "$1/".[^.]* "$1/"..?* "$1"/* "$2" )
     elif test -n "$include_directories" ; then
         cp -pRL "$1"/* "$2"
@@ -868,7 +876,9 @@ copy_sources() {
     else
 	cp -p "$1"/* "$2"
     fi
-    test -n "$RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" && cp -f "$RECIPEPATH" "$2"
+    if test -n "$RECIPE_RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" -a -z "$NO_SOURCE_COPY"; then
+	cp -f "$RECIPEPATH" "$2"
+    fi
 }
 
 mkdir_build_root() {
@@ -1006,7 +1016,14 @@ shopt -s nullglob
 export PATH=$BUILD_DIR:/sbin:/usr/sbin:/bin:/usr/bin:$PATH
 
 if vm_detect_2nd_stage ; then
-    set "/.build-srcdir/$RECIPEFILE"
+    vm_mount_sources "/.build-srcdir" || cleanup_and_exit 1
+    if test -z "$NO_SOURCE_COPY"; then
+	set "/.build-srcdir/$RECIPEFILE"
+    else
+	# receipt has to be relative for this to work
+	RECIPEFILES=("$RECIPEFILE")
+	cd /.build-srcdir
+    fi
     export PATH=/.build:$PATH
 fi
 
@@ -1384,10 +1401,6 @@ if test -n "$OBSURL" ; then
     initbuildsysstuff[${#initbuildsysstuff[@]}]="--obs"
     initbuildsysstuff[${#initbuildsysstuff[@]}]="$OBSURL"
 fi
-if test -n "$RPM_BUILD_IN_PLACE"; then
-    initbuildsysstuff[${#initbuildsysstuff[@]}]="--define"
-    initbuildsysstuff[${#initbuildsysstuff[@]}]="_build_in_place 1"
-fi
 
 if test -n "$DO_WIPE" ; then
     wipe_build_environment
@@ -1420,15 +1433,23 @@ if test -n "$CCACHE" ; then
     fi
 fi
 
+set_build_arch
+
 if test -z "$RPMLIST" -a -z "$RUNNING_IN_VM" ; then
     if test -z "$repos" -a -z "$BUILD_RPMS" -a "$BUILD_DIST" = "${BUILD_DIST#obs:/}"; then
-	repos=(--repository 'zypp://')
+	repos=(--repository)
+	if test -n "$BUILD_DIST"; then
+		# distro explicitly specified, check config first
+		repos+=(`"$BUILD_DIR/queryconfig" repourl --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`)
+	fi
+	if test "${#repos[@]}" = 1; then
+		# config provides no default, use system repos
+		repos+=('zypp://')
+	fi
     fi
 else
     repos=()
 fi
-
-set_build_arch
 
 if test "$DO_INIT" = false -a -n "$RUN_SHELL" -a -z "$VM_TYPE"; then
     mount_stuff
@@ -1445,7 +1466,8 @@ if test -n "$LIST_STATE" ; then
     test -d "$BUILD_ROOT" || cleanup_and_exit 3
     RECIPEPATH=$RECIPEFILES # only one specified anyways
     test "$RECIPEPATH" != "${RECIPEPATH%.src.rpm}" && recipe_unpack_srcrpm "$RECIPEPATH"
-    init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --list-state "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $DLNOSIGNATURE $USEUSEDFORBUILD $RECIPEPATH $BUILD_EXTRA_PACKS
+    compute_recipe_args "$RECIPEPATH"
+    init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --list-state "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${initbuildsys_recipeargs[@]}" "${repos[@]}" $DLNOSIGNATURE $RECIPEPATH $BUILD_EXTRA_PACKS
     ERR=$?
     rm -rf "$BUILD_ROOT"
     cleanup_and_exit $ERR
@@ -1537,14 +1559,23 @@ MODULEMDFILE=
 
 for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 
-    if test -n "$RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" ; then
+    RECIPE_RPM_BUILD_IN_PLACE=
+    if recipe_is_build_in_place "$RECIPEPATH"; then
+	RECIPE_RPM_BUILD_IN_PLACE=1
+    fi
+
+    if test -n "$RECIPE_RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" -a -z "$NO_SOURCE_COPY" ; then
 	SRCDIR="$PWD"
 	RECIPEFILE="${RECIPEPATH##*/}"
+    elif test -n "$NO_SOURCE_COPY" ; then
+	SRCDIR="$PWD"
+	RECIPEFILE="$RECIPEPATH"
     elif test "$RECIPEPATH" != "${RECIPEPATH%/debian/control}" ; then
 	SRCDIR="${RECIPEPATH%/debian/control}"
 	RECIPEFILE="debian/control"
     else
 	SRCDIR="${RECIPEPATH%/*}"
+	test "$SRCDIR" = "$RECIPEPATH" && SRCDIR="$PWD"
 	RECIPEFILE="${RECIPEPATH##*/}"
     fi
 
@@ -1569,6 +1600,13 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	BUILD_RPMS=
 	BUILD_DIST="$SRCDIR/.build.config"
 	repos=()
+    fi
+
+    # Need to make sure VM/chroot can access the files. So
+    # So use spec file as reference for build user.
+    # Obviously crazy ownership combos won't work here.
+    if test -n "$NO_SOURCE_COPY"; then
+	read ABUILD_UID ABUILD_GID < <(stat -c "%u %g" "$RECIPEPATH")
     fi
 
     recipe_set_buildtype
@@ -1630,11 +1668,8 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	Q="'\''"
 	test -n "$DISTURL" && echo "BUILD_DISTURL='${DISTURL//"'"/$Q}'" >> $BUILD_ROOT/.buildenv
 	test "$BUILDTYPE" = preinstallimage && mkdir -p $BUILD_ROOT/.preinstall_image
-	CREATE_BUILD_BINARIES=
-	if recipe_needs_build_binaries "$RECIPEPATH" ; then
-	    CREATE_BUILD_BINARIES=--create-build-binaries
-	fi
-	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $DLNOSIGNATURE $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$RECIPEPATH" $ADDITIONAL_PACKS
+	compute_recipe_args "$RECIPEPATH"
+	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${initbuildsys_recipeargs[@]}" "${repos[@]}" $CLEAN_BUILD $DLNOSIGNATURE $USEUSEDFORBUILD $RPMLIST "$RECIPEPATH" $ADDITIONAL_PACKS
 	echo "$* ..."
         start_time=$SECONDS
 	"$@" || cleanup_and_exit 1
@@ -1750,11 +1785,11 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
     setupicecream
     ccache_setup
 
-    test -n "$RUN_SHELL" && run_shell
-
     # fill build directories with sources. Also sets TOPDIR
     recipe_setup
     RECIPEPATH=
+
+    test -n "$RUN_SHELL" && run_shell
     
     # strip prefix from autogenerated files of source services.
     # sorted by line length to let the latest run service win
@@ -1832,7 +1867,8 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
     if test "$BUILD_SUCCEEDED" = genbuildreqs -a "$DO_INIT" = true -a -z "$RPMLIST" -a -z "$RUNNING_IN_VM" -a -n "${GEN_BUILDREQS_PACKS[*]}" ; then
 	# re-expand deps with GEN_BUILDREQS_PACKS extra packages
 	umount_stuff
-	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $DLNOSIGNATURE $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS "${GEN_BUILDREQS_PACKS[@]}"
+	compute_recipe_args "$RECIPEPATH"
+	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${initbuildsys_recipeargs[@]}" "${repos[@]}" $DLNOSIGNATURE $USEUSEDFORBUILD $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS "${GEN_BUILDREQS_PACKS[@]}"
 	echo "$* ..."
 	"$@" || cleanup_and_exit 1
 	check_exit
