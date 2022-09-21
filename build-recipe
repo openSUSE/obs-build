@@ -180,6 +180,16 @@ expand_recipe_directories() {
 		    found=true
 		done
 		test -n "$found" && break
+		# find spec files in subdirectories to switch on build-in-place mode automatically
+		if test $t = .spec ; then
+		    files=("$f"/{package,dist}/*$t)
+		    for ff in "${files[@]}" ; do
+			test -f "$ff" || continue
+			RPM_BUILD_IN_PLACE=1
+			echo "spec file found in sub directory, enabling build-in-place mode"
+			RECIPEFILES=("${RECIPEFILES[@]}" "${ff#$PWD/}")
+		    done
+		fi
 		if test "$t" = .dsc -a -f "$f/debian.control" ; then
 		    RECIPEFILES=("${RECIPEFILES[@]}" "$f/debian.control")
 		    break
