@@ -106,7 +106,8 @@ check_native_arch() {
     return 1
 }
 
-check_use_emulator() {
+set_initvm_name_for_emulator_in() {
+    local initvmdir="$1"
     INITVM_NAME=
     # check if the extended host arch contains the build arch
     if check_native_arch "${BUILD_ARCH%%:*}" ; then
@@ -117,14 +118,15 @@ check_use_emulator() {
     # to run the qemu initialization in the vm, we need to
     # register it with a static program or shell script
     INITVM_NAME="initvm.$BUILD_INITVM_ARCH"
-    if test -e "$BUILD_DIR/$INITVM_NAME" -a -e "$BUILD_DIR/qemu-reg" ; then
-	chmod 0755 "$BUILD_DIR/$INITVM_NAME"
-	return 0	# chroot build, we need to run
+    if test -e "$initvmdir/$INITVM_NAME" -a -e "$initvmdir/qemu-reg" ; then
+        # it exists, assume we need to run it
+	return 0
     fi
+    INITVM_NAME=
+
     # XXX: error?
     echo "Warning: cross compile not possible due to missing static binaries. please install build-initvm package for that purpose."
     echo "         check that the right architecture is available for your build host, you need $INITVM_NAME for this one."
-    INITVM_NAME=
     return 1
 }
 

@@ -682,7 +682,7 @@ else
     # (we do not need this for the prepare step, as we do not run scripts in this case)
     #
     if test -z "$PREPARE_VM" ; then
-	if check_use_emulator ; then
+	if set_initvm_name_for_emulator_in "$BUILD_DIR" ; then
 	    echo "registering binfmt handlers for cross build"
 	    "$BUILD_DIR/$INITVM_NAME"
 	    echo 0 > /proc/sys/vm/mmap_min_addr
