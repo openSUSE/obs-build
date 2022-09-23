@@ -1049,7 +1049,7 @@ vm_first_stage() {
     buildroot_umount /mnt
 
     vm_init_script="/.build/build"
-    if check_use_emulator ; then
+    if set_initvm_name_for_emulator_in "$BUILD_ROOT/.build" ; then
         vm_init_script="/.build/$INITVM_NAME"
     fi
 

@@ -164,7 +164,6 @@ make CFLAGS="$RPM_BUILD_FLAGS" initvm-all
 make DESTDIR=%{buildroot} initvm-install
 strip %{buildroot}/usr/lib/build/initvm.*
 export NO_BRP_STRIP_DEBUG="true"
-chmod 0644 %{buildroot}/usr/lib/build/initvm.*
 %endif
 
 # main
