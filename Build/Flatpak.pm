@@ -30,6 +30,10 @@ use Build::Rpm;
 my $yamlxs = eval { require YAML::XS; $YAML::XS::LoadBlessed = 0; return 1 };
 my $yamlpp = eval { require YAML::PP; return YAML::PP->new };
 
+sub _have_yaml_parser {
+  return $yamlpp || $yamlxs ? 1 : undef;
+}
+
 sub _load_yaml {
   my ($yaml) = @_;
   my $data;

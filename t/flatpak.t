@@ -32,6 +32,7 @@ my @sources = map { "https://example.org/$_" } (
 );
 
 subtest parse => sub {
+    plan skip_all => 'no YAML parser' unless Build::Flatpak::_have_yaml_parser();
     my $expected = {
         name => 'org.gnome.Chess',
         version => '3.36.2',
@@ -55,6 +56,7 @@ subtest parse => sub {
 };
 
 subtest show => sub {
+    plan skip_all => 'no YAML parser' unless Build::Flatpak::_have_yaml_parser();
     local @ARGV = ("$path/flatpak.yaml", 'name');
     my $data = capture_stdout(sub { Build::Flatpak::show() });
     is $data, "org.gnome.Chess\n", 'Build::Flatpak::show name';
@@ -66,6 +68,7 @@ subtest show => sub {
 };
 
 subtest rewrite => sub {
+    plan skip_all => 'no YAML parser' unless Build::Flatpak::_have_yaml_parser();
     local @ARGV = ("$path/flatpak.yaml");
     my $yaml = capture_stdout(sub { Build::Flatpak::rewrite() });
     my $ok = is $yaml, $rewritten_manifest, 'Build::Flatpak::show rewrite';
