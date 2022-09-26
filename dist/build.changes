@@ -1,4 +1,17 @@
 -------------------------------------------------------------------
+Mon Sep 26 08:15:38 UTC 2022 - Adrian Schröter <adrian@suse.de>
+
+- build-recipe-livebuild: run as root
+- vm_kill_kvm: Use SIGKILL after 3 minutes if the kvm process is not going away
+- Zip: Allow extraction of symlink targets
+- Convert obsolete egrep/fgrep calls to grep -E/-F
+- Add RemoteAsset support for Dockerfile based builds
+- new image format: mkosi
+- Support stacked container builds
+- Revert "build-vm-kvm: enable l3-cache on i386/x86_64 builds"
+- handling of non-compressed tar when creating Debian archive for DSC 3.0
+
+-------------------------------------------------------------------
 Mon Jun 20 09:33:55 UTC 2022 - Adrian Schröter <adrian@suse.de>
 
 - kvm: exclude powerpc from io_uring, enable iothreads always (#829)
