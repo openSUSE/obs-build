@@ -1,7 +1,7 @@
 #
-# spec file for package build
+# spec file
 #
-# Copyright (c) 2020 SUSE LLC
+# Copyright (c) 2022 SUSE LLC
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -28,7 +28,7 @@ Name:           %{__pkg_name}
 Summary:        A Script to Build SUSE Linux RPMs
 License:        GPL-2.0-only OR GPL-3.0-only
 Group:          Development/Tools/Building
-Version:        20200131
+Version:        20220926
 Release:        0
 Source:         obs-build-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
@@ -64,26 +64,28 @@ Conflicts:      qemu < 2.5.0
 BuildRequires:  perl(Date::Parse)
 BuildRequires:  perl(Test::Harness)
 BuildRequires:  perl(Test::More)
+%if 0%{?suse_version} >= 1200
 BuildRequires:  perl(YAML::LibYAML)
+%endif
 %if 0%{?suse_version} > 1000 || 0%{?centos_version} >= 800 || 0%{?rhel_version} >= 800 || 0%{?fedora_version} >= 21
 # None of them are actually required for core features.
 # Perl helper scripts use them.
 Recommends:     perl(Archive::Tar)
+Recommends:     /sbin/mkfs.ext3
+Recommends:     /usr/bin/qemu-kvm
+Recommends:     bsdtar
+Recommends:     qemu-linux-user
+Recommends:     zstd
 Recommends:     perl(Config::IniFiles)
 Recommends:     perl(Date::Language)
 Recommends:     perl(Date::Parse)
 Recommends:     perl(LWP::UserAgent)
+Recommends:     perl(Net::SSL)
 Recommends:     perl(Pod::Usage)
 Recommends:     perl(Time::Zone)
 Recommends:     perl(URI)
 Recommends:     perl(XML::Parser)
-Recommends:     perl(Net::SSL)
 Recommends:     perl(YAML::LibYAML)
-Recommends:     bsdtar
-Recommends:     qemu-linux-user
-Recommends:     zstd
-Recommends:     /usr/bin/qemu-kvm
-Recommends:     /sbin/mkfs.ext3
 %endif
 
 %if 0%{?suse_version} > 1120 || ! 0%{?suse_version}
@@ -96,9 +98,8 @@ Recommends:     %{__pkg_name}-mkdrpms
 
 # With fedora 33 the POSIX module was split out of the perl
 # package
-BuildRequires: perl(POSIX)
-Requires: perl(POSIX)
-
+BuildRequires:  perl(POSIX)
+Requires:       perl(POSIX)
 
 %description
 This package provides a script for building RPMs for SUSE Linux in a
@@ -133,6 +134,7 @@ for generating delta rpm packages.
 %if "%{_host_cpu}" == "i686"
 %define initvm_arch i586
 %endif
+
 %package initvm-%{initvm_arch}
 Summary:        Virtualization initializer for emulated cross architecture builds
 Group:          Development/Tools/Building
