@@ -1,6 +1,7 @@
 -------------------------------------------------------------------
 Mon Sep 26 08:15:38 UTC 2022 - Adrian Schröter <adrian@suse.de>
 
+- sync factory build config
 - build-recipe-livebuild: run as root
 - vm_kill_kvm: Use SIGKILL after 3 minutes if the kvm process is not going away
 - Zip: Allow extraction of symlink targets
