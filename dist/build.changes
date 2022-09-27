@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue Sep 27 07:01:33 UTC 2022 - Adrian Schröter <adrian@suse.de>
+
+- fix build of testsuite spec file
+
+-------------------------------------------------------------------
 Mon Sep 26 08:15:38 UTC 2022 - Adrian Schröter <adrian@suse.de>
 
 - sync factory build config
