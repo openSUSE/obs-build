@@ -28,7 +28,7 @@ Name:           %{__pkg_name}
 Summary:        A Script to Build SUSE Linux RPMs
 License:        GPL-2.0-only OR GPL-3.0-only
 Group:          Development/Tools/Building
-Version:        20220926
+Version:        20220927
 Release:        0
 Source:         obs-build-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
@@ -259,6 +259,9 @@ exit 0
 sed -i 's,build-mkbaselibs,,' ../configs/*.conf
 if [ ! -e /.build.packages/rpmlint-Factory.rpm ]; then
   sed -i 's,rpmlint-Factory,,' ../configs/*.conf
+fi
+if [ ! -e /.build.packages/rpmlint-strict.rpm ]; then
+  sed -i 's,rpmlint-strict,,' ../configs/*.conf
 fi
 ./testbuild.sh /.build.binaries/
 
