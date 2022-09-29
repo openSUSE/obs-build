@@ -125,11 +125,16 @@ vm_verify_options_kvm() {
 		fi
 	    fi
 	    if grep -q "POWER9" /proc/cpuinfo; then
-		# This option has been added in QEMU 2.10
-		if $kvm_bin -machine 'help' 2>&1 | grep -q ^pseries-6; then
-		    kvm_options="-enable-kvm -M pseries,max-cpu-compat=power8"
-		else
-		    kvm_cpu="-cpu host,compat=power8"
+                local backward_compability_hack
+                test -n "$BUILD_DIST" && backward_compability_hack=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags kvm-max-cpu-compat-power8`
+                if test -n "$backward_compability_hack" ; then
+                        # old compability hack to limit the cpu guest to power8, even when running on power9
+			if $kvm_bin -machine 'help' 2>&1 | grep -q ^pseries-6; then
+			    # This option has been changed in QEMU 2.10
+			    kvm_options="-enable-kvm -M pseries,max-cpu-compat=power8"
+			else
+			    kvm_cpu="-cpu host,compat=power8"
+			fi
 		fi
 	    fi
 	    grep -q PPC970MP /proc/cpuinfo && kvm_check_ppc970
