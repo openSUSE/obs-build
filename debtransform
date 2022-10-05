@@ -233,26 +233,30 @@ sub dotar_quilt {
   my $input_file_name = basename($input_file_path_without_ext);
   my $decompress_dst = "${tempdirname}/${input_file_name}.tar";
 
-  # print "Decompress '$decompress_src' to '$decompress_dst' for concatenation\n";
+  my $tar_for_concatination_path = $decompress_dst;
+
+  # print "Decompress '$input_file_path_relative' to '$tar_for_concatination_path' for concatenation\n";
 
   if (($ext eq ".tgz") or ($ext eq ".tar.gz")) {
-      system("gzip -dck \"$decompress_src\" > \"$decompress_dst\"") == 0 || die("Can not unpack gzip archive '$decompress_src': $!\n");
-  } elsif (($ext eq ".tar.xz")) {
-      system("xz -dck \"$decompress_src\" > \"$decompress_dst\"") == 0 || die("Can not unpack xz archive '$decompress_src': $!\n");
-  } elsif (($ext eq ".tar.bz2")) {
-      system("bzip2 -dck \"$decompress_src\" > \"$decompress_dst\"") == 0 || die("Can not unpack bzip2 archive '$decompress_src': $!\n");
+    (system qq(gzip -dck '$decompress_src' > '$decompress_dst')) == 0 or die "Can not unpack gzip archive '$decompress_src': $!\n";
+  } elsif ($ext eq ".tar.xz") {
+    (system qq(xz -dck '$decompress_src' > '$decompress_dst')) == 0 or die "Can not unpack xz archive '$decompress_src': $!\n";
+  } elsif ($ext eq ".tar.bz2") {
+    (system qq(bzip2 -dck '$decompress_src' > '$decompress_dst')) == 0 or die "Can not unpack bzip2 archive '$decompress_src': $!\n";
+  } elsif ($ext eq ".tar") {
+    system 'cp', $decompress_src, $decompress_dst;
+  } else {
+    die "Unrecognized archive filename extension: '$ext'\n";
   }
-
-  my $tar_for_concatination_path = $decompress_dst;
 
   # Looking for changelog in tar
   my $changelog_path_in_tar = 'debian/changelog';
-  my $is_changelog_in_tar = (system("tar -tf \"${tar_for_concatination_path}\" $changelog_path_in_tar > /dev/null 2>&1") == 0);
+  my $is_changelog_in_tar = (system qq(tar -tf '$tar_for_concatination_path' '$changelog_path_in_tar' > /dev/null 2>&1)) == 0;
 
   if ($is_changelog_in_tar){
     print "Found '$changelog_path_in_tar' in '${tar_for_concatination_path}', extract to '$tempdirname'.\n";
-    system("tar xf \"$input_file_path\" --directory $tempdirname $changelog_path_in_tar") == 0
-      || die("Can not extract file '$changelog_path_in_tar' from tar '$input_file_path': $!\n");
+    (system 'tar', 'xf', $input_file_path, '--directory', $tempdirname, $changelog_path_in_tar) == 0
+      or die "Can not extract file '$changelog_path_in_tar' from tar '$input_file_path': $!\n";
 
     # Patch changelog
     my $changelog_file_path = "$tempdirname/$changelog_path_in_tar";
@@ -267,19 +271,20 @@ sub dotar_quilt {
     close $out;
 
     # Replace original changelog with patched
-    unlink($changelog_file_path);
-    rename($changelog_file_path_patched, $changelog_file_path);
+    unlink $changelog_file_path;
+    rename $changelog_file_path_patched, $changelog_file_path;
 
     print "Update tar '$tar_for_concatination_path' due to changelog '$changelog_file_path' patched.\n";
     # Add changelog file to tar relative to tempdirname
-    system("tar -C \"$tempdirname\" -uf \"$tar_for_concatination_path\" \"$changelog_path_in_tar\"") == 0
-      || die("Can not update tar '$tar_for_concatination_path' with file '$changelog_file_path': $!\n");
+    (system 'tar', '-C', $tempdirname, '-uf', $tar_for_concatination_path, $changelog_path_in_tar) == 0
+      or die "Can not update tar '$tar_for_concatination_path' with file '$changelog_file_path': $!\n";
 
-    unlink($changelog_file_path);
+    unlink $changelog_file_path;
   }
 
-  system("tar --concatenate -f \"$output_file_path\" \"${tar_for_concatination_path}\"");
-  unlink("${tar_for_concatination_path}");
+  system 'tar', '--concatenate', '-f', $output_file_path, $tar_for_concatination_path;
+
+  unlink $tar_for_concatination_path;
 }
 
 sub dofile {

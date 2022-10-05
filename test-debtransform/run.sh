@@ -40,7 +40,9 @@ run 2 grandorgue.dsc 0 2-out
 run 3 grandorgue.dsc 0 3-out
 run 4 grandorgue.dsc 0 4-out
 run 5 grandorgue.dsc 0 5-out
+run 6 grandorgue.dsc 0 6-out
 
 # check with absolute paths too
 run "$(realpath 4)" grandorgue.dsc 0 "$(realpath 4-out)"
 run "$(realpath 5)" grandorgue.dsc 0 "$(realpath 5-out)"
+run "$(realpath 6)" grandorgue.dsc 0 "$(realpath 6-out)"
