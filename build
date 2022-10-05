@@ -1537,7 +1537,11 @@ MODULEMDFILE=
 
 for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 
-    if test -n "$RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" ; then
+    if test -n "$RPM_BUILD_IN_PLACE" -a -n "$RPM_RECIPE_IN_SUBDIR" -a -z "$RUNNING_IN_VM" ; then
+	SRCDIR=${RECIPEPATH%/*}
+	SRCDIR=${SRCDIR%/*}
+	RECIPEFILE="${RECIPEPATH##*/}"
+    elif test -n "$RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" ; then
 	SRCDIR="$PWD"
 	RECIPEFILE="${RECIPEPATH##*/}"
     elif test "$RECIPEPATH" != "${RECIPEPATH%/debian/control}" ; then
@@ -1548,7 +1552,7 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	RECIPEFILE="${RECIPEPATH##*/}"
     fi
 
-    if test "$RECIPEFILE" != "${RECIPEFILE%.slsa_provenance.json}" ; then
+    if test "$RECIPEFILE" = "_slsa_provenance.json" -o "$RECIPEFILE" != "${RECIPEFILE%.slsa_provenance.json}" ; then
 	MYSRCDIR="$BUILD_ROOT/.build-srcdir"
 	rm -rf "$MYSRCDIR"
 	mkdir -p "$MYSRCDIR"

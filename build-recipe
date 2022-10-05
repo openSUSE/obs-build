@@ -26,6 +26,7 @@ BUILDTYPE=
 KIWI_PARAMETERS=
 BUILD_SKIP_BUNDLE=
 RPM_BUILD_IN_PLACE=
+RPM_RECIPE_IN_SUBDIR=
 RPM_NOPREP=
 
 for i in spec dsc kiwi arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild appimage docker podman fissile helm flatpak mkosi; do
@@ -137,7 +138,7 @@ recipe_set_buildtype() {
 
 # expands all directories into files
 expand_recipe_directories() {
-    local f t ff found types
+    local f t ff found types subdir
     if test -z "$RECIPEFILES" ; then
 	set -- "`pwd`"
     else
@@ -161,11 +162,17 @@ expand_recipe_directories() {
 			mkosi) types="mkosi." ;;
 		    esac
 		fi
-		types="$types .spec .dsc PKGBUILD Dockerfile build.collax .kiwi .src.rpm .nosrc.rpm simpleimage snapcraft.yaml Chart.yaml flatpak.yaml flatpak.json mkosi."
+		types="$types .spec _specsubdir:package _specsubdir:dist .dsc PKGBUILD Dockerfile build.collax .kiwi .src.rpm .nosrc.rpm simpleimage snapcraft.yaml Chart.yaml flatpak.yaml flatpak.json mkosi."
 	    fi
 	    for t in $types ; do
 		found=
-		if test $t = mkosi. ; then
+		subdir=
+		if test "$t" != ${t#_specsubdir:} ; then
+		    test -n "$RPM_BUILD_IN_PLACE" && continue
+		    subdir="${t#_specsubdir:}"
+		    t="$subdir/*.spec"
+		fi
+		if test "$t" = mkosi. ; then
 		    files=("$f"/$t*)
 		else
 		    files=("$f"/*$t)
@@ -175,6 +182,11 @@ expand_recipe_directories() {
 		    RECIPEFILES=("${RECIPEFILES[@]}" "$ff")
 		    found=true
 		done
+		if test -n "$found" -a -n "$subdir" ; then
+		    echo "spec files found in '$subdir' directory, enabling build-in-place mode"
+		    RPM_BUILD_IN_PLACE=1
+		    RPM_RECIPE_IN_SUBDIR="$subdir"
+		fi
 		test -n "$found" && break
 		if test "$t" = .dsc -a -f "$f/debian.control" ; then
 		    RECIPEFILES=("${RECIPEFILES[@]}" "$f/debian.control")
