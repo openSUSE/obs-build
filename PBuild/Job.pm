@@ -332,6 +332,7 @@ sub createjob {
   push @args, "--buildflavor=$p->{'flavor'}" if $p->{'flavor'};
   push @args, "--obspackage=".($p->{'originpackage'} || $p->{'pkg'}) if $needobspackage;
   push @args, "--copy-sources-asis" if $copy_sources_asis;
+  push @args, "--rpm-recipe-in-subdir" if $p->{'recipe'} =~ /^(?:package|dist)\/.*\.spec$/;
   push @args, "$srcdir/$p->{'recipe'}";
 
   if ($kiwimode) {

@@ -76,6 +76,10 @@ recipe_parse_options() {
 	RPM_BUILD_IN_PLACE=1
 	RPM_NOPREP=1
         ;;
+      -rpm-recipe-in-subdir)
+	RPM_BUILD_IN_PLACE=1
+	RPM_RECIPE_IN_SUBDIR=1
+	;;
       -rpm-noprep)
 	RPM_NOPREP=1
         ;;
@@ -185,7 +189,7 @@ expand_recipe_directories() {
 		if test -n "$found" -a -n "$subdir" ; then
 		    echo "spec files found in '$subdir' directory, enabling build-in-place mode"
 		    RPM_BUILD_IN_PLACE=1
-		    RPM_RECIPE_IN_SUBDIR="$subdir"
+		    RPM_RECIPE_IN_SUBDIR=1
 		fi
 		test -n "$found" && break
 		if test "$t" = .dsc -a -f "$f/debian.control" ; then

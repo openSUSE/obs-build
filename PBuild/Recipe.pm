@@ -78,6 +78,14 @@ sub find_recipe {
       return $files{$files[0]};
     }
   }
+  if ($type eq 'spec' && $files{'package/'}) {
+    my @specs = sort(grep {/\.spec/} PBuild::Util::ls("$p->{'dir'}/package"));
+    return "package/$specs[0]" if @specs;
+  }
+  if ($type eq 'spec' && $files{'dist/'}) {
+    my @specs = sort(grep {/\.spec/} PBuild::Util::ls("$p->{'dir'}/dist"));
+    return "dist/$specs[0]" if @specs;
+  }
   return undef;
 }
 
