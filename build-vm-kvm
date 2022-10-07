@@ -406,8 +406,12 @@ vm_fixup_kvm() {
 
     # move IO into separate I/O thread for some architectures
     if test "${kvm_device%%-*}" = "virtio" ; then
-        kvm_options="$kvm_options -object iothread,id=io0"
-        kvm_device_opts=",iothread=io0"
+        if $kvm_bin -version | grep -F -q 7.1.0; then
+            echo "QEMU 7.1.0 detected: Skipping iothreads because of bsc#1204082"
+        else
+            kvm_options="$kvm_options -object iothread,id=io0"
+            kvm_device_opts=",iothread=io0"
+        fi
         case $(uname -m) in
             ppc|ppcle|ppc64|ppc64le)
                 # PowerPC currently not reliably working
