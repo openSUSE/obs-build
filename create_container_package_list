@@ -25,8 +25,8 @@ skopeo copy docker-archive:$tmpdir/cont oci:$tmpdir/image:latest >/dev/null
 rm -f $tmpdir/cont
 umoci unpack --image $tmpdir/image:latest $tmpdir/unpack >/dev/null
 if test -x "$tmpdir/unpack/rootfs/usr/bin/rpm" ; then
-    chroot $tmpdir/unpack/rootfs rpm -qa --qf '[%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}|%{DISTURL}\n]'
+    chroot $tmpdir/unpack/rootfs rpm -qa --qf '[%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}|%{DISTURL}|%{LICENSE}\n]'
 else
-    rpm --root "$tmpdir/unpack/rootfs" -qa --qf '[%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}|%{DISTURL}\n]'
+    rpm --root "$tmpdir/unpack/rootfs" -qa --qf '[%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}|%{DISTURL}|%{LICENSE}\n]'
 fi
 
