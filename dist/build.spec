@@ -262,6 +262,9 @@ fi
 if [ ! -e /.build.packages/rpmlint-strict.rpm ]; then
   sed -i 's,rpmlint-strict,,' ../configs/*.conf
 fi
+if [ ! -e /.build.packages/rpmlint-mini.rpm ]; then
+  sed -i 's,rpmlint-mini,,' ../configs/*.conf
+fi
 ./testbuild.sh /.build.binaries/
 
 %files
