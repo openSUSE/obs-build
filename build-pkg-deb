@@ -44,6 +44,25 @@ deb_chroot ()
     )
 }
 
+#
+# A wrapper around chroot + su to set the environment correctly for
+# the build process
+#
+su_deb_chroot()
+{
+    dir="$1"
+    command="$2"
+    shift 2
+    (
+	cd "$dir" &&
+			   LC_ALL=C.UTF-8 LANGUAGE=C.UTF-8 LANG=C.UTF-8 \
+			   TZ=UTC \
+			   chroot "$dir" su - "$BUILD_USER" \
+			   -w "LC_ALL,LANGUAGE,LANG,TZ" \
+			   -c "$command" "$@" < /dev/null
+    )
+}
+
 deb_setup() {
     mkdir -p $BUILD_ROOT/var/lib/dpkg
     mkdir -p $BUILD_ROOT/var/log

@@ -138,10 +138,10 @@ EOF
 
 dsc_build() {
     local buildroot=$1
-    deb_chroot "$buildroot" su -c "cat /proc/self/mountinfo" - "$BUILD_USER" < /dev/null || true
-    deb_chroot "$buildroot" su -c "id" - "$BUILD_USER" < /dev/null || true
-    deb_chroot "$buildroot" su -c "env | LC_ALL=C sort -u" - "$BUILD_USER" < /dev/null || true
-    deb_chroot "$buildroot" su -c "dpkg-query -W" - "$BUILD_USER" < /dev/null || true
+    su_deb_chroot "$buildroot" "cat /proc/self/mountinfo" || true
+    su_deb_chroot "$buildroot" "id" || true
+    su_deb_chroot "$buildroot" "env | LC_ALL=C sort -u" || true
+    su_deb_chroot "$buildroot" "dpkg-query -W" || true
 
     DSC_BUILD_OPTIONS=
     if test -n "$BUILD_JOBS" ; then
@@ -184,12 +184,12 @@ dsc_build() {
 	DSC_BUILD_OPTIONS="${DSC_BUILD_OPTIONS# }"
     fi
 
-    deb_chroot $buildroot su -c "export DEB_BUILD_OPTIONS=${DSC_BUILD_OPTIONS} ; cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
-		    deb_chroot "$buildroot" su -c "dpkg-deb --info $(printf '%q' "$TOPDIR/$f")" - "$BUILD_USER" < /dev/null || true
-		    deb_chroot "$buildroot" su -c "dpkg-deb --contents $(printf '%q' "$TOPDIR/$f")" - "$BUILD_USER" < /dev/null || true
-    if test "$BUILD_SUCCEEDED" = true -a "$DO_CHECKS" != "false" && ( deb_chroot $buildroot su -c "which lintian > /dev/null" - $BUILD_USER < /dev/null ); then
-	DEB_CHANGESFILE=${DEB_DSCFILE%.dsc}$OBS_DCH_RELEASE"_"$(deb_chroot $buildroot su -c 'dpkg-architecture -qDEB_BUILD_ARCH')".changes"
-	deb_chroot $buildroot su -c "cd $TOPDIR && echo Running lintian && (set -x && lintian -i $TOPDIR/$DEB_CHANGESFILE)" - $BUILD_USER < /dev/null || BUILD_SUCCEEDED=false
+    su_deb_chroot $buildroot "export DEB_BUILD_OPTIONS=${DSC_BUILD_OPTIONS} ; cd $TOPDIR/BUILD && $DSC_BUILD_CMD" && BUILD_SUCCEEDED=true
+		    su_deb_chroot "$buildroot" "dpkg-deb --info $(printf '%q' "$TOPDIR/$f")" || true
+		    su_deb_chroot "$buildroot" "dpkg-deb --contents $(printf '%q' "$TOPDIR/$f")" || true
+    if test "$BUILD_SUCCEEDED" = true -a "$DO_CHECKS" != "false" && ( chroot $buildroot su -c "which lintian > /dev/null" - $BUILD_USER < /dev/null ); then
+	DEB_CHANGESFILE=${DEB_DSCFILE%.dsc}$OBS_DCH_RELEASE"_"$(chroot $buildroot su -c 'dpkg-architecture -qDEB_BUILD_ARCH')".changes"
+	su_deb_chroot $buildroot "cd $TOPDIR && echo Running lintian && (set -x && lintian -i $TOPDIR/$DEB_CHANGESFILE)" || BUILD_SUCCEEDED=false
     fi
 }
 
