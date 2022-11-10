@@ -35,12 +35,12 @@ deb_chroot ()
     # when doing a 'chroot /' call lets subshell and change dir manually
     #
     (
-	cd $1 &&
+	cd "$1" &&
 	    DEBIAN_FRONTEND=noninteractive DEBIAN_PRIORITY=critical \
 			   DEBCONF_NONINTERACTIVE_SEEN=true \
 			   LC_ALL=C.UTF-8 LANGUAGE=C.UTF-8 LANG=C.UTF-8 \
 			   TZ=UTC \
-			   chroot $*
+			   chroot "$@"
     )
 }
 
