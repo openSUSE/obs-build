@@ -598,8 +598,12 @@ if test -e "$BUILD_IS_RUNNING" ; then
     echo "y - yes, cleanup the build root"
     echo "N - No, abort build (default on enter)"
     echo "c - Continue anyway with this build root"
-    echo -n "[y/N/c] "
+    # The output is line-buffered, so echo -n will not work
+    prompt="Your choice: [y/N/c]"
+    echo "$prompt?"
     read ANSWER
+    # log the choice
+    echo "$prompt = $ANSWER"
     case "$ANSWER" in
 	c|C)
 	    rm -f $BUILD_IS_RUNNING $BUILD_ROOT/exit ;;
