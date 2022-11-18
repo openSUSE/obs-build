@@ -4,6 +4,7 @@
 ################################################################
 #
 # Copyright (c) 1995-2014 SUSE Linux Products GmbH
+# Copyright (c) 2022 Andreas Stieger <Andreas.Stieger@gmx.de>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 or 3 as
@@ -154,7 +155,7 @@ recipe_build_spec() {
     test "$BUILDTYPE" = debbuild && rpmbuild=debbuild
 
     HAVE_DYNAMIC_BUILDREQUIRES=
-    if egrep '^%generate_buildrequires' "$BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE" >/dev/null ; then
+    if grep -E '^%generate_buildrequires' "$BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE" >/dev/null ; then
 	HAVE_DYNAMIC_BUILDREQUIRES=true
     fi
 

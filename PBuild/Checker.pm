@@ -661,7 +661,7 @@ sub build {
   my @vmdeps = Build::get_vminstalls($bconf);
   my @missing = grep {!$dep2pkg->{$_}} (@pdeps, @vmdeps);
   if (@missing) {
-    my $missing = join(', ', sort(BSUtil::unify(@missing)));
+    my $missing = join(', ', sort(PBuild::Util::unify(@missing)));
     return ('unresolvable', "missing pre/vminstalls: $missing");
   }
   my $tdeps;

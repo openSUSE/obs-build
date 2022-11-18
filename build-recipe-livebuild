@@ -70,7 +70,8 @@ createrepo_debian() {
 	gzip -c9 dists/${DIST}/main/source/Sources \
 	    > dists/${DIST}/main/source/Sources.gz
 	EOF
-    chroot $BUILD_ROOT su -c "sh /.createrepo_debian.tmp.sh" - root
+    chmod +x ${BUILD_ROOT}/.createrepo_debian.tmp.sh
+    chroot $BUILD_ROOT /.createrepo_debian.tmp.sh
     local RESULT=$?
     rm -f $BUILD_ROOT/.createrepo_debian.tmp.sh
     [ "${RESULT}" != 0 ] && return
@@ -121,8 +122,8 @@ createrepo_debian() {
 # $RECIPEFILE the name of the live-build config tarball
 
 recipe_build_livebuild() {
-    local ARCH=$(chroot $BUILD_ROOT su -c "dpkg-architecture -qDEB_BUILD_ARCH")
-    local DIST=$(chroot $BUILD_ROOT su -c "lsb_release --codename" | awk '{ print $2 }')
+    local ARCH=$(chroot $BUILD_ROOT dpkg-architecture -qDEB_BUILD_ARCH)
+    local DIST=$(chroot $BUILD_ROOT lsb_release --codename | awk '{ print $2 }')
     local LIVEBUILD_ROOT="LIVEBUILD_ROOT"
 
     [ -z "${ARCH}" -o -z "${DIST}" ] && cleanup_and_exit 1
@@ -133,7 +134,7 @@ recipe_build_livebuild() {
     # the example cited in the above bug, the metadata for sid would be incorrect
     # anyway, and we would want the ones for potato.
     if test "${DIST}" = "n/a" ; then
-	DIST=$(chroot $BUILD_ROOT su -c "sed 's/\(.*\)\/.*/\1/' /etc/debian_version")
+	DIST=$(chroot $BUILD_ROOT sed 's/\(.*\)\/.*/\1/' /etc/debian_version)
     fi
 
     test -d $BUILD_ROOT/.build.binaries || cleanup_and_exit 1
@@ -193,9 +194,9 @@ recipe_build_livebuild() {
 
     if [ -x $BUILD_ROOT/usr/lib/build/livebuild_pre_run ] ; then
 	echo "Running OBS build livebuild_pre_run hook"
-	chroot $BUILD_ROOT su -c \
+	chroot $BUILD_ROOT sh -c \
         "export RECIPEFILE=${RECIPEFILE}; /usr/lib/build/livebuild_pre_run" \
-        - root < /dev/null || cleanup_and_exit 1
+        < /dev/null || cleanup_and_exit 1
     fi
 
     # TODO: this might move to lb auto/config file
@@ -204,12 +205,12 @@ recipe_build_livebuild() {
 	    $BUILD_ROOT/.build.livebuild_pre_run
 	chmod +x $BUILD_ROOT/.build.livebuild_pre_run
 	echo "Running package livebuild_pre_run hook"
-	chroot $BUILD_ROOT su -c \
+	chroot $BUILD_ROOT sh -c \
         "export RECIPEFILE=${RECIPEFILE}; /.build.livebuild_pre_run" \
-        - root < /dev/null || cleanup_and_exit 1
+        < /dev/null || cleanup_and_exit 1
     fi
 
-    chroot $BUILD_ROOT su -c "cd $TOPDIR/$LIVEBUILD_ROOT && lb build" - root \
+    chroot $BUILD_ROOT sh -c "cd $TOPDIR/$LIVEBUILD_ROOT && lb build" \
 	< /dev/null || cleanup_and_exit 1
 
     # extract build result basenames

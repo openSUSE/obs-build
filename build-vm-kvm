@@ -125,11 +125,16 @@ vm_verify_options_kvm() {
 		fi
 	    fi
 	    if grep -q "POWER9" /proc/cpuinfo; then
-		# This option has been added in QEMU 2.10
-		if $kvm_bin -machine 'help' 2>&1 | grep -q ^pseries-6; then
-		    kvm_options="-enable-kvm -M pseries,max-cpu-compat=power8"
-		else
-		    kvm_cpu="-cpu host,compat=power8"
+                local backward_compability_hack
+                test -n "$BUILD_DIST" && backward_compability_hack=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags kvm-max-cpu-compat-power8`
+                if test -n "$backward_compability_hack" ; then
+                        # old compability hack to limit the cpu guest to power8, even when running on power9
+			if $kvm_bin -machine 'help' 2>&1 | grep -q ^pseries-6; then
+			    # This option has been changed in QEMU 2.10
+			    kvm_options="-enable-kvm -M pseries,max-cpu-compat=power8"
+			else
+			    kvm_cpu="-cpu host,compat=power8"
+			fi
 		fi
 	    fi
 	    grep -q PPC970MP /proc/cpuinfo && kvm_check_ppc970
@@ -168,7 +173,6 @@ vm_verify_options_kvm() {
             # build minimal machine - TODO enable sandbox on all architectures
             # options to evaluate: mem-merge=off
             kvm_options="-M pc,accel=kvm,usb=off,dump-guest-core=off,vmport=off -sandbox on"
-            kvm_cpu="-cpu host,l3-cache=on"
 
             # from qemu-microvm, minified and hardened PC bios (slightly faster than seabios)
             test -e /usr/share/qemu/qboot.rom && kvm_options="$kvm_options -bios /usr/share/qemu/qboot.rom"
@@ -369,7 +373,15 @@ vm_startup_kvm() {
 vm_kill_kvm() {
     if ! fuser -k -TERM "$VM_ROOT" ; then
 	echo "could not kill build in $VM_ROOT, kvm instance is dead already"
+	return
     fi
+    local tries=0
+    while test $tries -lt 1800 ; do
+	sleep .1
+	fuser -s "$VM_ROOT" || return
+	tries=$(( $tries + 1 ))
+    done
+    fuser -k "$VM_ROOT"
 }
 
 vm_fixup_kvm() {
@@ -394,8 +406,12 @@ vm_fixup_kvm() {
 
     # move IO into separate I/O thread for some architectures
     if test "${kvm_device%%-*}" = "virtio" ; then
-        kvm_options="$kvm_options -object iothread,id=io0"
-        kvm_device_opts=",iothread=io0"
+        if $kvm_bin -version | grep -F -q 7.1.0; then
+            echo "QEMU 7.1.0 detected: Skipping iothreads because of bsc#1204082"
+        else
+            kvm_options="$kvm_options -object iothread,id=io0"
+            kvm_device_opts=",iothread=io0"
+        fi
         case $(uname -m) in
             ppc|ppcle|ppc64|ppc64le)
                 # PowerPC currently not reliably working

@@ -159,6 +159,7 @@ sub copyimagebinaries {
     PBuild::Verify::verify_filename($q->{'filename'});
     my $from = "$repo->{'dir'}/$q->{'filename'}";
     $from = "$repo->{'dir'}/$q->{'packid'}/$q->{'filename'}" if $q->{'packid'};
+    $from = "$repo->{'dir'}/$q->{'packid'}/$q->{'lnk'}" if $q->{'packid'} && $q->{'lnk'};	# obsbinlnk
     PBuild::Util::cp($from, $to);
   }
 }

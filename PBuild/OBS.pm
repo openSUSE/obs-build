@@ -292,8 +292,10 @@ sub fetch_repodata {
   my $requrl .= "${baseurl}build/$prp/$arch/_repository?view=cache";
   $requrl .= "&module=".PBuild::Util::urlencode($_) for @{$modules || []};
   Build::Download::download($requrl, "$tmpdir/repository.cpio", undef, 'retry' => 3);
-  PBuild::Cpio::cpio_extract("$tmpdir/repository.cpio", "$tmpdir/repository.data", 'extract' => 'repositorycache');
-  my $rdata = PBuild::Util::retrieve("$tmpdir/repository.data");
+  unlink("$tmpdir/repository.data");
+  PBuild::Cpio::cpio_extract("$tmpdir/repository.cpio", "$tmpdir/repository.data", 'extract' => 'repositorycache', 'missingok' => 1);
+  my $rdata;
+  $rdata = PBuild::Util::retrieve("$tmpdir/repository.data") if -s "$tmpdir/repository.data";
   my @bins = grep {ref($_) eq 'HASH' && defined($_->{'name'})} values %{$rdata || {}};
   for (@bins) {
     if ($_->{'path'} =~ /^\.\.\/([^\/\.][^\/]*\/[^\/\.][^\/]*)$/s) {

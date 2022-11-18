@@ -43,6 +43,7 @@ our $do_docker;
 our $do_fissile;
 our $do_helm;
 our $do_flatpak;
+our $do_mkosi;
 
 sub import {
   for (@_) {
@@ -58,8 +59,9 @@ sub import {
     $do_fissile = 1 if $_ eq ':fissile';
     $do_helm = 1 if $_ eq ':helm';
     $do_flatpak = 1 if $_ eq ':flatpak';
+    $do_mkosi = 1 if $_ eq ':mkosi';
   }
-  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = $do_fissile = $do_helm = $do_flatpak = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker && !$do_fissile && !$do_helm && !$do_flatpak;
+  $do_rpm = $do_deb = $do_kiwi = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = $do_fissile = $do_helm = $do_flatpak = $do_mkosi = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker && !$do_fissile && !$do_helm && !$do_flatpak && !$do_mkosi;
 
   if ($do_deb) {
     require Build::Deb;
@@ -93,6 +95,9 @@ sub import {
   }
   if ($do_flatpak) {
     require Build::Flatpak;
+  }
+  if ($do_mkosi) {
+    require Build::Mkosi;
   }
 }
 
@@ -142,6 +147,39 @@ my %subst_defaults = (
   ],
   'system-packages:livebuild' => [
     'apt-utils', 'cpio', 'dpkg-dev', 'live-build', 'lsb-release', 'tar',
+  ],
+  'build-packages:mkosi:rpm' => [
+    'btrfs-progs | btrfsprogs', 'dracut', 'e2fsprogs', 'systemd',
+    'systemd-networkd | systemd-network', 'systemd-udev | udev', 'xfsprogs',
+  ],
+  'build-packages:mkosi:deb' => [
+    'apt', 'btrfs-progs', 'ca-certificates', 'dracut', 'e2fsprogs', 'file',
+    'libpam-systemd', 'mawk', 'systemd', 'systemd-boot', 'systemd-resolved',
+    'systemd-sysv', 'tar', 'xfsprogs',
+  ],
+  'build-packages:mkosi:arch' => [
+    'base', 'btrfs-progs', 'cryptsetup', 'device-mapper', 'dracut', 'e2fsprogs',
+    'linux', 'systemd', 'xfsprogs',
+  ],
+  'system-packages:mkosi:rpm' => [
+    'mkosi', 'binutils', 'btrfs-progs | btrfsprogs', 'cpio', 'createrepo',
+    'cryptsetup', 'dnf', 'dosfstools', 'e2fsprogs', 'integritysetup', 'gnupg',
+    'python3dist(cryptography)', 'squashfs-tools | squashfs',
+    'system-release | openSUSE-release', 'systemd-container', 'util-linux',
+    'veritysetup', 'tar', 'xz', 'xfsprogs', 'zstd', 'zypper',
+  ],
+  'system-packages:mkosi:deb' => [
+    'mkosi', 'apt', 'btrfs-progs', 'cpio', 'cryptsetup-bin', 'dctrl-tools',
+    'debootstrap', 'debconf', 'dosfstools', 'dpkg-dev', 'e2fsprogs', 'fdisk',
+    'gnupg', 'linux-base', 'lsb-release', 'python3-cryptography',
+    'squashfs-tools', 'systemd-container', 'tar', 'xz-utils', 'xfsprogs',
+    'zstd',
+  ],
+  'system-packages:mkosi:arch' => [
+    'mkosi', 'arch-install-scripts', 'binutils', 'btrfs-progs', 'cpio',
+    'cryptsetup', 'dosfstools', 'e2fsprogs', 'gnupg', 'gzip',
+    'python-cryptography', 'squashfs-tools', 'systemd', 'util-linux', 'tar',
+    'xfsprogs', 'xz', 'zstd',
   ],
   'system-packages:mock' => [
     'mock', 'system-packages:repo-creation',
@@ -528,7 +566,7 @@ sub read_config {
     $config->{'binarytype'} = 'rpm' if $config->{'type'} eq 'spec';
     $config->{'binarytype'} = 'deb' if $config->{'type'} eq 'dsc' || $config->{'type'} eq 'collax' || $config->{'type'} eq 'livebuild';
     $config->{'binarytype'} = 'arch' if $config->{'type'} eq 'arch';
-    if (grep {$_ eq $config->{'type'}} qw{snapcraft appimage docker fissile kiwi}){
+    if (grep {$_ eq $config->{'type'}} qw{snapcraft appimage docker fissile kiwi mkosi}){
       if (grep {$_ eq 'rpm'} @{$config->{'preinstall'} || []}) {
         $config->{'binarytype'} = 'rpm';
       } elsif (grep {$_ eq 'debianutils'} @{$config->{'preinstall'} || []}) {
@@ -688,7 +726,12 @@ sub get_build {
   }
   my $buildtype = $config->{'type'} || '';
   my $nobasepackages;
-  push @deps, @{$config->{'substitute'}->{"build-packages:$buildtype"} || $subst_defaults{"build-packages:$buildtype"} || []};
+  if ($buildtype eq 'mkosi') {
+    my $binarytype = $config->{'binarytype'} || '';
+    push @deps, @{$config->{'substitute'}->{"build-packages:$buildtype:$binarytype"} || $subst_defaults{"build-packages:$buildtype:$binarytype"} || []};
+  } else {
+    push @deps, @{$config->{'substitute'}->{"build-packages:$buildtype"} || $subst_defaults{"build-packages:$buildtype"} || []};
+  }
    if ($buildtype eq 'docker' || $buildtype eq 'kiwi') {
     $nobasepackages = 1 if $config->{"expandflags:$buildtype-nobasepackages"};
     @deps = grep {!/^kiwi-image:/} @deps if $buildtype eq 'kiwi';	# only needed for sysdeps
@@ -801,6 +844,10 @@ sub get_sysbuild {
   } elsif ($buildtype eq 'deltarpm') {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:deltarpm'} || []};
     @sysdeps = @{$subst_defaults{'system-packages:deltarpm'} || []} unless @sysdeps;
+  } elsif ($buildtype eq 'mkosi') {
+    my $binarytype = $config->{'binarytype'} || '';
+    @sysdeps = @{$config->{'substitute'}->{"system-packages:mkosi:$binarytype"} || []};
+    @sysdeps = @{$subst_defaults{"system-packages:mkosi:$binarytype"} || []} unless @sysdeps;
   }
   return () unless @sysdeps;	# no extra build environment used
   push @sysdeps, @$extradeps if $extradeps;
@@ -1228,6 +1275,7 @@ sub recipe2buildtype {
   return 'flatpak' if $recipe =~ m/flatpak\.(?:ya?ml|json)$/;
   return 'dsc' if $recipe eq 'debian.control';
   return 'dsc' if $recipe eq 'control' && $_[0] =~ /(?:^|\/)debian\/[^\/]+$/s;
+  return 'mkosi' if $recipe =~ m/^mkosi\./;
   return undef;
 }
 
@@ -1269,6 +1317,7 @@ sub parse {
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /config\.xml$/;
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /\.kiwi$/;
   return Build::LiveBuild::parse($cf, $fn, @args) if $do_livebuild && $fn =~ /\.livebuild$/;
+  return Build::Mkosi::parse($cf, $fn, @args) if $do_mkosi && $fn =~ /^mkosi\./;
   return parse_typed($cf, $fn, recipe2buildtype($fn), @args);
 }
 
@@ -1289,6 +1338,7 @@ sub parse_typed {
   return parse_preinstallimage($cf, $fn, @args) if $buildtype eq 'preinstallimage';
   return Build::Helm::parse($cf, $fn, @args) if $buildtype eq 'helm';
   return Build::Flatpak::parse($cf, $fn, @args) if $buildtype eq 'flatpak';
+  return Build::Mkosi::parse($cf, $fn, @args) if $do_mkosi && $buildtype eq 'mkosi';
   return undef;
 }
 

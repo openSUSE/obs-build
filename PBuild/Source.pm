@@ -88,12 +88,23 @@ sub get_scm_controlled {
   return { map {$_ => 1} @d };
 }
 
+sub is_subdir_build {
+  my ($dir, $files) = @_;
+  my @sd = grep {$_ eq 'dist' || $_ eq 'package'} @$files;
+  return 0 unless @sd;
+  return 0 if grep {/\.spec$/} @$files;
+  for my $sd (@sd) {
+    return 1 if grep {/\.spec$/} PBuild::Util::ls("$dir/$sd");
+  }
+}
+
 sub list_package {
   my ($dir) = @_;
   my %files;
   my @assets;
   my $controlled;
-  for my $file (sort(PBuild::Util::ls($dir))) {
+  my @all = sort(PBuild::Util::ls($dir));
+  for my $file (@all) {
     next if $file eq '_meta' || $file eq '.git';
     next if $file =~ /\n/;
     my @s = lstat("$dir/$file");
@@ -110,7 +121,10 @@ sub list_package {
     }
     if (-l _ || -d _ || $file =~ /^\./) {
       if (!$controlled) {
-        $controlled = get_scm_controlled($dir);
+	$controlled = get_scm_controlled($dir);
+	if (!%$controlled && is_subdir_build($dir, \@all)) {
+	  $controlled = { map {$_ => 1} @all };
+	}
 	# redo stat because get_scm_controlled changed it
 	lstat("$dir/$file") || die("$dir/$file: $!\n");
       }

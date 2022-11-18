@@ -208,6 +208,7 @@ sub parse {
   my $useobsrepositories;
   my $nosquash;
   my $dockerfile_data;
+  my $remoteasset;
   if (ref($fn) eq 'SCALAR') {
     $dockerfile_data = $$fn;
   } else {
@@ -232,7 +233,9 @@ sub parse {
   my $excludedline;
   my $vars = {};
   my $vars_env = {};
+  my $vars_meta = {};
   my %as_container;
+  my $from_seen;
 
   my @requiredarch;
   my @badarch;
@@ -278,6 +281,11 @@ sub parse {
 	my $arch = gettargetarch($cf);
 	$excludedline = (grep {$_ eq $arch} split(' ', $1)) ? 1 : undef;
       }
+      if ($line =~ /^\#\!RemoteAssetUrl:\s*(\S+)\s*$/i) {
+        $remoteasset->{'url'} = $1;
+        push @{$ret->{'remoteassets'}}, $remoteasset;
+        $remoteasset = undef;
+      }
       next;
     }
     $ret->{'exclarch'} = [ unify(@requiredarch) ] if @requiredarch;
@@ -303,6 +311,9 @@ sub parse {
     while ($line =~ /([\"\'])/) {
       my $q = $1;
       last unless $line =~ s/$q(.*?)$q/quote($1, $q, $vars)/e;
+    }
+    if ($cmd eq 'FROM') {
+      $vars = { %$vars_meta };		# reset vars
     }
     # split into args then expand
     @args = split(/[ \t]+/, $line);
@@ -330,6 +341,7 @@ sub parse {
       }
       $vars_env = {};		# should take env from base container
       $vars = { %$vars_env };
+      $from_seen = 1;
     } elsif ($cmd eq 'RUN') {
       $line =~ s/#.*//;	# get rid of comments
       for my $l (split(/(?:\||\|\||\&|\&\&|;|\)|\()/, $line)) {
@@ -364,7 +376,8 @@ sub parse {
       for (@args) {
 	next unless /^([^=]+)(?:=(.*))?$/;
 	next if $vars_env->{$1};
-	$vars->{$1} = $build_vars{$1} || (defined($2) ? [ $2 ] : []);
+	$vars->{$1} = $build_vars{$1} || (defined($2) ? [ $2 ] : $vars_meta->{$1} || []);
+	$vars_meta->{$1} = $vars->{$1} unless $from_seen;
       }
     }
   }

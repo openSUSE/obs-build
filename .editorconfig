@@ -1,0 +1,17 @@
+# http://EditorConfig.org
+root = true
+
+[**]
+indent_style = space
+indent_size = 2
+tab_width = 8
+end_of_line = lf
+charset = utf-8
+
+[{build,build-*,init_buildsystem}]
+indent_style = tab
+indent_size = 4
+
+[Makefile]
+indent_style = tab
+indent_size = 8

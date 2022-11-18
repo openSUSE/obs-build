@@ -8,6 +8,7 @@
 ################################################################
 #
 # Copyright (c) 1995-2014 SUSE Linux Products GmbH
+# Copyright (c) 2022 Andreas Stieger <Andreas.Stieger@gmx.de>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 or 3 as
@@ -956,7 +957,7 @@ sysrq_running_build() {
 
 kill_running_build() {
     test -z "$SRCDIR" || usage
-    (set -C; > "$BUILD_ROOT/exit" 2>/dev/null || true)
+    (set -C; > "$BUILD_ROOT/exit" || true) 2>/dev/null
     if test -n "$VM_TYPE" ; then
 	# mark job as failed so that we don't extract packages
 	vm_set_buildstatus 1
@@ -977,7 +978,7 @@ mount_stuff() {
 	mkdir -p $BUILD_ROOT/dev/shm
 	mount -n -tproc none $BUILD_ROOT/proc
 	mount -n -tsysfs none $BUILD_ROOT/sys
-	mount -n -tdevpts -omode=0620,gid=5 none $BUILD_ROOT/dev/pts
+	mount -n -tdevpts -omode=0620,ptmxmode=0666,gid=5 none $BUILD_ROOT/dev/pts
 	mount -n -ttmpfs none $BUILD_ROOT/dev/shm
     fi
 }
@@ -1536,7 +1537,11 @@ MODULEMDFILE=
 
 for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 
-    if test -n "$RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" ; then
+    if test -n "$RPM_BUILD_IN_PLACE" -a -n "$RPM_RECIPE_IN_SUBDIR" -a -z "$RUNNING_IN_VM" ; then
+	SRCDIR=${RECIPEPATH%/*}
+	SRCDIR=${SRCDIR%/*}
+	RECIPEFILE="${RECIPEPATH##*/}"
+    elif test -n "$RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" ; then
 	SRCDIR="$PWD"
 	RECIPEFILE="${RECIPEPATH##*/}"
     elif test "$RECIPEPATH" != "${RECIPEPATH%/debian/control}" ; then
@@ -1547,7 +1552,7 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	RECIPEFILE="${RECIPEPATH##*/}"
     fi
 
-    if test "$RECIPEFILE" != "${RECIPEFILE%.slsa_provenance.json}" ; then
+    if test "$RECIPEFILE" = "_slsa_provenance.json" -o "$RECIPEFILE" != "${RECIPEFILE%.slsa_provenance.json}" ; then
 	MYSRCDIR="$BUILD_ROOT/.build-srcdir"
 	rm -rf "$MYSRCDIR"
 	mkdir -p "$MYSRCDIR"
@@ -1682,9 +1687,9 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	test -n "$SUSE_VERSION" -a "${SUSE_VERSION:-0}" -le 1020 && BUILD_USER=root
     fi
     if test "$BUILD_USER" = abuild ; then
-	egrep '^#[[:blank:]]*needsrootforbuild[[:blank:]]*$' >/dev/null <$RECIPEPATH && BUILD_USER=root
+	grep -E '^#[[:blank:]]*needsrootforbuild[[:blank:]]*$' >/dev/null <$RECIPEPATH && BUILD_USER=root
     else
-	egrep '^#[[:blank:]]*norootforbuild[[:blank:]]*$' >/dev/null <$RECIPEPATH && BUILD_USER=abuild
+	grep -E '^#[[:blank:]]*norootforbuild[[:blank:]]*$' >/dev/null <$RECIPEPATH && BUILD_USER=abuild
     fi
     test -n "$NOROOTFORBUILD" && BUILD_USER=abuild
 
@@ -1693,14 +1698,14 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	imagetype=$(perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::show $RECIPEPATH imagetype)
 	test "$imagetype" = product || BUILD_USER=root
     fi
-    # same with docker and fissile builds
-    if test "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman ; then
+    # same with docker, fissile and livebuild builds
+    if test "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman -o "$BUILDTYPE" = livebuild ; then
 	BUILD_USER=root
     fi
 
     # fixup passwd/group
     if test $BUILD_USER = abuild ; then
-	if ! egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
+	if ! grep -E '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
 	    echo "abuild:x:${ABUILD_UID}:${ABUILD_GID}:Autobuild:/home/abuild:/bin/bash" >>$BUILD_ROOT/etc/passwd
 	    echo 'abuild:*:::::::' >>$BUILD_ROOT/etc/shadow # This is needed on Mandriva 2009
 	    echo 'abuild:*::' >>$BUILD_ROOT/etc/gshadow # This is needed on Ubuntu
@@ -1708,10 +1713,10 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	    mkdir -p $BUILD_ROOT/home/abuild
 	    chown "$ABUILD_UID:$ABUILD_GID" $BUILD_ROOT/home/abuild
 	else
-	    if ! egrep "^abuild:x?:${ABUILD_UID}:${ABUILD_GID}" >/dev/null <$BUILD_ROOT/etc/passwd ; then
+	    if ! grep -E "^abuild:x?:${ABUILD_UID}:${ABUILD_GID}" >/dev/null <$BUILD_ROOT/etc/passwd ; then
 		echo "abuild user present in the buildroot ($BUILD_ROOT) but uid:gid does not match"
 		echo "buildroot currently using:"
-		egrep "^abuild:" <$BUILD_ROOT/etc/passwd
+		grep -E "^abuild:" <$BUILD_ROOT/etc/passwd
 		echo "build script attempting to use:"
 		echo "abuild::${ABUILD_UID}:${ABUILD_GID}:..."
 		echo "build aborting"
@@ -1729,7 +1734,7 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	# building as root
 	ABUILD_UID=0
 	ABUILD_GID=0
-	if egrep '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
+	if grep -E '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
 	    rm -rf "$BUILD_ROOT/home/abuild"
 	    sed -i -e '/^abuild:/d' $BUILD_ROOT/etc/passwd
 	    sed -i -e '/^abuild:/d' $BUILD_ROOT/etc/group

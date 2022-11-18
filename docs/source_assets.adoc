@@ -50,7 +50,16 @@ disabled via
 
 ==== Dockerfile description
 
-Has no support for assets yet.
+Remote assets that will be downloaded before the build can be added via the
+comment `#!RemoteAssetUrl: https://my.url/asset.tar`. `pbuild` will fetch the
+asset before the build and will make it available in the buildroot so that the
+asset can copied into the container as follows:
+[source,Dockerfile]
+----
+#!RemoteAssetUrl: https://my.url/asset.tar
+COPY asset.tar .
+RUN tar -xvzf asset.tar
+----
 
 ==== Arch Linux PKGBUILD
 

@@ -122,7 +122,7 @@ sub collect_result {
   push @d, 'SRPMS';
   @d = ('DEBS') if $p->{'recipe'} =~ /(?:\.dsc|build\.collax)$/ || $p->{'recipe'} eq 'debian/control' || $p->{'recipe'} eq 'debian.control';
   if (-d "$buildroot/.build.packages/SDEBS") {
-    @d = map {"DEBS/$_"} sort(ls("$buildroot/.build.packages/DEBS"));   # assume debbuild
+    @d = map {"DEBS/$_"} sort(PBuild::Util::ls("$buildroot/.build.packages/DEBS"));   # assume debbuild
     push @d, 'SDEBS';
   }
   @d = ('ARCHPKGS') if $p->{'recipe'} =~ /PKGBUILD$/;
@@ -332,6 +332,7 @@ sub createjob {
   push @args, "--buildflavor=$p->{'flavor'}" if $p->{'flavor'};
   push @args, "--obspackage=".($p->{'originpackage'} || $p->{'pkg'}) if $needobspackage;
   push @args, "--copy-sources-asis" if $copy_sources_asis;
+  push @args, "--rpm-recipe-in-subdir" if $p->{'recipe'} =~ /^(?:package|dist)\/.*\.spec$/;
   push @args, "$srcdir/$p->{'recipe'}";
 
   if ($kiwimode) {
@@ -345,7 +346,7 @@ sub createjob {
       push @kiwiargs, '--add-repotype', 'rpm-md';
       push @kiwiargs, '--add-repoprio', '1';
       if (-d "$srcdir/containers") {
-	for my $containerfile (grep {/\.tar$/} sort(ls("$srcdir/containers")))  {
+	for my $containerfile (grep {/\.tar$/} sort(PBuild::Util::ls("$srcdir/containers")))  {
 	  push @kiwiargs, "--set-container-derived-from=dir://./containers/$containerfile";
 	}
       }

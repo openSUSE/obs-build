@@ -213,7 +213,6 @@ sub dotar {
 sub dotar_quilt {
   use File::Temp qw(tempdir);
   use File::Basename;
-  use IPC::Run qw(run);
 
   my $tmpdir = File::Temp->newdir();
   my $tempdirname = $tmpdir->dirname;
@@ -239,11 +238,11 @@ sub dotar_quilt {
   # print "Decompress '$input_file_path_relative' to '$tar_for_concatination_path' for concatenation\n";
 
   if (($ext eq ".tgz") or ($ext eq ".tar.gz")) {
-    run ['gzip', '-dck', $decompress_src], '>', $decompress_dst or die "Can not unpack gzip archive '$decompress_src': $!\n";
+    (system qq(gzip -dck '$decompress_src' > '$decompress_dst')) == 0 or die "Can not unpack gzip archive '$decompress_src': $!\n";
   } elsif ($ext eq ".tar.xz") {
-    run ['xz', '-dck', $decompress_src], '>', $decompress_dst or die "Can not unpack xz archive '$decompress_src': $!\n";
+    (system qq(xz -dck '$decompress_src' > '$decompress_dst')) == 0 or die "Can not unpack xz archive '$decompress_src': $!\n";
   } elsif ($ext eq ".tar.bz2") {
-    run ['bzip2', '-dck', $decompress_src], '>', $decompress_dst or die "Can not unpack bzip2 archive '$decompress_src': $!\n";
+    (system qq(bzip2 -dck '$decompress_src' > '$decompress_dst')) == 0 or die "Can not unpack bzip2 archive '$decompress_src': $!\n";
   } elsif ($ext eq ".tar") {
     system 'cp', $decompress_src, $decompress_dst;
   } else {
@@ -252,7 +251,7 @@ sub dotar_quilt {
 
   # Looking for changelog in tar
   my $changelog_path_in_tar = 'debian/changelog';
-  my $is_changelog_in_tar = run ['tar', '-tf', $tar_for_concatination_path, $changelog_path_in_tar], '>', '/dev/null', '2>&1';
+  my $is_changelog_in_tar = (system qq(tar -tf '$tar_for_concatination_path' '$changelog_path_in_tar' > /dev/null 2>&1)) == 0;
 
   if ($is_changelog_in_tar){
     print "Found '$changelog_path_in_tar' in '${tar_for_concatination_path}', extract to '$tempdirname'.\n";

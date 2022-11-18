@@ -324,13 +324,13 @@ vm_shutdown_halt_helper() {
         sync ; sync ; sync
     fi
     sync	# halt from systemd is not syncing anymore.
-    if ! test -x /sbin/halt ; then
+    if ! test -x /sbin/poweroff ; then
 	test -e /proc/sysrq-trigger || mount -n -tproc none /proc
 	echo o > /proc/sysrq-trigger
 	sleep 5 # wait for sysrq to take effect
-	echo "Warning: VM doesn't support sysrq and /sbin/halt not installed"
+	echo "Warning: VM doesn't support sysrq and /sbin/poweroff not installed"
     else
-	halt -f -p
+	poweroff -f
     fi
     exit $1
 }
@@ -456,6 +456,12 @@ vm_img_mkfs() {
     if test -n "$populate"; then
       if test "$fs" = "ext2" -o "$fs" = "ext3" -o "$fs" = "ext4"; then
         mkfs_extra_options="$mkfs_extra_options -d $populate"
+        # mkfs needs to see the files it copies into the fs as owned by root.
+        # Otherwise the whole fs tree would be owned by the calling user.
+        # Doesn't matter too much when setting up the build root initially as
+        # rpm is called inside anway to fix everything. However, when reusing
+        # an image suddenly all ownerships would change.
+        [ -x "/usr/bin/unshare" ] && mkfs="unshare --user --map-root-user $mkfs"
       else
         print "ERROR: populating filesystem is only supported with ext file systems"
         cleanup_and_exit 1
@@ -651,7 +657,7 @@ vm_detect_2nd_stage() {
     test -d /dev/shm || rm -f /dev/shm
     mkdir -p /dev/pts
     mkdir -p /dev/shm
-    mount -n -tdevpts -omode=0620,gid=5 none /dev/pts
+    mount -n -tdevpts -omode=0620,ptmxmode=0666,gid=5 none /dev/pts
     mount -n -ttmpfs none /dev/shm
 
     if test -n "$VM_SWAP" ; then
@@ -1049,7 +1055,7 @@ vm_first_stage() {
     buildroot_umount /mnt
 
     vm_init_script="/.build/build"
-    if check_use_emulator ; then
+    if set_initvm_name_for_emulator_in "$BUILD_ROOT/.build" ; then
         vm_init_script="/.build/$INITVM_NAME"
     fi
 

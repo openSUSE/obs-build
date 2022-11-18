@@ -38,6 +38,17 @@ while (<STDIN>) {
 print join('', @{shift @sections});
 
 for my $s (@sections) {
+  # cannot use docker support for scratch images
+  if (@$s && $s->[0] =~ /^\s*[fF][rR][oO][mM]\s+scratch[\s\n]/) {
+    print join('', @$s);
+    next;
+  }
+  # do not install docker support if no RUN is used
+  # (we always do it for the last stage to get the basepackage list)
+  if ($s != $sections[-1] && !grep {/^\s*RUN/i} @$s) {
+    print join('', @$s);
+    next;
+  }
   # analyze the section (first line is always FROM)
   my ($install_idx, $uninstall_idx, $from_scratch);
   my $idx = 0;
@@ -48,16 +59,12 @@ for my $s (@sections) {
     } elsif ($line =~ /^[uU][sS][eE][rR]\s+/) {
       $install_idx = 0 unless defined $install_idx;
       $uninstall_idx = $idx unless defined $uninstall_idx;
-    } elsif ($line =~ /^FROM\s+scratch[\s\n]/) {
-      $from_scratch = $idx
     }
     $idx++;
   }
-  unless (defined $from_scratch) {
-      # patch in commands
-      $s->[$install_idx || 0] .= $install_docker_support;
-      substr($s->[$uninstall_idx], 0, 0, $uninstall_docker_support) if defined $uninstall_idx;
-      $s->[-1] .= $uninstall_docker_support unless defined $uninstall_idx;
-  }
+  # patch in docker support commands
+  $s->[$install_idx || 0] .= $install_docker_support;
+  substr($s->[$uninstall_idx], 0, 0, $uninstall_docker_support) if defined $uninstall_idx;
+  $s->[-1] .= $uninstall_docker_support unless defined $uninstall_idx;
   print join('', @$s);
 }
