@@ -1,4 +1,21 @@
 -------------------------------------------------------------------
+Fri Nov 18 15:34:56 UTC 2022 - Adrian Schröter <adrian@suse.de>
+
+- INCOMPATIBLE CHANGE: get rid off the power8 cpu limitation (#889) on powerpc
+- Add handling of non-compressed tar when creating Debian archive for DSC 3.0
+- Add automatic build-in-place detection
+- Support dist/package subdir builds in pbuild
+- Skip iothreads on QEMU 7.1.0
+- Fix permissions of /dev/pts/ptmx
+- Add license to container package list output
+- initial SP5 build configurations
+- vm-type:qemu use virtio on x86_64
+- Improve installation of obs-docker-support for multi-stage builds
+- Tweak ARG handling in dockerfile parser
+- fixed Undefined subroutine &PBuild::Job::ls issue
+- Add missing dependencies from vc as Recommends
+
+-------------------------------------------------------------------
 Tue Sep 27 07:01:33 UTC 2022 - Adrian Schröter <adrian@suse.de>
 
 - fix build of testsuite spec file
