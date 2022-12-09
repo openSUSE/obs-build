@@ -372,10 +372,9 @@ my @filesystem;
 
 # Used for each package by
 sub parse_config {
-  my $target = shift;
-  my $pkgname = shift;
-  my $pkgver = shift;
+  my ($target, $pkgname, $pkgver, $pkgrel, $pkgepoch) = @_;
 
+  my $pkgevr = $pkgepoch ? "$pkgepoch:$pkgver-$pkgrel" : "$pkgver-$pkgrel";
   my $pkghasmatched;
 
   my $pkgmatches = 1;
@@ -418,6 +417,8 @@ sub parse_config {
     s/\<targetarch\>/$targetarch/g;
     s/\<name\>/$pkgname/g;
     s/\<version\>/$pkgver/g;
+    s/\<release\>/$pkgrel/g;
+    s/\<evr\>/$pkgevr/g;
     s/\<prefix\>/$prefix/g;
     s/\<extension\>/$extension/g;
     s/\<configdir\>/$configdir/g;
@@ -569,7 +570,7 @@ sub handle_rpms {
   }
   for my $target (@targets) {
 
-    next unless parse_config($target, $res{'NAME'}->[0], $res{'VERSION'}->[0]);
+    next unless parse_config($target, $res{'NAME'}->[0], $res{'VERSION'}->[0], $res{'RELEASE'}->[0], ($res{'EPOCH'} || [])->[0]);
     die("targetname not set\n") unless $targetname;
     $target_matched{$target} = 1;
 
@@ -588,9 +589,20 @@ sub handle_rpms {
       my $rr = substr($r, 1);
       if (substr($r, 0, 1) eq '+') {
 	if ($rr =~ /^(.*?)\s*->\s*(.*?)$/) {
-	  if (grep {$_ eq $1} @rpmfiles) {
-	    $files{$1} = 1;
-	    $moves{$1} = $2;
+	  $rr = $1;
+	  my $mrr = $2;
+	  if ($mrr =~ /\$[1-9]/) {
+	    for my $f (grep {/$rr/} @rpmfiles) {
+	      $files{$f} = 1;
+	      $moves{$f} = $mrr;
+	      my @s = $f =~ /$rr/;
+	      $moves{$f} =~ s/\$([1-9])/$s[$1 - 1]/g;
+	    }
+	  } else {
+	    if (grep {$_ eq $rr} @rpmfiles) {
+	      $files{$_} = 1;
+	      $moves{$_} = $mrr;
+	    }
 	  }
 	} else {
 	  for (grep {/$rr/} @rpmfiles) {
