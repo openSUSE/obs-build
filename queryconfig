@@ -45,7 +45,7 @@ while (@ARGV)  {
     shift @ARGV;
     $dist = shift @ARGV;
     next;
-  } elsif ($ARGV[0] eq '--archpath') {
+  } elsif ($ARGV[0] eq '--archpath' || $ARGV[0] eq '--arch') {
     shift @ARGV;
     $archs = shift @ARGV;
     next;

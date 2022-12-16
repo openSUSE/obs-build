@@ -1,0 +1,88 @@
+#!/usr/bin/perl -w
+
+################################################################
+#
+# Copyright (c) 1995-2014 SUSE Linux Products GmbH
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+BEGIN {
+  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+}
+
+use strict;
+
+use Build;
+
+my ($dist, $archs, $configdir, $type, $recipe, $buildflavor, $obspackage);
+$buildflavor = '';
+
+$configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
+
+while (@ARGV)  {
+  if ($ARGV[0] eq '--dist') {
+    shift @ARGV;
+    $dist = shift @ARGV;
+    next;
+  } elsif ($ARGV[0] eq '--archpath' || $ARGV[0] eq '--arch') {
+    shift @ARGV;
+    $archs = shift @ARGV;
+    next;
+  } elsif ($ARGV[0] eq '--configdir') {
+    shift @ARGV;
+    $configdir = shift @ARGV;
+    next;
+  } elsif ($ARGV[0] eq '--buildflavor') {
+    shift @ARGV;
+    $buildflavor = shift @ARGV;
+    next;
+  } elsif ($ARGV[0] eq '--obspackage') {
+    shift @ARGV;
+    $obspackage = shift @ARGV;
+    next;
+  } else {
+    if (!defined($recipe)) {
+      $recipe = shift @ARGV;
+    } else {
+      $type = shift @ARGV;
+    }
+  }
+}
+
+die("Please specify what to query\n") unless defined $recipe;
+
+my $cf = Build::read_config_dist($dist, $archs, $configdir);
+die("Unable to read config\n") unless $cf;
+$cf->{'buildflavor'} = $buildflavor if defined $buildflavor;
+$cf->{'obspackage'} = $obspackage if defined $obspackage;
+
+my $q = Build::parse($cf, $recipe);
+
+if (!defined $type) {
+  require Data::Dumper;
+  print Data::Dumper::Dumper($q);
+  exit(0);
+}
+if (ref($q->{$type}) eq 'ARRAY') {
+  print "$_\n" for @{$q->{$type}};
+} elsif (ref($q->{$type}) eq '') {
+  print "$q->{$type}\n" if defined $q->{$type};
+} elsif (defined $q->{$type}) {
+  print "unsupported query $type\n";
+  exit(1);
+}
+

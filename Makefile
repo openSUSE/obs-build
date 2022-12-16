@@ -53,6 +53,7 @@ install:
 	    getbuildids \
 	    killchroot \
 	    queryconfig \
+	    queryrecipe \
 	    common_functions \
 	    init_buildsystem \
 	    substitutedeps \

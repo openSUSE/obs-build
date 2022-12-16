@@ -34,6 +34,19 @@ recipe_setup_spec() {
     chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
 }
 
+spec_get_buildtarget() {
+    local args=()
+    if test -n "$BUILD_FLAVOR" ; then
+	args[${#args[@]}]="--buildflavor"
+	args[${#args[@]}]="$BUILD_FLAVOR"
+    fi
+    if test -n "$OBS_PACKAGE" ; then
+	args[${#args[@]}]="--obspackage"
+	args[${#args[@]}]="$OBS_PACKAGE"
+    fi
+    queryrecipe "${args[@]}" --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" "$BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE" buildtarget
+}
+
 recipe_prepare_spec() {
     # fixup specfile
     args=()
@@ -56,22 +69,6 @@ recipe_prepare_spec() {
 
     substitutedeps "${args[@]}" --root "$BUILD_ROOT" --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" "$BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE" "$BUILD_ROOT/.spec.new" || cleanup_and_exit 1
 
-    # fix rpmrc if we are compiling for i686
-    test -f $BUILD_ROOT/usr/lib/rpm/rpmrc_i586 && mv $BUILD_ROOT/usr/lib/rpm/rpmrc_i586 $BUILD_ROOT/usr/lib/rpm/rpmrc
-    if test -e $BUILD_ROOT/usr/lib/rpm/rpmrc -a "$BUILD_ARCH" != "${BUILD_ARCH#i686}" ; then
-	mv $BUILD_ROOT/usr/lib/rpm/rpmrc $BUILD_ROOT/usr/lib/rpm/rpmrc_i586
-	sed -e 's/^buildarchtranslate: athlon.*/buildarchtranslate: athlon: i686/' -e 's/^buildarchtranslate: i686.*/buildarchtranslate: i686: i686/' < $BUILD_ROOT/usr/lib/rpm/rpmrc_i586 > $BUILD_ROOT/usr/lib/rpm/rpmrc
-    fi
-
-    # extract optflags from configuration
-    queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" optflags ${BUILD_DEBUG:+debug} > $BUILD_ROOT/root/.rpmrc
-    test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/.rpmrc $BUILD_ROOT/home/abuild/.rpmrc
-
-    if test -z "$ABUILD_TARGET"; then
-	ABUILD_TARGET=$(queryconfig target --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" )
-	test -z "$ABUILD_TARGET" || echo "build target is $ABUILD_TARGET"
-    fi
-
     # report specfile changes
     if test -f $BUILD_ROOT/.spec.new ; then
 	if ! cmp -s $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE $BUILD_ROOT/.spec.new ; then
@@ -85,6 +82,23 @@ recipe_prepare_spec() {
 	else
 	    rm -f $BUILD_ROOT/.spec.new
 	fi
+    fi
+
+    # fix rpmrc if we are compiling for i686
+    test -f $BUILD_ROOT/usr/lib/rpm/rpmrc_i586 && mv $BUILD_ROOT/usr/lib/rpm/rpmrc_i586 $BUILD_ROOT/usr/lib/rpm/rpmrc
+    if test -e $BUILD_ROOT/usr/lib/rpm/rpmrc -a "$BUILD_ARCH" != "${BUILD_ARCH#i686}" ; then
+	mv $BUILD_ROOT/usr/lib/rpm/rpmrc $BUILD_ROOT/usr/lib/rpm/rpmrc_i586
+	sed -e 's/^buildarchtranslate: athlon.*/buildarchtranslate: athlon: i686/' -e 's/^buildarchtranslate: i686.*/buildarchtranslate: i686: i686/' < $BUILD_ROOT/usr/lib/rpm/rpmrc_i586 > $BUILD_ROOT/usr/lib/rpm/rpmrc
+    fi
+
+    # extract optflags from configuration
+    queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" optflags ${BUILD_DEBUG:+debug} > $BUILD_ROOT/root/.rpmrc
+    test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/.rpmrc $BUILD_ROOT/home/abuild/.rpmrc
+
+    if test -z "$ABUILD_TARGET"; then
+	ABUILD_TARGET=$(spec_get_buildtarget)
+	test -z "$ABUILD_TARGET" && ABUILD_TARGET=$(queryconfig target --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" )
+	test -z "$ABUILD_TARGET" || echo "build target is $ABUILD_TARGET"
     fi
 }
 

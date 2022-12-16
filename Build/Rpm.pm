@@ -711,6 +711,14 @@ sub parse {
       push @{$ret->{'remoteassets'}}, $remoteasset;
       $remoteasset = undef;
     }
+    if ($preamble && $line =~ /^\#\!BuildTarget:\s*(\S+)\s*$/i) {
+      my $bt = $1;
+      if ($bt =~ s/(.*?)://) {
+	$bt = '' if $1 ne '' && $1 ne ($macros{'_target_cpu'} || 'unknown');
+      }
+      delete $ret->{'buildtarget'};
+      $ret->{'buildtarget'} = $bt if $bt;
+    }
     if ($line =~ /^(?:Requires\(pre\)|Requires\(post\)|PreReq)\s*:\s*(\S.*)$/i) {
       my $deps = $1;
       my @deps;
