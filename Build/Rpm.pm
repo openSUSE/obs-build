@@ -230,7 +230,7 @@ sub grabargs {
 sub initmacros {
   my ($config, $macros, $macros_args) = @_;
   for my $line (@{$config->{'macros'} || []}) {
-    next unless $line =~ /^%define\s*([0-9a-zA-Z_]+)(?:\(([^\)]*)\))?\s*(.*?)$/;
+    next unless $line =~ /^%define\s*([0-9a-zA-Z_]+)(?:\(([^\)]*)\))?\s*(.*?)$/s;
     my $macname = $1;
     my $macargs = $2;
     my $macbody = $3;

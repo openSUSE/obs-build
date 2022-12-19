@@ -589,13 +589,10 @@ sub read_config {
   }
   # add rawmacros to our macro list
   if ($config->{'rawmacros'} ne '') {
+    my $multilinedefine;
     for my $rm (split("\n", $config->{'rawmacros'})) {
-      if (@macros && $macros[-1] =~ /\\$/) {
-	if ($rm =~ /\\$/) {
-	  push @macros, '...\\';
-	} else {
-	  push @macros, '...';
-	}
+      if (@macros && $macros[-1] =~ /\\\z/s) {
+	$macros[-1] = substr($macros[-1], 0, -2)."\n$rm";
       } elsif ($rm !~ /^%/) {
 	push @macros, $rm;
       } else {
