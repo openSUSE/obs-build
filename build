@@ -1954,6 +1954,13 @@ if test \( -n "$RPMS" -o -n "$DEBS" \) -a -n "$CREATE_BASELIBS"; then
     create_baselibs
 fi
 
+for SCRIPT in $BUILD_ROOT/usr/lib/build/post-mkbaselibs-checks/* ; do
+    if test -x "$SCRIPT"; then
+       echo "... running ${SCRIPT##*/}"
+       BUILD_ROOT=/ HOME=/root chroot "$BUILD_ROOT" "/usr/lib/build/post-mkbaselibs-checks/${SCRIPT##*/}" || cleanup_and_exit 1
+    fi
+done
+
 if test -n "$MODULEMDFILE" ; then
    mkdir -p "$BUILD_ROOT/$TOPDIR/OTHER"
    find "$BUILD_ROOT/$TOPDIR/RPMS" "$BUILD_ROOT/$TOPDIR/SRPMS" -type f -name "*.rpm" | sort | $BUILD_DIR/writemodulemd ${DISTURL:+--disturl "$DISTURL"} "$MODULEMDFILE" - > "$BUILD_ROOT/$TOPDIR/OTHER/_modulemd.yaml"
