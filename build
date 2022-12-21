@@ -1898,7 +1898,6 @@ TIME_POSTCHECKS=$SECONDS
 
 # RPM specific post checks are in /usr/lib/build/checks
 if test -n "$RPMS" -a -d "$BUILD_ROOT/usr/lib/build/checks" ; then
-    export DO_RPM_REMOVE=true
     # workaround for broken 13.1 check scripts which umount /proc
     if test -n "$RUNNING_IN_VM" -a "$BUILD_ROOT" = / ; then
         umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2>/dev/null
