@@ -1,4 +1,18 @@
 -------------------------------------------------------------------
+Mon Jan  2 08:09:43 UTC 2023 - Adrian Schröter <adrian@suse.de>
+
+- configure mkbaselibs to create glibc-hwcaps baselibs as well
+- Better filetype detection for temp changes files
+- Add hook to run checks after mkbaselibs run
+- Delete leftover multilinedefine variable definition
+- Support multiline macros in the config's macro sections
+- Support #!BuildConstraint lines
+- Support #!BuildTarget in spec files to set the build target
+  (as workaround of broken BuildArch in rpm since 2001)
+- Support a regexp for file renames
+- Set home to /root when running build time services
+
+-------------------------------------------------------------------
 Fri Nov 18 15:34:56 UTC 2022 - Adrian Schröter <adrian@suse.de>
 
 - INCOMPATIBLE CHANGE: get rid off the power8 cpu limitation (#889) on powerpc
