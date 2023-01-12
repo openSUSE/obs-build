@@ -227,6 +227,53 @@ sub grabargs {
   return \%m;
 }
 
+# no support for most special chars yet
+sub luapattern {
+  my ($pat) = @_;
+  $pat = "\Q$pat\E";
+  $pat =~ s/^\\\^/\^/;
+  $pat =~ s/\\\$/\$/;
+  $pat =~ s/\\\./\./;
+  $pat =~ s/\\\*/\*/;
+  $pat =~ s/\\\-/\*\?/;
+  $pat =~ s/\\\?/\?/;
+  $pat =~ s/\\\+/\+/;
+  $pat =~ s/\\%([%ds])/\\$1/g;
+  return $pat;
+}
+
+sub luamacro {
+  my ($macname, @args) = @_;
+  push @args, '' unless @args;
+  return lc($args[0]) if $macname eq 'lower';
+  return uc($args[0]) if $macname eq 'upper';
+  return length($args[0]) if $macname eq 'len';
+  return reverse($args[0]) if $macname eq 'reverse';
+  return $args[0] x $args[1] if $macname eq 'rep';
+  if ($macname eq 'sub') {
+    push @args, 1 if @args < 2;
+    push @args, -1 if @args < 3;
+    $args[1] -= 1 if $args[1] > 0;
+    $args[1] = length($args[0]) + $args[1] if $args[1] < 0;
+    $args[1] = 0 if $args[1] < 0;
+    $args[2] -= 1 if $args[2] > 0;
+    $args[2] = length($args[0]) + $args[2] if $args[2] < 0;
+    return $args[1] <= $args[2] ? substr($args[0], $args[1], $args[2] - $args[1] + 1) : '';
+  }
+  if ($macname eq 'gsub') {
+    return unless @args >= 3;
+    my $pat = luapattern($args[1]);
+    my $rep = $args[3];
+    if (!defined($rep)) {
+      $args[0] =~ s/$pat/$args[2]/g;
+    } else {
+      $args[0] =~ s/$pat(?(?{$rep--<=0})(*F))/$args[2]/g;
+    }
+    return $args[0];
+  }
+  return '';
+}
+
 sub initmacros {
   my ($config, $macros, $macros_args) = @_;
   for my $line (@{$config->{'macros'} || []}) {
@@ -383,6 +430,18 @@ reexpand:
       $macalt = (expr($macalt))[0];
       $macalt =~ s/^[v\"]//;	# stringify
       $expandedline .= $macalt;
+    } elsif ($macname eq 'gsub' || $macname eq 'len' || $macname eq 'lower' || $macname eq 'upper' || $macname eq 'rep' || $macname eq 'reverse' || $macname eq 'sub') {
+      my @args;
+      if (defined $macalt) {
+	push @args, $macalt;
+      } elsif (defined $macdata)  {
+	push @args, split(' ', $macdata);
+      } else {
+	$line =~ /^\s*([^\n]*).*$/;
+	push @args, split(' ', $1);
+	$line = '';
+      }
+      $expandedline .= luamacro($macname, @args);
     } elsif (exists($macros->{$macname})) {
       if (!defined($macros->{$macname})) {
 	print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand '$macname'\n" if $config->{'warnings'};
