@@ -264,12 +264,14 @@ sub luamacro {
     return unless @args >= 3;
     my $pat = luapattern($args[1]);
     my $rep = $args[3];
-    if (!defined($rep)) {
-      $args[0] =~ s/$pat/$args[2]/g;
-    } else {
-      $args[0] =~ s/$pat(?(?{$rep--<=0})(*F))/$args[2]/g;
-    }
-    return $args[0];
+    eval {
+      if (!defined($rep)) {
+        $args[0] =~ s/$pat/$args[2]/g;
+      } else {
+        $args[0] =~ s/$pat(?(?{$rep--<=0})(*F))/$args[2]/g;
+      }
+    };
+    return $@ ? '' : $args[0];
   }
   return '';
 }
