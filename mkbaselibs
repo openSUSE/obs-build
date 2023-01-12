@@ -591,12 +591,17 @@ sub handle_rpms {
 	if ($rr =~ /^(.*?)\s*->\s*(.*?)$/) {
 	  $rr = $1;
 	  my $mrr = $2;
-	  for my $f (grep {/$rr/} @rpmfiles) {
-	    $files{$f} = 1;
-	    $moves{$f} = $mrr;
-	    if ($mrr =~ /\$[1-9]/) {
+	  if ($mrr =~ /\$[1-9]/) {
+	    for my $f (grep {/$rr/} @rpmfiles) {
+	      $files{$f} = 1;
+	      $moves{$f} = $mrr;
 	      my @s = $f =~ /$rr/;
 	      $moves{$f} =~ s/\$([1-9])/$s[$1 - 1]/g;
+	    }
+	  } else {
+	    if (grep {$_ eq $rr} @rpmfiles) {
+	      $files{$_} = 1;
+	      $moves{$_} = $mrr;
 	    }
 	  }
 	} else {
