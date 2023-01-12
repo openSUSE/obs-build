@@ -600,8 +600,8 @@ sub handle_rpms {
 	    }
 	  } else {
 	    if (grep {$_ eq $rr} @rpmfiles) {
-	      $files{$_} = 1;
-	      $moves{$_} = $mrr;
+	      $files{$rr} = 1;
+	      $moves{$rr} = $mrr;
 	    }
 	  }
 	} else {
