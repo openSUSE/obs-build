@@ -314,7 +314,11 @@ EOF
 }
 
 if test `id -u` != "0"; then
-    echo "obs-docker-support: not executed as root user!"
+    echo <<EOF
+obs-docker-support: not executed as root user!
+
+This can happen if your base container (see FROM line) is setting USER already, then builds in dependent container run as that user/group.
+EOF
     exit 1
 fi
 
