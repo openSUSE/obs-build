@@ -443,6 +443,7 @@ reexpand:
 	push @args, split(' ', $1);
 	$line = '';
       }
+      $_ = expandmacros($config, $_, $lineno, $macros, $macros_args, $tries) for @args;
       $expandedline .= luamacro($macname, @args);
     } elsif (exists($macros->{$macname})) {
       if (!defined($macros->{$macname})) {
