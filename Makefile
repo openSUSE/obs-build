@@ -91,6 +91,7 @@ install:
 	    download_assets \
 	    export_debian_orig_from_git \
 	    unpack_slsa_provenance \
+	    generate_spdx_sbom \
 	    $(DESTDIR)$(pkglibdir)
 	install -m644 \
 	    qemu-reg \

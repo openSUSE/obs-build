@@ -1,0 +1,459 @@
+#!/usr/bin/perl
+
+################################################################
+#
+# Copyright (c) 2023 SUSE Linux LLC
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+BEGIN {
+  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+}
+
+use strict;
+
+use Data::Dumper;
+use File::Temp;
+
+use Digest::SHA;
+use Digest::MD5;
+
+use Build::Rpm;
+use Build::SimpleJSON;
+
+my $spdx_json_template = {
+  '_order' => [ qw{spdxVersion dataLicense SPDXID name documentNamespace creationInfo packages files relationships} ],
+  'creationInfo' => {
+    '_order' => [ qw{licenseListVersion creators created} ],
+  },
+  'packages' => {
+    '_order' => [ qw{name SPDXID versionInfo originator downloadLocation sourceInfo licenseConcluded licenseDeclared copyrightText externalRefs} ],
+    'externalRefs' => {
+      '_order' => [ qw{referenceCategory referenceType referenceLocator} ],
+    },
+  },
+  'files' => {
+    '_order' => [ qw{fileName SPDXID checksums licenseConcluded copyrightText comment} ],
+  },
+  'relationships' => {
+    '_order' => [ qw{spdxElementId relatedSpdxElement relationshipType} ],
+  },
+};
+
+my $intoto_json_template = {
+  '_order' => [ qw{_type predicateType subject predicate} ],
+  'subject' => {
+    '_order' => [ qw{name digest} ],
+  },
+  'predicate' => $spdx_json_template,
+};
+
+
+sub urlencode {
+  my ($str, $iscgi) = @_;
+  if ($iscgi) {
+    $str =~ s/([\000-\037<>;\"#\?&\+=%[\177-\377])/sprintf("%%%02X",ord($1))/sge;
+    $str =~ tr/ /+/;
+  } else {
+    $str =~ s/([\000-\040<>;\"#\?&\+=%[\177-\377])/sprintf("%%%02X",ord($1))/sge;
+  }
+  return $str;
+}
+
+sub rfc3339time {
+  my ($t) = @_;
+  my @gt = gmtime($t || time());
+  return sprintf "%04d-%02d-%02dT%02d:%02d:%02dZ", $gt[5] + 1900, $gt[4] + 1, @gt[3,2,1,0];
+}
+
+sub sha256file {
+  my ($fn) = @_;
+  my $ctx = Digest::SHA->new(256);
+  eval { $ctx->addfile($fn) };
+  die("$fn: $@\n") if $@;
+  return $ctx->hexdigest();
+}
+
+sub system_chroot {
+  my ($root, @args) = @_;
+  my $pid = 0;
+  if ($args[0] eq 'exec') {
+    shift @args;
+  } else {
+    $pid = fork();
+    die("fork: $!\n") unless defined $pid;
+  }
+  if (!$pid) {
+    if ($args[0] eq 'quiet') {
+      shift @args;
+      open(STDOUT, '>>', '/dev/null');
+      open(STDERR, '>>', '/dev/null');
+    }
+    if ($args[0] eq 'stdout') {
+      open(STDOUT, '>', $args[1]) || die("$args[1]: $!\n");
+      splice(@args, 0, 2);
+    }
+    !$root || chroot($root) || die("chroot $root: $!\n");
+    exec(@args);
+    die("exec $args[0]: $!\n");
+  }
+  die unless waitpid($pid, 0) == $pid;
+  return $?;
+}
+
+sub popen_chroot {
+  my ($root, @args) = @_;
+
+  my $fd;
+  if (!$root) {
+    open($fd, '-|', @args) || die("open: $!\n");
+    return $fd;
+  }
+  my $pid = open($fd, '-|');
+  die("open: $!\n") unless defined $pid;
+  if ($pid == 0) {
+    !$root || chroot($root) || die("chroot $root: $!\n");
+    exec(@args);
+    die("exec $args[0]: $!\n");
+  }
+  return $fd;
+}
+
+sub can_run {
+  my ($root, $fname) = @_;
+  return 0 if $root && $>;
+  return -x "$root$fname";
+}
+
+sub systemq {
+  my $pid = fork();
+  die("fork: $!\n") unless defined $pid;
+  if (!$pid) {
+    open(STDOUT, '>', '/dev/null') || die("/dev/null: $!\n");
+    exec @_;
+    die("$_[0]: $!\n");
+  }
+  waitpid($pid, 0) == $pid || die("waitpid: $!\n");
+  exit($?) if $?;
+}
+
+sub uncompress_container {
+  my ($container, $outfile) = @_;
+  my @decompressor;
+  if ($container =~ /\.tar$/) {
+    push @decompressor, 'cat';
+  } elsif ($container =~ /\.tar\.gz$/) {
+    push @decompressor, 'gunzip';
+  } elsif ($container =~ /\.tar\.xz$/) {
+    push @decompressor, 'xzdec';
+  } else {
+    die("$container: unknown format\n");
+  }
+  my $pid = fork();
+  die("fork: $!\n") unless defined $pid;
+  if (!$pid) {
+    open(STDIN, '<', $container) || die("$container: $!\n");
+    open(STDOUT, '>', $outfile) || die("$outfile: $!\n");
+    exec @decompressor;
+    die("$decompressor[0]: $!\n");
+  }
+  waitpid($pid, 0) == $pid || die("waitpid: $!\n");
+  exit($?) if $?;
+}
+
+sub unpack_container {
+  my ($dir, $container) = @_;
+  uncompress_container($container, "$dir/cont");
+  systemq('skopeo', 'copy', "docker-archive:$dir/cont", "oci:$dir/image:latest");
+  unlink("$dir/cont");
+  systemq('umoci', 'unpack', '--image', "$dir/image:latest", "$dir/unpack");
+  return "$dir/unpack/rootfs";
+}
+
+sub dump_rpmdb {
+  my ($root, $outfile) = @_;
+  my $dbpath;
+  for my $phase (0, 1) {
+    if (can_run($root, '/usr/bin/rpmdb')) {
+      # check if we have the exportdb option
+      if (system_chroot($root, 'quiet', '/usr/bin/rpmdb', '--exportdb', '--version') == 0) {
+        if ($dbpath) {
+          system_chroot($root, 'stdout', $outfile, '/usr/bin/rpmdb', '--dbpath', $dbpath, '--exportdb');
+        } else {
+          system_chroot($root, 'stdout', $outfile, '/usr/bin/rpmdb', '--exportdb');
+        }
+      }
+      exit($?) if $?;
+      return;
+    }
+    # try to get the dbpath from the root if we can
+    if (!$dbpath && can_run($root, '/usr/bin/rpm')) {
+      my $fd = popen_chroot($root, '/usr/bin/rpm', '--eval', '%_dbpath');
+      my $path = <$fd>;
+      close($fd);
+      chomp $path;
+      $dbpath = $path if $path && $path =~ /^\//;
+    }
+    $dbpath ||= '/var/lib/rpm';           # guess
+    # try to dump with rpmdb_dump
+    if (-s "$root$dbpath/Packages" && can_run($root, '/usr/lib/rpm/rpmdb_dump')) {
+      my $outfh;
+      open($outfh, '>', $outfile) || die("$outfile: $!\n");
+      my $fd = popen_chroot($root, '/usr/lib/rpm/rpmdb_dump', "$dbpath/Packages");
+      while (<$fd>) {
+	next unless /^\s*[0-9a-fA-F]{8}/;
+	chomp;
+	my $v = <$fd>;
+	die("unexpected EOF\n") unless $v;
+	chomp $v;
+	substr($v, 0, 1, '') while substr($v, 0, 1) eq ' ';
+	$v = pack('H*', $v);
+	next if length($v) < 16;
+	my ($il, $dl) = unpack('NN', $v);
+	die("bad header length\n") unless length($v) == 8 + $il * 16 + $dl;
+	die("print: $!\n") unless print $outfh pack('H*', '8eade80100000000');
+	die("print: $!\n") unless print $outfh $v;
+      }
+      close($fd) || die("rpmdb_dump: $!\n");
+      close($outfh) || die("close: $!\n");
+      return;
+    }
+
+    last unless $root;
+    # try with the system rpm and a dbpath
+    $dbpath = "$root$dbpath";
+    $root = '';
+  }
+  die("could not dump rpm database\n");
+}
+
+sub gen_filelist {
+  my ($dir) = @_;
+  my $fd;
+  my $pid = open($fd, '-|');
+  die("fork: $!\n") unless defined $pid;
+  if (!$pid) {
+    chdir($dir) || die("chdir $!\n");
+    exec('find', '-print0');
+    die("find: $!\n");
+  }
+  local $/ = "\0";
+  my @files = <$fd>;
+  chomp @files;
+  close($fd) || die("find: $?\n");
+  $_ =~ s/^\.\//\// for @files;
+  $_ = {'name' => $_} for @files;
+  for my $f (@files) {
+    if (-l "$dir$f->{'name'}" || ! -f _) {
+      $f->{'SKIP'} = 1;
+      next;
+    }
+    $f->{'sha256sum'} = sha256file("$dir/$f->{'name'}");
+  }
+  return \@files;
+}
+
+sub read_pkgs {
+  my ($rpmhdrs) = @_;
+  my $fd;
+  open($fd, '<', $rpmhdrs) || die("$rpmhdrs: $!\n");
+  my @rpms;
+  while (1) {
+    my $hdr = '';
+    last unless read($fd, $hdr, 16) == 16;
+    my ($il, $dl) = unpack('@8NN', $hdr);
+    die("bad rpm header\n") unless $il && $dl;
+    die("bad rpm header\n") unless read($fd, $hdr, $il * 16 + $dl, 16) == $il * 16 + $dl;
+    my %r = Build::Rpm::rpmq([ $hdr ], qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL FILENAMES 1011 1030 1035 5011 261});
+    delete $r{$_} for qw{BASENAMES DIRNAMES DIRINDEXES};
+    $r{'VENDOR'} = delete $r{'1011'} if $r{'1011'};
+    $r{'FILEDIGESTALGO'} = delete $r{'5011'} if $r{'5011'};
+    $r{'FILEMODES'} = delete $r{'1030'} if $r{'1030'};
+    $r{'FILEDIGESTS'} = delete $r{'1035'} if $r{'1035'};
+    for (qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL VENDOR FILEDIGESTALGO 261}) {
+      next unless $r{$_};
+      die("bad rpm entry for $_\n") unless ref($r{$_}) eq 'ARRAY' && @{$r{$_}} == 1;
+      $r{$_} = $r{$_}->[0];
+    }
+    push @rpms, \%r;
+  }
+  close($fd);
+  @rpms = sort {$a->{'NAME'} cmp $b->{'NAME'} || $a->{'VERSION'} cmp $b->{'VERSION'} || $a->{'RELEASE'} cmp $b->{'RELEASE'}} @rpms;
+  return \@rpms;
+}
+
+sub read_dist {
+  my ($dir) = @_;
+  my %dist;
+  my $fd;
+  if (open($fd, '<', '/etc/os-release') || open($fd, '<', '/usr/lib/os-release')) {
+    while(<$fd>) {
+      chomp;
+      next unless /\s*(\S+)=(.*)/;
+      my $k = lc($1);
+      my $v = $2;
+      $v =~ s/\s+$//;
+      $v =~ s/^\"(.*)\"$/$1/;
+      if ($k eq 'id_like') {
+        push @{$dist{$k}}, $v;
+      } else {
+        $dist{$k} = $v;
+      }
+    }
+    close($fd);
+  }
+  return \%dist;
+}
+
+my $wrap_intoto;
+
+if (@ARGV && $ARGV[0] eq '--intoto') {
+  $wrap_intoto = 1;
+  shift @ARGV;
+}
+
+my $containertar = $ARGV[0];
+
+my $tmpdir = File::Temp::tempdir( CLEANUP => 1 );
+#my $tmpdir = File::Temp::tempdir();
+
+my $unpackdir = unpack_container($tmpdir, $containertar);
+dump_rpmdb($unpackdir, "$tmpdir/rpmdb");
+
+my $files = gen_filelist($unpackdir);
+my $pkgs = read_pkgs("$tmpdir/rpmdb");
+my $dist = read_dist($unpackdir);
+
+my $subjectname = $containertar;
+$subjectname =~ s/.*\///;
+
+my $spdx = {
+  'spdxVersion' => 'SPDX-2.3',
+  'dataLicense' => 'CC0-1.0',
+  'SPDXID' => 'SPDXRef-DOCUMENT',
+  'name' => $subjectname,
+};
+
+my $creationinfo = {
+  'created' => rfc3339time(time()),
+  'licenseListVersion' => '3.19',
+};
+$spdx->{'creationInfo'} = $creationinfo;
+
+for my $p (@$pkgs) {
+  my $vr = $p->{'VERSION'};
+  $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
+  my $evr = $vr;
+  $evr = "$p->{'EPOCH'}:$evr" if $p->{'EPOCH'};
+  my $spdxpkg = {
+    'name' => $p->{'NAME'},
+    'versionInfo' => $evr,
+  };
+  $spdxpkg->{'originator'} = "Organization: $p->{'VENDOR'}" if $p->{'VENDOR'};
+  $spdxpkg->{'downloadLocation'} = 'NOASSERTION';
+  $spdxpkg->{'sourceInfo'} = 'acquired package info from RPM DB';
+  $spdxpkg->{'licenseConcluded'} = 'NOASSERTION';
+  $spdxpkg->{'licenseDeclared'} = 'NOASSERTION';
+  my $license = $p->{'LICENSE'};
+  if ($license) {
+    $license =~ s/ and / AND /g;
+    $spdxpkg->{'licenseConcluded'} = $license;
+    $spdxpkg->{'licenseDeclared'} = $license;
+  }
+  $spdxpkg->{'copyrightText'} = 'NOASSERTION';
+  my $dist_id = $dist->{'id'};
+  my $dist_str = $dist_id;
+  $dist_str .= "-$dist->{'version_id'}" if defined($dist->{'version_id'}) && $dist->{'version_id'} ne '';
+  $dist_str .= "-$dist->{'build_id'}" if defined($dist->{'build_id'}) && $dist->{'build_id'} ne '';
+  my $purlurl = "pkg:".urlencode("rpm/$dist_id/$p->{'NAME'}\@$vr").'?';
+  $purlurl .= '&epoch='.urlencode($p->{'EPOCH'}) if $p->{'EPOCH'};
+  $purlurl .= '&arch='.urlencode($p->{'ARCH'}) if $p->{'ARCH'};
+  $purlurl .= '&upstream='.urlencode($p->{'SOURCERPM'}) if $p->{'SOURCERPM'};
+  $purlurl .= '&distro='.urlencode($dist_str) if $dist_str;
+  $purlurl =~ s/\?\&/\?/;
+  $purlurl =~ s/\?$//;
+  my @xref;
+  push @xref, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator', $purlurl } if $purlurl;
+  $spdxpkg->{'externalRefs'} = \@xref if @xref;
+  $p->{'spdx_id'} = "SPDXRef-Package-$p->{'NAME'}-".unpack('H*', $p->{'261'});
+  $p->{'spdx_id'} =~ s/[^a-zA-Z0-9\.\-]/-/g;
+  $spdxpkg->{'SPDXID'} = $p->{'spdx_id'};
+  push @{$spdx->{'packages'}}, $spdxpkg;
+}
+
+for my $f (@$files) {
+  next if $f->{'SKIP'};
+  my $spdxfile = {
+    'fileName' => $f->{'name'},
+    'licenseConcluded' => 'NOASSERTION',
+    'copyrightText' => '',
+  };
+  my @chks;
+  push @chks, { 'algorithm' => 'SHA256', 'checksumValue' => $f->{'sha256sum'} } if $f->{'sha256sum'};
+  $spdxfile->{'checksums'} = \@chks if @chks;
+  $f->{'spdx_id'} = "SPDXRef-".Digest::MD5::md5_hex($f->{'name'}.($f->{'sha256sum'} || ''));
+  $spdxfile->{'SPDXID'} = $f->{'spdx_id'};
+  push @{$spdx->{'files'}}, $spdxfile;
+}
+
+if (@$files) {
+  my %f2p;
+  for my $p (@$pkgs) {
+    push @{$f2p{$_}}, $p for @{$p->{'FILENAMES'} || []};
+  }
+  for my $f (@$files) {
+    next if $f->{'SKIP'};
+    #warn("unpackaged file: $f->{'name'}\n") unless @{$f2p{$f->{'name'}} || []};
+    for my $p (@{$f2p{$f->{'name'}} || []}) {
+      next unless $f->{'spdx_id'} && $p->{'spdx_id'};
+      my $rel = {
+        'spdxElementId' => $p->{'spdx_id'},
+        'relatedSpdxElement' => $f->{'spdx_id'},
+	'relationshipType', 'CONTAINS',
+      };
+      push @{$spdx->{'relationships'}}, $rel;
+    }
+  }
+}
+
+push @{$spdx->{'relationships'}}, {
+  'spdxElementId' => 'SPDXRef-DOCUMENT',
+  'relatedSpdxElement' => 'SPDXRef-DOCUMENT',
+  'relationshipType', 'DESCRIBES',
+};
+
+my $uuid = pack('H*', '1e9d579964de4594a4e835719a1c259f');	# uuid ns
+$uuid = substr(Digest::SHA::sha1($uuid . Build::SimpleJSON::unparse($spdx, 'template' => $spdx_json_template, 'keepspecial' => 1)), 0, 16);
+substr($uuid, 6, 1, pack('C', unpack('@6C', $uuid) & 0x0f | 0x50));
+substr($uuid, 8, 1, pack('C', unpack('@8C', $uuid) & 0x3f | 0x80));
+$uuid = join('-', unpack("H8H4H4H4H12", $uuid));
+
+$spdx->{'documentNamespace'} = 'http://open-build-service.org/spdx/'.urlencode($subjectname).'-'.$uuid;
+
+if ($wrap_intoto) {
+  my $intoto = {
+    '_type' => 'https://in-toto.io/Statement/v0.1',
+    'predicateType' => 'https://spdx.dev/Document',
+    'subject' => [ { 'name' => $subjectname , 'digest' => { 'sha256' => sha256file($containertar) } } ],
+    'predicate' => $spdx,
+  };
+  print Build::SimpleJSON::unparse($intoto, 'template' => $intoto_json_template, 'keepspecial' => 1)."\n";
+} else {
+  print Build::SimpleJSON::unparse($spdx, 'template' => $spdx_json_template, 'keepspecial' => 1)."\n";
+}
+
+
