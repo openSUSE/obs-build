@@ -693,7 +693,16 @@ postprocess_kiwi_containers() {
     test -n "$RELEASE" && args=("${args[@]}" --release "$RELEASE")
     for r in $BUILD_ROOT/$TOPDIR/KIWI/*.tar ; do
 	test -e "$r" && perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::showcontainerinfo -- "${args[@]}" $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE "$r" > "${r%.tar}.containerinfo"
-	test -s "${r%.tar}.containerinfo" || rm -f "${r%.tar}.containerinfo"
+	if test -s "${r%.tar}.containerinfo" ; then
+	    # create sbom if requested
+	    if test -n "$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags spdx)" ; then
+		echo "Generating SPDX sbom file for ${r##*/}"
+		generate_spdx_sbom "$r" > "${r%.tar}.sbom.json"
+		test -s "${r%.tar}.sbom.json" || rm -f "${r%.tar}.sbom.json"
+	    fi
+	else
+	    rm -f "${r%.tar}.containerinfo"
+	fi
     done
     if test -n "$KIWI_DERIVED_CONTAINER" ; then
 	for r in $BUILD_ROOT/$TOPDIR/KIWI/*.packages ; do
