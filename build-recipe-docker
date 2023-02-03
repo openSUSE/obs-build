@@ -290,7 +290,7 @@ recipe_build_docker() {
     # create sbom if requested
     if test -n "$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags spdx)" ; then
 	echo "Generating SPDX sbom file"
-	generate_spdx_sbom "$FILENAME.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.sbom.json"
+	generate_spdx_sbom "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.sbom.json"
  	test -s "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.sbom.json" || rm -f "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.sbom.json"
     fi
  
