@@ -300,7 +300,7 @@ sub read_dist {
   my ($dir) = @_;
   my %dist;
   my $fd;
-  if (open($fd, '<', '/etc/os-release') || open($fd, '<', '/usr/lib/os-release')) {
+  if (open($fd, '<', "$dir/etc/os-release") || open($fd, '<', "$dir/usr/lib/os-release")) {
     while(<$fd>) {
       chomp;
       next unless /\s*(\S+)=(.*)/;
@@ -317,6 +317,25 @@ sub read_dist {
     close($fd);
   }
   return \%dist;
+}
+
+sub gen_purl_rpm {
+  my ($p, $dist) = @_;
+
+  my $vr = $p->{'VERSION'};
+  $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
+  my $dist_id = $dist->{'id'};
+  my $dist_str = $dist_id;
+  $dist_str .= "-$dist->{'version_id'}" if defined($dist->{'version_id'}) && $dist->{'version_id'} ne '';
+  $dist_str .= "-$dist->{'build_id'}" if defined($dist->{'build_id'}) && $dist->{'build_id'} ne '';
+  my $purlurl = "pkg:".urlencode("rpm/$dist_id/$p->{'NAME'}\@$vr").'?';
+  $purlurl .= '&epoch='.urlencode($p->{'EPOCH'}) if $p->{'EPOCH'};
+  $purlurl .= '&arch='.urlencode($p->{'ARCH'}) if $p->{'ARCH'};
+  $purlurl .= '&upstream='.urlencode($p->{'SOURCERPM'}) if $p->{'SOURCERPM'};
+  $purlurl .= '&distro='.urlencode($dist_str) if $dist_str;
+  $purlurl =~ s/\?\&/\?/;
+  $purlurl =~ s/\?$//;
+  return $purlurl;
 }
 
 my $wrap_intoto;
@@ -375,17 +394,7 @@ for my $p (@$pkgs) {
     $spdxpkg->{'licenseDeclared'} = $license;
   }
   $spdxpkg->{'copyrightText'} = 'NOASSERTION';
-  my $dist_id = $dist->{'id'};
-  my $dist_str = $dist_id;
-  $dist_str .= "-$dist->{'version_id'}" if defined($dist->{'version_id'}) && $dist->{'version_id'} ne '';
-  $dist_str .= "-$dist->{'build_id'}" if defined($dist->{'build_id'}) && $dist->{'build_id'} ne '';
-  my $purlurl = "pkg:".urlencode("rpm/$dist_id/$p->{'NAME'}\@$vr").'?';
-  $purlurl .= '&epoch='.urlencode($p->{'EPOCH'}) if $p->{'EPOCH'};
-  $purlurl .= '&arch='.urlencode($p->{'ARCH'}) if $p->{'ARCH'};
-  $purlurl .= '&upstream='.urlencode($p->{'SOURCERPM'}) if $p->{'SOURCERPM'};
-  $purlurl .= '&distro='.urlencode($dist_str) if $dist_str;
-  $purlurl =~ s/\?\&/\?/;
-  $purlurl =~ s/\?$//;
+  my $purlurl = gen_purl_rpm($p, $dist);
   my @xref;
   push @xref, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator', $purlurl } if $purlurl;
   $spdxpkg->{'externalRefs'} = \@xref if @xref;
