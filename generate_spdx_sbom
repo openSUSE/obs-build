@@ -38,7 +38,7 @@ use Build::SimpleJSON;
 my $spdx_json_template = {
   '_order' => [ qw{spdxVersion dataLicense SPDXID name documentNamespace creationInfo packages files relationships} ],
   'creationInfo' => {
-    '_order' => [ qw{licenseListVersion creators created} ],
+    '_order' => [ qw{created creators licenseListVersion} ],
   },
   'packages' => {
     '_order' => [ qw{name SPDXID versionInfo originator downloadLocation sourceInfo licenseConcluded licenseDeclared copyrightText externalRefs} ],
@@ -369,6 +369,7 @@ my $spdx = {
 
 my $creationinfo = {
   'created' => rfc3339time(time()),
+  'creators' => [ 'Tool: obs_build_generate_spdx_sbom-1.0' ],
   'licenseListVersion' => '3.19',
 };
 $spdx->{'creationInfo'} = $creationinfo;
