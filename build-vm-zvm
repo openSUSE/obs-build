@@ -45,7 +45,7 @@ zvm_fatal() {
 }
 
 zvm_prevent_detach() {
-    if test "$1" = "150" -o "$1" = "0150"; then
+    if test "$1" = "100" -o "$1" = "0100"; then
         zvm_fatal "don't detach local root"
     fi
 }
@@ -295,12 +295,17 @@ vm_startup_zvm() {
     # link root/swap to the worker
     zvm_cp volume_attach $VM_WORKER $ZVM_VOLUME_ROOT
     zvm_cp volume_attach $VM_WORKER $ZVM_VOLUME_SWAP
+    sleep 0.100
+    .log 5 "IPL of worker $VM_WORKER"
     zvm_cp ipl $VM_WORKER $ZVM_VOLUME_ROOT
-    # start IUCV Console
-    # IPL needs some time until IPL really starts...
-    sleep 5
-    # start iucv console. This blocks until build process is finished.
-    iucvconn $VM_WORKER lnxhvc0
+    sleep 3
+    .log 5 "Start iucv connection to $VM_WORKER"
+    # start iucv console multiple times, until guest starts. If connected, it blocks until build process is finished.
+    for start in {1..10}; do
+        sleep 1
+        iucvconn $VM_WORKER lnxhvc0 && break
+    done
+    .log 5 "iucv connection to $VM_WORKER finished"
     # sleep some time before taking root and swap devices from worker
     # This might be critical regarding timing (IUCV_CONSOLE down, but machine still running)
     sleep 5
@@ -373,11 +378,9 @@ vm_fixup_zvm() {
     vm_kernel="/.build.kernel.kvm"
     test -e "${BUILD_ROOT}${vm_kernel}" -a ! -L "${BUILD_ROOT}${vm_kernel}" || cleanup_and_exit 1 "${vm_kernel} does not exist"
     kernel_version=$(get_kernel_version "${BUILD_ROOT}${vm_kernel}")
-    # add kernel modules to existing initrd
-    vm_initrd_obs_modules_zvm "${BUILD_ROOT}" "${vm_initrd}" "${kernel_version}"
     vm_initrd="${vm_initrd}-${kernel_version}"
     # copy initrd to build worker:
-    echo "copy $vm_initrd to $BUILD_ROOT"
+    .log 5 "copy $vm_initrd to $BUILD_ROOT"
     cp --remove-destination -a "${vm_initrd}" "${BUILD_ROOT}/boot/${vm_initrd}"
     # finally, install bootloader to the worker disk
     # XXX/TODO: does zipl read or write ${BUILD_ROOT}${vm_initrd}? Either
@@ -406,6 +409,7 @@ vm_attach_swap_zvm() {
     VM_SWAP="/dev/$VM_SWAPDEV"
     VM_SWAPDEV="/dev/$VM_SWAPDEV"
     VM_SWAP_TYPE=device
+    sleep 0.100
 }
 
 vm_detach_root_zvm () {
