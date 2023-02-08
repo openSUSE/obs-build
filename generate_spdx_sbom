@@ -304,7 +304,6 @@ sub read_pkgs {
 
 sub read_pkgs_from_product_directory {
   my ($dir) = @_;
-
   my @rpms;
   my $addrpmfile = sub {
     my $fn = $File::Find::name;
@@ -334,22 +333,23 @@ sub read_dist {
     }
     close($fd);
   }
-  return \%dist;
+  return %dist ? \%dist : undef;
 }
 
 sub gen_purl_rpm {
-  my ($p, $dist) = @_;
+  my ($p, $distro) = @_;
 
   my $vr = $p->{'VERSION'};
   $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
   my $vendor = lc($p->{'VENDOR'});
   $vendor =~ s/obs:\/\///; # third party OBS builds
   $vendor =~ s/\ .*//;     # eg. SUSE LLC...
-  my $purlurl = "pkg:".urlencode("rpm/$vendor/$p->{'NAME'}\@$vr").'?';
+  $vendor =~ s/\/?$/\//;
+  my $purlurl = "pkg:".urlencode("rpm/$vendor$p->{'NAME'}\@$vr").'?';
   $purlurl .= '&epoch='.urlencode($p->{'EPOCH'}) if $p->{'EPOCH'};
   $purlurl .= '&arch='.urlencode($p->{'ARCH'}) if $p->{'ARCH'};
   $purlurl .= '&upstream='.urlencode($p->{'SOURCERPM'}) if $p->{'SOURCERPM'};
-  $purlurl .= '&distro='.urlencode($dist) if $dist;
+  $purlurl .= '&distro='.urlencode($distro) if $distro;
   $purlurl =~ s/\?\&/\?/;
   $purlurl =~ s/\?$//;
   return $purlurl;
@@ -357,27 +357,24 @@ sub gen_purl_rpm {
 
 my $wrap_intoto;
 my $isproduct;
-my $subjectname;
-my $toprocess;
 my $distro;
-while (@ARGV) {
-  if (@ARGV > 1 && $ARGV[0] eq '--distro') {
-    shift @ARGV;
+
+while (@ARGV && $ARGV[0] =~ /^-/) {
+  my $opt = shift @ARGV;
+  if ($opt eq '--distro') {
     $distro = shift @ARGV;
-  } elsif (@ARGV && $ARGV[0] eq '--intoto') {
+  } elsif ($opt eq '--intoto') {
     $wrap_intoto = 1;
-    shift @ARGV;
-  } elsif (@ARGV && $ARGV[0] eq '--product') {
+  } elsif ($opt eq '--product') {
     $isproduct = 1;
-    shift @ARGV;
-  } elsif (@ARGV && $ARGV[0] =~ /^-/) {
-    die("unknown parameter: $ARGV[0]");
   } else {
-    $toprocess = shift @ARGV;
+    last if $opt eq '--';
+    die("unknown option: $opt\n");
   }
 }
 
-die("usage: generate_spdx_sbom [--disto NAME] [--intoto] PRODUCT_DIRECTORY|CONTAINER_TAR\n") unless $toprocess;
+die("usage: generate_spdx_sbom [--disto NAME] [--intoto] [--product] PRODUCT_DIRECTORY|CONTAINER_TAR\n") unless @ARGV == 1;
+my $toprocess = $ARGV[0];
 
 my $tmpdir = File::Temp::tempdir( CLEANUP => 1 );
 
@@ -385,11 +382,9 @@ my $files;
 my $pkgs;
 my $dist;
 if ($isproduct) {
-  # KIWI product case
-  # to be decided: Do we need to track the files on the medium or the ones which will exist on installed system?
+  # product case
   #$files = gen_filelist($toprocess);
   $pkgs = read_pkgs_from_product_directory($toprocess);
-#  $dist = read_dist('/');
 } else {
   # container tar case
   my $unpackdir = unpack_container($tmpdir, $toprocess);
@@ -399,10 +394,11 @@ if ($isproduct) {
   $pkgs = read_pkgs("$tmpdir/rpmdb");
   $dist = read_dist($unpackdir);
 }
-$subjectname = $toprocess;
+
+my $subjectname = $toprocess;
 $subjectname =~ s/.*\///;
 
-if (!$distro) {
+if (!$distro && $dist) {
   $distro = $dist->{'id'};
   $distro .= "-$dist->{'version_id'}" if defined($dist->{'version_id'}) && $dist->{'version_id'} ne '';
   $distro .= "-$dist->{'build_id'}" if defined($dist->{'build_id'}) && $dist->{'build_id'} ne '';
@@ -503,17 +499,15 @@ $uuid = join('-', unpack("H8H4H4H4H12", $uuid));
 $spdx->{'documentNamespace'} = 'http://open-build-service.org/spdx/'.urlencode($subjectname).'-'.$uuid;
 
 if ($wrap_intoto) {
+  my $subject = { 'name' => $subjectname };
+  # no digest for products as it might be a directory. And an iso file would change the checksum later while signing.
+  $subject->{'digest'} = { 'sha256' => sha256file($toprocess) } unless $isproduct;
   my $intoto = {
     '_type' => 'https://in-toto.io/Statement/v0.1',
+    'subject' => [ $subject ],
     'predicateType' => 'https://spdx.dev/Document',
     'predicate' => $spdx,
   };
-  if ($isproduct) {
-     # no digest as it might be a directory. And an iso file would change the checksum later while signing.
-    $intoto->{'subject'} = [ { 'name' => $subjectname } ];
-  } else {
-    $intoto->{'subject'} = [ { 'name' => $subjectname , 'digest' => { 'sha256' => sha256file($toprocess) } } ];
-  }
   print Build::SimpleJSON::unparse($intoto, 'template' => $intoto_json_template, 'keepspecial' => 1)."\n";
 } else {
   print Build::SimpleJSON::unparse($spdx, 'template' => $spdx_json_template, 'keepspecial' => 1)."\n";
