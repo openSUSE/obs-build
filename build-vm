@@ -309,6 +309,9 @@ vm_parse_options() {
 }
 
 vm_set_buildstatus() {
+    .log 5 "VM_SWAP: $VM_SWAP"
+    .log 5 "VM_SWAPDEV: $VM_SWAPDEV"
+    .log 5 "BUILDSTATUS: $BUILDSTATUS"
     if test -n "$VM_ROOT" -a -n "$VM_SWAP" -a "$VM_SWAP_TYPE" != unattached -a -e "$VM_SWAP" ; then
         echo -n "BUILDSTATUS$1" >"$VM_SWAP"
     fi
@@ -352,7 +355,16 @@ vm_shutdown() {
     test -n "$VM_WATCHDOG" && echo "### VM INTERACTION START ###"
     exec >&0 2>&0	# so that the logging tee finishes
     cd /
+    .log 5 "vm_shutdown called with $1. VM_SWAP is set to $VM_SWAP"
     test -n "$1" || set 1
+    if test "$VM_TYPE" = "zvm"; then
+        if test ${#VM_SWAP} -eq 4; then
+            if (( 16#$VM_SWAP )); then
+                VM_SWAP="/dev/$(ls /sys/bus/ccw/devices/0.0.${VM_SWAP}/block/)1"
+            fi
+        fi
+    fi
+    .log 5 "Writing BUILDSTATUS ${BUILDSTATUS}$1 to SWAP $VM_SWAP"
     if test -n "$VM_SWAP" -a -e "$VM_SWAP" ; then
 	swapoff "$VM_SWAP" 2>/dev/null
 	echo -n "BUILDSTATUS$1" >"$VM_SWAP"
@@ -669,6 +681,19 @@ vm_detect_2nd_stage() {
 	    echo "resolved swap device $VM_SWAP to $i"
 	    VM_SWAP=$i
 	fi
+        # for zvm, there is just a 4-digig hex number
+        if test "$VM_TYPE" = "zvm"; then
+            if (( 16#$VM_SWAP )); then
+                if test ${#VM_SWAP} -eq 4; then
+                    .log 5 "VM_SWAP id in z/VM is: $VM_SWAP"
+                    # first, set the swap disk online, and then read the device node
+                    test -d /sys/bus/ccw/devices/0.0.${VM_SWAP} && echo 1 > /sys/bus/ccw/devices/0.0.${VM_SWAP}/online
+                    VM_SWAP="/dev/$(ls /sys/bus/ccw/devices/0.0.${VM_SWAP}/block/)1"
+                    VM_SWAPDEV="${VM_SWAP}"
+                    .log 5 "resolved swap device to ${VM_SWAP}"
+                fi
+            fi
+        fi
 	for i in 1 2 3 4 5 6 7 8 9 10 ; do
 	    test -e "$VM_SWAP" && break
 	    test $i = 1 && echo "waiting for $VM_SWAP to appear"
@@ -771,6 +796,7 @@ vm_set_defaults() {
 	VM_ROOT_TYPE=file
 	test -b "$VM_ROOT" && VM_ROOT_TYPE=device
     fi
+    .log 5 "VM_SWAP: $VM_SWAP"
     if test -n "$VM_SWAP" -a -z "$VM_SWAP_TYPE" ; then
 	VM_SWAP_TYPE=file
 	test -b "$VM_SWAP" && VM_SWAP_TYPE=device
@@ -1003,7 +1029,14 @@ vm_first_stage() {
     echo "KIWI_PARAMETERS='${KIWI_PARAMETERS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     echo "VM_TELNET='${VM_TELNET//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     echo "VM_CONSOLE_INPUT='${VM_CONSOLE_INPUT//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
-    test -n "$VM_SWAP" && echo "VM_SWAP='${VM_SWAPDEV//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    case $VM_TYPE in
+        zvm)
+            echo VM_SWAP=${ZVM_VOLUME_SWAP} >> $BUILD_ROOT/.build/build.data
+            ;;
+        *)
+            test -n "$VM_SWAP" && echo "VM_SWAP='${VM_SWAPDEV//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+            ;;
+    esac
     test -n "$VMDISK_MOUNT_OPTIONS" && echo "VMDISK_MOUNT_OPTIONS='${VMDISK_MOUNT_OPTIONS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     PERSONALITY=0
     test -n "$PERSONALITY_SYSCALL" && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
@@ -1110,6 +1143,7 @@ vm_first_stage() {
 
     vm_startup "${VM_ARGS[@]}"
 
+    .log 5 "Worker has been shutdown"
     # kill watchdog again
     if test -n "$VM_WATCHDOG" ; then
 	echo "### VM INTERACTION END ###"
@@ -1119,6 +1153,8 @@ vm_first_stage() {
     vm_attach_root
     if test -n "$VM_SWAP" -a -z "$RUN_SHELL" ; then
 	vm_attach_swap
+        .log 5 "$(cat /proc/partitions)"
+        .log 5 "VM_SWAP: $VM_SWAP"
 	BUILDSTATUS=$(dd if="$VM_SWAP" bs=12 count=1 status=none | tr '\0' a)
 	case $BUILDSTATUS in
 	  BUILDSTATUS[029])
@@ -1200,6 +1236,15 @@ vm_save_statistics() {
 # args: resultdirs
 vm_wrapup_build() {
     test "$DO_STATISTICS" = 1 && vm_save_statistics
+    # in zvm, VM_SWAP is replaced by the actual device during the build. Unfortunately, build calls
+    # this function without the replacement taking place, thus lets do it anyways:
+    if test "$VM_TYPE" = "zvm"; then
+        if (( 16#$VM_SWAP )); then
+            if test ${#VM_SWAP} -eq 4; then
+                VM_SWAP="/dev/$(ls /sys/bus/ccw/devices/0.0.${VM_SWAP}/block/)1"
+            fi
+        fi
+    fi
     if test -n "$VM_SWAP"; then
         echo "... saving built packages"
         swapoff "$VM_SWAP"
