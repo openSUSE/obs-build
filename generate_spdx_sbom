@@ -27,6 +27,7 @@ BEGIN {
 use strict;
 
 use Data::Dumper;
+use File::Find;
 use File::Temp;
 
 use Digest::SHA;
@@ -267,7 +268,19 @@ sub gen_filelist {
   return \@files;
 }
 
-sub read_pkgs {
+sub read_rpm {
+  my ($rpm) = @_;
+  my %r = Build::Rpm::rpmq($rpm, qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL FILENAMES VENDOR FILEMODES FILEDIGESTS FILEDIGESTALGO SIGMD5});
+  delete $r{$_} for qw{BASENAMES DIRNAMES DIRINDEXES};	# save mem
+  for (qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL VENDOR FILEDIGESTALGO SIGMD5}) {
+    next unless $r{$_};
+    die("bad rpm entry for $_\n") unless ref($r{$_}) eq 'ARRAY' && @{$r{$_}} == 1;
+    $r{$_} = $r{$_}->[0];
+  }
+  return \%r;
+}
+
+sub read_pkgs_rpmdb {
   my ($rpmhdrs) = @_;
   my $fd;
   open($fd, '<', $rpmhdrs) || die("$rpmhdrs: $!\n");
@@ -278,21 +291,21 @@ sub read_pkgs {
     my ($il, $dl) = unpack('@8NN', $hdr);
     die("bad rpm header\n") unless $il && $dl;
     die("bad rpm header\n") unless read($fd, $hdr, $il * 16 + $dl, 16) == $il * 16 + $dl;
-    my %r = Build::Rpm::rpmq([ $hdr ], qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL FILENAMES 1011 1030 1035 5011 261});
-    delete $r{$_} for qw{BASENAMES DIRNAMES DIRINDEXES};
-    $r{'VENDOR'} = delete $r{'1011'} if $r{'1011'};
-    $r{'FILEDIGESTALGO'} = delete $r{'5011'} if $r{'5011'};
-    $r{'FILEMODES'} = delete $r{'1030'} if $r{'1030'};
-    $r{'FILEDIGESTS'} = delete $r{'1035'} if $r{'1035'};
-    for (qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL VENDOR FILEDIGESTALGO 261}) {
-      next unless $r{$_};
-      die("bad rpm entry for $_\n") unless ref($r{$_}) eq 'ARRAY' && @{$r{$_}} == 1;
-      $r{$_} = $r{$_}->[0];
-    }
-    push @rpms, \%r;
+    push @rpms, read_rpm([ $hdr ]);
   }
   close($fd);
   @rpms = sort {$a->{'NAME'} cmp $b->{'NAME'} || $a->{'VERSION'} cmp $b->{'VERSION'} || $a->{'RELEASE'} cmp $b->{'RELEASE'}} @rpms;
+  return \@rpms;
+}
+
+sub read_pkgs_from_product_directory {
+  my ($dir) = @_;
+  my @rpms;
+  my $addrpmfile = sub {
+    my $fn = $File::Find::name;
+    push @rpms, read_rpm($fn) if $fn =~ /\.rpm$/;
+  };
+  find($addrpmfile, $dir);
   return \@rpms;
 }
 
@@ -316,49 +329,76 @@ sub read_dist {
     }
     close($fd);
   }
-  return \%dist;
+  return %dist ? \%dist : undef;
 }
 
 sub gen_purl_rpm {
-  my ($p, $dist) = @_;
+  my ($p, $distro) = @_;
 
   my $vr = $p->{'VERSION'};
   $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
-  my $dist_id = $dist->{'id'};
-  my $dist_str = $dist_id;
-  $dist_str .= "-$dist->{'version_id'}" if defined($dist->{'version_id'}) && $dist->{'version_id'} ne '';
-  $dist_str .= "-$dist->{'build_id'}" if defined($dist->{'build_id'}) && $dist->{'build_id'} ne '';
-  my $purlurl = "pkg:".urlencode("rpm/$dist_id/$p->{'NAME'}\@$vr").'?';
+  my $vendor = lc($p->{'VENDOR'});
+  $vendor =~ s/obs:\/\///; # third party OBS builds
+  $vendor =~ s/\ .*//;     # eg. SUSE LLC...
+  $vendor =~ s/\/?$/\//;
+  my $purlurl = "pkg:".urlencode("rpm/$vendor$p->{'NAME'}\@$vr").'?';
   $purlurl .= '&epoch='.urlencode($p->{'EPOCH'}) if $p->{'EPOCH'};
   $purlurl .= '&arch='.urlencode($p->{'ARCH'}) if $p->{'ARCH'};
   $purlurl .= '&upstream='.urlencode($p->{'SOURCERPM'}) if $p->{'SOURCERPM'};
-  $purlurl .= '&distro='.urlencode($dist_str) if $dist_str;
+  $purlurl .= '&distro='.urlencode($distro) if $distro;
   $purlurl =~ s/\?\&/\?/;
   $purlurl =~ s/\?$//;
   return $purlurl;
 }
 
 my $wrap_intoto;
+my $isproduct;
+my $distro;
 
-if (@ARGV && $ARGV[0] eq '--intoto') {
-  $wrap_intoto = 1;
-  shift @ARGV;
+while (@ARGV && $ARGV[0] =~ /^-/) {
+  my $opt = shift @ARGV;
+  if ($opt eq '--distro') {
+    $distro = shift @ARGV;
+  } elsif ($opt eq '--intoto') {
+    $wrap_intoto = 1;
+  } elsif ($opt eq '--product') {
+    $isproduct = 1;
+  } else {
+    last if $opt eq '--';
+    die("unknown option: $opt\n");
+  }
 }
 
-my $containertar = $ARGV[0];
+die("usage: generate_spdx_sbom [--disto NAME] [--intoto] [--product] PRODUCT_DIRECTORY|CONTAINER_TAR\n") unless @ARGV == 1;
+my $toprocess = $ARGV[0];
 
 my $tmpdir = File::Temp::tempdir( CLEANUP => 1 );
-#my $tmpdir = File::Temp::tempdir();
 
-my $unpackdir = unpack_container($tmpdir, $containertar);
-dump_rpmdb($unpackdir, "$tmpdir/rpmdb");
+my $files;
+my $pkgs;
+my $dist;
+if ($isproduct) {
+  # product case
+  #$files = gen_filelist($toprocess);
+  $pkgs = read_pkgs_from_product_directory($toprocess);
+} else {
+  # container tar case
+  my $unpackdir = unpack_container($tmpdir, $toprocess);
+  dump_rpmdb($unpackdir, "$tmpdir/rpmdb");
 
-my $files = gen_filelist($unpackdir);
-my $pkgs = read_pkgs("$tmpdir/rpmdb");
-my $dist = read_dist($unpackdir);
+  $files = gen_filelist($unpackdir);
+  $pkgs = read_pkgs_rpmdb("$tmpdir/rpmdb");
+  $dist = read_dist($unpackdir);
+}
 
-my $subjectname = $containertar;
+my $subjectname = $toprocess;
 $subjectname =~ s/.*\///;
+
+if (!$distro && $dist) {
+  $distro = $dist->{'id'};
+  $distro .= "-$dist->{'version_id'}" if defined($dist->{'version_id'}) && $dist->{'version_id'} ne '';
+  $distro .= "-$dist->{'build_id'}" if defined($dist->{'build_id'}) && $dist->{'build_id'} ne '';
+}
 
 my $spdx = {
   'spdxVersion' => 'SPDX-2.3',
@@ -395,11 +435,11 @@ for my $p (@$pkgs) {
     $spdxpkg->{'licenseDeclared'} = $license;
   }
   $spdxpkg->{'copyrightText'} = 'NOASSERTION';
-  my $purlurl = gen_purl_rpm($p, $dist);
+  my $purlurl = gen_purl_rpm($p, $distro);
   my @xref;
   push @xref, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator', $purlurl } if $purlurl;
   $spdxpkg->{'externalRefs'} = \@xref if @xref;
-  $p->{'spdx_id'} = "SPDXRef-Package-$p->{'NAME'}-".unpack('H*', $p->{'261'});
+  $p->{'spdx_id'} = "SPDXRef-Package-$p->{'NAME'}-".unpack('H*', $p->{'SIGMD5'});
   $p->{'spdx_id'} =~ s/[^a-zA-Z0-9\.\-]/-/g;
   $spdxpkg->{'SPDXID'} = $p->{'spdx_id'};
   push @{$spdx->{'packages'}}, $spdxpkg;
@@ -455,10 +495,13 @@ $uuid = join('-', unpack("H8H4H4H4H12", $uuid));
 $spdx->{'documentNamespace'} = 'http://open-build-service.org/spdx/'.urlencode($subjectname).'-'.$uuid;
 
 if ($wrap_intoto) {
+  my $subject = { 'name' => $subjectname };
+  # no digest for products as it might be a directory. And an iso file would change the checksum later while signing.
+  $subject->{'digest'} = { 'sha256' => sha256file($toprocess) } unless $isproduct;
   my $intoto = {
     '_type' => 'https://in-toto.io/Statement/v0.1',
+    'subject' => [ $subject ],
     'predicateType' => 'https://spdx.dev/Document',
-    'subject' => [ { 'name' => $subjectname , 'digest' => { 'sha256' => sha256file($containertar) } } ],
     'predicate' => $spdx,
   };
   print Build::SimpleJSON::unparse($intoto, 'template' => $intoto_json_template, 'keepspecial' => 1)."\n";
