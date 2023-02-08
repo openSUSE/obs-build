@@ -270,13 +270,9 @@ sub gen_filelist {
 
 sub read_rpm {
   my ($rpm) = @_;
-  my %r = Build::Rpm::rpmq($rpm, qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL FILENAMES 1011 1030 1035 5011 261});
-  delete $r{$_} for qw{BASENAMES DIRNAMES DIRINDEXES};
-  $r{'VENDOR'} = delete $r{'1011'} if $r{'1011'};
-  $r{'FILEDIGESTALGO'} = delete $r{'5011'} if $r{'5011'};
-  $r{'FILEMODES'} = delete $r{'1030'} if $r{'1030'};
-  $r{'FILEDIGESTS'} = delete $r{'1035'} if $r{'1035'};
-  for (qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL VENDOR FILEDIGESTALGO 261}) {
+  my %r = Build::Rpm::rpmq($rpm, qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL FILENAMES VENDOR FILEMODES FILEDIGESTS FILEDIGESTALGO SIGMD5});
+  delete $r{$_} for qw{BASENAMES DIRNAMES DIRINDEXES};	# save mem
+  for (qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL VENDOR FILEDIGESTALGO SIGMD5}) {
     next unless $r{$_};
     die("bad rpm entry for $_\n") unless ref($r{$_}) eq 'ARRAY' && @{$r{$_}} == 1;
     $r{$_} = $r{$_}->[0];
@@ -284,7 +280,7 @@ sub read_rpm {
   return \%r;
 }
 
-sub read_pkgs {
+sub read_pkgs_rpmdb {
   my ($rpmhdrs) = @_;
   my $fd;
   open($fd, '<', $rpmhdrs) || die("$rpmhdrs: $!\n");
@@ -391,7 +387,7 @@ if ($isproduct) {
   dump_rpmdb($unpackdir, "$tmpdir/rpmdb");
 
   $files = gen_filelist($unpackdir);
-  $pkgs = read_pkgs("$tmpdir/rpmdb");
+  $pkgs = read_pkgs_rpmdb("$tmpdir/rpmdb");
   $dist = read_dist($unpackdir);
 }
 
@@ -443,7 +439,7 @@ for my $p (@$pkgs) {
   my @xref;
   push @xref, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator', $purlurl } if $purlurl;
   $spdxpkg->{'externalRefs'} = \@xref if @xref;
-  $p->{'spdx_id'} = "SPDXRef-Package-$p->{'NAME'}-".unpack('H*', $p->{'261'});
+  $p->{'spdx_id'} = "SPDXRef-Package-$p->{'NAME'}-".unpack('H*', $p->{'SIGMD5'});
   $p->{'spdx_id'} =~ s/[^a-zA-Z0-9\.\-]/-/g;
   $spdxpkg->{'SPDXID'} = $p->{'spdx_id'};
   push @{$spdx->{'packages'}}, $spdxpkg;

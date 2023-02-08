@@ -962,6 +962,7 @@ sub parse {
 ###########################################################################
 
 my %rpmstag = (
+  "SIGMD5"         => 261,
   "SIGTAG_SIZE"    => 1000,     # Header+Payload size in bytes. */
   "SIGTAG_PGP"     => 1002,     # RSA signature over Header+Payload
   "SIGTAG_MD5"     => 1004,     # MD5 hash over Header+Payload
@@ -973,9 +974,12 @@ my %rpmstag = (
   "SUMMARY"        => 1004,
   "DESCRIPTION"    => 1005,
   "BUILDTIME"      => 1006,
+  "VENDOR"         => 1011,
   "LICENSE"        => 1014,
   "ARCH"           => 1022,
   "OLDFILENAMES"   => 1027,
+  "FILEMODES"      => 1030,
+  "FILEDIGESTS"    => 1035,
   "SOURCERPM"      => 1044,
   "PROVIDENAME"    => 1047,
   "REQUIREFLAGS"   => 1048,
@@ -1006,7 +1010,8 @@ my %rpmstag = (
   "OLDENHANCESNAME" => 1159,
   "OLDENHANCESVERSION" => 1160,
   "OLDENHANCESFLAGS" => 1161,
-  "RECOMMENDNAME" => 5046,
+  "FILEDIGESTALGO" => 5011,
+  "RECOMMENDNAME"  => 5046,
   "RECOMMENDVERSION" => 5047,
   "RECOMMENDFLAGS" => 5048,
   "SUGGESTNAME"    => 5049,
