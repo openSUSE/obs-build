@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Wed Feb  8 11:54:16 UTC 2023 - Adrian Schröter <adrian@suse.de>
+
+- SPDX SBOM generation for container and product builds
+- Revert & Redo "Better filetype detection for temp changes files"
+- Fix typo in glibc hwcaps supplements
+- Implement lua string macros
+
+-------------------------------------------------------------------
 Mon Jan  2 08:09:43 UTC 2023 - Adrian Schröter <adrian@suse.de>
 
 - configure mkbaselibs to create glibc-hwcaps baselibs as well
