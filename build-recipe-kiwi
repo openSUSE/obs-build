@@ -697,8 +697,8 @@ postprocess_kiwi_containers() {
 	if test -s "${r%.tar}.containerinfo" ; then
 	    # create sbom if requested
 	    if test -n "$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags spdx)" ; then
-		echo "Generating SPDX sbom file for ${r##*/}"
-		generate_spdx_sbom "$r" > "${r%.tar}.sbom.json"
+		echo "Generating sbom file for ${r##*/}"
+		generate_sbom "$r" > "${r%.tar}.sbom.json"
 		test -s "${r%.tar}.sbom.json" || rm -f "${r%.tar}.sbom.json"
 	    fi
 	else
