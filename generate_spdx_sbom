@@ -26,7 +26,6 @@ BEGIN {
 
 use strict;
 
-use Data::Dumper;
 use File::Find;
 use File::Temp;
 
@@ -309,6 +308,28 @@ sub read_pkgs_from_product_directory {
   return \@rpms;
 }
 
+sub read_pkgs_from_rpmmd {
+  my ($primaryfile) = @_;
+
+  require Build::Rpmmd;
+  my $fh;
+  if ($primaryfile =~ /\.gz$/) {
+    open($fh, '-|', 'gunzip', '-dc', $primaryfile) || die("$primaryfile: $!\n");
+  } else {
+    open($fh, '<', $primaryfile) || die("$primaryfile: $!\n");
+  }
+  my @rpms;
+  for my $pkg (@{Build::Rpmmd::parse($fh, undef, 'withlicense' => 1, 'withchecksum' => 1, 'withvendor' => 1)}) {
+    my $r = {};
+    for (qw{name epoch version release arch vendor sourcerpm license checksum}) {
+      $r->{uc($_)} = $pkg->{$_} if defined $pkg->{$_};
+    }
+    push @rpms, $r;
+  }
+  close($fh);
+  return \@rpms;
+}
+
 sub read_dist {
   my ($dir) = @_;
   my %dist;
@@ -354,6 +375,7 @@ sub gen_purl_rpm {
 my $wrap_intoto;
 my $isproduct;
 my $distro;
+my $rpmmd;
 
 while (@ARGV && $ARGV[0] =~ /^-/) {
   my $opt = shift @ARGV;
@@ -363,6 +385,8 @@ while (@ARGV && $ARGV[0] =~ /^-/) {
     $wrap_intoto = 1;
   } elsif ($opt eq '--product') {
     $isproduct = 1;
+  } elsif ($opt eq '--rpmmd') {
+    $rpmmd = 1;
   } else {
     last if $opt eq '--';
     die("unknown option: $opt\n");
@@ -381,6 +405,19 @@ if ($isproduct) {
   # product case
   #$files = gen_filelist($toprocess);
   $pkgs = read_pkgs_from_product_directory($toprocess);
+} elsif ($rpmmd) {
+  require Build::Rpmmd;
+  my $primary;
+  if (-d $toprocess) {
+    my %d = map {$_->{'type'} => $_} @{Build::Rpmmd::parse_repomd("$toprocess/repomd.xml")};
+    my $primary = $d{'primary'};
+    die("no primary type in repomd.xml\n") unless $primary;
+    my $loc = $primary->{'location'};
+    $loc =~ s/.*\///;
+    $toprocess .= "/$loc";
+  }
+  die("$toprocess: $!\n") unless -e $toprocess;
+  $pkgs = read_pkgs_from_rpmmd($toprocess);
 } else {
   # container tar case
   my $unpackdir = unpack_container($tmpdir, $toprocess);
@@ -439,8 +476,20 @@ for my $p (@$pkgs) {
   my @xref;
   push @xref, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator', $purlurl } if $purlurl;
   $spdxpkg->{'externalRefs'} = \@xref if @xref;
-  $p->{'spdx_id'} = "SPDXRef-Package-$p->{'NAME'}-".unpack('H*', $p->{'SIGMD5'});
-  $p->{'spdx_id'} =~ s/[^a-zA-Z0-9\.\-]/-/g;
+  if (!$p->{'spdx_id'}) {
+    if ($p->{'SIGMD5'}) {
+      $p->{'spdx_id'} = "SPDXRef-Package-$p->{'NAME'}-".unpack('H*', $p->{'SIGMD5'});
+    } elsif ($p->{'CHECKSUM'}) {
+      my $id = $p->{'CHECKSUM'};
+      $id =~ s/.*://;
+      $id = substr($id, 0, 32);
+      $p->{'spdx_id'} = "SPDXRef-Package-$p->{'NAME'}-$id";
+    } else {
+      my $id = Digest::MD5::md5_hex(Build::SimpleJSON::unparse($p));
+      $p->{'spdx_id'} = "SPDXRef-Package-$p->{'NAME'}-$id";
+    }
+    $p->{'spdx_id'} =~ s/[^a-zA-Z0-9\.\-]/-/g;
+  }
   $spdxpkg->{'SPDXID'} = $p->{'spdx_id'};
   push @{$spdx->{'packages'}}, $spdxpkg;
 }
