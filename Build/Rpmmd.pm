@@ -117,6 +117,7 @@ my $primaryparser = {
       name => { _text => 1, _end => \&generic_store_text, _tag => 'name' },
       arch => { _text => 1, _end => \&generic_store_text, _tag => 'arch' },
       version => { _start => \&primary_handle_version },
+      url => { _text => 1, _end => \&generic_store_text, _tag => 'url' },
       checksum => { _start => \&generic_store_attr, _attr => 'type', _tag => 'checksum', _text => 1, _end => \&primary_handle_checksum },
       'time' => { _start => \&primary_handle_time },
       format => {
@@ -212,6 +213,7 @@ sub primary_add_result {
   delete $data->{'checksum'} unless $options->{'withchecksum'};
   delete $data->{'license'} unless $options->{'withlicense'};
   delete $data->{'vendor'} unless $options->{'withvendor'};
+  delete $data->{'url'} unless $options->{'withurl'};
   return generic_add_result(@_);
 }
 
