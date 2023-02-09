@@ -28,6 +28,7 @@ BUILD_SKIP_BUNDLE=
 RPM_BUILD_IN_PLACE=
 RPM_RECIPE_IN_SUBDIR=
 RPM_NOPREP=
+VCSURL=
 
 for i in spec dsc kiwi arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild appimage docker podman fissile helm flatpak mkosi; do
     . "$BUILD_DIR/build-recipe-$i"
@@ -83,6 +84,11 @@ recipe_parse_options() {
       -rpm-noprep)
 	RPM_NOPREP=1
         ;;
+      -vcs)
+	needarg
+	VCSURL="$ARG"
+	shift
+      ;;
       -*)
 	return 1
 	;;

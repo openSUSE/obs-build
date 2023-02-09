@@ -62,6 +62,10 @@ recipe_prepare_spec() {
 	args[${#args[@]}]="--obspackage"
 	args[${#args[@]}]="$OBS_PACKAGE"
     fi
+    if test -n "$VCSURL" ; then
+	args[${#args[@]}]="--vcs"
+	args[${#args[@]}]="$VCSURL"
+    fi
     if test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" ; then
 	args[${#args[@]}]="--changelog"
 	args[${#args[@]}]="$BUILD_ROOT/.build-changelog"

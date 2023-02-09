@@ -998,6 +998,7 @@ vm_first_stage() {
     echo "CHANGELOG='${CHANGELOG//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     echo "INCARNATION='${INCARNATION//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     echo "DISTURL='${DISTURL//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
+    echo "VCSURL='${VCSURL//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     echo "DO_INIT='${DO_INIT//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     echo "DO_INIT_TOPDIR='${DO_INIT_TOPDIR//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
     echo "KIWI_PARAMETERS='${KIWI_PARAMETERS//"'"/$Q}'" >> $BUILD_ROOT/.build/build.data
