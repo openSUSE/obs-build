@@ -37,7 +37,7 @@ sub expand {
   return @xspec && ref($xspec[0]) ? $xspec[0]->[1] : '';
 }
 
-my ($dist, $buildroot, $rpmdeps, $archs, $configdir, $release, $changelog, $buildflavor, $obspackage);
+my ($dist, $buildroot, $rpmdeps, $archs, $configdir, $release, $changelog, $buildflavor, $obspackage, $vcsurl);
 $buildflavor = '';	# default to empty
 
 $configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
@@ -63,6 +63,11 @@ while (@ARGV)  {
     $configdir = shift @ARGV;
     next;
   }
+  if ($ARGV[0] eq '--vcs') {
+    shift @ARGV;
+    $vcsurl = shift @ARGV;
+    next;
+  }
   if ($ARGV[0] eq '--release') {
     shift @ARGV;
     $release = shift @ARGV;
@@ -85,7 +90,7 @@ while (@ARGV)  {
   }
   last;
 }
-die("Usage: substitutedeps --dist <dist> --archpath <archpath> [--configdir <configdir>] <specin> <specout>\n") unless @ARGV == 2;
+die("Usage: substitutedeps --dist <dist> --archpath <archpath> [--configdir <configdir>] [--vcs <url>] <specin> <specout>\n") unless @ARGV == 2;
 my $spec = $ARGV[0];
 my $specdir = $spec;
 $specdir =~ s/[^\/]*$//;
@@ -142,9 +147,13 @@ for my $line (@$xspec) {
     next;
   }
 
+  next if $vcsurl && $line =~ /^VCS\s*:/i;
+
   if ($line =~ /^Name\s*:\s*(\S+)/i) {
     $pkg = $mainpkg = $1 unless $mainpkg;
+    $line .= "\nVCS: $vcsurl" if $vcsurl;
   }
+
   if ($line =~ /^\s*%package\s+(-n\s+)?(\S+)/) {
     if ($1) {
       $pkg = $2;
