@@ -976,6 +976,7 @@ my %rpmstag = (
   "BUILDTIME"      => 1006,
   "VENDOR"         => 1011,
   "LICENSE"        => 1014,
+  "URL"            => 1020,
   "ARCH"           => 1022,
   "OLDFILENAMES"   => 1027,
   "FILEMODES"      => 1030,

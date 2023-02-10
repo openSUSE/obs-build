@@ -41,7 +41,7 @@ my $spdx_json_template = {
     '_order' => [ qw{created creators licenseListVersion} ],
   },
   'packages' => {
-    '_order' => [ qw{name SPDXID versionInfo originator downloadLocation sourceInfo licenseConcluded licenseDeclared copyrightText externalRefs} ],
+    '_order' => [ qw{name SPDXID versionInfo originator downloadLocation sourceInfo homepage licenseConcluded licenseDeclared copyrightText externalRefs} ],
     'externalRefs' => {
       '_order' => [ qw{referenceCategory referenceType referenceLocator} ],
     },
@@ -269,9 +269,9 @@ sub gen_filelist {
 
 sub read_rpm {
   my ($rpm) = @_;
-  my %r = Build::Rpm::rpmq($rpm, qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL FILENAMES VENDOR FILEMODES FILEDIGESTS FILEDIGESTALGO SIGMD5});
+  my %r = Build::Rpm::rpmq($rpm, qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL FILENAMES URL VENDOR FILEMODES FILEDIGESTS FILEDIGESTALGO SIGMD5});
   delete $r{$_} for qw{BASENAMES DIRNAMES DIRINDEXES};	# save mem
-  for (qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL VENDOR FILEDIGESTALGO SIGMD5}) {
+  for (qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL URL VENDOR FILEDIGESTALGO SIGMD5}) {
     next unless $r{$_};
     die("bad rpm entry for $_\n") unless ref($r{$_}) eq 'ARRAY' && @{$r{$_}} == 1;
     $r{$_} = $r{$_}->[0];
@@ -319,9 +319,9 @@ sub read_pkgs_from_rpmmd {
     open($fh, '<', $primaryfile) || die("$primaryfile: $!\n");
   }
   my @rpms;
-  for my $pkg (@{Build::Rpmmd::parse($fh, undef, 'withlicense' => 1, 'withchecksum' => 1, 'withvendor' => 1)}) {
+  for my $pkg (@{Build::Rpmmd::parse($fh, undef, 'withlicense' => 1, 'withchecksum' => 1, 'withvendor' => 1, 'withurl' => 1)}) {
     my $r = {};
-    for (qw{name epoch version release arch vendor sourcerpm license checksum}) {
+    for (qw{name epoch version release arch url vendor sourcerpm license checksum}) {
       $r->{uc($_)} = $pkg->{$_} if defined $pkg->{$_};
     }
     push @rpms, $r;
@@ -393,7 +393,7 @@ while (@ARGV && $ARGV[0] =~ /^-/) {
   }
 }
 
-die("usage: generate_spdx_sbom [--disto NAME] [--intoto] [--product] PRODUCT_DIRECTORY|CONTAINER_TAR\n") unless @ARGV == 1;
+die("usage: generate_sbom [--disto NAME] [--intoto] [--product DIRECTORY]|[--rpmmd DIRECTORY]|CONTAINER_TAR\n") unless @ARGV == 1;
 my $toprocess = $ARGV[0];
 
 my $tmpdir = File::Temp::tempdir( CLEANUP => 1 );
@@ -409,6 +409,7 @@ if ($isproduct) {
   require Build::Rpmmd;
   my $primary;
   if (-d $toprocess) {
+    $toprocess = "$toprocess/repodata/" unless -f "$toprocess/repomd.xml";
     my %d = map {$_->{'type'} => $_} @{Build::Rpmmd::parse_repomd("$toprocess/repomd.xml")};
     my $primary = $d{'primary'};
     die("no primary type in repomd.xml\n") unless $primary;
@@ -472,6 +473,7 @@ for my $p (@$pkgs) {
     $spdxpkg->{'licenseDeclared'} = $license;
   }
   $spdxpkg->{'copyrightText'} = 'NOASSERTION';
+  $spdxpkg->{'homepage'} = $p->{'URL'} if $p->{'URL'};
   my $purlurl = gen_purl_rpm($p, $distro);
   my @xref;
   push @xref, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator', $purlurl } if $purlurl;
