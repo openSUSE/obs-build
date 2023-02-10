@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri Feb 10 14:35:55 UTC 2023 - Adrian Schröter <adrian@suse.de>
+
+- added support for generating VCS url information into rpms
+
+-------------------------------------------------------------------
 Wed Feb  8 11:54:16 UTC 2023 - Adrian Schröter <adrian@suse.de>
 
 - SPDX SBOM generation for container and product builds
