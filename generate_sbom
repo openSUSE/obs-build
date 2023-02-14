@@ -35,33 +35,8 @@ use Digest::MD5;
 use Build::Rpm;
 use Build::SimpleJSON;
 
-my $spdx_json_template = {
-  '_order' => [ qw{spdxVersion dataLicense SPDXID name documentNamespace creationInfo packages files relationships} ],
-  'creationInfo' => {
-    '_order' => [ qw{created creators licenseListVersion} ],
-  },
-  'packages' => {
-    '_order' => [ qw{name SPDXID versionInfo originator downloadLocation sourceInfo homepage licenseConcluded licenseDeclared copyrightText externalRefs} ],
-    'externalRefs' => {
-      '_order' => [ qw{referenceCategory referenceType referenceLocator} ],
-    },
-  },
-  'files' => {
-    '_order' => [ qw{fileName SPDXID checksums licenseConcluded copyrightText comment} ],
-  },
-  'relationships' => {
-    '_order' => [ qw{spdxElementId relatedSpdxElement relationshipType} ],
-  },
-};
-
-my $intoto_json_template = {
-  '_order' => [ qw{_type predicateType subject predicate} ],
-  'subject' => {
-    '_order' => [ qw{name digest} ],
-  },
-  'predicate' => $spdx_json_template,
-};
-
+my $tool_name = 'obs_build_generate_sbom';
+my $tool_version = '1.0';
 
 sub urlencode {
   my ($str, $iscgi) = @_;
@@ -372,10 +347,203 @@ sub gen_purl_rpm {
   return $purlurl;
 }
 
+sub gen_uuid {
+  my $uuid = pack('H*', '1e9d579964de4594a4e835719a1c259f');	# uuid ns
+  $uuid = substr(Digest::SHA::sha1($uuid . Build::SimpleJSON::unparse($_[0], 'keepspecial' => 1)), 0, 16);
+  substr($uuid, 6, 1, pack('C', unpack('@6C', $uuid) & 0x0f | 0x50));
+  substr($uuid, 8, 1, pack('C', unpack('@8C', $uuid) & 0x3f | 0x80));
+  return join('-', unpack("H8H4H4H4H12", $uuid));
+}
+
+sub gen_pkg_id {
+  my ($p) = @_;
+  if ($p->{'SIGMD5'}) {
+    return unpack('H*', $p->{'SIGMD5'});
+  } elsif ($p->{'CHECKSUM'}) {
+    my $id = $p->{'CHECKSUM'};
+    $id =~ s/.*://;
+    return substr($id, 0, 32);
+  }
+  return Digest::MD5::md5_hex(Build::SimpleJSON::unparse($p));
+}
+
+##################################################################################################
+#
+# CycloneDX support
+#
+
+my $cyclonedx_json_template_component = {
+  '_order' => [ qw{bom-ref type name version description cpe purl externalReferences properties } ],
+  'externalReferences' => { '_order' => [ qw{url comment type} ] },
+};
+
+my $cyclonedx_json_template = {
+  '_order' => [ qw{bomFormat specVersion serialNumber version metadata components services externalReferences dependencies compositions vulnerabilities signature} ],
+  'version' => 'number',
+  'metadata' => {
+    '_order' => [ qw{timestamp tools component} ],
+    'tools' => { '_order' => [ qw{vendor name version } ] }.
+    'component' => $cyclonedx_json_template_component,
+  },
+  'components' => $cyclonedx_json_template_component,
+  'dependencies' => { '_order' => [ qw{ref dependsOn} ] }
+};
+
+sub cyclonedx_encode_pkg {
+  my ($p, $distro) = @_;
+  my $vr = $p->{'VERSION'};
+  $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
+  my $cyc = {
+    'type' => 'library',
+    'name' => $p->{'NAME'},
+    'version' => $vr,
+  };
+  $cyc->{'publisher'} = $p->{'VENDOR'} if $p->{'VENDOR'};
+  my $license = $p->{'LICENSE'};
+  if ($license) {
+    $license =~ s/ and / AND /g;
+    if ($license =~ /\s+/) {
+      push @{$cyc->{'licenses'}}, { 'expression' => $license };
+    } else {
+      push @{$cyc->{'licenses'}}, { 'license' => {'id' => $p->{'LICENSE'} } };
+    }
+  }
+  my $purlurl = gen_purl_rpm($p, $distro);
+  $cyc->{'purl'} = $purlurl if $purlurl;
+  if (!$p->{'cyc_id'}) {
+    $p->{'cyc_id'} = "pkg:$p->{'NAME'}-" . gen_pkg_id($p);
+    $p->{'cyc_id'} =~ s/[^a-zA-Z0-9\.\-]/-/g;
+    $p->{'cyc_id'} =~ s/-/:/;
+  }
+  $cyc->{'bom-ref'} = $p->{'cyc_id'};
+  return $cyc;
+}
+
+sub cyclonedx_encode_dist {
+  my ($dist) = @_;
+  my $cyc = {
+    'type' => 'operating-system',
+    'name' => $dist->{'id'},
+  };
+  $cyc->{'version'} = $dist->{'version_id'} if defined($dist->{'version_id'}) && $dist->{'version_id'} ne '';
+  $cyc->{'description'} = $dist->{'pretty_name'} if $dist->{'pretty_name'};
+  push @{$cyc->{'externalReferences'}}, { 'url' => $dist->{'bug_report_url'}, 'type' => 'issue-tracker' } if $dist->{'bug_report_url'};
+  push @{$cyc->{'externalReferences'}}, { 'url' => $dist->{'home_url'}, 'type' => 'website' } if $dist->{'home_url'};
+  return $cyc;
+}
+
+sub cyclonedx_encode_header {
+  my ($subjectname) = @_;
+  my $cyc = {
+    'bomFormat' => 'CycloneDX',
+    'specVersion' => '1.4',
+    'version' => 1,
+    'metadata' => {
+      'timestamp' => rfc3339time(time()),
+      'tools' => [ {'name' => $tool_name, 'version' => $tool_version } ],
+    },
+  };
+  return $cyc;
+}
+
+##################################################################################################
+#
+# SPDX support
+#
+
+my $spdx_json_template = {
+  '_order' => [ qw{spdxVersion dataLicense SPDXID name documentNamespace creationInfo packages files relationships} ],
+  'creationInfo' => {
+    '_order' => [ qw{created creators licenseListVersion} ],
+  },
+  'packages' => {
+    '_order' => [ qw{name SPDXID versionInfo originator downloadLocation sourceInfo homepage licenseConcluded licenseDeclared copyrightText externalRefs} ],
+    'externalRefs' => {
+      '_order' => [ qw{referenceCategory referenceType referenceLocator} ],
+    },
+  },
+  'files' => {
+    '_order' => [ qw{fileName SPDXID checksums licenseConcluded copyrightText comment} ],
+  },
+  'relationships' => {
+    '_order' => [ qw{spdxElementId relatedSpdxElement relationshipType} ],
+  },
+};
+
+sub spdx_encode_pkg {
+  my ($p, $distro) = @_;
+  my $vr = $p->{'VERSION'};
+  $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
+  my $evr = $vr;
+  $evr = "$p->{'EPOCH'}:$evr" if $p->{'EPOCH'};
+  my $spdx = {
+    'name' => $p->{'NAME'},
+    'versionInfo' => $evr,
+  };
+  $spdx->{'originator'} = "Organization: $p->{'VENDOR'}" if $p->{'VENDOR'};
+  $spdx->{'downloadLocation'} = 'NOASSERTION';
+  $spdx->{'sourceInfo'} = 'acquired package info from RPM DB';
+  $spdx->{'licenseConcluded'} = 'NOASSERTION';
+  $spdx->{'licenseDeclared'} = 'NOASSERTION';
+  my $license = $p->{'LICENSE'};
+  if ($license) {
+    $license =~ s/ and / AND /g;
+    $spdx->{'licenseConcluded'} = $license;
+    $spdx->{'licenseDeclared'} = $license;
+  }
+  $spdx->{'copyrightText'} = 'NOASSERTION';
+  $spdx->{'homepage'} = $p->{'URL'} if $p->{'URL'};
+  my $purlurl = gen_purl_rpm($p, $distro);
+  push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator', $purlurl } if $purlurl;
+  if (!$p->{'spdx_id'}) {
+    $p->{'spdx_id'} = "SPDXRef-Package-$p->{'NAME'}-" . gen_pkg_id($p);
+    $p->{'spdx_id'} =~ s/[^a-zA-Z0-9\.\-]/-/g;
+  }
+  $spdx->{'SPDXID'} = $p->{'spdx_id'};
+  return $spdx;
+}
+
+sub spdx_encode_file {
+  my ($f) = @_;
+  my $spdx = {
+    'fileName' => $f->{'name'},
+    'licenseConcluded' => 'NOASSERTION',
+    'copyrightText' => '',
+  };
+  my @chks;
+  push @chks, { 'algorithm' => 'SHA256', 'checksumValue' => $f->{'sha256sum'} } if $f->{'sha256sum'};
+  $spdx->{'checksums'} = \@chks if @chks;
+  $f->{'spdx_id'} = "SPDXRef-".Digest::MD5::md5_hex($f->{'name'}.($f->{'sha256sum'} || ''));
+  $spdx->{'SPDXID'} = $f->{'spdx_id'};
+  return $spdx;
+}
+
+sub spdx_encode_header {
+  my ($subjectname) = @_;
+  my $spdx = {
+    'spdxVersion' => 'SPDX-2.3',
+    'dataLicense' => 'CC0-1.0',
+    'SPDXID' => 'SPDXRef-DOCUMENT',
+    'name' => $subjectname,
+  };
+  my $creationinfo = {
+    'created' => rfc3339time(time()),
+    'creators' => [ "Tool: $tool_name-$tool_version" ],
+    'licenseListVersion' => '3.19',
+  };
+  $spdx->{'creationInfo'} = $creationinfo;
+  return $spdx;
+}
+
+##################################################################################################
+
+
 my $wrap_intoto;
 my $isproduct;
+my $isdir;
 my $distro;
 my $rpmmd;
+my $format;
 
 while (@ARGV && $ARGV[0] =~ /^-/) {
   my $opt = shift @ARGV;
@@ -385,13 +553,19 @@ while (@ARGV && $ARGV[0] =~ /^-/) {
     $wrap_intoto = 1;
   } elsif ($opt eq '--product') {
     $isproduct = 1;
+  } elsif ($opt eq '--dir') {
+    $isdir = 1;
   } elsif ($opt eq '--rpmmd') {
     $rpmmd = 1;
+  } elsif ($opt eq '--format') {
+    $format = shift @ARGV;
   } else {
     last if $opt eq '--';
     die("unknown option: $opt\n");
   }
 }
+$format ||= 'spdx';
+die("unknown format $format\n") unless $format eq 'spdx' || $format eq 'cyclonedx';
 
 die("usage: generate_sbom [--disto NAME] [--intoto] [--product DIRECTORY]|[--rpmmd DIRECTORY]|CONTAINER_TAR\n") unless @ARGV == 1;
 my $toprocess = $ARGV[0];
@@ -409,7 +583,7 @@ if ($isproduct) {
   require Build::Rpmmd;
   my $primary;
   if (-d $toprocess) {
-    $toprocess = "$toprocess/repodata/" unless -f "$toprocess/repomd.xml";
+    $toprocess = "$toprocess/repodata" unless -f "$toprocess/repomd.xml";
     my %d = map {$_->{'type'} => $_} @{Build::Rpmmd::parse_repomd("$toprocess/repomd.xml")};
     my $primary = $d{'primary'};
     die("no primary type in repomd.xml\n") unless $primary;
@@ -419,12 +593,16 @@ if ($isproduct) {
   }
   die("$toprocess: $!\n") unless -e $toprocess;
   $pkgs = read_pkgs_from_rpmmd($toprocess);
+} elsif ($isdir) {
+  dump_rpmdb($toprocess, "$tmpdir/rpmdb");
+  $files = gen_filelist($toprocess) if $format eq 'spdx';
+  $pkgs = read_pkgs_rpmdb("$tmpdir/rpmdb");
+  $dist = read_dist($toprocess);
 } else {
   # container tar case
   my $unpackdir = unpack_container($tmpdir, $toprocess);
   dump_rpmdb($unpackdir, "$tmpdir/rpmdb");
-
-  $files = gen_filelist($unpackdir);
+  $files = gen_filelist($unpackdir) if $format eq 'spdx';
   $pkgs = read_pkgs_rpmdb("$tmpdir/rpmdb");
   $dist = read_dist($unpackdir);
 }
@@ -438,126 +616,77 @@ if (!$distro && $dist) {
   $distro .= "-$dist->{'build_id'}" if defined($dist->{'build_id'}) && $dist->{'build_id'} ne '';
 }
 
-my $spdx = {
-  'spdxVersion' => 'SPDX-2.3',
-  'dataLicense' => 'CC0-1.0',
-  'SPDXID' => 'SPDXRef-DOCUMENT',
-  'name' => $subjectname,
-};
+my $json_template;
+my $intoto_type;
+my $doc;
 
-my $creationinfo = {
-  'created' => rfc3339time(time()),
-  'creators' => [ 'Tool: obs_build_generate_spdx_sbom-1.0' ],
-  'licenseListVersion' => '3.19',
-};
-$spdx->{'creationInfo'} = $creationinfo;
-
-for my $p (@$pkgs) {
-  my $vr = $p->{'VERSION'};
-  $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
-  my $evr = $vr;
-  $evr = "$p->{'EPOCH'}:$evr" if $p->{'EPOCH'};
-  my $spdxpkg = {
-    'name' => $p->{'NAME'},
-    'versionInfo' => $evr,
-  };
-  $spdxpkg->{'originator'} = "Organization: $p->{'VENDOR'}" if $p->{'VENDOR'};
-  $spdxpkg->{'downloadLocation'} = 'NOASSERTION';
-  $spdxpkg->{'sourceInfo'} = 'acquired package info from RPM DB';
-  $spdxpkg->{'licenseConcluded'} = 'NOASSERTION';
-  $spdxpkg->{'licenseDeclared'} = 'NOASSERTION';
-  my $license = $p->{'LICENSE'};
-  if ($license) {
-    $license =~ s/ and / AND /g;
-    $spdxpkg->{'licenseConcluded'} = $license;
-    $spdxpkg->{'licenseDeclared'} = $license;
-  }
-  $spdxpkg->{'copyrightText'} = 'NOASSERTION';
-  $spdxpkg->{'homepage'} = $p->{'URL'} if $p->{'URL'};
-  my $purlurl = gen_purl_rpm($p, $distro);
-  my @xref;
-  push @xref, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator', $purlurl } if $purlurl;
-  $spdxpkg->{'externalRefs'} = \@xref if @xref;
-  if (!$p->{'spdx_id'}) {
-    if ($p->{'SIGMD5'}) {
-      $p->{'spdx_id'} = "SPDXRef-Package-$p->{'NAME'}-".unpack('H*', $p->{'SIGMD5'});
-    } elsif ($p->{'CHECKSUM'}) {
-      my $id = $p->{'CHECKSUM'};
-      $id =~ s/.*://;
-      $id = substr($id, 0, 32);
-      $p->{'spdx_id'} = "SPDXRef-Package-$p->{'NAME'}-$id";
-    } else {
-      my $id = Digest::MD5::md5_hex(Build::SimpleJSON::unparse($p));
-      $p->{'spdx_id'} = "SPDXRef-Package-$p->{'NAME'}-$id";
-    }
-    $p->{'spdx_id'} =~ s/[^a-zA-Z0-9\.\-]/-/g;
-  }
-  $spdxpkg->{'SPDXID'} = $p->{'spdx_id'};
-  push @{$spdx->{'packages'}}, $spdxpkg;
-}
-
-for my $f (@$files) {
-  next if $f->{'SKIP'};
-  my $spdxfile = {
-    'fileName' => $f->{'name'},
-    'licenseConcluded' => 'NOASSERTION',
-    'copyrightText' => '',
-  };
-  my @chks;
-  push @chks, { 'algorithm' => 'SHA256', 'checksumValue' => $f->{'sha256sum'} } if $f->{'sha256sum'};
-  $spdxfile->{'checksums'} = \@chks if @chks;
-  $f->{'spdx_id'} = "SPDXRef-".Digest::MD5::md5_hex($f->{'name'}.($f->{'sha256sum'} || ''));
-  $spdxfile->{'SPDXID'} = $f->{'spdx_id'};
-  push @{$spdx->{'files'}}, $spdxfile;
-}
-
-if (@$files) {
-  my %f2p;
+if ($format eq 'spdx') {
+  $json_template = $spdx_json_template;
+  $intoto_type = 'https://spdx.dev/Document';
+  $doc = spdx_encode_header($subjectname);
   for my $p (@$pkgs) {
-    push @{$f2p{$_}}, $p for @{$p->{'FILENAMES'} || []};
+    push @{$doc->{'packages'}}, spdx_encode_pkg($p, $distro);
   }
   for my $f (@$files) {
     next if $f->{'SKIP'};
-    #warn("unpackaged file: $f->{'name'}\n") unless @{$f2p{$f->{'name'}} || []};
-    for my $p (@{$f2p{$f->{'name'}} || []}) {
-      next unless $f->{'spdx_id'} && $p->{'spdx_id'};
-      my $rel = {
-        'spdxElementId' => $p->{'spdx_id'},
-        'relatedSpdxElement' => $f->{'spdx_id'},
-	'relationshipType', 'CONTAINS',
-      };
-      push @{$spdx->{'relationships'}}, $rel;
+    push @{$doc->{'files'}}, spdx_encode_file($f);
+  }
+
+  if (@$files) {
+    my %f2p;
+    for my $p (@$pkgs) {
+      push @{$f2p{$_}}, $p for @{$p->{'FILENAMES'} || []};
+    }
+    for my $f (@$files) {
+      next if $f->{'SKIP'};
+      #warn("unpackaged file: $f->{'name'}\n") unless @{$f2p{$f->{'name'}} || []};
+      for my $p (@{$f2p{$f->{'name'}} || []}) {
+	next unless $f->{'spdx_id'} && $p->{'spdx_id'};
+	my $rel = {
+	  'spdxElementId' => $p->{'spdx_id'},
+	  'relatedSpdxElement' => $f->{'spdx_id'},
+	  'relationshipType', 'CONTAINS',
+	};
+	push @{$doc->{'relationships'}}, $rel;
+      }
     }
   }
+  push @{$doc->{'relationships'}}, {
+    'spdxElementId' => 'SPDXRef-DOCUMENT',
+    'relatedSpdxElement' => 'SPDXRef-DOCUMENT',
+    'relationshipType', 'DESCRIBES',
+  };
+  $doc->{'documentNamespace'} = 'http://open-build-service.org/spdx/'.urlencode($subjectname).'-'.gen_uuid($doc);
+} elsif ($format eq 'cyclonedx') {
+  $json_template = $cyclonedx_json_template;
+  $intoto_type = 'https://cyclonedx.org/bom';
+  $doc = cyclonedx_encode_header($subjectname);
+  for my $p (@$pkgs) {
+    push @{$doc->{'components'}}, cyclonedx_encode_pkg($p, $distro);
+  }
+  if ($dist && %$dist) {
+    push @{$doc->{'components'}}, cyclonedx_encode_dist($dist);
+  }
+  $doc->{'serialNumber'} = 'urn:uuid:'.gen_uuid($doc);
 }
 
-push @{$spdx->{'relationships'}}, {
-  'spdxElementId' => 'SPDXRef-DOCUMENT',
-  'relatedSpdxElement' => 'SPDXRef-DOCUMENT',
-  'relationshipType', 'DESCRIBES',
-};
-
-my $uuid = pack('H*', '1e9d579964de4594a4e835719a1c259f');	# uuid ns
-$uuid = substr(Digest::SHA::sha1($uuid . Build::SimpleJSON::unparse($spdx, 'template' => $spdx_json_template, 'keepspecial' => 1)), 0, 16);
-substr($uuid, 6, 1, pack('C', unpack('@6C', $uuid) & 0x0f | 0x50));
-substr($uuid, 8, 1, pack('C', unpack('@8C', $uuid) & 0x3f | 0x80));
-$uuid = join('-', unpack("H8H4H4H4H12", $uuid));
-
-$spdx->{'documentNamespace'} = 'http://open-build-service.org/spdx/'.urlencode($subjectname).'-'.$uuid;
-
 if ($wrap_intoto) {
+  my $intoto_json_template = {
+    '_order' => [ qw{_type predicateType subject predicate} ],
+    'subject' => { '_order' => [ qw{name digest} ] },
+    'predicate' => $json_template,
+  };
   my $subject = { 'name' => $subjectname };
   # no digest for products as it might be a directory. And an iso file would change the checksum later while signing.
-  $subject->{'digest'} = { 'sha256' => sha256file($toprocess) } unless $isproduct;
+  $subject->{'digest'} = { 'sha256' => sha256file($toprocess) } unless $isproduct || $isdir;
   my $intoto = {
     '_type' => 'https://in-toto.io/Statement/v0.1',
     'subject' => [ $subject ],
-    'predicateType' => 'https://spdx.dev/Document',
-    'predicate' => $spdx,
+    'predicateType' => $intoto_type,
+    'predicate' => $doc,
   };
   print Build::SimpleJSON::unparse($intoto, 'template' => $intoto_json_template, 'keepspecial' => 1)."\n";
 } else {
-  print Build::SimpleJSON::unparse($spdx, 'template' => $spdx_json_template, 'keepspecial' => 1)."\n";
+  print Build::SimpleJSON::unparse($doc, 'template' => $json_template, 'keepspecial' => 1)."\n";
 }
-
 
