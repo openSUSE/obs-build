@@ -290,8 +290,8 @@ recipe_build_docker() {
     # create sbom if requested
     for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom) ; do
 	echo "Generating $format sbom file"
-	generate_sbom --format "$format" "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.$format.json"
- 	test -s "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.$format.json" || rm -f "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.$format.json"
+	generate_sbom --format "$format" "$TOPDIR/DOCKER/$FILENAME.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.${format/cyclonedx/cdx}.json"
+ 	test -s "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.${format/cyclonedx/cdx}.json" || rm -f "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.${format/cyclonedx/cdx}.json"
     done
  
     # We're done. Clean up.
