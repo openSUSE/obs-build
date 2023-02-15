@@ -288,11 +288,11 @@ recipe_build_docker() {
     rm -rf "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD"
 
     # create sbom if requested
-    if test -n "$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags spdx)" ; then
-	echo "Generating sbom file"
-	generate_sbom "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.sbom.json"
- 	test -s "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.sbom.json" || rm -f "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.sbom.json"
-    fi
+    for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom) ; do
+	echo "Generating $format sbom file"
+	generate_sbom --format "$format" "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.$format.json"
+ 	test -s "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.$format.json" || rm -f "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.$format.json"
+    done
  
     # We're done. Clean up.
     recipe_cleanup_docker

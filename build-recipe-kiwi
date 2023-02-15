@@ -696,11 +696,11 @@ postprocess_kiwi_containers() {
 	test -e "$r" && perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::showcontainerinfo -- "${args[@]}" $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE "$r" > "${r%.tar}.containerinfo"
 	if test -s "${r%.tar}.containerinfo" ; then
 	    # create sbom if requested
-	    if test -n "$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags spdx)" ; then
-		echo "Generating sbom file for ${r##*/}"
-		generate_sbom "$r" > "${r%.tar}.sbom.json"
-		test -s "${r%.tar}.sbom.json" || rm -f "${r%.tar}.sbom.json"
-	    fi
+	    for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom) ; do
+		echo "Generating $format sbom file for ${r##*/}"
+		generate_sbom --format "$format" "$r" > "${r%.tar}.$format.json"
+		test -s "${r%.tar}.$format.json" || rm -f "${r%.tar}.$format.json"
+	    done
 	else
 	    rm -f "${r%.tar}.containerinfo"
 	fi

@@ -155,7 +155,9 @@ sub unpack_container {
   uncompress_container($container, "$dir/cont");
   systemq('skopeo', 'copy', "docker-archive:$dir/cont", "oci:$dir/image:latest");
   unlink("$dir/cont");
-  systemq('umoci', 'unpack', '--image', "$dir/image:latest", "$dir/unpack");
+  my @rootless;
+  push @rootless, '--rootless' if $>;
+  systemq('umoci', 'unpack', @rootless, '--image', "$dir/image:latest", "$dir/unpack");
   return "$dir/unpack/rootfs";
 }
 
@@ -668,25 +670,26 @@ if ($format eq 'spdx') {
     push @{$doc->{'components'}}, cyclonedx_encode_dist($dist);
   }
   $doc->{'serialNumber'} = 'urn:uuid:'.gen_uuid($doc);
+} else {
+  die("internal error\n");
 }
 
 if ($wrap_intoto) {
-  my $intoto_json_template = {
-    '_order' => [ qw{_type predicateType subject predicate} ],
-    'subject' => { '_order' => [ qw{name digest} ] },
-    'predicate' => $json_template,
-  };
   my $subject = { 'name' => $subjectname };
   # no digest for products as it might be a directory. And an iso file would change the checksum later while signing.
   $subject->{'digest'} = { 'sha256' => sha256file($toprocess) } unless $isproduct || $isdir;
-  my $intoto = {
+  $doc = {
     '_type' => 'https://in-toto.io/Statement/v0.1',
     'subject' => [ $subject ],
     'predicateType' => $intoto_type,
     'predicate' => $doc,
   };
-  print Build::SimpleJSON::unparse($intoto, 'template' => $intoto_json_template, 'keepspecial' => 1)."\n";
-} else {
-  print Build::SimpleJSON::unparse($doc, 'template' => $json_template, 'keepspecial' => 1)."\n";
+  $json_template = {
+    '_order' => [ qw{_type predicateType subject predicate} ],
+    'subject' => { '_order' => [ qw{name digest} ] },
+    'predicate' => $json_template,
+  };
 }
+
+print Build::SimpleJSON::unparse($doc, 'template' => $json_template, 'keepspecial' => 1)."\n";
 
