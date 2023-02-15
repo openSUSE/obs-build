@@ -897,6 +897,7 @@ recipe_build_kiwi() {
     # Hook for creating SBOM data
     for imgtype in $imagetype ; do
 	test "$imgtype" = docker && continue	# done in postprocess_kiwi_containers
+	test "$imgtype" = product && continue	# done in plugin
 	for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom) ; do
 	    echo "Generating $format sbom file for KIWIROOT-$imgtype"
 	    if ! generate_sbom --format "$format" --dir "$BUILD_ROOT/$TOPDIR/KIWIROOT-$imgtype" > "$BUILD_ROOT/$TOPDIR/OTHER/kiwi-$imgtype.${format/cyclonedx/cdx}.json" ; then
