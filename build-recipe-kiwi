@@ -894,6 +894,13 @@ recipe_build_kiwi() {
 	build_kiwi_appliance
     fi
 
+    # Hook for creating SBOM data
+    for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom) ; do
+        if ! chroot $BUILD_ROOT su -c "/.build/generate_sbom --format $format --dir $BUILD_ROOT/$TOPDIR/KIWIROOT-$imgtype > $BUILD_ROOT/$TOPDIR/OTHER/kiwi-$imgtype.${format}.json" ; then
+	    cleanup_and_exit 1 "/usr/lib/build/generate_sbom script failed!"
+        fi
+    done
+
     # Hook for running post kiwi build scripts like QA scripts if installed
     if test -x $BUILD_ROOT/usr/lib/build/kiwi_post_run ; then
         if ! chroot $BUILD_ROOT su -c /usr/lib/build/kiwi_post_run ; then

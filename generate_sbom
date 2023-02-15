@@ -569,7 +569,7 @@ while (@ARGV && $ARGV[0] =~ /^-/) {
 $format ||= 'spdx';
 die("unknown format $format\n") unless $format eq 'spdx' || $format eq 'cyclonedx';
 
-die("usage: generate_sbom [--disto NAME] [--intoto] [--product DIRECTORY]|[--rpmmd DIRECTORY]|CONTAINER_TAR\n") unless @ARGV == 1;
+die("usage: generate_sbom [--disto NAME] [--format spdx|cyclonedx] [--intoto] [--product DIRECTORY]|[--rpmmd DIRECTORY]|CONTAINER_TAR\n") unless @ARGV == 1;
 my $toprocess = $ARGV[0];
 
 my $tmpdir = File::Temp::tempdir( CLEANUP => 1 );
