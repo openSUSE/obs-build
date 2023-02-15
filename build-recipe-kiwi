@@ -356,8 +356,7 @@ perform_product_bundle() {
                    fi
                    mv "$i" $BUILD_ROOT/$TOPDIR/KIWI/.
                    test -n "$milestone" && echo "$milestone" > $BUILD_ROOT/$TOPDIR/OTHER/${i%.iso}.milestone ;;
-	    *.packages) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
-	    *.sbom.json) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
+	    *.packages|*.spdx.json|*.cdx.json) mv $i $BUILD_ROOT/$TOPDIR/OTHER/. ;;
 	    *.report)
 		mv $i $BUILD_ROOT/$TOPDIR/OTHER/.
 		test -n "$milestone" && echo "$milestone" > $BUILD_ROOT/$TOPDIR/OTHER/${i%.report}.milestone
