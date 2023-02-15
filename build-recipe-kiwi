@@ -511,8 +511,23 @@ perform_image_bundle() {
         bundle_call="$bundle_call --bundle-dir /$TOPDIR/KIWI.bundle/"
 	bundle_call="$bundle_call $KIWI_BUNDLE_PARAMETERS"
     fi
+
     echo "$bundle_call"
     if chroot $BUILD_ROOT su -c "$bundle_call" - root < /dev/null; then
+        # Hook for creating SBOM data
+        if test "$imgtype" != docker; then	# done in postprocess_kiwi_containers
+            for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom) ; do
+                echo "Generating $format sbom file for KIWIROOT-$imgtype"
+                if ! generate_sbom --format "$format" --dir "$BUILD_ROOT/$TOPDIR/KIWIROOT-$imgtype" > "$BUILD_ROOT/$TOPDIR/OTHER/kiwi-sbom.json" ; then
+                    cleanup_and_exit 1 "generate_sbom script failed!"
+                fi
+                for packages in "$BUILD_ROOT/$TOPDIR/KIWI.bundle/"*.packages; do
+                    cp "$BUILD_ROOT/$TOPDIR/OTHER/kiwi-sbom.json" "${packages%.packages}.${format/cyclonedx/cdx}.json"
+                done
+                rm "$BUILD_ROOT/$TOPDIR/OTHER/kiwi-sbom.json"
+            done
+        fi
+
         mv "$BUILD_ROOT/$TOPDIR/KIWI.bundle/"* "$BUILD_ROOT/$TOPDIR/KIWI/" || cleanup_and_exit 1
         rmdir "$BUILD_ROOT/$TOPDIR/KIWI.bundle"
         return 0	# success
@@ -893,18 +908,6 @@ recipe_build_kiwi() {
     else
 	build_kiwi_appliance
     fi
-
-    # Hook for creating SBOM data
-    for imgtype in $imagetype ; do
-	test "$imgtype" = docker && continue	# done in postprocess_kiwi_containers
-	test "$imgtype" = product && continue	# done in plugin
-	for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom) ; do
-	    echo "Generating $format sbom file for KIWIROOT-$imgtype"
-	    if ! generate_sbom --format "$format" --dir "$BUILD_ROOT/$TOPDIR/KIWIROOT-$imgtype" > "$BUILD_ROOT/$TOPDIR/OTHER/kiwi-$imgtype.${format/cyclonedx/cdx}.json" ; then
-		cleanup_and_exit 1 "generate_sbom script failed!"
-	    fi
-	done
-    done
 
     # Hook for running post kiwi build scripts like QA scripts if installed
     if test -x $BUILD_ROOT/usr/lib/build/kiwi_post_run ; then
