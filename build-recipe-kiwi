@@ -515,7 +515,7 @@ perform_image_bundle() {
     if chroot $BUILD_ROOT su -c "$bundle_call" - root < /dev/null; then
         # Hook for creating SBOM data
         if test "$imgtype" != docker; then	# done in postprocess_kiwi_containers
-            for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom) ; do
+            for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom | sort -u) ; do
                 echo "Generating $format sbom file for KIWIROOT-$imgtype"
                 if ! generate_sbom --format "$format" --dir "$BUILD_ROOT/$TOPDIR/KIWIROOT-$imgtype" > "$BUILD_ROOT/$TOPDIR/OTHER/kiwi-sbom.json" ; then
                     cleanup_and_exit 1 "generate_sbom script failed!"
@@ -710,7 +710,7 @@ postprocess_kiwi_containers() {
 	test -e "$r" && perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::showcontainerinfo -- "${args[@]}" $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE "$r" > "${r%.tar}.containerinfo"
 	if test -s "${r%.tar}.containerinfo" ; then
 	    # create sbom if requested
-	    for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom) ; do
+	    for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom | sort -u) ; do
 		echo "Generating $format sbom file for ${r##*/}"
 		generate_sbom --format "$format" "$r" > "${r%.tar}.${format/cyclonedx/cdx}.json"
 		test -s "${r%.tar}.${format/cyclonedx/cdx}.json" || rm -f "${r%.tar}.${format/cyclonedx/cdx}.json"
