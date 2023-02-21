@@ -132,7 +132,14 @@ pkg_install_rpm() {
 }
 
 pkg_sysrootinstall_rpm() {
+    local TEMP_BUILD_SYSROOT="${BUILD_SYSROOT}.hostsystem.temp"
     if test "x$1" = "x--prepare" ; then
+        if test -d "$BUILD_ROOT$BUILD_SYSROOT" -a ! -d "$BUILD_ROOT$TEMP_BUILD_SYSROOT"; then
+            # The host system may already provide files for the sysroot target
+            # rpm is not able to handle directory to symlink conversation, so
+            # we need to move it away first and copy it back later.
+            mv "$BUILD_ROOT$BUILD_SYSROOT" "$BUILD_ROOT$TEMP_BUILD_SYSROOT"
+        fi
 	assert_dir_path "$BUILD_SYSROOT"
 	chroot $BUILD_ROOT mkdir -p "$BUILD_SYSROOT"
 	chroot $BUILD_ROOT rpm  --root "$BUILD_SYSROOT" --initdb
@@ -141,6 +148,18 @@ pkg_sysrootinstall_rpm() {
 	return
     fi
     if test "x$1" = "x--finalize" ; then
+        if test -d "$BUILD_ROOT$TEMP_BUILD_SYSROOT"; then
+            # copy back the files provided by the host system
+            # a simple "cp -a" is not working as some directories
+            # may be symlinks now
+            pushd "$BUILD_ROOT$TEMP_BUILD_SYSROOT"
+            find . -type f | while read fn; do
+                mkdir -p "$BUILD_ROOT$BUILD_SYSROOT/${fn%/*}"
+                cp -an "$fn" "$BUILD_ROOT$BUILD_SYSROOT/$fn"
+            done
+            popd
+            rm -rf "$BUILD_ROOT$TEMP_BUILD_SYSROOT"
+        fi
 	return
     fi
     export ADDITIONAL_PARAMS=
