@@ -189,6 +189,11 @@ vm_startup_qemu() {
     if test -n "$VM_CUSTOMOPT"; then
         qemu_options="$qemu_options $VM_CUSTOMOPT"
     fi
+    if ! test -e "$vm_kernel"; then
+        echo "ERROR: No kernel image for the target architecture available!"
+        echo "       You may want to use vmtype=kvm instead if you do not want to emulate a foreign architecture."
+        cleanup_and_exit 1
+    fi
     set -- $qemu_bin -nodefaults -no-reboot -nographic -vga none $qemu_cpu $qemu_options \
         -kernel $vm_kernel \
         -initrd $vm_initrd \
