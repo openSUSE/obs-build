@@ -229,6 +229,11 @@ recipe_build_docker() {
 	esac
     done < <( queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ dockerarg )
 
+    if test -n "$BUILD_FLAVOR" ; then
+	buildargs[${#buildargs[@]}]='--build-arg'
+	buildargs[${#buildargs[@]}]="BUILD_FLAVOR=$BUILD_FLAVOR"
+    fi
+
     # patch in obs-docker-support helper
     patchdockerfile < "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" > "$BUILD_ROOT/$TOPDIR/SOURCES/.$RECIPEFILE" && \
        mv "$BUILD_ROOT/$TOPDIR/SOURCES/.$RECIPEFILE" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
