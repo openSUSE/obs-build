@@ -39,7 +39,7 @@ print join('', @{shift @sections});
 
 for my $s (@sections) {
   # cannot use docker support for scratch images
-  if (@$s && $s->[0] =~ /^\s*[fF][rR][oO][mM]\s+scratch[\s\n]/) {
+  if (@$s && $s->[0] =~ /^\s*[fF][rR][oO][mM]\s+(--.*\s+)?scratch[\s\n]/) {
     print join('', @$s);
     next;
   }
