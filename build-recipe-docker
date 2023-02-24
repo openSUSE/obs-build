@@ -266,10 +266,14 @@ recipe_build_docker() {
 	return
     fi
 
+    # Check for OS setting
+    GOOS=`$DOCKER_CMD image inspect "$FIRSTTAG" --format '{{ .Os }}'`
+
     # Save the resulting image to a tarball. Use first tag for generating the file name.
     mkdir -p $BUILD_ROOT$TOPDIR/DOCKER
     FILENAME="$FIRSTTAG"
     FILENAME="${FILENAME//[\/:]/-}"
+    test -n "$GOOS" -a "$GOOS" != "linux" && FILENAME="${FILENAME}_$GOOS"
     FILENAME="$FILENAME.${BUILD_ARCH%%:*}"
     test -n "$RELEASE" && FILENAME="$FILENAME-$RELEASE"
     echo "Saving image $FIRSTTAG to $FILENAME.tar"
