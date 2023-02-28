@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Tue Feb 28 11:00:54 UTC 2023 - Adrian Schröter <adrian@suse.de>
+
+- Dockerfile support:
+  * export multibuild flavor as argument
+  * allow parameters in FROM .. scratch lines
+  * include OS name in build result if != linux
+- Workaround directory->symlink usrmerge problems for cross arch sysroot
+- multiple fixes for SBOM support
+
+-------------------------------------------------------------------
 Wed Feb 15 14:23:09 UTC 2023 - Adrian Schröter <adrian@suse.de>
 
 - KIWI VM image SBOM support added
