@@ -179,6 +179,9 @@ recipe_build_spec() {
 
     # XXX: move _srcdefattr to macro file?
     rpmbopts=("--define" "_srcdefattr (-,root,root)")
+    if test -n "$BUILD_TOOL_OPT" ; then
+	    rpmbopts[${#rpmbopts[@]}]="$BUILD_TOOL_OPT"
+    fi
     if test "$DO_CHECKS" != true ; then
 	if chroot "$BUILD_ROOT" "$rpmbuild" --nocheck --help >/dev/null 2>&1; then
 	    rpmbopts[${#rpmbopts[@]}]="--nocheck"

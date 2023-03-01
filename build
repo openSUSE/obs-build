@@ -437,7 +437,10 @@ Known Parameters:
   --norootforbuild
               Force building with user 'abuild', ignore the "needsrootforbuild"
               hint from the recipe file
-              
+
+  --buildtool-opt=OPTIONS
+              Pass OPTIONS to the used build tool (currently supported: rpmbuild)
+
 
 Remember to have fun!
 
