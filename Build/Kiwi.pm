@@ -119,6 +119,7 @@ sub kiwiparse_product {
 
   $ret->{'sourcemedium'} = -1;
   $ret->{'debugmedium'} = -1;
+  my $use_newest_package;
   if ($instsource->{'productoptions'}) {
     my $productoptions = $instsource->{'productoptions'}->[0] || {};
     for my $po (@{$productoptions->{'productvar'} || []}) {
@@ -129,6 +130,7 @@ sub kiwiparse_product {
       $ret->{'sourcemedium'} = $po->{'_content'} if $po->{'name'} eq 'SOURCEMEDIUM';
       $ret->{'debugmedium'} = $po->{'_content'} if $po->{'name'} eq 'DEBUGMEDIUM';
       $ret->{'milestone'} = $po->{'_content'} if $po->{'name'} eq 'BETA_VERSION';
+      $use_newest_package = $po->{'_content'} if $po->{'name'} eq 'USE_NEWEST_PACKAGE';
     }
   }
   if ($instsource->{'architectures'}) {
@@ -196,6 +198,7 @@ sub kiwiparse_product {
     $_ = {'project' => $s[0], 'repository' => $s[1]};
     $_->{'priority'} = $repoprio{"$s[0]/$s[1]"} if $repoextras && defined $repoprio{"$s[0]/$s[1]"};
   }
+  push @{$ret->{'deps'}}, '--use-newest-package' if @packages && $use_newest_package;
   return $ret;
 }
 
