@@ -1794,7 +1794,7 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	rm -f $BUILD_ROOT/.unpack.command
     done
 
-    # macros may be used by buildtime servies
+    # macros may be used by buildtime services or non-rpm build types
     recipe_setup_macros
 
     if  test -e _service; then
@@ -1857,6 +1857,7 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
     test "$BUILD_SUCCEEDED" = true || cleanup_and_exit 1
     BUILD_SUCCEEDED=
 
+    recipe_run_post_hook
     recipe_build_time_statistics
     recipe_gendiff
     recipe_cleanup

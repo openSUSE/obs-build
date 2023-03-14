@@ -46,6 +46,18 @@ recipe_build() {
     recipe_build_$BUILDTYPE "$@"
 }
 
+recipe_run_post_hook() {
+    # Hook for running any post build modification scripts provided via a package
+    if test -d $BUILD_ROOT/usr/lib/build/post_build.d ; then
+        for hook in $BUILD_ROOT/usr/lib/build/post_build.d/*; do
+          test -x "$hook" || continue
+          if ! chroot $BUILD_ROOT su -c "/usr/lib/build/post_build.d/${hook##*/}" ; then
+              cleanup_and_exit 1 "/usr/lib/build/post_build.d/${hook##*/} script failed!"
+          fi
+        done
+    fi
+}
+
 recipe_resultdirs () {
     recipe_resultdirs_$BUILDTYPE "$@"
 }

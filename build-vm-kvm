@@ -375,6 +375,7 @@ vm_kill_kvm() {
 	echo "could not kill build in $VM_ROOT, kvm instance is dead already"
 	return
     fi
+    echo "Killed the instance, waiting for shutdown..."
     local tries=0
     while test $tries -lt 1800 ; do
 	sleep .1
