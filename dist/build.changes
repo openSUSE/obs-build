@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Tue Mar 14 13:33:33 UTC 2023 - Adrian Schröter <adrian@suse.de>
+
+- universal post-build hook, just place a file in /usr/lib/build/post_build.d/
+- mkbaselibs/hwcaps, fix pattern name once again (x86_64_v3)
+- KiwiProduct: add --use-newest-package hint if the option is set
+
+-------------------------------------------------------------------
 Tue Feb 28 11:00:54 UTC 2023 - Adrian Schröter <adrian@suse.de>
 
 - Dockerfile support:
