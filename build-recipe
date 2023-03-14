@@ -68,6 +68,11 @@ recipe_cleanup () {
 
 recipe_parse_options() {
     case ${PARAM/#--/-} in
+      -buildtool-opt)
+	needarg
+	BUILD_TOOL_OPT="$ARG"
+	shift
+	;;
       -stage)
 	needarg
 	BUILD_RPM_BUILD_STAGE="$ARG"
