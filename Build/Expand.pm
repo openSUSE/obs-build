@@ -311,6 +311,54 @@ sub check_conddeps_notinst {
   return $ret;
 }
 
+sub fulfilled_cplx_rec_set {
+  my ($config, $r) = @_;
+  if ($r->[0] == 0) {
+    my $whatprovides = $config->{'whatprovidesh'};
+    return @{$whatprovides->{$r->[1]} || Build::addproviders($config, $r->[1])} if $r->[0] == 0;
+  }
+  $r = [2, $r->[1], $r->[3]] if ($r->[0] == 3 || $r->[0] == 4) && @$r == 4;
+  return fulfilled_cplx_rec_set($config, $r->[1]) if $r->[0] == 3 || $r->[0] == 4;
+  if ($r->[0] == 1 || $r->[0] == 2) {
+    my %s = map {$_ => 1} fulfilled_cplx_rec_set($config, $r->[1]), fulfilled_cplx_rec_set($config, $r->[2]);
+    return sort keys %s;
+  }
+  if ($r->[0] == 6) {
+    my %s = map {$_ => 1} fulfilled_cplx_rec_set($config, $r->[2]);
+    return grep {$s{$_}} fulfilled_cplx_rec_set($config, $r->[1]);
+  }
+  if ($r->[0] == 7) {
+    my %s = map {$_ => 1} fulfilled_cplx_rec_set($config, $r->[2]);
+    return grep {!$s{$_}} fulfilled_cplx_rec_set($config, $r->[1]);
+  }
+  return ();
+}
+
+sub fulfilled_cplx_rec {
+  my ($config, $installed, $r) = @_;
+  if ($r->[0] == 0) {
+    my $whatprovides = $config->{'whatprovidesh'};
+    return 1 if grep {$installed->{$_}} @{$whatprovides->{$r->[1]} || Build::addproviders($config, $r->[1])};
+    return 0;
+  }
+  if ($r->[0] == 1) {			# A AND B
+    return fulfilled_cplx_rec($config, $installed, $r->[1]) && fulfilled_cplx_rec($config, $installed, $r->[2]);
+  }
+  if ($r->[0] == 2) {			# A OR B
+    return fulfilled_cplx_rec($config, $installed, $r->[1]) || fulfilled_cplx_rec($config, $installed, $r->[2]);
+  }
+  if ($r->[0] == 3) {			# A IF B
+    return fulfilled_cplx_rec($config, $installed, $r->[1]) if fulfilled_cplx_rec($config, $installed, $r->[2]);
+    return @$r == 4 ? fulfilled_cplx_rec($config, $installed, $r->[3]) : 0;
+  }
+  if ($r->[0] == 4) {			# A UNLESS B
+    return fulfilled_cplx_rec($config, $installed, $r->[1]) unless fulfilled_cplx_rec($config, $installed, $r->[2]);
+    return @$r == 4 ? fulfilled_cplx_rec($config, $installed, $r->[3]) : 0;
+  }
+  return 1 if grep {$installed->{$_}} fulfilled_cplx_rec_set($config, $r);
+  return 0;
+}
+
 sub extractnative {
   my ($config, $r, $p, $foreign) = @_;
   my $ma = $config->{'multiarchh'}->{$p} || '';
@@ -334,8 +382,10 @@ sub expand {
   my $ignore = $config->{'ignoreh'};
   my $ignoreconflicts = $config->{'expandflags:ignoreconflicts'};
   my $keepfilerequires = $config->{'expandflags:keepfilerequires'};
+  my $dosupplements = $config->{'expandflags:dosupplements'};
   my $ignoreignore;
   my $userecommendsforchoices = 1;
+  my $usesupplementsforchoices;
   my $dorecommends = $config->{'expandflags:dorecommends'};
 
   my $whatprovides = $config->{'whatprovidesh'};
@@ -345,11 +395,13 @@ sub expand {
   $ignoreconflicts = 1 if $xignore->{'-ignoreconflicts--'};
   $keepfilerequires = 1 if $xignore->{'-keepfilerequires--'};
   $dorecommends = 1 if $xignore->{'-dorecommends--'};
+  $dosupplements = 1 if $xignore->{'-dosupplements--'};
   $ignore = {} if $xignore->{'-ignoreignore--'};
   if ($ignoreignore) {
     $xignore = {};
     $ignore = {};
   }
+  $usesupplementsforchoices = 1 if $dosupplements;
   my @directdepsend;
   if ($xignore->{'-directdepsend--'}) {
     delete $xignore->{'-directdepsend--'};
@@ -508,7 +560,8 @@ sub expand {
       @todo_inst = ();
     }
  
-    for my $pass (0, 1, 2, 3, 4, 5) {
+    for my $pass (0, 1, 2, 3, 4, 5, 6) {
+      next if $pass == 5 && !$usesupplementsforchoices;
       my @todo_next;
       while (@todo) {
 	my ($r, $p) = splice(@todo, 0, 2);
@@ -634,8 +687,38 @@ sub expand {
           next;
         }
 
-        # pass 5: record error
-        if ($pass < 5) {
+	# pass 5: prune with supplements
+	if ($pass < 5) {
+	  push @todo_next, $rtodo, $p;
+	  next;
+	}
+	if ($usesupplementsforchoices) {
+	  my $pkgsupplements = $config->{'supplementsh'} || {};
+	  my @pq;
+	  for my $q (@q) {
+	    for my $rs (@{$pkgsupplements->{$q} || []}) {
+	      if ($rs =~ /^\(.*\)$/) {
+      		my $rd = Build::Rpm::parse_rich_dep($rs);
+		next if !$rd || fulfilled_cplx_rec($config, \%p, $rd);
+	      } else {
+	        next unless grep {$p{$_}} @{$whatprovides->{$rs} || Build::addproviders($config, $rs)};
+	      }
+	      push @pq, $q;
+	      last;
+	    }
+	  }
+	  print "supplemented [@pq] among [@q]\n" if $expand_dbg;
+	  @q = @pq if @pq;
+	  if (@q == 1) {
+	    next if $extractnative && extractnative($config, $r, $q[0], \@native);
+	    push @todo_inst, $q[0];
+	    print "added $q[0] because of $pp$r\n" if $expand_dbg;
+	    next;
+	  }
+	}
+
+        # pass 6: record error
+        if ($pass < 6) {
 	  push @todo_next, $rtodo, $p;
 	  next;
         }
@@ -672,6 +755,30 @@ sub expand {
 	    }
 	    push @todo, $r, $p if @q;
 	  }
+	}
+      }
+    }
+
+    if ($dosupplements) {
+      my $pkgsupplements = $config->{'supplementsh'} || {};
+      for my $p (sort keys %$pkgsupplements) {
+	next unless @{$pkgsupplements->{$p}};
+	next if $p{$p};
+	next if $aconflicts{$p};
+	if (!$ignoreconflicts) {
+	  next if @{$pkgconflicts->{$p} || []} && checkconflicts($config, \%p, $p, [], @{$pkgconflicts->{$p}});
+	  next if @{$pkgobsoletes->{$p} || []} && checkobsoletes($config, \%p, $p, [], @{$pkgobsoletes->{$p}});
+	}
+	for my $rs (@{$pkgsupplements->{$p} || []}) {
+	  if ($rs =~ /^\(.*\)$/) {
+	    my $rd = Build::Rpm::parse_rich_dep($rs);
+	    next unless $rd && fulfilled_cplx_rec($config, \%p, $rd);
+	  } else {
+	    next unless grep {$p{$_}} @{$whatprovides->{$rs} || Build::addproviders($config, $rs)};
+	  }
+	  push @todo_inst, $p;
+	  print "added $p because it supplements $rs\n" if $expand_dbg;
+	  last;
 	}
       }
     }
