@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 4;
+use Test::More tests => 8;
 
 require 't/testlib.pm';
 
@@ -35,3 +35,20 @@ $config = setuptest($repo, "ExpandFlags: keepfilerequires\nFileProvides: /file c
 @r = expand($config, 'a');
 is_deeply(\@r, [1, 'a', 'b', 'c'], 'honoured file requires');
 
+$config = setuptest($repo, "ExpandFlags: dorecommends");
+@r = expand($config, 'd');
+is_deeply(\@r, [1, 'b', 'd'], 'ignored file requires');
+
+$config = setuptest($repo, "ExpandFlags: dorecommends\nFileProvides: /file c");
+@r = expand($config, 'd');
+is_deeply(\@r, [1, 'b', 'c', 'd'], 'honoured file requires');
+
+$config = setuptest($repo, "ExpandFlags: dorecommends keepfilerequires");
+@r = expand($config, 'd');
+# This should rather just ignore b
+# is_deeply(\@r, [1, 'd'], 'missing file provides');
+is_deeply(\@r, [undef, 'nothing provides /file needed by b'], 'missing file provides');
+
+$config = setuptest($repo, "ExpandFlags: dorecommends keepfilerequires\nFileProvides: /file c");
+@r = expand($config, 'd');
+is_deeply(\@r, [1, 'b', 'c', 'd'], 'honoured file requires');
