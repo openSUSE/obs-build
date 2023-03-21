@@ -1598,7 +1598,7 @@ sub parse_rich_rec {
   return ($d, undef) unless $d ne '';
   return ($d, $r) if $d =~ s/^\)//;
   return ($d, undef) unless $d =~ s/([a-z]+)\s+//;
-  my $op = $richops {$1};
+  my $op = $richops{$1};
   return ($d, undef) unless $op;
   return ($d, undef) if $op == 5 && $chainop != 3 && $chainop != 4;
   $chainop = 0 if $op == 5;
