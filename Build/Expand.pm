@@ -776,6 +776,7 @@ sub expand {
 	  } else {
 	    next unless grep {$p{$_}} @{$whatprovides->{$rs} || Build::addproviders($config, $rs)};
 	  }
+	  last if $extractnative && extractnative($config, $rs, $p, \@native);
 	  push @todo_inst, $p;
 	  print "added $p because it supplements $rs\n" if $expand_dbg;
 	  last;
