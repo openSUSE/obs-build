@@ -220,10 +220,11 @@ sub normalizerich {
   }
   my $c = [$config, $p, $ignore || {}, $xignore || {}];
   my ($n, @q);
-  if ($deptype == 0) {
+  if ($deptype == 0 || $deptype == 2) {
     ($n, @q) = normalize_cplx_rec($c, $r);
     return () if $n == 1;
     if (!$n) {
+      return () if $deptype == 2;
       if (defined($p)) {
         push @$error, "nothing provides $dep needed by $p";
       } else {
@@ -274,6 +275,7 @@ sub check_conddeps_inst {
 	  }
 	  next;
 	}
+	next if $rtype == 2;			# ignore for recommends
 	if (defined($p)) {
 	  push @$error, map {"$p conflicts with $_"} sort(@$cond);
 	} else {
@@ -282,6 +284,7 @@ sub check_conddeps_inst {
       }    
     } else {
       if (!@q && @cx == 1) { 
+	next if $rtype == 2;
 	if (defined($p)) {
           $aconflicts->{$cx[0]} = "is in conflict with $p";
 	} else {
@@ -333,12 +336,15 @@ sub expand {
   my $keepfilerequires = $config->{'expandflags:keepfilerequires'};
   my $ignoreignore;
   my $userecommendsforchoices = 1;
+  my $dorecommends = $config->{'expandflags:dorecommends'};
 
   my $whatprovides = $config->{'whatprovidesh'};
   my $requires = $config->{'requiresh'};
 
   my $xignore = { map {substr($_, 1) => 1} grep {/^-/} @p };
   $ignoreconflicts = 1 if $xignore->{'-ignoreconflicts--'};
+  $keepfilerequires = 1 if $xignore->{'-keepfilerequires--'};
+  $dorecommends = 1 if $xignore->{'-dorecommends--'};
   $ignore = {} if $xignore->{'-ignoreignore--'};
   if ($ignoreignore) {
     $xignore = {};
@@ -362,6 +368,7 @@ sub expand {
   my %p;		# expanded packages
   my @todo;		# dependencies to install
   my @todo_inst;	# packages we decided to install
+  my @todo_recommends;
   my %todo_cond;
   my %recommended;	# recommended by installed packages
   my @rec_todo;		# installed todo
@@ -443,6 +450,7 @@ sub expand {
 
       # check against old cond dependencies. we do this step by step so we don't get dups.
       for my $p (@todo_inst) {
+	push @todo_recommends, $p if $dorecommends;
 	$p{$p} = 1;
 	if ($todo_cond{$p}) {
           for my $c (@{delete $todo_cond{$p}}) {
@@ -642,6 +650,31 @@ sub expand {
       last if @todo_inst;
     }
     return undef, @error if @error;
+
+    if (@todo_recommends && !@todo && !@todo_inst) {
+      my $pkgrecommends = $config->{'recommendsh'} || {};
+      for my $p (@todo_recommends) {
+	for my $r (@{$pkgrecommends->{$p} || []}) {
+	  if ($r =~ /^\(.*\)$/) {
+	    my $n = normalizerich($config, $p, $r, 2, \@error, $ignore, $xignore);
+	    check_conddeps_inst($p, $n, \@error, \%p, undef, \@todo, \%todo_cond);
+	  } else {
+	    my @q = @{$whatprovides->{$r} || Build::addproviders($config, $r)};
+	    next if grep {$p{$_}} @q;
+	    @q = grep {!$aconflicts{$_}} @q;
+	    if (!$ignoreconflicts) {
+	      for my $q (splice @q) {
+		push @q, $q unless @{$pkgconflicts->{$q} || []} && checkconflicts($config, \%p, $q, [], @{$pkgconflicts->{$q}});
+	      }
+	      for my $q (splice @q) {
+		push @q, $q unless @{$pkgobsoletes->{$q} || []} && checkobsoletes($config, \%p, $q, [], @{$pkgobsoletes->{$q}});
+	      }
+	    }
+	    push @todo, $r, $p if @q;
+	  }
+	}
+      }
+    }
   }
 
   if ($extractnative && @native) {
