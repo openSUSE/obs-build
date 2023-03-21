@@ -330,6 +330,7 @@ sub expand {
   my $prefer = $config->{'preferh'};
   my $ignore = $config->{'ignoreh'};
   my $ignoreconflicts = $config->{'expandflags:ignoreconflicts'};
+  my $keepfilerequires = $config->{'expandflags:keepfilerequires'};
   my $ignoreignore;
   my $userecommendsforchoices = 1;
 
@@ -469,7 +470,7 @@ sub expand {
 	  next if $ignore->{"$p:$ri"} || $xignore->{"$p:$ri"};
 	  next if $ignore->{$ri} || $xignore->{$ri};
 	  next if $ri =~ /^rpmlib\("/;
-	  next if $ri =~ /^\// && !@{$whatprovides->{$ri} || []};
+	  next if !$keepfilerequires && ($ri =~ /^\//) && !@{$whatprovides->{$ri} || []};
 	  push @todo, ($r, $p);
 	}
 	if (!$ignoreconflicts) {
@@ -519,7 +520,8 @@ sub expand {
 	}
 
 	if (!@q) {
-	  next if defined($p) && ($r =~ /^\// || $r =~ /^rpmlib\(/);
+	  next if defined($p) && $r =~ /^rpmlib\(/;
+	  next if defined($p) && !$keepfilerequires && ($r =~ /^\//);
 	  push @error, "nothing provides $r$pn";
 	  next;
 	}

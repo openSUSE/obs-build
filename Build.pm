@@ -934,7 +934,7 @@ sub parse_depfile {
 sub readdeps {
   my ($config, $pkginfo, @depfiles) = @_;
 
-  my $nofiledeps = %{$config->{'fileprovides'} || {}} ? 0 : 1;
+  my $nofiledeps = %{$config->{'fileprovides'} || {}} || $config->{'expandflags:keepfilerequires'} ? 0 : 1;
   $pkginfo ||= {};
   for my $depfile (@depfiles) {
     if (ref($depfile) eq 'HASH') {
