@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 6;
+use Test::More tests => 7;
 
 require 't/testlib.pm';
 
@@ -23,6 +23,9 @@ P: y2 = 1-1 y
 s: e
 P: f = 1-1
 s: (a and d)
+P: n1 = 1-1
+P: n2 = 1-1
+s: (n1 unless (n3 if foo))
 EOR
 
 my $config = setuptest($repo, "Expandflags: dosupplements");
@@ -45,3 +48,6 @@ is_deeply(\@r, [1, 'e', 'x', 'y2'], 'install x e');
 
 @r = expand($config, 'a', 'd');
 is_deeply(\@r, [1, 'a', 'b', 'd', 'f'], 'install a d');
+
+@r = expand($config, 'n1');
+is_deeply(\@r, [1, 'n1'], 'install n1');

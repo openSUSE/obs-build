@@ -315,7 +315,7 @@ sub fulfilled_cplx_rec_set {
   my ($config, $r) = @_;
   if ($r->[0] == 0) {
     my $whatprovides = $config->{'whatprovidesh'};
-    return @{$whatprovides->{$r->[1]} || Build::addproviders($config, $r->[1])} if $r->[0] == 0;
+    return @{$whatprovides->{$r->[1]} || Build::addproviders($config, $r->[1])};
   }
   $r = [2, $r->[1], $r->[3]] if ($r->[0] == 3 || $r->[0] == 4) && @$r == 4;
   return fulfilled_cplx_rec_set($config, $r->[1]) if $r->[0] == 3 || $r->[0] == 4;
@@ -349,7 +349,7 @@ sub fulfilled_cplx_rec {
   }
   if ($r->[0] == 3) {			# A IF B
     return fulfilled_cplx_rec($config, $installed, $r->[1]) if fulfilled_cplx_rec($config, $installed, $r->[2]);
-    return @$r == 4 ? fulfilled_cplx_rec($config, $installed, $r->[3]) : 0;
+    return @$r == 4 ? fulfilled_cplx_rec($config, $installed, $r->[3]) : 1;
   }
   if ($r->[0] == 4) {			# A UNLESS B
     return fulfilled_cplx_rec($config, $installed, $r->[1]) unless fulfilled_cplx_rec($config, $installed, $r->[2]);
