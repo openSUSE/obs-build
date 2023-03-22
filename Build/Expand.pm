@@ -150,7 +150,7 @@ sub normalize_cplx_rec {
     # and / unless
     my $todnf2 = $r->[0] == 4 ? !$todnf : $todnf;
     my ($n1, @q1) = normalize_cplx_rec($c, $r->[1], $todnf);
-    my ($n2, @q2) = normalize_cplx_rec($c, $r->[2], $todnf);
+    my ($n2, @q2) = normalize_cplx_rec($c, $r->[2], $todnf2);
     ($n2, @q2) = cplx_inv($n2, @q2) if $r->[0] == 4;
     return 0 if $n1 == 0 || $n2 == 0;
     return ($n2, @q2) if $n1 == 1;
