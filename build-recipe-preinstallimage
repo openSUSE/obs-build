@@ -94,9 +94,9 @@ preinstallimage_compress() {
     rm -f "$pimage".*
     if test -n "$(type -p zstd)" ; then
         echo "Compressing preinstallimage using 'zstd'."
-        zstd --no-progress --rm -19 -T0 "$pimage"
+        zstd --no-progress --rm -19 -T0 "$pimage" || cleanup_and_exit 1
     else
         echo "Compressing preinstallimage using 'gzip'."
-        gzip "$pimage"
+        gzip "$pimage" || cleanup_and_exit 1
     fi
 }
