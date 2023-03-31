@@ -313,9 +313,16 @@ sub kiwiparse {
   }
 
   # take default version setting
-  my $preferences = ($kiwi->{'preferences'} || []);
+  my $preferences = $kiwi->{'preferences'} || [];
   if ($preferences->[0]->{'version'}) {
     $ret->{'version'} = $preferences->[0]->{'version'}->[0]->{'_content'};
+  }
+  # set the multiversion flag if there are different versions
+  if ($ret->{'version'}) {
+    for (@$preferences) {
+      next unless $_->{'version'} && $_->{'version'}->[0] && $_->{'version'}->[0]->{'_content'};
+      $ret->{'multiversion'} = 1 if $ret->{'version'} ne $_->{'version'}->[0]->{'_content'};
+    }
   }
 
   # add extra tags
