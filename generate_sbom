@@ -459,7 +459,7 @@ my $spdx_json_template = {
     '_order' => [ qw{created creators licenseListVersion} ],
   },
   'packages' => {
-    '_order' => [ qw{name SPDXID versionInfo originator downloadLocation sourceInfo homepage licenseConcluded licenseDeclared copyrightText externalRefs} ],
+    '_order' => [ qw{name SPDXID versionInfo supplier originator downloadLocation sourceInfo homepage licenseConcluded licenseDeclared copyrightText externalRefs} ],
     'externalRefs' => {
       '_order' => [ qw{referenceCategory referenceType referenceLocator} ],
     },
@@ -482,7 +482,10 @@ sub spdx_encode_pkg {
     'name' => $p->{'NAME'},
     'versionInfo' => $evr,
   };
-  $spdx->{'originator'} = "Organization: $p->{'VENDOR'}" if $p->{'VENDOR'};
+  if ($p->{'VENDOR'}) {
+    $spdx->{'originator'} = "Organization: $p->{'VENDOR'}";
+    $spdx->{'supplier'} = $spdx->{'originator'}; # same as originator OBS-247
+  }
   $spdx->{'downloadLocation'} = 'NOASSERTION';
   $spdx->{'sourceInfo'} = 'acquired package info from RPM DB';
   $spdx->{'licenseConcluded'} = 'NOASSERTION';
