@@ -43,6 +43,7 @@ extend_build_arch() {
       armv6hl) BUILD_ARCH="armv6hl:armv6l:armv5tel" ;;
       armv6l) BUILD_ARCH="armv6l:armv5tel" ;;
       armv5tel) BUILD_ARCH="armv5tel" ;;
+      loongarch64) BUILD_ARCH="loongarch64" ;;
       m68k) BUILD_ARCH="m68k" ;;
       mips64) BUILD_ARCH="mips64:mips" ;;
       mips) BUILD_ARCH="mips" ;;

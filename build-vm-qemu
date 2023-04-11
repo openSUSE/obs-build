@@ -100,6 +100,12 @@ vm_startup_qemu() {
             qemu_cpu=""
             qemu_options="$qemu_options -bios /usr/share/qemu/hppa-firmware.img"
             ;;
+        loongarch64)
+            qemu_bin="/usr/bin/qemu-system-loongarch64"
+            qemu_console=${qemu_console:-ttyAMA0}
+            qemu_cpu=""
+            qemu_options="$qemu_options -bios /usr/share/qemu/loongarch_bios.bin"
+            ;;
         m68k)
             qemu_bin="/usr/bin/qemu-system-m68k"
             qemu_console=${qemu_console:-ttyAMA0}

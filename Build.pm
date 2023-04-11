@@ -120,7 +120,7 @@ my $std_macros = q{
 %define mipseb  mips mipsr6 mips64 mips64r6
 %define mipsel  mipsel mipsr6el mips64el mips64r6el
 %define mips    %{mips32} %{mips64}
-%define loongarch64    loongarch64
+%define loongarch64 loongarch64
 %define sparc   sparc sparcv8 sparcv9 sparcv9v sparc64 sparc64v
 %define alpha   alpha alphaev56 alphaev6 alphaev67
 %define power64 ppc64 ppc64p7 ppc64le
