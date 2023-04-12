@@ -196,6 +196,11 @@ die("cross project config: $bconf_host->{'error'}\n") if $bconf_host && $bconf_h
 
 # make sure our config includes some basic setup
 if (!@{($bconf_host || $bconf)->{'preinstall'} || []}) {
+  if ($preset) {
+    print("Preset $preset->{'name'} does not contain a build setup definition.\n");
+    print("Please specify a distribution with the --dist option.\n");
+    exit;
+  } 
   my @presetnames = PBuild::Preset::known_presets($dir);
   if (@presetnames) {
     print("Please specify a distribution or a preset!\n\n");
