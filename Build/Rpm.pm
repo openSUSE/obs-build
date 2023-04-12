@@ -33,6 +33,13 @@ sub expr_boolify {
   return !defined($v) || $v eq '"' || $v =~ /^(?:0*$|v)/s ? 0 : 1;
 }
 
+sub expr_stringify {
+  my ($v) = @_;
+  return '' unless defined $v;
+  $v =~ s/^[v\"]//;
+  return $v;
+}
+
 sub expr_vcmp {
   my ($v1, $v2, $rr) = @_;
   my $r = verscmp(substr($v1, 1), substr($v2, 1));
@@ -68,15 +75,16 @@ sub expr {
   my $t = substr($expr, 0, 1);
   if ($t eq '(') {
     ($v, $expr) = expr(substr($expr, 1), 0, $xp);
-    return undef unless defined $v;
-    return undef unless $expr =~ s/^\)//;
+    return (undef, $expr) unless defined $v;
+    return (undef, 'unmatched (') unless $expr =~ s/^\)//;
   } elsif ($t eq '!') {
     ($v, $expr) = expr(substr($expr, 1), 6, $xp);
-    return undef unless defined $v;
+    return (undef, $expr) unless defined $v;
     $v = expr_boolify($v) ? 0 : 1;
   } elsif ($t eq '-') {
     ($v, $expr) = expr(substr($expr, 1), 6, $xp);
-    return undef unless defined $v;
+    return (undef, $expr) unless defined $v;
+    return(undef, "argument of - is not a number") if $v =~ /^[\"a-zA-Z_]/;
     $v = -$v;
   } elsif ($expr =~ /^([0-9]+)(.*?)$/s || ($xp && $expr =~ /^(%)(.*)$/)) {
     $v = $1;
@@ -98,7 +106,7 @@ sub expr {
     $v = "\"$1";
     $expr = $2;
   } else {
-    return;
+    return (undef, 'syntax error in expression');
   }
   return ($v, $expr) if $lev >= 6;
   while (1) {
@@ -107,81 +115,107 @@ sub expr {
       return ($v, $expr) if $lev >= 2;
       my $b = expr_boolify($v);
       ($v2, $expr) = expr(substr($expr, 2), 2, $xp && !$b ? \&expr_dummyexpander : $xp);
-      return undef unless defined $v2;
+      return (undef, $expr) unless defined $v2;
       $v = $v2 if $b;
     } elsif ($expr =~ /^\|\|/) {
       return ($v, $expr) if $lev >= 2;
       my $b = expr_boolify($v);
       ($v2, $expr) = expr(substr($expr, 2), 2, $xp && $b ? \&expr_dummyexpander : $xp);
-      return undef unless defined $v2;
+      return (undef, $expr) unless defined $v2;
       $v = $v2 unless $b;
     } elsif ($expr =~ /^>=/) {
       return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 2), 3, $xp);
-      return undef unless defined $v2;
+      return (undef, $expr) unless defined $v2;
       $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 6) : ($v =~ /^\"/) ? $v ge $v2 : $v >= $v2) ? 1 : 0;
     } elsif ($expr =~ /^>/) {
       return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 1), 3, $xp);
-      return undef unless defined $v2;
+      return (undef, $expr) unless defined $v2;
       $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 4) : ($v =~ /^\"/) ? $v gt $v2 : $v > $v2) ? 1 : 0;
     } elsif ($expr =~ /^<=/) {
       return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 2), 3, $xp);
-      return undef unless defined $v2;
+      return (undef, $expr) unless defined $v2;
       $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 3) : ($v =~ /^\"/) ? $v le $v2 : $v <= $v2) ? 1 : 0;
     } elsif ($expr =~ /^</) {
       return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 1), 3, $xp);
-      return undef unless defined $v2;
+      return (undef, $expr) unless defined $v2;
       $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 1) : ($v =~ /^\"/) ? $v lt $v2 : $v < $v2) ? 1 : 0;
     } elsif ($expr =~ /^==/) {
       return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 2), 3, $xp);
-      return undef unless defined $v2;
+      return (undef, $expr) unless defined $v2;
       $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 2) : ($v =~ /^\"/) ? $v eq $v2 : $v == $v2) ? 1 : 0;
     } elsif ($expr =~ /^!=/) {
       return ($v, $expr) if $lev >= 3;
       ($v2, $expr) = expr(substr($expr, 2), 3, $xp);
-      return undef unless defined $v2;
+      return (undef, $expr) unless defined $v2;
       $v = (($v =~ /^v/) ? expr_vcmp($v, $v2, 5) : ($v =~ /^\"/) ? $v ne $v2 : $v != $v2) ? 1 : 0;
     } elsif ($expr =~ /^\+/) {
       return ($v, $expr) if $lev >= 4;
       ($v2, $expr) = expr(substr($expr, 1), 4, $xp);
-      return undef unless defined $v2;
+      return (undef, $expr) unless defined $v2;
       if ($v =~ /^\"/ && $v2 =~ s/^\"//) {
 	$v .= $v2;
       } else {
+        return(undef, "argument of + is not a number") if $v =~ /^[\"a-zA-Z_]/;
+        return(undef, "argument of + is not a number") if $v2 =~ /^[\"a-zA-Z_]/;
         $v += $v2;
       }
     } elsif ($expr =~ /^-/) {
       return ($v, $expr) if $lev >= 4;
       ($v2, $expr) = expr(substr($expr, 1), 4, $xp);
-      return undef unless defined $v2;
+      return (undef, $expr) unless defined $v2;
+      return(undef, "argument of - is not a number") if $v =~ /^[\"a-zA-Z_]/;
+      return(undef, "argument of - is not a number") if $v2 =~ /^[\"a-zA-Z_]/;
       $v -= $v2;
     } elsif ($expr =~ /^\*/) {
       ($v2, $expr) = expr(substr($expr, 1), 5, $xp);
-      return undef unless defined $v2;
+      return (undef, $expr) unless defined $v2;
+      return(undef, "argument of * is not a number") if $v =~ /^[\"a-zA-Z_]/;
+      return(undef, "argument of * is not a number") if $v2 =~ /^[\"a-zA-Z_]/;
       $v *= $v2;
     } elsif ($expr =~ /^\//) {
       ($v2, $expr) = expr(substr($expr, 1), 5, $xp);
-      return undef unless defined $v2 && 0 + $v2;
+      return (undef, $expr) unless defined $v2;
+      return(undef, "argument of / is not a number") if $v =~ /^[\"a-zA-Z_]/;
+      return(undef, "argument of / is not a number") if $v2 =~ /^[\"a-zA-Z_]/;
+      return (undef, 'division by zero') unless 0 + $v2;
       $v /= $v2;
     } elsif ($expr =~ /^\?/) {
       return ($v, $expr) if $lev > 1;
       my $b = expr_boolify($v);
       ($v, $expr) = expr(substr($expr, 1), 1, $xp && !$b ? \&expr_dummyexpander : $xp);
-      warn("syntax error while parsing ternary in $_[0]\n") unless defined($v) && $expr =~ s/^://;
+      return (undef, $expr) unless defined $v;
+      return (undef, "syntax error while parsing ternary in $_[0]") unless $expr =~ s/^://;
       ($v2, $expr) = expr($expr, 1, $xp && $b ? \&expr_dummyexpander : $xp);
-      return undef unless defined $v2;
+      return (undef, $expr) unless defined $v2;
       $v = $v2 unless $b;
     } elsif ($expr =~ /^([=&|])/) {
-      warn("syntax error while parsing $1$1\n");
-      return ($v, $expr);
+      return (undef, "syntax error while parsing $1$1");
     } else {
       return ($v, $expr);
     }
   }
+}
+
+sub do_warn {
+  my ($config, $err) = @_;
+  if ($config && $config->{'parsing_config'}) {
+    $config->{'error'} ||= $err;
+  } elsif ($config && $config->{'warnings'}) {
+    warn("$err\n");
+  }
+}
+
+sub do_expr {
+  my ($config, $expr, $xp) = @_;
+  my ($v, $r) = expr($expr, 0, $xp);
+  ($v, $r) = (undef, 'syntax error in expression') if defined($v) && $r !~ /^\s*$/;
+  do_warn($config, $r || 'syntax error in expression') unless defined $v;
+  return $v;
 }
 
 sub adaptmacros {
@@ -331,7 +365,7 @@ sub expandmacros {
 reexpand:
   while ($line =~ /^(.*?)%(\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\*\*?|#|\(|\[)(.*?)\z/s) {
     if ($tries++ > 1000) {
-      print STDERR "Warning: spec file parser ",($lineno?" line $lineno":''),": macro too deeply nested\n" if $config->{'warnings'};
+      do_warn($config, "spec file parser ",($lineno?" line $lineno":''),": macro too deeply nested");
       $line = 'MACRO';
       last;
     }
@@ -371,7 +405,7 @@ reexpand:
     }
     $macname =~ s/^[\!\?]+//s;
     if ($macname eq '(') {
-      print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand %(...)\n" if $config->{'warnings'};
+      do_warn($config, "spec file parser",($lineno?" line $lineno":''),": can't expand %(...)");
       $line = 'MACRO';
       last;
     } elsif ($macname eq '[') {
@@ -380,9 +414,8 @@ reexpand:
       $macalt =~ s/^%\[//;
       $macalt =~ s/\]$//;
       my $xp = sub {expandmacros($config, $_[0], $lineno, $macros, $macros_args, $tries)};
-      $macalt = (expr($macalt, 0, $xp))[0];
-      $macalt =~ s/^[v\"]//;	# stringify
-      $expandedline .= $macalt;
+      $macalt = do_expr($config, $macalt, $xp);
+      $expandedline .= expr_stringify($macalt);
     } elsif ($macname eq 'define' || $macname eq 'global') {
       my $isglobal = $macname eq 'global' ? 1 : 0;
       if ($line =~ /^\s*([0-9a-zA-Z_]+)(?:\(([^\)]*)\))?\s*(.*?)$/) {
@@ -429,9 +462,8 @@ reexpand:
       $macalt = $macros->{$macname} unless defined $macalt;
       $macalt = '' if $mactest == -1;
       $macalt = expandmacros($config, $macalt, $lineno, $macros, $macros_args, $tries);
-      $macalt = (expr($macalt))[0];
-      $macalt =~ s/^[v\"]//;	# stringify
-      $expandedline .= $macalt;
+      $macalt = do_expr($config, $macalt);
+      $expandedline .= expr_stringify($macalt);
     } elsif ($macname eq 'gsub' || $macname eq 'len' || $macname eq 'lower' || $macname eq 'upper' || $macname eq 'rep' || $macname eq 'reverse' || $macname eq 'sub') {
       my @args;
       if (defined $macalt) {
@@ -447,7 +479,7 @@ reexpand:
       $expandedline .= luamacro($macname, @args);
     } elsif (exists($macros->{$macname})) {
       if (!defined($macros->{$macname})) {
-	print STDERR "Warning: spec file parser",($lineno?" line $lineno":''),": can't expand '$macname'\n" if $config->{'warnings'};
+	do_warn($config, "spec file parser",($lineno?" line $lineno":''),": can't expand '$macname'");
 	$line = 'MACRO';
 	last;
       }
@@ -729,7 +761,7 @@ sub parse {
       next;
     }
     if ($line =~ /^\s*%if(.*)$/) {
-      my ($v, $r) = expr($1);
+      my $v = do_expr($config, $1);
       $v = expr_boolify($v);
       $skip = 2 unless $v;
       $hasif = 1;
@@ -740,7 +772,7 @@ sub parse {
 	my $data = $includecallback->($1);
 	unshift @includelines, split("\n", $data) if $data;
       } else {
-	warn("%include statment level too high, ignored\n") if $config->{'warnings'};
+	do_warn($config, "%include statment level too high, ignored");
       }
     }
     if ($main_preamble) {
@@ -904,7 +936,7 @@ sub parse {
 	    # but hopefully good enough :-)
 	    $ret->{'patch'} = delete $ret->{$tag};
 	  }
-	  print STDERR "Warning: spec file parser: $tag already exists\n" if exists($ret->{$tag}) && $config->{'warnings'};
+	  do_warn($config, "spec file parser: $tag already exists") if exists $ret->{$tag};
 	  $autonum{$1} = $num + 1 if $num >= $autonum{$1};
 	  $macros{uc($1) . "URL$num"} = $val;
 	}
@@ -916,7 +948,7 @@ sub parse {
       }
       $remoteasset = undef;
     } elsif (!$preamble && ($line =~ /^(Source\d*|Patch\d*|Url|Icon|BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires)\s*:\s*(\S.*)$/i)) {
-      print STDERR "Warning: spec file parser ".($lineno ? " line $lineno" : '').": Ignoring $1 used beyond the preamble.\n" if $config->{'warnings'};
+      do_warn($config, "spec file parser ".($lineno ? " line $lineno" : '').": Ignoring $1 used beyond the preamble");
     }
 
     if ($line =~ /^\s*%package\s+(-n\s+)?(\S+)/) {
@@ -956,6 +988,7 @@ sub parse {
   $ret->{'onlynative'} = \@onlynative if @onlynative;
   $ret->{'alsonative'} = \@alsonative if @alsonative;
   $ret->{'configdependent'} = 1 if $ifdeps;
+  do_warn($config, "unterminated if/ifarch/ifos statement") if $skip && $config->{'parsing_config'};
   return $ret;
 }
 

@@ -371,6 +371,7 @@ sub read_config_dist {
   my $cfile = slurp_config_file($dist);
   my $cf = read_config($arch, $cfile);
   die("$dist: parse error\n") unless $cf;
+  die("$dist: $cf->{'error'}\n") if $cf->{'error'};
   return $cf;
 }
 
@@ -405,8 +406,10 @@ sub read_config {
   }
   my @spec;
   $config->{'save_expanded'} = 1;
+  $config->{'parsing_config'} = 1;
   Build::Rpm::parse($config, \@newconfig, \@spec);
   delete $config->{'save_expanded'};
+  delete $config->{'parsing_config'};
   $config->{'preinstall'} = [];
   $config->{'vminstall'} = [];
   $config->{'runscripts'} = [];
