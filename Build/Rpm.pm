@@ -277,7 +277,7 @@ sub luapattern {
 }
 
 sub luamacro {
-  my ($macname, @args) = @_;
+  my ($config, $macname, @args) = @_;
   push @args, '' unless @args;
   return lc($args[0]) if $macname eq 'lower';
   return uc($args[0]) if $macname eq 'upper';
@@ -305,8 +305,14 @@ sub luamacro {
         $args[0] =~ s/$pat(?(?{$rep--<=0})(*F))/$args[2]/g;
       }
     };
-    return $@ ? '' : $args[0];
+    if ($@) {
+      chomp $@;
+      do_warn($config, "gsub macro: $@");
+      return '';
+    }
+    return $args[0];
   }
+  do_warn($config, "unsupported lua macro $macname");
   return '';
 }
 
@@ -476,7 +482,7 @@ reexpand:
 	$line = '';
       }
       $_ = expandmacros($config, $_, $lineno, $macros, $macros_args, $tries) for @args;
-      $expandedline .= luamacro($macname, @args);
+      $expandedline .= luamacro($config, $macname, @args);
     } elsif (exists($macros->{$macname})) {
       if (!defined($macros->{$macname})) {
 	do_warn($config, "spec file parser",($lineno?" line $lineno":''),": can't expand '$macname'");
