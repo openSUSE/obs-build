@@ -213,8 +213,8 @@ sub do_warn {
 sub do_expr {
   my ($config, $expr, $xp) = @_;
   my ($v, $r) = expr($expr, 0, $xp);
-  ($v, $r) = (undef, 'syntax error in expression') if defined($v) && $r !~ /^\s*$/;
   do_warn($config, $r || 'syntax error in expression') unless defined $v;
+  do_warn($config, 'syntax error in expression') if defined($v) && $r !~ /^\s*$/;
   return $v;
 }
 
