@@ -371,7 +371,6 @@ sub read_config_dist {
   my $cfile = slurp_config_file($dist);
   my $cf = read_config($arch, $cfile);
   die("$dist: parse error\n") unless $cf;
-  die("$dist: $cf->{'error'}\n") if $cf->{'error'};
   return $cf;
 }
 

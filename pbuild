@@ -190,9 +190,9 @@ $localconfig = "\n%define _repository $reponame\n\n$localconfig" if $reponame &&
 
 my $buildconfig = Build::combine_configs(reverse(@baseconfigs), $localconfig);
 my $bconf = Build::read_config($myarch, [ split("\n", $buildconfig) ]);
-die("project config: $bconf->{'error'}\n") if $bconf->{'error'};
+die("project config: $bconf->{'parse_error'}\n") if $bconf->{'parse_error'};
 my $bconf_host = $cross ? Build::read_config($hostarch, [ split("\n", $buildconfig) ]) : undef;
-die("cross project config: $bconf_host->{'error'}\n") if $bconf_host && $bconf_host->{'error'};
+die("cross project config: $bconf_host->{'parse_error'}\n") if $bconf_host && $bconf_host->{'parse_error'};
 
 # make sure our config includes some basic setup
 if (!@{($bconf_host || $bconf)->{'preinstall'} || []}) {

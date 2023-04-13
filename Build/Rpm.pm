@@ -204,7 +204,7 @@ sub expr {
 sub do_warn {
   my ($config, $err) = @_;
   if ($config && $config->{'parsing_config'}) {
-    $config->{'error'} ||= $err;
+    $config->{'parse_error'} ||= $err;
   } elsif ($config && $config->{'warnings'}) {
     warn("$err\n");
   }
