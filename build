@@ -581,6 +581,7 @@ ccache_pack() {
 }
 
 ccache_setup() {
+    test "$DO_INIT" = "true" || return
     CCACHE_SETUP_START_TIME=
     if test -n "$CCACHE" -a "$CCACHE_TYPE" = sccache ; then
 	sccache_setup
