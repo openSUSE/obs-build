@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Mon Apr 24 10:22:18 UTC 2023 - Dominique Leuenberger <dimstar@opensuse.org>
+
+- openSUSE Tumbleweed: sync config and move to suse_version 1699.
+
+-------------------------------------------------------------------
 Tue Mar 14 13:33:33 UTC 2023 - Adrian Schröter <adrian@suse.de>
 
 - universal post-build hook, just place a file in /usr/lib/build/post_build.d/
