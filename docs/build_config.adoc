@@ -148,6 +148,23 @@ will fail.
 
 A common use case for obsgendiff is to run release-compare after the
 build.
+
+* setvcs
+
+Adds the SCM URL to binary results when the package sources are managed
+via the scmsync mechanic. The url is written into the VCS tag of rpms
+when enabling this functionality.
+
+* sbom:FORMAT
+
+Enables generation of SBOM (Software Bill Of Material) data. Supported
+formats are spdx and cyclonedx.
+
+* container-compression-format:FORMAT
+
+Sets a compression format for container layers. Possible values are gzip, zstd,
+zstd:chunk. The usage of values beside gzip is only supported by podman and buildah.
+
   
 ==== Constraint: SELECTOR STRING
 
