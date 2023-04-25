@@ -163,7 +163,7 @@ formats are spdx and cyclonedx.
 * container-compression-format:FORMAT
 
 Sets a compression format for container layers. Possible values are gzip, zstd,
-zstd:chunk. The usage of values beside gzip is only supported by podman and buildah.
+zstd:chunked. The usage of values beside gzip is only supported by podman and buildah.
 
   
 ==== Constraint: SELECTOR STRING
