@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
-<meta name="generator" content="AsciiDoc" />
+<meta name="generator" content="AsciiDoc 10.2.0" />
 <title>pbuild Reference Guide</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
@@ -1032,7 +1032,12 @@ disabled via</p></div>
 </div>
 <div class="sect3">
 <h4 id="_dockerfile_description">2.4.3. Dockerfile description</h4>
-<div class="paragraph"><p>Has no support for assets yet.</p></div>
+<div class="paragraph"><p>Remote assets that will be downloaded before the build can be added via the
+comment <code>#!RemoteAssetUrl: https://my.url/asset.tar</code>. <code>pbuild</code> will fetch the
+asset before the build and will make it available in the buildroot so that the
+asset can copied into the container as follows:</p></div>
+<div class="listingblock">
+<div class="content"></div></div>
 </div>
 <div class="sect3">
 <h4 id="_arch_linux_pkgbuild">2.4.4. Arch Linux PKGBUILD</h4>
@@ -1226,6 +1231,34 @@ least one script in /usr/lib/build/obsgendiff.d/, otherwise your build
 will fail.</p></div>
 <div class="paragraph"><p>A common use case for obsgendiff is to run release-compare after the
 build.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+setvcs
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Adds the SCM URL to binary results when the package sources are managed
+via the scmsync mechanic. The url is written into the VCS tag of rpms
+when enabling this functionality.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+sbom:FORMAT
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Enables generation of SBOM (Software Bill Of Material) data. Supported
+formats are spdx and cyclonedx.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+container-compression-format:FORMAT
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Sets a compression format for container layers. Possible values are gzip, zstd,
+zstd:chunked. The usage of values beside gzip is only supported by podman and buildah.</p></div>
 </div>
 <div class="sect3">
 <h4 id="_constraint_selector_string">3.1.4. Constraint: SELECTOR STRING</h4>
@@ -1682,12 +1715,6 @@ In this case the base system for the target system can manually get configured v
 </div></div>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_repository_setup">4.5. Repository setup</h3>
-</div>
-<div class="sect2">
-<h3 id="_build_config">4.6. Build Config</h3>
-</div>
 </div>
 </div>
 </div>
@@ -1695,7 +1722,7 @@ In this case the base system for the target system can manually get configured v
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2022-03-24 09:17:43 CET
+ 2023-04-26 15:27:12 CST
 </div>
 </div>
 </body>

@@ -82,7 +82,3 @@ Note: the basic design of rpm was the GNU style, but it changed in the way that 
       specify the host architecture via %target macro on most distributions:
 
  ./configure --build=%build --host=%target
-
-=== Repository setup
-
-=== Build Config 
