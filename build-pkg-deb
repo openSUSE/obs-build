@@ -59,7 +59,7 @@ su_deb_chroot()
 			   TZ=UTC \
 			   chroot "$dir" su - "$BUILD_USER" \
 			   -w "LC_ALL,LANGUAGE,LANG,TZ" \
-			   -c "$command" "$@" < /dev/null
+			   -c "PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/X11; $command" "$@" < /dev/null
     )
 }
 
