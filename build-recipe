@@ -25,6 +25,7 @@
 BUILDTYPE=
 KIWI_PARAMETERS=
 BUILD_SKIP_BUNDLE=
+BUILD_TOOL_OPTS=()
 RPM_BUILD_IN_PLACE=
 RPM_RECIPE_IN_SUBDIR=
 RPM_NOPREP=
@@ -70,7 +71,7 @@ recipe_parse_options() {
     case ${PARAM/#--/-} in
       -buildtool-opt)
 	needarg
-	BUILD_TOOL_OPT="$ARG"
+	BUILD_TOOL_OPTS[${#BUILD_TOOL_OPTS[@]}]=$ARG
 	shift
 	;;
       -stage)
