@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue May  2 12:13:54 UTC 2023 - Adrian Schröter <adrian@suse.de>
+
+- Add SUSE ALP build config
+
+-------------------------------------------------------------------
 Tue Apr 25 12:01:03 UTC 2023 - Adrian Schröter <adrian@suse.de>
 
 - BREAKING: Record errors when parsing the project config

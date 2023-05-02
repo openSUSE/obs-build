@@ -206,6 +206,10 @@ ln -s sle${SLE_V:0:2}.${SLE_V:3:1}.conf default.conf
 # this is SUSE SLE 11
 ln -s sles11sp2.conf default.conf
 %endif
+%if 0%{?suse_version} == 1600
+# this is SUSE ALP
+ln -s alp.conf default.conf
+%endif
 # make sure that we have a config
 test -e default.conf || exit 1
 %endif
