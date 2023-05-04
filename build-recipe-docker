@@ -298,11 +298,13 @@ recipe_build_docker() {
     perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo -- "${args[@]}" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$ALLTAGS" containers/annotation > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
 
     # copy over .packages files
-    if test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/basepackages" ; then
-	cp "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/basepackages" "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.basepackages"
-    fi
-    if test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/packages" ; then
-	cp "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/packages" "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.packages"
+    for i in basepackages packages ; do
+	test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i " && cp "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.$i"
+    done
+    if test -e "$BUILD_ROOT/$TOPDIR/SOURCES/repos/.pkgsummaries" ; then
+	for i in basepkgsummaries pkgsummaries ; do
+	    test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i " && cp "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.$i"
+	done
     fi
     rm -rf "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD"
 

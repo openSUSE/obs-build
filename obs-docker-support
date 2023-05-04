@@ -240,7 +240,10 @@ upload_packages() {
     local n=$1
     local ans
     if test -x /usr/bin/rpm -o -x /bin/rpm ; then
-	rpm -qa --qf '%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}|%{DISTURL}|%{LICENSE}\n' > /tmp/packages
+	case $n in
+	   *pkgsummaries) rpm -qa --qf '%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}|%{SUMMARY}\n' > /tmp/packages ;;
+	   *) rpm -qa --qf '%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}|%{DISTURL}|%{LICENSE}\n' > /tmp/packages ;;
+	esac
 	if test -n "$DATA_DIR" ; then
 	    cp /tmp/packages "$DATA_DIR/UPLOAD/$n"
 	elif test -x /usr/bin/curl ; then
@@ -297,6 +300,7 @@ EOF
 	    /usr/bin/apt-get -o Dir::Etc::SourceList=$LOCAL_APTREPOS_D/obssource -o Dir::Etc::SourceParts=$LOCAL_APTREPOS_D update
 	fi
 	upload_packages basepackages
+	upload_packages basepkgsummaries
     ;;
     --uninstall|-u)
 	rm -rf "$LOCAL_REPOS_D"
@@ -308,6 +312,7 @@ EOF
 	    mv /var/lib/apt.obssave /var/lib/apt
 	fi
 	upload_packages packages
+	upload_packages pkgsummaries
 	rm -f /usr/local/sbin/obs-docker-support
     ;;
     esac
