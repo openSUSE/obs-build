@@ -299,11 +299,11 @@ recipe_build_docker() {
 
     # copy over .packages files
     for i in basepackages packages ; do
-	test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i " && cp "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.$i"
+	test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" && cp "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.$i"
     done
     if test -e "$BUILD_ROOT/$TOPDIR/SOURCES/repos/.pkgsummaries" ; then
 	for i in basepkgsummaries pkgsummaries ; do
-	    test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i " && cp "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.$i"
+	    test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" && cp "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.$i"
 	done
     fi
     rm -rf "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD"
