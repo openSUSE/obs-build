@@ -300,7 +300,6 @@ EOF
 	    /usr/bin/apt-get -o Dir::Etc::SourceList=$LOCAL_APTREPOS_D/obssource -o Dir::Etc::SourceParts=$LOCAL_APTREPOS_D update
 	fi
 	upload_packages basepackages
-	upload_packages basepkgsummaries
     ;;
     --uninstall|-u)
 	rm -rf "$LOCAL_REPOS_D"

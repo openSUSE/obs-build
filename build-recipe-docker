@@ -302,7 +302,7 @@ recipe_build_docker() {
 	test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" && cp "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.$i"
     done
     if test -e "$BUILD_ROOT/$TOPDIR/SOURCES/repos/.pkgsummaries" ; then
-	for i in basepkgsummaries pkgsummaries ; do
+	for i in pkgsummaries ; do
 	    test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" && cp "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.$i"
 	done
     fi

@@ -1,9 +1,16 @@
 #!/bin/bash
 
+qf='[%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}|%{DISTURL}|%{LICENSE}\n]'
+
+if test "$1" = "--summaries" ; then
+  qf='[%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}|%{SUMMARY}\n]'
+  shift
+fi
+
 container="$1"
 
 if test -z "$container" ; then
-  echo "usage: create_container_package_list <container>"
+  echo "usage: create_container_package_list [--summaries] <container>"
   exit 1
 fi
 if ! test -s "$container" ; then
@@ -25,8 +32,8 @@ skopeo copy docker-archive:$tmpdir/cont oci:$tmpdir/image:latest >/dev/null
 rm -f $tmpdir/cont
 umoci unpack --image $tmpdir/image:latest $tmpdir/unpack >/dev/null
 if test -x "$tmpdir/unpack/rootfs/usr/bin/rpm" ; then
-    chroot $tmpdir/unpack/rootfs rpm -qa --qf '[%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}|%{DISTURL}|%{LICENSE}\n]'
+    chroot $tmpdir/unpack/rootfs rpm -qa --qf "$qf"
 else
-    rpm --root "$tmpdir/unpack/rootfs" -qa --qf '[%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}|%{DISTURL}|%{LICENSE}\n]'
+    rpm --root "$tmpdir/unpack/rootfs" -qa --qf "$qf"
 fi
 
