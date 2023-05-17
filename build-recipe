@@ -30,7 +30,7 @@ RPM_RECIPE_IN_SUBDIR=
 RPM_NOPREP=
 VCSURL=
 
-for i in spec dsc kiwi arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild appimage docker podman fissile helm flatpak mkosi; do
+for i in spec dsc kiwi arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild appimage docker podman fissile helm flatpak mkosi openwrt; do
     . "$BUILD_DIR/build-recipe-$i"
 done
 
@@ -136,6 +136,7 @@ recipe_set_buildtype() {
         debian.control) BUILDTYPE=dsc ;;
         debian/control) BUILDTYPE=dsc ;;
         mkosi.*) BUILDTYPE=mkosi ;;
+        openwrt.json) BUILDTYPE=openwrt ;;
     esac
     if test -z "$BUILDTYPE" ; then
        cleanup_and_exit 1 "I don't know how to build $RECIPEFILE"
@@ -189,7 +190,7 @@ expand_recipe_directories() {
 			mkosi) types="mkosi." ;;
 		    esac
 		fi
-		types="$types .spec _specsubdir:package _specsubdir:dist .dsc PKGBUILD Dockerfile build.collax .kiwi .src.rpm .nosrc.rpm simpleimage snapcraft.yaml Chart.yaml flatpak.yaml flatpak.json mkosi."
+		types="$types .spec _specsubdir:package _specsubdir:dist .dsc PKGBUILD Dockerfile build.collax .kiwi .src.rpm .nosrc.rpm simpleimage snapcraft.yaml Chart.yaml flatpak.yaml flatpak.json mkosi. openwrt.json"
 	    fi
 	    for t in $types ; do
 		found=

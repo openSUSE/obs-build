@@ -1,0 +1,8 @@
+{
+	"name": "helloworld",
+	"giturl": "https://github.com/zoobab/openwrt_helloworld",
+	"sdkurl": "https://downloads.openwrt.org/releases/21.02.0-rc4/targets/x86/64/openwrt-sdk-21.02.0-rc4-x86-64_gcc-8.4.0_musl.Linux-x86_64.tar.xz",
+	"arch": "x86",
+	"subarch": "64",
+	"relver": "21.02.0-rc4"
+}
