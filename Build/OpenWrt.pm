@@ -114,6 +114,7 @@ sub parse {
   $ret->{arch} = $data->{'arch'} or die "OpenWrt file is missing arch key.";
   $ret->{subarch} = $data->{'subarch'} or die "OpenWrt file is missing subarch key.";
   $ret->{relver} = $data->{'relver'} or die "OpenWrt file is missing relver key.";
+  $ret->{tarball} = $data->{'tarball'} or die "OpenWrt file is missing tarball key.";
   my $runtime_version = "tbd";
 
   my @packdeps;

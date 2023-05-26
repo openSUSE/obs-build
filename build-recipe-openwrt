@@ -101,6 +101,7 @@ recipe_build_openwrt() {
     local ARCH=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$FLATPAK_FILE" arch)
     local SUBARCH=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$FLATPAK_FILE" subarch)
     local RELVER=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$FLATPAK_FILE" relver)
+    local TARBALL=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$FLATPAK_FILE" tarball)
     
     export NAME
     export GITURL
@@ -108,18 +109,39 @@ recipe_build_openwrt() {
     export SUBARCH
     export RELVER
     export SDKURL
+    export TARBALL
 
-
-    cd "$BUILD_ROOT"/sdk
-    stat ./scripts/config/conf
-    make download V=s
-    make package/$NAME/download V=s
-    for d in $(find package/ -mindepth 1 -maxdepth 2 -type d); do
-    if [ -e $d/Makefile ]
+    tar xf "$TARBALL" -C "$BUILD_ROOT/repo/"
+    local URL=$(grep PKG_SOURCE_URL: "$BUILD_ROOT/repo/$NAME/Makefile" | cut -f2 -d '=')
+    if [ "$URL" != '/git' ]
     then
-      make $d/download V=s || true
+	rm -rf "$BUILD_ROOT/git"
+        git clone "$URL" "$BUILD_ROOT/git"
+        sed -i "s|$URL|/git|" "$BUILD_ROOT/repo/$NAME/Makefile"
     fi
-    done
+
+
+    chroot "$BUILD_ROOT" bash -c "cd sdk && grep localrepo feeds.conf.default || echo \"src-link localrepo /repo/\" >> feeds.conf.default"
+
+
+   
+
+    
+    #pushd "$BUILD_ROOT" && cd sdk && ./scripts/feeds update -a
+    #popd
+    #chroot "$BUILD_ROOT" bash -c "cd sdk && ./scripts/feeds update -a"
+    chroot "$BUILD_ROOT" /bin/bash -c "cd sdk && make download V=s"
+    chroot "$BUILD_ROOT" /bin/bash -c "cd sdk && make package/$NAME/download V=s"
+
+
+    #for d in $(find package/ -mindepth 1 -maxdepth 2 -type d); do
+    #if [ -e $d/Makefile ]
+    #then
+    #  make $d/download V=s || true
+    #fi
+    #done
+
+
     $BUILD_DIR/call-openwrt-sdk --root "$BUILD_ROOT"
 
 

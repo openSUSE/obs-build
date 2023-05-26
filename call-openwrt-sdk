@@ -60,19 +60,15 @@ VERSION_RELEASE="$FLATPAK_APP_VERSION"
 if [[ -n $RELEASE ]]; then
     VERSION_RELEASE+="-$RELEASE"
 fi
-chroot "$BUILD_ROOT" bash -c "chmod 777 -R sdk"
 chroot "$BUILD_ROOT" bash -c "cd sdk && grep localrepo feeds.conf.default || echo \"src-link localrepo /repo/\" >> feeds.conf.default"
-chroot "$BUILD_ROOT" bash -c ". /etc/profile && cd sdk && ./scripts/feeds update myrepo"
+chroot "$BUILD_ROOT" bash -c "cd sdk && cp feeds.conf.default /usr/src/packages"
+chroot "$BUILD_ROOT" bash -c "rm -f /sdk/staging_dir/host/lib/libncurses* && cp -r /sdk/staging_dir/host/lib/* /lib/"
+chroot "$BUILD_ROOT" bash -c "ln -sf /sdk/include /usr/src/packages/include"
+chroot "$BUILD_ROOT" bash -c "mkdir -p /usr/src/packages/package/feeds/"
+chroot "$BUILD_ROOT" bash -c "cd sdk && ./scripts/feeds update localrepo"
 chroot "$BUILD_ROOT" bash -c "cd sdk && ./scripts/feeds install $NAME"
+chroot "$BUILD_ROOT" bash -c "cd sdk && ./staging_dir/host/bin/usign -G -s ./key-build -p ./key-build.pub -c localkey"
 chroot "$BUILD_ROOT" bash -c "cd sdk && make defconfig"
-
-# Hack to prepare for compile
-chroot "$BUILD_ROOT" bash -c "cp -f /usr/bin/git /usr/bin/git.bak && cp -f /bin/true /usr/bin/git"
-
-chroot "$BUILD_ROOT" bash -c "cd sdk && make package/$NAME/compile V=s -j9"
-
-# Fix git
-chroot "$BUILD_ROOT" bash -c "mv /usr/bin/git.bak /usr/bin/git"
-
-
+chroot "$BUILD_ROOT" bash -c "cd sdk/staging_dir/host/bin/ && mv -n fakeroot fakeroot.bak && ln -sf /usr/bin/unshare /sdk/staging_dir/host/bin/fakeroot"
+chroot "$BUILD_ROOT" bash -c "cd sdk && make package/$NAME/compile V=s"
 chroot "$BUILD_ROOT" bash -c "cd sdk && make package/index V=s"
