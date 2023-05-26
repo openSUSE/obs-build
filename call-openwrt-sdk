@@ -21,7 +21,7 @@ while test -n "$1" ; do
 done
 
 if test -z "$BUILD_ROOT" ; then
-    echo "Usage: call-flatpak-builder --root <buildroot>"
+    echo "Usage: call-openwrt-sdk --root <buildroot>"
     exit 1
 fi
 
@@ -53,13 +53,6 @@ set -x
 # Set up the SDK
 #chroot "$BUILD_ROOT" bash -c "cd sdk && ./scripts/feeds update -a"
 
-
-
-# Create bundle from repo
-VERSION_RELEASE="$FLATPAK_APP_VERSION"
-if [[ -n $RELEASE ]]; then
-    VERSION_RELEASE+="-$RELEASE"
-fi
 chroot "$BUILD_ROOT" bash -c "cd sdk && grep localrepo feeds.conf.default || echo \"src-link localrepo /repo/\" >> feeds.conf.default"
 chroot "$BUILD_ROOT" bash -c "cd sdk && cp feeds.conf.default /usr/src/packages"
 chroot "$BUILD_ROOT" bash -c "rm -f /sdk/staging_dir/host/lib/libncurses* && cp -r /sdk/staging_dir/host/lib/* /lib/"

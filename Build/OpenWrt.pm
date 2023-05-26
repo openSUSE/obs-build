@@ -115,12 +115,6 @@ sub parse {
   $ret->{subarch} = $data->{'subarch'} or die "OpenWrt file is missing subarch key.";
   $ret->{relver} = $data->{'relver'} or die "OpenWrt file is missing relver key.";
   $ret->{tarball} = $data->{'tarball'} or die "OpenWrt file is missing tarball key.";
-  my $runtime_version = "tbd";
-
-  my @packdeps;
-  push @packdeps, "firstpackdep";
-  push @packdeps, "secondpackdep";
-  $ret->{deps} = \@packdeps;
 
   my @sources;
   if (my $modules = $data->{modules}) {
@@ -151,35 +145,6 @@ sub show {
     else {
         print "$value\n";
     }
-}
-
-# This replaces http urls with local file urls because during build
-# flatpak-builder has no network
-sub rewrite {
-  my ($fn) = @ARGV;
-  my $data = _read_manifest($fn);
-  if (my $modules = $data->{modules}) {
-    for my $module (@$modules) {
-      if (my $sources = $module->{sources}) {
-        for my $source (@$sources) {
-          if ($source->{type} eq 'archive') {
-            my $path = $source->{url};
-            $path =~ s{.*/}{}; # Get filename
-            $source->{url} = "file:///usr/src/packages/SOURCES/$path";
-          }
-        }
-      }
-    }
-  }
-  my $yaml = '';
-  if ($yamlpp) {
-    # YAML::PP would allow us to keep key order
-    $yaml = $yamlpp->dump_string($data);
-  }
-  elsif ($yamlxs) {
-    $yaml = YAML::XS::Dump($data);
-  }
-  print $yaml;
 }
 
 1;

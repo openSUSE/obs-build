@@ -1,6 +1,8 @@
 #################################################################
 #
-# Flatpak specific functions.
+# OpenWrt specific functions.
+#
+# Adapted from Flatpak specific functions, see details below.
 #
 # Author: Tina Müller <tina.mueller@suse.com>
 #
@@ -29,7 +31,7 @@ recipe_setup_openwrt() {
     pwd
     TOPDIR=/usr/src/packages
     "$DO_INIT_TOPDIR" && rm -rf "$BUILD_ROOT$TOPDIR"
-    for i in OTHER SOURCES FLATPAK_ROOT ; do
+    for i in OTHER SOURCES ; do
 	mkdir -p "$BUILD_ROOT$TOPDIR/$i"
     done
     if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
@@ -47,61 +49,29 @@ recipe_prepare_openwrt() {
 # Variables:
 # $BUILD_ROOT is the chroot
 # $TOPDIR/SOURCES includes the sources
-# $RECIPEFILE the name of the flatpak.(yaml|json) config file
+# $RECIPEFILE the name of the openwrt.(yaml|json) config file
 
 recipe_build_openwrt() {
-    echo "===================== recipe_build_flatpak ($@)"
+    echo "===================== recipe_build_openwrt ($@)"
     set -e
 
-    mkdir -p "$BUILD_ROOT/var/lib/flatpak/runtime"
-    cd "$BUILD_ROOT/var/lib/flatpak/runtime"
-    # Unpack the tarfiles installed by the rpms
-    local pkg
-    for i in ../tars/*.tar.gz; do
-      echo "Unpacking $i"
-      pkg="$(basename $i)" pkg="${pkg/-*}"
-      [[ -d $pkg ]] || tar xf $i
-    done
-
-#    env | sort
-
-#    perl -v
-#    perl -wE'use JSON::PP 99' || true
-#    perl -wE'use YAML::XS 99' || true
-#    perl -wE'use YAML::PP 99' || true
-#    perl -wE'use URI 99' || true
-
     ls -l $BUILD_ROOT$TOPDIR/SOURCES
-    cd "$BUILD_ROOT$TOPDIR/FLATPAK_ROOT"
+    cd "$BUILD_ROOT$TOPDIR/"
     cp $BUILD_ROOT$TOPDIR/SOURCES/* .
 
-    local FLATPAK_FILE="$TOPDIR/SOURCES/$RECIPEFILE"
-    local FLATPAK_FILE_LOCAL="$TOPDIR/SOURCES/flatpak-local.yaml"
-    local FLATPAK_APP=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$FLATPAK_FILE" name)
-    #local FLATPAK_APP_VERSION=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$FLATPAK_FILE" version)
-    FLATPAK_APP_VERSION=7654
-    # Rewrite http urls to file urls
-    perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::rewrite' -- "$BUILD_ROOT$FLATPAK_FILE" > "$BUILD_ROOT$FLATPAK_FILE_LOCAL"
-    FLATPAK_FILE="$FLATPAK_FILE_LOCAL"
-    FLATPAK_APP_VERSION="${FLATPAK_APP_VERSION:-0}"
-    local FLATPAK_REPO=/tmp/flatpakrepo
-    local FLATPAK_REMOTE=https://dl.flathub.org/repo/flathub.flatpakrepo
-    export FLATPAK_REPO
-    export FLATPAK_REMOTE
-    export FLATPAK_APP
-    export FLATPAK_APP_VERSION
-    export FLATPAK_FILE
+    local OPENWRT_FILE="$TOPDIR/SOURCES/$RECIPEFILE"
+    export OPENWRT_FILE
     export TOPDIR
     export RELEASE
 
 
-    local NAME=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$FLATPAK_FILE" name)
-    local GITURL=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$FLATPAK_FILE" giturl)
-    local SDKURL=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$FLATPAK_FILE" sdkurl)
-    local ARCH=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$FLATPAK_FILE" arch)
-    local SUBARCH=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$FLATPAK_FILE" subarch)
-    local RELVER=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$FLATPAK_FILE" relver)
-    local TARBALL=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$FLATPAK_FILE" tarball)
+    local NAME=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$OPENWRT_FILE" name)
+    local GITURL=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$OPENWRT_FILE" giturl)
+    local SDKURL=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$OPENWRT_FILE" sdkurl)
+    local ARCH=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$OPENWRT_FILE" arch)
+    local SUBARCH=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$OPENWRT_FILE" subarch)
+    local RELVER=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$OPENWRT_FILE" relver)
+    local TARBALL=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$OPENWRT_FILE" tarball)
     
     export NAME
     export GITURL
@@ -124,12 +94,7 @@ recipe_build_openwrt() {
     chroot "$BUILD_ROOT" bash -c "cd sdk && grep localrepo feeds.conf.default || echo \"src-link localrepo /repo/\" >> feeds.conf.default"
 
 
-   
-
-    
-    #pushd "$BUILD_ROOT" && cd sdk && ./scripts/feeds update -a
-    #popd
-    #chroot "$BUILD_ROOT" bash -c "cd sdk && ./scripts/feeds update -a"
+    # Download the dependencies
     chroot "$BUILD_ROOT" /bin/bash -c "cd sdk && make download V=s"
     chroot "$BUILD_ROOT" /bin/bash -c "cd sdk && make package/$NAME/download V=s"
 
