@@ -5,12 +5,12 @@ and one for the environment for the build result.
 
 ==== Terminology
 
-The terminiology for this is unfortunatly not standarised and tools have conflicting
+The terminiology for this is unfortunatly not standarised and various tools have conflicting
 defintions. 
 
 We use the following
 
-=====  Host: The architecture build environment which executes the for example the compiler.
+=====  Host Native: The architecture build environment which executes the for example the compiler.
 
 cmake is calling this HOST as well (eg. CMAKE_HOST_SYSTEM_PROCESSOR)
 
@@ -32,7 +32,7 @@ in the list below.
 
 [width="15%"]
 |=================================
-|build || host  | target  |  -/-
+|pbuild|| host  | target  |  -/-
 |cmake || HOST  | default |  -/-
 |GNU   || build | host    | target
 |rpm   || build | target  |  -/-
