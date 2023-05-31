@@ -615,6 +615,7 @@ vm_detect_2nd_stage() {
     BUILD_DIR=/.build
     echo "machine type: `uname -m`"
     echo "Linux version: `uname -rv`"
+    echo "Time: `date`"
     echo "Increasing log level from now on..."
     echo 4 > /proc/sysrq-trigger
     echo "Enable sysrq operations"
