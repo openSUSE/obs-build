@@ -53,14 +53,24 @@ set -x
 # Set up the SDK
 #chroot "$BUILD_ROOT" bash -c "cd sdk && ./scripts/feeds update -a"
 
+# Set up local repository, prepare libraries
 chroot "$BUILD_ROOT" bash -c "cd sdk && grep localrepo feeds.conf.default || echo \"src-link localrepo /repo/\" >> feeds.conf.default"
 chroot "$BUILD_ROOT" bash -c "cd sdk && cp feeds.conf.default /usr/src/packages"
 chroot "$BUILD_ROOT" bash -c "rm -f /sdk/staging_dir/host/lib/libncurses* && cp -r /sdk/staging_dir/host/lib/* /lib/"
-chroot "$BUILD_ROOT" bash -c "ln -sf /sdk/include /usr/src/packages/include"
-chroot "$BUILD_ROOT" bash -c "mkdir -p /usr/src/packages/package/feeds/"
+chroot "$BUILD_ROOT" bash -c "cp -r /sdk/include /repo/$NAME/"
+chroot "$BUILD_ROOT" bash -c "grep INCLUDE_DIR: /repo/$NAME/Makefile || sed 1s@^@INCLUDE_DIR:=/repo/$NAME/include/\\\\n@ -i /repo/$NAME/Makefile"
+
+# Update index files
+chroot "$BUILD_ROOT" bash -c "for f in /sdk/*; do ln -sf \$f /usr/src/packages/; done"
 chroot "$BUILD_ROOT" bash -c "cd sdk && ./scripts/feeds update localrepo"
+
+# Install local repository
 chroot "$BUILD_ROOT" bash -c "cd sdk && ./scripts/feeds install $NAME"
+
+# Set up signatures
 chroot "$BUILD_ROOT" bash -c "cd sdk && ./staging_dir/host/bin/usign -G -s ./key-build -p ./key-build.pub -c localkey"
+
+# Compile the package
 chroot "$BUILD_ROOT" bash -c "cd sdk && make defconfig"
 chroot "$BUILD_ROOT" bash -c "cd sdk/staging_dir/host/bin/ && mv -n fakeroot fakeroot.bak && ln -sf /usr/bin/unshare /sdk/staging_dir/host/bin/fakeroot"
 chroot "$BUILD_ROOT" bash -c "cd sdk && make package/$NAME/compile V=s"
