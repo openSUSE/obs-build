@@ -4,7 +4,8 @@
 #
 # Adapted from Flatpak specific functions, see details below.
 #
-# Author: Tina Müller <tina.mueller@suse.com>
+# Original Author: Tina Müller <tina.mueller@suse.com>
+# Adapted-By: Andrei Enache <andreien@proton.me>
 #
 ################################################################
 #
