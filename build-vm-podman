@@ -1,0 +1,88 @@
+#
+# Podman specific functions
+#
+################################################################
+#
+# Copyright (c) 2023 Dirk Mueller
+# Copyright (c) 2023 SUSE, LLC
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+vm_verify_options_podman() {
+    VM_ROOT=
+    VM_SWAP=
+}
+
+vm_startup_podman() {
+    local name="build_${RECIPEFILE}"
+    podman rm "$name" >/dev/null 2>&1 || true
+    local podman_opts=
+    test -n "$VM_TYPE_PRIVILEGED" && podman_opts="--privileged --cap-add=SYS_ADMIN --cap-add=MKNOD"
+    podman run \
+        --rm --name "$name" --net=none $podman_opts \
+        --mount "type=bind,source=$BUILD_ROOT,destination=/" \
+        "$@" build-scratch:latest "$vm_init_script"
+    BUILDSTATUS="$?"
+    test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
+    cleanup_and_exit "$BUILDSTATUS"
+}
+
+vm_kill_podman() {
+    local name="build_${RECIPEFILE}"
+    podman stop -t 2 "$name" || true
+}
+
+vm_fixup_podman() {
+
+    # create a scratch image for our build environment
+    if ! podman image exists build-scratch:latest ; then
+        echo "FROM scratch"  | podman build -t build-scratch:latest  -
+    fi
+
+    # we need this as marker for handling container specific code. Docker is setting it as well
+    touch $BUILD_ROOT/.podmanenv
+    test -n "$VM_TYPE_PRIVILEGED" && touch $BUILD_ROOT/.podmanenv.privileged
+}
+
+vm_attach_root_podman() {
+    :
+}
+
+vm_attach_swap_podman() {
+    :
+}
+
+vm_detach_root_podman() {
+    :
+}
+
+vm_detach_swap_podman() {
+    :
+}
+
+vm_cleanup_podman() {
+    :
+}
+
+vm_sysrq_podman() {
+    :
+}
+
+vm_wipe_podman() {
+    local name="build_${RECIPEFILE}"
+    podman rm "$name" >/dev/null 2>&1 || true
+}
