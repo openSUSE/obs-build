@@ -190,6 +190,10 @@ clean_build_root() {
 	umount_stuff
 	rm -rf -- "$BUILD_ROOT"/* 2> /dev/null || true
 	chattr -a -A -i -R -- "$BUILD_ROOT" 2> /dev/null || true    # does not follow symlinks
+	# For rootless podman switch to subuid root
+	if test "$UID" != 0 && unshare --map-auto true >/dev/null 2>&1; then
+	    unshare --map-auto -r rm -rf -- "$BUILD_ROOT"/* 2> /dev/null || true
+	fi
 	rm -rf -- "$BUILD_ROOT"/*
 	rm -rf -- "$BUILD_ROOT/.build"
 	rm -rf -- "$BUILD_ROOT"/.build.console.*
