@@ -255,6 +255,9 @@ sub parse {
       if ($line =~ /^#!BuildVersion:\s*(\S+)\s*$/) {
 	$ret->{'version'} = $1;
       }
+      if ($line =~ /^#!BuildRelease:\s*(\S+)\s*$/) {
+	$ret->{'release'} = $1;
+      }
       if ($line =~ /^#!UnorderedRepos\s*$/) {
         $unorderedrepos = 1;
       }
@@ -383,7 +386,8 @@ sub parse {
   }
   push @{$ret->{'deps'}}, '--unorderedimagerepos' if $unorderedrepos;
   my $version = $ret->{'version'};
-  my $release = $cf->{'buildrelease'};
+  my $release = $ret->{'release'};
+  $release = $cf->{'buildrelease'} if defined $cf->{'buildrelease'};
   for (@{$ret->{'containertags'} || []}) {
     s/<VERSION>/$version/g if defined $version;
     s/<RELEASE>/$release/g if defined $release;
