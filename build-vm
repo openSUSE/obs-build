@@ -34,6 +34,7 @@ VM_SWAPDEV=/dev/hda2
 VM_TYPE=
 declare -a VM_ARGS
 VM_TYPE_PRIVILEGED=
+VM_TYPE_CONTAINER=
 VM_ROOT=
 VM_SWAP=
 VM_ROOT_TYPE=
@@ -73,7 +74,7 @@ EMULATOR_SCRIPT=
 # openstack specific
 VM_OPENSTACK_FLAVOR=
 
-for i in ec2 emulator kvm lxc openstack qemu uml xen zvm docker pvm nspawn; do
+for i in ec2 emulator kvm lxc openstack qemu uml xen zvm docker podman pvm nspawn; do
     . "$BUILD_DIR/build-vm-$i"
 done
 
@@ -146,11 +147,14 @@ vm_parse_options() {
 	needarg
 	VM_TYPE="$ARG"
 	case "$VM_TYPE" in
-	    docker:privileged|nspawn:privileged)
+	    podman:privileged|docker:privileged|nspawn:privileged)
                 VM_TYPE_PRIVILEGED=true
+                VM_TYPE_CONTAINER=true
                 VM_TYPE=${VM_TYPE%:*}
             ;;
-	    lxc|docker|nspawn) ;;
+	    lxc|podman|docker|nspawn)
+                VM_TYPE_CONTAINER=true
+            ;;
 	    ec2|xen|kvm|uml|qemu|emulator|openstack|zvm|pvm)
 		test -z "$VM_ROOT" && VM_ROOT=1
 	    ;;
@@ -338,7 +342,7 @@ vm_shutdown_halt_helper() {
 vm_shutdown_halt() {
     # get rid of the exit handler
     trap EXIT
-    test "$VM_TYPE" = lxc -o "$VM_TYPE" = docker -o "$VM_TYPE" = nspawn && exit $1
+    test -n "$VM_TYPE_CONTAINER" && exit $1
     # shutdown from fresh shell to close out deleted inodes
     exec -a "build: halt" -- $BASH -c "$(declare -f vm_shutdown_halt_helper); vm_shutdown_halt_helper $1"
     echo "Warning: clean shut down of the VM didn't work"
@@ -616,19 +620,21 @@ vm_detect_2nd_stage() {
     echo "machine type: `uname -m`"
     echo "Linux version: `uname -rv`"
     echo "Time: `date`"
-    echo "Increasing log level from now on..."
-    echo 4 > /proc/sysrq-trigger
-    echo "Enable sysrq operations"
-    echo 1 > /proc/sys/kernel/sysrq
-    if test "$PERSONALITY" != 0 -a -z "$PERSONALITY_SET" ; then
-	export PERSONALITY_SET=true
-	echo "switching personality to $PERSONALITY..."
-	# this is 32bit perl/glibc, thus the 32bit syscall number
-	exec perl -e 'syscall(136, '$PERSONALITY') == -1 && warn("personality: $!\n");exec "/.build/build" || die("/.build/build: $!\n")'
+    if test -z "$VM_TYPE_CONTAINER"; then
+        echo "Increasing log level from now on..."
+        echo 4 > /proc/sysrq-trigger
+        echo "Enable sysrq operations"
+        echo 1 > /proc/sys/kernel/sysrq
+        if test "$PERSONALITY" != 0 -a -z "$PERSONALITY_SET" ; then
+            export PERSONALITY_SET=true
+            echo "switching personality to $PERSONALITY..."
+            # this is 32bit perl/glibc, thus the 32bit syscall number
+            exec perl -e 'syscall(136, '$PERSONALITY') == -1 && warn("personality: $!\n");exec "/.build/build" || die("/.build/build: $!\n")'
+        fi
     fi
     RUNNING_IN_VM=true
     test -e /proc/version || mount -orw -n -tproc none /proc
-    if test "$VM_TYPE" != lxc -a "$VM_TYPE" != docker -a "$VM_TYPE" != nspawn ; then
+    if test -z "$VM_TYPE_CONTAINER" ; then
 	mount -n ${VMDISK_MOUNT_OPTIONS},remount,rw /
     fi
     umount /run >/dev/null 2>&1
@@ -704,20 +710,22 @@ vm_detect_2nd_stage() {
         test -e /etc/mtab || ln -sf /proc/mounts /etc/mtab
     fi
 
-    # set date to build start on broken systems (now < build start)
-    if test $(date '+%s') -lt $(date -r /.build/.date '+%s') ; then
-        echo -n "WARNING: system has a broken clock, setting it to a newer time: "
-        date -s $(</.build/.date)
-    fi
+    if test -z "$VM_TYPE_CONTAINER" ; then
+        # set date to build start on broken systems (now < build start)
+        if test $(date '+%s') -lt $(date -r /.build/.date '+%s') ; then
+            echo -n "WARNING: system has a broken clock, setting it to a newer time: "
+            date -s $(</.build/.date)
+        fi
 
-    # Enable Core dump generation
-    mkdir -p "$BUILD_ROOT/.build/cores"
-    echo "/.build/cores/%p" > /proc/sys/kernel/core_pattern
+        # Enable Core dump generation
+        mkdir -p "$BUILD_ROOT/.build/cores"
+        echo "/.build/cores/%p" > /proc/sys/kernel/core_pattern
 
-    # Load selinux policy (if a preinstall image is used)
-    if test -s /etc/selinux/config -a -x /usr/sbin/load_policy -a -e /sys/fs/selinux/status -a -e /installed-pkg ; then
-	echo "loading selinux policy"
-	/usr/sbin/load_policy
+        # Load selinux policy (if a preinstall image is used)
+        if test -s /etc/selinux/config -a -x /usr/sbin/load_policy -a -e /sys/fs/selinux/status -a -e /installed-pkg ; then
+            echo "loading selinux policy"
+            /usr/sbin/load_policy
+        fi
     fi
     return 0
 }
@@ -1014,7 +1022,6 @@ vm_first_stage() {
 	ppc|ppcle|s390) PERSONALITY=8 ;;	# ppc/s390 kernel never tells us if a 32bit personality is active, assume we run on 64bit
 	aarch64) test "$BUILD_ARCH" != "${BUILD_ARCH#armv[567]}" && PERSONALITY=8 ;; # workaround, to be removed
     esac
-    test "$VM_TYPE" = lxc -o "$VM_TYPE" = docker -o "$VM_TYPE" = nspawn && PERSONALITY=0
     echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
     echo "VM_HOSTNAME='$HOST'" >> $BUILD_ROOT/.build/build.data
     echo -n "definesnstuff=(" >> $BUILD_ROOT/.build/build.data
@@ -1024,6 +1031,7 @@ vm_first_stage() {
     shellquote "${repos[@]}" >> $BUILD_ROOT/.build/build.data
     echo ")" >> $BUILD_ROOT/.build/build.data
     echo "VM_TYPE='$VM_TYPE'" >> $BUILD_ROOT/.build/build.data
+    echo "VM_TYPE_CONTAINER='$VM_TYPE_CONTAINER'" >> $BUILD_ROOT/.build/build.data
     echo "VM_NETWORK='$VM_NETWORK'" >> $BUILD_ROOT/.build/build.data
     echo "RUN_SHELL='$RUN_SHELL'" >> $BUILD_ROOT/.build/build.data
     echo "RUN_SHELL_AFTER_FAIL='$RUN_SHELL_AFTER_FAIL'" >> $BUILD_ROOT/.build/build.data
@@ -1175,28 +1183,31 @@ vm_save_statistics() {
 	echo "" >> $otherdir/_statistics
 	rm /.build/_statistics.memory
     fi
-    if ! test -e /sys/block; then
-	mkdir -p /sys
-	mount -n sys /sys -t sysfs
-	sys_mounted=1
+
+    if test -z "$VM_TYPE_CONTAINER"; then
+        if ! test -e /sys/block; then
+            mkdir -p /sys
+            mount -n sys /sys -t sysfs
+            sys_mounted=1
+        fi
+        device="hda1"
+        test -e /dev/sda && device="sda"
+        test -e /dev/vda && device="vda"
+        test -e /dev/xvda && device="xvda"   # in newer XEN setups
+        test -e /dev/dasda && device="dasda" # in z/VM
+        test -e /dev/nfhd0 && device="nfhd0" # in aranym
+        if test -e /sys/block/${device}/stat ; then
+            disk=(`cat /sys/block/${device}/stat`)
+            test "0${disk[0]}" -gt 0 && echo "IO_requests_read: ${disk[0]}"  >> $otherdir/_statistics
+            test "0${disk[2]}" -gt 0 && echo "IO_sectors_read: ${disk[2]}"   >> $otherdir/_statistics
+            test "0${disk[4]}" -gt 0 && echo "IO_requests_write: ${disk[4]}" >> $otherdir/_statistics
+            test "0${disk[6]}" -gt 0 && echo "IO_sectors_write: ${disk[6]}"  >> $otherdir/_statistics
+        else
+            echo "ERROR: no root disk device found, yet another new device name?"
+            ls -l /sys/block/
+        fi
+        test -n "$sys_mounted" && umount /sys
     fi
-    device="hda1"
-    test -e /dev/sda && device="sda"
-    test -e /dev/vda && device="vda"
-    test -e /dev/xvda && device="xvda"   # in newer XEN setups
-    test -e /dev/dasda && device="dasda" # in z/VM
-    test -e /dev/nfhd0 && device="nfhd0" # in aranym
-    if test -e /sys/block/${device}/stat ; then
-	disk=(`cat /sys/block/${device}/stat`)
-	test "0${disk[0]}" -gt 0 && echo "IO_requests_read: ${disk[0]}"  >> $otherdir/_statistics
-	test "0${disk[2]}" -gt 0 && echo "IO_sectors_read: ${disk[2]}"   >> $otherdir/_statistics
-	test "0${disk[4]}" -gt 0 && echo "IO_requests_write: ${disk[4]}" >> $otherdir/_statistics
-	test "0${disk[6]}" -gt 0 && echo "IO_sectors_write: ${disk[6]}"  >> $otherdir/_statistics
-    else
-	echo "ERROR: no root disk device found, yet another new device name?"
-	ls -l /sys/block/
-    fi
-    test -n "$sys_mounted" && umount /sys
 }
 
 # args: resultdirs
@@ -1259,7 +1270,7 @@ vm_setup_network() {
 	    cleanup_and_exit 1 "ERROR: neither /sbin/ifconfig nor /sbin/ip is installed, please specify correct package via -x option"
 	fi
     fi
-    if test -n "$VM_HOSTNAME" ; then 
+    if test -z "$VM_TYPE_CONTAINER" -a -n "$VM_HOSTNAME" ; then
 	if test -e /bin/hostname -o -e /usr/bin/hostname -o -e /sbin/hostname -o -e /usr/sbin/hostname ; then
 	    hostname "$VM_HOSTNAME"
 	elif test -e /proc/sys/kernel/hostname ; then
