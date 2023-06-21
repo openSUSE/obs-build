@@ -258,6 +258,9 @@ sub parse {
       if ($line =~ /^#!BuildRelease:\s*(\S+)\s*$/) {
 	$ret->{'release'} = $1;
       }
+      if ($line =~ /^#!BuildConstraint:\s*(\S.+?)\s*$/) {
+	push @{$ret->{'buildconstraint'}}, $1;
+      }
       if ($line =~ /^#!UnorderedRepos\s*$/) {
         $unorderedrepos = 1;
       }
