@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Wed Jun 28 07:50:46 UTC 2023 - Adrian Schröter <adrian@suse.de>
+
+- --vm-type=podman added (supports also root-less builds)
+- Also support build constraints in the Dockerfile
+- minor fixes
+
+-------------------------------------------------------------------
 Tue May  2 12:13:54 UTC 2023 - Adrian Schröter <adrian@suse.de>
 
 - Add SUSE ALP build config
