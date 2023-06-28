@@ -330,9 +330,9 @@ int main(int argc, char* argv[], char* env[])
 	int retval;
 	char buf[BUFSIZ], *build_dir;
 
-        /* Docker builds get /proc mounted */
+        /* Docker builds get /proc mounted, so test for /proc/self */
         struct stat sb;
-        if (stat("/.dockerenv", &sb)) {
+        if (lstat("/proc/self", &sb)) {
 	        /* mount proc filesystem if it isn't already. */
 		if (mount("proc", "/proc", "proc", MS_MGC_VAL, NULL) == -1) {
 			if (errno != EBUSY) {
