@@ -51,7 +51,6 @@ vm_kill_docker() {
 vm_fixup_docker() {
     # we need this as marker for handling container specific code. Docker is setting it as well
     touch $BUILD_ROOT/.dockerenv
-    test -n "$VM_TYPE_PRIVILEGED" && touch $BUILD_ROOT/.dockerenv.privileged
 }
 
 vm_attach_root_docker() {

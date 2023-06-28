@@ -47,15 +47,10 @@ vm_kill_podman() {
 }
 
 vm_fixup_podman() {
-
     # create a scratch image for our build environment
     if ! podman image exists build-scratch:latest ; then
         echo "FROM scratch"  | podman build -t build-scratch:latest  -
     fi
-
-    # we need this as marker for handling container specific code. Docker is setting it as well
-    touch $BUILD_ROOT/.podmanenv
-    test -n "$VM_TYPE_PRIVILEGED" && touch $BUILD_ROOT/.podmanenv.privileged
 }
 
 vm_attach_root_podman() {
