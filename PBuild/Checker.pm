@@ -169,8 +169,9 @@ sub pkgcheck {
     # cycle handling code
     my $incycle = 0; 
     if ($cychash->{$packid}) {
-      ($packid, $incycle) = handlecycle($ctx, $packid, \@cpacks, \%cycpass, \%packstatus);
-      next unless $incycle;
+      ($packid, $incycle) = handlecycle($ctx, $packid, \@cpacks, \%cycpass);
+      next  if $incycle == 4;    # ignore after pass1/2
+      next  if $packstatus{$packid} && $packstatus{$packid} ne 'done' && $packstatus{$packid} ne 'succeeded' && $packstatus{$packid} ne 'failed'; # already decided
     }
     my $p = $pkgsrc->{$packid};
     if ($p->{'error'}) {
@@ -515,7 +516,7 @@ relsynccheck:
 # Build dependency cycle handling
 #
 sub handlecycle {
-  my ($ctx, $packid, $cpacks, $cycpass, $packstatus) = @_;
+  my ($ctx, $packid, $cpacks, $cycpass) = @_;
 
   my $incycle = 0; 
   my $cychash = $ctx->{'cychash'};
@@ -553,8 +554,6 @@ sub handlecycle {
       $notready->{($pkgsrc->{$_} || {})->{'name'} || $_} ||= 1 for @cycp;
     }
   }
-  return ($packid, undef) if $incycle == 4;    # ignore after pass1/2
-  return ($packid, undef) if $packstatus->{$packid} && $packstatus->{$packid} ne 'done' && $packstatus->{$packid} ne 'succeeded' && $packstatus->{$packid} ne 'failed'; # already decided
   return ($packid, $incycle);
 }
 
