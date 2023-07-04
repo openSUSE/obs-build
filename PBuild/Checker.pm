@@ -106,6 +106,110 @@ sub pkgexpand {
 }
 
 #
+# Sort the components of a dependency cycle
+#
+sub cycsort {
+  my ($pkg2dep, $dep2src, $pkg2src, @cyc) = @_;
+  @cyc = sort(@cyc);
+  my @i = 0..(@cyc- 1);
+
+  # create forward dependencies
+  my @xfdeps;
+  my %d;
+  for my $i (@i) {
+    $d{$dep2src->{$_} || $_}->{$i} = 1 for @{$pkg2dep->{$cyc[$i]}};
+  }
+  for my $i (@i) {
+    $_ != $i and push @{$xfdeps[$_]}, $i for keys %{$d{$pkg2src->{$cyc[$i]}} || {}};
+  }
+
+  my @xrdeps;
+  for my $i (@i) {
+    push @{$xrdeps[$_]}, $i for @{$xfdeps[$i]};
+  }
+
+  my @fdone;
+  my @rdone;
+
+  my @nfdeps = (0) x scalar(@cyc);
+  my @nrdeps = (0) x scalar(@cyc);
+  for my $i (@i) {
+    for (@{$xfdeps[$i]}) {
+      next if $_ == $i;
+      $nfdeps[$i]++;
+      $nrdeps[$_]++;
+    }
+  }
+
+  while (1) {
+    my $min = @cyc;
+    my $max = -1;
+    my $mini;
+
+    for my $i (@i) {
+      my $n = $nfdeps[$i];
+      if ($n > 0 && $min >= $n) {
+	next if $min == $n && $max >= $nrdeps[$i];
+	$min = $n;
+	$mini = $i;
+	$max = $nrdeps[$i];
+      }
+    }
+    for my $i (@i) {
+      my $n = $nrdeps[$i];
+      if ($n > 0 && $min >= $n) {
+	next if $min == $n && $max >= $nfdeps[$i];
+	$min = $n;
+	$mini = $i + @cyc;
+	$max = $nfdeps[$i];
+      }
+    }
+    last unless defined $mini;
+
+    my ($i, $o);
+    if ($mini < @cyc) {
+      # outgoing, choose other
+      $i = $mini;
+      $o = (sort {$nrdeps[$b] <=> $nrdeps[$a]} grep {$nrdeps[$_] > 0} @{$xfdeps[$i]})[0];
+    } else {
+      $o = $mini - @cyc;
+      $i = (sort {$nfdeps[$a] <=> $nfdeps[$b]} grep {$nfdeps[$_] > 0} @{$xrdeps[$o]})[0];
+    }
+    #print "CHOOSE $i -> $o $cyc[$i] -> $cyc[$o]\n";
+    $nrdeps[$_]-- for @{$xfdeps[$i]};
+    $nfdeps[$_]-- for @{$xrdeps[$o]};
+    $nfdeps[$i] = 0;
+    $nrdeps[$o] = 0;
+    $fdone[$i] = $o;
+    $rdone[$o] = $i;
+  }
+
+  my @fin;
+  my @done;
+  while (@fin < @cyc) {
+    my @j = grep {defined($fdone[$_])} @i;
+    my @j2 = grep {!defined($rdone[$_])} @j;
+    my $i = @j2 ? $j2[0] : $j[0];
+    last unless defined $i;
+    while (defined($i) && !$done[$i]) {
+      push @fin, $cyc[$i];
+      $done[$i] = 1;
+      ($i, $fdone[$i]) = ($fdone[$i], undef);
+    }
+  }
+  #print "XXX @fin\n";
+  @fin = reverse(@fin);
+  push @fin, map {$cyc[$_]} grep {!$done[$_]} @i;
+
+  # our meta pruning algorithm uses lexicographic ordering, so
+  # we shift the cycle here.
+  my $first = (sort @cyc)[0];
+  push @fin, shift @fin while $fin[0] ne $first;
+
+  return @fin;
+}
+
+#
 # Sort the packages by dependencies
 #
 sub pkgsort {
@@ -125,7 +229,7 @@ sub pkgsort {
   for my $cyc (@sccs) {
     next if @$cyc < 2;  # just in case
     my @c = map {@{$cychash{$_} || [ $_ ]}} @$cyc;
-    @c = PBuild::Util::unify(sort(@c));
+    @c = cycsort(\%pdeps, $ctx->{'dep2src'}, \%pkg2src, @c);
     $cychash{$_} = \@c for @c; 
   }
   #if (@sccs) {
