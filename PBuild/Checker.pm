@@ -754,7 +754,11 @@ sub build {
     @bdeps = Build::get_build($bconf, $ctx->{'subpacks'}->{$p->{'name'}}, @bdeps);
   }
   if (!shift(@bdeps)) {
-    return ('unresolvable', join(', ', @bdeps));
+    if ($ctx->{'bconf_host'}) {
+      return ('unresolvable', 'host:' . join(', ', @bdeps));
+    } else {
+      return ('unresolvable', join(', ', @bdeps));
+    }
   }
   if (@sysdeps && !shift(@sysdeps)) {
     return ('unresolvable', 'sysdeps:' . join(', ', @sysdeps));
