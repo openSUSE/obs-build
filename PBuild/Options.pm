@@ -121,7 +121,14 @@ my $pbuild_options = {
   'showlog' => '',
   'ccache' => \&ccache_special,
   'ccache-type' => '',
+  'debugflags' => \&debugflags_special,
 };
+
+sub debugflags_special {
+  my ($opts, $opt, $origopt, $args) = @_;
+  my $arg = Build::Options::getarg($origopt, $args);
+  $opts->{'debugflags'}->{$_} = 1 for split(',', $arg);
+}
 
 sub vm_type_special {
   my ($opts, $opt, $origopt, $args) = @_;

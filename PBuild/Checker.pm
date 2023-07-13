@@ -56,6 +56,7 @@ sub create {
     'assetmgr' => $assetmgr,
   };
   $ctx->{'rebuild'} = $opts->{'buildtrigger'} if $opts->{'buildtrigger'};
+  $Build::Expand::expand_dbg = 1 if $opts->{'debugflags'}->{'expansion'};
   return bless $ctx;
 }
 
@@ -88,7 +89,9 @@ sub pkgexpand {
   my ($ctx, @pkgs) = @_;
   my $bconf = $ctx->{'bconf'};
   my $bconf_host = $ctx->{'bconf_host'};
+  my $expand_dbg = $Build::Expand::expand_dbg;
   if (($bconf_host || $bconf)->{'expandflags:preinstallexpand'}) {
+    print "=== preinstall expansion\n" if $expand_dbg;
     my $err = Build::expandpreinstalls($bconf_host || $bconf);
     die("cannot expand preinstalls: $err\n") if $err;
   }
@@ -96,6 +99,7 @@ sub pkgexpand {
   my $subpacks = $ctx->{'subpacks'};
   my $cross = $bconf_host ? 1 : 0;
   for my $pkg (@pkgs) {
+    print "=== dependency expansion of $pkg\n" if $expand_dbg;
     my $p = $pkgsrc->{$pkg};
     if ($p->{'native'}) {
       PBuild::Expand::expand_deps($p, $bconf_host, $subpacks);
@@ -718,8 +722,10 @@ sub build {
     }
     @btdeps = PBuild::Util::unify(@btdeps);
   }
+  my $expand_dbg = $Build::Expand::expand_dbg;
   my @sysdeps = @btdeps;
   unshift @sysdeps, grep {/^kiwi-.*:/} @{$p->{'dep'} || []} if $buildtype eq 'kiwi-image';
+  print "=== sysdeps expansion\n" if $expand_dbg;
   if (@sysdeps) {
     @sysdeps = Build::get_sysbuild($bconf, $buildtype, [ @sysdeps ]);   # cannot cache...
   } else {
@@ -752,6 +758,7 @@ sub build {
   if ($kiwimode || $buildtype eq 'buildenv' || $buildtype eq 'preinstallimage') {
     @bdeps = (1, @$edeps);      # reuse edeps packages, no need to expand again
   } else {
+    print "=== builddeps expansion\n" if $expand_dbg;
     @bdeps = Build::get_build($bconf, $ctx->{'subpacks'}->{$p->{'name'}}, @bdeps);
   }
   if (!shift(@bdeps)) {
