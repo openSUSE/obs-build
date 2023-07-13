@@ -375,6 +375,7 @@ sub extractnative {
 sub expand {
   my ($config, @p) = @_;
 
+  print "expand: @p\n" if $expand_dbg;
   my $conflicts = $config->{'conflicth'};
   my $pkgconflicts = $config->{'pkgconflictsh'} || {};
   my $pkgobsoletes = $config->{'pkgobsoletesh'} || {};
