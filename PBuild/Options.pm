@@ -122,6 +122,9 @@ my $pbuild_options = {
   'ccache' => \&ccache_special,
   'ccache-type' => '',
   'debugflags' => \&debugflags_special,
+  'extra-packs' => '::',
+  'extrapacks' => 'extra-packs::',
+  'X' => 'extra-packs::',
 };
 
 sub debugflags_special {

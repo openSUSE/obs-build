@@ -699,6 +699,7 @@ sub build {
   my $reason = $data->[0];
   my $hdeps = $data->[1];
   #print Dumper($reason);
+  my $opts = $ctx->{'opts'};
   my %jobopts;
   $jobopts{'nounchanged'} = 1 if $packid && $ctx->{'cychash'}->{$packid};
   my @btdeps;
@@ -722,6 +723,7 @@ sub build {
     }
     @btdeps = PBuild::Util::unify(@btdeps);
   }
+  push @btdeps, @{$opts->{'extra-packs'}} if $opts->{'extra-packs'};
   my $expand_dbg = $Build::Expand::expand_dbg;
   my @sysdeps = @btdeps;
   unshift @sysdeps, grep {/^kiwi-.*:/} @{$p->{'dep'} || []} if $buildtype eq 'kiwi-image';
@@ -744,7 +746,6 @@ sub build {
     unshift @bdeps, @{$p->{'dep'} || []}, @btdeps;
   }
   push @bdeps, '--ignoreignore--' if @sysdeps || $buildtype eq 'simpleimage';
-  my $opts = $ctx->{'opts'};
   if ($opts->{'ccache'} && ($buildtype eq 'arch' || $buildtype eq 'spec' || $buildtype eq 'dsc')) {
     my $opackid = $packid;
     $opackid = $p->{'releasename'} if $p->{'releasename'};

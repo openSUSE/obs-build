@@ -104,6 +104,7 @@ my $newlastopts = PBuild::Options::merge_old_options($opts, $oldlastopts);
 # tweak options
 die("Option --shell only works with --single\n") if $opts->{'shell'} && !$opts->{'single'};
 die("Option --shell-after-fail only works with --single\n") if $opts->{'shell-after-fail'} && !$opts->{'single'};
+die("Option --extra-packs only works with --single\n") if $opts->{'extra-packs'} && !$opts->{'single'};
 $opts->{'showlog'} = 1 if $opts->{'shell'} || $opts->{'shell-after-fail'} || $opts->{'single'};
 $opts->{'buildjobs'} = 1 if $opts->{'showlog'} || $opts->{'single'};
 
@@ -501,6 +502,23 @@ while (1) {
 
   # check status of all packages
   my $result = $ctx->pkgcheck(\@builders, @pkgs);
+
+  # finish if extra-packs was used as we cannot use the result
+  if ($opts->{'extra-packs'}) {
+    my $pkg = $opts->{'single'};
+    die unless $pkg;
+    my $code = $result->{$pkg}->{'code'};
+    my $details = '';
+    if ($code eq 'building') {
+      my @building = map {$_->{'job'}} grep {$_->{'job'}} @builders;
+      my $job = PBuild::Job::waitjob($opts, @building);
+      ($code) = PBuild::Job::finishjob($job);
+    } else {
+      $details = ": $result->{$pkg}->{'details'}" if $result->{$pkg}->{'details'};
+    }
+    print "$pkg: $code$details\n";
+    exit($code eq 'broken' || $code eq 'failed' || $code eq 'unresolvable' ? 1 : 0);
+  }
 
   # mix in old result from other packages if in single package mode
   if ($opts->{'single'}) {
