@@ -637,7 +637,7 @@ sub parse {
     $ret->{'error'} = "open $specfile: $!";
     return $ret;
   }
-  
+
   initmacros($config, \%macros, \%macros_args);
   my $skip = 0;
   my $main_preamble = 1;
@@ -923,32 +923,33 @@ sub parse {
 	}
       }
       next;
-    } elsif ($preamble && $line =~ /^(Source\d*|Patch\d*|Url|Icon)\s*:\s*(\S+)/i) {
+    } elsif ($preamble && $line =~ /^(Url|Icon)\s*:\s*(\S+)/i) {
       my ($tag, $val) = (lc($1), $2);
       $macros{$tag} = $val if $tag eq 'url';
       # associate url and icon tags with the corresponding subpackage
-      $tag .= scalar @subpacks if ($tag eq 'url' || $tag eq 'icon') && @subpacks;
+      $tag .= scalar @subpacks if @subpacks;
       if ($tag =~ /icon/) {
         # there can be a gif and xpm icon
         push @{$ret->{$tag}}, $val;
       } else {
-	if ($tag =~ /^(source|patch)(\d+)?$/) {
-	  my $num = defined($2) ? 0 + $2 : $autonum{$1};
-	  $tag = "$1$num";
-	  if ($tag eq 'patch0' && exists($ret->{$tag})) {
-	    # gross hack. Before autonumbering "Patch" and "Patch0" could
-	    # exist. So take out the previous patch and add it back
-	    # without number. This does not exactly work as old rpms
-	    # but hopefully good enough :-)
-	    $ret->{'patch'} = delete $ret->{$tag};
-	  }
-	  do_warn($config, "spec file parser: $tag already exists") if exists $ret->{$tag};
-	  $autonum{$1} = $num + 1 if $num >= $autonum{$1};
-	  $macros{uc($1) . "URL$num"} = $val;
-	}
 	$ret->{$tag} = $val;
       }
-      if ($remoteasset && $tag =~ /^(?:source|patch)/) {
+    } elsif ($preamble && $line =~ /^(Source|Patch)(\d*)\s*(\s+[^:]*?)?:\s*(\S+)/i) {
+      my ($tagtype, $num, $tagextra, $val) = (lc($1), $2, $3, $4);
+      $num = $num ne '' ? 0 + $num : $autonum{$tagtype};
+      my $tag = "$1$num";
+      if ($tag eq 'patch0' && exists($ret->{$tag})) {
+        # gross hack. Before autonumbering "Patch" and "Patch0" could
+        # exist. So take out the previous patch and add it back
+        # without number. This does not exactly work as old rpms
+        # but hopefully good enough :-)
+        $ret->{'patch'} = delete $ret->{$tag};
+      }
+      do_warn($config, "spec file parser: $tag already exists") if exists $ret->{$tag};
+      $autonum{$tagtype} = $num + 1 if $num >= $autonum{$tag};
+      $macros{uc($tagtype) . "URL$num"} = $val;
+      $ret->{$tag} = $val;
+      if ($remoteasset) {
         $remoteasset->{'url'} = $val;
         push @{$ret->{'remoteassets'}}, $remoteasset;
       }
@@ -1570,7 +1571,7 @@ sub getrpmheaders {
     die("$path: no md5 signature header\n") unless $idxarea =~ /\A(?:.{16})*\000\000\003\354\000\000\000\007(....)\000\000\000\020/s;
     my $md5off = unpack('N', $1);
     die("$path: bad md5 offset\n") unless $md5off;
-    $md5off += 96 + 16 + $cnt * 16; 
+    $md5off += 96 + 16 + $cnt * 16;
     $hdrmd5 = unpack("\@${md5off}H32", $buf);
   }
   ($headmagic, $cnt, $cntdata) = unpack('N@8NN', substr($buf, $hlen));
