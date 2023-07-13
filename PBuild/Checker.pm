@@ -699,7 +699,8 @@ sub build {
   $jobopts{'nounchanged'} = 1 if $packid && $ctx->{'cychash'}->{$packid};
   my @btdeps;
   my $edeps = $p->{'dep_expanded'} || [];
-  my $bconf = $ctx->{'bconf_host'} || $ctx->{'bconf'};
+  my $bconf_host = $ctx->{'bconf_host'};
+  my $bconf = $bconf_host || $ctx->{'bconf'};
   my $buildtype = $p->{'buildtype'};
   $buildtype = 'kiwi-image' if $buildtype eq 'kiwi';
   my $kiwimode;
@@ -731,7 +732,7 @@ sub build {
   unshift @bdeps, '--directdepsend--' if @bdeps;
   unshift @bdeps, @{$p->{'dep_native'} || []};
   unshift @bdeps, @{$genbuildreqs->[1]} if $genbuildreqs;
-  if (!$kiwimode && $ctx->{'bconf_host'}) {
+  if (!$kiwimode && $bconf_host) {
     unshift @bdeps, @{$p->{'dep_host'} || $p->{'dep'} || []}, @btdeps;
   } else {
     unshift @bdeps, @{$p->{'dep'} || []}, @btdeps;
@@ -754,14 +755,12 @@ sub build {
     @bdeps = Build::get_build($bconf, $ctx->{'subpacks'}->{$p->{'name'}}, @bdeps);
   }
   if (!shift(@bdeps)) {
-    if ($ctx->{'bconf_host'}) {
-      return ('unresolvable', 'host:' . join(', ', @bdeps));
-    } else {
-      return ('unresolvable', join(', ', @bdeps));
-    }
+    my $hint = $bconf_host ? 'host:' : '';
+    return ('unresolvable', $hint . join(', ', @bdeps));
   }
   if (@sysdeps && !shift(@sysdeps)) {
-    return ('unresolvable', 'sysdeps:' . join(', ', @sysdeps));
+    my $hint = $bconf_host ? 'host-sysdeps:' : 'sysdeps:';
+    return ('unresolvable', $hint . join(', ', @sysdeps));
   }
   my $dep2pkg = $ctx->{'dep2pkg_host'} || $ctx->{'dep2pkg'};
   my @pdeps = Build::get_preinstalls($bconf);
@@ -769,16 +768,17 @@ sub build {
   my @missing = grep {!$dep2pkg->{$_}} (@pdeps, @vmdeps);
   if (@missing) {
     my $missing = join(', ', sort(PBuild::Util::unify(@missing)));
-    return ('unresolvable', "missing pre/vminstalls: $missing");
+    my $hint = $bconf_host ? 'host:' : '';
+    return ('unresolvable', "${hint}missing pre/vminstalls: $missing");
   }
   my $tdeps;
-  $tdeps = [ @$edeps ] if !$kiwimode && !$p->{'native'} && $ctx->{'bconf_host'};
+  $tdeps = [ @$edeps ] if !$kiwimode && !$p->{'native'} && $bconf_host;
   my $oldsrcmd5 = $p->{'srcmd5'};
   $ctx->{'assetmgr'}->getremoteassets($p);
   return ('recheck', 'assets changed') if $p->{'srcmd5'} ne $oldsrcmd5;
   return ('broken', $p->{'error'}) if $p->{'error'};	# missing assets
   my $bins;
-  if ($kiwimode && $ctx->{'bconf_host'}) {
+  if ($kiwimode && $bconf_host) {
     $bins = dep2bins_host($ctx, PBuild::Util::unify(@pdeps, @vmdeps, @sysdeps));
     push @$bins, @{dep2bins($ctx, PBuild::Util::unify(@bdeps))};
   } else {
