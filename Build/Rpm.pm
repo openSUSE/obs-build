@@ -937,7 +937,7 @@ sub parse {
     } elsif ($preamble && $line =~ /^(Source|Patch)(\d*)\s*(\s+[^:]*?)?:\s*(\S+)/i) {
       my ($tagtype, $num, $tagextra, $val) = (lc($1), $2, $3, $4);
       $num = $num ne '' ? 0 + $num : $autonum{$tagtype};
-      my $tag = "$1$num";
+      my $tag = "$tagtype$num";
       if ($tag eq 'patch0' && exists($ret->{$tag})) {
         # gross hack. Before autonumbering "Patch" and "Patch0" could
         # exist. So take out the previous patch and add it back
