@@ -448,7 +448,7 @@ vm_img_mkfs() {
 
     var="vm_img_mkfs_${fs}"; mkfs="${!var}"
     var="vm_img_mkfs_extra_options_${fs}"; mkfs_extra_options="${!var}"
-    var="vm_img_tunefs_${fs}"; vm_img_tunefs="${!var}"
+    var="vm_img_tunefs_${fs}"; tunefs="${!var}"
 
     local labelopt=
     test "$VM_ROOTDEV" != "${VM_ROOTDEV#LABEL=}" && labelopt="-L ${VM_ROOTDEV#LABEL=}"
