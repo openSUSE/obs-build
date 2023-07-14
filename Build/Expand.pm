@@ -699,7 +699,7 @@ sub expand {
 	  for my $q (@q) {
 	    for my $rs (@{$pkgsupplements->{$q} || []}) {
 	      if ($rs =~ /^\(.*\)$/) {
-      		my $rd = Build::Rpm::parse_rich_dep($rs);
+		my $rd = Build::Rpm::parse_rich_dep($rs);
 		next if !$rd || fulfilled_cplx_rec($config, \%p, $rd);
 	      } else {
 	        next unless grep {$p{$_}} @{$whatprovides->{$rs} || Build::addproviders($config, $rs)};
@@ -791,7 +791,7 @@ sub expand {
     for my $r (splice @native) {
       next if $rdone{$r}++;
       if ($r eq '--directdepsend--') {
- 	push @native, $r;
+	push @native, $r;
 	next;
       }
       my @q = @{$whatprovides->{$r} || Build::addproviders($config, $r)};

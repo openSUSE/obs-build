@@ -68,14 +68,14 @@ recipe_build_appimage() {
 
     if test "$DO_INIT" = true; then
         if test -n "$DEB" -a ! -d "$BUILD_ROOT/.build.binaries/dists" ; then
-  	    echo "creating debian repository metadata..."
+	    echo "creating debian repository metadata..."
             createrepo_debian $BUILD_ROOT/.build.binaries ${ARCH} ${DIST}
             # setup /etc/apt/sources.list
             mkdir -p "$BUILD_ROOT/etc/apt"
             echo "deb [trusted=yes] file:/.build.binaries OBS main" >> "$BUILD_ROOT/etc/apt/sources.list"
         fi
         if test -z "$DEB" -a ! -d "$BUILD_ROOT/.build.binaries/repodata" ; then
-  	    echo "creating repository metadata..."
+	    echo "creating repository metadata..."
             if chroot "$BUILD_ROOT" test -x /usr/bin/createrepo_c; then
                 chroot "$BUILD_ROOT" /usr/bin/createrepo_c /.build.binaries
             elif chroot "$BUILD_ROOT" test -x /usr/bin/createrepo; then
