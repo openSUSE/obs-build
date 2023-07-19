@@ -40,8 +40,9 @@ In addition, there is currently experimental support for
 For hardware emulation there are
 ---
 - `qemu`,
-  which runs a `QEMU` system emulator inside of ``KVM``. This can
-  be considered also secure and reproducible.
+  which runs a `QEMU` system emulator. This can be considered
+  also secure and reproducible. It requires a kernel image as
+  part of the build config.
 - The "emulator" VM can be used to run builds using any other
   emulator via a wrapper script.
 - A `QEMU` user land emulation is also possible. This would give
