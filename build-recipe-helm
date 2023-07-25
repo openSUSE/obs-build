@@ -60,6 +60,19 @@ recipe_prepare_helm() {
 }
 
 recipe_build_helm() {
+    BUILD_PATH=
+    if [ -d "$BUILD_ROOT/$TOPDIR/BUILD/_service" ]; then
+      # get the packaging file name
+      FILENAME=$(cat $BUILD_ROOT/$TOPDIR/BUILD/_service | xmllint --xpath 'string(//param[@name="filename"])' -)
+      # get specified path
+      EXTRACT=$(cat $BUILD_ROOT/$TOPDIR/BUILD/_service| xmllint --xpath 'string(//param[@name="extract"])' -)
+      # define $BUILD_PATH
+      if [ -z "$EXTRACT" ]; then
+        BUILD_PATH="$FILENAME/"
+      else
+        BUILD_PATH="$FILENAME/$(dirname "$EXTRACT")"
+      fi
+    fi
     cd "$BUILD_ROOT$TOPDIR/BUILD"
     mkdir -p "$BUILD_ROOT$TOPDIR/HELM"
     chown "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR/HELM"
@@ -73,7 +86,7 @@ recipe_build_helm() {
     # avoid packaging sources services and changes files (also include content from _helmignore)
     chroot $BUILD_ROOT su -c "(cd $TOPDIR/BUILD; [ -f _helmignore ] && mv -f _helmignore .helmignore; echo -e '/*.changes\n/_*\n' >> .helmignore; )"  - $BUILD_USER || cleanup_and_exit 1
     # create chart
-    chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD && helm package -d $TOPDIR/HELM ."  - $BUILD_USER || cleanup_and_exit 1
+    chroot $BUILD_ROOT su -c "cd $TOPDIR/BUILD/$BUILD_PATH && helm package -d $TOPDIR/HELM ."  - $BUILD_USER || cleanup_and_exit 1
     test -f "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz" || cleanup_and_exit 1 "helm package command did not create $nameversion.tgz"
     # extract generated Chart.yaml file
     tar -xOf "$BUILD_ROOT$TOPDIR/HELM/$nameversion.tgz" -- "$name/Chart.yaml" > "$BUILD_ROOT$TOPDIR/HELM/Chart.yaml"
