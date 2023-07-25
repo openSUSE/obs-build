@@ -457,9 +457,10 @@ vm_img_mkfs() {
     if test "$options" = "nodirindex" && test "$fs" = "ext2" -o "$fs" = "ext3" -o "$fs" = "ext4"; then
         mkfs_extra_options="$mkfs_extra_options -O ^dir_index"
     fi
+    local mkfs_populate_options
     if test -n "$populate"; then
       if test "$fs" = "ext2" -o "$fs" = "ext3" -o "$fs" = "ext4"; then
-        mkfs_extra_options="$mkfs_extra_options -d $populate"
+        mkfs_populate_options="-d $populate"
         # mkfs needs to see the files it copies into the fs as owned by root.
         # Otherwise the whole fs tree would be owned by the calling user.
         # Doesn't matter too much when setting up the build root initially as
@@ -467,7 +468,7 @@ vm_img_mkfs() {
         # an image suddenly all ownerships would change.
         [ -x "/usr/bin/unshare" ] && mkfs="unshare --user --map-root-user $mkfs"
       else
-        print "ERROR: populating filesystem is only supported with ext file systems"
+        print "ERROR: populating the filesystem is only supported with ext file systems"
         cleanup_and_exit 1
       fi
     fi
@@ -478,12 +479,12 @@ vm_img_mkfs() {
 
     echo "Creating $fs filesystem on $img"
     export MKE2FS_SYNC=0
-    if ! $mkfs $labelopt $mkfs_extra_options "$img" ; then
+    if ! $mkfs $labelopt $mkfs_extra_options $mkfs_populate_options "$img" ; then
         if test -z "$mkfs_extra_options" ; then
             cleanup_and_exit 3
         else
             echo "Filesystem creation failed, trying again without extra options..."
-            $mkfs $labelopt "$img" || cleanup_and_exit 4
+            $mkfs $labelopt $mkfs_populate_options "$img" || cleanup_and_exit 4
         fi
     fi
     if test -n "$tunefs" ; then
