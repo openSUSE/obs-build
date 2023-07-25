@@ -466,7 +466,7 @@ vm_img_mkfs() {
         # Doesn't matter too much when setting up the build root initially as
         # rpm is called inside anway to fix everything. However, when reusing
         # an image suddenly all ownerships would change.
-        [ -x "/usr/bin/unshare" ] && mkfs="unshare --user --map-root-user $mkfs"
+        test $UID != 0 -a -x /usr/bin/unshare && mkfs="unshare --user --map-root-user $mkfs"
       else
         print "ERROR: populating the filesystem is only supported with ext file systems"
         cleanup_and_exit 1
