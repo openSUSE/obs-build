@@ -946,7 +946,7 @@ sub parse {
         $ret->{'patch'} = delete $ret->{$tag};
       }
       do_warn($config, "spec file parser: $tag already exists") if exists $ret->{$tag};
-      $autonum{$tagtype} = $num + 1 if $num >= $autonum{$tag};
+      $autonum{$tagtype} = $num + 1 if $num >= $autonum{$tagtype};
       $macros{uc($tagtype) . "URL$num"} = $val;
       $ret->{$tag} = $val;
       if ($remoteasset) {
