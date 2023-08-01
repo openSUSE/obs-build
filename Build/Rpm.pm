@@ -371,7 +371,7 @@ sub expandmacros {
 reexpand:
   while ($line =~ /^(.*?)%(\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\*\*?|#|\(|\[)(.*?)\z/s) {
     if ($tries++ > 1000) {
-      do_warn($config, "spec file parser ",($lineno?" line $lineno":''),": macro too deeply nested");
+      do_warn($config, "spec file parser".($lineno?" line $lineno":'').": macro too deeply nested");
       $line = 'MACRO';
       last;
     }
@@ -411,7 +411,7 @@ reexpand:
     }
     $macname =~ s/^[\!\?]+//s;
     if ($macname eq '(') {
-      do_warn($config, "spec file parser",($lineno?" line $lineno":''),": can't expand %(...)");
+      do_warn($config, "spec file parser".($lineno?" line $lineno":'').": can't expand %(...)");
       $line = 'MACRO';
       last;
     } elsif ($macname eq '[') {
@@ -485,7 +485,7 @@ reexpand:
       $expandedline .= luamacro($config, $macname, @args);
     } elsif (exists($macros->{$macname})) {
       if (!defined($macros->{$macname})) {
-	do_warn($config, "spec file parser",($lineno?" line $lineno":''),": can't expand '$macname'");
+	do_warn($config, "spec file parser".($lineno?" line $lineno":'').": can't expand '$macname'");
 	$line = 'MACRO';
 	last;
       }
