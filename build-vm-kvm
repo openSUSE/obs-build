@@ -177,6 +177,19 @@ vm_verify_options_kvm() {
             # from qemu-microvm, minified and hardened PC bios (slightly faster than seabios)
             test -e /usr/share/qemu/qboot.rom && kvm_options="$kvm_options -bios /usr/share/qemu/qboot.rom"
             ;;
+	riscv64)
+	    kvm_bin="/usr/bin/qemu-system-riscv64"
+	    kvm_options="-M virt,accel=kvm"
+	    kvm_cpu="-cpu rv64,sv48=on"
+	    vm_kernel=/boot/Image
+	    vm_initrd=/boot/initrd
+	    test -e /boot/kernel.obs.guest && vm_kernel=/boot/kernel.obs.guest
+	    test -e /boot/initrd.obs.guest && vm_initrd=/boot/initrd.obs.guest
+	    kvm_device=virtio-blk-device
+	    kvm_serial_device=virtio-serial-device,max_ports=2
+	    kvm_console=hvc0
+	    kvm_rng_device=virtio-rng-device
+	    ;;
     esac
 
     # check if we can run kvm
