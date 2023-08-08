@@ -90,6 +90,7 @@ sub expand_deps_image {
   }
   my @deps = @{$p->{'dep'} || []};
   push @deps, '--ignoreignore--' unless ($p->{'buildtype'} || '') eq 'preinstallimage';
+  local $bconf->{'type'} = $p->{'buildtype'};
   my ($ok, @edeps) = Build::get_build($bconf, [], @deps);
   if (!$ok) {
     delete $p->{'dep_expanded'};
