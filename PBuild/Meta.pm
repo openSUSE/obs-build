@@ -161,4 +161,33 @@ sub diffsortedmd5 {
   return @ret;
 }
 
+# return the depth where the two metas differ
+# 0: same metas
+# 1: first line (i.e. different source)
+# >=2: number of '/' + 1
+sub diffdepth {
+  my ($m1, $m2) = @_;
+  my $i = -1;
+  for (@$m1) {
+    $i++;
+    my $m = $m2->[$i];
+    if (!defined($m)) {
+      return 1 unless $i;
+      my $i1 = $_ =~ y!/!/!;
+      return $i1 + 2;
+    } elsif ($m ne $_) {
+      return 1 unless $i;
+      my $i1 = $_ =~ y!/!/!;
+      my $i2 = $m =~ y!/!/!;
+      return $i1 < $i2 ? $i1 + 2 : $i2 + 2;
+    }
+  }
+  $i++;
+  my $m = $m2->[$i];
+  return 0 unless defined $m;
+  return 1 unless $i;
+  my $i2 = $m =~ y!/!/!;
+  return $i2 + 2;
+}
+
 1;

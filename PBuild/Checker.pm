@@ -114,103 +114,23 @@ sub pkgexpand {
 #
 sub cycsort {
   my ($pkg2dep, $dep2src, $pkg2src, @cyc) = @_;
+
   @cyc = sort(@cyc);
-  my @i = 0..(@cyc- 1);
-
-  # create forward dependencies
-  my @xfdeps;
   my %d;
-  for my $i (@i) {
-    $d{$dep2src->{$_} || $_}->{$i} = 1 for @{$pkg2dep->{$cyc[$i]}};
+  my %cdeps;
+  for my $pkg (@cyc) {
+    $d{$dep2src->{$_} || $_}->{$pkg} = 1 for @{$pkg2dep->{$pkg}};
   }
-  for my $i (@i) {
-    $_ != $i and push @{$xfdeps[$_]}, $i for keys %{$d{$pkg2src->{$cyc[$i]}} || {}};
+  # remove all bi-directional edges
+  my %ign;
+  for my $pkg (@cyc) {
+    $ign{$pkg}->{$_} = 1 for keys %{$d{$pkg2src->{$pkg}} || {}};
   }
-
-  my @xrdeps;
-  for my $i (@i) {
-    push @{$xrdeps[$_]}, $i for @{$xfdeps[$i]};
+  for my $pkg (@cyc) {
+    $_ ne $pkg && !$ign{$_}->{$pkg} and push @{$cdeps{$_}}, $pkg for keys %{$d{$pkg2src->{$pkg}} || {}};
   }
-
-  my @fdone;
-  my @rdone;
-
-  my @nfdeps = (0) x scalar(@cyc);
-  my @nrdeps = (0) x scalar(@cyc);
-  for my $i (@i) {
-    for (@{$xfdeps[$i]}) {
-      next if $_ == $i;
-      $nfdeps[$i]++;
-      $nrdeps[$_]++;
-    }
-  }
-
-  while (1) {
-    my $min = @cyc;
-    my $max = -1;
-    my $mini;
-
-    for my $i (@i) {
-      my $n = $nfdeps[$i];
-      if ($n > 0 && $min >= $n) {
-	next if $min == $n && $max >= $nrdeps[$i];
-	$min = $n;
-	$mini = $i;
-	$max = $nrdeps[$i];
-      }
-    }
-    for my $i (@i) {
-      my $n = $nrdeps[$i];
-      if ($n > 0 && $min >= $n) {
-	next if $min == $n && $max >= $nfdeps[$i];
-	$min = $n;
-	$mini = $i + @cyc;
-	$max = $nfdeps[$i];
-      }
-    }
-    last unless defined $mini;
-
-    my ($i, $o);
-    if ($mini < @cyc) {
-      # outgoing, choose other
-      $i = $mini;
-      $o = (sort {$nrdeps[$b] <=> $nrdeps[$a]} grep {$nrdeps[$_] > 0} @{$xfdeps[$i]})[0];
-    } else {
-      $o = $mini - @cyc;
-      $i = (sort {$nfdeps[$a] <=> $nfdeps[$b]} grep {$nfdeps[$_] > 0} @{$xrdeps[$o]})[0];
-    }
-    #print "CHOOSE $i -> $o $cyc[$i] -> $cyc[$o]\n";
-    $nrdeps[$_]-- for @{$xfdeps[$i]};
-    $nfdeps[$_]-- for @{$xrdeps[$o]};
-    $nfdeps[$i] = 0;
-    $nrdeps[$o] = 0;
-    $fdone[$i] = $o;
-    $rdone[$o] = $i;
-  }
-
-  my @fin;
-  my @done;
-  while (@fin < @cyc) {
-    my @j = grep {defined($fdone[$_])} @i;
-    my @j2 = grep {!defined($rdone[$_])} @j;
-    my $i = @j2 ? $j2[0] : $j[0];
-    last unless defined $i;
-    while (defined($i) && !$done[$i]) {
-      push @fin, $cyc[$i];
-      $done[$i] = 1;
-      ($i, $fdone[$i]) = ($fdone[$i], undef);
-    }
-  }
-  #print "XXX @fin\n";
-  @fin = reverse(@fin);
-  push @fin, map {$cyc[$_]} grep {!$done[$_]} @i;
-
-  # our meta pruning algorithm uses lexicographic ordering, so
-  # we shift the cycle here.
-  my $first = (sort @cyc)[0];
-  push @fin, shift @fin while $fin[0] ne $first;
-
-  return @fin;
+  @cyc = PBuild::Depsort::depsort(\%cdeps, undef, undef, undef, @cyc);
+  return @cyc;
 }
 
 #
@@ -223,7 +143,7 @@ sub pkgsort {
   my $pkgsrc = $ctx->{'pkgsrc'};
   for my $pkg (@pkgs) {
     my $p = $pkgsrc->{$pkg};
-    $pdeps{$pkg} = $p->{'dep_expanded'} || []; 
+    $pdeps{$pkg} = $p->{'dep_expanded'} || [];
     $pkg2src{$pkg} = $p->{'name'} || $p->{'pkg'};
   }
   my @cycles;
@@ -234,7 +154,7 @@ sub pkgsort {
     next if @$cyc < 2;  # just in case
     my @c = map {@{$cychash{$_} || [ $_ ]}} @$cyc;
     @c = cycsort(\%pdeps, $ctx->{'dep2src'}, \%pkg2src, @c);
-    $cychash{$_} = \@c for @c; 
+    $cychash{$_} = \@c for @c;
   }
   #if (@sccs) {
   #  print "  sccs:\n";
@@ -263,6 +183,7 @@ sub pkgcheck {
   $ctx->{'building'}->{$_->{'job'}->{'pdata'}->{'pkg'}} = $_->{'job'} for grep {$_->{'job'}} @$builders;
   $ctx->{'notready'} = {};	# building or blocked
   $ctx->{'nharder'} = 0;
+  $ctx->{'cyclevel'} = {};
 
   my $builddir = $ctx->{'builddir'};
   my $pkgsrc = $ctx->{'pkgsrc'};
@@ -275,11 +196,11 @@ sub pkgcheck {
     my $packid = shift @cpacks;
 
     # cycle handling code
-    my $incycle = 0; 
+    my $incycle = 0;
     if ($cychash->{$packid}) {
       ($packid, $incycle) = handlecycle($ctx, $packid, \@cpacks, \%cycpass);
-      next  if $incycle == 4;    # ignore after pass1/2
-      next  if $packstatus{$packid} && $packstatus{$packid} ne 'done' && $packstatus{$packid} ne 'succeeded' && $packstatus{$packid} ne 'failed'; # already decided
+      next if $incycle == 4;    # ignore after pass1/2
+      next if $packstatus{$packid} && $packstatus{$packid} ne 'done' && $packstatus{$packid} ne 'succeeded' && $packstatus{$packid} ne 'failed'; # already decided
     }
     my $p = $pkgsrc->{$packid};
     if ($p->{'error'}) {
@@ -303,6 +224,7 @@ sub pkgcheck {
       $packstatus{$packid} = 'building';
       $packdetails{$packid} = "on builder $job->{'name'}" if $job->{'nbuilders'} > 1;
       $ctx->{'notready'}->{$p->{'name'} || $p->{'pkg'}} = 1 if $p->{'useforbuildenabled'};
+      $ctx->{'cyclevel'}->{$packid} = $job->{'cyclevel'} if $incycle && $job->{'cyclevel'};
       next;
     }
 
@@ -333,6 +255,7 @@ recheck_package:
           print "${bid}building $p->{'pkg'}/$p->{'recipe'}\n";
         }
         $ctx->{'building'}->{$packid} = $builder->{'job'};
+	$job->{'cyclevel'} = $ctx->{'cyclevel'}->{$packid} if $incycle && $ctx->{'cyclevel'}->{$packid};
       }
       #printf("%s -> %s%s", $packid, $status, $error ? " ($error)" : '');
     } elsif ($status eq 'done') {
@@ -489,10 +412,14 @@ sub check {
     return ('blocked', join(', ', @blocked));
   }
   # prune cycle packages from blocked
-  if ($incycle) {
+  if ($incycle > 1) {
+    my $cyclevel = $ctx->{'cyclevel'};
     my $pkgsrc = $ctx->{'pkgsrc'};
-    my %cycs = map {(($pkgsrc->{$_} || {})->{'name'} || $_) => 1} @{$ctx->{'cychash'}->{$packid}};
-    @blocked = grep {!$cycs{$dep2src->{$_}}} @blocked;
+    my $level = $cyclevel->{$packid};
+    if ($level) {
+      my %cycs = map {(($pkgsrc->{$_} || {})->{'name'} || $_) => ($cyclevel->{$_} || 1)} @{$ctx->{'cychash'}->{$packid}};
+      @blocked = grep {($cycs{$dep2src->{$_}} || 0) < $level} @blocked;
+    }
   }
   if (@blocked) {
     # print "      - $packid ($buildtype)\n";
@@ -558,11 +485,6 @@ sub check {
       goto relsynccheck;
     }
     # more work, check if dep rpm changed
-    if ($incycle == 1) {
-      # print "      - $packid ($buildtype)\n";
-      # print "        in cycle, no source change...\n";
-      return ('done');
-    }
     my $check = substr($mylastcheck, 32, 32);	# metamd5
 
     my $dep2pkg = $p->{'native'} ? $ctx->{'dep2pkg_host'} : $ctx->{'dep2pkg'};
@@ -592,6 +514,16 @@ sub check {
       @meta = <F>;
       close F;
       chomp @meta;
+    }
+    if ($incycle == 1) {
+      # calculate cyclevel
+      my $level = PBuild::Meta::diffdepth(\@meta, $new_meta);
+      $ctx->{'cyclevel'}->{$packid} = $level;
+      if ($level > 1) {
+        # print "      - $packid ($buildtype)\n";
+        # print "        in cycle, no source change...\n";
+        return ('done');	# postpone till phase 2
+      }
     }
     if ($rebuildmethod eq 'direct') {
       @meta = grep {!/\//} @meta;
@@ -625,42 +557,26 @@ relsynccheck:
 #
 sub handlecycle {
   my ($ctx, $packid, $cpacks, $cycpass) = @_;
-
-  my $incycle = 0; 
   my $cychash = $ctx->{'cychash'};
   return ($packid, 0) unless $cychash->{$packid};
-  # do every package in the cycle twice:
-  # pass1: only build source changes
-  # pass2: normal build, but block if a pass1 package is building
-  # pass3: ignore
-  $incycle = $cycpass->{$packid};
-  if (!$incycle) {
-    # starting pass 1       (incycle == 1)
-    my @cycp = @{$cychash->{$packid}};
-    unshift @$cpacks, $cycp[0];      # pass3
-    unshift @$cpacks, @cycp;         # pass2
-    unshift @$cpacks, @cycp;         # pass1
+  my $incycle = $cycpass->{$packid};
+  return ($packid, $incycle) if $incycle > 0;	# still in pass
+  my @cycp = @{$cychash->{$packid}};
+  $incycle = -$incycle + 1;			# start next pass
+  $cycpass->{$_} = $incycle for @cycp;
+  if ($incycle == 1) {
+    unshift @$cpacks, $cycp[0];
+    unshift @$cpacks, @cycp;
     $packid = shift @$cpacks;
-    $incycle = 1; 
-    $cycpass->{$_} = $incycle for @cycp;
-    $cycpass->{$packid} = -1;         # pass1 ended
-  } elsif ($incycle == -1) {
-    # starting pass 2       (incycle will be 2 or 3)
-    my @cycp = @{$cychash->{$packid}};
-    $incycle = (grep {$ctx->{'building'}->{$_}} @cycp) ? 3 : 2;
-    $cycpass->{$_} = $incycle for @cycp;
-    $cycpass->{$packid} = -2;         # pass2 ended
-  } elsif ($incycle == -2) {
-    # starting pass 3       (incycle == 4)
-    my @cycp = @{$cychash->{$packid}};
-    $incycle = 4;
-    $cycpass->{$_} = $incycle for @cycp;
-    # propagate notready to all cycle packages
-    my $notready = $ctx->{'notready'};
-    my $pkgsrc = $ctx->{'pkgsrc'};
-    if (grep {$notready->{($pkgsrc->{$_} || {})->{'name'} || $_}} @cycp) {
-      $notready->{($pkgsrc->{$_} || {})->{'name'} || $_} ||= 1 for @cycp;
-    }
+    $cycpass->{$packid} = -1;			# set pass1 endmarker
+  } elsif ($incycle == 2) {
+    my $cyclevel = $ctx->{'cyclevel'};
+    unshift @$cpacks, sort {($cyclevel->{$a} || 0) <=> ($cyclevel->{$b} || 0)} @cycp;
+    $packid = shift @$cpacks;
+    $cycpass->{$packid} = -2;			# set pass2 endmarker
+  } elsif ($incycle == 3) {
+    unshift @$cpacks, @cycp;
+    $packid = shift @$cpacks;
   }
   return ($packid, $incycle);
 }
