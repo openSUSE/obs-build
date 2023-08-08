@@ -1,4 +1,17 @@
 -------------------------------------------------------------------
+Tue Aug  8 15:30:05 UTC 2023 - Adrian Schröter <adrian@suse.de>
+
+- pbuild:
+  * fix dependency expansion for build types other than spec
+  * Reworked cycle handling code
+  * add --extra-packs option
+  * add debugflags option
+- Pass-through --buildtool-opt
+- Parse Patch and Source lines more accurately
+- fix tunefs functionality
+- minor bugfixes
+
+-------------------------------------------------------------------
 Wed Jun 28 07:50:46 UTC 2023 - Adrian Schröter <adrian@suse.de>
 
 - --vm-type=podman added (supports also root-less builds)
