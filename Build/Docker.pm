@@ -258,6 +258,9 @@ sub parse {
       if ($line =~ /^#!BuildRelease:\s*(\S+)\s*$/) {
 	$ret->{'release'} = $1;
       }
+      if ($line =~ /^#!BcntSyncTag:\s*(\S+)\s*$/) {
+	$ret->{'bcntsynctag'} = $1;
+      }
       if ($line =~ /^#!BuildConstraint:\s*(\S.+?)\s*$/) {
 	push @{$ret->{'buildconstraint'}}, $1;
       }

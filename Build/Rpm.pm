@@ -819,8 +819,11 @@ sub parse {
       delete $ret->{'buildtarget'};
       $ret->{'buildtarget'} = $bt if $bt;
     }
-    if ($preamble && $line =~ /^\#\!BuildConstraint:\s*(\S.+?)\s*$/i) {
+    if ($preamble && $line =~ /^\#\!BuildConstraint:\s*(\S.*?)\s*$/i) {
       push @{$ret->{'buildconstraint'}}, $1;
+    }
+    if ($preamble && $line =~ /^\#\!BcntSyncTag:\s*(\S.*?)\s*$/i) {
+      $ret->{'bcntsynctag'} = $1;
     }
     if ($line =~ /^(?:Requires\(pre\)|Requires\(post\)|PreReq)\s*:\s*(\S.*)$/i) {
       my $deps = $1;
