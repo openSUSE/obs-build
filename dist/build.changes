@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri Aug 11 06:25:38 UTC 2023 - Adrian Schröter <adrian@suse.de>
+
+- Added parser for BcntSyncTag in sources
+
+-------------------------------------------------------------------
 Tue Aug  8 15:30:05 UTC 2023 - Adrian Schröter <adrian@suse.de>
 
 - pbuild:
