@@ -180,7 +180,6 @@ vm_verify_options_kvm() {
 	riscv64)
 	    kvm_bin="/usr/bin/qemu-system-riscv64"
 	    kvm_options="-M virt,accel=kvm"
-	    kvm_cpu="-cpu rv64,sv48=on"
 	    vm_kernel=/boot/Image
 	    vm_initrd=/boot/initrd
 	    test -e /boot/kernel.obs.guest && vm_kernel=/boot/kernel.obs.guest
