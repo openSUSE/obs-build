@@ -552,7 +552,13 @@ while (1) {
   my $p = $job->{'pdata'};
   delete $p->{'force_rebuild'};
   my $duration = $job->{'endtime'} - $job->{'starttime'};
-  $duration = sprintf("%d:%02d", int($duration / 60), $duration % 60);
+  if ($duration < 60) {
+    $duration = sprintf("%ds", $duration % 60);
+  } elsif ($duration < 3600) {
+    $duration = sprintf("%dm%02ds", int($duration / 60), $duration % 60);
+  } else {
+    $duration = sprintf("%dh%02dm%02ds", int($duration / 3600), int($duration / 60) % 60, $duration % 60);
+  }
   my $bid = ($job->{'nbuilders'} || 1) > 1 ? "$job->{'name'}: " : '';
   print "${bid}finished $p->{'pkg'}/$p->{'recipe'} after ${duration}: $code\n";
 

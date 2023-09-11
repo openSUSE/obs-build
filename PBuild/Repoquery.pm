@@ -235,7 +235,7 @@ sub repoquery {
 	} else {
 	  $excluded = '  ';
 	}
-	print "  $excluded $nevra\n";
+	print "  $excluded  $nevra\n";
       }
     }
   }
