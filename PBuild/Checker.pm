@@ -115,7 +115,7 @@ sub pkgexpand {
 sub cycsort {
   my ($pkg2dep, $dep2src, $pkg2src, @cyc) = @_;
 
-  @cyc = sort(@cyc);
+  @cyc = PBuild::Util::unify(sort(@cyc));
   my %d;
   my %cdeps;
   for my $pkg (@cyc) {
@@ -199,7 +199,6 @@ sub pkgcheck {
     my $incycle = 0;
     if ($cychash->{$packid}) {
       ($packid, $incycle) = handlecycle($ctx, $packid, \@cpacks, \%cycpass);
-      next if $incycle == 4;    # ignore after pass1/2
       next if $packstatus{$packid} && $packstatus{$packid} ne 'done' && $packstatus{$packid} ne 'succeeded' && $packstatus{$packid} ne 'failed'; # already decided
     }
     my $p = $pkgsrc->{$packid};
@@ -559,7 +558,7 @@ sub handlecycle {
   my ($ctx, $packid, $cpacks, $cycpass) = @_;
   my $cychash = $ctx->{'cychash'};
   return ($packid, 0) unless $cychash->{$packid};
-  my $incycle = $cycpass->{$packid};
+  my $incycle = $cycpass->{$packid} || 0;
   return ($packid, $incycle) if $incycle > 0;	# still in pass
   my @cycp = @{$cychash->{$packid}};
   $incycle = -$incycle + 1;			# start next pass
