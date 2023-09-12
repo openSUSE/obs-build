@@ -164,7 +164,7 @@ sub diffsortedmd5 {
 # return the depth where the two metas differ
 # 0: same metas
 # 1: first line (i.e. different source)
-# >=2: number of '/' + 1
+# >=2: number of '/' + 2
 sub diffdepth {
   my ($m1, $m2) = @_;
   my $i = -1;
