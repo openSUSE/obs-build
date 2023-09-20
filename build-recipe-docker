@@ -250,7 +250,12 @@ recipe_build_docker() {
 
     if test "$BUILDENGINE" = podman; then
 	test -n "$squashopt" && squashopt="--layers=false"
-	if ! $DOCKER_CMD build $squashopt -v "$TOPDIR/SOURCES/repos:$TOPDIR/SOURCES/repos" --network=host "${tagargs[@]}" "${buildargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
+        buildformat=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags container-build-format)
+        formatopt="--format docker"
+        if test "$buildformat" = oci; then
+            formatopt="--format oci"
+        fi
+	if ! $DOCKER_CMD build $formatopt $squashopt -v "$TOPDIR/SOURCES/repos:$TOPDIR/SOURCES/repos" --network=host "${tagargs[@]}" "${buildargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
 	    cleanup_and_exit 1 "$DOCKER_TOOL build command failed"
 	fi
     else
