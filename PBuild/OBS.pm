@@ -295,7 +295,15 @@ sub fetch_repodata {
   unlink("$tmpdir/repository.data");
   PBuild::Cpio::cpio_extract("$tmpdir/repository.cpio", "$tmpdir/repository.data", 'extract' => 'repositorycache', 'missingok' => 1);
   my $rdata;
-  $rdata = PBuild::Util::retrieve("$tmpdir/repository.data") if -s "$tmpdir/repository.data";
+  if (-s "$tmpdir/repository.data") {
+    if (defined $Storable::flags) {
+      # we do not want to trust the data from the remote OBS server
+      local $Storable::flags = 0;
+      $rdata = PBuild::Util::retrieve("$tmpdir/repository.data");
+    } else {
+      $rdata = PBuild::Util::retrieve("$tmpdir/repository.data");
+    }
+  }
   my @bins = grep {ref($_) eq 'HASH' && defined($_->{'name'})} values %{$rdata || {}};
   for (@bins) {
     if ($_->{'path'} =~ /^\.\.\/([^\/\.][^\/]*\/[^\/\.][^\/]*)$/s) {
