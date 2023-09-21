@@ -199,7 +199,7 @@ sub pkgcheck {
     my $incycle = 0;
     if ($cychash->{$packid}) {
       ($packid, $incycle) = handlecycle($ctx, $packid, \@cpacks, \%cycpass);
-      next if $packstatus{$packid} && $packstatus{$packid} ne 'done' && $packstatus{$packid} ne 'succeeded' && $packstatus{$packid} ne 'failed'; # already decided
+      next if !$packid || ($packstatus{$packid} && $packstatus{$packid} ne 'done' && $packstatus{$packid} ne 'succeeded' && $packstatus{$packid} ne 'failed'); # already decided
     }
     my $p = $pkgsrc->{$packid};
     if ($p->{'error'}) {
@@ -404,12 +404,6 @@ sub check {
   # calculate if we're blocked
   my @blocked = grep {$notready->{$dep2src->{$_}}} @$edeps;
   @blocked = () if $ctx->{'block'} && $ctx->{'block'} eq 'never';
-  # check if cycle builds are in progress
-  if ($incycle && $incycle == 3) {
-    push @blocked, 'cycle' unless @blocked;
-    splice(@blocked, 10, scalar(@blocked), '...') if @blocked > 10;
-    return ('blocked', join(', ', @blocked));
-  }
   # prune cycle packages from blocked
   if ($incycle > 1) {
     my $cyclevel = $ctx->{'cyclevel'};
@@ -574,8 +568,12 @@ sub handlecycle {
     $packid = shift @$cpacks;
     $cycpass->{$packid} = -2;			# set pass2 endmarker
   } elsif ($incycle == 3) {
-    unshift @$cpacks, @cycp;
-    $packid = shift @$cpacks;
+    my $notready = $ctx->{'notready'};
+    my $pkgsrc = $ctx->{'pkgsrc'};
+    if (grep {$notready->{$_->{'name'} || $_->{'pkg'}}} map {$pkgsrc->{$_}} @cycp) {
+      $notready->{$_->{'name'} || $_->{'pkg'}} ||= 1 for @cycp;
+    }
+    return (undef, 3);
   }
   return ($packid, $incycle);
 }
