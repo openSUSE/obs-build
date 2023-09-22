@@ -479,9 +479,11 @@ sub show {
   local $Build::Kiwi::urlmapper = sub { return $_[0] };
   my $cf = {};
   $cf->{'buildrelease'} = $release if defined $release;
+  $cf->{'__dockernoname'} = 1 if $field && $field eq 'filename';
   my $d = {};
   $d = parse($cf, $fn) if $fn;
   die("$d->{'error'}\n") if $d->{'error'};
+  $d->{'filename'} = "$d->{'name'}-$d->{'version'}" if !$d->{'filename'} && $d->{'name'} && $d->{'version'};
   my $x = $d->{$field};
   $x = [ $x ] unless ref $x;
   print "@$x\n";

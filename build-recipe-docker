@@ -274,9 +274,12 @@ recipe_build_docker() {
     # Check for OS setting
     GOOS=`$DOCKER_CMD image inspect "$FIRSTTAG" --format '{{ .Os }}'`
 
-    # Save the resulting image to a tarball. Use first tag for generating the file name.
+    # Save the resulting image to a tarball. Use first tag for generating the file name if name or version is unknown.
     mkdir -p $BUILD_ROOT$TOPDIR/DOCKER
-    FILENAME="$FIRSTTAG"
+    FILENAME=$(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::show -- "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" filename)
+    if test -z "$FILENAME" ; then
+	FILENAME="$FIRSTTAG"
+    fi
     FILENAME="${FILENAME//[\/:]/-}"
     test -n "$GOOS" -a "$GOOS" != "linux" && FILENAME="${FILENAME}_$GOOS"
     FILENAME="$FILENAME.${BUILD_ARCH%%:*}"
