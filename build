@@ -935,7 +935,7 @@ run_rsync() {
 
 unmount_build_root() {
 	# unmount all mounts still in the build root path
-	for m in $(cat /proc/mounts | grep "$BUILD_ROOT" | awk '{ print $2 }'); do
+	for m in $(cat /proc/mounts | grep " $BUILD_ROOT" | awk '{ print $2 }'); do
 	    if ! umount -n "$m" 2>/dev/null ; then
 		echo "Failed to umount "$m", cannot wipe buildroot"
 		exit 1
