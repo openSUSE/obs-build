@@ -205,6 +205,7 @@ sub parse {
   my ($cf, $fn) = @_;
 
   my $unorderedrepos;
+  my $plusrecommended;
   my $useobsrepositories;
   my $nosquash;
   my $dockerfile_data;
@@ -266,6 +267,9 @@ sub parse {
       }
       if ($line =~ /^#!UnorderedRepos\s*$/) {
         $unorderedrepos = 1;
+      }
+      if ($line =~ /^#!PlusRecommended\s*$/) {
+        $plusrecommended = 1;
       }
       if ($line =~ /^#!UseOBSRepositories\s*$/) {
         $useobsrepositories = 1;
@@ -390,6 +394,7 @@ sub parse {
       }
     }
   }
+  push @{$ret->{'deps'}}, '--dorecommends--', '--dosupplements--' if $plusrecommended;
   push @{$ret->{'deps'}}, '--unorderedimagerepos' if $unorderedrepos;
   my $version = $ret->{'version'};
   my $release = $ret->{'release'};
