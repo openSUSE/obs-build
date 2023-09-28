@@ -311,7 +311,7 @@ sub createjob {
   push @args, '--shell-after-fail' if $opts->{'shell-after-fail'};
   push @args, '--no-timestamps' if $opts->{'no-timestamps'};
   push @args, '--skip-bundle';
-  push @args, '--changelog';
+  push @args, '--changelog' unless $opts->{'nochangelog'};
   #push @args, '--oldpackages', $oldresultdir if -d $oldresultdir;
   push @args, '--ccache' if $jobopts->{'ccache'};
   push @args, '--ccache-create-archive' if $jobopts->{'ccache'};

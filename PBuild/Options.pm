@@ -125,6 +125,8 @@ my $pbuild_options = {
   'extra-packs' => '::',
   'extrapacks' => 'extra-packs::',
   'X' => 'extra-packs::',
+  'nochangelog' => '',
+  'no-nochangelog' => 'nochangelog',
 };
 
 sub debugflags_special {
