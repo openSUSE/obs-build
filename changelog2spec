@@ -44,6 +44,8 @@ my $emailonly;
 my $printtype;
 my $input = '';
 my $target = 'rpm';
+my $timestampfile;
+my $first_timestamp;
 
 while (@ARGV) {
   if ($ARGV[0] eq '--selftest') {
@@ -59,6 +61,11 @@ while (@ARGV) {
   if ($ARGV[0] eq '--type') {
     $printtype = 1;
     shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--timestampfile') {
+    shift @ARGV;
+    $timestampfile = shift @ARGV;
     next;
   }
   if ($ARGV[0] eq '--fulltimestamps') {
@@ -86,19 +93,18 @@ if (@ARGV == 2 && $ARGV[0] eq '--file') {
   opendir(D, $dir) || die("$dir: $!\n");
   my @changes = grep {/\.changes$/} readdir(D);
   closedir(D);
-  my $changesfile=map_changes($file, @changes);
+  my $changesfile = map_changes($file, @changes);
   exit(1) unless $changesfile;
   @ARGV = ("$dir/$changesfile");
 }
 
-sub map_changes
-{
+sub map_changes {
   my ($file, @changes) = @_;
   @changes = sort {length($a) <=> length($b) || $a cmp $b} @changes;
   # support _service: prefixes, they need to be stripped
   $file =~ s/^_service:.*://;
   my %changes = map {/^((?:_service:.*:)?(.*?))$/ ? ($2, $1) : ($_, $_)} @changes;
-  @changes = keys %changes;
+  @changes = sort keys %changes;
   return undef unless @changes;	# nothing to do
   @changes = sort {length($a) <=> length($b) || $a cmp $b} @changes;
   if (@changes > 1) {
@@ -259,6 +265,7 @@ while(defined($_)) {
     die("changes file not incremental: $dline\n") if $test;
     warn("changes file not incremental: $dline\n");
   }
+  $first_timestamp = $t unless defined $first_timestamp;
   $lastt = $t;
   my @gm = gmtime($t);
   # silly rpm can't hande dates < 1997, so we fold everything to
@@ -278,4 +285,12 @@ while(defined($_)) {
   $changes =~ s/^\*/  */mg;
   print $changes;
 }
+
+if ($timestampfile) {
+  my $fd;
+  open($fd, '>', $timestampfile) || die("$timestampfile: $!\n");
+  print $fd "$first_timestamp\n" if defined $first_timestamp;
+  close($fd) || die("$timestampfile: $!\n");
+}
+
 exit(0);

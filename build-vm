@@ -1054,6 +1054,7 @@ vm_first_stage() {
     echo "BUILD_RPM_BUILD_STAGE='$BUILD_RPM_BUILD_STAGE'" >> $BUILD_ROOT/.build/build.data
     echo "RPM_BUILD_IN_PLACE='$RPM_BUILD_IN_PLACE'" >> $BUILD_ROOT/.build/build.data
     echo "RPM_NOPREP='$RPM_NOPREP'" >> $BUILD_ROOT/.build/build.data
+    echo "BUILD_CHANGELOG_TIMESTAMP='$BUILD_CHANGELOG_TIMESTAMP'" >> $BUILD_ROOT/.build/build.data
     # fallback time for broken hosts
     rm -rf $BUILD_ROOT/.build/.date
     date '+@%s' > $BUILD_ROOT/.build/.date

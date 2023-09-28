@@ -1628,15 +1628,21 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	cleanup_and_exit
     fi
 
+    #
+    # create legacy .buildenv file
+    #
+    test -z "$INCARNATION" && INCARNATION=0 
+    echo "BUILD_INCARNATION=$INCARNATION" > $BUILD_ROOT/.buildenv
+    Q="'\''"
+    test -n "$DISTURL" && echo "BUILD_DISTURL='${DISTURL//"'"/$Q}'" >> $BUILD_ROOT/.buildenv
+    test -n "$RELEASE" && echo "BUILD_RELEASE='${RELEASE//"'"/$Q}'" >> $BUILD_ROOT/.buildenv
+    test -n "$BUILD_CHANGELOG_TIMESTAMP" && echo "BUILD_CHANGELOG_TIMESTAMP=$BUILD_CHANGELOG_TIMESTAMP" >> $BUILD_ROOT/.buildenv
+    
+    #
+    # install the build environment
+    #
     if test "$DO_INIT" = true ; then
         start_time=$SECONDS
-	#
-	# create legacy .buildenv file
-	#
-	test -z "$INCARNATION" && INCARNATION=0
-	echo "BUILD_INCARNATION=$INCARNATION" > $BUILD_ROOT/.buildenv
-	Q="'\''"
-	test -n "$DISTURL" && echo "BUILD_DISTURL='${DISTURL//"'"/$Q}'" >> $BUILD_ROOT/.buildenv
 	test "$BUILDTYPE" = preinstallimage && mkdir -p $BUILD_ROOT/.preinstall_image
 	CREATE_BUILD_BINARIES=
 	if recipe_needs_build_binaries "$RECIPEPATH" ; then

@@ -29,6 +29,7 @@ BUILD_TOOL_OPTS=()
 RPM_BUILD_IN_PLACE=
 RPM_RECIPE_IN_SUBDIR=
 RPM_NOPREP=
+BUILD_CHANGELOG_TIMESTAMP=
 VCSURL=
 
 for i in spec dsc kiwi arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild appimage docker podman fissile helm flatpak mkosi; do
@@ -263,7 +264,7 @@ recipe_setup_macros() {
 
 # generate a .build-changelog file from a .changes file
 recipe_create_changelog() {
-   rm -f $BUILD_ROOT/.build-changelog
+   rm -f $BUILD_ROOT/.build-changelog $BUILD_ROOT/.build-changelog-timestamp
    case $1 in
 	*.dsc) CFFORMAT=debian ;;
 	*) CFFORMAT=rpm ;;
@@ -276,9 +277,14 @@ recipe_create_changelog() {
 	esac
     fi
     echo "running changelog2spec --target $CFFORMAT --file $1"
-    if ! $BUILD_DIR/changelog2spec --target $CFFORMAT --file "$1" > $BUILD_ROOT/.build-changelog ; then 
-	rm -f $BUILD_ROOT/.build-changelog
+    if ! $BUILD_DIR/changelog2spec --target $CFFORMAT --timestampfile "$BUILD_ROOT/.build-changelog-timestamp" --file "$1" > $BUILD_ROOT/.build-changelog ; then 
+	rm -f $BUILD_ROOT/.build-changelog $BUILD_ROOT/.build-changelog-timestamp
     fi
+    BUILD_CHANGELOG_TIMESTAMP=
+    if test -s "$BUILD_ROOT/.build-changelog-timestamp" ; then
+	read BUILD_CHANGELOG_TIMESTAMP < "$BUILD_ROOT/.build-changelog-timestamp" 
+    fi
+    rm -f $BUILD_ROOT/.build-changelog-timestamp
 }
 
 recipe_needs_build_binaries() {
