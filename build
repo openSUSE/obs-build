@@ -933,19 +933,22 @@ run_rsync() {
     fi
 }
 
-wipe_build_environment() {
-    if test -n "$VM_TYPE" ; then
-	vm_img_wipe
-    else
-	echo "Wiping build root: '$BUILD_ROOT'"
-
+unmount_build_root() {
 	# unmount all mounts still in the build root path
-	for m in $(cat /proc/mounts | grep "$BUILD_ROOT" | awk '{ print $2 }'); do
+	for m in $(cat /proc/mounts | grep " $BUILD_ROOT" | awk '{ print $2 }'); do
 	    if ! umount -n "$m" 2>/dev/null ; then
 		echo "Failed to umount "$m", cannot wipe buildroot"
 		exit 1
 	    fi
 	done
+}
+
+wipe_build_environment() {
+    if test -n "$VM_TYPE" ; then
+	vm_img_wipe
+    else
+	echo "Wiping build root: '$BUILD_ROOT'"
+	unmount_build_root
 	rm -rf "$BUILD_ROOT"
     fi  
 }
