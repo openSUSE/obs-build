@@ -168,26 +168,33 @@ sub diffsortedmd5 {
 sub diffdepth {
   my ($m1, $m2) = @_;
   my $i = -1;
-  for (@$m1) {
-    $i++;
-    my $m = $m2->[$i];
-    if (!defined($m)) {
-      return 1 unless $i;
-      my $i1 = $_ =~ y!/!/!;
-      return $i1 + 2;
-    } elsif ($m ne $_) {
-      return 1 unless $i;
-      my $i1 = $_ =~ y!/!/!;
-      my $i2 = $m =~ y!/!/!;
-      return $i1 < $i2 ? $i1 + 2 : $i2 + 2;
+  if (@$m1 <= @$m2) {
+    for (@$m1) {
+      if ($_ ne $m2->[++$i]) {
+        return 1 unless $i;
+        my $i1 = $_ =~ y!/!/!;
+        my $i2 = $m2->[$i]  =~ y!/!/!;
+        return $i1 < $i2 ? $i1 + 2 : $i2 + 2;
+      }
     }
+    return 0 if ++$i == @$m2;
+    return 1 unless $i;
+    my $i2 = $m2->[$i] =~ y!/!/!;
+    return $i2 + 2;
+  } else {
+    for (@$m2) {
+      if ($_ ne $m1->[++$i]) {
+        return 1 unless $i;
+        my $i1 = $m1->[$i]  =~ y!/!/!;
+        my $i2 = $_ =~ y!/!/!;
+        return $i1 < $i2 ? $i1 + 2 : $i2 + 2;
+      }
+    }
+    $i++;
+    return 1 unless $i;
+    my $i1 = $m1->[$i]  =~ y!/!/!;
+    return $i1 + 2;
   }
-  $i++;
-  my $m = $m2->[$i];
-  return 0 unless defined $m;
-  return 1 unless $i;
-  my $i2 = $m =~ y!/!/!;
-  return $i2 + 2;
 }
 
 1;
