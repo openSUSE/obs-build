@@ -362,7 +362,7 @@ while (@ARGV) {
     (undef, $root) = splice(@ARGV, 0, 2);
   } elsif (@ARGV && $ARGV[0] eq '-J') {
     shift @ARGV;
-  } elsif ($ARGV[0] eq '-j' || $ARGV[0] eq '-J' || $ARGV[0] eq '-z') {
+  } elsif ($ARGV[0] eq '-j' || $ARGV[0] eq '-J' || $ARGV[0] eq '-z' || $ARGV[0] eq '--zstd') {
     shift @ARGV;
   } elsif ($ARGV[0] =~ /^-/) {
     die("unpackarchive: unsupported option $ARGV[0]\n");
