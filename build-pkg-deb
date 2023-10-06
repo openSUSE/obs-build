@@ -159,14 +159,14 @@ pkg_preinstall_deb() {
     elif test -f "control.tar.xz" -a ! -L "control.tar.xz" ; then
 	$TAR -C "$BUILD_INIT_CACHE/scripts/control" -J < control.tar.xz
     elif test -f "control.tar.zst" -a ! -L "control.tar.zst" ; then
-	$TAR -C "$BUILD_INIT_CACHE/scripts/control" -J < control.tar.zst
+	$TAR -C "$BUILD_INIT_CACHE/scripts/control" --zstd < control.tar.zst
     fi
     if test -f "data.tar.gz" -a ! -L "data.tar.gz" ; then
 	$TAR -z < data.tar.gz
     elif test -f "data.tar.xz" -a ! -L "data.tar.xz" ; then
 	$TAR -J < data.tar.xz
     elif test -f "data.tar.zst" -a ! -L "data.tar.zst" ; then
-	$TAR -J < data.tar.zst
+	$TAR --zstd < data.tar.zst
     fi
     rm -rf "$BUILD_INIT_CACHE/scripts/$PKG.pre" "$BUILD_INIT_CACHE/scripts/$PKG.post"
     if test -e "$BUILD_INIT_CACHE/scripts/$PKG.run" ; then
