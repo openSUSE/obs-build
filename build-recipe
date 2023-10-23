@@ -125,7 +125,7 @@ recipe_set_buildtype() {
         PKGBUILD) BUILDTYPE=arch ;;
         snapcraft.yaml) BUILDTYPE=snapcraft ;;
         appimage.yml) BUILDTYPE=appimage ;;
-        Dockerfile) BUILDTYPE=docker ;;
+        Dockerfile|Dockerfile.*) BUILDTYPE=docker ;;
         fissile.yml) BUILDTYPE=fissile ;;
         build.collax) BUILDTYPE=collax ;;
         _preinstallimage) BUILDTYPE=preinstallimage ;;
@@ -140,7 +140,7 @@ recipe_set_buildtype() {
         mkosi.*) BUILDTYPE=mkosi ;;
     esac
     if test -z "$BUILDTYPE" ; then
-       cleanup_and_exit 1 "I don't know how to build $RECIPEFILE"
+	cleanup_and_exit 1 "I don't know how to build $RECIPEFILE"
     fi
     # we can't query right after vm startup, so we put the BUILDENGINE in the build.data
     if test -z "$RUNNING_IN_VM" ; then

@@ -127,7 +127,7 @@ sub collect_result {
   }
   @d = ('ARCHPKGS') if $p->{'recipe'} =~ /PKGBUILD$/;
   @d = ('KIWI') if $p->{'recipe'} =~ /\.kiwi$/;
-  @d = ('DOCKER') if $p->{'recipe'} =~ /Dockerfile$/;
+  @d = ('DOCKER') if $p->{'recipe'} =~ /Dockerfile(\.|$)/;
   @d = ('FISSILE') if $p->{'recipe'} =~ /fissile\.yml$/;
   @d = ('HELM') if $p->{'recipe'} =~ /Chart\.yaml$/;
   push @d, 'OTHER';

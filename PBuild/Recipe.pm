@@ -45,6 +45,7 @@ sub find_recipe {
   return $files{'PKGBUILD'} ? $files{'PKGBUILD'} : undef if $type eq 'arch';
   my $pkg = $p->{'pkg'};
   $pkg = $p->{'flavor'} if $p->{'flavor'};
+  return $files{"Dockerfile.$pkg"} if $type eq 'docker' && $files{"Dockerfile.$pkg"};
   return $files{"$pkg.$type"} if $files{"$pkg.$type"};
   # try again without last components
   return $files{"$1.$type"} if $pkg =~ /^(.*?)\./ && $files{"$1.$type"};
@@ -60,6 +61,7 @@ sub find_recipe {
   # as last resort ignore the type for image/container building
   if ($type ne 'docker') {
     return $files{'Dockerfile'} if $files{'Dockerfile'};
+    return $files{"Dockerfile.$pkg"} if $files{"Dockerfile.$pkg"};
   }
   if ($type ne 'kiwi') {
     @files = grep {/\.kiwi$/} keys %files;
@@ -202,7 +204,7 @@ sub looks_like_packagedir {
   return 0 if grep {/^_build\./} @files;
   for my $file (@files) {
     return 1 if $file =~ /\.(?:spec|dsc|kiwi)$/;
-    return 1 if $file =~ /^mkosi\./;
+    return 1 if $file =~ /^(?:Dockerfile|mkosi)\./;
     return 1 if $file eq 'snapcraft.yaml' || $file eq 'appimage.yml';
     return 1 if $file eq 'Dockerfile' || $file eq 'fissile.yml' || $file eq 'Chart.yml';
     return 1 if $file eq 'PKGBUILD';
