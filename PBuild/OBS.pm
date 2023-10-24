@@ -27,6 +27,9 @@ use Build::Download;
 use PBuild::Util;
 use PBuild::Cpio;
 use PBuild::Structured;
+use PBuild::SigAuth;
+
+my $cookie_jar;
 
 my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst};
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
@@ -77,12 +80,38 @@ my $dtd_proj = [
 ];
 
 #
+# set the cookie jar for the user agent
+#
+sub set_cookie_jar {
+  my ($ua) = @_;
+  if (!defined($cookie_jar)) {
+    eval {
+      require HTTP::Cookies;
+      $cookie_jar = HTTP::Cookies->new();
+    };
+    $cookie_jar = 0 unless $cookie_jar;
+  }
+  $ua->cookie_jar($cookie_jar) if $cookie_jar;
+}
+
+#
+# create a user agent if we not have it and set our cookie jar
+#
+sub create_ua {
+  my ($ua) = @_;
+  $ua ||= Build::Download::create_ua();
+  set_cookie_jar($ua);
+  return $ua;
+}
+
+#
 # get the project data from an OBS project
 #
 sub fetch_proj {
   my ($projid, $baseurl) = @_;
   my $projid2 = PBuild::Util::urlencode($projid);
-  my ($projxml) = Build::Download::fetch("${baseurl}source/$projid2/_meta");
+  my $ua = create_ua();
+  my ($projxml) = Build::Download::fetch("${baseurl}source/$projid2/_meta", 'ua' => $ua);
   return PBuild::Structured::fromxml($projxml, $dtd_proj, 0, 1);
 }
 
@@ -93,7 +122,8 @@ sub fetch_config {
   my ($prp, $baseurl) = @_;
   my ($projid, $repoid) = split('/', $prp, 2);
   my $projid2 = PBuild::Util::urlencode($projid);
-  my ($config) = Build::Download::fetch("${baseurl}source/$projid2/_config", 'missingok' => 1);
+  my $ua = create_ua();
+  my ($config) = Build::Download::fetch("${baseurl}source/$projid2/_config", 'ua' => $ua, 'missingok' => 1);
   $config = '' unless defined $config;
   $config = "\n### from $projid\n%define _repository $repoid\n$config" if $config;
   return $config;
@@ -267,11 +297,11 @@ sub fetch_binaries {
   my ($url, $repodir, $names, $callback, $ua) = @_;
   my @names = sort keys %$names;
   while (@names) {
-    $ua ||= Build::Download::create_ua();
     my @nchunk = splice(@names, 0, 100);
     my $chunkurl = "$url/_repository?view=cpio";
     $chunkurl .= "&binary=".PBuild::Util::urlencode($_) for @nchunk;
     my $tmpcpio = "$repodir/.$$.binaries.cpio";
+    $ua = create_ua($ua);
     Build::Download::download($chunkurl, $tmpcpio, undef, 'ua' => $ua, 'retry' => 3);
     PBuild::Cpio::cpio_extract($tmpcpio, sub {fetch_binaries_cpioextract($_[0], $_[1], $repodir, $names, $callback)});
     unlink($tmpcpio);
@@ -291,7 +321,8 @@ sub fetch_repodata {
   $baseurl .= '/' unless $baseurl =~ /\/$/;
   my $requrl .= "${baseurl}build/$prp/$arch/_repository?view=cache";
   $requrl .= "&module=".PBuild::Util::urlencode($_) for @{$modules || []};
-  Build::Download::download($requrl, "$tmpdir/repository.cpio", undef, 'retry' => 3);
+  my $ua = create_ua();
+  Build::Download::download($requrl, "$tmpdir/repository.cpio", undef, 'ua' => $ua, 'retry' => 3);
   unlink("$tmpdir/repository.data");
   PBuild::Cpio::cpio_extract("$tmpdir/repository.cpio", "$tmpdir/repository.data", 'extract' => 'repositorycache', 'missingok' => 1);
   my $rdata;

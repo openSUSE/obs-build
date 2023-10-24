@@ -36,6 +36,7 @@ sub create_ua {
   my $ssl_opts = $opt{'ssl_opts'} || { verify_hostname => 1 };
   my $ua = LWP::UserAgent->new(agent => $agent, timeout => $timeout, ssl_opts => $ssl_opts);
   $ua->env_proxy;
+  $ua->cookie_jar($opt{'cookie_jar'}) if $opt{'cookie_jar'};
   return $ua;
 }
 
