@@ -1265,6 +1265,7 @@ sub recipe2buildtype {
   return 'collax' if $recipe eq 'build.collax';
   return 'snapcraft' if $recipe eq 'snapcraft.yaml';
   return 'appimage' if $recipe eq 'appimage.yml';
+  return 'docker' if $recipe eq 'Containerfile' || $recipe =~ /^Containerfile\..*/;
   return 'docker' if $recipe eq 'Dockerfile' || $recipe =~ /^Dockerfile\..*/;
   return 'fissile' if $recipe eq 'fissile.yml';
   return 'preinstallimage' if $recipe eq '_preinstallimage';

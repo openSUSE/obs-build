@@ -125,7 +125,7 @@ recipe_set_buildtype() {
         PKGBUILD) BUILDTYPE=arch ;;
         snapcraft.yaml) BUILDTYPE=snapcraft ;;
         appimage.yml) BUILDTYPE=appimage ;;
-        Dockerfile|Dockerfile.*) BUILDTYPE=docker ;;
+        Containerfile|Containerfile.*|Dockerfile|Dockerfile.*) BUILDTYPE=docker ;;
         fissile.yml) BUILDTYPE=fissile ;;
         build.collax) BUILDTYPE=collax ;;
         _preinstallimage) BUILDTYPE=preinstallimage ;;
@@ -191,7 +191,7 @@ expand_recipe_directories() {
 			mkosi) types="mkosi." ;;
 		    esac
 		fi
-		types="$types .spec _specsubdir:package _specsubdir:dist .dsc PKGBUILD Dockerfile build.collax .kiwi .src.rpm .nosrc.rpm simpleimage snapcraft.yaml Chart.yaml flatpak.yaml flatpak.json mkosi."
+		types="$types .spec _specsubdir:package _specsubdir:dist .dsc PKGBUILD Containerfile Dockerfile build.collax .kiwi .src.rpm .nosrc.rpm simpleimage snapcraft.yaml Chart.yaml flatpak.yaml flatpak.json mkosi."
 	    fi
 	    for t in $types ; do
 		found=

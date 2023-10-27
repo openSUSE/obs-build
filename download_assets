@@ -153,7 +153,7 @@ for my $dir (@dirs) {
       find_assets($assetmgr, $bconf, $p, $opts->{'recipe'});
     } else {
       for my $file (sort keys %$files) {
-	next unless $file eq 'sources' || $file eq 'go.sum' || $file eq 'PKGBUILD' || $file eq 'Dockerfile' || $file =~ /^Dockerfile\./ || $file =~ /\.(?:spec|dsc|kiwi)/;
+	next unless $file eq 'sources' || $file eq 'go.sum' || $file eq 'PKGBUILD' || $file eq 'Containerfile'|| $file eq 'Dockerfile' || $file =~ /^(?:Container|Docker)file\./ || $file =~ /\.(?:spec|dsc|kiwi)/;
 	find_assets($assetmgr, $bconf, $p, $file);
       }
     }

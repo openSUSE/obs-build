@@ -38,6 +38,7 @@ sub find_recipe {
   return $files{'simpleimage'} if $files{'simpleimage'};
   return $files{'snapcraft.yaml'} if $type eq 'snapcraft' && $files{'snapcraft.yaml'};
   return $files{'appimage.yml'} if $type eq 'appimage' && $files{'appimage.yml'};
+  return $files{'Containerfile'} if $type eq 'docker' && $files{'Containerfile'};
   return $files{'Dockerfile'} if $type eq 'docker' && $files{'Dockerfile'};
   return $files{'fissile.yml'} if $type eq 'fissile' && $files{'fissile.yml'};
   return $files{'Chart.yaml'} if $type eq 'helm' && $files{'Chart.yaml'};
@@ -45,6 +46,7 @@ sub find_recipe {
   return $files{'PKGBUILD'} ? $files{'PKGBUILD'} : undef if $type eq 'arch';
   my $pkg = $p->{'pkg'};
   $pkg = $p->{'flavor'} if $p->{'flavor'};
+  return $files{"Containerfile.$pkg"} if $type eq 'docker' && $files{"Containerfile.$pkg"};
   return $files{"Dockerfile.$pkg"} if $type eq 'docker' && $files{"Dockerfile.$pkg"};
   return $files{"$pkg.$type"} if $files{"$pkg.$type"};
   # try again without last components
@@ -60,7 +62,9 @@ sub find_recipe {
   return $files{'debian/control'} if $type eq 'dsc' && $files{'debian/control'};
   # as last resort ignore the type for image/container building
   if ($type ne 'docker') {
+    return $files{'Containerfile'} if $files{'Containerfile'};
     return $files{'Dockerfile'} if $files{'Dockerfile'};
+    return $files{"Containerfile.$pkg"} if $files{"Containerfile.$pkg"};
     return $files{"Dockerfile.$pkg"} if $files{"Dockerfile.$pkg"};
   }
   if ($type ne 'kiwi') {
@@ -204,9 +208,9 @@ sub looks_like_packagedir {
   return 0 if grep {/^_build\./} @files;
   for my $file (@files) {
     return 1 if $file =~ /\.(?:spec|dsc|kiwi)$/;
-    return 1 if $file =~ /^(?:Dockerfile|mkosi)\./;
+    return 1 if $file =~ /^(?:Containerfile|Dockerfile|mkosi)\./;
     return 1 if $file eq 'snapcraft.yaml' || $file eq 'appimage.yml';
-    return 1 if $file eq 'Dockerfile' || $file eq 'fissile.yml' || $file eq 'Chart.yml';
+    return 1 if $file eq 'Containerfile' || $file eq 'Dockerfile' || $file eq 'fissile.yml' || $file eq 'Chart.yml';
     return 1 if $file eq 'PKGBUILD';
   }
   return 0;
