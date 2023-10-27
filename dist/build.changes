@@ -1,4 +1,18 @@
 -------------------------------------------------------------------
+Fri Oct 27 08:29:31 UTC 2023 - Adrian Schröter <adrian@suse.de>
+
+- Docker:
+  - Support flavor specific build descriptions via Dockerfile.$flavor
+  - support "PlusRecommended" hint to also provide recommended packages
+  - use the name/version as filename if both are known
+  - Produce docker format containers by default
+- pbuild: Support for signature authentification of OBS resources
+- Fix wiping build root for --vm-type podman
+- Put BUILD_RELEASE and BUILD_CHANGELOG_TIMESTAMP in the /.buildenv
+- build-vm-kvm: use -cpu host on riscv64
+- small fixes and cleanups
+
+-------------------------------------------------------------------
 Fri Aug 11 06:25:38 UTC 2023 - Adrian Schröter <adrian@suse.de>
 
 - Added parser for BcntSyncTag in sources
