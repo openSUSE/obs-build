@@ -294,18 +294,20 @@ sub fetch_binaries_cpioextract {
 # Download binaries in batches from a remote obs instance
 #
 sub fetch_binaries {
-  my ($url, $repodir, $names, $callback, $ua) = @_;
+  my ($url, $repodir, $names, $callback) = @_;
   my @names = sort keys %$names;
+  return undef unless @names;
+  my $ua = create_ua();
   while (@names) {
     my @nchunk = splice(@names, 0, 100);
     my $chunkurl = "$url/_repository?view=cpio";
     $chunkurl .= "&binary=".PBuild::Util::urlencode($_) for @nchunk;
     my $tmpcpio = "$repodir/.$$.binaries.cpio";
-    $ua = create_ua($ua);
     Build::Download::download($chunkurl, $tmpcpio, undef, 'ua' => $ua, 'retry' => 3);
     PBuild::Cpio::cpio_extract($tmpcpio, sub {fetch_binaries_cpioextract($_[0], $_[1], $repodir, $names, $callback)});
     unlink($tmpcpio);
   }
+  return $ua;
 }
 
 #

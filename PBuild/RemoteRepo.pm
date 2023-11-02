@@ -448,10 +448,10 @@ sub fetchbinaries_obs {
     next if $1 ne $url;
     $names{$bin->{'name'}} = [ ".$$.$binname", $binname, $bin ];
   }
-  return unless %names;
+  return undef unless %names;
   my $repodir = $repo->{'dir'};
   PBuild::Util::mkdir_p($repodir);
-  PBuild::OBS::fetch_binaries($url, $repodir, \%names, \&fetchbinaries_replace, $ua);
+  return PBuild::OBS::fetch_binaries($url, $repodir, \%names, \&fetchbinaries_replace);
 }
 
 #
@@ -464,8 +464,8 @@ sub fetchbinaries {
   die("bad repo\n") unless $url;
   print "fetching ".PBuild::Util::plural(scalar(@$bins), 'binary')." from $url\n";
   PBuild::Util::mkdir_p($repodir);
-  my $ua = Build::Download::create_ua();
-  fetchbinaries_obs($repo, $bins, $ua) if $url =~ /^obs:/;
+  my $ua;
+  $ua = fetchbinaries_obs($repo, $bins) if $url =~ /^obs:/;
   for my $bin (@$bins) {
     next if $bin->{'filename'};
     my $location = $bin->{'location'};
@@ -474,6 +474,7 @@ sub fetchbinaries {
     my $binname = calc_binname($bin);
     PBuild::Verify::verify_filename($binname);
     my $tmpname = ".$$.$binname";
+    $ua ||= Build::Download::create_ua();
     if ($bin->{'name'} =~ /^container:/) {
       # we cannot query containers, just download and set the filename
       die("container has no hdrmd5\n") unless $bin->{'hdrmd5'};
