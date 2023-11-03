@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Nov  3 10:03:35 UTC 2023 - Adrian Schröter <adrian@suse.de>
+
+- fix SLE 15 SP5 build configuration
+- Improve user agent handling for obs repositories
+
+-------------------------------------------------------------------
 Fri Oct 27 08:29:31 UTC 2023 - Adrian Schröter <adrian@suse.de>
 
 - Docker:
