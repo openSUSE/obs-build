@@ -782,9 +782,11 @@ sub parse {
       }
     }
     if ($main_preamble) {
-      if ($line =~ /^(Name|Epoch|Version|Release|Disttag)\s*:\s*(\S+)/i) {
+      if ($line =~ /^(Name|Epoch|Version|Release|Disttag|Url)\s*:\s*(\S+)/i) {
 	$ret->{lc $1} = $2;
 	$macros{lc $1} = $2;
+	# add a separate uppercase macro for tags from the main preamble
+	$macros{uc $1} = $2;
       } elsif ($line =~ /^ExclusiveArch\s*:\s*(.*)/i) {
 	$exclarch ||= [];
 	push @$exclarch, split(' ', $1);
