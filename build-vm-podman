@@ -28,7 +28,7 @@ vm_verify_options_podman() {
 }
 
 vm_startup_podman() {
-    local name="build_${RECIPEFILE}"
+    local name="build_${RECIPEFILE//:/-}"
     podman rm "$name" >/dev/null 2>&1 || true
     local podman_opts=
     test -n "$VM_TYPE_PRIVILEGED" && podman_opts="--privileged --cap-add=SYS_ADMIN --cap-add=MKNOD"
@@ -42,7 +42,7 @@ vm_startup_podman() {
 }
 
 vm_kill_podman() {
-    local name="build_${RECIPEFILE}"
+    local name="build_${RECIPEFILE//:/-}"
     podman stop -t 2 "$name" || true
 }
 
@@ -78,7 +78,7 @@ vm_sysrq_podman() {
 }
 
 vm_wipe_podman() {
-    local name="build_${RECIPEFILE}"
+    local name="build_${RECIPEFILE//:/-}"
     podman rm "$name" >/dev/null 2>&1 || true
 
     echo "Wiping build root: '$BUILD_ROOT'"
