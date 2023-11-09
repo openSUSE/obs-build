@@ -173,9 +173,9 @@ sub dump_rpmdb {
         } else {
           system_chroot($root, 'stdout', $outfile, '/usr/bin/rpmdb', '--exportdb');
         }
+        exit($?) if $?;
+        return;
       }
-      exit($?) if $?;
-      return;
     }
     # try to get the dbpath from the root if we can
     if (!$dbpath && can_run($root, '/usr/bin/rpm')) {
