@@ -1,0 +1,129 @@
+#################################################################
+#
+# OpenWrt specific functions.
+#
+# Adapted from Flatpak specific functions, see details below.
+#
+# Original Author: Tina Müller <tina.mueller@suse.com>
+# Adapted-By: Andrei Enache <andreien@proton.me>
+#
+################################################################
+#
+# Copyright © 2020 SUSE LLC
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, see <http://www.gnu.org/licenses/>.
+#
+################################################################
+
+
+recipe_setup_openwrt() {
+    echo $BUILD_ROOT
+    pwd
+    TOPDIR=/usr/src/packages
+    "$DO_INIT_TOPDIR" && rm -rf "$BUILD_ROOT$TOPDIR"
+    for i in OTHER SOURCES ; do
+	mkdir -p "$BUILD_ROOT$TOPDIR/$i"
+    done
+    if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
+	mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+    else
+	copy_sources "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"
+    fi
+    chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+}
+
+recipe_prepare_openwrt() {
+    :
+}
+
+# Variables:
+# $BUILD_ROOT is the chroot
+# $TOPDIR/SOURCES includes the sources
+# $RECIPEFILE the name of the openwrt.(yaml|json) config file
+
+recipe_build_openwrt() {
+    echo "===================== recipe_build_openwrt ($@)"
+    set -e
+
+    ls -l $BUILD_ROOT$TOPDIR/SOURCES
+    cd "$BUILD_ROOT$TOPDIR/"
+    cp $BUILD_ROOT$TOPDIR/SOURCES/* .
+
+    local OPENWRT_FILE="$TOPDIR/SOURCES/$RECIPEFILE"
+    export OPENWRT_FILE
+    export TOPDIR
+    export RELEASE
+
+
+    local NAME=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$OPENWRT_FILE" name)
+    local GITURL=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$OPENWRT_FILE" giturl)
+    local SDKURL=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$OPENWRT_FILE" sdkurl)
+    local ARCH=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$OPENWRT_FILE" arch)
+    local SUBARCH=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$OPENWRT_FILE" subarch)
+    local RELVER=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$OPENWRT_FILE" relver)
+    local TARBALL=$(perl -I$BUILD_DIR -MBuild::OpenWrt -e 'Build::OpenWrt::show' -- "$BUILD_ROOT$OPENWRT_FILE" tarball)
+    
+    export NAME
+    export GITURL
+    export ARCH
+    export SUBARCH
+    export RELVER
+    export SDKURL
+    export TARBALL
+
+    tar xf "$TARBALL" -C "$BUILD_ROOT/repo/"
+    local URL=$(grep PKG_SOURCE_URL: "$BUILD_ROOT/repo/$NAME/Makefile" | cut -f2 -d '=')
+    if [ "$URL" != '/git' ]
+    then
+	rm -rf "$BUILD_ROOT/git"
+        git clone "$URL" "$BUILD_ROOT/git"
+        sed -i "s|$URL|/git|" "$BUILD_ROOT/repo/$NAME/Makefile"
+    fi
+
+
+    chroot "$BUILD_ROOT" bash -c "cd sdk && grep localrepo feeds.conf.default || echo \"src-link localrepo /repo/\" >> feeds.conf.default"
+
+
+    # Download the dependencies
+    chroot "$BUILD_ROOT" /bin/bash -c "cd sdk && make download V=s"
+    chroot "$BUILD_ROOT" /bin/bash -c "cd sdk && make package/$NAME/download V=s"
+
+
+    #for d in $(find package/ -mindepth 1 -maxdepth 2 -type d); do
+    #if [ -e $d/Makefile ]
+    #then
+    #  make $d/download V=s || true
+    #fi
+    #done
+
+
+    $BUILD_DIR/call-openwrt-sdk --root "$BUILD_ROOT"
+
+
+    set +e
+
+    BUILD_SUCCEEDED=true
+}
+
+recipe_resultdirs_openwrt() {
+    :
+}
+
+recipe_cleanup_openwrt() {
+    :
+}
+
+# Local Variables:
+# mode: Shell-script
+# End:
