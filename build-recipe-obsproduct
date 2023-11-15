@@ -1,0 +1,79 @@
+#
+# KIWI specific functions. Handle with care.
+#
+################################################################
+#
+# Copyright (c) 2023 SUSE Linux Products GmbH
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+
+recipe_setup_obsproduct() {
+    TOPDIR=/usr/src/packages
+    test "$DO_INIT_TOPDIR" = false || rm -rf "$BUILD_ROOT$TOPDIR"
+    mkdir -p "$BUILD_ROOT$TOPDIR"
+    mkdir -p "$BUILD_ROOT$TOPDIR/OTHER"
+    mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
+    mkdir -p "$BUILD_ROOT$TOPDIR/OBSPRODUCT"
+    # compat, older build versions did not clean TOPDIR ...
+    mkdir -p "$BUILD_ROOT$TOPDIR/BUILD"
+    mkdir -p "$BUILD_ROOT$TOPDIR/RPMS"
+    mkdir -p "$BUILD_ROOT$TOPDIR/SRPMS"
+
+    if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir; then
+	mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
+    else
+	if test -z "$LINKSOURCES" ; then
+	    cp -dLR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/ || cleanup_and_exit 1 "source copy failed"
+	else
+	    cp -lR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/ || cleanup_and_exit 1 "source copy failed"
+	fi
+    fi
+    chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+
+    if test -z "$ABUILD_TARGET"; then
+        ABUILD_TARGET=$(queryconfig target --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" )
+        test -z "$ABUILD_TARGET" || echo "build target is $ABUILD_TARGET"
+    fi
+}
+
+recipe_prepare_obsproduct() {
+    :
+}
+
+recipe_build_obsproduct() {
+    echo "running obs product builder..."
+
+    chroot "$BUILD_ROOT" chown -R abuild.abuild "$TOPDIR"
+
+    extra_args=""
+    if test -n "$RELEASE" ; then
+	extra_args=" $extra_args --release $RELEASE"
+    fi
+    if test -n "$BUILD_FLAVOR" ; then
+	extra_args=" $extra_args --flavor $BUILD_FLAVOR"
+    fi
+    chroot "$BUILD_ROOT" su -c "/usr/bin/obs-product-builder build $extra_args -v --clean $TOPDIR/SOURCES/$RECIPEFILE $TOPDIR/OBSPRODUCT" - abuild < /dev/null && BUILD_SUCCEEDED=true
+}
+
+recipe_resultdirs_obsproduct() {
+    echo OBSPRODUCT
+}
+
+recipe_cleanup_obsproduct() {
+    :
+}

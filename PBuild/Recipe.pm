@@ -72,6 +72,15 @@ sub find_recipe {
       return $files{$files[0]};
     }
   }
+  if ($type ne 'obsproduct') {
+    @files = grep {/\.obsproduct$/} keys %files;
+    @files = grep {/^\Q$pkg\E/i} @files if @files > 1;
+    return $files{$files[0]} if @files == 1;
+    if (@files > 1) {
+      @files = sort @files;
+      return $files{$files[0]};
+    }
+  }
   if (1) {
     @files = grep {/mkosi\.$/} keys %files;
     return $files{$files[0]} if @files == 1;

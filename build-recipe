@@ -32,7 +32,7 @@ RPM_NOPREP=
 BUILD_CHANGELOG_TIMESTAMP=
 VCSURL=
 
-for i in spec dsc kiwi arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild appimage docker podman fissile helm flatpak mkosi; do
+for i in spec dsc kiwi obsproduct arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild appimage docker podman fissile helm flatpak mkosi; do
     . "$BUILD_DIR/build-recipe-$i"
 done
 
@@ -122,6 +122,7 @@ recipe_set_buildtype() {
         *.spec|*.src.rpm) BUILDTYPE=spec ;;
         *.dsc) BUILDTYPE=dsc ;;
         *.kiwi) BUILDTYPE=kiwi ;;
+        *.obsproduct) BUILDTYPE=obsproduct ;;
         PKGBUILD) BUILDTYPE=arch ;;
         snapcraft.yaml) BUILDTYPE=snapcraft ;;
         appimage.yml) BUILDTYPE=appimage ;;
@@ -184,6 +185,7 @@ expand_recipe_directories() {
 		    case $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" type) in
 			dsc) types=".dsc" ;;
 			kiwi) types=".kiwi" ;;
+			obsproduct) types=".obsproduct" ;;
 			arch) types="PKGBUILD" ;;
 			collax) types="build.collax" ;;
 			livebuild) types=".livebuild" ;;
@@ -191,7 +193,7 @@ expand_recipe_directories() {
 			mkosi) types="mkosi." ;;
 		    esac
 		fi
-		types="$types .spec _specsubdir:package _specsubdir:dist .dsc PKGBUILD Dockerfile build.collax .kiwi .src.rpm .nosrc.rpm simpleimage snapcraft.yaml Chart.yaml flatpak.yaml flatpak.json mkosi."
+		types="$types .spec _specsubdir:package _specsubdir:dist .dsc PKGBUILD Dockerfile build.collax .kiwi .obsproduct .src.rpm .nosrc.rpm simpleimage snapcraft.yaml Chart.yaml flatpak.yaml flatpak.json mkosi."
 	    fi
 	    for t in $types ; do
 		found=
