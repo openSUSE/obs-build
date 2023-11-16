@@ -70,6 +70,7 @@ supported by the kiwi tool
 - *SimpleImage*&mdash;`chroot` `tar` ball based on `rpm` spec file syntax
 - [Debian](http://debian.org) *Livebuild*
 - *Preinstallimages*&mdash;for speeding up builds esp. inside of [OBS](http://openbuildservice.org/)
+- OBS Product Builds, to generate rpm-md trees and installable images.
 
 Desktop Image formats
 ---

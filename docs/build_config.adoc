@@ -395,7 +395,7 @@ architecture!). For example arm-linux-gnueabihf for armv7hl builds.
 Build recipe type. This is the format of the file which provides the
 build description. This gets usually autodetected, but in some rare
 cases it can be set here to either one of these: spec, dsc, kiwi,
-livebuild, arch, preinstallimage.
+livebuild, arch, preinstallimage, obsproduct.
 
 Defines the build recipe format. Valid values are currently: none, spec,
 dsc, arch, kiwi, preinstallimage. If no type is specified, OBS deduces a
