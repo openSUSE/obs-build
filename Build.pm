@@ -447,7 +447,9 @@ sub read_config {
   for my $l (@spec) {
     $l = $l->[1] if ref $l;
     next unless defined $l;
-    my @l = split(' ', $l);
+    # Support escaped spaces in the values
+    # zero-width negative look-behind assertion searching for spaces not preceded with a backslash
+    my @l = split(/(?<!\\) /, $l);
     next unless @l;
     my $ll = shift @l;
     my $l0 = lc($ll);
@@ -468,6 +470,8 @@ sub read_config {
     if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:' || $l0 eq 'expandflags:' || $l0 eq 'buildflags:' || $l0 eq 'publishflags:' || $l0 eq 'repourl:' || $l0 eq 'registryurl:' || $l0 eq 'assetsurl:' || $l0 eq 'onlynative:' || $l0 eq 'alsonative:') {
       my $t = substr($l0, 0, -1);
       for my $l (@l) {
+        # Strip the escaping backslashes
+        $l =~ s/\\(.)/$1/g;
 	if ($l eq '!*') {
 	  $config->{$t} = [];
 	} elsif ($l =~ /^!/) {
