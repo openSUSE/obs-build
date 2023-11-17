@@ -58,8 +58,6 @@ recipe_prepare_obsproduct() {
 recipe_build_obsproduct() {
     echo "running obs product builder..."
 
-    chroot "$BUILD_ROOT" chown -R abuild.abuild "$TOPDIR"
-
     extra_args=""
     if test -n "$RELEASE" ; then
 	extra_args=" $extra_args --release $RELEASE"

@@ -87,9 +87,12 @@ sub parse {
 
   # can we live without additional repository config?
 
-  # currently always on
-  $ret->{'sourcemedium'} = 1;
-  $ret->{'debugmedium'} = 1;
+  # Do we need source or debug packages?
+  my $bo = $data->{'build_options'};
+  if ($bo) {
+    $ret->{'sourcemedium'} = 1 if $bo->{'source'};
+    $ret->{'debugmedium'} = 1 if $bo->{'debug'};
+  }
 
   return $ret;
 }
