@@ -123,6 +123,9 @@ for my $url (@args) {
       use IO::Uncompress::Gunzip qw($GunzipError);
       $fh = new IO::Uncompress::Gunzip $fh or die "Error opening $u: $GunzipError\n";
     }
+    if ($u =~ /\.zst$/) {
+      open ($fh, "-|", "zstd", "-dc", "$dir/repodata/$u");
+    }
     my $parsefn;
     if ($opts->{'dump'}) {
       $parsefn = sub {
