@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Mon Nov 20 08:00:48 UTC 2023 - Adrian Schröter <adrian@suse.de>
+
+- Support zstd compressed rpm-md meta data (bsc#1217269)
+- Added Debian 12 configuration
+- First ObsProduct build format support
+
+-------------------------------------------------------------------
 Fri Nov  3 10:03:35 UTC 2023 - Adrian Schröter <adrian@suse.de>
 
 - fix SLE 15 SP5 build configuration
