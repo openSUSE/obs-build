@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Mon Nov 20 14:59:25 UTC 2023 - Adrian Schröter <adrian@suse.de>
+
+- obsproduct build type got renamed to productcompose
+
+-------------------------------------------------------------------
 Mon Nov 20 08:00:48 UTC 2023 - Adrian Schröter <adrian@suse.de>
 
 - Support zstd compressed rpm-md meta data (bsc#1217269)
