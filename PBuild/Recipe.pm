@@ -72,8 +72,8 @@ sub find_recipe {
       return $files{$files[0]};
     }
   }
-  if ($type ne 'obsproduct') {
-    @files = grep {/\.obsproduct$/} keys %files;
+  if ($type ne 'productcompose') {
+    @files = grep {/\.productcompose$/} keys %files;
     @files = grep {/^\Q$pkg\E/i} @files if @files > 1;
     return $files{$files[0]} if @files == 1;
     if (@files > 1) {

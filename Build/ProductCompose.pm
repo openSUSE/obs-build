@@ -18,7 +18,7 @@
 #
 ################################################################
 
-package Build::ObsProduct;
+package Build::ProductCompose;
 
 use strict;
 use warnings;

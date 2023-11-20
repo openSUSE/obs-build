@@ -382,7 +382,7 @@ Build::readdeps($cf, undef, \%repo);
 
 my @sysdeps = Build::get_sysbuild($cf, $buildtype, $extrasysdeps);
 
-if ($buildtype eq 'kiwi-image' || $buildtype eq 'kiwi-product' || $buildtype eq 'obsproduct') {
+if ($buildtype eq 'kiwi-image' || $buildtype eq 'kiwi-product' || $buildtype eq 'productcompose') {
   if (!shift @sysdeps) {
     print STDERR "expansion error\n";
     print STDERR "  $_\n" for @sysdeps;

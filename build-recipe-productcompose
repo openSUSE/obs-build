@@ -22,13 +22,13 @@
 ################################################################
 
 
-recipe_setup_obsproduct() {
+recipe_setup_productcompose() {
     TOPDIR=/usr/src/packages
     test "$DO_INIT_TOPDIR" = false || rm -rf "$BUILD_ROOT$TOPDIR"
     mkdir -p "$BUILD_ROOT$TOPDIR"
     mkdir -p "$BUILD_ROOT$TOPDIR/OTHER"
     mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
-    mkdir -p "$BUILD_ROOT$TOPDIR/OBSPRODUCT"
+    mkdir -p "$BUILD_ROOT$TOPDIR/PRODUCT"
     # compat, older build versions did not clean TOPDIR ...
     mkdir -p "$BUILD_ROOT$TOPDIR/BUILD"
     mkdir -p "$BUILD_ROOT$TOPDIR/RPMS"
@@ -51,12 +51,12 @@ recipe_setup_obsproduct() {
     fi
 }
 
-recipe_prepare_obsproduct() {
+recipe_prepare_productcompose() {
     :
 }
 
-recipe_build_obsproduct() {
-    echo "running obs product builder..."
+recipe_build_productcompose() {
+    echo "running product composer..."
 
     extra_args=""
     if test -n "$RELEASE" ; then
@@ -65,13 +65,13 @@ recipe_build_obsproduct() {
     if test -n "$BUILD_FLAVOR" ; then
 	extra_args=" $extra_args --flavor $BUILD_FLAVOR"
     fi
-    chroot "$BUILD_ROOT" su -c "/usr/bin/obs-product-builder build $extra_args -v --clean $TOPDIR/SOURCES/$RECIPEFILE $TOPDIR/OBSPRODUCT" - abuild < /dev/null && BUILD_SUCCEEDED=true
+    chroot "$BUILD_ROOT" su -c "/usr/bin/product-composer build $extra_args -v --clean $TOPDIR/SOURCES/$RECIPEFILE $TOPDIR/PRODUCT" - abuild < /dev/null && BUILD_SUCCEEDED=true
 }
 
-recipe_resultdirs_obsproduct() {
-    echo OBSPRODUCT
+recipe_resultdirs_productcompose() {
+    echo PRODUCT
 }
 
-recipe_cleanup_obsproduct() {
+recipe_cleanup_productcompose() {
     :
 }

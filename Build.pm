@@ -44,7 +44,7 @@ our $do_fissile;
 our $do_helm;
 our $do_flatpak;
 our $do_mkosi;
-our $do_obsproduct;
+our $do_productcompose;
 
 sub import {
   for (@_) {
@@ -61,9 +61,9 @@ sub import {
     $do_helm = 1 if $_ eq ':helm';
     $do_flatpak = 1 if $_ eq ':flatpak';
     $do_mkosi = 1 if $_ eq ':mkosi';
-    $do_obsproduct = 1 if $_ eq ':obsproduct';
+    $do_productcompose = 1 if $_ eq ':productcompose';
   }
-  $do_rpm = $do_deb = $do_kiwi = $do_obsproduct = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = $do_fissile = $do_helm = $do_flatpak = $do_mkosi = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker && !$do_fissile && !$do_helm && !$do_flatpak && !$do_mkosi && !$do_obsproduct;
+  $do_rpm = $do_deb = $do_kiwi = $do_productcompose = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = $do_fissile = $do_helm = $do_flatpak = $do_mkosi = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker && !$do_fissile && !$do_helm && !$do_flatpak && !$do_mkosi && !$do_productcompose;
 
   if ($do_deb) {
     require Build::Deb;
@@ -101,8 +101,8 @@ sub import {
   if ($do_mkosi) {
     require Build::Mkosi;
   }
-  if ($do_obsproduct) {
-    require Build::ObsProduct;
+  if ($do_productcompose) {
+    require Build::ProductCompose;
   }
 }
 
@@ -197,6 +197,9 @@ my %subst_defaults = (
   ],
   'system-packages:kiwi-product' => [
     'kiwi',
+  ],
+  'system-packages:productcompose' => [
+    'product-composer',
   ],
   'system-packages:docker' => [
     'docker', 'system-packages:repo-creation',
@@ -831,6 +834,9 @@ sub get_sysbuild {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:kiwi-image'} || []};
     @sysdeps = @{$config->{'substitute'}->{'kiwi-setup:image'} || []} unless @sysdeps;
     @sysdeps = @{$subst_defaults{'system-packages:kiwi-image'} || []} unless @sysdeps;
+  } elsif ($buildtype eq 'productcompose') {
+    @sysdeps = @{$config->{'substitute'}->{'system-packages:productcompose'} || []};
+    @sysdeps = @{$subst_defaults{'system-packages:productcompose'} || []} unless @sysdeps;
   } elsif ($buildtype eq 'kiwi-product') {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:kiwi-product'} || []};
     @sysdeps = @{$config->{'substitute'}->{'kiwi-setup:product'} || []} unless @sysdeps;
@@ -1263,7 +1269,7 @@ sub add_all_providers {
 sub recipe2buildtype {
   my ($recipe) = @_;
   return undef unless defined $recipe;
-  return $1 if $recipe =~ /\.(spec|dsc|kiwi|obsproduct|livebuild)$/;
+  return $1 if $recipe =~ /\.(spec|dsc|kiwi|productcompose|livebuild)$/;
   $recipe =~ s/.*\///;
   $recipe =~ s/^_service:.*://;
   return 'arch' if $recipe eq 'PKGBUILD';
@@ -1321,7 +1327,7 @@ sub parse {
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $fn =~ /\.kiwi$/;
   return Build::LiveBuild::parse($cf, $fn, @args) if $do_livebuild && $fn =~ /\.livebuild$/;
   return Build::Mkosi::parse($cf, $fn, @args) if $do_mkosi && $fn =~ /^mkosi\./;
-  return Build::ObsProduct::parse($cf, $fn, @args) if $do_obsproduct && $fn =~ /\.obsproduct$/;
+  return Build::ProductCompose::parse($cf, $fn, @args) if $do_productcompose && $fn =~ /\.productcompose$/;
   return parse_typed($cf, $fn, recipe2buildtype($fn), @args);
 }
 
@@ -1331,7 +1337,7 @@ sub parse_typed {
   return Build::Rpm::parse($cf, $fn, @args) if $do_rpm && $buildtype eq 'spec';
   return Build::Deb::parse($cf, $fn, @args) if $do_deb && $buildtype eq 'dsc';
   return Build::Kiwi::parse($cf, $fn, @args) if $do_kiwi && $buildtype eq 'kiwi';
-  return Build::ObsProduct::parse($cf, $fn, @args) if $do_obsproduct && $buildtype eq 'obsproduct';
+  return Build::ProductCompose::parse($cf, $fn, @args) if $do_productcompose && $buildtype eq 'productcompose';
   return Build::LiveBuild::parse($cf, $fn, @args) if $do_livebuild && $buildtype eq 'livebuild';
   return Build::Snapcraft::parse($cf, $fn, @args) if $do_snapcraft && $buildtype eq 'snapcraft';
   return Build::Appimage::parse($cf, $fn, @args) if $do_appimage && $buildtype eq 'appimage';
