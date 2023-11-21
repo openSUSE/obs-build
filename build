@@ -843,7 +843,7 @@ copy_oldpackages() {
 
 copy_sources() {
     local include_directories
-    if test -n "$RUNNING_IN_VM" -o "$BUILDTYPE" = kiwi -o "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman ; then
+    if test -n "$RUNNING_IN_VM" -o "$BUILDTYPE" = kiwi -o "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman  -o "$BUILDTYPE" = productcompose ; then
         include_directories=true
     fi
     if test -n "$RUNNING_IN_VM" -o -n "$COPY_SOURCES_ASIS" -o -n "$RPM_BUILD_IN_PLACE" ; then
