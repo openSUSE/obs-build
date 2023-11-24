@@ -92,6 +92,13 @@ sub parse {
   if ($bo) {
     $ret->{'sourcemedium'} = 1 if $bo->{'source'};
     $ret->{'debugmedium'} = 1 if $bo->{'debug'};
+    my @architectures = @{$bo->{'architectures'} || []};
+    if ($bo->{'flavors'}) {
+      if ($bo->{'flavors'}) {
+
+      }
+    }
+    $ret->{'exclarch'} = \@architectures if @architectures;
   }
 
   return $ret;
