@@ -79,27 +79,47 @@ sub parse {
   $ret->{name} = $data->{'name'} or die "OBS Product name is missing";
   my $runtime_version = $data->{'runtime-version'};
   my $sdk = $data->{sdk};
-
-  my @unpack_packdeps = filter_packages(@{$data->{'unpack_packages'}});
-  my @packdeps = filter_packages(@{$data->{'packages'}});
-  my @merged = (@unpack_packdeps, @packdeps);
-  $ret->{deps} = \@merged;
-
-  # can we live without additional repository config?
+  my @architectures;
 
   # Do we need source or debug packages?
   my $bo = $data->{'build_options'};
   if ($bo) {
     $ret->{'sourcemedium'} = 1 if $bo->{'source'};
     $ret->{'debugmedium'} = 1 if $bo->{'debug'};
-    my @architectures = @{$bo->{'architectures'} || []};
+    @architectures = @{$bo->{'architectures'} || []};
     if ($bo->{'flavors'}) {
-      if ($bo->{'flavors'}) {
-
+      for my $flavor (@{$bo->{'flavors'}}) {
+	my $f = $flavor->{$cf->{'buildflavor'}};
+        next unless $f;
+	@architectures = $f->{'architectures'};
       }
     }
     $ret->{'exclarch'} = \@architectures if @architectures;
   }
+
+  my @unpack_packdeps = filter_packages(@{$data->{'unpack_packages'}});
+  my @packdeps = filter_packages(@{$data->{'packages'}});
+  my @merged;
+  for my $dep (@unpack_packdeps, @packdeps) {
+    if (ref($dep) eq 'HASH') {
+      next if $dep->{'flavors'} && grep { $_ eq $cf->{'buildflavor'} } @{$dep->{'flavors'} || []};
+      if ($dep->{'architectures'}) {
+        my $match;
+        for my $a (@architectures) {
+	   $match if grep { $_ eq $a } @{$dep->{'architectures'} || []};
+        }
+	next unless $match;
+      }
+      for my $d (@{$dep->{'packages'}}) {
+        push @merged, $d;
+      }
+    } else {
+      push @merged, $dep;
+    }
+  }
+  $ret->{deps} = \@merged;
+
+  # can we live without additional repository config?
 
   return $ret;
 }
