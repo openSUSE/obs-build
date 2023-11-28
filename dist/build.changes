@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Tue Nov 28 07:10:37 UTC 2023 - Adrian Schröter <adrian@suse.de>
+
+- productcompose:
+  * support filtered package lists
+  * support default architecture listing
+  * fix copy in binaries in VM builds^
+
+-------------------------------------------------------------------
 Mon Nov 20 14:59:25 UTC 2023 - Adrian Schröter <adrian@suse.de>
 
 - obsproduct build type got renamed to productcompose
