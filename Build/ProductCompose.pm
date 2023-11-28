@@ -119,7 +119,8 @@ sub parse {
   }
   $ret->{deps} = \@merged;
 
-  # can we live without additional repository config?
+  # We have currently no option to configure own path list for the product on purpose
+  $ret->{path} = '_obsrepositories/';
 
   return $ret;
 }
