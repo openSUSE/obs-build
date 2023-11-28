@@ -106,7 +106,7 @@ sub parse {
       if ($dep->{'architectures'}) {
         my $match;
         for my $a (@architectures) {
-	   $match if grep { $_ eq $a } @{$dep->{'architectures'} || []};
+	   $match = 1 if grep { $_ eq $a } @{$dep->{'architectures'} || []};
         }
 	next unless $match;
       }
