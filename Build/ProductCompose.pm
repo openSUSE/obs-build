@@ -120,7 +120,7 @@ sub parse {
   $ret->{deps} = \@merged;
 
   # We have currently no option to configure own path list for the product on purpose
-  $ret->{path} = [ { project => '_obsrepositories/', repository => '' } ];
+  $ret->{path} = [ { project => '_obsrepositories', repository => '' } ];
 
   return $ret;
 }
