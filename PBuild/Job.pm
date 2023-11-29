@@ -375,10 +375,6 @@ sub rename_build_result {
     rmdir("$buildroot/.build.packages");
   }
   rename("$buildroot/.mount/.build.packages", "$buildroot/.build.packages") || die("final rename failed: $!\n");
-  # XXX: extracted cpio is flat but code below expects those directories...
-  symlink('.', "$buildroot/.build.packages/SRPMS");
-  symlink('.', "$buildroot/.build.packages/DEBS");
-  symlink('.', "$buildroot/.build.packages/KIWI");
 }
 
 #
