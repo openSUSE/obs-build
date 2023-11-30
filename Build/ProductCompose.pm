@@ -92,7 +92,7 @@ sub parse {
     for my $flavor (@{$data->{'flavors'}}) {
       my $f = $flavor->{$cf->{'buildflavor'}};
       next unless $f;
-      @architectures = $f->{'architectures'};
+      @architectures = @{$f->{'architectures'}} if $f->{'architectures'};
     }
   }
   $ret->{'exclarch'} = \@architectures if @architectures;
