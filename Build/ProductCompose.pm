@@ -92,10 +92,18 @@ sub parse {
     for my $flavor (@{$data->{'flavors'}}) {
       my $f = $flavor->{$cf->{'buildflavor'}};
       next unless $f;
-      @architectures = @{$f->{'architectures'}} if $f->{'architectures'};
+      @architectures = @{$f->{'architectures'} || []} if $f->{'architectures'};
     }
+    if (@architectures) {
+      $ret->{'exclarch'} = \@architectures;
+    } else {
+      # We have flavors, but no architecture defined.
+      # This can also exclude the main package in multibuild case
+      $ret->{'error'} = 'excluded';
+    }
+  } else {
+    $ret->{'exclarch'} = \@architectures if @architectures;
   }
-  $ret->{'exclarch'} = \@architectures if @architectures;
 
   my @unpack_packdeps = filter_packages(@{$data->{'unpack_packages'}});
   my @packdeps = filter_packages(@{$data->{'packages'}});
