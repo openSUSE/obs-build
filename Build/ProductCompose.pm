@@ -84,18 +84,18 @@ sub parse {
   # Do we need source or debug packages?
   my $bo = $data->{'build_options'};
   if ($bo) {
-    $ret->{'sourcemedium'} = 1 if $bo->{'source'};
-    $ret->{'debugmedium'} = 1 if $bo->{'debug'};
-    @architectures = @{$bo->{'architectures'} || []};
-    if ($bo->{'flavors'}) {
-      for my $flavor (@{$bo->{'flavors'}}) {
-	my $f = $flavor->{$cf->{'buildflavor'}};
-        next unless $f;
-	@architectures = $f->{'architectures'};
-      }
-    }
-    $ret->{'exclarch'} = \@architectures if @architectures;
   }
+  $ret->{'sourcemedium'} = 1 if $data->{'source'};
+  $ret->{'debugmedium'} = 1 if $data->{'debug'};
+  @architectures = @{$data->{'architectures'} || []};
+  if ($data->{'flavors'}) {
+    for my $flavor (@{$data->{'flavors'}}) {
+      my $f = $flavor->{$cf->{'buildflavor'}};
+      next unless $f;
+      @architectures = $f->{'architectures'};
+    }
+  }
+  $ret->{'exclarch'} = \@architectures if @architectures;
 
   my @unpack_packdeps = filter_packages(@{$data->{'unpack_packages'}});
   my @packdeps = filter_packages(@{$data->{'packages'}});
