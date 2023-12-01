@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri Dec  1 10:15:05 UTC 2023 - Adrian Schröter <adrian@suse.de>
+
+- fixed handling for cmdline parameters via kernel packages
+
+-------------------------------------------------------------------
 Thu Nov 30 09:49:19 UTC 2023 - Adrian Schröter <adrian@suse.de>
 
 - productcompose:
