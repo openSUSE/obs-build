@@ -89,9 +89,9 @@ sub parse {
   $ret->{'debugmedium'} = 1 if $data->{'debug'};
   @architectures = @{$data->{'architectures'} || []};
   if ($data->{'flavors'}) {
-    for my $flavor (@{$data->{'flavors'}}) {
-      my $f = $flavor->{$cf->{'buildflavor'}};
-      next unless $f;
+    if ($data->{'flavors'}) {
+      my $f = $data->{'flavors'}->{$cf->{'buildflavor'}};
+      return { error => "Flavor '$cf->{'buildflavor'}' not found" } unless defined $f;
       @architectures = @{$f->{'architectures'} || []} if $f->{'architectures'};
     }
     if (@architectures) {
