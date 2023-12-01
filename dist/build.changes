@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Dec  1 12:39:14 UTC 2023 - Adrian Schröter <adrian@suse.de>
+
+- productcompose: follow incompatible flavor syntax change
+- pbuild: support for zstd
+
+-------------------------------------------------------------------
 Fri Dec  1 10:15:05 UTC 2023 - Adrian Schröter <adrian@suse.de>
 
 - fixed handling for cmdline parameters via kernel packages
