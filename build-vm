@@ -1083,9 +1083,6 @@ vm_first_stage() {
 	    if test -f "$BUILD_ROOT/.build.initrd.$vm_type" -a ! -L "$BUILD_ROOT/.build.initrd.$vm_type" ; then
 	        cp "$BUILD_ROOT/.build.initrd.$vm_type" "$KERNEL_TEMP_DIR/initrd"
 	    fi
-	    if test -f "$BUILD_ROOT/.build.cmdline.$vm_type" -a ! -L "$BUILD_ROOT/.build.cmdline.$vm_type" ; then
-	        vm_cmdline="$(cat $BUILD_ROOT/.build.cmdline.$vm_type)"
-	    fi
 	fi
 	check_exit
 	if test -n "$VM_USE_MKFS_COPYIN" ; then

@@ -417,6 +417,10 @@ vm_fixup_kvm() {
 	fi
     fi
 
+    if test -z "$VM_KERNEL" -a -z "$VM_CMDLINE" -a -f "$BUILD_ROOT/.build.cmdline.$vm_type" -a ! -L "$BUILD_ROOT/.build.cmdline.$vm_type" ; then
+	vm_cmdline="$(cat $BUILD_ROOT/.build.cmdline.$vm_type)"
+    fi
+
     # move IO into separate I/O thread for some architectures
     if test "${kvm_device%%-*}" = "virtio" ; then
         if $kvm_bin -version | grep -F -q 7.1.0; then
