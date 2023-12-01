@@ -197,6 +197,7 @@ clean_build_root() {
 	rm -rf -- "$BUILD_ROOT"/*
 	rm -rf -- "$BUILD_ROOT/.build"
 	rm -rf -- "$BUILD_ROOT"/.build.console.*
+	rm -rf -- "$BUILD_ROOT"/.build.cmdline.*
 	rm -rf -- "$BUILD_ROOT"/.build.hostarch.*
 	rm -rf -- "$BUILD_ROOT"/.build.kernel.*
 	rm -rf -- "$BUILD_ROOT"/.build.initrd.*
@@ -249,7 +250,7 @@ preinstall_setup() {
 	# please keep in sync with recipe_build_preinstallimage
 	case "$i" in
 	    .|..|build-preinstall) continue ;;
-	    .build.kernel.*|.build.hostarch.*|.build.initrd.*|.build.console.*) ;;
+	    .build.kernel.*|.build.hostarch.*|.build.initrd.*|.build.console.*|.build.cmdline.*) ;;
 	    .build*|.init_b_cache|.preinstallimage*|.srcfiles*|.pkgs|.rpm-cache|installed-pkg|proc|sys) continue ;;
 	esac
         mv_args[${#mv_args[@]}]="$i"
@@ -264,7 +265,7 @@ preinstall_integrate() {
     for i in * .* ; do
 	case "$i" in
 	    .|..|build-preinstall) continue ;;
-	    .build.kernel.*|.build.hostarch.*|.build.initrd.*|.build.console.*) ;;
+	    .build.kernel.*|.build.hostarch.*|.build.initrd.*|.build.console.*|.build.cmdline.*) ;;
 	    .build*|.init_b_cache|.preinstallimage*|.srcfiles*|.pkgs|.rpm-cache|installed-pkg|proc|sys) continue ;;
 	esac
         mv_args[${#mv_args[@]}]="$i"
