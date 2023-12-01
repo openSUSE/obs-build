@@ -89,7 +89,7 @@ sub parse {
   $ret->{'debugmedium'} = 1 if $data->{'debug'};
   @architectures = @{$data->{'architectures'} || []};
   if ($data->{'flavors'}) {
-    if ($data->{'flavors'}) {
+    if ($cf->{'buildflavor'}) {
       my $f = $data->{'flavors'}->{$cf->{'buildflavor'}};
       return { error => "Flavor '$cf->{'buildflavor'}' not found" } unless defined $f;
       @architectures = @{$f->{'architectures'} || []} if $f->{'architectures'};
