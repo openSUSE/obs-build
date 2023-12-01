@@ -112,6 +112,10 @@ sub open_uncompressed {
   open($fh, '<', $filename) or die("Error opening $filename: $!\n");
   if ($filename =~ /\.gz$/) {
     $fh = IO::Uncompress::Gunzip->new($fh) or die("Error opening $filename: $IO::Uncompress::Gunzip::GunzipError\n");
+  } elsif ($filename =~ /\.$/) {
+    open($fh, '-|', 'xz', '-d', '-c', '--', $filename) || die("Error opening $filename: $!\n");
+  } elsif ($filename =~ /\.zst$/) {
+    open($fh, '-|', 'zstd', '-d', '-c', '--', $filename) || die("Error opening $filename: $!\n");
   }
   return $fh;
 }
@@ -132,7 +136,7 @@ sub fetchrepo_rpmmd {
   for my $f (@primaryfiles) {
     my $u = "$f->{'location'}";
     utf8::downgrade($u);
-    next unless $u =~ /(primary\.xml(?:\.gz)?)$/s;
+    next unless $u =~ /(primary\.xml(?:\.gz|\.xz|\.zst)?)$/s;
     my $fn = $1;
     if ($opts{'iszypp'}) {
       $fn = $u;
@@ -151,7 +155,7 @@ sub fetchrepo_rpmmd {
   for my $f (@moduleinfofiles) {
     my $u = "$f->{'location'}";
     utf8::downgrade($u);
-    next unless $u =~ /(modules\.yaml(?:\.gz)?)$/s;
+    next unless $u =~ /(modules\.yaml(?:\.gz|\.xz|\.zst)?)$/s;
     my $fn = $1;
     die("zypp:// repos do not support module data\n") if $opts{'iszypp'};
     die("modules file $u does not have a checksum\n") unless $f->{'checksum'} && $f->{'checksum'} =~ /:(.*)/;
