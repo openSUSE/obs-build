@@ -44,11 +44,6 @@ recipe_setup_productcompose() {
 	fi
     fi
     chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
-
-    if test -z "$ABUILD_TARGET"; then
-        ABUILD_TARGET=$(queryconfig target --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" )
-        test -z "$ABUILD_TARGET" || echo "build target is $ABUILD_TARGET"
-    fi
 }
 
 recipe_prepare_productcompose() {
@@ -58,7 +53,8 @@ recipe_prepare_productcompose() {
 recipe_build_productcompose() {
     echo "running product composer..."
 
-    extra_args=""
+    local milestone=$(kiwi_query_recipe milestone)
+    extra_args=
     if test -n "$RELEASE" ; then
 	extra_args=" $extra_args --release $RELEASE"
     fi
@@ -66,6 +62,23 @@ recipe_build_productcompose() {
 	extra_args=" $extra_args --flavor $BUILD_FLAVOR"
     fi
     chroot "$BUILD_ROOT" su -c "/usr/bin/product-composer build $extra_args -v --clean $TOPDIR/SOURCES/$RECIPEFILE $TOPDIR/PRODUCT" - abuild < /dev/null && BUILD_SUCCEEDED=true
+    pushd "$BUILD_ROOT/$TOPDIR/PRODUCT"
+    for i in * ; do
+	test -e "$i" || continue
+	case $i in
+	    *.iso)
+		test -n "$milestone" && echo "$milestone" > $BUILD_ROOT/$TOPDIR/PRODUCT/${i%.iso}.milestone
+		;;
+	    *.report)
+		test -n "$milestone" && echo "$milestone" > $BUILD_ROOT/$TOPDIR/PRODUCT/${i%.report}.milestone
+		;;
+	    *)
+		test -d "$i" || continue
+		test -n "$milestone" && echo "$milestone" > $BUILD_ROOT/$TOPDIR/PRODUCT/${i}.milestone
+		;;
+        esac
+    done
+    popd
 }
 
 recipe_resultdirs_productcompose() {
