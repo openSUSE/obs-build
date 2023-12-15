@@ -417,8 +417,8 @@ vm_fixup_kvm() {
 	fi
     fi
 
-    if test -z "$VM_KERNEL" -a -z "$VM_CMDLINE" -a -f "$BUILD_ROOT/.build.cmdline.$vm_type" -a ! -L "$BUILD_ROOT/.build.cmdline.$vm_type" ; then
-	vm_cmdline="$(cat $BUILD_ROOT/.build.cmdline.$vm_type)"
+    if test -z "$VM_KERNEL" -a -z "$VM_CMDLINE" -a -f "$BUILD_ROOT/.build.cmdline.kvm" -a ! -L "$BUILD_ROOT/.build.cmdline.kvm" ; then
+	vm_cmdline="$(cat $BUILD_ROOT/.build.cmdline.kvm)"
     fi
 
     # move IO into separate I/O thread for some architectures
