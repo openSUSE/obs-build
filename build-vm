@@ -1047,6 +1047,7 @@ vm_first_stage() {
     echo "CCACHE_ARCHIVE='$CCACHE_ARCHIVE'" >> $BUILD_ROOT/.build/build.data
     echo "CCACHE_CREATE_ARCHIVE='$CCACHE_CREATE_ARCHIVE'" >> $BUILD_ROOT/.build/build.data
     echo "CCACHE_CLEAN='$CCACHE_CLEAN'" >> $BUILD_ROOT/.build/build.data
+    echo "CCACHE_MAXSIZE='$CCACHE_MAXSIZE'" >> $BUILD_ROOT/.build/build.data
     echo "ABUILD_TARGET='$ABUILD_TARGET'" >> $BUILD_ROOT/.build/build.data
     echo "BUILD_FLAVOR='$BUILD_FLAVOR'" >> $BUILD_ROOT/.build/build.data
     echo "OBS_PACKAGE='$OBS_PACKAGE'" >> $BUILD_ROOT/.build/build.data

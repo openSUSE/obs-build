@@ -111,6 +111,7 @@ RUN_SHELL_CMD=
 CCACHE=
 CCACHE_ARCHIVE=
 CCACHE_CREATE_ARCHIVE=
+CCACHE_MAXSIZE=
 CCACHE_TYPE=
 CCACHE_CLEAN=
 DLNOSIGNATURE=
@@ -608,9 +609,11 @@ ccache_setup() {
         if test -e $cconf; then
             grep -q "^compression*" $cconf && sed -i "s:compression.*:compression = true:g" $cconf || echo "compression = true"   >> $cconf
             grep -q "^cache_dir*"   $cconf && sed -i "s:cache_dir.*:cache_dir = /.ccache:g" $cconf || echo "cache_dir = /.ccache" >> $cconf
+            grep -q "^max_size*"    $cconf && sed -i "s:max_size.*:max_size = ${CCACHE_MAXSIZE:-5G}:g" $cconf || echo "max_size = ${CCACHE_MAXSIZE:-5G}" >> $cconf
         else
             echo "compression = true"    >> $cconf
             echo "cache_dir = /.ccache" >> $cconf
+            echo "max_size = ${CCACHE_MAXSIZE:-5G}" >> $cconf
         fi
 	test -n "$CCACHE_ARCHIVE" -a -e "$CCACHE_ARCHIVE" && ccache_unpack "$BUILD_ROOT/.ccache" ccache
 	chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT/.ccache"
@@ -1215,6 +1218,12 @@ while test -n "$1"; do
       -ccache-create-archive)
 	CCACHE_CREATE_ARCHIVE=true
 	;;
+      -ccache-maxsize)
+	CCACHE_MAXSIZE=$ARG
+	shift
+	CCACHE=true
+	CCACHE_TYPE=ccache
+        ;;
       -sccache)
 	CCACHE=true
 	CCACHE_TYPE=sccache
