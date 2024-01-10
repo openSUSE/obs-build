@@ -27,24 +27,6 @@ use Build::Rpm;
 my $yamlxs = eval { require YAML::XS; $YAML::XS::LoadBlessed = 0; return 1 };
 my $yamlpp = eval { require YAML::PP; return YAML::PP->new };
 
-sub _have_yaml_parser {
-  return $yamlpp || $yamlxs ? 1 : undef;
-}
-
-sub _load_yaml {
-  my ($yaml) = @_;
-  my $data;
-  if ($yamlpp) {
-    $data = eval { $yamlpp->load_string($yaml) };
-    return $data;
-  }
-  if ($yamlxs) {
-    eval { $data = YAML::XS::Load($yaml) };
-    return $data;
-  }
-  die "Neither YAML::PP nor YAML::XS available\n";
-}
-
 sub _load_yaml_file {
   my ($fn) = @_;
   my $data;
@@ -69,6 +51,75 @@ sub filter_packages {
   return @ret;
 }
 
+sub add_pkgset {
+  my ($ps1, $ps2) = @_;
+  my %r = map {$_ => 1} @$ps1;
+  return [ @$ps1, grep {!$r{$_}} @$ps2 ];
+}
+
+sub sub_pkgset {
+  my ($ps1, $ps2) = @_;
+  my %r = map {$_ => 1} @$ps2;
+  my @r;
+  for (@$ps1) {
+    next if $r{$_};
+    push @r, $_ unless /^([^ <=>]+)/ && $r{$1};
+  }
+  return \@r;
+}
+
+sub intersect_pkgset {
+  my ($ps1, $ps2) = @_;
+  my %r;
+  for (@$ps2) {
+    $r{$1} = 1 if /^([^ <=>]+)/;
+  }
+  my @r;
+  for (@$ps1) {
+    push @r, $_ if /^([^ <=>]+)/ && $r{$1};
+  }
+  return \@r;
+}
+
+sub get_pkgset {
+  my ($packagesets, $setname, $arch, $flavor) = @_;
+  $flavor = '' unless defined $flavor;
+  my @seenps;
+  for my $s (@$packagesets) {
+    next unless $setname eq ($s->{'name'} || 'main');
+    next if $s->{'flavors'} && !grep {$_ eq $flavor} @{$s->{'flavors'}};
+    next if $s->{'architectures'} && !grep {$_ eq $arch} @{$s->{'architectures'}};
+    push @seenps, $s;
+    my $pkgset = $s->{'packages'} || [];
+    for my $n (@{$s->{'add'} || []}) {
+      $pkgset = add_pkgset($pkgset, get_pkgset(\@seenps, $n, $arch, $flavor));
+    }
+    for my $n (@{$s->{'sub'} || []}) {
+      $pkgset = sub_pkgset($pkgset, get_pkgset(\@seenps, $n, $arch, $flavor));
+    }
+    for my $n (@{$s->{'intersect'} || []}) {
+      $pkgset = intersect_pkgset($pkgset, get_pkgset(\@seenps, $n, $arch, $flavor));
+    }
+    return $pkgset
+  }
+  return [];
+}
+
+sub get_pkgset_compat {
+  my ($pkgs, $arch, $flavor) = @_;
+  my @r;
+  for my $s (@{$pkgs || []}) {
+    if (ref($s) eq 'HASH') {
+      next if $s->{'flavors'} && !grep {$_ eq $flavor} @{$s->{'flavors'}};
+      next if $s->{'architectures'} && !grep {$_ eq $arch} @{$s->{'architectures'}};
+      push @r, @{$s->{'packages'} || []};
+    } else {
+      push @r, $s;
+    }
+  }
+  return \@r;
+}
+
 sub parse {
   my ($cf, $fn) = @_;
 
@@ -77,55 +128,36 @@ sub parse {
   my $ret = {};
   $ret->{version} = $data->{'version'};
   $ret->{name} = $data->{'name'} or die "OBS Product name is missing";
-  my $runtime_version = $data->{'runtime-version'};
-  my $sdk = $data->{sdk};
-  my @architectures;
 
   # Do we need source or debug packages?
-  my $bo = $data->{'build_options'};
-  if ($bo) {
-  }
-  $ret->{'sourcemedium'} = 1 if $data->{'source'};
-  $ret->{'debugmedium'} = 1 if $data->{'debug'};
-  @architectures = @{$data->{'architectures'} || []};
+  $ret->{'sourcemedium'} = 1 unless ($data->{'source'} || '') eq 'drop';
+  $ret->{'debugmedium'} = 1 unless ($data->{'debug'} || '') eq 'drop';
+  my @architectures = @{$data->{'architectures'} || []};
   if ($data->{'flavors'}) {
     if ($cf->{'buildflavor'}) {
       my $f = $data->{'flavors'}->{$cf->{'buildflavor'}};
       return { error => "Flavor '$cf->{'buildflavor'}' not found" } unless defined $f;
       @architectures = @{$f->{'architectures'} || []} if $f->{'architectures'};
     }
-    if (@architectures) {
-      $ret->{'exclarch'} = \@architectures;
-    } else {
-      # We have flavors, but no architecture defined.
-      # This can also exclude the main package in multibuild case
-      $ret->{'error'} = 'excluded';
-    }
-  } else {
-    $ret->{'exclarch'} = \@architectures if @architectures;
   }
+  $ret->{'error'} = 'excluded' unless @architectures;
+  $ret->{'exclarch'} = \@architectures if @architectures;
 
-  my @unpack_packdeps = filter_packages(@{$data->{'unpack_packages'}});
-  my @packdeps = filter_packages(@{$data->{'packages'}});
-  my @merged;
-  for my $dep (@unpack_packdeps, @packdeps) {
-    if (ref($dep) eq 'HASH') {
-      next if $dep->{'flavors'} && grep { $_ eq $cf->{'buildflavor'} } @{$dep->{'flavors'} || []};
-      if ($dep->{'architectures'}) {
-        my $match;
-        for my $a (@architectures) {
-	   $match = 1 if grep { $_ eq $a } @{$dep->{'architectures'} || []};
-        }
-	next unless $match;
-      }
-      for my $d (@{$dep->{'packages'}}) {
-        push @merged, $d;
+  my $flavor = $data->{'flavors'} ? $cf->{'buildflavor'} : undef;
+
+  my $pkgs = [];
+  for my $arch (@architectures) {
+    if ($data->{'packagesets'}) {
+      $pkgs = add_pkgset($pkgs, get_pkgset($data->{'packagesets'}, 'main', $arch, $flavor));
+      for my $setname (@{$data->{'unpack'} || [ 'unpack' ]}) {
+        $pkgs = add_pkgset($pkgs, get_pkgset($data->{'packagesets'}, $setname, $arch, $flavor));
       }
     } else {
-      push @merged, $dep;
+      $pkgs = add_pkgset($pkgs, get_pkgset_compat($data->{'packages'}, $arch, $flavor));
+      $pkgs = add_pkgset($pkgs, get_pkgset_compat($data->{'unpack_packages'}, $arch, $flavor));
     }
   }
-  $ret->{deps} = \@merged;
+  $ret->{deps} = $pkgs;
 
   # We have currently no option to configure own path list for the product on purpose
   $ret->{path} = [ { project => '_obsrepositories', repository => '' } ];
