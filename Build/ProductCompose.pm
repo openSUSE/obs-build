@@ -92,7 +92,7 @@ sub get_pkgset {
     push @seenps, $s;
     my $pkgset = $s->{'packages'} || [];
     for my $n (@{$s->{'add'} || []}) {
-      $pkgset = add_pkgset($pkgset, get_pkgset(\@seenps, $n, $arch, $flavor));
+      $pkgset = add_pkgset($pkgset, get_pkgset($packagesets, $n, $arch, $flavor));
     }
     for my $n (@{$s->{'sub'} || []}) {
       $pkgset = sub_pkgset($pkgset, get_pkgset(\@seenps, $n, $arch, $flavor));
@@ -100,7 +100,7 @@ sub get_pkgset {
     for my $n (@{$s->{'intersect'} || []}) {
       $pkgset = intersect_pkgset($pkgset, get_pkgset(\@seenps, $n, $arch, $flavor));
     }
-    return $pkgset
+    return $pkgset;
   }
   return [];
 }
