@@ -85,14 +85,17 @@ sub get_pkgset {
   my ($packagesets, $setname, $arch, $flavor) = @_;
   $flavor = '' unless defined $flavor;
   my @seenps;
+  my $lasts;
   for my $s (@$packagesets) {
+    push @seenps, $lasts if defined $lasts;
+    $lasts = $s;
     next unless $setname eq ($s->{'name'} || 'main');
     next if $s->{'flavors'} && !grep {$_ eq $flavor} @{$s->{'flavors'}};
     next if $s->{'architectures'} && !grep {$_ eq $arch} @{$s->{'architectures'}};
     push @seenps, $s;
     my $pkgset = $s->{'packages'} || [];
     for my $n (@{$s->{'add'} || []}) {
-      $pkgset = add_pkgset($pkgset, get_pkgset($packagesets, $n, $arch, $flavor));
+      $pkgset = add_pkgset($pkgset, get_pkgset(\@seenps, $n, $arch, $flavor));
     }
     for my $n (@{$s->{'sub'} || []}) {
       $pkgset = sub_pkgset($pkgset, get_pkgset(\@seenps, $n, $arch, $flavor));
