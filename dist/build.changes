@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Thu Jan 11 10:23:46 UTC 2024 - Adrian Schröter <adrian@suse.de>
+
+- productcompose:
+  - support schema 0.1
+  - support milestones
+- Leap 15.6 config
+- SLE 15 SP6 config
+
+-------------------------------------------------------------------
 Fri Dec  1 12:39:14 UTC 2023 - Adrian Schröter <adrian@suse.de>
 
 - productcompose: follow incompatible flavor syntax change
