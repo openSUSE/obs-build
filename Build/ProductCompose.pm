@@ -41,16 +41,6 @@ sub _load_yaml_file {
   die "Neither YAML::PP nor YAML::XS available\n";
 }
 
-sub filter_packages {
-  my (@list) = @_;
-  my @ret;
-  for my $item (@list) {
-  # FIXME filter by rules
-    push @ret, $item;
-  }
-  return @ret;
-}
-
 sub add_pkgset {
   my ($ps1, $ps2) = @_;
   my %r = map {$_ => 1} @$ps1;
