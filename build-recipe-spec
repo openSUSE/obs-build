@@ -229,6 +229,10 @@ recipe_build_spec() {
 	rpmbopts[${#rpmbopts[@]}]='--define'
 	rpmbopts[${#rpmbopts[@]}]="RSYNCDONE 1"
     fi
+    if test -n "$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags define_specfile)" ; then
+	rpmbopts[${#rpmbopts[@]}]='--define'
+	rpmbopts[${#rpmbopts[@]}]="_build_specfile $TOPDIR/SOURCES/$RECIPEFILE"
+    fi
 
     buildrootoverride=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags rpm-buildroot-override)
     if test -n "$buildrootoverride" ; then
