@@ -1,7 +1,7 @@
 #
 # spec file
 #
-# Copyright (c) 2022 SUSE LLC
+# Copyright (c) 2024 SUSE LLC
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -28,7 +28,7 @@ Name:           %{__pkg_name}
 Summary:        A Script to Build SUSE Linux RPMs
 License:        GPL-2.0-only OR GPL-3.0-only
 Group:          Development/Tools/Building
-Version:        20220927
+Version:        20240111
 Release:        0
 Source:         obs-build-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
@@ -53,7 +53,8 @@ BuildRequires:  perl(Date::Parse)
 BuildRequires:  perl(Test::Harness)
 BuildRequires:  perl(Test::More)
 %if 0%{?fedora}
-Requires:       perl-MD5
+Requires:       perl(LWP-Protocol-https)
+Requires:       perl(XML::Parser)
 Requires:       perl-TimeDate
 BuildRequires:  perl-TimeDate
 %endif
@@ -72,9 +73,14 @@ BuildRequires:  perl(YAML::LibYAML)
 # Perl helper scripts use them.
 Recommends:     perl(Archive::Tar)
 Recommends:     /sbin/mkfs.ext3
+Recommends:     /sbin/mkfs.ext3
+Recommends:     /usr/bin/qemu-kvm
 Recommends:     /usr/bin/qemu-kvm
 Recommends:     bsdtar
+Recommends:     bsdtar
 Recommends:     qemu-linux-user
+Recommends:     qemu-linux-user
+Recommends:     zstd
 Recommends:     zstd
 Recommends:     perl(Config::IniFiles)
 Recommends:     perl(Date::Language)
@@ -85,11 +91,6 @@ Recommends:     perl(Time::Zone)
 Recommends:     perl(URI)
 Recommends:     perl(XML::Parser)
 Recommends:     perl(YAML::LibYAML)
-Recommends:     bsdtar
-Recommends:     qemu-linux-user
-Recommends:     zstd
-Recommends:     /usr/bin/qemu-kvm
-Recommends:     /sbin/mkfs.ext3
 # for vc:
 Recommends:     /usr/bin/dnsdomainname
 Recommends:     /usr/bin/rpmdev-packager
