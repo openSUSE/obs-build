@@ -36,28 +36,26 @@ sub parse {
   my $c = '';
   my $xmllen = length($xml);
   $xml =~ s/^\s*\<\?.*?\?\>//s;
-  while ($xml =~ /^(.*?)\</s) {
-    if ($1 ne '') {
-      $c .= $1;
-      $xml = substr($xml, length($1));
-    }
+  my $i;
+  while (($i = index($xml, '<')) >= 0) {
+    $c .= substr($xml, 0, $i, '');
     if (substr($xml, 0, 4) eq '<!--') {
       die("bad xml, missing end of comment\n") unless $xml =~ s/.*?-->//s;
       next;
     }
     my $elstart = length($xml);
-    die("bad xml\n") unless $xml =~ /(.*?\>)/s;
-    my $tag = $1;
-    $xml = substr($xml, length($tag));
+    $i = index($xml, '>');
+    die("bad xml\n") unless $i >= 0;
+    my $tag = substr($xml, 0, $i + 1, '');
     my $mode = 0;
     if ($tag =~ s/^\<\///s) {
       chop $tag;
       $mode = 1;	# end
     } elsif ($tag =~ s/\/\>$//s) {
       $mode = 2;	# start & end
-      $tag = substr($tag, 1);
+      substr($tag, 0, 1, '');
     } else {
-      $tag = substr($tag, 1);
+      substr($tag, 0, 1, '');
       chop $tag;
     }
     my @tag = split(/(=(?:\"[^\"]*\"|\'[^\']*\'|[^\"\s]*))?\s+/, "$tag ");
@@ -66,14 +64,13 @@ sub parse {
     push @tag, undef if @tag & 1;
     my %atts = @tag;
     for (values %atts) {
-      next unless defined $_;
-      s/^=\"([^\"]*)\"$/=$1/s or s/^=\'([^\']*)\'$/=$1/s;
-      s/^=//s;
+      s/^\"([^\"]*)\"$/$1/s or s/^\'([^\']*)\'$/$1/s if s/^=//;
+      next unless /&/;
       s/&lt;/</g;
       s/&gt;/>/g;
-      s/&amp;/&/g;
       s/&apos;/\'/g;
       s/&quot;/\"/g;
+      s/&amp;/&/g;
     }
     if ($mode == 0 || $mode == 2) {
       my $n = {};
@@ -114,6 +111,7 @@ sub parse {
     $c = undef if $c eq '';
   }
   $node->{'_content'} = $c if defined $c;
+  $node->{'_end'} = $xmllen if $record;
   return $node;
 }
 
