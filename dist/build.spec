@@ -73,14 +73,9 @@ BuildRequires:  perl(YAML::LibYAML)
 # Perl helper scripts use them.
 Recommends:     perl(Archive::Tar)
 Recommends:     /sbin/mkfs.ext3
-Recommends:     /sbin/mkfs.ext3
-Recommends:     /usr/bin/qemu-kvm
 Recommends:     /usr/bin/qemu-kvm
 Recommends:     bsdtar
-Recommends:     bsdtar
 Recommends:     qemu-linux-user
-Recommends:     qemu-linux-user
-Recommends:     zstd
 Recommends:     zstd
 Recommends:     perl(Config::IniFiles)
 Recommends:     perl(Date::Language)
