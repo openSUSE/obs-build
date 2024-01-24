@@ -53,7 +53,7 @@ BuildRequires:  perl(Date::Parse)
 BuildRequires:  perl(Test::Harness)
 BuildRequires:  perl(Test::More)
 %if 0%{?fedora}
-Requires:       perl(LWP-Protocol-https)
+Requires:       perl(LWP::Protocol::https)
 Requires:       perl(XML::Parser)
 Requires:       perl-TimeDate
 BuildRequires:  perl-TimeDate
