@@ -122,7 +122,7 @@ sub fetch {
     die("download of $url failed: $status\n") unless $retry-- > 0 && $res->previous;
     warn("retrying $url\n");
   }
-  my $data = $res->decoded_content;
+  my $data = $res->decoded_content('charset' => 'none');
   my $ct = $res->header('content_type');
   checkdigest($data, $opt{'digest'}) if $opt{'digest'};
   return ($data, $ct);
