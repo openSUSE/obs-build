@@ -103,7 +103,7 @@ sub get_pkgset_compat {
   my @r;
   for my $s (@{$pkgs || []}) {
     if (ref($s) eq 'HASH') {
-      next if $s->{'flavors'} && !grep {$_ eq $flavor} @{$s->{'flavors'}};
+      next if $s->{'flavors'} && !grep {$flavor && $_ eq $flavor} @{$s->{'flavors'}};
       next if $s->{'architectures'} && !grep {$_ eq $arch} @{$s->{'architectures'}};
       push @r, @{$s->{'packages'} || []};
     } else {
