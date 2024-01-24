@@ -79,6 +79,7 @@ sub prepare {
   $ctx->{'dep2pkg'} = $dep2pkg;
   $ctx->{'subpacks'} = \%subpacks;
   PBuild::Meta::setgenmetaalgo($ctx->{'genmetaalgo'});
+  $ctx->{'repos'} = $repos;
   $ctx->{'dep2pkg_host'} = PBuild::Expand::configure_repos($ctx->{'bconf_host'}, $hostrepos) if $ctx->{'bconf_host'};
 }
 
@@ -302,12 +303,41 @@ sub genmeta_image {
 }
 
 #
+# Generate the dependency tracking data for a image/container
+#
+sub genmeta_product {
+  my ($ctx, $p, $edeps) = @_;
+  my @new_meta;
+  for my $bin (@$edeps) {
+    die("bad binary in genmeta_product (not a hash)\n") unless ref($bin) eq 'HASH';
+    my $name = $bin->{'filename'};
+    my $package = $bin->{'packid'};
+    if (!$package) {
+      die("bad binary in genmeta_product (bad location)\n") unless $bin->{'location'} =~ /\/([^\/]+)\/([^\/]+)$/;
+      $package = $1;
+      $name = $2;
+    }
+    if ($bin->{'hdrmd5'}) {
+      push @new_meta, "$bin->{'hdrmd5'}  $package/$name";
+    } elsif ($bin->{'md5sum'}) {
+      push @new_meta, "$bin->{'md5sum'}  $package/$name";
+    } else {
+      die("bad binary in genmeta_product (no hrdmd5/md5sum)\n");
+    }
+  }
+  @new_meta = sort {substr($a, 34) cmp substr($b, 34) || $a cmp $b} @new_meta;
+  unshift @new_meta, ($p->{'verifymd5'} || $p->{'srcmd5'})."  $p->{'pkg'}";
+  return \@new_meta;
+}
+
+#
 # Generate the dependency tracking data for a package
 #
 sub genmeta {
   my ($ctx, $p, $edeps, $hdeps) = @_;
   my $buildtype = $p->{'buildtype'};
   return genmeta_image($ctx, $p, $edeps) if $buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'preinstallimage';
+  return genmeta_product($ctx, $p, $edeps) if $buildtype eq 'productcompose';
   my $dep2pkg = $p->{'native'} ? $ctx->{'dep2pkg_host'} : $ctx->{'dep2pkg'};
   my $metacache = $ctx->{'metacache'};
   my @new_meta;
@@ -345,6 +375,34 @@ sub genmeta {
   return \@new_meta;
 }
 
+sub check_meta {
+  my ($ctx, $p, $new_meta, @data) = @_;
+  my $packid = $p->{'pkg'};
+  my $dst = "$ctx->{'builddir'}/$packid";
+  my @meta;
+  my $mfp;
+  if (open($mfp, '<', "$dst/_meta")) {
+    @meta = <$mfp>;
+    close $mfp;
+    chomp @meta;
+  }
+  return ('scheduled', [ { 'explain' => 'new build' }, @data ]) if !@meta;
+  return ('scheduled', [ { 'explain' => 'source change', 'oldsource' => substr($meta[0], 0, 32) }, @data ]) if $meta[0] ne $new_meta->[0];
+  return ('scheduled', [ { 'explain' => 'forced rebuild' }, @data ]) if $p->{'force_rebuild'};
+  my $rebuildmethod = $ctx->{'rebuild'} || 'transitive';
+  if ($rebuildmethod eq 'local') {
+    return ('scheduled', [ { 'explain' => 'rebuild counter sync' }, @data ]) if $ctx->{'relsynctrigger'}->{$packid};
+    return ('done');
+  }
+  if (@meta == @$new_meta && join('\n', @meta) eq join('\n', @$new_meta)) {
+    return ('scheduled', [ { 'explain' => 'rebuild counter sync' }, @data ]) if $ctx->{'relsynctrigger'}->{$packid};
+    return ('done');
+  }
+  my @diff = PBuild::Meta::diffsortedmd5(\@meta, $new_meta);
+  my $reason = PBuild::Meta::sortedmd5toreason(@diff);
+  return ('scheduled', [ { 'explain' => 'meta change', 'packagechange' => $reason }, @data ] );
+}
+
 #
 # Check the status of a single image/container
 #
@@ -360,30 +418,105 @@ sub check_image {
     return ('blocked', join(', ', @blocked));
   }
   my $new_meta = genmeta($ctx, $p, $edeps);
-  my $packid = $p->{'pkg'};
-  my $dst = "$ctx->{'builddir'}/$packid";
-  my @meta;
-  my $mfp;
-  if (open($mfp, '<', "$dst/_meta")) {
-    @meta = <$mfp>;
-    close $mfp;
-    chomp @meta;
+  return check_meta($ctx, $p, $new_meta);
+}
+
+sub check_product {
+  my ($ctx, $p) = @_;
+  my $notready = $ctx->{'notready'};
+  my $dep2src = $ctx->{'dep2src'};
+  my @deps = @{$p->{'dep'} || []};
+  my %deps = map {$_ => 1} @deps;
+  my $versioned_deps;
+  for (grep {/[<=>]/} @deps) {
+    next unless /^(.*?)\s*([<=>].*)$/;
+    $deps{$1} = $2;
+    delete $deps{$_};
+    $versioned_deps = 1;
   }
-  return ('scheduled', [ { 'explain' => 'new build' } ]) if !@meta;
-  return ('scheduled', [ { 'explain' => 'source change', 'oldsource' => substr($meta[0], 0, 32) } ]) if $meta[0] ne $new_meta->[0];
-  return ('scheduled', [ { 'explain' => 'forced rebuild' } ]) if $p->{'force_rebuild'};
-  my $rebuildmethod = $ctx->{'rebuild'} || 'transitive';
-  if ($rebuildmethod eq 'local') {
-    return ('scheduled', [ { 'explain' => 'rebuild counter sync' } ]) if $ctx->{'relsynctrigger'}->{$packid};
-    return ('done');
+  delete $deps{''};
+  delete $deps{"-$_"} for grep {!/^-/} keys %deps;
+  my $allpacks = $deps{'*'} ? 1 : 0;
+  my $nodbgpkgs = $p->{'nodbgpkgs'};
+  my $nosrcpkgs = $p->{'nosrcpkgs'};
+  my %unneeded_na;
+
+  my @rpms;
+  for my $repo (@{$ctx->{'repos'}}) {
+    my %seen_fn;	# resolve file conflicts in this prp
+    my $gbininfo;
+    my @next_unneeded_na;
+    $gbininfo = $ctx->{'repomgr'}->get_gbininfo($repo);
+    my @apackids = sort keys %$gbininfo;
+    for my $apackid (@apackids) {
+      next if $apackid eq '_volatile';
+      my $bininfo = $gbininfo->{$apackid};
+      next unless $bininfo;
+      my $needit;
+      for my $fn (keys %$bininfo) {
+	next unless $fn =~ /^(?:::import::.*::)?(.+)-(?:[^-]+)-(?:[^-]+)\.([a-zA-Z][^\.\-]*)\.rpm$/;
+	my ($bn, $ba) = ($1, $2);
+	next if $ba eq 'src' || $ba eq 'nosrc';     # always unneeded
+	my $na = "$bn.$ba";
+	next if $unneeded_na{$na};
+	if ($fn =~ /-(?:debuginfo|debugsource)-/) {
+	  if ($nodbgpkgs || !$deps{$bn}) {
+	    $unneeded_na{$na} = 1;
+	    next;
+	  }
+	}
+	next if $seen_fn{$fn};
+	if ($fn =~ /^::import::(.*?)::(.*)$/) {
+	  next if $seen_fn{$2};
+	}
+	my $d = $deps{$bn};
+	if (!($d || ($allpacks && !$deps{"-$bn"}))) {
+	  $unneeded_na{$na} = 1;    # cache unneeded
+	  next;
+	}
+	if ($d && $d ne '1') {
+	  my $bi = $bininfo->{$fn};
+	  my $evr = "$bi->{'version'}-$bi->{'release'}";
+	  $evr = "$bi->{'epoch'}:$evr" if $bi->{'epoch'};
+	  next unless Build::matchsingledep("$bn=$evr", "$bn$d", 'rpm');
+	}
+	$needit = 1;
+	last;
+      }
+      next unless $needit;
+      # we need the package, add all artifacts
+      my @bi = sort(keys %$bininfo);
+      my @ibi = grep {/^::import::/} @bi;
+      if (@ibi) {
+        @bi = grep {!/^::import::/} @bi;
+        push @bi, @ibi;
+      }
+      for my $fn (@bi) {
+	next unless $fn =~ /^(?:::import::.*::)?(.+)-(?:[^-]+)-(?:[^-]+)\.([a-zA-Z][^\.\-]*)\.rpm$/;
+	my ($bn, $ba) = ($1, $2);
+        next if $nosrcpkgs && ($ba eq 'src' || $ba eq 'nosrc');
+        next if $nodbgpkgs && $fn =~ /-(?:debuginfo|debugsource)-/;
+        my $na = "$bn.$ba";
+        # ignore if we already have this file
+        next if $seen_fn{$fn};
+        next if $fn =~ /^::import::(.*?)::(.*)$/ && $seen_fn{$2};
+        my $b = $bininfo->{$fn};
+        push @rpms, { %{$bininfo->{$fn}}, 'package' => $apackid };
+        $seen_fn{$fn} = 1; 
+        push @next_unneeded_na, $na unless $ba eq 'src' || $ba eq 'nosrc';
+      }
+      for my $fn (@bi) {
+	next unless ($fn =~ /[-.]appdata\.xml$/) || $fn eq '_modulemd.yaml' || $fn eq 'updateinfo.xml';
+	next if $seen_fn{$fn};
+        push @rpms, { %{$bininfo->{$fn}}, 'package' => $apackid };
+	$seen_fn{$fn} = 1 unless $fn eq 'updateinfo.xml' || $fn eq '_modulemd.yaml';        # we expect those to be renamed
+      }
+    }
+    @next_unneeded_na = () if $deps{'--use-newest-package'};
+    $unneeded_na{$_} = 1 for @next_unneeded_na;
   }
-  if (@meta == @$new_meta && join('\n', @meta) eq join('\n', @$new_meta)) {
-    return ('scheduled', [ { 'explain' => 'rebuild counter sync' } ]) if $ctx->{'relsynctrigger'}->{$packid};
-    return ('done');
-  }
-  my @diff = PBuild::Meta::diffsortedmd5(\@meta, $new_meta);
-  my $reason = PBuild::Meta::sortedmd5toreason(@diff);
-  return ('scheduled', [ { 'explain' => 'meta change', 'packagechange' => $reason } ] );
+  my $new_meta = genmeta($ctx, $p, \@rpms);
+  return check_meta($ctx, $p, $new_meta, undef, \@rpms);
 }
 
 #
@@ -394,6 +527,7 @@ sub check {
 
   my $buildtype = $p->{'buildtype'};
   return check_image($ctx, $p) if $buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'preinstallimage';
+  return check_product($ctx, $p) if $buildtype eq 'productcompose';
 
   my $packid = $p->{'pkg'};
   my $notready = $ctx->{'notready'};
@@ -585,6 +719,7 @@ sub dep2bins {
   my ($ctx, @deps) = @_;
   my $dep2pkg = $ctx->{'dep2pkg'};
   for (@deps) {
+    next if ref($_) eq 'HASH';	# already a binary reference (used for product builds)
     my $q = $dep2pkg->{$_};
     die("unknown binary $_\n") unless $q;
     $_ = $q;
@@ -621,8 +756,9 @@ sub build {
   my $bconf = $bconf_host || $ctx->{'bconf'};
   my $buildtype = $p->{'buildtype'};
   $buildtype = 'kiwi-image' if $buildtype eq 'kiwi';
+  $edeps = $data->[2] if $buildtype eq 'productcompose';
   my $kiwimode;
-  $kiwimode = $buildtype if $buildtype eq 'kiwi-image' || $buildtype eq 'kiwi-product' || $buildtype eq 'docker' || $buildtype eq 'fissile';
+  $kiwimode = $buildtype if $buildtype eq 'kiwi-image' || $buildtype eq 'kiwi-product' || $buildtype eq 'docker' || $buildtype eq 'fissile' || $buildtype eq 'productcompose';
 
   if ($p->{'buildtimeservice'}) {
     for my $service (@{$p->{'buildtimeservice'} || []}) {
@@ -699,7 +835,11 @@ sub build {
   return ('recheck', 'assets changed') if $p->{'srcmd5'} ne $oldsrcmd5;
   return ('broken', $p->{'error'}) if $p->{'error'};	# missing assets
   my $bins;
-  if ($kiwimode && $bconf_host) {
+  if ($kiwimode && $kiwimode eq 'productcompose') {
+    $bins = dep2bins_host($ctx, PBuild::Util::unify(@pdeps, @vmdeps, @sysdeps));
+    push @$bins, @{dep2bins($ctx, PBuild::Util::unify(@$tdeps))} if $tdeps;
+    $ctx->{'repomgr'}->getremoteproductbinaries(\@bdeps);
+  } elsif ($kiwimode && $bconf_host) {
     $bins = dep2bins_host($ctx, PBuild::Util::unify(@pdeps, @vmdeps, @sysdeps));
     push @$bins, @{dep2bins($ctx, PBuild::Util::unify(@bdeps))};
   } else {

@@ -130,12 +130,17 @@ sub collect_result {
   @d = ('DOCKER') if $p->{'recipe'} =~ /Dockerfile(\.|$)/;
   @d = ('FISSILE') if $p->{'recipe'} =~ /fissile\.yml$/;
   @d = ('HELM') if $p->{'recipe'} =~ /Chart\.yaml$/;
+  @d = ('PRODUCT') if $p->{'recipe'} =~ /\.productcompose$/;
   push @d, 'OTHER';
   my @send;
   for my $d ('.', @d) {
     my @files = sort(PBuild::Util::ls("$buildroot/.build.packages/$d"));
     @files = grep {$_ ne 'same_result_marker' && $_ ne '.kiwitree'} @files;
-    @files = grep {! -l "$buildroot/.build.packages/$d/$_" && -f _} @files;
+    if ($p->{'buildtype'} eq 'productcompose' && $d eq 'PRODUCT') {
+      @files = grep {! -l "$buildroot/.build.packages/$d/$_" && (-d _ || -f _)} @files;
+    } else {
+      @files = grep {! -l "$buildroot/.build.packages/$d/$_" && -f _} @files;
+    }
     push @send, map {"$buildroot/.build.packages/$d/$_"} @files;
   }
   my %send = map {(split('/', $_))[-1] => $_} @send;
@@ -207,7 +212,7 @@ sub createjob {
   my %sysdeps = map {$_ => 1} @$sysdeps;
 
   my @alldeps;
-  my $kiwimode = $p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker' || $p->{'buildtype'} eq 'fissile' ? $p->{'buildtype'} : undef;
+  my $kiwimode = $p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker' || $p->{'buildtype'} eq 'fissile' || $p->{'buildtype'} eq 'productcompose' ? $p->{'buildtype'} : undef;
   if ($kiwimode) {
     @alldeps = PBuild::Util::unify(@$pdeps, @$vmdeps, @$sysdeps);
   } else {
@@ -338,7 +343,7 @@ sub createjob {
   if ($kiwimode) {
     # now setup the repos/containers directories
     $ctx->{'repomgr'}->copyimagebinaries($ctx->dep2bins(@$bdeps), $srcdir);
-    # tell kiwi how to use them
+    # and tell kiwi how to use them
     if ($p->{'buildtype'} eq 'kiwi') {
       my @kiwiargs;
       push @kiwiargs, '--ignore-repos';

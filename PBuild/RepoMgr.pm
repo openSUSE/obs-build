@@ -46,6 +46,7 @@ sub addremoterepo {
   my $bins = PBuild::RemoteRepo::fetchrepo($bconf, $myarch, $repodir, $repourl, $buildtype, $opts);
   $_->{'repoid'} = $id for @$bins;
   my $repo = { 'dir' => $repodir, 'bins' => $bins, 'url' => $repourl, 'arch' => $myarch, 'type' => 'repo', 'repoid' => $id };
+  $repo->{'obs'} = $opts->{'obs'} if $repourl =~ /^obs:/;
   $repos->{$id} = $repo;
   return $repo;
 }
@@ -82,7 +83,7 @@ sub addlocalrepo {
 }
 
 #
-# Add an emptt repository to the manager
+# Add an empty repository to the manager
 #
 sub addemptyrepo {
   my ($repos) = @_;
@@ -123,7 +124,25 @@ sub getremotebinaries {
     } elsif ($repo->{'type'} eq 'registry') {
       PBuild::RemoteRegistry::fetchbinaries($repo, $tofetch{$repoid});
     } else {
-      die("unknown repo type $repo->{'type'}\n");
+      die("unsupported repo type $repo->{'type'}\n");
+    }
+    $_->{'repoid'} = $repoid for @{$tofetch{$repoid}};
+  }
+}
+
+sub getremoteproductbinaries {
+  my ($repos, $bins) = @_;
+  my %tofetch;
+  for my $q (@$bins) {
+    push @{$tofetch{$q->{'repoid'}}}, $q unless $q->{'filename'};
+  }
+  for my $repoid (sort {$a cmp $b} keys %tofetch) {
+    my $repo = $repos->{$repoid};
+    die("bad repoid $repoid\n") unless $repo;
+    if ($repo->{'type'} eq 'repo') {
+      PBuild::RemoteRepo::fetchproductbinaries($repo, $tofetch{$repoid});
+    } else {
+      die("unsupported repo type $repo->{'type'}\n");
     }
     $_->{'repoid'} = $repoid for @{$tofetch{$repoid}};
   }
@@ -135,6 +154,7 @@ sub getremotebinaries {
 sub copyimagebinaries {
   my ($repos, $bins, $dstdir) = @_;
   PBuild::Util::mkdir_p("$dstdir/repos/pbuild/pbuild");
+  my %provenance;
   for my $q (@$bins) {
     my $repo = $repos->{$q->{'repoid'}};
     die("package $q->{'name'} has no repo\n") unless $repo;
@@ -155,12 +175,28 @@ sub copyimagebinaries {
       PBuild::RemoteRegistry::construct_containertar($repo->{'dir'}, $q, $to);
       next;
     }
-    die("package $q->{'name'} is not available\n") unless $q->{'filename'};
-    PBuild::Verify::verify_filename($q->{'filename'});
-    my $from = "$repo->{'dir'}/$q->{'filename'}";
-    $from = "$repo->{'dir'}/$q->{'packid'}/$q->{'filename'}" if $q->{'packid'};
+    my $filename = $q->{'filename'};
+    die("package $q->{'name'} is not available\n") unless $filename;
+    if (!$q->{'packid'} && $q->{'package'}) {
+      PBuild::Verify::verify_filename($filename);
+      my $from = "$repo->{'dir'}/_gbins/$filename";
+      $filename =~ s/^\Q$q->{'package'}-\E// if $filename =~ /\.rpm$/ || $filename =~ /\.slsa_provenance\.json$/;
+      $to = "$dstdir/repos/pbuild/pbuild/$filename";
+      $provenance{"$1.slsa_provenance.json"} = "$dstdir/repos/pbuild/pbuild/$q->{'package'}-_slsa_provenance.json" if $to =~ /(.*)\.rpm$/;
+      PBuild::Util::cp($from, $to);
+      next;
+    }
+    PBuild::Verify::verify_filename($filename);
+    my $from = "$repo->{'dir'}/$filename";
+    $from = "$repo->{'dir'}/$q->{'packid'}/$filename" if $q->{'packid'};
     $from = "$repo->{'dir'}/$q->{'packid'}/$q->{'lnk'}" if $q->{'packid'} && $q->{'lnk'};	# obsbinlnk
     PBuild::Util::cp($from, $to);
+  }
+  # create provenance links
+  for my $p (sort keys %provenance) {
+    if (-e $provenance{$p} && ! -e "$p") {
+      link($provenance{$p}, $p) || die("link $provenance{$p} $p: $!\n");
+    }
   }
 }
 
@@ -181,6 +217,28 @@ sub getbinarylocations {
     }
   }
   return \%locations;
+}
+
+#
+# Return gbininfo data for a repository
+#
+sub get_gbininfo {
+  my ($repos, $repo) = @_;
+  return $repo->{'gbininfo'} if $repo->{'gbininfo'};
+  my $gbininfo;
+  if ($repo->{'type'} eq 'local') {
+    $gbininfo = PBuild::LocalRepo::get_gbininfo($repo->{'dir'});
+  } elsif ($repo->{'type'} eq 'repo') {
+    $gbininfo = PBuild::RemoteRepo::get_gbininfo($repo);
+  } else {
+    die("get_gbininfo: unsupported repo type '$repo->{'type'}'\n");
+  }
+  my $id = $repo->{'repoid'};
+  for my $p (values %$gbininfo) {
+    $_->{'repoid'} = $id for values %$p;
+  }
+  $repo->{'gbininfo'} = $gbininfo;
+  return $gbininfo;
 }
 
 1;

@@ -79,6 +79,14 @@ sub configure_repos {
 }
 
 #
+# expand dependencies of a single package (product case)
+#
+sub expand_deps_product {
+  my ($p, $bconf, $subpacks, $cross) = @_;
+  $p->{'dep_expanded'} = [];	# we don't expand anything for products
+}
+
+#
 # expand dependencies of a single package (image case)
 #
 sub expand_deps_image {
@@ -106,6 +114,7 @@ sub expand_deps_image {
 sub expand_deps {
   my ($p, $bconf, $subpacks, $cross) = @_;
   my $buildtype = $p->{'buildtype'} || '';
+  return expand_deps_product($p, $bconf, $subpacks, $cross) if $buildtype eq 'productcompose';
   return expand_deps_image($p, $bconf, $subpacks, $cross) if $buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'fissile' || $buildtype eq 'preinstallimage';
   delete $p->{'dep_experror'};
   if ($p->{'error'}) {

@@ -114,7 +114,7 @@ sub integrate_build_result {
     next if $file eq '_meta' || $file eq '_meta.success' || $file eq '_meta.fail';
     next if $file eq '_log' || $file eq '_log.success';
     next if $file eq '_repository';
-    unlink("$dst/$file");
+    unlink("$dst/$file") || PBuild::Util::rm_rf("$dst/$file");
   }
   # copy new stuff over
   for my $file (sort keys %$result) {
@@ -125,6 +125,10 @@ sub integrate_build_result {
       die unless $result->{$file} =~ /^(.*)\/([^\/]+)$/;
       my $obsbinlnk = PBuild::Container::containerinfo2obsbinlnk($1, $2, $p->{'pkg'});
       PBuild::Util::store("$dst/$prefix.obsbinlnk", undef, $obsbinlnk) if $obsbinlnk;
+    }
+    if ($p->{'buildtype'} eq 'productcompose' && -d $result->{$file}) {
+      PBuild::Util::cp_a($result->{$file}, "$dst/$file");
+      next;
     }
     PBuild::Util::cp($result->{$file}, "$dst/$file");
   }

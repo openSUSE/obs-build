@@ -23,8 +23,10 @@ package PBuild::OBS;
 use strict;
 
 use Build::Download;
+use Build::Rpm;
 
 use PBuild::Util;
+use PBuild::Verify;
 use PBuild::Cpio;
 use PBuild::Structured;
 use PBuild::SigAuth;
@@ -78,6 +80,26 @@ my $dtd_proj = [
       [ 'access' => @dtd_disableenable ],
       [ $dtd_repo ],
 ];
+
+my $dtd_packagebinaryversionlist = [
+    'packagebinaryversionlist' =>
+     [[ 'binaryversionlist' =>
+            'package',
+            'code',
+         [[ 'binary' =>
+                'name',
+                'sizek',
+                'error',
+                'hdrmd5',
+                'metamd5',
+                'leadsigmd5',
+                'md5sum',
+                'evr',
+                'arch',
+         ]],
+     ]],
+];
+
 
 #
 # set the cookie jar for the user agent
@@ -347,6 +369,110 @@ sub fetch_repodata {
     recode_deps($_);       # recode deps from testcase format to rpm
   }
   return \@bins;
+}
+
+sub fetch_gbininfo {
+  my ($url, $arch, $opts) = @_;
+  die("bad obs: reference\n") unless $url =~ /^obs:\/{1,3}([^\/]+\/[^\/]+)(?:\/([^\/]*))?$/;
+  my $prp = $1;
+  $arch = $2 if $2;
+  die("please specify the build service url with the --obs option\n") unless $opts->{'obs'};
+  my $baseurl = $opts->{'obs'};
+  $baseurl .= '/' unless $baseurl =~ /\/$/;
+  my $requrl .= "${baseurl}build/$prp/$arch?view=binaryversions";
+  print "fetching package artifact data for OBS repo $prp\n";
+  my $ua = create_ua();
+  my ($data) = Build::Download::fetch($requrl, 'ua' => $ua, 'retry' => 3);
+  my $packagebinaryversionlist = PBuild::Structured::fromxml($data, $dtd_packagebinaryversionlist, 0, 1);
+  my $gbininfo = {};
+  for my $binaryversionlist (@{$packagebinaryversionlist->{'binaryversionlist'} || []}) {
+    my $location = "${baseurl}build/$prp/$arch/$binaryversionlist->{'package'}/";
+    my %bins;
+    for my $binary (@{$binaryversionlist->{'binary'} || []}) {
+      my $filename = $binary->{'name'};
+      my $bin;
+      # XXX: should not rely on the filename here!
+      if ($filename =~ /^(?:::import::.*::)?(.+)-[^-]+-[^-]+\.([a-zA-Z][^\.\-]*)\.rpm$/) {
+        $bin = {'name' => $1, 'arch' => $2};
+      } elsif ($filename =~ /^([^\/]+)_[^\/]*_([^\/]*)\.deb$/) {
+        $bin = {'name' => $1, 'arch' => $2};
+      } elsif ($filename =~ /^([^\/]+)-[^-]+-[^-]+-([a-zA-Z][^\/\.\-]*)\.pkg\.tar\.(?:gz|xz|zst)$/) {
+        $bin = {'name' => $1, 'arch' => $2};
+      } elsif ($filename eq '.nouseforbuild') {
+        $bin = {};
+      } else {
+        $bin = {};
+      }
+      $bin->{'hdrmd5'} = $binary->{'hdrmd5'} if $binary->{'hdrmd5'};
+      $bin->{'leadsigmd5'} = $binary->{'leadsigmd5'} if $binary->{'leadsigmd5'};
+      $bin->{'md5sum'} = $binary->{'md5sum'} if $binary->{'md5sum'};
+      $bin->{'location'} = $location . $filename;
+      $bins{$filename} = $bin;
+    }
+    $gbininfo->{$binaryversionlist->{'package'}} = \%bins;
+  }
+  return $gbininfo;
+}
+
+sub fetch_productbinaries_cpioextract {
+  my ($ent, $xfile, $repodir, $packid, $files) = @_;
+  return undef unless $ent->{'cpiotype'} == 8;
+  my $name = $ent->{'name'};
+  PBuild::Verify::verify_filename("$packid-$name");
+  my $tmpname = "$repodir/.$$.$packid-$name";
+  if (!defined($xfile)) {
+    return undef unless $files->{$name};
+    return $tmpname;	# ok, extract this one!
+  }
+  my $bin = $files->{$name};
+  die unless $bin;
+  if ($bin->{'md5sum'}) {
+    Build::Download::checkfiledigest($tmpname, "md5:$bin->{'md5sum'}");
+  } elsif ($bin->{'hdrmd5'} || $bin->{'leadsigmd5'}) {
+    my $leadsigmd5;
+    my $hdrmd5 = Build::Rpm::queryhdrmd5($tmpname, \$leadsigmd5);
+    die("downloaded binary does not match hdrmd5\n") if $bin->{'hdrmd5'} && $bin->{'hdrmd5'} ne ($hdrmd5 || '');
+    die("downloaded binary does not match leadsigmd5\n") if $bin->{'leadsigmd5'} && $bin->{'leadsigmd5'} ne ($leadsigmd5 || '');
+  }
+  rename($tmpname, "$repodir/_gbins/$packid-$name") || die("rename $tmpname $repodir/_gbins/$packid-$name: $!\n");
+  die unless ($bin->{'package'} || '') eq $packid;
+  $bin->{'filename'} = "$packid-$name";
+  return undef;	# continue extracting
+}
+
+sub fetch_productbinaries {
+  my ($url, $repodir, $bins) = @_;
+  # group by package
+  my %packages;
+  my $location;
+  for my $bin (@$bins) {
+    my $l = $bin->{'location'};
+    die("fetch_productbinaries: missing location\n") unless $l;
+    die("fetch_productbinaries: bad location $l\n")  unless $l =~ /^(.+)\/([^\/]+)\/([^\/]+)$/;
+    die("fetch_productbinaries: package mismatch$l\n")  unless $2 eq $bin->{'package'};
+    $location = $1 unless defined $location;
+    die("fetch_productbinaries: location conflict\n") unless $1 eq $location;
+    push @{$packages{$2}}, [ $3, $bin ];
+  }
+  PBuild::Util::mkdir_p("$repodir/_gbins");
+  my $ua = create_ua();
+  for my $packid (sort keys %packages) {
+    #print "downloading ".scalar(@{$packages{$packid}}). " artifacts from $packid\n";
+    my $tmpcpio = "$repodir/.$$.binaries.cpio";
+    my %files;
+    my $requrl .= "$location/$packid?view=cpio";
+    for (@{$packages{$packid}}) {
+      my $fn = $_->[0];
+      $fn =~ s/([\000-\037<>;\"#\?&\+=%[\177-\377])/sprintf("%%%02X",ord($1))/sge;
+      $fn =~ tr/ /+/;
+      $requrl .= "&binary=$fn";
+      $files{$_->[0]} = $_->[1];
+    }
+    die unless %files;
+    Build::Download::download($requrl, $tmpcpio, undef, 'ua' => $ua, 'retry' => 3);
+    PBuild::Cpio::cpio_extract($tmpcpio, sub {fetch_productbinaries_cpioextract($_[0], $_[1], $repodir, $packid, \%files)});
+    unlink($tmpcpio);
+  }
 }
 
 1;

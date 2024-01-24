@@ -246,11 +246,17 @@ sub calc_binname {
 # Replace already downloaded entries in the metadata
 #
 sub replace_with_local {
-  my ($repodir, $bins) = @_;
+  my ($repodir, $bins, $oldbins) = @_;
+  my %oldbins;
+  for (@{$oldbins || []}) {
+    $oldbins{$_->{'filename'}} = $_ if $_->{'filename'};
+  }
   my $bad;
   my %files = map {$_ => 1} PBuild::Util::ls($repodir);
   delete $files{'_metadata'};
   delete $files{'.tmp'};
+  delete $files{'_gbins'};
+  delete $files{'_gbininfo'};
   for my $bin (@$bins) {
     next if $bin->{'name'} eq 'moduleinfo:';
     my $file = $bin->{'filename'};
@@ -269,6 +275,16 @@ sub replace_with_local {
       $bin->{'filename'} = $file;
       next;
     }
+    my $oldbin = $oldbins{$file};
+    if ($oldbin) {
+      if ($bin->{'hdrmd5'} && $bin->{'hdrmd5'} eq ($oldbin->{'hdrmd5'} || '')) {
+        if (!$bin->{'leadsigmd5'} || $bin->{'leadsigmd5'} eq ($oldbin->{'leadsigmd5'} || '')) {
+	  %$bin = %$oldbin;
+          $files{$file} = 2;
+	  next;
+	}
+      }
+    }
     eval {
       my $q = querybinary($repodir, $file);
       %$bin = %$q;
@@ -276,7 +292,7 @@ sub replace_with_local {
     };
     if ($@) {
       warn($@);
-      unlink($file);
+      unlink("$repodir/$file");
     }
   }
   for my $file (grep {$files{$_} == 1} sort keys %files) {
@@ -364,7 +380,7 @@ sub fetchrepo {
   }
   $repo = { 'bins' => $repo } if $repo && ref($repo) ne 'HASH';
   die unless $repo && $repo->{'bins'};
-  replace_with_local($repodir, $repo->{'bins'}) unless $repo == $oldrepo;
+  replace_with_local($repodir, $repo->{'bins'}, $oldrepo ? $oldrepo->{'bins'} : undef) unless $oldrepo && $repo == $oldrepo;
   PBuild::Util::store("$repodir/._metadata.$$", $repofile, $repo);
   return $repo->{'bins'};
 }
@@ -492,6 +508,94 @@ sub fetchbinaries {
   }
   # update _metadata
   PBuild::Util::store("$repodir/._metadata.$$", "$repodir/_metadata", $repo->{'bins'});
+}
+
+sub fetchproductbinaries {
+  my ($repo, $bins) = @_;
+  my $repodir = $repo->{'dir'};
+  my $url = $repo->{'url'};
+  die("bad repo\n") unless $url;
+  print "fetching ".PBuild::Util::plural(scalar(@$bins), 'product binary')." from $url\n";
+  die("unsupported url $url\n") unless $url =~ /^obs:/;
+  PBuild::OBS::fetch_productbinaries($url, $repodir, $bins);
+}
+
+sub replace_with_local_gbininfo {
+  my ($repodir, $gbininfo, $oldgbininfo) = @_;
+  my %files = map {$_ => 1} PBuild::Util::ls("$repodir/_gbins");
+  for my $packid (sort keys %$gbininfo) {
+    my $bins = $gbininfo->{$packid};
+    my $oldbins = $oldgbininfo ? $oldgbininfo->{$packid} : undef;
+    for my $name (sort keys %$bins) {
+      my $bin = $bins->{$name};
+      my $file = $bin->{'filename'};
+      if (defined $file) {
+        if ($files{$file}) {
+	  $files{$file} = 2;
+	} else {
+          delete $bin->{'filename'};
+        }
+	next;
+      }
+      $file = "$packid-$name";
+      next unless $files{$file};
+      my $oldbin = $oldbins ? $oldbins->{$name} : undef;
+      if ($oldbin && $oldbin->{'filename'} eq $file) {
+	if ($bin->{'md5sum'} && $bin->{'md5sum'} eq ($oldbin->{'md5sum'} || '')) {
+	  %$bin = %$oldbin;
+          $files{$file} = 2;
+	  next;
+	}
+	if ($bin->{'hdrmd5'} && $bin->{'hdrmd5'} eq ($oldbin->{'hdrmd5'} || '')) {
+	  if (!$bin->{'leadsigmd5'} || $bin->{'leadsigmd5'} eq ($oldbin->{'leadsigmd5'} || '')) {
+	    %$bin = %$oldbin;
+            $files{$file} = 2;
+	    next;
+	  }
+	}
+      }
+      if ($bin->{'md5sum'}) {
+	eval { Build::Download::checkfiledigest("$repodir/_gbins/$file", "md5:$bin->{'md5sum'}") };
+	if (!$@) {
+	  $bin->{'filename'} = $file;
+          $files{$file} = 2;
+	  next;
+	}
+      } elsif ($bin->{'hdrmd5'}) {
+	my ($hdrmd5, $leadsigmd5);
+	eval { $hdrmd5 = Build::queryhdrmd5("$repodir/_gbins/$file", \$leadsigmd5) };
+	if ($@) {
+	  warn($@);
+          unlink("$repodir/_gbins/$file");
+	  next;
+	}
+	if ($bin->{'hdrmd5'} eq ($hdrmd5 || '')) {
+	  if (!$bin->{'leadsigmd5'} || $bin->{'leadsigmd5'} eq ($leadsigmd5 || '')) {
+	    $bin->{'filename'} = $file;
+            $files{$file} = 2;
+	    next;
+	  }
+	}
+      }
+    }
+  }
+  for my $file (grep {$files{$_} == 1} sort keys %files) {
+    unlink("$repodir/_gbins/$file");
+  }
+}
+
+
+sub get_gbininfo {
+  my ($repo) = @_;
+  my $url = $repo->{'url'};
+  die("bad repo\n") unless $url;
+  die("get_gbininfo is not supported for $url\n") unless $url =~ /^obs:/;
+  my $repodir = $repo->{'dir'};
+  my $oldgbininfo = PBuild::Util::retrieve("$repodir/_gbininfo", 1);
+  my $gbininfo = PBuild::OBS::fetch_gbininfo($url, $repo->{'arch'}, { 'obs' => $repo->{'obs'} });
+  replace_with_local_gbininfo($repodir, $gbininfo, $oldgbininfo);
+  PBuild::Util::store("$repodir/._gbininfo.$$", "$repodir/_gbininfo", $gbininfo);
+  return $gbininfo;
 }
 
 1;

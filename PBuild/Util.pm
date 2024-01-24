@@ -194,6 +194,17 @@ sub retrieve {
   return $dd;
 }
 
+sub fromstorable {
+  my $nonfatal = $_[1];
+  return Storable::thaw(substr($_[0], 4)) unless $nonfatal;
+  my $d = eval { Storable::thaw(substr($_[0], 4)) };
+  if ($@) {
+    warn($@) if $nonfatal == 2;
+    return undef;
+  }
+  return $d;
+}
+
 sub identical {
   my ($d1, $d2, $except, $subexcept) = @_;
 

@@ -52,7 +52,7 @@ sub containerinfo2obsbinlnk {
   for my $tag (@{$d->{tags}}) {
     push @{$lnk->{'provides'}}, "container:$tag" unless "container:$tag" eq $lnk->{'name'};
   }
-  eval { PBuild::Verify::verify_nevraquery($lnk) };
+  eval { PBuild::Verify::verify_nevraquery($lnk); PBuild::Verify::verify_filename($d->{'file'}) };
   return undef if $@;
   local *F;
   if ($d->{'tar_md5sum'}) {

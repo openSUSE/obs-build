@@ -189,4 +189,12 @@ sub cleanup_builddir {
   }
 }
 
+#
+# Return the artifact data of all built packages
+#
+sub get_gbininfo {
+  my ($builddir) = @_;
+  return PBuild::Util::retrieve("$builddir/.pbuild/_bininfo");
+}
+
 1;
