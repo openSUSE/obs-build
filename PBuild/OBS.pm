@@ -83,6 +83,7 @@ my $dtd_proj = [
 
 my $dtd_packagebinaryversionlist = [
     'packagebinaryversionlist' =>
+	'cookie',
      [[ 'binaryversionlist' =>
             'package',
             'code',
@@ -412,6 +413,25 @@ sub fetch_gbininfo {
     $gbininfo->{$binaryversionlist->{'package'}} = \%bins;
   }
   return $gbininfo;
+}
+
+sub fetch_gbininfo_cookie {
+  my ($url, $arch, $opts) = @_;
+  die("bad obs: reference\n") unless $url =~ /^obs:\/{1,3}([^\/]+\/[^\/]+)(?:\/([^\/]*))?$/;
+  my $prp = $1;
+  $arch = $2 if $2;
+  die("please specify the build service url with the --obs option\n") unless $opts->{'obs'};
+  my $baseurl = $opts->{'obs'};
+  $baseurl .= '/' unless $baseurl =~ /\/$/;
+  my $requrl .= "${baseurl}build/$prp/$arch?view=binaryversionscookie";
+  my $cookie;
+  my $ua = create_ua();
+  eval {
+    my ($data) = Build::Download::fetch($requrl, 'ua' => $ua, 'retry' => 3);
+    my $packagebinaryversionlist = PBuild::Structured::fromxml($data, $dtd_packagebinaryversionlist, 0, 1);
+    $cookie = $packagebinaryversionlist->{'cookie'}
+  };
+  return $@ ? undef : $cookie;
 }
 
 sub fetch_productbinaries_cpioextract {

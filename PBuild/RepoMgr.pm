@@ -47,6 +47,7 @@ sub addremoterepo {
   $_->{'repoid'} = $id for @$bins;
   my $repo = { 'dir' => $repodir, 'bins' => $bins, 'url' => $repourl, 'arch' => $myarch, 'type' => 'repo', 'repoid' => $id };
   $repo->{'obs'} = $opts->{'obs'} if $repourl =~ /^obs:/;
+  $repo->{'no-repo-refresh'} = $opts->{'no-repo-refresh'} if $opts->{'no-repo-refresh'};
   $repos->{$id} = $repo;
   return $repo;
 }

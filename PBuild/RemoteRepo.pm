@@ -261,18 +261,20 @@ sub replace_with_local {
     next if $bin->{'name'} eq 'moduleinfo:';
     my $file = $bin->{'filename'};
     if (defined $file) {
-      if (!$files{$file}) {
+      if (!$files{$file} || $files{$file} == 2) {
 	$bad = 1;
-	next;
+      } else {
+        $files{$file} = 2;
       }
-      $files{$file} = 2;
       next;
     }
     $file = calc_binname($bin);
     next unless $files{$file};
+    $bad = 1 if $files{$file} == 2;
     if ($bin->{'name'} =~ /^container:/) {
       delete $bin->{'id'};
       $bin->{'filename'} = $file;
+      $files{$file} = 2;
       next;
     }
     my $oldbin = $oldbins{$file};
@@ -380,7 +382,9 @@ sub fetchrepo {
   }
   $repo = { 'bins' => $repo } if $repo && ref($repo) ne 'HASH';
   die unless $repo && $repo->{'bins'};
-  replace_with_local($repodir, $repo->{'bins'}, $oldrepo ? $oldrepo->{'bins'} : undef) unless $oldrepo && $repo == $oldrepo;
+  if (!($oldrepo && $repo == $oldrepo)) {
+    replace_with_local($repodir, $repo->{'bins'}, $oldrepo ? $oldrepo->{'bins'} : undef) || die("replace_with_local failed\n");
+  }
   PBuild::Util::store("$repodir/._metadata.$$", $repofile, $repo);
   return $repo->{'bins'};
 }
@@ -522,6 +526,7 @@ sub fetchproductbinaries {
 
 sub replace_with_local_gbininfo {
   my ($repodir, $gbininfo, $oldgbininfo) = @_;
+  my $bad = 0;
   my %files = map {$_ => 1} PBuild::Util::ls("$repodir/_gbins");
   for my $packid (sort keys %$gbininfo) {
     my $bins = $gbininfo->{$packid};
@@ -530,15 +535,16 @@ sub replace_with_local_gbininfo {
       my $bin = $bins->{$name};
       my $file = $bin->{'filename'};
       if (defined $file) {
-        if ($files{$file}) {
-	  $files{$file} = 2;
+        if (!$files{$file} || $files{$file} == 2) {
+	  $bad = 1;
 	} else {
-          delete $bin->{'filename'};
+          $files{$file} = 2;
         }
 	next;
       }
       $file = "$packid-$name";
       next unless $files{$file};
+      $bad = 1 if $files{$file} == 2;
       my $oldbin = $oldbins ? $oldbins->{$name} : undef;
       if ($oldbin && $oldbin->{'filename'} eq $file) {
 	if ($bin->{'md5sum'} && $bin->{'md5sum'} eq ($oldbin->{'md5sum'} || '')) {
@@ -577,11 +583,16 @@ sub replace_with_local_gbininfo {
 	  }
 	}
       }
+      # cannot verify, so download again
+      unlink("$repodir/_gbins/$file");
+      delete $files{$file};
+      next;
     }
   }
   for my $file (grep {$files{$_} == 1} sort keys %files) {
     unlink("$repodir/_gbins/$file");
   }
+  return $bad ? 0 : 1;
 }
 
 
@@ -592,9 +603,18 @@ sub get_gbininfo {
   die("get_gbininfo is not supported for $url\n") unless $url =~ /^obs:/;
   my $repodir = $repo->{'dir'};
   my $oldgbininfo = PBuild::Util::retrieve("$repodir/_gbininfo", 1);
+  my $oldcookie = $oldgbininfo ? delete $oldgbininfo->{'.cookie'} : undef;
+  return $oldgbininfo if $oldgbininfo && $repo->{'no-repo-refresh'};
+  my $cookie = PBuild::OBS::fetch_gbininfo_cookie($url, $repo->{'arch'}, { 'obs' => $repo->{'obs'} });
+  if ($oldgbininfo && $oldcookie && $cookie && $oldcookie eq $cookie) {
+    return $oldgbininfo if replace_with_local_gbininfo($repodir, $oldgbininfo);
+    undef $oldgbininfo;
+  }
   my $gbininfo = PBuild::OBS::fetch_gbininfo($url, $repo->{'arch'}, { 'obs' => $repo->{'obs'} });
-  replace_with_local_gbininfo($repodir, $gbininfo, $oldgbininfo);
+  replace_with_local_gbininfo($repodir, $gbininfo, $oldgbininfo) || die("replace_with_local_gbininfo failed\n");
+  $gbininfo->{'.cookie'} = $cookie if $cookie;
   PBuild::Util::store("$repodir/._gbininfo.$$", "$repodir/_gbininfo", $gbininfo);
+  delete $gbininfo->{'.cookie'};
   return $gbininfo;
 }
 
