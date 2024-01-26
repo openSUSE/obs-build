@@ -33,6 +33,7 @@ vm_startup_podman() {
     local podman_opts=
     test -n "$VM_TYPE_PRIVILEGED" && podman_opts="--privileged --cap-add=SYS_ADMIN --cap-add=MKNOD"
     podman run \
+        --runtime=runc \
         --rm --name "$name" --net=none $podman_opts \
         --mount "type=bind,source=$BUILD_ROOT,destination=/" \
         "$@" build-scratch:latest "$vm_init_script"
