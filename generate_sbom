@@ -546,6 +546,7 @@ sub spdx_encode_header {
 my $wrap_intoto;
 my $isproduct;
 my $isdir;
+my $istar;
 my $distro;
 my $rpmmd;
 my $format;
@@ -562,8 +563,13 @@ while (@ARGV && $ARGV[0] =~ /^-/) {
     $isdir = 1;
   } elsif ($opt eq '--rpmmd') {
     $rpmmd = 1;
+  } elsif ($opt eq '--container-archive') {
+    $istar = 1;
   } elsif ($opt eq '--format') {
     $format = shift @ARGV;
+  } elsif ($opt eq '--help') {
+    echo_help();
+    exit(0);
   } else {
     last if $opt eq '--';
     die("unknown option: $opt\n");
@@ -572,7 +578,45 @@ while (@ARGV && $ARGV[0] =~ /^-/) {
 $format ||= 'spdx';
 die("unknown format $format\n") unless $format eq 'spdx' || $format eq 'cyclonedx';
 
-die("usage: generate_sbom [--distro NAME] [--format spdx|cyclonedx] [--intoto] [--product DIRECTORY]|[--rpmmd DIRECTORY|CONTAINER_TAR]\n") unless @ARGV == 1;
+sub echo_help {
+    print "\n
+The Software Bill of Materials (SBOM) generation tool
+=====================================================
+
+This tool generates SBOM data based on data from rpm packages.
+
+Output formats
+==============
+
+  --format spdx
+     Generates SPDX 2.3 formated data. This is the default.
+
+  --format cyclonedx
+     Generates CycloneDX 1.4 formated data
+
+  --intoto
+     Can be used optional to wrap the generated data into in-toto.io
+     specified format.
+
+Supported content
+=================
+
+  --dir DIRECTORY
+     The RPM database of the system below DIRECTORY will be evaluated, also all
+     files will be referenced in the SBOM.
+
+  --product DIRECTORY
+     An installation medium. All .rpm files in any sub directory will be scanned.
+
+  --rpmmd DIRECTORY
+     A directory providing rpm-md meta data. A 'repodata/repomd.xml' file is expected.
+
+  --container-archive CONTAINER_ARCHIVE
+     An container providing a system
+
+";
+}
+die("usage: generate_sbom [--distro NAME] [--format spdx|cyclonedx] [--intoto] [--dir DIRECTORY]|[--product DIRECTORY]|[--rpmmd DIRECTORY]|[--container-archive CONTAINER_ARCHIVE]\n") unless @ARGV == 1;
 my $toprocess = $ARGV[0];
 
 my $tmpdir = File::Temp::tempdir( CLEANUP => 1 );
@@ -603,7 +647,7 @@ if ($isproduct) {
   $files = gen_filelist($toprocess) if $format eq 'spdx';
   $pkgs = read_pkgs_rpmdb("$tmpdir/rpmdb");
   $dist = read_dist($toprocess);
-} else {
+} else { # no check for $istar to stay backward compatible
   # container tar case
   my $unpackdir = unpack_container($tmpdir, $toprocess);
   dump_rpmdb($unpackdir, "$tmpdir/rpmdb");

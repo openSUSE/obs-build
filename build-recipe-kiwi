@@ -712,7 +712,7 @@ postprocess_kiwi_containers() {
 	    # create sbom if requested
 	    for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom | sort -u) ; do
 		echo "Generating $format sbom file for ${r##*/}"
-		generate_sbom --format "$format" "$r" > "${r%.tar}.${format/cyclonedx/cdx}.json"
+		generate_sbom --format "$format" --container-archive "$r" > "${r%.tar}.${format/cyclonedx/cdx}.json"
 		test -s "${r%.tar}.${format/cyclonedx/cdx}.json" || rm -f "${r%.tar}.${format/cyclonedx/cdx}.json"
 	    done
 	else
