@@ -142,10 +142,12 @@ sub pkgsort {
   my %pdeps;
   my %pkg2src;
   my $pkgsrc = $ctx->{'pkgsrc'};
+  my @products;
   for my $pkg (@pkgs) {
     my $p = $pkgsrc->{$pkg};
     $pdeps{$pkg} = $p->{'dep_expanded'} || [];
     $pkg2src{$pkg} = $p->{'name'} || $p->{'pkg'};
+    push @products, $pkg if ($p->{'buildtype'} || '') eq 'productcompose';
   }
   my @cycles;
   my @sccs;
@@ -168,6 +170,15 @@ sub pkgsort {
   #  }
   #}
   $ctx->{'cychash'} = \%cychash;
+  # put products last
+  if (@products) {
+    @products = ();
+    for my $pkg (splice @pkgs) {
+      push @pkgs, $pkg;
+      push @products, pop(@pkgs) if ($pkgsrc->{$pkg}->{'buildtype'} || '') eq 'productcompose';
+    }
+    push @pkgs, @products;
+  }
   return @pkgs;
 }
 
@@ -183,6 +194,7 @@ sub pkgcheck {
   $ctx->{'building'} = {};	# building
   $ctx->{'building'}->{$_->{'job'}->{'pdata'}->{'pkg'}} = $_->{'job'} for grep {$_->{'job'}} @$builders;
   $ctx->{'notready'} = {};	# building or blocked
+  $ctx->{'packstatus'} = \%packstatus;
   $ctx->{'nharder'} = 0;
   $ctx->{'cyclevel'} = {};
 
@@ -442,12 +454,14 @@ sub check_product {
   my %unneeded_na;
 
   my @rpms;
+  my @blocked;
   for my $repo (@{$ctx->{'repos'}}) {
     my %seen_fn;	# resolve file conflicts in this prp
     my $gbininfo;
     my @next_unneeded_na;
     $gbininfo = $ctx->{'repomgr'}->get_gbininfo($repo);
     my @apackids = sort keys %$gbininfo;
+    my $packstatus = $repo->{'type'} eq 'local' ? $ctx->{'packstatus'} : undef;
     for my $apackid (@apackids) {
       next if $apackid eq '_volatile';
       my $bininfo = $gbininfo->{$apackid};
@@ -484,6 +498,10 @@ sub check_product {
 	last;
       }
       next unless $needit;
+      if ($packstatus && ($packstatus->{$apackid} || '') eq 'blocked') {
+	push @blocked, $apackid;
+	next;
+      }
       # we need the package, add all artifacts
       my @bi = sort(keys %$bininfo);
       my @ibi = grep {/^::import::/} @bi;
@@ -512,8 +530,13 @@ sub check_product {
 	$seen_fn{$fn} = 1 unless $fn eq 'updateinfo.xml' || $fn eq '_modulemd.yaml';        # we expect those to be renamed
       }
     }
+    last if @blocked;
     @next_unneeded_na = () if $deps{'--use-newest-package'};
     $unneeded_na{$_} = 1 for @next_unneeded_na;
+  }
+  if (@blocked) {
+    splice(@blocked, 10, scalar(@blocked), '...') if @blocked > 10;
+    return ('blocked', join(', ', @blocked));
   }
   my $new_meta = genmeta($ctx, $p, \@rpms);
   return check_meta($ctx, $p, $new_meta, undef, \@rpms);
