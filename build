@@ -1914,7 +1914,7 @@ TIME_POSTCHECKS=$SECONDS
 if test -n "$RPMS" -a -d "$BUILD_ROOT/usr/lib/build/checks" ; then
     # workaround for broken 13.1 check scripts which umount /proc
     if test -n "$RUNNING_IN_VM" -a "$BUILD_ROOT" = / ; then
-	if grep umount "$BUILD_ROOT/usr/lib/build/checks/99-check-remove-rpms" >/dev/null 2>&1 ; then
+	if grep 'umount proc' "$BUILD_ROOT/usr/lib/build/checks/99-check-remove-rpms" >/dev/null 2>&1 ; then
 	    umount -n $BUILD_ROOT/proc/sys/fs/binfmt_misc 2>/dev/null
 	fi
     fi
