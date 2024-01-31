@@ -156,7 +156,6 @@ sub parse_suse {
     $tdt = str2time("$year-1-1");
   }
   $tdt += 12 * 3600 unless $dt =~ /\d:\d/;	# 12:00 if not specified
-  $tdt += ($zone || 0);
   my $ok = 1;
   my $change = '';
   while(<>) {
