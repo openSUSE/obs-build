@@ -472,22 +472,19 @@ sub fetch_productbinaries {
     die("fetch_productbinaries: package mismatch$l\n")  unless $2 eq $bin->{'package'};
     $location = $1 unless defined $location;
     die("fetch_productbinaries: location conflict\n") unless $1 eq $location;
-    push @{$packages{$2}}, [ $3, $bin ];
+    $packages{$2}->{$3} = $bin;
   }
   PBuild::Util::mkdir_p("$repodir/_gbins");
   my $ua = create_ua();
   for my $packid (sort keys %packages) {
-    #print "downloading ".scalar(@{$packages{$packid}}). " artifacts from $packid\n";
+    my $files = $packages{$packid};
+    die unless %$files;
+    #print "downloading ".keys(%$files). " artifacts from $packid\n";
+    my $requrl = "$location/".PBuild::Util::urlencode($packid).'?view=cpio';
+    $requrl .= "&binary=".PBuild::Util::urlencode($_, 1) for sort keys %$files;
     my $tmpcpio = "$repodir/.$$.binaries.cpio";
-    my %files;
-    my $requrl .= "$location/$packid?view=cpio";
-    for (@{$packages{$packid}}) {
-      $requrl .= "&binary=".PBuild::Util::urlencode($_->[0], 1);
-      $files{$_->[0]} = $_->[1];
-    }
-    die unless %files;
     Build::Download::download($requrl, $tmpcpio, undef, 'ua' => $ua, 'retry' => 3);
-    PBuild::Cpio::cpio_extract($tmpcpio, sub {fetch_productbinaries_cpioextract($_[0], $_[1], $repodir, $packid, \%files)});
+    PBuild::Cpio::cpio_extract($tmpcpio, sub {fetch_productbinaries_cpioextract($_[0], $_[1], $repodir, $packid, $files)});
     unlink($tmpcpio);
   }
 }
