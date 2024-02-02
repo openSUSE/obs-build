@@ -43,9 +43,9 @@ sub addremoterepo {
   my $id = Digest::MD5::md5_hex("$myarch/$repourl");
   return $repos->{$id} if $repos->{$id};
   my $repodir = "$builddir/.pbuild/_base/$id";
-  my $bins = PBuild::RemoteRepo::fetchrepo($bconf, $myarch, $repodir, $repourl, $buildtype, $opts);
+  my ($bins, $meta) = PBuild::RemoteRepo::fetchrepo($bconf, $myarch, $repodir, $repourl, $buildtype, $opts);
   $_->{'repoid'} = $id for @$bins;
-  my $repo = { 'dir' => $repodir, 'bins' => $bins, 'url' => $repourl, 'arch' => $myarch, 'type' => 'repo', 'repoid' => $id };
+  my $repo = { 'dir' => $repodir, 'bins' => $bins, 'meta' => $meta, 'url' => $repourl, 'arch' => $myarch, 'type' => 'repo', 'repoid' => $id };
   $repo->{'obs'} = $opts->{'obs'} if $repourl =~ /^obs:/;
   $repo->{'no-repo-refresh'} = $opts->{'no-repo-refresh'} if $opts->{'no-repo-refresh'};
   $repos->{$id} = $repo;
@@ -62,9 +62,9 @@ sub addremoteregistry {
   my $id = Digest::MD5::md5_hex("$myarch/$repourl");
   return $repos->{$id} if $repos->{$id};
   my $repodir = "$builddir/.pbuild/_base/$id";
-  my $bins = PBuild::RemoteRegistry::fetchrepo($bconf, $myarch, $repodir, $repourl, $tags);
+  my ($bins, $meta) = PBuild::RemoteRegistry::fetchrepo($bconf, $myarch, $repodir, $repourl, $tags);
   $_->{'repoid'} = $id for @$bins;
-  my $repo = { 'dir' => $repodir, 'bins' => $bins, 'url' => $repourl, 'arch' => $myarch, 'type' => 'registry', 'repoid' => $id };
+  my $repo = { 'dir' => $repodir, 'bins' => $bins, 'meta' => $meta, 'url' => $repourl, 'arch' => $myarch, 'type' => 'registry', 'repoid' => $id };
   $repos->{$id} = $repo;
   return $repo;
 }
@@ -121,9 +121,9 @@ sub getremotebinaries {
     my $repo = $repos->{$repoid};
     die("bad repoid $repoid\n") unless $repo;
     if ($repo->{'type'} eq 'repo') {
-      PBuild::RemoteRepo::fetchbinaries($repo, $tofetch{$repoid});
+      PBuild::RemoteRepo::fetchbinaries($repo->{'meta'}, $tofetch{$repoid});
     } elsif ($repo->{'type'} eq 'registry') {
-      PBuild::RemoteRegistry::fetchbinaries($repo, $tofetch{$repoid});
+      PBuild::RemoteRegistry::fetchbinaries($repo->{'meta'}, $tofetch{$repoid});
     } else {
       die("unsupported repo type $repo->{'type'}\n");
     }
@@ -131,6 +131,9 @@ sub getremotebinaries {
   }
 }
 
+#
+# Fetch missing gbininfo product binaries from a remote repo/registry
+#
 sub getremoteproductbinaries {
   my ($repos, $bins) = @_;
   my %tofetch;
@@ -141,7 +144,7 @@ sub getremoteproductbinaries {
     my $repo = $repos->{$repoid};
     die("bad repoid $repoid\n") unless $repo;
     if ($repo->{'type'} eq 'repo') {
-      PBuild::RemoteRepo::fetchproductbinaries($repo, $tofetch{$repoid});
+      PBuild::RemoteRepo::fetchproductbinaries($repo->{'gbininfo_meta'}, $tofetch{$repoid});
     } else {
       die("unsupported repo type $repo->{'type'}\n");
     }
@@ -173,7 +176,7 @@ sub copyimagebinaries {
       $to = "$dstdir/repos/pbuild/pbuild/$q->{'filename'}";
     }
     if ($repo->{'type'} eq 'registry') {
-      PBuild::RemoteRegistry::construct_containertar($repo->{'dir'}, $q, $to);
+      PBuild::RemoteRegistry::construct_containertar($repo->{'meta'}, $q, $to);
       next;
     }
     my $filename = $q->{'filename'};
@@ -226,11 +229,13 @@ sub getbinarylocations {
 sub get_gbininfo {
   my ($repos, $repo) = @_;
   return $repo->{'gbininfo'} if $repo->{'gbininfo'};
-  my $gbininfo;
+  my ($gbininfo, $meta);
   if ($repo->{'type'} eq 'local') {
-    $gbininfo = PBuild::LocalRepo::get_gbininfo($repo->{'dir'});
+    $gbininfo = PBuild::LocalRepo::fetch_gbininfo($repo->{'dir'});
   } elsif ($repo->{'type'} eq 'repo') {
-    $gbininfo = PBuild::RemoteRepo::get_gbininfo($repo);
+    # hack: reconstruct the part of the options we need
+    my $opts = { 'no-repo-refresh' => $repo->{'no-repo-refresh'}, 'obs' => $repo->{'obs'} };
+    ($gbininfo, $meta) = PBuild::RemoteRepo::fetch_gbininfo($repo->{'arch'}, $repo->{'dir'}, $repo->{'url'}, $opts);
   } else {
     die("get_gbininfo: unsupported repo type '$repo->{'type'}'\n");
   }
@@ -239,6 +244,7 @@ sub get_gbininfo {
     $_->{'repoid'} = $id for values %$p;
   }
   $repo->{'gbininfo'} = $gbininfo;
+  $repo->{'gbininfo_meta'} = $meta;
   return $gbininfo;
 }
 

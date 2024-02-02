@@ -195,16 +195,17 @@ sub fetchrepo {
     my $bin = queryremotecontainer($ua, $arch, $repodir, $url, $repotag);
     push @bins, $bin if $bin;
   }
-  return \@bins;
+  my $meta = { 'repodir' => $repodir, 'url' => $url };
+  return (\@bins, $meta);
 }
 
 #
 # download the blobs needed to reconstruct a container
 #
 sub fetchbinaries {
-  my ($repo, $bins) = @_;
-  my $repodir = $repo->{'dir'};
-  my $url = $repo->{'url'};
+  my ($meta, $bins) = @_;
+  my $repodir = $meta->{'repodir'};
+  my $url = $meta->{'url'};
   my $nbins = @$bins;
   die("bad repo\n") unless $url;
   my %tofetch;
@@ -263,7 +264,8 @@ sub maketarhead {
 # reconstruct a container from blobs
 #
 sub construct_containertar {
-  my ($repodir, $q, $dst) = @_;
+  my ($meta, $q, $dst) = @_;
+  my $repodir = $meta->{'repodir'};
   die("construct_containertar: $q->{'name'}: not a container\n") unless $q->{'name'} =~ /^container:/;
   my $fd;
   open ($fd, '>', $dst) || die("$dst: $!\n");

@@ -44,6 +44,20 @@ use PBuild::Cando;
 my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst};
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
 
+sub open_uncompressed {
+  my ($filename) = @_;
+  my $fh;
+  open($fh, '<', $filename) or die("Error opening $filename: $!\n");
+  if ($filename =~ /\.gz$/) {
+    $fh = IO::Uncompress::Gunzip->new($fh) or die("Error opening $filename: $IO::Uncompress::Gunzip::GunzipError\n");
+  } elsif ($filename =~ /\.$/) {
+    open($fh, '-|', 'xz', '-d', '-c', '--', $filename) || die("Error opening $filename: $!\n");
+  } elsif ($filename =~ /\.zst$/) {
+    open($fh, '-|', 'zstd', '-d', '-c', '--', $filename) || die("Error opening $filename: $!\n");
+  }
+  return $fh;
+}
+
 sub download_zypp {
   my ($url, $dest, $digest) = @_;
   die("do not know how to download $url\n") unless $url =~ m#^zypp://([^/]+)/((?:.*/)?([^/]+)\.rpm)$#;
@@ -104,20 +118,6 @@ sub fetchrepo_debian {
     Build::Debrepo::parse("$tmpdir/Packages.gz", sub { addpkg(\@bins, $_[0], $baseurl) }, 'addselfprovides' => 1, 'withchecksum' => 1, 'normalizedeps' => 1);
   }
   return \@bins;
-}
-
-sub open_uncompressed {
-  my ($filename) = @_;
-  my $fh;
-  open($fh, '<', $filename) or die("Error opening $filename: $!\n");
-  if ($filename =~ /\.gz$/) {
-    $fh = IO::Uncompress::Gunzip->new($fh) or die("Error opening $filename: $IO::Uncompress::Gunzip::GunzipError\n");
-  } elsif ($filename =~ /\.$/) {
-    open($fh, '-|', 'xz', '-d', '-c', '--', $filename) || die("Error opening $filename: $!\n");
-  } elsif ($filename =~ /\.zst$/) {
-    open($fh, '-|', 'zstd', '-d', '-c', '--', $filename) || die("Error opening $filename: $!\n");
-  }
-  return $fh;
 }
 
 sub fetchrepo_rpmmd {
@@ -279,12 +279,30 @@ sub replace_with_local {
     }
     my $oldbin = $oldbins{$file};
     if ($oldbin) {
-      if ($bin->{'hdrmd5'} && $bin->{'hdrmd5'} eq ($oldbin->{'hdrmd5'} || '')) {
-        if (!$bin->{'leadsigmd5'} || $bin->{'leadsigmd5'} eq ($oldbin->{'leadsigmd5'} || '')) {
+      if ($oldbin->{'checksum'} && $bin->{'checksum'}) {
+	if ($oldbin->{'checksum'} eq $bin->{'checksum'}) {
 	  %$bin = %$oldbin;
           $files{$file} = 2;
+	} else {
+          unlink("$repodir/$file");
+          delete $files{$file};
+	}
+	next;
+      }
+      if ($bin->{'hdrmd5'} && $oldbin->{'hdrmd5'}) {
+	if ($bin->{'hdrmd5'} ne $oldbin->{'hdrmd5'}) {
+          unlink("$repodir/$file");
+          delete $files{$file};
 	  next;
 	}
+	if ($bin->{'leadsigmd5'} && $bin->{'leadsigmd5'} ne ($oldbin->{'leadsigmd5'} || '')) {
+          unlink("$repodir/$file");
+          delete $files{$file};
+	  next;
+	}
+	%$bin = %$oldbin;
+        $files{$file} = 2;
+	next;
       }
     }
     eval {
@@ -343,22 +361,21 @@ sub fetchrepo {
   }
   my $modules = [ PBuild::Util::unify(sort(@{$bconf->{'modules'} || []})) ];
   my $repofile = "$repodir/_metadata";
-  my $cookie;
-  my $oldrepo;
-  if (-s $repofile) {
-    $oldrepo = PBuild::Util::retrieve($repofile, 1);
-    undef $oldrepo unless ref($oldrepo) eq 'HASH' && $oldrepo->{'bins'};
-    if ($oldrepo && $repotype eq 'obs') {
-      # obs repo data changes with the modules, so be careful
-      my $oldbins = $oldrepo->{'bins'};
-      my $repomodules = [];
-      if (@$oldbins && $oldbins->[-1]->{'name'} eq 'moduleinfo:') {
-        $repomodules = $oldbins->[-1]->{'modules'} || [];
-      }
-      undef $oldrepo if join(',', @$modules) ne join(',', @$repomodules);
+  my $oldrepo = (-s $repofile) ? PBuild::Util::retrieve($repofile, 1) : undef;
+  undef $oldrepo unless $oldrepo && ref($oldrepo) eq 'HASH' && $oldrepo->{'bins'};
+  if ($oldrepo && $repotype eq 'obs') {
+    # obs repo data changes with the modules, so be careful
+    my $oldbins = $oldrepo->{'bins'};
+    my $repomodules = [];
+    if (@$oldbins && $oldbins->[-1]->{'name'} eq 'moduleinfo:') {
+      $repomodules = $oldbins->[-1]->{'modules'} || [];
     }
-    undef $oldrepo if $oldrepo && !replace_with_local($repodir, $oldrepo->{'bins'});
-    return $oldrepo->{'bins'} if $oldrepo && $opts->{'no-repo-refresh'};
+    undef $oldrepo if join(',', @$modules) ne join(',', @$repomodules);
+  }
+  undef $oldrepo if $oldrepo && !replace_with_local($repodir, $oldrepo->{'bins'});
+  if ($oldrepo && $opts->{'no-repo-refresh'}) {
+    my $meta = { 'metadata' => $oldrepo, 'repodir' => $repodir, 'url' => $url, 'repotype' => $repotype };
+    return ($oldrepo->{'bins'}, $meta);
   }
   my $tmpdir = "$repodir/.tmp";
   PBuild::Util::cleandir($tmpdir) if -e $tmpdir;
@@ -385,8 +402,9 @@ sub fetchrepo {
   if (!($oldrepo && $repo == $oldrepo)) {
     replace_with_local($repodir, $repo->{'bins'}, $oldrepo ? $oldrepo->{'bins'} : undef) || die("replace_with_local failed\n");
   }
-  PBuild::Util::store("$repodir/._metadata.$$", $repofile, $repo);
-  return $repo->{'bins'};
+  my $meta = { 'metadata' => $repo, 'repodir' => $repodir, 'url' => $url, 'repotype' => $repotype };
+  PBuild::Util::store("$repodir/._metadata.$$", $repofile, $meta->{'metadata'});
+  return ($repo->{'bins'}, $meta);
 }
 
 #
@@ -451,6 +469,7 @@ sub fetchbinaries_replace {
   die("downloaded binary $binname does not match repository metadata\n") unless is_matching_binary($bin, $q);
   rename("$repodir/$tmpname", "$repodir/$binname") || die("rename $repodir/$tmpname $repodir/$binname\n");
   $q->{'filename'} = $binname;
+  $q->{'checksum'} = $bin->{'checksum'} if $bin->{'checksum'};
   %$bin = %$q;	# inline replace!
 }
 
@@ -458,7 +477,7 @@ sub fetchbinaries_replace {
 # Download missing binaries in batches from a remote obs instance
 #
 sub fetchbinaries_obs {
-  my ($repo, $bins, $ua) = @_;
+  my ($meta, $bins, $ua) = @_;
   my $url;
   my %names;
   for my $bin (@$bins) {
@@ -473,7 +492,7 @@ sub fetchbinaries_obs {
     $names{$bin->{'name'}} = [ ".$$.$binname", $binname, $bin ];
   }
   return undef unless %names;
-  my $repodir = $repo->{'dir'};
+  my $repodir = $meta->{'repodir'};
   PBuild::Util::mkdir_p($repodir);
   return PBuild::OBS::fetch_binaries($url, $repodir, \%names, \&fetchbinaries_replace);
 }
@@ -482,14 +501,12 @@ sub fetchbinaries_obs {
 # Download missing binaries from a remote repository
 #
 sub fetchbinaries {
-  my ($repo, $bins) = @_;
-  my $repodir = $repo->{'dir'};
-  my $url = $repo->{'url'};
-  die("bad repo\n") unless $url;
-  print "fetching ".PBuild::Util::plural(scalar(@$bins), 'binary')." from $url\n";
+  my ($meta, $bins) = @_;
+  print "fetching ".PBuild::Util::plural(scalar(@$bins), 'binary')." from $meta->{'url'}\n";
+  my $repodir = $meta->{'repodir'};
   PBuild::Util::mkdir_p($repodir);
   my $ua;
-  $ua = fetchbinaries_obs($repo, $bins) if $url =~ /^obs:/;
+  $ua = fetchbinaries_obs($meta, $bins) if $meta->{'repotype'} eq 'obs';
   for my $bin (@$bins) {
     next if $bin->{'filename'};
     my $location = $bin->{'location'};
@@ -511,19 +528,25 @@ sub fetchbinaries {
     fetchbinaries_replace($repodir, $tmpname, $binname, $bin);
   }
   # update _metadata
-  PBuild::Util::store("$repodir/._metadata.$$", "$repodir/_metadata", $repo->{'bins'});
+  PBuild::Util::store("$repodir/._metadata.$$", "$repodir/_metadata", $meta->{'metadata'});
 }
 
+#
+# Download missing gbininfo product binaries from a remote repository
+#
 sub fetchproductbinaries {
-  my ($repo, $bins) = @_;
-  my $repodir = $repo->{'dir'};
-  my $url = $repo->{'url'};
-  die("bad repo\n") unless $url;
-  print "fetching ".PBuild::Util::plural(scalar(@$bins), 'product binary')." from $url\n";
-  die("unsupported url $url\n") unless $url =~ /^obs:/;
-  PBuild::OBS::fetch_productbinaries($url, $repodir, $bins);
+  my ($meta, $bins) = @_;
+  my $repodir = $meta->{'repodir'};
+  print "fetching ".PBuild::Util::plural(scalar(@$bins), 'product binary')." from $meta->{'url'}\n";
+  die("unsupported repo type $meta->{'repotype'}\n") unless $meta->{'repotype'} eq 'obs';
+  PBuild::OBS::fetch_productbinaries($meta->{'url'}, $repodir, $bins);
+  # updata meta data
+  PBuild::Util::store("$repodir/._gbininfo.$$", "$repodir/_gbininfo", $meta->{'metadata'});
 }
 
+#
+# Replace already downloaded entries in the gbininfo metadata
+#
 sub replace_with_local_gbininfo {
   my ($repodir, $gbininfo, $oldgbininfo) = @_;
   my $bad = 0;
@@ -595,27 +618,50 @@ sub replace_with_local_gbininfo {
   return $bad ? 0 : 1;
 }
 
+sub fetch_gbininfo_obs {
+  my ($url, %opts) = @_;
+  my $cookie = PBuild::OBS::fetch_gbininfo_cookie($url, $opts{'arch'}, $opts{'opts'});
+  my $oldmetadata = $opts{'oldmetadata'};
+  return $oldmetadata if $oldmetadata && $cookie && ($oldmetadata->{'cookie'} || '') eq $cookie;
+  my $gbininfo = PBuild::OBS::fetch_gbininfo($url, $opts{'arch'}, $opts{'opts'});
+  my $metadata = { 'gbininfo' => $gbininfo, 'cookie' => $cookie };
+  return $metadata;
+}
 
-sub get_gbininfo {
-  my ($repo) = @_;
-  my $url = $repo->{'url'};
-  die("bad repo\n") unless $url;
+#
+# Get artifact data for a remote repository
+#
+sub fetch_gbininfo {
+  my ($arch, $repodir, $url, $opts) = @_;
+  die("get_gbininfo: need an url\n") unless $url;
   die("get_gbininfo is not supported for $url\n") unless $url =~ /^obs:/;
-  my $repodir = $repo->{'dir'};
-  my $oldgbininfo = PBuild::Util::retrieve("$repodir/_gbininfo", 1);
-  my $oldcookie = $oldgbininfo ? delete $oldgbininfo->{'.cookie'} : undef;
-  return $oldgbininfo if $oldgbininfo && $repo->{'no-repo-refresh'};
-  my $cookie = PBuild::OBS::fetch_gbininfo_cookie($url, $repo->{'arch'}, { 'obs' => $repo->{'obs'} });
-  if ($oldgbininfo && $oldcookie && $cookie && $oldcookie eq $cookie) {
-    return $oldgbininfo if replace_with_local_gbininfo($repodir, $oldgbininfo);
-    undef $oldgbininfo;
+  my $repotype = 'obs';
+  # read old meta data
+  my $oldmetadata = (-s "$repodir/_gbininfo") ? PBuild::Util::retrieve("$repodir/_gbininfo", 1) : undef;
+  undef $oldmetadata unless $oldmetadata && ref($oldmetadata) eq 'HASH' && $oldmetadata->{'gbininfo'};
+  $oldmetadata = undef if $oldmetadata && !replace_with_local_gbininfo($repodir, $oldmetadata->{'gbininfo'});
+  if ($oldmetadata && $opts->{'no-repo-refresh'}) {
+    my $meta = { 'metadata' => $oldmetadata, 'repodir' => $repodir, 'url' => $url, 'repotype' => $repotype};
+    return ($oldmetadata->{'gbininfo'}, $meta);
   }
-  my $gbininfo = PBuild::OBS::fetch_gbininfo($url, $repo->{'arch'}, { 'obs' => $repo->{'obs'} });
-  replace_with_local_gbininfo($repodir, $gbininfo, $oldgbininfo) || die("replace_with_local_gbininfo failed\n");
-  $gbininfo->{'.cookie'} = $cookie if $cookie;
-  PBuild::Util::store("$repodir/._gbininfo.$$", "$repodir/_gbininfo", $gbininfo);
-  delete $gbininfo->{'.cookie'};
-  return $gbininfo;
+  # fetch new meta data
+  my %opts = ('arch' => $arch, 'oldmetadata' => $oldmetadata, 'opts' => $opts);
+  my $metadata;
+  if ($repotype eq 'obs') {
+    $metadata = fetch_gbininfo_obs($url, %opts);
+  } else {
+    die("unsupported repotype '$repotype'\n");
+  }
+  die unless $metadata->{'gbininfo'};
+  # replace local packages
+  if (!($oldmetadata && $metadata == $oldmetadata)) {
+    my $oldgbininfo = ($oldmetadata || {})->{'gbininfo'};
+    replace_with_local_gbininfo($repodir, $metadata->{'gbininfo'}, $oldgbininfo) || die("replace_with_local_gbininfo failed\n");
+  }
+  # store new meta data
+  my $meta = { 'metadata' => $metadata, 'repodir' => $repodir, 'url' => $url, 'repotype' => $repotype};
+  PBuild::Util::store("$repodir/._gbininfo.$$", "$repodir/_gbininfo", $meta->{'metadata'});
+  return ($metadata->{'gbininfo'}, $meta);
 }
 
 1;
