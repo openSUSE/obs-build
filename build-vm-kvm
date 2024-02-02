@@ -232,9 +232,6 @@ vm_verify_options_kvm() {
 	    fi
 	fi
     fi
-    if ! test -r "$vm_initrd" ; then
-	cleanup_and_exit 4 "Initrd file $vm_initrd is not readable."
-    fi
 
     case $kvm_device in
 	virtio*)
@@ -310,6 +307,9 @@ kvm_add_console_args() {
 }
 
 vm_startup_kvm() {
+    if ! test -r "$vm_initrd" ; then
+	cleanup_and_exit 4 "Initrd file $vm_initrd is not readable."
+    fi
     qemu_bin="$kvm_bin"
     qemu_args=("$@" -drive file="$VM_ROOT",format=raw,if=none,id=disk,$kvm_drive_opts -device "$kvm_device$kvm_device_opts",drive=disk,serial=0)
     if [ -n "$VM_USER" ] ; then
