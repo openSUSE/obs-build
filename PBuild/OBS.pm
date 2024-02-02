@@ -387,7 +387,7 @@ sub fetch_gbininfo {
   my $packagebinaryversionlist = PBuild::Structured::fromxml($data, $dtd_packagebinaryversionlist, 0, 1);
   my $gbininfo = {};
   for my $binaryversionlist (@{$packagebinaryversionlist->{'binaryversionlist'} || []}) {
-    my $location = "${baseurl}build/$prp/$arch/$binaryversionlist->{'package'}/";
+    my $location = "${baseurl}build/$prp/$arch/".PBuild::Util::urlencode("$binaryversionlist->{'package'}/");
     my %bins;
     for my $binary (@{$binaryversionlist->{'binary'} || []}) {
       my $filename = $binary->{'name'};
@@ -407,7 +407,11 @@ sub fetch_gbininfo {
       $bin->{'hdrmd5'} = $binary->{'hdrmd5'} if $binary->{'hdrmd5'};
       $bin->{'leadsigmd5'} = $binary->{'leadsigmd5'} if $binary->{'leadsigmd5'};
       $bin->{'md5sum'} = $binary->{'md5sum'} if $binary->{'md5sum'};
-      $bin->{'location'} = $location . $filename;
+      if ($filename =~ /([\000-\040<>;\"#\?&\+=%[\177-\377])/s) {
+        $bin->{'location'} = $location . PBuild::Util::urlencode($filename);
+      } else {
+        $bin->{'location'} = $location . $filename;
+      }
       $bins{$filename} = $bin;
     }
     $gbininfo->{$binaryversionlist->{'package'}} = \%bins;
@@ -435,33 +439,24 @@ sub fetch_gbininfo_cookie {
 }
 
 sub fetch_productbinaries_cpioextract {
-  my ($ent, $xfile, $repodir, $packid, $files) = @_;
+  my ($ent, $xfile, $repodir, $packid, $files, $callback) = @_;
   return undef unless $ent->{'cpiotype'} == 8;
   my $name = $ent->{'name'};
-  PBuild::Verify::verify_filename("$packid-$name");
-  my $tmpname = "$repodir/.$$.$packid-$name";
+  my $binname = "$packid-$name";
+  PBuild::Verify::verify_filename($binname);
+  my $tmpname = ".$$.$binname";
   if (!defined($xfile)) {
     return undef unless $files->{$name};
-    return $tmpname;	# ok, extract this one!
+    return "$repodir/$tmpname";		# ok, extract this one!
   }
   my $bin = $files->{$name};
-  die unless $bin;
-  if ($bin->{'md5sum'}) {
-    Build::Download::checkfiledigest($tmpname, "md5:$bin->{'md5sum'}");
-  } elsif ($bin->{'hdrmd5'} || $bin->{'leadsigmd5'}) {
-    my $leadsigmd5;
-    my $hdrmd5 = Build::Rpm::queryhdrmd5($tmpname, \$leadsigmd5);
-    die("downloaded binary does not match hdrmd5\n") if $bin->{'hdrmd5'} && $bin->{'hdrmd5'} ne ($hdrmd5 || '');
-    die("downloaded binary does not match leadsigmd5\n") if $bin->{'leadsigmd5'} && $bin->{'leadsigmd5'} ne ($leadsigmd5 || '');
-  }
-  rename($tmpname, "$repodir/_gbins/$packid-$name") || die("rename $tmpname $repodir/_gbins/$packid-$name: $!\n");
-  die unless ($bin->{'package'} || '') eq $packid;
-  $bin->{'filename'} = "$packid-$name";
-  return undef;	# continue extracting
+  die unless $bin && ($bin->{'package'} || '') eq $packid;
+  $callback->($repodir, $tmpname, $binname, $bin);
+  return undef;		# continue extracting
 }
 
 sub fetch_productbinaries {
-  my ($url, $repodir, $bins) = @_;
+  my ($url, $repodir, $bins, $callback) = @_;
   # group by package
   my %packages;
   my $location;
@@ -469,12 +464,10 @@ sub fetch_productbinaries {
     my $l = $bin->{'location'};
     die("fetch_productbinaries: missing location\n") unless $l;
     die("fetch_productbinaries: bad location $l\n")  unless $l =~ /^(.+)\/([^\/]+)\/([^\/]+)$/;
-    die("fetch_productbinaries: package mismatch$l\n")  unless $2 eq $bin->{'package'};
     $location = $1 unless defined $location;
     die("fetch_productbinaries: location conflict\n") unless $1 eq $location;
-    $packages{$2}->{$3} = $bin;
+    $packages{$bin->{'package'}}->{$bin->{'fn'}} = $bin;
   }
-  PBuild::Util::mkdir_p("$repodir/_gbins");
   my $ua = create_ua();
   for my $packid (sort keys %packages) {
     my $files = $packages{$packid};
@@ -484,9 +477,10 @@ sub fetch_productbinaries {
     $requrl .= "&binary=".PBuild::Util::urlencode($_, 1) for sort keys %$files;
     my $tmpcpio = "$repodir/.$$.binaries.cpio";
     Build::Download::download($requrl, $tmpcpio, undef, 'ua' => $ua, 'retry' => 3);
-    PBuild::Cpio::cpio_extract($tmpcpio, sub {fetch_productbinaries_cpioextract($_[0], $_[1], $repodir, $packid, $files)});
+    PBuild::Cpio::cpio_extract($tmpcpio, sub {fetch_productbinaries_cpioextract($_[0], $_[1], $repodir, $packid, $files, $callback)});
     unlink($tmpcpio);
   }
+  return $ua;
 }
 
 1;

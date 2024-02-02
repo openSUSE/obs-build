@@ -436,6 +436,8 @@ sub is_matching_binary {
   return 0 if $b1->{'version'} ne $b2->{'version'};
   return 0 if ($b1->{'epoch'} || 0) ne ($b2->{'epoch'} || 0);
   return 0 if (defined $b1->{'release'} ? $b1->{'release'} : '__undef__') ne (defined $b2->{'release'} ? $b2->{'release'} : '__undef__');
+  return 0 if $b1->{'hdrmd5'} && $b2->{'hdrmd5'} && $b1->{'hdrmd5'} ne $b2->{'hdrmd5'};
+  return 0 if $b1->{'leadsigmd5'} && $b2->{'leadsigmd5'} && $b1->{'leadsigmd5'} ne $b2->{'leadsigmd5'};
   return 1;
 }
 
@@ -532,14 +534,58 @@ sub fetchbinaries {
 }
 
 #
+# Check if the downloaded binary matches and set the local filename
+#
+sub fetchproductbinaries_replace {
+  my ($repodir, $tmpname, $binname, $bin) = @_;
+  Build::Download::checkfiledigest("$repodir/$tmpname", $bin->{'checksum'}) if $bin->{'checksum'};
+  if ($bin->{'md5sum'}) {
+    Build::Download::checkfiledigest("$repodir/$tmpname", $bin->{'checksum'}) if "md5:$bin->{'md5sum'}";
+  } elsif ($bin->{'hdrmd5'}) {
+    my $leadsigmd5;
+    my $hdrmd5 = Build::queryhdrmd5("$repodir/$tmpname", \$leadsigmd5);
+    die("downloaded product binary $binname does not match repository metadata (hdrmd5)\n") unless ($hdrmd5 || '') eq $bin->{'hdrmd5'};
+    die("downloaded product binary $binname does not match repository metadata (leadsigmd5)\n") unless !$bin->{'leadsigmd5'} || ($leadsigmd5 || '') eq $bin->{'leadsigmd5'};
+  }
+  PBuild::Verify::verify_filename($binname);
+  rename("$repodir/$tmpname", "$repodir/_gbins/$binname") || die("rename $repodir/$tmpname $repodir/_gbins/$binname: $!\n");
+  $bin->{'filename'} = $binname;
+}
+
+#
 # Download missing gbininfo product binaries from a remote repository
 #
 sub fetchproductbinaries {
   my ($meta, $bins) = @_;
   my $repodir = $meta->{'repodir'};
   print "fetching ".PBuild::Util::plural(scalar(@$bins), 'product binary')." from $meta->{'url'}\n";
-  die("unsupported repo type $meta->{'repotype'}\n") unless $meta->{'repotype'} eq 'obs';
-  PBuild::OBS::fetch_productbinaries($meta->{'url'}, $repodir, $bins);
+  my $repodir = $meta->{'repodir'};
+  PBuild::Util::mkdir_p("$repodir/_gbins");
+  my $ua;
+  $ua = PBuild::OBS::fetch_productbinaries($meta->{'url'}, $repodir, $bins, \&fetchproductbinaries_replace);
+  for my $bin (@$bins) {
+    next if $bin->{'filename'};
+    my $location = $bin->{'location'};
+    die("missing location for binary $bin->{'name'}\n") unless $location;
+    die("bad location: $location\n") unless $location =~ /^(?:https?|zypp):\/\//;
+    my $packid = $bin->{'package'};
+    my $fn = $bin->{'fn'};
+    die unless $packid && $fn;
+    my $binname = "$packid-$fn";
+    PBuild::Verify::verify_filename($binname);
+    my $tmpname = ".$$.$binname";
+    $ua ||= Build::Download::create_ua();
+    download($location, "$repodir/$tmpname", undef, undef, $ua);
+    fetchproductbinaries_replace($repodir, $tmpname, $binname, $bin);
+  }
+  # copy filename into real gbininfo as we clone the bininfo in the Checker
+  my $gbininfo = $meta->{'metadata'}->{'gbininfo'};
+  for my $bin (@{$bins}) {
+    next unless $bin->{'filename'} && $bin->{'fn'} && $bin->{'package'};
+    my $bininfo = $gbininfo->{$bin->{'package'}};
+    die unless $bininfo && $bininfo->{$bin->{'fn'}};
+    $bininfo->{$bin->{'fn'}}->{'filename'} = $bin->{'filename'};
+  }
   # updata meta data
   PBuild::Util::store("$repodir/._gbininfo.$$", "$repodir/_gbininfo", $meta->{'metadata'});
 }
