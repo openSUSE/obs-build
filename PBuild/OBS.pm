@@ -324,7 +324,7 @@ sub fetch_binaries {
   while (@names) {
     my @nchunk = splice(@names, 0, 100);
     my $chunkurl = "$url/_repository?view=cpio";
-    $chunkurl .= "&binary=".PBuild::Util::urlencode($_) for @nchunk;
+    $chunkurl .= "&binary=".PBuild::Util::urlencode($_, 1) for @nchunk;
     my $tmpcpio = "$repodir/.$$.binaries.cpio";
     Build::Download::download($chunkurl, $tmpcpio, undef, 'ua' => $ua, 'retry' => 3);
     PBuild::Cpio::cpio_extract($tmpcpio, sub {fetch_binaries_cpioextract($_[0], $_[1], $repodir, $names, $callback)});
@@ -345,7 +345,7 @@ sub fetch_repodata {
   my $baseurl = $opts->{'obs'};
   $baseurl .= '/' unless $baseurl =~ /\/$/;
   my $requrl .= "${baseurl}build/$prp/$arch/_repository?view=cache";
-  $requrl .= "&module=".PBuild::Util::urlencode($_) for @{$modules || []};
+  $requrl .= "&module=".PBuild::Util::urlencode($_, 1) for @{$modules || []};
   my $ua = create_ua();
   Build::Download::download($requrl, "$tmpdir/repository.cpio", undef, 'ua' => $ua, 'retry' => 3);
   unlink("$tmpdir/repository.data");
@@ -482,10 +482,7 @@ sub fetch_productbinaries {
     my %files;
     my $requrl .= "$location/$packid?view=cpio";
     for (@{$packages{$packid}}) {
-      my $fn = $_->[0];
-      $fn =~ s/([\000-\037<>;\"#\?&\+=%[\177-\377])/sprintf("%%%02X",ord($1))/sge;
-      $fn =~ tr/ /+/;
-      $requrl .= "&binary=$fn";
+      $requrl .= "&binary=".PBuild::Util::urlencode($_->[0], 1);
       $files{$_->[0]} = $_->[1];
     }
     die unless %files;
