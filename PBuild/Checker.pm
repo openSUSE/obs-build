@@ -322,17 +322,17 @@ sub genmeta_product {
   my @new_meta;
   for my $bin (@$edeps) {
     die("bad binary in genmeta_product (not a hash)\n") unless ref($bin) eq 'HASH';
-    my $name = $bin->{'filename'};
     my $package = $bin->{'packid'};
+    my $fn = $bin->{'filename'};
     if (!$package) {
-      die("bad binary in genmeta_product (bad location)\n") unless $bin->{'location'} =~ /\/([^\/]+)\/([^\/]+)$/;
-      $package = $1;
-      $name = $2;
+      die("bad binary in genmeta_product (bad data)\n") unless $bin->{'package'} && $bin->{'fn'};
+      $package = $bin->{'package'};
+      $fn = $bin->{'fn'};
     }
     if ($bin->{'hdrmd5'}) {
-      push @new_meta, "$bin->{'hdrmd5'}  $package/$name";
+      push @new_meta, "$bin->{'hdrmd5'}  $package/$fn";
     } elsif ($bin->{'md5sum'}) {
-      push @new_meta, "$bin->{'md5sum'}  $package/$name";
+      push @new_meta, "$bin->{'md5sum'}  $package/$fn";
     } else {
       die("bad binary in genmeta_product (no hrdmd5/md5sum)\n");
     }

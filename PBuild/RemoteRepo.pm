@@ -562,7 +562,7 @@ sub fetchproductbinaries {
   my $repodir = $meta->{'repodir'};
   PBuild::Util::mkdir_p("$repodir/_gbins");
   my $ua;
-  $ua = PBuild::OBS::fetch_productbinaries($meta->{'url'}, $repodir, $bins, \&fetchproductbinaries_replace);
+  $ua = PBuild::OBS::fetch_productbinaries($meta->{'url'}, $meta->{'arch'}, $meta->{'opts'}, $repodir, $bins, \&fetchproductbinaries_replace);
   for my $bin (@$bins) {
     next if $bin->{'filename'};
     my $location = $bin->{'location'};
@@ -687,7 +687,7 @@ sub fetch_gbininfo {
   undef $oldmetadata unless $oldmetadata && ref($oldmetadata) eq 'HASH' && $oldmetadata->{'gbininfo'};
   $oldmetadata = undef if $oldmetadata && !replace_with_local_gbininfo($repodir, $oldmetadata->{'gbininfo'});
   if ($oldmetadata && $opts->{'no-repo-refresh'}) {
-    my $meta = { 'metadata' => $oldmetadata, 'repodir' => $repodir, 'url' => $url, 'repotype' => $repotype};
+    my $meta = { 'metadata' => $oldmetadata, 'repodir' => $repodir, 'url' => $url, 'repotype' => $repotype, 'arch' => $arch, 'opts' => $opts};
     return ($oldmetadata->{'gbininfo'}, $meta);
   }
   # fetch new meta data
@@ -705,7 +705,7 @@ sub fetch_gbininfo {
     replace_with_local_gbininfo($repodir, $metadata->{'gbininfo'}, $oldgbininfo) || die("replace_with_local_gbininfo failed\n");
   }
   # store new meta data
-  my $meta = { 'metadata' => $metadata, 'repodir' => $repodir, 'url' => $url, 'repotype' => $repotype};
+  my $meta = { 'metadata' => $metadata, 'repodir' => $repodir, 'url' => $url, 'repotype' => $repotype, 'arch' => $arch, 'opts' => $opts};
   PBuild::Util::store("$repodir/._gbininfo.$$", "$repodir/_gbininfo", $meta->{'metadata'});
   return ($metadata->{'gbininfo'}, $meta);
 }
