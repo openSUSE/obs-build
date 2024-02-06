@@ -30,7 +30,7 @@ RPM_BUILD_IN_PLACE=
 RPM_RECIPE_IN_SUBDIR=
 RPM_NOPREP=
 BUILD_CHANGELOG_TIMESTAMP=
-VCSURL=
+BUILD_VCSURL=
 
 for i in spec dsc kiwi productcompose arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild appimage docker podman fissile helm flatpak mkosi; do
     . "$BUILD_DIR/build-recipe-$i"
@@ -105,7 +105,7 @@ recipe_parse_options() {
         ;;
       -vcs)
 	needarg
-	VCSURL="$ARG"
+	BUILD_VCSURL="$ARG"
 	shift
       ;;
       -*)

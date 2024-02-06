@@ -61,6 +61,12 @@ recipe_build_productcompose() {
     if test -n "$BUILD_FLAVOR" ; then
 	extra_args=" $extra_args --flavor $BUILD_FLAVOR"
     fi
+    if test -n "$DISTURL" ; then
+	extra_args=" $extra_args --disturl $DISTURL"
+    fi
+    if test -n "$BUILD_VCSURL" ; then
+	extra_args=" $extra_args --vcs $BUILD_VCSURL"
+    fi
     chroot "$BUILD_ROOT" su -c "/usr/bin/product-composer build $extra_args -v --clean $TOPDIR/SOURCES/$RECIPEFILE $TOPDIR/PRODUCT" - abuild < /dev/null && BUILD_SUCCEEDED=true
     pushd "$BUILD_ROOT/$TOPDIR/PRODUCT"
     for i in * ; do
