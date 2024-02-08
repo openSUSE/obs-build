@@ -156,7 +156,6 @@ sub parse_suse {
     $tdt = str2time("$year-1-1");
   }
   $tdt += 12 * 3600 unless $dt =~ /\d:\d/;	# 12:00 if not specified
-  $tdt += ($zone || 0);
   my $ok = 1;
   my $change = '';
   while(<>) {
@@ -267,6 +266,8 @@ while(defined($_)) {
   }
   $first_timestamp = $t unless defined $first_timestamp;
   $lastt = $t;
+  # convert to time zone of first entry unless we want full UTC timestamps
+  $t += $zone if !$fulltimestamps && $zone;
   my @gm = gmtime($t);
   # silly rpm can't hande dates < 1997, so we fold everything to
   # Thu Jan 02 1997
