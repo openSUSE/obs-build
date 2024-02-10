@@ -92,7 +92,7 @@ while(<S>)
 
     if ($in_prep
         && /^%auto(patch|setup)\b/) {
-        $autopatch = 1;
+        $autopatch = 1 unless /%autosetup.+-N/;
     }
     if ($in_prep
         && /^%setup\b/) {
