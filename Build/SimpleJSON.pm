@@ -51,7 +51,7 @@ my %specialescapes = (
 
 sub unparse_string {
   my ($d) = @_;
-  $d =~ s/([\"\\\000-\037])/$specialescapes{$1} || sprintf('\\u%04d', ord($1))/ge;
+  $d =~ s/([\"\\\000-\037])/$specialescapes{$1} || sprintf('\\u%04x', ord($1))/ge;
   return "\"$d\"";
 }
 
