@@ -20,7 +20,3 @@ build_arch %_build_arch
 %files
 %_libdir/libdummy.so.1
 
-%changelog
-* Mon Feb 19 2024 Dominique Leuenberger <dimstar@opensuse.org>
-- No information provided here - we needed a dated entry for
-  RPM/reproducible builds

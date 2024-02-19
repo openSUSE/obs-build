@@ -1,0 +1,6 @@
+-------------------------------------------------------------------
+Mon Feb 19 08:31:23 UTC 2024 - openSUSE <packaging@lists.opensuse.org>
+
+- package for testing, this entry is needed for reproducible builds to extract
+  SOURCE_DATE_EPOCH, date may be incorrect as this file might not be updated
+

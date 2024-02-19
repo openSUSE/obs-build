@@ -101,6 +101,7 @@ run_build()
 	set -- $linux32 $SU_WRAPPER \
 		$BUILD_DIR/build \
 		--root "${build_root}" \
+		--changelog --release 5.23 \
 		"${repos[@]}" \
 		"${build_args[@]}"
 	echo "$@"
