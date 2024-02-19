@@ -557,7 +557,6 @@ sub fetchproductbinaries_replace {
 #
 sub fetchproductbinaries {
   my ($meta, $bins) = @_;
-  my $repodir = $meta->{'repodir'};
   print "fetching ".PBuild::Util::plural(scalar(@$bins), 'product binary')." from $meta->{'url'}\n";
   my $repodir = $meta->{'repodir'};
   PBuild::Util::mkdir_p("$repodir/_gbins");
