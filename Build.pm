@@ -250,7 +250,8 @@ sub init_helper_hashes {
   for (@{$config->{'conflict'}}) {
     my @s = split(/[,:]/, $_);
     my $s = shift @s;
-    push @{$conflicts{$s}}, @s;
+    push @{$conflicts{':'}}, $s if $s && !@s;
+    push @{$conflicts{$s}}, @s if @s;
     push @{$conflicts{$_}}, $s for @s;
   }
   for (keys %conflicts) {

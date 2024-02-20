@@ -429,6 +429,9 @@ sub expand {
   my %aconflicts;	# packages we are conflicting with
   my @native;
 
+  # handle conflicts from the project config
+  push @{$aconflicts{$_}}, "is in conflict" for @{$conflicts->{':'} || []};
+
   # handle direct conflicts
   for (grep {/^!/} @p) {
     my $r = /^!!/ ? substr($_, 2) : substr($_, 1);

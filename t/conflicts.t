@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 13;
+use Test::More tests => 15;
 
 require 't/testlib.pm';
 
@@ -28,9 +28,12 @@ P: l = 1-1
 R: b d
 P: m = 1-1
 C: m
+P: x = 1-1
+P: y = 1-1
+R: x
 EOR
 
-my $config = setuptest($repo, "Conflict: i:j");
+my $config = setuptest($repo, "Conflict: i:j\nConflict: x");
 my @r;
 
 # test that conflicts can fix choices
@@ -76,3 +79,9 @@ is_deeply(\@r, [undef, 'd conflicts with b'], 'install l');
 
 @r = expand($config, 'm');
 is_deeply(\@r, [1, 'm'], 'install m');
+
+@r = expand($config, 'x');
+is_deeply(\@r, [undef, 'x is in conflict'], 'install x');
+
+@r = expand($config, 'y');
+is_deeply(\@r, [undef, '(provider x is in conflict)', 'conflict for providers of x needed by y'], 'install y');
