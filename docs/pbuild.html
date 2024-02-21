@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
-<meta name="generator" content="AsciiDoc 10.2.0" />
+<meta name="generator" content="AsciiDoc" />
 <title>pbuild Reference Guide</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
@@ -1057,63 +1057,78 @@ with the "--assets" option.</p></div>
 <div class="sect1">
 <h2 id="_about_the_build_configuration">3. About the Build Configuration</h2>
 <div class="sectionbody">
-<div class="paragraph"><p>The build configuration syntax is</p></div>
-<div class="paragraph"><p>Switch on or off certain features during the build.</p></div>
-<div class="paragraph"><p>Decide which package is installed during build if there are circular
-dependencies.</p></div>
-<div class="paragraph"><p>Handle user decisions like package providing the same or special macros,
-packages, or flags in the build environment.</p></div>
+<div class="paragraph"><p>The build configuration syntax describes the build environment
+used for building packages. It is used to:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+Switch on or off certain features during the build
+</p>
+</li>
+<li>
+<p>
+Decide which packages are installed during build
+</p>
+</li>
+<li>
+<p>
+Resolve dependency problems like when there are multiple providers
+for a dependency
+</p>
+</li>
+<li>
+<p>
+Handle user decisions like macro settings
+</p>
+</li>
+</ul></div>
 <div class="sect2">
 <h3 id="_configuration_file_syntax">3.1. Configuration File Syntax</h3>
-<div class="paragraph"><p>The syntax is basically the same than in RPM spec files. However, it is
-independent of the used packaging format. The project configuration is
-parsed by &obsa;. This means, you can use RPM features like macros or
-conditions in the configuration. All lines have the form:</p></div>
-<div class="paragraph"><p>keyword: arguments</p></div>
-<div class="paragraph"><p>In addition to that rpm macro statement can get used, for example
-to activate some rules only for specific architectures via conditions.</p></div>
-<div class="paragraph"><p>The following list contains a list of allowed keywords in the project
-configuration:</p></div>
-<div class="paragraph"><p>Available Keywords in Project Configuration</p></div>
-<div class="sect3">
-<h4 id="_binarytype_type">3.1.1. BinaryType: TYPE</h4>
-<div class="paragraph"><p>The binary type is the format of the files which will be the result of
-the build jobs. This gets usually set depending on the build recipe
-type. In some situations, for example a &kiwi; build job result gets
-converted into an rpm, it can be used to overwrite it. Possible values
-are: rpm, deb or none.</p></div>
-<div class="paragraph"><p>Sets the binary format used to set up the build environment. For example
-a package with spec build description may use and generate deb packages
-instead of RPMs. If no binary type is specified, OBS deduces it from the
-build recipe type. If the recipe type is also not set, OBS looks at the
-Preinstall package list for a hint.</p></div>
-</div>
-<div class="sect3">
-<h4 id="_buildengine_engine">3.1.2. BuildEngine: ENGINE</h4>
-<div class="paragraph"><p>Use an alternative build engine. This is still chained inside of the
-build script for security reasons. Alternatives are mock (for Fedora and
-Red Hat) and debootstrap (for Debian). This will avoid differences in
-the build environment setup, but it will also have an effect on speed
-and reduced features. It should only be used when you want to emulate
-the distribution build. debbuild engine will build deb files out of a
-spec file description. It can be used by the following definition inside
-of the project build config:</p></div>
+<div class="paragraph"><p>The syntax is basically the same as in RPM spec files. However, it is
+independent of the used packaging format. You can use spec file
+features like macros or conditions in the configuration.</p></div>
+<div class="paragraph"><p>All lines have the form:</p></div>
 <div class="literalblock">
 <div class="content">
-<pre><code>Repotype: debian
-Type: spec
+<pre><code>keyword: arguments</code></pre>
+</div></div>
+<div class="paragraph"><p>Use <code>%if</code> or <code>%ifarch</code> if the line should only be used in some condition</p></div>
+<div class="paragraph"><p>Many keywords like <code>Require</code> or <code>BuildFlags</code> do not replace existing
+data, but add to it. This means you can have multiple <code>BuildFlags</code>
+lines instead of having one line with all the flags you need.</p></div>
+<div class="paragraph"><p>You can prepend an exclamation mark <code>!</code> to the argument to remove
+an existing entry from the data.</p></div>
+</div>
+<div class="sect2">
+<h3 id="_available_keywords_in_project_configuration">3.2. Available Keywords in Project Configuration</h3>
+<div class="paragraph"><p>The following list contains all the allowed keywords in the project
+configuration:</p></div>
+<div class="sect3">
+<h4 id="_binarytype_type">3.2.1. BinaryType: TYPE</h4>
+<div class="paragraph"><p>The binary type is the format of the packages that make up the build
+environment. This is usually set automatically depending on the recipe
+type and preinstall package list.
+Currently understood values are: <code>rpm</code>, <code>deb</code>, and <code>arch</code>.</p></div>
+</div>
+<div class="sect3">
+<h4 id="_buildengine_engine">3.2.2. BuildEngine: ENGINE</h4>
+<div class="paragraph"><p>Use an alternative build engine. Examples are <code>mock</code> (for Fedora and
+Red Hat) and <code>debootstrap</code> (for Debian), <code>debbuild</code> (to build debian
+packages with spec files), <code>podman</code> (container builds).</p></div>
+<div class="paragraph"><p>Here is an example config for <code>debbuild</code>:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>Type: spec
+Repotype: debian
 Binarytype: deb
 BuildEngine: debbuild
-Support: pax
-Support: debbuild
-Keep: debbuild</code></pre>
+Support: pax debbuild</code></pre>
 </div></div>
 </div>
 <div class="sect3">
-<h4 id="_buildflags_flag_value">3.1.3. BuildFlags: FLAG:VALUE</h4>
+<h4 id="_buildflags_flag_value">3.2.3. BuildFlags: FLAG:VALUE</h4>
 <div class="paragraph"><p>The BuildFlags keyword defines flags for the build process. The
-following values for FLAG are usable. All flags with a leading colon (:)
-require an additional parameter directly following them.</p></div>
+following values for FLAG are usable.</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
@@ -1122,7 +1137,7 @@ vmfstype:TYPE
 </li>
 </ul></div>
 <div class="paragraph"><p>Defines a specific file system when building inside of a VM. Possible
-values are ext2, ext3, ext4, btrfs, xfs, reiserfs (v3).</p></div>
+values are <code>ext2</code>, <code>ext3</code>, <code>ext4</code>, <code>btrfs</code>, <code>xfs</code>, <code>reiserfs</code> (v3).</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
@@ -1130,10 +1145,10 @@ vmfsoptions:OPTIONS
 </p>
 </li>
 </ul></div>
-<div class="paragraph"><p>There is also an option to disable directory indexing for ext2, ext3,
-and ext4 file systems. This makes file ordering inside of directories
-reproducible but may have a negative performance impact. To apply this,
-specify vmfsoptions:nodirindex</p></div>
+<div class="paragraph"><p>Sets options for file system creation. Currently only the <code>nodirindex</code>
+option is supported, which disables directory indexing for ext file
+systems. This makes file ordering inside of directories reproducible
+but may have a negative performance impact.</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
@@ -1141,7 +1156,7 @@ kiwiprofile:PROFILE
 </p>
 </li>
 </ul></div>
-<div class="paragraph"><p>builds the selected profile in &kiwi; appliance builds.</p></div>
+<div class="paragraph"><p>Selects the profiles to build in kiwi appliance builds.</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
@@ -1149,9 +1164,8 @@ logidlelimit:SECONDS
 </p>
 </li>
 </ul></div>
-<div class="paragraph"><p>Build jobs which don’t create any output get aborted after some time.
-This flag can be used to modify the limit. Specify the seconds behind
-flag.</p></div>
+<div class="paragraph"><p>Build jobs which do not create any output are aborted after some time.
+This flag can be used to modify the limit.</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
@@ -1159,8 +1173,9 @@ excludebuild:PACKAGE
 </p>
 </li>
 </ul></div>
-<div class="paragraph"><p>Exclude a package from building. _multibuild flavors can be specified
-via package:flavor syntax.</p></div>
+<div class="paragraph"><p>Exclude a package from building. If a package builds multiple flavors
+("multibuild"), the corresponding flavor can be specified via the
+<code>package:flavor</code> syntax.</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
@@ -1168,9 +1183,9 @@ onlybuild:PACKAGE
 </p>
 </li>
 </ul></div>
-<div class="paragraph"><p>DANGER: this may remove many build results when introduced the first
-time! It can be used to maintain a whitelist of packages to be built.
-All other packages will turn to excluded state.</p></div>
+<div class="paragraph"><p>This can be used to maintain a whitelist of packages to be built.
+All other packages will turn to excluded state (and the old build
+results will be erased!).</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
@@ -1178,7 +1193,7 @@ ccachetype:TYPE
 </p>
 </li>
 </ul></div>
-<div class="paragraph"><p>Defines the ccache implementation, possible values are: ccache, sccache</p></div>
+<div class="paragraph"><p>Defines the ccache implementation, possible values are: <code>ccache</code>, <code>sccache</code>.</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
@@ -1186,33 +1201,7 @@ useccache:PACKAGE
 </p>
 </li>
 </ul></div>
-<div class="paragraph"><p>Configure usage of ccache when building packages that match the value of
-this parameter. The ccache package will automatically be installed and
-configured. The directory /.ccache/ will be configured as cache
-directory. To configure ccache, the file /.ccache/ccache.conf can be
-modified as part of the build process by the $BUILD_USER environment
-variable.</p></div>
-<div class="paragraph"><p>In some cases, there is no archive for the current package, such as when
-the package was newly branched or when binaries were deleted. In these
-cases, &obs; will check whether there is a package of the same name
-built for the same architecture within one of the repositories
-configured in the project’s meta configuration. If so, the archive of
-that package will be used. The repositories will be searched in the
-order they are configured in the meta configuration, starting from the
-top.</p></div>
-<div class="paragraph"><p>An alternative way to enable caching based on build dependencies is to
-add "--enable-cache" as dependency, for example via a Substitute rule:</p></div>
-<div class="literalblock">
-<div class="content">
-<pre><code>Substitute: gcc-c++ gcc-c++ --enable-ccache</code></pre>
-</div></div>
-<div class="paragraph"><p>This will always enable ccache when a direct build depdency to gcc-c++
-is required.</p></div>
-<div class="paragraph"><p>It is also possible to set the type, eg:</p></div>
-<div class="literalblock">
-<div class="content">
-<pre><code>Substitute: cargo cargo --enable-ccache=sccache</code></pre>
-</div></div>
+<div class="paragraph"><p>Configure usage of ccache when building the specified package.</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
@@ -1221,7 +1210,7 @@ obsgendiff
 </li>
 </ul></div>
 <div class="paragraph"><p>OBS can run an external program that has access to the current build and
-the previously successful result, e.g. to generate a difference or a
+the previously successful result, e.g. to generate a difference or a
 changelog from the diff.</p></div>
 <div class="paragraph"><p>build will run all scripts in /usr/lib/build/obsgendiff.d/ on the build
 host (not in the %buildroot) when this flag is set. If one of the
@@ -1257,11 +1246,22 @@ container-compression-format:FORMAT
 </p>
 </li>
 </ul></div>
-<div class="paragraph"><p>Sets a compression format for container layers. Possible values are gzip, zstd,
-zstd:chunked. The usage of values beside gzip is only supported by podman and buildah.</p></div>
+<div class="paragraph"><p>Sets a compression format for container layers. Possible values are <code>gzip</code>, <code>zstd</code>,
+<code>zstd:chunked</code>. The usage of values other than gzip is only supported by the
+podman engine.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+container-build-format:FORMAT
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>For podman container builds, it specifies the container config format. Possible values
+are <em>docker</em> and <em>oci</em>. The default is <em>docker</em>. The <em>docker</em> format allows a few
+extensions like ONBUILD, SHELL, DOMAINNAME, COMMENT, HEALTHCHECK amongst others.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_constraint_selector_string">3.1.4. Constraint: SELECTOR STRING</h4>
+<h4 id="_constraint_selector_string">3.2.4. Constraint: SELECTOR STRING</h4>
 <div class="admonitionblock">
 <table><tr>
 <td class="icon">
@@ -1275,12 +1275,12 @@ colon-separated list which gets a string assigned. See the build job
 constraints page for details.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_expandflags_flag">3.1.5. ExpandFlags: FLAG</h4>
+<h4 id="_expandflags_flag">3.2.5. ExpandFlags: FLAG</h4>
 <div class="paragraph"><p>Flags which modify the behaviour during dependency resolution.</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
-unorderedimagerepos (OBS 2.10 or later)
+unorderedimagerepos
 </p>
 </li>
 </ul></div>
@@ -1308,62 +1308,83 @@ module:NAME-STREAM
 </li>
 </ul></div>
 <div class="paragraph"><p>Enable Red Hat-specific module support in repo md repositories. By
-default, modules are not used, but content can be made available by
-specifying the module name. To remove a module, add an exclamation mark
+default, no module is used, so every module needed needs to be
+specified in the configuration. To remove a module, add an exclamation mark
 (!) as prefix.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+docker-nobasepackages
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Do not put the require/support/preinstall packages in the repositories
+offered to the container build tool. This should have been the default.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+kiwi-nobasepackages
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Do not put the require/support/preinstall packages in the repositories
+offered to the kiwi build tool. This should have been the default.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_exportfilter_regex_arch">3.1.6. ExportFilter: REGEX ARCH</h4>
+<h4 id="_exportfilter_regex_architectures">3.2.6. ExportFilter: REGEX ARCHITECTURES</h4>
 <div class="paragraph"><p>The export filter can be used to export build results from one
 architecture to others. This is required when one architecture needs
 packages from another architecture for building. The REGEX placeholder
 must match the resulting binary name of the package. It will export it
-to all listed scheduler architectures. Using a single dot will export it
-to the architecture which was used to build it. So not using a dot there
-will filter the package.</p></div>
+to all listed scheduler architectures. Exported packages are not
+used in the built architecture by default, add a <code>.</code> pseudo architecture
+to also use them locally.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_fileprovides_file_packages">3.1.7. FileProvides: FILE PACKAGES</h4>
-<div class="paragraph"><p>&obsa; ignores dependencies to files (instead of package names) by
-default. This is mostly done to reduce the amount of memory needed, as
-the package file lists take up a considerable amount of repository meta
-data. As a workaround, FileProvides can be used to tell the systems
-which packages contain a file. The File needs to have the full path.</p></div>
+<h4 id="_fileprovides_file_packages">3.2.7. FileProvides: FILE PACKAGES</h4>
+<div class="paragraph"><p>Due to memory consumption reasons dependencies to files as supported
+by rpm are ignored by default. As a workaround, FileProvides can be
+used to tell the systems which packages contain a file. The file needs
+to have the full path.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_hostarch_host_arch">3.1.8. HostArch: HOST_ARCH</h4>
+<h4 id="_hostarch_host_arch">3.2.8. HostArch: HOST_ARCH</h4>
 <div class="paragraph"><p>This is used for cross builds. It defines the host architecture used for
 building, while the scheduler architecture remains the target
 architecture.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_ignore_packages">3.1.9. Ignore: PACKAGES</h4>
+<h4 id="_ignore_package_or_dependency">3.2.9. Ignore: PACKAGE_OR_DEPENDENCY</h4>
 <div class="paragraph"><p>Ignore can be used to break dependencies. This can be useful to reduce
-the number of needed packages or to break cyclic dependencies. Be
-careful with this feature, as breaking dependencies can have surprising
-results.</p></div>
+the number of needed packages or to break cyclic dependencies. If a
+package is specified, all capabilities provided by the package are
+ignored.</p></div>
+<div class="paragraph"><p>Be careful with this feature as breaking dependencies can have unwanted
+results. It is usually better to limit its usage by also specify the
+originating package as described in the following section.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_ignore_package_a_packages">3.1.10. Ignore: PACKAGE_A:PACKAGES</h4>
-<div class="paragraph"><p>It is possible to define the ignore only for one package. This package
-must be listed first with a colon.</p></div>
+<h4 id="_ignore_origin_package_package_or_dependency">3.2.10. Ignore: ORIGIN_PACKAGE:PACKAGE_OR_DEPENDENCY</h4>
+<div class="paragraph"><p>Ignore a dependency coming from ORIGIN_PACKAGE. See the previous section
+for more details.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_keep_packages">3.1.11. Keep: PACKAGES</h4>
-<div class="paragraph"><p>To eliminate build cycles the to-be-built package is not installed by
-default, even when it is required. Keep can be used to overwrite this
-behavior. It is usually needed for packages like make that are used to
-build itself. Preinstalled packages are automatically kept, as the
-package installation program needs to work all the time.</p></div>
+<h4 id="_keep_packages">3.2.11. Keep: PACKAGES</h4>
+<div class="paragraph"><p>To eliminate build cycles the to-be-built packages are not installed by
+default. Keep can be used to overwrite this behavior. It is usually needed
+for packages like <code>make</code> that are used to build itself. Preinstalled
+packages are automatically kept, as the package installation program needs
+to work all the time.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_optflags_target_arch_flags_rpm_only">3.1.12. OptFlags: TARGET_ARCH FLAGS (RPM only)</h4>
-<div class="paragraph"><p>Optflags exports compiler flags to the build. They will only have an
-effect when the spec file is using $RPM_OPT_FLAGS. The target
-architecture may be * to affect all architectures.</p></div>
+<h4 id="_optflags_target_arch_flags_rpm_only">3.2.12. OptFlags: TARGET_ARCH FLAGS (RPM only)</h4>
+<div class="paragraph"><p>Optflags exports compiler flags to the build by adding lines to rpm&#8217;s
+<code>rpmrc</code> file. They will only have an effect when the spec file is using
+<code>$RPM_OPT_FLAGS</code> or <code>%{optflags}</code>. The target architecture may be set
+to <code>*</code> to affect all architectures.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_order_package_a_package_b">3.1.13. Order: PACKAGE_A:PACKAGE_B</h4>
+<h4 id="_order_package_a_package_b">3.2.13. Order: PACKAGE_A:PACKAGE_B</h4>
 <div class="paragraph"><p>The build script takes care about the installation order if they are
 defined via dependencies inside of the packages. However, there might be
 dependency loops (reported during setup of the build system) or missing
@@ -1373,34 +1394,36 @@ to break the loop.</p></div>
 PACKAGE_B.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_patterntype_types">3.1.14. Patterntype: TYPES</h4>
-<div class="paragraph"><p>Defines the pattern format. Valid values are: none (default), ymp,
-comps.</p></div>
+<h4 id="_patterntype_types">3.2.14. Patterntype: TYPES</h4>
+<div class="paragraph"><p>Defines the pattern format. Valid values are: <code>none</code> (default), <code>ymp</code>,
+<code>comps</code>.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_prefer_packages">3.1.15. Prefer: PACKAGES</h4>
-<div class="paragraph"><p>In case multiple packages satisfy a dependency, the OBS system will
-complain about that situation. This is unlike like most package managing
-tools, which just pick one of the package. Because one of OBS’ goal is
-to provide reproducible builds, it reports an error in this case instead
-of choosing a random package. The Prefer: tag lists packages to be
-preferred in case a choice exists. When the package name is prefixed
-with a dash, this is treated as a de-prefer.</p></div>
+<h4 id="_prefer_package">3.2.15. Prefer: PACKAGE</h4>
+<div class="paragraph"><p>In case multiple packages satisfy a dependency, the dependency expansion
+will fail. This is unlike like most package managing tools, which just
+pick one of the package. It is done that way to provide reproducible
+builds and reduce the chance of surprising changes when new packages
+are added to the repository.
+The Prefer: tag lists packages to be preferred in case a choice exists.
+When the package name is prefixed with a minus sign, it is treated
+as a de-prefer.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_prefer_package_a_packages">3.1.16. Prefer: PACKAGE_A:PACKAGES</h4>
-<div class="paragraph"><p>It is possible to define the prefer only when one package is creating
-the choice error. This package must be listed first with a colon.</p></div>
+<h4 id="_prefer_origin_package_package">3.2.16. Prefer: ORIGIN_PACKAGE:PACKAGE</h4>
+<div class="paragraph"><p>It is possible to define the prefer only when the dependency comes
+from the specified originating package.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_preinstall_packages">3.1.17. Preinstall: PACKAGES</h4>
-<div class="paragraph"><p>Are needed to run the package installation program. These packages get
-unpacked before the VM gets started. Included scripts are not executed
-during this phase. However, these packages will get installed again
-inside of the VM including script execution.</p></div>
+<h4 id="_preinstall_package">3.2.17. Preinstall: PACKAGE</h4>
+<div class="paragraph"><p>This is used to specify packages needed to run the package installation
+program. These packages are unpacked so that the native installation
+program can be used to install the build environment.
+Included scripts are not executed during this phase. However, these
+packages will be re-installed later on including script execution.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_publishflag_flag">3.1.18. PublishFlag: FLAG</h4>
+<h4 id="_publishflag_flag">3.2.18. PublishFlag: FLAG</h4>
 <div class="admonitionblock">
 <table><tr>
 <td class="icon">
@@ -1459,7 +1482,7 @@ is used by the installer to check if the repository is suitable for the
 installed distribution.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_publishfilter_regexp_regexp">3.1.19. PublishFilter: REGEXP [REGEXP]</h4>
+<h4 id="_publishfilter_regexp_regexp">3.2.19. PublishFilter: REGEXP [REGEXP]</h4>
 <div class="admonitionblock">
 <table><tr>
 <td class="icon">
@@ -1474,96 +1497,88 @@ There can be only one line of PublishFilter for historic reasons.
 However, multiple REGEXP can be defined.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_repotype_type_options">3.1.20. Repotype: TYPE[:OPTIONS]</h4>
+<h4 id="_repotype_type_options">3.2.20. Repotype: TYPE[:OPTIONS]</h4>
 <div class="paragraph"><p>Defines the repository format for published repositories. Valid values
-are: none, rpm-md, suse, debian, hdlist2, arch, staticlinks and vagrant.
+are: <code>none</code>, <code>rpm-md</code>, <code>suse</code>, <code>debian</code>, <code>hdlist2</code>, <code>arch</code>, <code>staticlinks</code>
+and vagrant.
 The OPTIONS parameter depends on the repository type, for rpm-md the
-known options are &#8216;legacy&#8217; to create the old rpm-md format, &#8216;deltainfo&#8217;
-or &#8216;prestodelta&#8217; to create delta rpm packages, &#8216;rsyncable&#8217; to use
+known options are <code>legacy</code> to create the old rpm-md format, <code>deltainfo</code>
+or <code>prestodelta</code> to create delta rpm packages, <code>rsyncable</code> to use
 rsyncable gzip compression. To split the debug packages in an own
-published repository the option splitdebug:REPOSITORY_SUFFIX can be
-appended, e.g.</p></div>
-</div>
-<div class="sect3">
-<h4 id="_repotype_rpm_md_splitdebug_debuginfo">3.1.21. Repotype: rpm-md splitdebug:-debuginfo</h4>
-<div class="paragraph"><p>(the repository format may even be omitted to use the default type).
-This results in a debuginfo package repository being created in parallel
+published repository the option <code>splitdebug:REPOSITORY_SUFFIX</code> can be
+appended, e.g.:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>Repotype: splitdebug:-debuginfo</code></pre>
+</div></div>
+<div class="paragraph"><p>This results in a debuginfo package repository being created in parallel
 to the package repository.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_required_packages">3.1.22. Required: PACKAGES</h4>
-<div class="paragraph"><p>Contain one or more packages that always get installed for package
-builds. A change in one of these packages triggers a new build.</p></div>
+<h4 id="_required_package">3.2.21. Required: PACKAGE</h4>
+<div class="paragraph"><p>Specify a package that always is installed for package builds.
+A change in one of these packages triggers a new build.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_runscripts_packages">3.1.23. Runscripts: PACKAGES</h4>
-<div class="paragraph"><p>Defines the scripts of preinstalled packages which needs to be executed
-directly after the preinstall phase, but before installing the remaining
-packages.</p></div>
+<h4 id="_runscripts_package">3.2.22. Runscripts: PACKAGE</h4>
+<div class="paragraph"><p>Execute the scriptlets of the specified preinstalled package. Scriptlet
+execution takes place after the preinstall phase, but before installing
+the remaining packages.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_substitute_package_a_packages">3.1.24. Substitute: PACKAGE_A PACKAGES</h4>
+<h4 id="_substitute_dependency_dependency_8230">3.2.23. Substitute: DEPENDENCY DEPENDENCY&#8230;</h4>
 <div class="paragraph"><p>It is possible to replace to BuildRequires with other packages. This
 will have only an effect on directly BuildRequired packages, not on
 indirectly required packages.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_support_packages">3.1.25. Support: PACKAGES</h4>
-<div class="paragraph"><p>Contain one or more packages which also get installed for package
-builds, but a change in one of the packages does not trigger an
+<h4 id="_support_package">3.2.24. Support: PACKAGE</h4>
+<div class="paragraph"><p>Specify a package that always is installed for package builds.
+Unlike <code>Required:</code>, a change in one of these packages does not trigger an
 automatic rebuild.</p></div>
 <div class="paragraph"><p>This is useful for packages that most likely do not influence the build
-result, for example make or coreutils.</p></div>
+result, for example <code>make</code> or <code>coreutils</code>.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_target_target_arch_rpm_only">3.1.26. Target: TARGET_ARCH (RPM only)</h4>
-<div class="paragraph"><p>Defines the target architecture. This can be used to build for i686 on
-i586 schedulers for example.</p></div>
-</div>
-<div class="sect3">
-<h4 id="_target_gnu_triplet_deb_only">3.1.27. Target: GNU_TRIPLET (DEB only)</h4>
+<h4 id="_target_gnu_triplet">3.2.25. Target: GNU_TRIPLET</h4>
 <div class="paragraph"><p>Defines the target architecture via a gnu triplet (not the debian
-architecture!). For example arm-linux-gnueabihf for armv7hl builds.</p></div>
+architecture!). For example <code>arm-linux-gnueabihf</code> for armv7hl builds,
+or <code>i686</code> for building i686 packages.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_type_type">3.1.28. Type: TYPE</h4>
+<h4 id="_type_type">3.2.26. Type: TYPE</h4>
 <div class="paragraph"><p>Build recipe type. This is the format of the file which provides the
-build description. This gets usually autodetected, but in some rare
-cases it can be set here to either one of these: spec, dsc, kiwi,
-livebuild, arch, preinstallimage.</p></div>
-<div class="paragraph"><p>Defines the build recipe format. Valid values are currently: none, spec,
-dsc, arch, kiwi, preinstallimage. If no type is specified, OBS deduces a
-type from the binary type.</p></div>
+build description (the "build recipe"). This is usually autodetected from
+the binary type, but in some rare cases it may be needed to manually
+configure the type. Currently the following types are understood:
+<code>spec</code>, <code>dsc</code>, <code>arch</code>, <code>kiwi</code>, <code>livebuild</code>, <code>productcompose</code>, <code>preinstallimage</code>.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_vminstall_packages">3.1.29. VMInstall: PACKAGES</h4>
+<h4 id="_vminstall_package">3.2.27. VMInstall: PACKAGE</h4>
 <div class="paragraph"><p>Like Preinstall, but these packages get only installed when a virtual
 machine like Xen or KVM is used for building. Usually packages like
-mount are listed here.</p></div>
+<code>mount</code> are listed here.</p></div>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_macros">3.2. Macros</h3>
-<div class="paragraph"><p>Macros are defined at the end of the project configuration. The macro
-section is only used on RPM builds.</p></div>
-<div class="paragraph"><p>The project configuration knows two possible definitions:</p></div>
-<div class="literalblock">
-<div class="content">
-<pre><code>%define Macro Definition</code></pre>
-</div></div>
-<div class="paragraph"><p>Starting with a %define line and are used in the project configuration
-only. These definitions are not available inside the build root.
-These are only needed when these macros are used elsewhere in the build
-config.</p></div>
+<h3 id="_macros_definitions_for_the_build_configuration">3.3. Macros Definitions for the build configuration</h3>
+<div class="paragraph"><p>You can use rpm macro definitions in the project config to improve
+configurability.
+Macros are defined with <code>%define</code> or <code>%global</code>. They are only known
+in the project configuration but not available when the build is
+done.</p></div>
 <div class="paragraph"><p>For example:</p></div>
 <div class="literalblock">
 <div class="content">
-<pre><code>%define _use_profiler 1
-%if 0%{?_use_profiler}
+<pre><code>%define _use_profiler 1</code></pre>
+</div></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>%if 0%{?_use_profiler}
 Require: gprof
 %endif</code></pre>
 </div></div>
-<div class="paragraph"><p>Another example doing it by architecture:</p></div>
+<div class="paragraph"><p>Another example limiting a line to an architecture:</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><code>%ifarch x86_64
@@ -1572,21 +1587,51 @@ Support: x86_64_only_package
 </div></div>
 </div>
 <div class="sect2">
-<h3 id="_macro_definitions">3.3. Macro Definitions</h3>
-<div class="paragraph"><p>Starting after the Macros: line and are exported into the .rpmmacros
-file of the build root. As such, these macro definitions can be used in
-a spec file.</p></div>
-<div class="paragraph"><p>For example, you can define</p></div>
-<div class="paragraph"><p>%define _with_pulseaudio 1</p></div>
-<div class="paragraph"><p>Macros Used in Spec Files Only</p></div>
-<div class="paragraph"><p>The macro definition in the project configuration is located at the end
-and has the following structure:</p></div>
-<div class="paragraph"><p>Structure of a Macro Definition</p></div>
-<div class="paragraph"><p>Macros:
+<h3 id="_macro_definitions_for_the_build_process">3.4. Macro Definitions for the build process</h3>
+<div class="paragraph"><p>To specify macros for the building process, use the <code>Macros:</code>
+keyword. All lines after <code>Macros:</code> up to the end of the config
+or to a <code>:Macros</code> line are used when parsing the spec file and
+also made available to the build by copying them to the <code>.rpmmacros</code>
+file in the build root.</p></div>
+<div class="paragraph"><p>Example:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>Macros:
 # add your macro definitions here
 %_hardened_build 0
-:Macros</p></div>
-<div class="paragraph"><p>Everything that starts with a hash mark (#) is considered a comment.</p></div>
+:Macros</code></pre>
+</div></div>
+</div>
+<div class="sect2">
+<h3 id="_building_with_ccache_or_sccache">3.5. Building with ccache or sccache</h3>
+<div class="paragraph"><p>The usage of ccache or sccache can be enabled for each package by
+seting the <code>useccache:PACKAGE</code> build flag.</p></div>
+<div class="paragraph"><p>The ccache package will automatically be installed and configured.
+The directory /.ccache/ will be configured as cache
+directory. To configure ccache, the file /.ccache/ccache.conf can be
+modified as part of the build process by the $BUILD_USER environment
+variable.</p></div>
+<div class="paragraph"><p>In some cases, there is no archive for the current package, such as when
+the package was newly branched or when binaries were deleted. In these
+cases, the system will check whether there is a package of the same name
+built for the same architecture within one of the repositories
+configured in the project&#8217;s meta configuration. If so, the archive of
+that package will be used. The repositories will be searched in the
+order they are configured in the meta configuration, starting from the
+top.</p></div>
+<div class="paragraph"><p>An alternative way to enable caching based on build dependencies is to
+add "--enable-cache" as dependency, for example via a Substitute rule:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>Substitute: gcc-c++ gcc-c++ --enable-ccache</code></pre>
+</div></div>
+<div class="paragraph"><p>This will always enable ccache when a direct build depdency to gcc-c++
+is required.</p></div>
+<div class="paragraph"><p>It is also possible to set the type, eg:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>Substitute: cargo cargo --enable-ccache=sccache</code></pre>
+</div></div>
 </div>
 </div>
 </div>
@@ -1609,11 +1654,11 @@ and has the following structure:</p></div>
 and one for the environment for the build result.</p></div>
 <div class="sect3">
 <h4 id="_terminology">4.4.1. Terminology</h4>
-<div class="paragraph"><p>The terminiology for this is unfortunatly not standarised and tools have conflicting
+<div class="paragraph"><p>The terminiology for this is unfortunatly not standarised and various tools have conflicting
 defintions.</p></div>
 <div class="paragraph"><p>We use the following</p></div>
 <div class="sect4">
-<h5 id="_host_the_architecture_build_environment_which_executes_the_for_example_the_compiler">Host: The architecture build environment which executes the for example the compiler.</h5>
+<h5 id="_host_native_the_architecture_build_environment_which_executes_the_for_example_the_compiler">Host Native: The architecture build environment which executes the for example the compiler.</h5>
 <div class="paragraph"><p>cmake is calling this HOST as well (eg. CMAKE_HOST_SYSTEM_PROCESSOR)</p></div>
 <div class="paragraph"><p>GNU tools (esp. the configure scripts generated by autoconf) is using BUILD as abbrevasion here</p></div>
 </div>
@@ -1641,7 +1686,7 @@ cellspacing="0" cellpadding="4">
 <col width="20%" />
 <tbody>
 <tr>
-<td align="left" valign="top"><p class="table">build</p></td>
+<td align="left" valign="top"><p class="table">pbuild</p></td>
 <td align="left" valign="top"><p class="table"></p></td>
 <td align="left" valign="top"><p class="table">host</p></td>
 <td align="left" valign="top"><p class="table">target</p></td>
@@ -1722,7 +1767,7 @@ In this case the base system for the target system can manually get configured v
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2023-04-26 15:27:12 CST
+ 2022-03-31 15:07:19 CEST
 </div>
 </div>
 </body>
