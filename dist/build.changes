@@ -1,4 +1,20 @@
 -------------------------------------------------------------------
+Wed Feb 21 11:55:13 UTC 2024 - Adrian Schröter <adrian@suse.de>
+
+- ProductCompose: multiple improvements
+- Add buildflags:define_specfile support
+- Fix copy-in of git subdirectory sources
+- pbuild: Speed up XML parsing
+- pubild: product compose support
+- generate_sbom: add help option
+- podman: enforce runtime=runc
+- Implement direct conflicts from the distro config
+- changelog2spec: fix time zone handling
+- Do not unmount /proc/sys/fs/binfmt_misc before runnint the check scripts
+- spec file cleanup
+- documentation updates
+
+-------------------------------------------------------------------
 Thu Jan 11 10:23:46 UTC 2024 - Adrian Schröter <adrian@suse.de>
 
 - productcompose:
