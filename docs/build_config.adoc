@@ -36,6 +36,11 @@ an existing entry from the data.
 The following list contains all the allowed keywords in the project
 configuration:
 
+==== AssetsURL: TYPE@URL
+
+Define a url for automatic asset downloading. Supported types
+are currently `fedpkg` and `goproxy`.
+
 ==== BinaryType: TYPE
 
 The binary type is the format of the packages that make up the build
@@ -142,6 +147,13 @@ For podman container builds, it specifies the container config format. Possible 
 are 'docker' and 'oci'. The default is 'docker'. The 'docker' format allows a few
 extensions like ONBUILD, SHELL, DOMAINNAME, COMMENT, HEALTHCHECK amongst others.
 
+==== Conflict: PACKAGE
+
+Specify that a package must not be installed in the build environment.
+
+==== Conflict: PACKAGE_A:PACKAGE_B
+
+Specify a synthetic conflict between to packages.
 
 ==== Constraint: SELECTOR STRING
 
@@ -150,6 +162,18 @@ CAUTION: OBS only
 Define build constraints for build jobs. The selector is a
 colon-separated list which gets a string assigned. See the build job
 constraints page for details.
+
+==== DistMacro: NAME VALUE
+
+Define a macro to be used when parsing the spec files of packages.
+This is similar to using a `Macros:` section with the difference
+that the macro will not be written to the .rpmmacros file. It should
+therefore be used for macros that come from packages of the
+distributions.
+
+Note that the lines of the project config are macro expanded while
+parsing, so you have to use `%%` for a literal percent sign in
+the value.
 
 ==== ExpandFlags: FLAG
 
@@ -234,6 +258,13 @@ for packages like `make` that are used to build itself. Preinstalled
 packages are automatically kept, as the package installation program needs
 to work all the time.
 
+==== Macros:
+
+Defines the start of a literal macros block. The block is ended
+by either reaching the end of the config or by a literal
+`Macros:` line. See the section about macro definitions below for
+more information.
+
 ==== OptFlags: TARGET_ARCH FLAGS (RPM only)
 
 Optflags exports compiler flags to the build by adding lines to rpm's
@@ -314,6 +345,13 @@ Defines the distversion to be used in group element of ymp files. This
 is used by the installer to check if the repository is suitable for the
 installed distribution.
 
+ * singleexport
+
+If multiple packages contain different versions of a rpm package, only
+publish the one from the first package. If the project is of the type
+`maintenance_release`, this will be the package with the highest
+incident number.
+
 ==== PublishFilter: REGEXP [REGEXP]
 
 CAUTION: OBS only
@@ -339,6 +377,16 @@ appended, e.g.:
 
 This results in a debuginfo package repository being created in parallel
 to the package repository.
+
+==== RegistryURL: URL
+
+Define a url for the downloading of containers.
+
+==== RepoURL: [TYPE@]URL
+
+Define a url for the downloading of repository packages. Supported types
+are currently `arch`, `debian`, `hdlist2`, `rpmmd`, `suse`. If the
+type is not specified, it is guessed from the build type.
 
 ==== Required: PACKAGE
 
@@ -422,6 +470,9 @@ Example:
     # add your macro definitions here
     %_hardened_build 0
     :Macros
+
+Note that the macro lines are copied verbatim, i.e. macro expansion
+does not take place.
 
 === Building with ccache or sccache
 
