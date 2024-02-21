@@ -857,7 +857,7 @@ copy_sources() {
 	    local ii="${i##*/}"
 	    test "$ii" = . -o "$ii" = .. -o "$ii" = .git && continue
 	    if test -L "$i" -o -d "$i" -o "${ii#.}" != "$ii" ; then
-		if test -e "$i/.build.asset" || git -C "$1" --noglob-pathspecs ls-files --error-unmatch -- "$ii" >& /dev/null ; then
+		if test -e "$i/.build.asset" || git -C "$1" --noglob-pathspecs -c safe.directory="$ii" ls-files --error-unmatch -- "$ii" >& /dev/null ; then
 		    cp -pRd "$i" "$2"
 		    continue
 		fi
