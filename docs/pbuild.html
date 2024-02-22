@@ -1104,7 +1104,7 @@ an existing entry from the data.</p></div>
 <div class="paragraph"><p>The following list contains all the allowed keywords in the project
 configuration:</p></div>
 <div class="sect3">
-<h4 id="_assetsurl_a_href_mailto_type_url_type_url_a">3.2.1. AssetsURL: <a href="mailto:TYPE@URL">TYPE@URL</a></h4>
+<h4 id="_assetsurl_type_url">3.2.1. AssetsURL: TYPE@URL</h4>
 <div class="paragraph"><p>Define a url for automatic asset downloading. Supported types
 are currently <code>fedpkg</code> and <code>goproxy</code>.</p></div>
 </div>
@@ -1131,7 +1131,7 @@ Support: pax debbuild</code></pre>
 </div></div>
 </div>
 <div class="sect3">
-<h4 id="_buildflags_flag_value">3.2.4. BuildFlags: FLAG:VALUE</h4>
+<h4 id="_buildflags_flag_value">3.2.4. BuildFlags: FLAG[:VALUE]</h4>
 <div class="paragraph"><p>The BuildFlags keyword defines flags for the build process. The
 following values for FLAG are usable.</p></div>
 <div class="ulist"><ul>
@@ -1299,7 +1299,7 @@ parsing, so you have to use <code>%%</code> for a literal percent sign in
 the value.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_expandflags_flag">3.2.9. ExpandFlags: FLAG</h4>
+<h4 id="_expandflags_flag_value">3.2.9. ExpandFlags: FLAG[:VALUE]</h4>
 <div class="paragraph"><p>Flags which modify the behaviour during dependency resolution.</p></div>
 <div class="ulist"><ul>
 <li>
@@ -1425,9 +1425,9 @@ to break the loop.</p></div>
 PACKAGE_B.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_patterntype_types">3.2.19. Patterntype: TYPES</h4>
+<h4 id="_patterntype_type">3.2.19. Patterntype: TYPE</h4>
 <div class="paragraph"><p>Defines the pattern format. Valid values are: <code>none</code> (default), <code>ymp</code>,
-<code>comps</code>.</p></div>
+<code>comps</code>. Multiple types can be specified.</p></div>
 </div>
 <div class="sect3">
 <h4 id="_prefer_package">3.2.20. Prefer: PACKAGE</h4>
@@ -1436,7 +1436,7 @@ will fail. This is unlike like most package managing tools, which just
 pick one of the package. It is done that way to provide reproducible
 builds and reduce the chance of surprising changes when new packages
 are added to the repository.
-The Prefer: tag lists packages to be preferred in case a choice exists.
+The Prefer directive lists packages to be preferred in case a choice exists.
 When the package name is prefixed with a minus sign, it is treated
 as a de-prefer.</p></div>
 </div>
@@ -1454,7 +1454,22 @@ Included scripts are not executed during this phase. However, these
 packages will be re-installed later on including script execution.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_publishflag_flag">3.2.23. PublishFlag: FLAG</h4>
+<h4 id="_publishfilter_regexp_regexp">3.2.23. PublishFilter: REGEXP [REGEXP]</h4>
+<div class="admonitionblock">
+<table><tr>
+<td class="icon">
+<img src="./images/icons/caution.png" alt="Caution" />
+</td>
+<td class="content">OBS only</td>
+</tr></table>
+</div>
+<div class="paragraph"><p>Limits the published binary packages in public repositories. Packages
+that match any REGEXP will not be put into the generated repository.</p></div>
+<div class="paragraph"><p>There can be only one line of PublishFilter for historic reasons.
+However, multiple REGEXP can be defined.</p></div>
+</div>
+<div class="sect3">
+<h4 id="_publishflags_flag_value">3.2.24. PublishFlags: FLAG[:VALUE]</h4>
 <div class="admonitionblock">
 <table><tr>
 <td class="icon">
@@ -1504,13 +1519,22 @@ withreports
 <div class="ulist"><ul>
 <li>
 <p>
-ympdist:NAME (OBS 2.11 or later)
+withsbom
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Also publish SBOM data in the repostory. Container SBOM data is always
+pushed to the registries.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+ympdist:NAME
 </p>
 </li>
 </ul></div>
 <div class="paragraph"><p>Defines the distversion to be used in group element of ymp files. This
 is used by the installer to check if the repository is suitable for the
-installed distribution.</p></div>
+installed distribution. (OBS 2.11 or later)</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
@@ -1522,43 +1546,39 @@ singleexport
 publish the one from the first package. If the project is of the type
 <code>maintenance_release</code>, this will be the package with the highest
 incident number.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+artifacthub:REG_REPO:ID:[NAME[:EMAIL]]
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Specify data for artifacthub repository verification. This will
+be added to the registry repository when pushing a container to
+it.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_publishfilter_regexp_regexp">3.2.24. PublishFilter: REGEXP [REGEXP]</h4>
-<div class="admonitionblock">
-<table><tr>
-<td class="icon">
-<img src="./images/icons/caution.png" alt="Caution" />
-</td>
-<td class="content">OBS only</td>
-</tr></table>
-</div>
-<div class="paragraph"><p>Limits the published binary packages in public repositories. Packages
-that match any REGEXP will not be put into the exported repository.
-There can be only one line of PublishFilter for historic reasons.
-However, multiple REGEXP can be defined.</p></div>
+<h4 id="_registryurl_url">3.2.25. RegistryURL: URL</h4>
+<div class="paragraph"><p>Define a url for the downloading of containers.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_repotype_type_options">3.2.25. Repotype: TYPE[:OPTIONS]</h4>
+<h4 id="_repotype_type_options">3.2.26. Repotype: TYPE[:OPTIONS]</h4>
 <div class="paragraph"><p>Defines the repository format for published repositories. Valid values
 are: <code>none</code>, <code>rpm-md</code>, <code>suse</code>, <code>debian</code>, <code>hdlist2</code>, <code>arch</code>, <code>staticlinks</code>
-and vagrant.
-The OPTIONS parameter depends on the repository type, for rpm-md the
+and vagrant. Multiple types can be specified to generate more than
+one metadata type.</p></div>
+<div class="paragraph"><p>The OPTIONS parameter depends on the repository type, for rpm-md the
 known options are <code>legacy</code> to create the old rpm-md format, <code>deltainfo</code>
 or <code>prestodelta</code> to create delta rpm packages, <code>rsyncable</code> to use
-rsyncable gzip compression. To split the debug packages in an own
-published repository the option <code>splitdebug:REPOSITORY_SUFFIX</code> can be
-appended, e.g.:</p></div>
+rsyncable gzip compression.</p></div>
+<div class="paragraph"><p>To split the debug packages in an own published repository the type
+<code>splitdebug:REPOSITORY_SUFFIX</code> can be appended, e.g.:</p></div>
 <div class="literalblock">
 <div class="content">
-<pre><code>Repotype: splitdebug:-debuginfo</code></pre>
+<pre><code>Repotype: rpm-md splitdebug:-debuginfo</code></pre>
 </div></div>
 <div class="paragraph"><p>This results in a debuginfo package repository being created in parallel
 to the package repository.</p></div>
-</div>
-<div class="sect3">
-<h4 id="_registryurl_url">3.2.26. RegistryURL: URL</h4>
-<div class="paragraph"><p>Define a url for the downloading of containers.</p></div>
 </div>
 <div class="sect3">
 <h4 id="_repourl_type_url">3.2.27. RepoURL: [TYPE@]URL</h4>
@@ -1578,10 +1598,10 @@ execution takes place after the preinstall phase, but before installing
 the remaining packages.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_substitute_dependency_dependency_8230">3.2.30. Substitute: DEPENDENCY DEPENDENCY&#8230;</h4>
-<div class="paragraph"><p>It is possible to replace to BuildRequires with other packages. This
-will have only an effect on directly BuildRequired packages, not on
-indirectly required packages.</p></div>
+<h4 id="_substitute_old_dependency_new_dependency_8230">3.2.30. Substitute: OLD_DEPENDENCY [NEW_DEPENDENCY&#8230; ]</h4>
+<div class="paragraph"><p>It is possible to replace BuildRequires dependencies with other
+dependencies. This will have only an effect on directly BuildRequired
+packages, not on indirectly required packages.</p></div>
 </div>
 <div class="sect3">
 <h4 id="_support_package">3.2.31. Support: PACKAGE</h4>

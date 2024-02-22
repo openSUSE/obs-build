@@ -36,7 +36,7 @@ an existing entry from the data.
 The following list contains all the allowed keywords in the project
 configuration:
 
-==== AssetsURL: TYPE@URL
+==== AssetsURL: \TYPE@URL
 
 Define a url for automatic asset downloading. Supported types
 are currently `fedpkg` and `goproxy`.
@@ -62,7 +62,7 @@ Here is an example config for `debbuild`:
     BuildEngine: debbuild
     Support: pax debbuild
 
-==== BuildFlags: FLAG:VALUE
+==== BuildFlags: FLAG[:VALUE]
 
 The BuildFlags keyword defines flags for the build process. The
 following values for FLAG are usable.
@@ -175,7 +175,7 @@ Note that the lines of the project config are macro expanded while
 parsing, so you have to use `%%` for a literal percent sign in
 the value.
 
-==== ExpandFlags: FLAG
+==== ExpandFlags: FLAG[:VALUE]
 
 Flags which modify the behaviour during dependency resolution.
 
@@ -283,10 +283,10 @@ to break the loop.
 The package in PACKAGE_A will get installed before the package in
 PACKAGE_B.
 
-==== Patterntype: TYPES
+==== Patterntype: TYPE
 
 Defines the pattern format. Valid values are: `none` (default), `ymp`,
-`comps`.
+`comps`. Multiple types can be specified.
 
 ==== Prefer: PACKAGE
 
@@ -295,7 +295,7 @@ will fail. This is unlike like most package managing tools, which just
 pick one of the package. It is done that way to provide reproducible
 builds and reduce the chance of surprising changes when new packages
 are added to the repository.
-The Prefer: tag lists packages to be preferred in case a choice exists.
+The Prefer directive lists packages to be preferred in case a choice exists.
 When the package name is prefixed with a minus sign, it is treated
 as a de-prefer.
 
@@ -312,7 +312,17 @@ program can be used to install the build environment.
 Included scripts are not executed during this phase. However, these
 packages will be re-installed later on including script execution.
 
-==== PublishFlag: FLAG
+==== PublishFilter: REGEXP [REGEXP]
+
+CAUTION: OBS only
+
+Limits the published binary packages in public repositories. Packages
+that match any REGEXP will not be put into the generated repository.
+
+There can be only one line of PublishFilter for historic reasons.
+However, multiple REGEXP can be defined.
+
+==== PublishFlags: FLAG[:VALUE]
 
 CAUTION: OBS only
 
@@ -339,11 +349,16 @@ even if a package fails to build on another architecture.
 
 Also publish internal content tracking files (.report files).
 
- * ympdist:NAME (OBS 2.11 or later)
+ * withsbom
+
+Also publish SBOM data in the repostory. Container SBOM data is always
+pushed to the registries.
+
+ * ympdist:NAME
 
 Defines the distversion to be used in group element of ymp files. This
 is used by the installer to check if the repository is suitable for the
-installed distribution.
+installed distribution. (OBS 2.11 or later)
 
  * singleexport
 
@@ -352,35 +367,35 @@ publish the one from the first package. If the project is of the type
 `maintenance_release`, this will be the package with the highest
 incident number.
 
-==== PublishFilter: REGEXP [REGEXP]
+* artifacthub:REG_REPO:ID:[NAME[:EMAIL]]
 
-CAUTION: OBS only
+Specify data for artifacthub repository verification. This will
+be added to the registry repository when pushing a container to
+it.
 
-Limits the published binary packages in public repositories. Packages
-that match any REGEXP will not be put into the exported repository.
-There can be only one line of PublishFilter for historic reasons.
-However, multiple REGEXP can be defined.
+==== RegistryURL: URL
+
+Define a url for the downloading of containers.
 
 ==== Repotype: TYPE[:OPTIONS]
 
 Defines the repository format for published repositories. Valid values
 are: `none`, `rpm-md`, `suse`, `debian`, `hdlist2`, `arch`, `staticlinks`
-and vagrant.
+and vagrant. Multiple types can be specified to generate more than
+one metadata type.
+
 The OPTIONS parameter depends on the repository type, for rpm-md the
 known options are `legacy` to create the old rpm-md format, `deltainfo`
 or `prestodelta` to create delta rpm packages, `rsyncable` to use
-rsyncable gzip compression. To split the debug packages in an own
-published repository the option `splitdebug:REPOSITORY_SUFFIX` can be
-appended, e.g.:
+rsyncable gzip compression.
 
-    Repotype: splitdebug:-debuginfo
+To split the debug packages in an own published repository the type
+`splitdebug:REPOSITORY_SUFFIX` can be appended, e.g.:
+
+    Repotype: rpm-md splitdebug:-debuginfo
 
 This results in a debuginfo package repository being created in parallel
 to the package repository.
-
-==== RegistryURL: URL
-
-Define a url for the downloading of containers.
 
 ==== RepoURL: [TYPE@]URL
 
@@ -399,11 +414,11 @@ Execute the scriptlets of the specified preinstalled package. Scriptlet
 execution takes place after the preinstall phase, but before installing
 the remaining packages.
 
-==== Substitute: DEPENDENCY DEPENDENCY...
+==== Substitute: OLD_DEPENDENCY [NEW_DEPENDENCY... ]
 
-It is possible to replace to BuildRequires with other packages. This
-will have only an effect on directly BuildRequired packages, not on
-indirectly required packages.
+It is possible to replace BuildRequires dependencies with other
+dependencies. This will have only an effect on directly BuildRequired
+packages, not on indirectly required packages.
 
 ==== Support: PACKAGE
 
