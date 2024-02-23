@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 21;
+use Test::More tests => 33;
 
 use Build::Rpm;
 
@@ -62,6 +62,18 @@ q{
 %{foo:%{bar}}}			=> 'world',
 q{%[1 + %[2 * 3]]}		=> '7',
 q{%[0 && %does_not_exist]}	=> '0',
+q{%{shrink: a  b c }}           => 'a b c',
+q{%{expr: 1 + 2}}               => '3',
+q{%{dirname:foo/bar}}           => 'foo',
+q{%{basename:foo/bar}}          => 'bar',
+q{%{dirname:foo}}               => 'foo',
+q{%{basename:foo}}              => 'foo',
+q{%{dirname:foo/bar/}}          => 'foo/bar',
+q{%{basename:foo/bar/}}         => '',
+q{%{dirname:/}}                 => '',
+q{%{basename:/}}                => '',
+q{%{dirname}}                   => '',
+q{%{basename}}                  => '',
 );
 
 while (@tests) {
