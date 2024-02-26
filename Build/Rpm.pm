@@ -472,14 +472,9 @@ reexpand:
 	$macros->{$macname} = $macbody;
       }
     } elsif ($macname eq 'defined' || $macname eq 'with' || $macname eq 'undefined' || $macname eq 'without' || $macname eq 'bcond_with' || $macname eq 'bcond_without') {
-      my @args;
-      if ($macorig =~ /^\{(.*)\}$/) {
-	@args = split(' ', $1);
-	shift @args;
-      } else {
-	@args = split(' ', $line);
-	$line = '';
-      }
+      $macalt = '' if $mactest == -1;
+      my @args = getmacroargs($line, $macdata, $macalt);	# modifies $line
+      $_ = expandmacros($config, $_, $lineno, $macros, $macros_args, $tries) for @args;
       next unless @args;
       if ($macname eq 'bcond_with') {
 	$macros->{"with_$args[0]"} = 1 if exists $macros->{"_with_$args[0]"};
@@ -490,7 +485,7 @@ reexpand:
 	next;
       }
       $args[0] = "with_$args[0]" if $macname eq 'with' || $macname eq 'without';
-      $line = ((exists($macros->{$args[0]}) ? 1 : 0) ^ ($macname eq 'undefined' || $macname eq 'without' ? 1 : 0)).$line;
+      $expandedline .= (exists($macros->{$args[0]}) ? 1 : 0) ^ ($macname eq 'undefined' || $macname eq 'without' ? 1 : 0);
     } elsif ($macname eq 'expand') {
       $macalt = '' if $mactest == -1;
       my @args = getmacroargs($line, $macdata, $macalt);	# modifies $line
@@ -522,9 +517,9 @@ reexpand:
         my @args = getmacroargs($line, $macdata, $macalt);	# modifies $line
 	next if $mactest == -1;
 	push @expandstack, ($line, $expandedline, $optmacros);
-	$optmacros = adaptmacros($macros, $optmacros, grabargs($macname, $macros_args->{$macname}, @args));
 	$line = $macros->{$macname};
 	$expandedline = '';
+	$optmacros = adaptmacros($macros, $optmacros, grabargs($macname, $macros_args->{$macname}, @args));
 	next;
       }
       $macalt = $macros->{$macname} unless defined $macalt;
