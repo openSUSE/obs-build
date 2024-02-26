@@ -492,11 +492,16 @@ reexpand:
       $args[0] = "with_$args[0]" if $macname eq 'with' || $macname eq 'without';
       $line = ((exists($macros->{$args[0]}) ? 1 : 0) ^ ($macname eq 'undefined' || $macname eq 'without' ? 1 : 0)).$line;
     } elsif ($macname eq 'expand') {
-      $macalt = $macros->{$macname} unless defined $macalt;
       $macalt = '' if $mactest == -1;
-      push @expandstack, ($expandedline, $line, undef);
-      $line = $macalt;
-      $expandedline = '';
+      my @args = getmacroargs($line, $macdata, $macalt);	# modifies $line
+      $_ = expandmacros($config, $_, $lineno, $macros, $macros_args, $tries) for @args;
+      $macalt = @args ? $args[0] : '';
+      if ($macalt =~ /%/) {
+	push @expandstack, ($line, '', undef) if $line ne '';
+	$line = $macalt;
+      } else {
+	$expandedline .= $macalt;
+      }
     } elsif ($macname eq 'expr' || $macname eq 'basename' || $macname eq 'dirname' || $macname eq 'shrink' || $macname eq 'suffix') {
       $macalt = '' if $mactest == -1;
       my @args = getmacroargs($line, $macdata, $macalt);	# modifies $line
@@ -516,7 +521,7 @@ reexpand:
 	# macro with args!
         my @args = getmacroargs($line, $macdata, $macalt);	# modifies $line
 	next if $mactest == -1;
-	push @expandstack, ($expandedline, $line, $optmacros);
+	push @expandstack, ($line, $expandedline, $optmacros);
 	$optmacros = adaptmacros($macros, $optmacros, grabargs($macname, $macros_args->{$macname}, @args));
 	$line = $macros->{$macname};
 	$expandedline = '';
@@ -525,7 +530,7 @@ reexpand:
       $macalt = $macros->{$macname} unless defined $macalt;
       $macalt = '' if $mactest == -1;
       if ($macalt =~ /%/) {
-	push @expandstack, ('', $line, 1) if $line ne '';
+	push @expandstack, ($line, '', undef) if $line ne '';
 	$line = $macalt;
       } else {
 	$expandedline .= $macalt;
@@ -533,7 +538,7 @@ reexpand:
     } elsif ($mactest) {
       $macalt = '' if !defined($macalt) || $mactest == 1;
       if ($macalt =~ /%/) {
-	push @expandstack, ('', $line, 1) if $line ne '';
+	push @expandstack, ($line, '', undef) if $line ne '';
 	$line = $macalt;
       } else {
 	$expandedline .= $macalt;
@@ -545,16 +550,9 @@ reexpand:
   $line = $expandedline . $line;
   if (@expandstack) {
     my $m = pop(@expandstack);
-    if ($m) {
-      $optmacros = adaptmacros($macros, $optmacros, $m) if ref $m;
-      $expandstack[-2] .= $line;
-      $line = pop(@expandstack);
-      $expandedline = pop(@expandstack);
-    } else {
-      my $todo = pop(@expandstack);
-      $expandedline = pop(@expandstack);
-      push @expandstack, ('', $todo, 1) if $todo ne '';
-    }
+    $optmacros = adaptmacros($macros, $optmacros, $m) if $m;
+    $expandedline = pop(@expandstack) . $line;
+    $line = pop(@expandstack);
     goto reexpand;
   }
   return $line;
