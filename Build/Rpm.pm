@@ -493,7 +493,7 @@ reexpand:
 	$macdata = $line;
 	$line = '';
       }
-      if ($macdata =~ /^\s*([0-9a-zA-Z_]+)(?:\(([^\)]*)\))?\s*(.*?)$/) {
+      if ($macdata =~ /^\s*([0-9a-zA-Z_]+)(?:\(([^\)]*)\))?\s*(.*?)$/s) {
 	my $macname = $1;
 	my $macargs = $2;
 	my $macbody = $3;
@@ -729,10 +729,10 @@ sub parse {
     }
     if ($multilinedefine || $line =~ /^\s*%(?:define|global)\s/s) {
       # is this a multi-line macro definition?
-      $line = "$multilinedefine\n$line" if defined $multilinedefine;
+      $line = "$multilinedefine$line" if defined $multilinedefine;
       undef $multilinedefine;
       if ($line =~ /\\\z/s) {
-	$multilinedefine = $line;	# we need another line!
+	$multilinedefine = substr($line, 0, -1)."\n";	# we need another line!
 	next;
       }
     }
