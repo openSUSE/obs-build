@@ -258,6 +258,7 @@ sub grabargs {
     $i++;
   }
   $m{'*'} = join(' ', @args);
+  s/%/%%/ for values %m;	# LITERALize
   return \%m;
 }
 
@@ -277,7 +278,7 @@ sub luapattern {
 }
 
 sub luamacro {
-  my ($config, $macname, @args) = @_;
+  my ($config, $macros, $macname, @args) = @_;
   push @args, '' unless @args;
   return lc($args[0]) if $macname eq 'lower';
   return uc($args[0]) if $macname eq 'upper';
@@ -317,7 +318,7 @@ sub luamacro {
 }
 
 sub builtinmacro {
-  my ($config, $macname, @args) = @_;
+  my ($config, $macros, $macname, @args) = @_;
   push @args, '' unless @args;
   return expr_stringify(do_expr($config, $args[0])) if $macname eq 'expr';
   return $args[0] =~ /\/([^\/]*)$/ ? $1 : $args[0] if $macname eq 'basename';
@@ -329,6 +330,16 @@ sub builtinmacro {
     $args[0] =~ s/ $//;
     return $args[0];
   }
+  if ($macname eq 'bcond_with') {
+    $macros->{"with_$args[0]"} = 1 if exists $macros->{"_with_$args[0]"};
+    return '';
+  }
+  if ($macname eq 'bcond_without') {
+    $macros->{"with_$args[0]"} = 1 unless exists $macros->{"_without_$args[0]"};
+    return '';
+  }
+  return (exists($macros->{"with_$args[0]"}) ? 1 : 0) ^ ($macname eq 'without' ? 1 : 0) if $macname eq 'with' || $macname eq 'without';
+  return (exists($macros->{$args[0]}) ? 1 : 0) ^ ($macname eq 'undefined' ? 1 : 0) if $macname eq 'defined' || $macname eq 'undefined';
   do_warn($config, "unsupported builtin macro $macname");
   return '';
 }
@@ -387,6 +398,29 @@ sub getmacroargs {
   return @args;
 }
 
+my %builtin_macros = (
+  'expand' => \&builtinmacro,
+  'defined' => \&builtinmacro,
+  'undefined' => \&builtinmacro,
+  'with' => \&builtinmacro,
+  'without' => \&builtinmacro,
+  'bcond_with' => \&builtinmacro,
+  'bcond_without' => \&builtinmacro,
+  'expr' => \&builtinmacro,
+  'basename' => \&builtinmacro,
+  'dirname' => \&builtinmacro,
+  'shrink' => \&builtinmacro,
+  'suffix' => \&builtinmacro,
+
+  'gsub' => \&luamacro,
+  'len' => \&luamacro,
+  'lower' => \&luamacro,
+  'upper' => \&luamacro,
+  'rep' => \&luamacro,
+  'reverse' => \&luamacro,
+  'sub' => \&luamacro,
+);
+
 sub expandmacros {
   my ($config, $line, $lineno, $macros, $macros_args, $tries) = @_;
 
@@ -418,7 +452,7 @@ reexpand:
     my $macdata;
     my $macalt;
     if (defined($3)) {
-      if ($macname =~ /[{\\]/) {	# tricky, use macroend
+      if ($macname =~ /[\{\\]/) {	# tricky, use macroend
 	$macname = macroend("%$macorig$line");
 	$line = substr("%$macorig$line", length($macname));
         $macorig = substr($macname, 1);
@@ -438,7 +472,7 @@ reexpand:
     my $mactest = 0;
     if ($macname =~ /^\!\?/s || $macname =~ /^\?\!/s) {
       $mactest = -1;
-    } elsif ($macname =~ /^\?/s) {
+    } elsif ($macname =~ /^[\-\?]/s) {
       $mactest = 1;
     }
     $macname =~ s/^[\!\?]+//s;
@@ -471,86 +505,82 @@ reexpand:
 	}
 	$macros->{$macname} = $macbody;
       }
-    } elsif ($macname eq 'defined' || $macname eq 'with' || $macname eq 'undefined' || $macname eq 'without' || $macname eq 'bcond_with' || $macname eq 'bcond_without') {
-      $macalt = '' if $mactest == -1;
-      my @args = getmacroargs($line, $macdata, $macalt);	# modifies $line
-      $_ = expandmacros($config, $_, $lineno, $macros, $macros_args, $tries) for @args;
-      next unless @args;
-      if ($macname eq 'bcond_with') {
-	$macros->{"with_$args[0]"} = 1 if exists $macros->{"_with_$args[0]"};
-	next;
-      }
-      if ($macname eq 'bcond_without') {
-	$macros->{"with_$args[0]"} = 1 unless exists $macros->{"_without_$args[0]"};
-	next;
-      }
-      $args[0] = "with_$args[0]" if $macname eq 'with' || $macname eq 'without';
-      $expandedline .= (exists($macros->{$args[0]}) ? 1 : 0) ^ ($macname eq 'undefined' || $macname eq 'without' ? 1 : 0);
-    } elsif ($macname eq 'expand') {
-      $macalt = '' if $mactest == -1;
-      my @args = getmacroargs($line, $macdata, $macalt);	# modifies $line
-      $_ = expandmacros($config, $_, $lineno, $macros, $macros_args, $tries) for @args;
-      $macalt = @args ? $args[0] : '';
-      if ($macalt =~ /%/) {
-	push @expandstack, ($line, '', undef) if $line ne '';
-	$line = $macalt;
-      } else {
-	$expandedline .= $macalt;
-      }
-    } elsif ($macname eq 'expr' || $macname eq 'basename' || $macname eq 'dirname' || $macname eq 'shrink' || $macname eq 'suffix') {
-      $macalt = '' if $mactest == -1;
-      my @args = getmacroargs($line, $macdata, $macalt);	# modifies $line
-      $_ = expandmacros($config, $_, $lineno, $macros, $macros_args, $tries) for @args;
-      $expandedline .= builtinmacro($config, $macname, @args);
-    } elsif ($macname eq 'gsub' || $macname eq 'len' || $macname eq 'lower' || $macname eq 'upper' || $macname eq 'rep' || $macname eq 'reverse' || $macname eq 'sub') {
-      my @args = getmacroargs($line, $macdata, $macalt);	# modifies $line
-      $_ = expandmacros($config, $_, $lineno, $macros, $macros_args, $tries) for @args;
-      $expandedline .= luamacro($config, $macname, @args);
-    } elsif (exists($macros->{$macname})) {
-      if (!defined($macros->{$macname})) {
-	do_warn($config, "spec file parser".($lineno?" line $lineno":'').": can't expand '$macname'");
-	$line = 'MACRO';
-	last;
-      }
-      if (defined($macros_args->{$macname})) {
-	# macro with args!
-        my @args = getmacroargs($line, $macdata, $macalt);	# modifies $line
-	next if $mactest == -1;
-	push @expandstack, ($line, $expandedline, $optmacros);
-	$line = $macros->{$macname};
-	$expandedline = '';
-	$optmacros = adaptmacros($macros, $optmacros, grabargs($macname, $macros_args->{$macname}, @args));
-	next;
-      }
-      $macalt = $macros->{$macname} unless defined $macalt;
-      $macalt = '' if $mactest == -1;
-      if ($macalt =~ /%/) {
-	push @expandstack, ($line, '', undef) if $line ne '';
-	$line = $macalt;
-      } else {
-	$expandedline .= $macalt;
-      }
-    } elsif ($mactest) {
-      $macalt = '' if !defined($macalt) || $mactest == 1;
-      if ($macalt =~ /%/) {
-	push @expandstack, ($line, '', undef) if $line ne '';
-	$line = $macalt;
-      } else {
-	$expandedline .= $macalt;
+    } elsif ($macname eq 'dnl') {
+      $line =~ s/[^\n]*\n?//s;
+    } elsif (!exists($builtin_macros{$macname}) && !exists($macros->{$macname})) {
+      # handle non-existing macros
+      if ($mactest == 0) {
+	$expandedline .= "%$macorig";
+      } elsif ($mactest < 0 && defined($macalt)) {
+	if ($macalt =~ /%/) {
+	  push @expandstack, $line if $line ne '';
+	  $line = $macalt;
+	} else {
+	  $expandedline .= $macalt;
+	}
       }
     } else {
-      $expandedline .= "%$macorig" unless $macname =~ /^-/;
+      next if $mactest < 0;
+
+      # check for simple non-parametric macros
+      if (!exists($builtin_macros{$macname}) && exists($macros->{$macname})) {
+        if (!defined($macros->{$macname})) {
+	  do_warn($config, "spec file parser".($lineno?" line $lineno":'').": can't expand '$macname'");
+	  $line = 'MACRO';
+	  last;
+        }
+	if (!defined($macros_args->{$macname})) {
+	  $macalt = $macros->{$macname} unless $mactest && defined($macalt);
+	  if ($macalt =~ /%/) {
+	    push @expandstack, $line if $line ne '';
+	    $line = $macalt;
+	  } else {
+	    $expandedline .= $macalt;
+	  }
+	  next;
+	}
+      }
+
+      # builtin macro or parametric marco, get arguments
+      my @args;
+      if (defined $macalt) {
+	$macalt = expandmacros($config, $macalt, $lineno, $macros, $macros_args, $tries);
+	push @args, $macalt;
+      } else {
+	if (!defined($macdata)) {
+	  $line =~ /^\s*([^\n]*).*$/;
+	  $macdata = $1;
+	  $line = '';
+	}
+	$macdata = expandmacros($config, $macdata, $lineno, $macros, $macros_args, $tries);
+	push @args, split(' ', $macdata);
+      }
+
+      # handle the macro
+      if ($macname eq 'expand') {
+	$macalt = @args ? $args[0] : '';
+	if ($macalt =~ /%/) {
+	  push @expandstack, $line if $line ne '';
+	  $line = $macalt;
+	} else {
+	  $expandedline .= $macalt;
+	}
+      } elsif ($builtin_macros{$macname}) {
+        $expandedline .= $builtin_macros{$macname}->($config, $macros, $macname, @args);
+      } else {
+	push @expandstack, $line, $optmacros;
+	$line = $macros->{$macname};
+	$optmacros = adaptmacros($macros, $optmacros, grabargs($macname, $macros_args->{$macname}, @args));
+      }
     }
   }
-  $line = $expandedline . $line;
+  $expandedline .= $line;
   if (@expandstack) {
-    my $m = pop(@expandstack);
-    $optmacros = adaptmacros($macros, $optmacros, $m) if $m;
-    $expandedline = pop(@expandstack) . $line;
+    $optmacros = adaptmacros($macros, $optmacros, pop(@expandstack)) if ref($expandstack[-1]);
     $line = pop(@expandstack);
     goto reexpand;
   }
-  return $line;
+  return $expandedline;
 }
 
 sub splitexpansionresult {
