@@ -29,13 +29,6 @@ use strict;
 use Build;
 use Build::Rpm;
 
-sub evalmacros {
-  my ($config, $str) = @_;
-  my @xspec;
-  Build::Rpm::parse({%$config, 'save_expanded' => 1} , [ "$str" ], \@xspec);
-  return @xspec && ref($xspec[0]) ? $xspec[0]->[1] : '';
-}
-
 my ($dist, $archs, $configdir, $type, $argument);
 
 $configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
@@ -96,7 +89,7 @@ if ($type eq 'buildflags') {
   print join(' ', @res)."\n" if @res;
 } elsif ($type eq 'eval') {
   die("Specify what to eval\n") unless defined $argument;
-  my $result = evalmacros($cf, $argument);
+  my $result = Build::Rpm::expandmacros($cf, $argument);
   print "$result\n";
 } else {
   die("unsupported query type: $type\n");
