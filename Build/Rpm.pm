@@ -20,8 +20,8 @@
 
 package Build::Rpm;
 
-our $unfilteredprereqs = 0;
-our $conflictdeps = 0;
+our $unfilteredprereqs = 0;		# collect all file prereqs
+our $conflictdeps = 0;			# use !dep dependencies for conflicts
 our $includecallback;
 
 use strict;
@@ -641,6 +641,25 @@ sub splitdeps {
   return @deps;
 }
 
+sub dep_qualifier_mismatch {
+  my ($macros, $qual) = @_;
+  my $arch = $macros->{'_target_cpu'} || '';
+  my $proj = $macros->{'_target_project'} || '';
+  $qual =~ s/^\s*\[//;
+  $qual =~ s/\]$//;
+  my $isneg;
+  my $bad;
+  for my $q (split('[\s,]', $qual)) {
+    $isneg = 1 if $q =~ s/^\!//;
+    $bad = 1 if !defined($bad) && !$isneg;
+    if ($q eq $arch || $q eq $proj) {
+      return 0 if $isneg;
+      $bad = 0;
+    }
+  }
+  return $bad ? 0 : 1;
+}
+
 # xspec may be passed as array ref to return the parsed spec files
 # an entry in the returned array can be
 # - a string: verbatim line from the original file
@@ -706,9 +725,8 @@ sub parse {
       $line = shift @$specdata;
       ++$lineno;
       if (ref $line) {
-	$line = $line->[0]; # verbatim line, used for macro collection
-	push @$xspec, $line if $doxspec;
-	$xspec->[-1] = [ $line, undef ] if $doxspec && $skip;
+	$line = $line->[0]; # verbatim line, used for macro block collection
+	push @$xspec, $skip ? [ $line, undef] : $line if $doxspec;
 	next;
       }
     } else {
@@ -718,6 +736,7 @@ sub parse {
       ++$lineno;
     }
     push @$xspec, $line if $doxspec;
+
     if ($line =~ /^#\s*neededforbuild\s*(\S.*)$/) {
       if (defined $hasnfb) {
 	$xspec->[-1] = [ $xspec->[-1], undef ] if $doxspec;
@@ -727,6 +746,8 @@ sub parse {
       $nfbline = \$xspec->[-1] if $doxspec;
       next;
     }
+
+    # do special multiline handling
     if ($multilinedefine || $line =~ /^\s*%(?:define|global)\s/s) {
       # is this a multi-line macro definition?
       $line = "$multilinedefine$line" if defined $multilinedefine;
@@ -745,13 +766,18 @@ sub parse {
 	next;
       }
     }
+
     if ($line =~ /^\s*#/) {
       next unless $line =~ /^#!/;
     }
+
+    # expand macros unless we are ignoring the line due to an %if
     if (!$skip && ($line =~ /%/)) {
       $line = expandmacros($config, $line, $lineno, \%macros, \%macros_args);
       $line = splitexpansionresult($line, \@includelines) if $line =~ /\n/s;
     }
+
+    # handle skipping of lines in %if... conditionals
     if ($line =~ /^\s*%(?:elif|elifarch|elifos)\b/) {
       $skip = 1 if !$skip;
       $skip = 2 - $skip if $skip <= 2;
@@ -768,19 +794,20 @@ sub parse {
       $skip = $skip > 2 ? $skip - 2 : 0;
       next;
     }
-
     if ($skip) {
-      $skip += 2 if $line =~ /^\s*%if/;
+      $skip += 2 if $line =~ /^\s*%if/;		# increase nesting level for %if statements
       $xspec->[-1] = [ $xspec->[-1], undef ] if $doxspec;
       $ifdeps = 1 if $line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires)\s*:\s*(\S.*)$/i;
       next;
     }
 
+    # line is not skipped, do buildflavor/obspackage substitution
     if ($line =~ /\@/) {
       $line =~ s/\@BUILD_FLAVOR\@/$buildflavor/g;
       $line =~ s/\@OBS_PACKAGE\@/$obspackage/g;
     }
 
+    # handle %if conditionals
     if ($line =~ /^\s*%ifarch(.*)$/) {
       my $arch = $macros{'_target_cpu'} || 'unknown';
       my @archs = grep {$_ eq $arch} split(/\s+/, $1);
@@ -816,6 +843,14 @@ sub parse {
       $hasif = 1;
       next;
     }
+
+    # just save the expanded line if we're parsing the config
+    if ($config->{'parsing_config'}) {
+      $xspec->[-1] = [ $xspec->[-1], $line ] if $doxspec;
+      next;
+    }
+
+    # handle %include statement
     if ($includecallback && $line =~ /^\s*%include\s+(.*)\s*$/) {
       if ($includenum++ < 10) {
 	my $data = $includecallback->($1);
@@ -824,12 +859,14 @@ sub parse {
 	do_warn($config, "%include statment level too high, ignored");
       }
     }
+
+    # generic parsing is done, the rest is spec specific
+
     if ($main_preamble) {
       if ($line =~ /^(Name|Epoch|Version|Release|Disttag|Url)\s*:\s*(\S+)/i) {
 	$ret->{lc $1} = $2;
 	$macros{lc $1} = $2;
-	# add a separate uppercase macro for tags from the main preamble
-	$macros{uc $1} = $2;
+	$macros{uc $1} = $2;	# add a separate uppercase macro for tags from the main preamble
       } elsif ($line =~ /^ExclusiveArch\s*:\s*(.*)/i) {
 	$exclarch ||= [];
 	push @$exclarch, split(' ', $1);
@@ -838,7 +875,7 @@ sub parse {
 	push @$badarch, split(' ', $1);
       }
     }
-    if (@subpacks && $preamble && exists($ret->{'version'}) && $line =~ /^Version\s*:\s*(\S+)/i) {
+    if ($preamble && @subpacks && exists($ret->{'version'}) && $line =~ /^Version\s*:\s*(\S+)/i) {
       $ret->{'multiversion'} = 1 if $ret->{'version'} ne $1;
     }
     if ($preamble && $line =~ /^\#\!ForceMultiVersion\s*$/i) {
@@ -885,6 +922,7 @@ sub parse {
 	  $ifdeps = 1;
 	  next unless $config->{'fileprovides'}->{$pack};
 	}
+	# we ignore the version for now
 	push @prereqs, $pack unless grep {$_ eq $pack} @prereqs;
       }
       next;
@@ -899,78 +937,48 @@ sub parse {
       # BuildRequire: foo [!home:bar]
       my @deps;
       if (" $deps" =~ /[\s,]\(/) {
-	# we need to be careful, there could be a rich dep
-	@deps = splitdeps($deps);
+	@deps = splitdeps($deps);	# we need to be careful, there could be a rich dep
       } else {
 	@deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
       }
-      my $replace = 0;
-      my @ndeps = ();
+      my $replace;		# put filtered line into xspec
+      my @ndeps;
       while (@deps) {
 	my ($pack, $vers, $qual) = splice(@deps, 0, 3);
 	if (defined($qual)) {
 	  $replace = 1;
-	  my $arch = $macros{'_target_cpu'} || '';
-	  my $proj = $macros{'_target_project'} || '';
-	  $qual =~ s/^\s*\[//;
-	  $qual =~ s/\]$//;
-	  my $isneg = 0;
-	  my $bad;
-	  for my $q (split('[\s,]', $qual)) {
-	    $isneg = 1 if $q =~ s/^\!//;
-	    $bad = 1 if !defined($bad) && !$isneg;
-	    if ($isneg) {
-	      if ($q eq $arch || $q eq $proj) {
-		$bad = 1;
-		last;
-	      }
-	    } elsif ($q eq $arch || $q eq $proj) {
-	      $bad = 0;
-	    }
-	  }
-	  next if $bad;
+	  next if dep_qualifier_mismatch(\%macros, $qual);
 	}
 	$vers = '' unless defined $vers;
-	$vers =~ s/=(>|<)/$1=/;
+	$vers =~ s/=(>|<)/$1=/;		# normalize a bit
 	push @ndeps, "$pack$vers";
       }
 
-      $replace = 1 if grep {/^-/} @ndeps;
       my $lcwhat = lc($what);
-      if ($lcwhat eq '#!alsonative') {
-	push @alsonative, @ndeps;
-	next;
-      }
-      if ($lcwhat eq '#!onlynative') {
-	push @onlynative, @ndeps;
-	next;
-      }
-      if ($lcwhat ne 'buildrequires' && $lcwhat ne 'buildprereq' && $lcwhat ne '#!buildrequires') {
-        if ($conflictdeps && $what =~ /conflict/i) {
-	  push @packdeps, map {"!$_"} @ndeps;
-	  next;
-	}
-	push @packdeps, map {"-$_"} @ndeps;
-	next;
-      }
-      if (defined($hasnfb)) {
+      if (defined($hasnfb) && $lcwhat eq 'buildrequires') {
 	if ((grep {$_ eq 'glibc' || $_ eq 'rpm' || $_ eq 'gcc' || $_ eq 'bash'} @ndeps) > 2) {
 	  # ignore old generated BuildRequire lines.
 	  $xspec->[-1] = [ $xspec->[-1], undef ] if $doxspec;
 	  next;
 	}
       }
-      push @packdeps, @ndeps;
-      next unless $doxspec;
-      if ($replace) {
-	my @cndeps = grep {!/^-/} @ndeps;
-	if (@cndeps) {
-	  $xspec->[-1] = [ $xspec->[-1], "$what:  ".join(' ', @cndeps) ];
-	} else {
-	  $xspec->[-1] = [ $xspec->[-1], ''];
-	}
+      # put filtered line into xspec if we did filtering by qualifier
+      if ($replace && $doxspec && $line !~ /^#/) {
+	$xspec->[-1] = [ $xspec->[-1], @ndeps ? "$what:  ".join(' ', @ndeps) : '' ];
       }
-      next;
+      if ($lcwhat eq '#!alsonative') {
+	push @alsonative, @ndeps;
+      } elsif ($lcwhat eq '#!onlynative') {
+	push @onlynative, @ndeps;
+      } elsif ($lcwhat eq 'buildconflicts' || $lcwhat eq '#!buildconflicts' || $lcwhat eq '#!buildignore') {
+        if ($conflictdeps && $lcwhat ne '#!buildignore') {
+	  push @packdeps, map {"!$_"} @ndeps;
+	} else {
+	  push @packdeps, map {"-$_"} @ndeps;
+        }
+      } else {
+	push @packdeps, @ndeps;
+      }
     } elsif ($preamble && $line =~ /^(Url|Icon)\s*:\s*(\S+)/i) {
       my ($tag, $val) = (lc($1), $2);
       $macros{$tag} = $val if $tag eq 'url';
@@ -1014,11 +1022,9 @@ sub parse {
       }
       $preamble = 1;
       $main_preamble = 0;
-    }
-
-    if ($line =~ /^\s*%(prep|build|install|check|clean|preun|postun|pretrans|posttrans|pre|post|files|changelog|description|triggerpostun|triggerun|triggerin|trigger|verifyscript)/) {
-      $main_preamble = 0;
+    } elsif ($line =~ /^\s*%(?:prep|build|install|check|clean|preun|postun|pretrans|posttrans|pre|post|files|changelog|description|triggerpostun|triggerun|triggerin|trigger|verifyscript)/) {
       $preamble = 0;
+      $main_preamble = 0;
     }
 
     # do this always?
