@@ -314,7 +314,7 @@ for my $line (@$xspec) {
   while (@deps) {
     my ($pack, $vers) = splice(@deps, 0, 2);
     $vers = '' unless defined $vers;
-    if (($isbuildrequires && $sdeps{$pack}) || exists($f2{$pack})) {
+    if (($isbuildrequires && $sdeps{$pack} && $pack !~ /^-/) || exists($f2{$pack})) {
       push @ndeps, "$pack$vers";
       delete $f2{$pack};
     } else {
