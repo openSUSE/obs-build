@@ -74,6 +74,7 @@ my $q = Build::parse($cf, $recipe);
 
 if (!defined $type) {
   require Data::Dumper;
+  $Data::Dumper::Sortkeys = $Data::Dumper::Sortkeys = 1;
   print Data::Dumper::Dumper($q);
   exit(0);
 }
