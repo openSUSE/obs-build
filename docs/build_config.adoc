@@ -201,11 +201,6 @@ default, no module is used, so every module needed needs to be
 specified in the configuration. To remove a module, add an exclamation mark
 (!) as prefix.
 
-* docker-nobasepackages
-
-Do not put the require/support/preinstall packages in the repositories
-offered to the container build tool. This should have been the default.
-
 * kiwi-nobasepackages
 
 Do not put the require/support/preinstall packages in the repositories
