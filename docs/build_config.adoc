@@ -201,10 +201,37 @@ default, no module is used, so every module needed needs to be
 specified in the configuration. To remove a module, add an exclamation mark
 (!) as prefix.
 
+* dorecommends
+
+Try to install all recommended packages. Packages with dependency conflicts
+are ignored.
+
+* dosupplements
+
+Try to install all supplemented packages. Packages with dependency conflicts
+are ignored. This has the downside that new packages can cause different
+dependency expansion, so this should only be enabled for special use
+cases.
+
+* ignoreconflicts
+
+Ignore defined conflicts of packages. By default these are reported as unresolvable.
+This switch may be useful when packages get not installed in the build environment,
+but getting processed afterwards. That tool, eg. some image building tool, must be
+able to handle the situation (eg. by just using a subset of the packages).
+
 * kiwi-nobasepackages
 
 Do not put the require/support/preinstall packages in the repositories
 offered to the kiwi build tool. This should have been the default.
+
+* keepfilerequires
+
+Dependencies on files are only fulfilled if matching FileProvides are specified
+in the project configuration. If those are missing, the dependency results in
+an "unresolvable" state for directly required files or in silent breaking of the
+dependency for indirectly required files. With this option, all file requires are
+honoured by default and lead to "unresolvable" if there are no matching FileProvides defined.
 
 ==== ExportFilter: REGEX ARCHITECTURES
 
