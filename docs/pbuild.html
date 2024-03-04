@@ -1338,12 +1338,55 @@ specified in the configuration. To remove a module, add an exclamation mark
 <div class="ulist"><ul>
 <li>
 <p>
+dorecommends
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Try to install all recommended packages. Packages with dependency conflicts
+are ignored.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+dosupplements
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Try to install all supplemented packages. Packages with dependency conflicts
+are ignored. This has the downside that new packages can cause different
+dependency expansion, so this should only be enabled for special use
+cases.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+ignoreconflicts
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Ignore defined conflicts of packages. By default these are reported as unresolvable.
+This switch may be useful when packages get not installed in the build environment,
+but getting processed afterwards. That tool, eg. some image building tool, must be
+able to handle the situation (eg. by just using a subset of the packages).</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
 kiwi-nobasepackages
 </p>
 </li>
 </ul></div>
 <div class="paragraph"><p>Do not put the require/support/preinstall packages in the repositories
 offered to the kiwi build tool. This should have been the default.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+keepfilerequires
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Dependencies on files are only fulfilled if matching FileProvides are specified
+in the project configuration. If those are missing, the dependency results in
+an "unresolvable" state for directly required files or in silent breaking of the
+dependency for indirectly required files. With this option, all file requires are
+honoured by default and lead to "unresolvable" if there are no matching FileProvides defined.</p></div>
 </div>
 <div class="sect3">
 <h4 id="_exportfilter_regex_architectures">3.2.10. ExportFilter: REGEX ARCHITECTURES</h4>
