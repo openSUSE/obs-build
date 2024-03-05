@@ -166,7 +166,7 @@ for my $diffname (keys %diffs) {
     print "Adding patch$striplevel $diffname to $specname\n";
 
 
-    splice @c, $last_patch_in_prep_index+1, 0, ("\%patch$patchnum$striplevel\n") unless $autopatch;
+    splice @c, $last_patch_in_prep_index+1, 0, ("\%patch -P$patchnum$striplevel\n") unless $autopatch;
     splice @c, $last_patch_in_global_index+1, 0,
     (sprintf "Patch%s:%s%s\n", $patchnum, ' ' x (10-length($patchnum)), $diffname);
     ++$last_patch_in_global_index;
