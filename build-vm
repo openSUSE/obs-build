@@ -657,6 +657,9 @@ vm_detect_2nd_stage() {
         mount -orw -n -t securityfs securityfs /sys/kernel/security 2>/dev/null || :
     fi
 
+    # delete dummy /etc/os-release file
+    test -e /etc/os-release -a ! -s /etc/os-release && rm -f /etc/os-release
+
 # qemu inside of xen does not work, check again with kvm later before enabling this
 #    if test -e /dev/kqemu ; then
 #        # allow abuild user to run qemu
@@ -1073,6 +1076,11 @@ vm_first_stage() {
     fi
 
     if test -n "$VM_ROOT" ; then
+	# create an empty os-release file unless it already exists. newer systemd version insist
+	# will not switch to the root unless it exists
+	if test ! -L "$BUILD_ROOT/etc/os-release" -a ! -e "$BUILD_ROOT/etc/os-release" ; then
+	    touch "$BUILD_ROOT/etc/os-release"
+	fi
 	# copy out kernel & initrd (if they exist) during unmounting VM image
 	KERNEL_TEMP_DIR=
         local vm_type="$VM_TYPE"
