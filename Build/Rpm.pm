@@ -702,7 +702,6 @@ sub parse {
 
   initmacros($config, \%macros, \%macros_args);
   my $skip = 0;
-  my $main_preamble = 1;
   my $preamble = 1;
   my $hasif = 0;
   my $lineno = 0;
@@ -737,13 +736,13 @@ sub parse {
     }
     push @$xspec, $line if $doxspec;
 
-    if ($line =~ /^#\s*neededforbuild\s*(\S.*)$/) {
+    if (substr($line, 0, 1) eq '#' && $line =~ /^#\s*neededforbuild\s*(\S.*)$/) {
       if (defined $hasnfb) {
 	$xspec->[-1] = [ $xspec->[-1], undef ] if $doxspec;
-	next;
+      } else {
+        $hasnfb = $1;
+        $nfbline = \$xspec->[-1] if $doxspec;
       }
-      $hasnfb = $1;
-      $nfbline = \$xspec->[-1] if $doxspec;
       next;
     }
 
@@ -772,32 +771,34 @@ sub parse {
     }
 
     # expand macros unless we are ignoring the line due to an %if
-    if (!$skip && ($line =~ /%/)) {
+    if (!$skip && index($line, '%') >= 0) {
       $line = expandmacros($config, $line, $lineno, \%macros, \%macros_args);
       $line = splitexpansionresult($line, \@includelines) if $line =~ /\n/s;
     }
 
     # handle skipping of lines in %if... conditionals
-    if ($line =~ /^\s*%(?:elif|elifarch|elifos)\b/) {
+    if ($line =~ /^\s*%(?:else|endif|elif|elifarch|elifos)\b/) {
+      if ($line =~ /^\s*%else/) {
+        $skip = 2 - $skip if $skip <= 2;
+        next;
+      }
+      if ($line =~ /^\s*%endif/) {
+        $skip = $skip > 2 ? $skip - 2 : 0;
+        next;
+      }
+      # elif... case
       $skip = 1 if !$skip;
       $skip = 2 - $skip if $skip <= 2;
       next if $skip;
       $line =~ s/^(\s*%)el/$1/;
+      # skip was set before, so we did not expand macros
       $line = expandmacros($config, $line, $lineno, \%macros, \%macros_args);
       $line = splitexpansionresult($line, \@includelines) if $line =~ /\n/s;
-    }
-    if ($line =~ /^\s*%else\b/) {
-      $skip = 2 - $skip if $skip <= 2;
-      next;
-    }
-    if ($line =~ /^\s*%endif\b/) {
-      $skip = $skip > 2 ? $skip - 2 : 0;
-      next;
     }
     if ($skip) {
       $skip += 2 if $line =~ /^\s*%if/;		# increase nesting level for %if statements
       $xspec->[-1] = [ $xspec->[-1], undef ] if $doxspec;
-      $ifdeps = 1 if $line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires)\s*:\s*(\S.*)$/i;
+      $ifdeps = 1 if $line =~ /^(?:BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires)\s*:\s*\S/i;
       next;
     }
 
@@ -808,45 +809,36 @@ sub parse {
     }
 
     # handle %if conditionals
-    if ($line =~ /^\s*%ifarch(.*)$/) {
-      my $arch = $macros{'_target_cpu'} || 'unknown';
-      my @archs = grep {$_ eq $arch} split(/\s+/, $1);
-      $skip = 2 if !@archs;
+    if ($line =~ /\s*%(if|ifarch|ifnarch|ifos|ifnos)\b(.*)/) {
       $hasif = 1;
-      next;
-    }
-    if ($line =~ /^\s*%ifnarch(.*)$/) {
-      my $arch = $macros{'_target_cpu'} || 'unknown';
-      my @archs = grep {$_ eq $arch} split(/\s+/, $1);
-      $skip = 2 if @archs;
-      $hasif = 1;
-      next;
-    }
-    if ($line =~ /^\s*%ifos(.*)$/) {
-      my $os = $macros{'_target_os'} || 'unknown';
-      my @oss = grep {$_ eq $os} split(/\s+/, $1);
-      $skip = 2 if !@oss;
-      $hasif = 1;
-      next;
-    }
-    if ($line =~ /^\s*%ifnos(.*)$/) {
-      my $os = $macros{'_target_os'} || 'unknown';
-      my @oss = grep {$_ eq $os} split(/\s+/, $1);
-      $skip = 2 if @oss;
-      $hasif = 1;
-      next;
-    }
-    if ($line =~ /^\s*%if(.*)$/) {
-      my $v = do_expr($config, $1);
-      $v = expr_boolify($v);
-      $skip = 2 unless $v;
-      $hasif = 1;
-      next;
+      if ($1 eq 'if') {
+        my $v = do_expr($config, $2);
+        $skip = 2 unless expr_boolify($v);
+        next;
+      }
+      if ($1 eq 'ifarch' || $1 eq 'ifnarch') {
+        my $arch = $macros{'_target_cpu'} || 'unknown';
+        $skip = 2 if $1 eq 'ifarch' && !grep {$_ eq $arch} split(/\s+/, $2);
+        $skip = 2 if $1 eq 'ifnarch' && grep {$_ eq $arch} split(/\s+/, $2);
+	next;
+      }
+      if ($1 eq 'ifos' || $1 eq 'ifnos') {
+        my $os = $macros{'_target_os'} || 'unknown';
+        $skip = 2 if $1 eq 'ifos' && !grep {$_ eq $os} split(/\s+/, $2);
+        $skip = 2 if $1 eq 'ifnos' && grep {$_ eq $os} split(/\s+/, $2);
+	next;
+      }
     }
 
     # just save the expanded line if we're parsing the config
     if ($config->{'parsing_config'}) {
       $xspec->[-1] = [ $xspec->[-1], $line ] if $doxspec;
+      next;
+    }
+
+    # fast check if this is an interesting line
+    if ($line !~ /[%:\!]/) {
+      $xspec->[-1] = [ $xspec->[-1], $line ] if $doxspec && $config->{'save_expanded'};
       next;
     }
 
@@ -861,136 +853,145 @@ sub parse {
     }
 
     # generic parsing is done, the rest is spec specific
+    my $keyword;
+    my $arg;
+    if ($preamble) {
+      if ($line =~ /^(\S+)\s*:\s*(\S.*)/) {
+        $keyword = lc($1);
+        $arg = $2;
+        $arg =~ s/\s+$//;
+      } elsif ($line =~ /^(#!\S+)\s*/) {
+        $keyword = lc($1);
+      }
+    }
 
-    if ($main_preamble) {
-      if ($line =~ /^(Name|Epoch|Version|Release|Disttag|Url)\s*:\s*(\S+)/i) {
-	$ret->{lc $1} = $2;
-	$macros{lc $1} = $2;
-	$macros{uc $1} = $2;	# add a separate uppercase macro for tags from the main preamble
-      } elsif ($line =~ /^ExclusiveArch\s*:\s*(.*)/i) {
-	$exclarch ||= [];
-	push @$exclarch, split(' ', $1);
-      } elsif ($line =~ /^ExcludeArch\s*:\s*(.*)/i) {
-	$badarch ||= [];
-	push @$badarch, split(' ', $1);
-      }
-    }
-    if ($preamble && @subpacks && exists($ret->{'version'}) && $line =~ /^Version\s*:\s*(\S+)/i) {
-      $ret->{'multiversion'} = 1 if $ret->{'version'} ne $1;
-    }
-    if ($preamble && $line =~ /^\#\!ForceMultiVersion\s*$/i) {
-      $ret->{'multiversion'} = 1;
-    }
-    if ($preamble && $line =~ /^\#\!NativeBuild\s*$/i) {
-      $ret->{'nativebuild'} = 1;
-    }
-    if ($preamble && $line =~ /^\#\!RemoteAsset(?::\s*([a-z0-9]+:[0-9a-f]+))?\s*$/i) {
-      $remoteasset = {};
-      $remoteasset->{'digest'} = $1 if $1;
-    }
-    if ($preamble && $line =~ /^\#\!RemoteAssetUrl:\s*(\S+)\s*$/i) {
-      $remoteasset->{'url'} = $1;
-      push @{$ret->{'remoteassets'}}, $remoteasset;
-      $remoteasset = undef;
-    }
-    if ($preamble && $line =~ /^\#\!BuildTarget:\s*(\S+)\s*$/i) {
-      my $bt = $1;
-      if ($bt =~ s/(.*?)://) {
-	$bt = '' if $1 ne '' && $1 ne ($macros{'_target_cpu'} || 'unknown');
-      }
-      delete $ret->{'buildtarget'};
-      $ret->{'buildtarget'} = $bt if $bt;
-    }
-    if ($preamble && $line =~ /^\#\!BuildConstraint:\s*(\S.*?)\s*$/i) {
-      push @{$ret->{'buildconstraint'}}, $1;
-    }
-    if ($preamble && $line =~ /^\#\!BcntSyncTag:\s*(\S.*?)\s*$/i) {
-      $ret->{'bcntsynctag'} = $1;
-    }
-    if ($line =~ /^(?:Requires\(pre\)|Requires\(post\)|PreReq)\s*:\s*(\S.*)$/i) {
-      my $deps = $1;
-      my @deps;
-      if (" $deps" =~ /[\s,]\(/) {
-	@deps = splitdeps($deps);
-      } else {
-	@deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
-      }
-      while (@deps) {
-	my ($pack, $vers, $qual) = splice(@deps, 0, 3);
-	next if $pack eq 'MACRO';	# hope for the best...
-	if (!$unfilteredprereqs && $pack =~ /^\//) {
-	  $ifdeps = 1;
-	  next unless $config->{'fileprovides'}->{$pack};
-	}
-	# we ignore the version for now
-	push @prereqs, $pack unless grep {$_ eq $pack} @prereqs;
-      }
-      next;
-    }
-    if ($preamble && ($line =~ /^(BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires|\#\!AlsoNative|\#\!OnlyNative)\s*:\s*(\S.*)$/i)) {
-      my $what = $1;
-      my $deps = $2;
-      $ifdeps = 1 if $hasif;
-      # XXX: weird syntax addition. can append arch or project to dependency
-      # BuildRequire: foo > 17 [i586,x86_64]
-      # BuildRequire: foo [home:bar]
-      # BuildRequire: foo [!home:bar]
-      my @deps;
-      if (" $deps" =~ /[\s,]\(/) {
-	@deps = splitdeps($deps);	# we need to be careful, there could be a rich dep
-      } else {
-	@deps = $deps =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
-      }
-      my $replace;		# put filtered line into xspec
-      my @ndeps;
-      while (@deps) {
-	my ($pack, $vers, $qual) = splice(@deps, 0, 3);
-	if (defined($qual)) {
-	  $replace = 1;
-	  next if dep_qualifier_mismatch(\%macros, $qual);
-	}
-	$vers = '' unless defined $vers;
-	$vers =~ s/=(>|<)/$1=/;		# normalize a bit
-	push @ndeps, "$pack$vers";
-      }
-
-      my $lcwhat = lc($what);
-      if (defined($hasnfb) && $lcwhat eq 'buildrequires') {
-	if ((grep {$_ eq 'glibc' || $_ eq 'rpm' || $_ eq 'gcc' || $_ eq 'bash'} @ndeps) > 2) {
-	  # ignore old generated BuildRequire lines.
-	  $xspec->[-1] = [ $xspec->[-1], undef ] if $doxspec;
-	  next;
+    if ($keyword && defined($arg)) {
+      # special main preamble handling
+      if (!@subpacks) {
+	if ($keyword eq 'name' || $keyword eq 'epoch' || $keyword eq 'version' || $keyword eq 'release' || $keyword eq 'disttag' || $keyword eq 'url') {
+	  $arg = (split(' ', $arg, 2))[0];
+	  $ret->{$keyword} = $arg;
+	  $macros{$keyword} = $arg;
+	  $macros{uc $keyword} = $arg;	# add a separate uppercase macro for tags from the main preamble
+	} elsif ($keyword eq 'exclusivearch') {
+	  $exclarch ||= [];
+	  push @$exclarch, split(' ', $arg);
+	} elsif ($keyword eq 'excludearch') {
+	  $badarch ||= [];
+	  push @$badarch, split(' ', $arg);
 	}
       }
-      # put filtered line into xspec if we did filtering by qualifier
-      if ($replace && $doxspec && $line !~ /^#/) {
-	$xspec->[-1] = [ $xspec->[-1], @ndeps ? "$what:  ".join(' ', @ndeps) : '' ];
-      }
-      if ($lcwhat eq '#!alsonative') {
-	push @alsonative, @ndeps;
-      } elsif ($lcwhat eq '#!onlynative') {
-	push @onlynative, @ndeps;
-      } elsif ($lcwhat eq 'buildconflicts' || $lcwhat eq '#!buildconflicts' || $lcwhat eq '#!buildignore') {
-        if ($conflictdeps && $lcwhat ne '#!buildignore') {
-	  push @packdeps, map {"!$_"} @ndeps;
-	} else {
-	  push @packdeps, map {"-$_"} @ndeps;
+      if ($keyword eq 'version') {
+        $arg = (split(' ', $arg, 2))[0];
+        $ret->{'multiversion'} = 1 if @subpacks && exists($ret->{'version'}) && $ret->{'version'} ne $arg;
+      } elsif ($keyword eq '#!remoteasset') {
+        $remoteasset = {};
+        $remoteasset->{'digest'} = $arg if $arg =~ /^[a-z0-9]+:[0-9a-f]+$/;
+      } elsif ($keyword eq '#!remoteasseturl') {
+        $arg = (split(' ', $arg, 2))[0];
+        $remoteasset->{'url'} = $arg;
+        push @{$ret->{'remoteassets'}}, $remoteasset;
+        $remoteasset = undef;
+      } elsif ($keyword eq '#!buildtarget') {
+        $arg = (split(' ', $arg, 2))[0];
+        if ($arg =~ s/(.*?)://) {
+	  $arg = '' if $1 ne '' && $1 ne ($macros{'_target_cpu'} || 'unknown');
         }
-      } else {
-	push @packdeps, @ndeps;
+        delete $ret->{'buildtarget'};
+        $ret->{'buildtarget'} = $arg if $arg;
+      } elsif ($keyword eq '#!buildconstraint') {
+        push @{$ret->{'buildconstraint'}}, $arg;
+      } elsif ($keyword eq '#!bcntsynctag') {
+        $ret->{'bcntsynctag'} = $arg;
+      } elsif ($keyword eq 'buildrequires' || $keyword eq 'buildprereq' || $keyword eq 'buildconflicts' || $keyword eq '#!buildignore' || $keyword eq '#!buildconflicts' || $keyword eq '#!buildrequires' || $keyword eq '#!alsonative' || $keyword eq '#!onlynative') {
+	my $deps = $arg;
+	$ifdeps = 1 if $hasif;
+	# XXX: weird syntax addition. can append arch or project to dependency
+	# BuildRequire: foo > 17 [i586,x86_64]
+	# BuildRequire: foo [home:bar]
+	# BuildRequire: foo [!home:bar]
+	my @deps;
+	if (" $arg" =~ /[\s,]\(/) {
+	  @deps = splitdeps($arg);	# we need to be careful, there could be a rich dep
+	} else {
+	  @deps = $arg =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
+	}
+	my $replace;		# put filtered line into xspec
+	my @ndeps;
+	while (@deps) {
+	  my ($pack, $vers, $qual) = splice(@deps, 0, 3);
+	  if (defined($qual)) {
+	    $replace = 1;
+	    next if dep_qualifier_mismatch(\%macros, $qual);
+	  }
+	  $vers = '' unless defined $vers;
+	  $vers =~ s/=(>|<)/$1=/;		# normalize a bit
+	  push @ndeps, "$pack$vers";
+	}
+	if (defined($hasnfb) && $keyword eq 'buildrequires') {
+	  if ((grep {$_ eq 'glibc' || $_ eq 'rpm' || $_ eq 'gcc' || $_ eq 'bash'} @ndeps) > 2) {
+	    # ignore old generated BuildRequire lines.
+	    $xspec->[-1] = [ $xspec->[-1], undef ] if $doxspec;
+	    next;
+	  }
+	}
+	# put filtered line into xspec if we did filtering by qualifier
+	if ($replace && $doxspec && $line !~ /^#/) {
+	  die unless $line =~ /(.*?):/;
+	  $xspec->[-1] = [ $xspec->[-1], @ndeps ? "$1:  ".join(' ', @ndeps) : '' ];
+	}
+	if ($keyword eq 'buildrequires' || $keyword eq 'buildprereq' || $keyword eq '#!buildrequires') {
+	  push @packdeps, @ndeps;
+	} elsif ($keyword eq '#!alsonative') {
+	  push @alsonative, @ndeps;
+	} elsif ($keyword eq '#!onlynative') {
+	  push @onlynative, @ndeps;
+	} elsif ($keyword eq 'buildconflicts' || $keyword eq '#!buildconflicts' || $keyword eq '#!buildignore') {
+	  if ($conflictdeps && $keyword ne '#!buildignore') {
+	    push @packdeps, map {"!$_"} @ndeps;
+	  } else {
+	    push @packdeps, map {"-$_"} @ndeps;
+	  }
+	}
+      } elsif ($keyword eq 'url') {
+        $macros{$keyword} = $arg;
+        $keyword .= scalar @subpacks if @subpacks;	# associate with the corresponding subpackage
+	$ret->{$keyword} = $arg;
+      } elsif ($keyword eq 'icon') {
+        $keyword .= scalar @subpacks if @subpacks;	# associate with the corresponding subpackage
+        push @{$ret->{$keyword}}, $arg;			# there can be a gif and xpm icon
+      } elsif ($keyword eq 'requires(pre)' || $keyword eq 'requires(post)' || $keyword eq 'prereq') {
+	my @deps;
+	if (" $arg" =~ /[\s,]\(/) {
+	  @deps = splitdeps($arg);
+	} else {
+	  @deps = $arg =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
+	}
+	while (@deps) {
+	  my ($pack, $vers, $qual) = splice(@deps, 0, 3);
+	  next if $pack eq 'MACRO';	# hope for the best...
+	  if (!$unfilteredprereqs && $pack =~ /^\//) {
+	    $ifdeps = 1;
+	    next unless $config->{'fileprovides'}->{$pack};
+	  }
+	  # we ignore the version for now
+	  push @prereqs, $pack unless grep {$_ eq $pack} @prereqs;
+	}
       }
-    } elsif ($preamble && $line =~ /^(Url|Icon)\s*:\s*(\S+)/i) {
-      my ($tag, $val) = (lc($1), $2);
-      $macros{$tag} = $val if $tag eq 'url';
-      # associate url and icon tags with the corresponding subpackage
-      $tag .= scalar @subpacks if @subpacks;
-      if ($tag =~ /icon/) {
-        # there can be a gif and xpm icon
-        push @{$ret->{$tag}}, $val;
-      } else {
-	$ret->{$tag} = $val;
+    }
+
+    if ($keyword && !defined($arg)) {
+      if ($keyword eq '#!forcemultiversion') {
+        $ret->{'multiversion'} = 1;
+      } elsif ($keyword eq '#!nativebuild') {
+        $ret->{'nativebuild'} = 1;
+      } elsif ($keyword eq '#!remoteasset') {
+        $remoteasset = {};
       }
-    } elsif ($preamble && $line =~ /^(Source|Patch)(\d*)\s*(\s+[^:]*?)?:\s*(\S+)/i) {
+    }
+
+    # need to special case because of tagextra...
+    if ($preamble && $line =~ /^(Source|Patch)(\d*)\s*(\s+[^:]*?)?:\s*(\S+)/i) {
       my ($tagtype, $num, $tagextra, $val) = (lc($1), $2, $3, $4);
       $num = $num ne '' ? 0 + $num : $autonum{$tagtype};
       my $tag = "$tagtype$num";
@@ -1010,7 +1011,9 @@ sub parse {
         push @{$ret->{'remoteassets'}}, $remoteasset;
       }
       $remoteasset = undef;
-    } elsif (!$preamble && ($line =~ /^(Source\d*|Patch\d*|Url|Icon|BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires)\s*:\s*(\S.*)$/i)) {
+    }
+
+    if (!$preamble && ($line =~ /^(Source\d*|Patch\d*|Url|Icon|BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires)\s*:\s*(\S.*)$/i)) {
       do_warn($config, "spec file parser ".($lineno ? " line $lineno" : '').": Ignoring $1 used beyond the preamble");
     }
 
@@ -1018,13 +1021,11 @@ sub parse {
       if ($1) {
 	push @subpacks, $2;
       } else {
-	push @subpacks, $ret->{'name'}.'-'.$2 if defined $ret->{'name'};
+	push @subpacks, defined($ret->{'name'}) ? "$ret->{'name'}-$2" : "unknown-$2";
       }
       $preamble = 1;
-      $main_preamble = 0;
-    } elsif ($line =~ /^\s*%(?:prep|build|install|check|clean|preun|postun|pretrans|posttrans|pre|post|files|changelog|description|triggerpostun|triggerun|triggerin|trigger|verifyscript)/) {
+    } elsif ($line =~ /^\s*%(?:prep|generate_buildrequires|conf|build|install|check|clean|preun|postun|pretrans|posttrans|preuntrans|postuntrans|pre|post|files|changelog|description|triggerpostun|triggerprein|triggerun|triggerin|trigger|verifyscript|sepolicy|filetriggerin|filetrigger|filetriggerun|filetriggerpostun|transfiletriggerin|transfiletrigger|transfiletriggerun|transfiletriggerpostun|end|patchlist|sourcelist)\b/) {
       $preamble = 0;
-      $main_preamble = 0;
     }
 
     # do this always?
