@@ -56,10 +56,10 @@ sub reply {
   push @hdrs, "Content-Length: ".length($str) if defined($str);
   my $data = join("\r\n", @hdrs)."\r\n\r\n";
   $data .= $str if defined $str;
-  fcntl($sock, F_SETFL,O_NONBLOCK);
+  fcntl($sock, F_SETFL, O_NONBLOCK);
   my $dummy = ''; 
   1 while sysread($sock, $dummy, 1024, 0);
-  fcntl($sock, F_SETFL,0);
+  fcntl($sock, F_SETFL, 0);
   replyraw($data);
 }
 
@@ -206,23 +206,23 @@ eval {
     die("stat: $!\n") unless @s;
     my $l = $s[7];
     reply(undef, "Content-Length: $l", 'Content-Type: application/octet-stream');
+    $l = 0 if $action eq 'HEAD';
     my $data;
-    while (1) {
-      last unless $l;
-      my $r = sysread($f, $data, 8192);
+    while ($l > 0) {
+      die("unexpected EOF in data\n") unless sysread($f, $data, 8192);
       $data = substr($data, 0, $l) if length($data) > $l;
       $l -= length($data);
-      while (length($data)) {
-        my $l2 = syswrite($sock, $data, length($data));
-        die("socket write: $!\n") unless $l2;
-        $data = substr($data, $l2);
-      }
+      replyraw($data);
     }
     close($f);
   } else {
     die("404 File not found\n");
   }
 };
-reply_error($@) if $@;
+if ($@) {
+  my $err = $@;
+  eval { reply_error($err) };
+  print "[$@]" if $@;
+}
 close $sock;
 print "[$status $path]";
