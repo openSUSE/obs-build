@@ -227,7 +227,7 @@ recipe_build_docker() {
 		buildargs[${#buildargs[@]}]="$kv"
 		;;
 	esac
-    done < <( queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ dockerarg )
+    done < <( queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" --decode buildflags+ dockerarg )
 
     if test -n "$BUILD_FLAVOR" ; then
 	buildargs[${#buildargs[@]}]='--build-arg'
