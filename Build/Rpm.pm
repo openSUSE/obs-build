@@ -756,7 +756,7 @@ sub parse {
 	next;
       }
     }
-    if ($multilinecondition || $line =~ /^\s*\%\{[?!]*-?[0-9a-zA-Z_]+:\s*$/s) {
+    if ($multilinecondition || $line =~ /^\s*%\{[?!]*-?[0-9a-zA-Z_]+:\s*$/s) {
       # is this a multi-line macro condition?
       $line = "$multilinecondition\n$line" if defined $multilinecondition;
       undef $multilinecondition;
@@ -794,8 +794,7 @@ sub parse {
       # skip was set before, so we did not expand macros
       $line = expandmacros($config, $line, $lineno, \%macros, \%macros_args);
       $line = splitexpansionresult($line, \@includelines) if $line =~ /\n/s;
-    }
-    if ($skip) {
+    } elsif ($skip) {
       $skip += 2 if $line =~ /^\s*%if/;		# increase nesting level for %if statements
       $xspec->[-1] = [ $xspec->[-1], undef ] if $doxspec;
       $ifdeps = 1 if $line =~ /^(?:BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires)\s*:\s*\S/i;
@@ -836,11 +835,11 @@ sub parse {
       next;
     }
 
+    # do this always?
+    $xspec->[-1] = [ $xspec->[-1], $line ] if $doxspec && $config->{'save_expanded'};
+
     # fast check if this is an interesting line
-    if ($line !~ /[%:\!]/) {
-      $xspec->[-1] = [ $xspec->[-1], $line ] if $doxspec && $config->{'save_expanded'};
-      next;
-    }
+    next if $line !~ /[%:\!]/;
 
     # handle %include statement
     if ($includecallback && $line =~ /^\s*%include\s+(.*)\s*$/) {
@@ -851,6 +850,7 @@ sub parse {
 	do_warn($config, "%include statment level too high, ignored");
       }
     }
+
 
     # generic parsing is done, the rest is spec specific
     my $keyword;
@@ -931,14 +931,18 @@ sub parse {
 	if (defined($hasnfb) && $keyword eq 'buildrequires') {
 	  if ((grep {$_ eq 'glibc' || $_ eq 'rpm' || $_ eq 'gcc' || $_ eq 'bash'} @ndeps) > 2) {
 	    # ignore old generated BuildRequire lines.
-	    $xspec->[-1] = [ $xspec->[-1], undef ] if $doxspec;
+	    if ($doxspec) {
+	      $xspec->[-1] = $xspec->[-1]->[0] if ref($xspec->[-1]);
+	      $xspec->[-1] = [ $xspec->[-1], undef ] if $doxspec;
+	    }
 	    next;
 	  }
 	}
 	# put filtered line into xspec if we did filtering by qualifier
 	if ($replace && $doxspec && $line !~ /^#/) {
 	  die unless $line =~ /(.*?):/;
-	  $xspec->[-1] = [ $xspec->[-1], @ndeps ? "$1:  ".join(' ', @ndeps) : '' ];
+	  $xspec->[-1] = $xspec->[-1]->[0] if ref($xspec->[-1]);
+	  $xspec->[-1] = [ $xspec->[-1], @ndeps ? "$1:  ".join(' ', @ndeps) : '' ] if $doxspec;
 	}
 	if ($keyword eq 'buildrequires' || $keyword eq 'buildprereq' || $keyword eq '#!buildrequires') {
 	  push @packdeps, @ndeps;
@@ -978,6 +982,7 @@ sub parse {
 	  push @prereqs, $pack unless grep {$_ eq $pack} @prereqs;
 	}
       }
+      next;
     }
 
     if ($keyword && !defined($arg)) {
@@ -988,6 +993,7 @@ sub parse {
       } elsif ($keyword eq '#!remoteasset') {
         $remoteasset = {};
       }
+      next;
     }
 
     # need to special case because of tagextra...
@@ -1011,6 +1017,7 @@ sub parse {
         push @{$ret->{'remoteassets'}}, $remoteasset;
       }
       $remoteasset = undef;
+      next;
     }
 
     if (!$preamble && ($line =~ /^(Source\d*|Patch\d*|Url|Icon|BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires)\s*:\s*(\S.*)$/i)) {
@@ -1028,10 +1035,6 @@ sub parse {
       $preamble = 0;
     }
 
-    # do this always?
-    if ($doxspec && $config->{'save_expanded'}) {
-      $xspec->[-1] = [ $xspec->[-1], $line ];
-    }
   }
   close SPEC unless ref $specfile;
   if (defined($hasnfb)) {
@@ -1043,8 +1046,8 @@ sub parse {
   }
   unshift @subpacks, $ret->{'name'} if defined $ret->{'name'};
   $ret->{'subpacks'} = \@subpacks;
-  $ret->{'exclarch'} = $exclarch if defined $exclarch;
-  $ret->{'badarch'} = $badarch if defined $badarch;
+  $ret->{'exclarch'} = $exclarch if $exclarch;
+  $ret->{'badarch'} = $badarch if $badarch;
   $ret->{'deps'} = \@packdeps;
   $ret->{'prereqs'} = \@prereqs if @prereqs;
   $ret->{'onlynative'} = \@onlynative if @onlynative;
