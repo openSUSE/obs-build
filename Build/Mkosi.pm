@@ -67,8 +67,9 @@ sub parse {
   if (length $cfg->val('Content', 'BuildPackages')) {
     push(@packages, split /\s+/, $cfg->val('Content', 'BuildPackages'));
   }
-  if (length $cfg->val('Partitions', 'BaseImage')) {
-    push(@packages, $cfg->val('Partitions', 'BaseImage'));
+  # XXX: split by comma
+  if (length $cfg->val('Content', 'BaseTrees')) {
+    push(@packages, "mkosi:".$cfg->val('Content', 'BaseTrees'));
   }
 
   $ret->{'name'} = $fn;

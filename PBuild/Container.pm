@@ -55,8 +55,12 @@ sub manifest2obsbinlnk {
     return {};
   }
 
-  foreach my $ext ("", ".gz", ".xz", ".zst", ".zstd") {
-    if (-e "$dir/$prefix$ext") {
+  for my $ext ("", ".raw", ".gz", ".xz", ".zst", ".zstd") {
+    my $fn = "$dir/$prefix$ext";
+    if (-e $fn) {
+      if (-l $fn) {
+        $prefix = readlink($fn);
+      }
       open(my $fh, '<', "$dir/$prefix$ext") or die("Error opening $dir/$prefix$ext: $!\n");
       $md5->addfile($fh);
       close($fh);
@@ -72,14 +76,14 @@ sub manifest2obsbinlnk {
   my $release = $metadata->{'config'}->{'release'};
   my $architecture = $metadata->{'config'}->{'architecture'};
   my $name = $metadata->{'config'}->{'name'};
-  my $version = $metadata->{'config'}->{'version'};
+  my $version = $metadata->{'config'}->{'version'} || '0';
   # Note: release here is not the RPM release, but the distribution release (eg: Debian 10)
-  my @provides = ("$distribution:$release", "$name = $version", "$packid = $version");
+  my @provides = ("$distribution:$release", "mkosi:$name = $version", "mkosi:$packid = $version");
 
   return {
       'provides' => \@provides,
       'source' => $packid,
-      'name' => $name,
+      'name' => "mkosi:$name",
       'version' => $version,
       'release' => '0',
       'arch' => $architecture,

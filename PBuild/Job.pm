@@ -215,6 +215,8 @@ sub createjob {
   my $kiwimode = $p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker' || $p->{'buildtype'} eq 'fissile' || $p->{'buildtype'} eq 'productcompose' ? $p->{'buildtype'} : undef;
   if ($kiwimode) {
     @alldeps = PBuild::Util::unify(@$pdeps, @$vmdeps, @$sysdeps);
+  } elsif ($p->{'buildtype'} eq 'mkosi') {
+    @alldeps = PBuild::Util::unify(@$pdeps, @$vmdeps, grep {!/^mkosi:/} @$bdeps, @$sysdeps);
   } else {
     @alldeps = PBuild::Util::unify(@$pdeps, @$vmdeps, @$bdeps, @$sysdeps);
   }
@@ -262,7 +264,7 @@ sub createjob {
   my $copy_sources_asis;
   # for kiwi/docker we need to copy the sources to $buildroot/.build-srcdir
   # so that we can set up the "repos" and "containers" directories
-  if ($kiwimode || $p->{'asset_files'} || grep {/\/$/} keys %{$p->{'files'} || {}}) {
+  if ($kiwimode || $p->{'buildtype'} eq 'mkosi' || $p->{'asset_files'} || grep {/\/$/} keys %{$p->{'files'} || {}}) {
     $srcdir = "$buildroot/.build-srcdir";
     copy_sources($p, $srcdir);
     $ctx->{'assetmgr'}->copy_assets($p, $srcdir) if $p->{'asset_files'};
@@ -340,7 +342,7 @@ sub createjob {
   push @args, "--rpm-recipe-in-subdir" if $p->{'recipe'} =~ /^(?:package|dist)\/.*\.spec$/;
   push @args, "$srcdir/$p->{'recipe'}";
 
-  if ($kiwimode) {
+  if ($kiwimode || $p->{'buildtype'} eq 'mkosi') {
     # now setup the repos/containers directories
     $ctx->{'repomgr'}->copyimagebinaries($ctx->dep2bins(@$bdeps), $srcdir);
     # and tell kiwi how to use them
