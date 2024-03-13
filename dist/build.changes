@@ -1,4 +1,18 @@
 -------------------------------------------------------------------
+Wed Mar 13 09:46:13 UTC 2024 - Adrian Schröter <adrian@suse.de>
+
+- Add a hack for systemd 255.3, creating an empty /etc/os-release
+  if missing after preinstall.
+- docker: Fix HEAD request in dummyhttpserver
+- pbuild: Make docker-nobasepackages expand flag the default
+- rpm: Support a couple of builtin rpm macros
+- rpm: Implement argument expansion for define/with/bcond...
+- Fix multiline macro handling
+- Accept -N parameter of %autosetup
+- documentation updates
+- various code cleanup and speedup work.
+
+-------------------------------------------------------------------
 Wed Feb 21 11:55:13 UTC 2024 - Adrian Schröter <adrian@suse.de>
 
 - ProductCompose: multiple improvements
