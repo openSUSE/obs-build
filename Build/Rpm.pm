@@ -862,6 +862,8 @@ sub parse {
         $arg =~ s/\s+$//;
       } elsif ($line =~ /^(#!\S+)\s*/) {
         $keyword = lc($1);
+      } elsif (!@subpacks && $line =~ /^ExclusiveArch\s*:/i) {
+	$exclarch ||= [];	 # bah! gross compatibility hack for old broken spec files!
       }
     }
 
