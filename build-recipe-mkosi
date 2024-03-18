@@ -111,8 +111,13 @@ recipe_build_mkosi() {
     cp "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" \
         "$BUILD_ROOT/$TOPDIR/OTHER/"
 
-    # compress the manifest file which can be quite large
-    gzip -9 -f "$BUILD_ROOT/$TOPDIR/OTHER/"*.manifest
+    # if present, compress the manifest file(s) which can be quite large
+    for f in "$BUILD_ROOT/$TOPDIR"/OTHER/*.manifest; do
+        if [ ! -f "$f" ]; then
+            continue
+        fi
+        gzip -9 -f "$f"
+    done
 
     # shellcheck disable=SC2034
     BUILD_SUCCEEDED=true
