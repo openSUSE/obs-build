@@ -330,11 +330,11 @@ sub builtinmacro {
     $args[0] =~ s/ $//;
     return $args[0];
   }
-  if ($macname eq 'bcond_with') {
+  if ($macname eq 'bcond_with' || ($macname eq 'bcond' && !$args[1])) {
     $macros->{"with_$args[0]"} = 1 if exists $macros->{"_with_$args[0]"};
     return '';
   }
-  if ($macname eq 'bcond_without') {
+  if ($macname eq 'bcond_without' || ($macname eq 'bcond' && $args[1])) {
     $macros->{"with_$args[0]"} = 1 unless exists $macros->{"_without_$args[0]"};
     return '';
   }
@@ -404,6 +404,7 @@ my %builtin_macros = (
   'undefined' => \&builtinmacro,
   'with' => \&builtinmacro,
   'without' => \&builtinmacro,
+  'bcond' => \&builtinmacro,
   'bcond_with' => \&builtinmacro,
   'bcond_without' => \&builtinmacro,
   'expr' => \&builtinmacro,
