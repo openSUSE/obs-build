@@ -121,11 +121,13 @@ for my $line (@$xspec) {
   }
 
   my $used = 1;
+  my $origline;
   if (ref($line)) {
     if (!defined($line->[1])) {
       $used = 0;
       $line = $line->[0];
     } else {
+      $origline = $line->[0];
       $line = $line->[1];
     }
   }
@@ -285,11 +287,13 @@ for my $line (@$xspec) {
   }
 
   if (!$used || ($line !~ /^(?:Requires|BuildRequires|PreReq)(?:\([^\)]+\))?:/i)) {
+    $line = $origline if defined $origline;
     print F "$line\n";
     next;
   }
   if ($line =~ /%\(/) {
     # too hard for us
+    $line = $origline if defined $origline;
     print F "$line\n";
     next;
   }
@@ -300,6 +304,7 @@ for my $line (@$xspec) {
   $r =~ s/^[^:]*:\s*//;
   if ($r =~ /^\(/) {
     # no rich dependency support for now
+    $line = $origline if defined $origline;
     print F "$line\n";
     next;
   }
@@ -335,8 +340,10 @@ for my $line (@$xspec) {
   }
   if ($replace) {
     $line =~ /^(.*?:\s*)/;
-    print F $1.join(' ', @ndeps)."\n" if @ndeps;
+    print F $1.join(' ', @ndeps) if @ndeps;
+    print F "\n";
   } else {
+    $line = $origline if defined $origline;
     print F "$line\n";
   }
 }
