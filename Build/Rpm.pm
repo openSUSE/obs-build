@@ -713,6 +713,7 @@ sub parse {
   my $remoteasset;
   my $multilinedefine;
   my $multilinecondition;
+  my $substitute = $config->{'substitute'};
   while (1) {
     my $line;
     my $doxspec = $xspec ? 1 : 0;
@@ -930,6 +931,7 @@ sub parse {
 	  $vers = '' unless defined $vers;
 	  $vers =~ s/=(>|<)/$1=/;		# normalize a bit
 	  push @ndeps, "$pack$vers";
+	  $replace = 1 if $doxspec && $substitute && $substitute->{$pack} && $keyword eq 'buildrequires';
 	}
 	if (defined($hasnfb) && $keyword eq 'buildrequires') {
 	  if ((grep {$_ eq 'glibc' || $_ eq 'rpm' || $_ eq 'gcc' || $_ eq 'bash'} @ndeps) > 2) {

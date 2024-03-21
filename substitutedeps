@@ -108,7 +108,6 @@ my %sdeps = map {$_ => 1} @sdeps;
 
 open(F, '>', $newspec) || die("$newspec: $!\n");
 
-my $used;
 my $inchangelog = 0;
 my $mainpkg = '';
 my $pkg;
@@ -120,7 +119,8 @@ for my $line (@$xspec) {
   } else {
     die("recipe contains \@OBS_PACKAGE\@, but no package is set\n") if $line =~ /\@OBS_PACKAGE\@/;
   }
-  $used = 1;
+
+  my $used = 1;
   if (ref($line)) {
     if (!defined($line->[1])) {
       $used = 0;
@@ -312,6 +312,7 @@ for my $line (@$xspec) {
     delete $f2{$_} for @neg;
     delete $f2{$_} for grep {/^-/} keys %f2;
   }
+  # go through the unsubstituted dependencies
   while (@deps) {
     my ($pack, $vers) = splice(@deps, 0, 2);
     $vers = '' unless defined $vers;
@@ -319,14 +320,15 @@ for my $line (@$xspec) {
       push @ndeps, "$pack$vers";
       delete $f2{$pack};
     } else {
-      $replace = 1;
+      $replace = 1;	# we dropped this one
     }
   }
+  # add extra dependencies coming from the substitution
   if (%f2) {
     while (@f2) {
       my ($pack, $vers) = splice(@f2, 0, 2);
-      next unless exists $f2{$pack};
       $vers = '' unless defined $vers;
+      next unless exists $f2{$pack};
       push @ndeps, "$pack$vers";
     }
     $replace = 1
