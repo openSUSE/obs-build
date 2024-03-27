@@ -176,7 +176,7 @@ vm_wipe_pvm(){
 
 vm_fixup_pvm(){
     VM_SWAPDEV=/dev/sdb
-    GRUBDIR=`mktemp -d /tmp/grubinstall.XXXX`
+    GRUBDIR=`mktemp -d /tmp/grubinstall.XXXXXXXXXX`
     modules="ext2 part_msdos linux disk elf"
     grubcfg="$GRUBDIR/grub.cfg"
     grubimg="$GRUBDIR/grub.img"

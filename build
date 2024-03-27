@@ -1448,7 +1448,7 @@ fi
 expand_recipe_directories
 
 if test -n "$LIST_STATE" ; then
-    BUILD_ROOT=`mktemp -d /var/tmp/build-list-state-XXXXXX`
+    BUILD_ROOT=`mktemp -d /var/tmp/build-list-state-XXXXXXXXXX`
     test -d "$BUILD_ROOT" || cleanup_and_exit 3
     RECIPEPATH=$RECIPEFILES # only one specified anyways
     test "$RECIPEPATH" != "${RECIPEPATH%.src.rpm}" && recipe_unpack_srcrpm "$RECIPEPATH"

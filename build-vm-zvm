@@ -334,7 +334,7 @@ vm_initrd_obs_modules_zvm() {
     # initrd is to be created at $2-$3
     # first, test if initrd has already been created
     test -f "${2}-${3}" && return
-    TEMPDIR=$(mktemp -d /tmp/initrd.XXX)
+    TEMPDIR=$(mktemp -d /tmp/initrd.XXXXXXXXXX)
     pushd $TEMPDIR
     # unpack initrd to add the kernel modules
     xzcat "$2" | cpio -i
