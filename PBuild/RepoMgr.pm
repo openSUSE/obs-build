@@ -170,6 +170,8 @@ sub copyimagebinaries {
       $to =~ s/[\/:]/_/g;
       PBuild::Verify::verify_filename($to);
       $to = "$dstdir/containers/$to";
+    } elsif ($q->{'name'} =~ /^mkosi:/) {
+      $to = "$dstdir/$q->{'lnk'}";
     } else {
       die("package $q->{'name'} is not available\n") unless $q->{'filename'};
       PBuild::Verify::verify_filename($q->{'filename'});
