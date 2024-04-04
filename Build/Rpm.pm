@@ -986,8 +986,10 @@ sub parse {
 	  # we ignore the version for now
 	  push @prereqs, $pack unless grep {$_ eq $pack} @prereqs;
 	}
+      } else {
+	undef $keyword;
       }
-      next;
+      next if $keyword;
     }
 
     if ($keyword && !defined($arg)) {
