@@ -294,10 +294,13 @@ sub parse {
 	my $arch = gettargetarch($cf);
 	$excludedline = (grep {$_ eq $arch} split(' ', $1)) ? 1 : undef;
       }
-      if ($line =~ /^\#\!RemoteAssetUrl:\s*(\S+)\s*$/i) {
+      if ($line =~ /^#!RemoteAssetUrl:\s*(\S+)\s*$/i) {
         $remoteasset->{'url'} = $1;
         push @{$ret->{'remoteassets'}}, $remoteasset;
         $remoteasset = undef;
+      }
+      if ($line =~ /^#!ForceMultiVersion\s*$/) {
+        $ret->{'multiversion'} = 1;
       }
       next;
     }
