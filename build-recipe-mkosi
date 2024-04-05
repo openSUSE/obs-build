@@ -93,9 +93,23 @@ recipe_build_mkosi() {
     if [ -n "$RELEASE" ]; then
         image_version="--image-version=${RELEASE}"
     fi
-    chroot "$BUILD_ROOT" sh -c \
-        "cd $TOPDIR/SOURCES && mkosi --default $RECIPEFILE $RELEASE_ARG $image_version --nspawn-keep-unit --output-dir $TOPDIR/OTHER --checksum --repository-key-check=no --with-network=never --local-mirror file:///.build.binaries/ --cache /.build.binaries/ build" \
-        || cleanup_and_exit 1
+    set -- mkosi \
+        --directory "$TOPDIR/SOURCES" \
+        --default \
+        "$RECIPEFILE" \
+        $RELEASE_ARG \
+        $image_version \
+        --nspawn-keep-unit \
+        --output-dir "$TOPDIR/OTHER" \
+        --checksum \
+        --repository-key-check=no \
+        --with-network=never \
+        --local-mirror file:///.build.binaries/ \
+        --cache /.build.binaries/ \
+        build
+
+    echo "running $*"
+    chroot "$BUILD_ROOT" "$@" || cleanup_and_exit 1
 
     # move the output files from the subdirectory, as only files in the OTHER/ directory
     # are published, but they get deposited in OTHER/$DIST~$RELEASE/
@@ -130,3 +144,5 @@ recipe_resultdirs_mkosi() {
 recipe_cleanup_mkosi() {
     :
 }
+
+# vim: syntax=sh
