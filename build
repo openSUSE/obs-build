@@ -883,6 +883,10 @@ mkdir_build_root() {
 	if test -z "$RUNNING_IN_VM" -a \! -O "$BUILD_ROOT" -a "`stat -c %u $BUILD_ROOT`" -ne 0 ; then
 	    cleanup_and_exit 1 "BUILD_ROOT=$BUILD_ROOT must be owned by root. Exit..."
 	fi
+
+	if test -z "$RUNNING_IN_VM" -a -O "$BUILD_ROOT" -a "`stat -c %u $BUILD_ROOT`" -ne 0 ; then
+            chmod u+w "$BUILD_ROOT"
+	fi
     else
 	test "$BUILD_ROOT" != "${BUILD_ROOT%/*}" && mkdir -p "${BUILD_ROOT%/*}"
 	if ! mkdir $BUILD_ROOT ; then
@@ -890,6 +894,7 @@ mkdir_build_root() {
 	fi
     fi
 
+    # For VM based builds as user, the root needs to be writeable
     if test ! -w "$BUILD_ROOT" ; then
 	cleanup_and_exit 1 "Error: BUILD_ROOT=$BUILD_ROOT not writable, try --clean."
     fi
