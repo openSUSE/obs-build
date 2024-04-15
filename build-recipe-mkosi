@@ -98,7 +98,7 @@ recipe_build_mkosi() {
                     "mkosi.postinst.chroot"
                     "mkosi.finalize"
                     "mkosi.finalize.chroot"
-                    "mkosi.clean" 
+                    "mkosi.clean"
                    )
 
     for file in `ls $TOPDIR/SOURCES`; do
