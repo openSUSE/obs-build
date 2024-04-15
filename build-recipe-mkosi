@@ -88,6 +88,24 @@ recipe_build_mkosi() {
             chroot "$BUILD_ROOT" sh -c "repo-add /.build.binaries/core.db.tar.gz /.build.binaries/*"
         fi
     fi
+    mkosi_scripts=( "mkosi.configure"
+                    "mkosi.sync"
+                    "mkosi.prepare"
+                    "mkosi.prepare.chroot"
+                    "mkosi.build"
+                    "mkosi.build.chroot"
+                    "mkosi.postinst"
+                    "mkosi.postinst.chroot"
+                    "mkosi.finalize"
+                    "mkosi.finalize.chroot"
+                    "mkosi.clean" 
+                   )
+
+    for file in `ls $TOPDIR/SOURCES`; do
+      if [[ "${mkosi_scripts[@]}" =~ "$file" ]]; then
+        chmod +x $file
+      fi
+    done
 
     local image_version=""
     if [ -n "$RELEASE" ]; then
