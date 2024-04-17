@@ -278,7 +278,7 @@ sub read_pkgs_rpmdb {
 
 sub parse_debian_copyright_file {
   my ($root, $pkg) = @_;
-  my $found = 0;
+  my $filesfound = 0;
   my $crfound = 0;
   my $formatfound = 0;
   my %ret;
@@ -286,29 +286,46 @@ sub parse_debian_copyright_file {
   local *F;
   if (open(F, '<', $file)) {
     my @copyright;
+    my @license;
     while(<F>) {
-      if ($_ =~ /Format: https:\/\/www.debian.org\/doc\/packaging-manuals\/copyright-format\/1.0\// or $formatfound ) {
+      if ($_ =~ /^Format: https:\/\/www.debian.org\/doc\/packaging-manuals\/copyright-format\/1.0\// or $formatfound ) {
         $formatfound = 1
       } else {
         last;
       }
-      if ($_ =~ /Files: \*/) {
-        $found = 1;
+      if ($_ =~ /^Files: \*/) {
+        $filesfound = 1;
         $crfound = 0;
       }
-      if ($_ =~ /Copyright:\s*(.+)\n/) {
+      if ($_ =~ /^Copyright:\s*(.+)\n/) {
+        $filesfound = 0;
         $crfound = 1;
         push(@copyright, $1);
-      } elsif ($_ =~ /^\s{2,}(.*)\n/ and $crfound ) {
-        push(@copyright, $1);
-      } elsif ($_ =~ /License:\s*(.+)\n/) {
+      } elsif ($_ =~ /^Copyright:/) {
+        $filesfound = 0;
+        $crfound = 1;
+      } elsif ($_ =~ /^License:\s*(.+)\n/) {
+        $filesfound = 0;
+        $crfound = 0;
         # TODO licenses has to match https://spdx.org/licenses/?
-        $ret{'license'} = $1;
-      } elsif ($_ =~ /^\n/ and $found ) {
+	push(@license, $1);
+      } elsif ($_ =~ /^(Comment|Disclaimer|Source|Upstream-Name|Upstream-Contact):/) {
+        $filesfound = 0;
+        $crfound = 0;
+      } elsif ($_ =~ /^\s{1,}(.*)\n/ and $crfound ) {
+        push(@copyright, $1);
+      } elsif ($_ =~ /^\n/ and $filesfound ) {
         last;
       }
     }
-    $ret{'copyright'} = join(', ', @copyright);
+    my %seen = ();
+    my @copyright_uniq = grep { !$seen{$_} ++ } @copyright;
+    @copyright_uniq = grep {!/^(\*No copyright\*|No copyright|none|\*unknown\*|unknown)$/} @copyright_uniq;
+    $ret{'copyright'} = join('\n ', sort @copyright_uniq);
+    %seen = ();
+    my @license_uniq = grep { !$seen{$_} ++ } @license;
+    $ret{'license'} = join(' AND ', sort @license_uniq);
+
   } else {
     %ret = undef;
   }
