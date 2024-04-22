@@ -28,6 +28,7 @@ use Build::SimpleXML;
 use PBuild::Util;
 use PBuild::Verify;
 use PBuild::Container;
+use PBuild::Mkosi;
 
 my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst};
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
@@ -130,11 +131,11 @@ sub integrate_build_result {
       PBuild::Util::cp_a($result->{$file}, "$dst/$file");
       next;
     }
-    if ($file =~ /(.*)\.manifest(?:\.(?:gz|bz2|xz|zst|zstd))?$/) {
+    if ($p->{'buildtype'} eq 'mkosi' && $file =~ /(.*)\.manifest(?:\.(?:gz|bz2|xz|zst|zstd))?$/) {
       # create an obsbinlnk file from the mkosi manifest
       my $prefix = $1;
       die unless $result->{$file} =~ /^(.*)\/([^\/]+)$/;
-      my $obsbinlnk = PBuild::Container::manifest2obsbinlnk($1, $2, $prefix, $p->{'pkg'});
+      my $obsbinlnk = PBuild::Mkosi::manifest2obsbinlnk($1, $2, $prefix, $p->{'pkg'});
       PBuild::Util::store("$dst/$prefix.obsbinlnk", undef, $obsbinlnk) if $obsbinlnk;
     }
     PBuild::Util::cp($result->{$file}, "$dst/$file");
