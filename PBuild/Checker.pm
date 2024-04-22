@@ -728,7 +728,7 @@ sub handlecycle {
     my $notready = $ctx->{'notready'};
     my $pkgsrc = $ctx->{'pkgsrc'};
     if (grep {$notready->{$_->{'name'} || $_->{'pkg'}}} map {$pkgsrc->{$_}} @cycp) {
-      $notready->{$_->{'name'} || $_->{'pkg'}} ||= 1 for @cycp;
+      $notready->{$_->{'name'} || $_->{'pkg'}} ||= 1 for map {$pkgsrc->{$_}} @cycp;
     }
     return (undef, 3);
   }
