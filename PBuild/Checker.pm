@@ -48,7 +48,7 @@ sub create {
     'builddir' => $builddir,
     'block' => undef,		# block strategy   (all,never)
     'rebuild' => undef,		# rebuild strategy (transitive,direct,local)
-    'debuginfo' => 1,		# create debug packages?
+    'debuginfo' => defined($opts->{'debuginfo'}) ? $opts->{'debuginfo'} : 1,	# create debug packages?
     'genmetaalgo' => $genmetaalgo,
     'lastcheck' => {},
     'metacache' => {},
