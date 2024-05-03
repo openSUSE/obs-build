@@ -308,7 +308,7 @@ sub parse_debian_copyright_file {
         $filesfound = 0;
         $crfound = 0;
         # TODO licenses has to match https://spdx.org/licenses/?
-	push(@license, $1);
+        push(@license, $1);
       } elsif ($_ =~ /^(Comment|Disclaimer|Source|Upstream-Name|Upstream-Contact):/) {
         $filesfound = 0;
         $crfound = 0;
