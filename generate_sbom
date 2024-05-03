@@ -32,7 +32,9 @@ use File::Temp;
 use Digest::SHA;
 use Digest::MD5;
 
+use Build;
 use Build::Rpm;
+use Build::Deb;
 use Build::SimpleJSON;
 
 my $tool_name = 'obs_build_generate_sbom';
@@ -274,6 +276,120 @@ sub read_pkgs_rpmdb {
   return \@rpms;
 }
 
+sub parse_debian_copyright_file {
+  my ($root, $pkg) = @_;
+  my $filesfound = 0;
+  my $crfound = 0;
+  my $formatfound = 0;
+  my %ret;
+  my $file = "$root/usr/share/doc/$pkg/copyright";
+  local *F;
+  if (open(F, '<', $file)) {
+    my @copyright;
+    my @license;
+    while(<F>) {
+      if ($_ =~ /^Format: https:\/\/www.debian.org\/doc\/packaging-manuals\/copyright-format\/1.0\// or $formatfound ) {
+        $formatfound = 1
+      } else {
+        last;
+      }
+      if ($_ =~ /^Files: \*/) {
+        $filesfound = 1;
+        $crfound = 0;
+      }
+      if ($_ =~ /^Copyright:\s*(.+)\n/) {
+        $filesfound = 0;
+        $crfound = 1;
+        push(@copyright, $1);
+      } elsif ($_ =~ /^Copyright:/) {
+        $filesfound = 0;
+        $crfound = 1;
+      } elsif ($_ =~ /^License:\s*(.+)\n/) {
+        $filesfound = 0;
+        $crfound = 0;
+        # TODO licenses has to match https://spdx.org/licenses/?
+        push(@license, $1);
+      } elsif ($_ =~ /^(Comment|Disclaimer|Source|Upstream-Name|Upstream-Contact):/) {
+        $filesfound = 0;
+        $crfound = 0;
+      } elsif ($_ =~ /^\s{1,}(.*)\n/ and $crfound ) {
+        push(@copyright, $1);
+      } elsif ($_ =~ /^\n/ and $filesfound ) {
+        last;
+      }
+    }
+    my %seen = ();
+    my @copyright_uniq = grep { !$seen{$_} ++ } @copyright;
+    @copyright_uniq = grep {!/^(\*No copyright\*|No copyright|none|\*unknown\*|unknown)$/} @copyright_uniq;
+    $ret{'copyright'} = join('\n ', sort @copyright_uniq);
+    %seen = ();
+    my @license_uniq = grep { !$seen{$_} ++ } @license;
+    $ret{'license'} = join(' AND ', sort @license_uniq);
+
+  } else {
+    %ret = undef;
+  }
+  return \%ret;
+}
+
+sub read_pkgs_deb {
+  my ($root, $vendorstring) = @_;
+  my @pkgs;
+  my %pkg_version; # hash to save pkg-version combination already in
+  local *F;
+  if (open(F, '<', "$root/var/lib/dpkg/status")) {
+    my $ctrl = '';
+    while(<F>) {
+      if ($_ eq "\n") {
+        my %res = Build::Deb::control2res($ctrl);
+        if (defined($res{'PACKAGE'})) {
+          my $data = {'NAME' => $res{'PACKAGE'}};
+          $res{'VERSION'} =~ /^(?:(\d+):)?(.*?)(?:-([^-]*))?$/s;
+          if (!$pkg_version{$data->{'NAME'}}{$data->{'VERSION'}}) {
+            $data->{'EPOC'} = $1 if defined $1;
+            $data->{'VERSION'} = $2;
+            $data->{'RELEASE'} = $3 if defined $3;
+            $data->{'ARCH'} = $res{'ARCHITECTURE'};
+            $data->{'URL'} = $res{'HOMEPAGE'} if defined $res{'HOMEPAGE'};
+            $data->{'MAINTAINER'} = $res{'MAINTAINER'} if defined $res{'MAINTAINER'};
+            $data->{'VENDOR'} = $vendorstring if $vendorstring ne "";
+            my $license = parse_debian_copyright_file($root, $res{'PACKAGE'});
+            $data->{'LICENSE'} = $license->{'license'} if defined $license->{'license'};
+            $data->{'COPYRIGHTTEXT'} = $license->{'copyright'} if defined $license->{'copyright'};
+            $pkg_version{$data->{'NAME'}}{$data->{'VERSION'}} = 1;
+            push @pkgs, $data;
+          }
+          my @bupkgs;
+          if ($res{'STATIC-BUILT-USING'}) {
+              @bupkgs = (split /,\s*/, $res{'STATIC-BUILT-USING'});
+          } elsif ($res{'BUILT-USING'}) {
+              @bupkgs = (split /,\s*/, $res{'BUILT-USING'});
+          }
+          foreach my $bd (@bupkgs) {
+            if ($bd =~ /(.+)\s+\(\s*=\s*(.+)\s*\)/) {
+              my $pkg = {'NAME' => "$1"};
+              $pkg->{'VERSION'} = "$2";
+              if (!$pkg_version{$pkg->{'NAME'}}{$pkg->{'VERSION'}}) {
+                my $license = parse_debian_copyright_file($root, $pkg->{'NAME'});
+                $pkg->{'LICENSE'} = $license->{'license'} if defined $license->{'license'};
+                $pkg->{'COPYRIGHTTEXT'} = $license->{'copyright'} if defined $license->{'copyright'};
+                $pkg->{'VENDOR'} = $vendorstring if $vendorstring ne "";
+                $pkg_version{$pkg->{'NAME'}}{$pkg->{'VERSION'}} = 1;
+                push @pkgs, $pkg;
+              }
+            }
+          }
+        }
+        $ctrl = '';
+        next;
+      }
+      $ctrl .= $_;
+    }
+    close F;
+  }
+  return \@pkgs;
+}
+
 sub read_pkgs_from_product_directory {
   my ($dir) = @_;
   my @rpms;
@@ -330,8 +446,8 @@ sub read_dist {
   return %dist ? \%dist : undef;
 }
 
-sub gen_purl_rpm {
-  my ($p, $distro) = @_;
+sub gen_purl {
+  my ($p, $distro, $type) = @_;
 
   my $vr = $p->{'VERSION'};
   $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
@@ -339,7 +455,7 @@ sub gen_purl_rpm {
   $vendor =~ s/obs:\/\///; # third party OBS builds
   $vendor =~ s/\ .*//;     # eg. SUSE LLC...
   $vendor =~ s/\/?$/\//;
-  my $purlurl = "pkg:".urlencode("rpm/$vendor$p->{'NAME'}\@$vr").'?';
+  my $purlurl = "pkg:".urlencode("$type/$vendor$p->{'NAME'}\@$vr").'?';
   $purlurl .= '&epoch='.urlencode($p->{'EPOCH'}) if $p->{'EPOCH'};
   $purlurl .= '&arch='.urlencode($p->{'ARCH'}) if $p->{'ARCH'};
   $purlurl .= '&upstream='.urlencode($p->{'SOURCERPM'}) if $p->{'SOURCERPM'};
@@ -392,7 +508,7 @@ my $cyclonedx_json_template = {
 };
 
 sub cyclonedx_encode_pkg {
-  my ($p, $distro) = @_;
+  my ($p, $distro, $type) = @_;
   my $vr = $p->{'VERSION'};
   $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
   my $cyc = {
@@ -410,7 +526,7 @@ sub cyclonedx_encode_pkg {
       push @{$cyc->{'licenses'}}, { 'license' => {'id' => $p->{'LICENSE'} } };
     }
   }
-  my $purlurl = gen_purl_rpm($p, $distro);
+  my $purlurl = gen_purl($p, $distro, $type);
   $cyc->{'purl'} = $purlurl if $purlurl;
   if (!$p->{'cyc_id'}) {
     $p->{'cyc_id'} = "pkg:$p->{'NAME'}-" . gen_pkg_id($p);
@@ -473,7 +589,7 @@ my $spdx_json_template = {
 };
 
 sub spdx_encode_pkg {
-  my ($p, $distro) = @_;
+  my ($p, $distro, $type) = @_;
   my $vr = $p->{'VERSION'};
   $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
   my $evr = $vr;
@@ -487,18 +603,30 @@ sub spdx_encode_pkg {
     $spdx->{'supplier'} = $spdx->{'originator'}; # same as originator OBS-247
   }
   $spdx->{'downloadLocation'} = 'NOASSERTION';
-  $spdx->{'sourceInfo'} = 'acquired package info from RPM DB';
+  if ($type eq "deb") {
+    $spdx->{'sourceInfo'} = 'acquired package info from DPKG DB';
+  } else {
+    $spdx->{'sourceInfo'} = 'acquired package info from RPM DB';
+  }
   $spdx->{'licenseConcluded'} = 'NOASSERTION';
   $spdx->{'licenseDeclared'} = 'NOASSERTION';
   my $license = $p->{'LICENSE'};
   if ($license) {
     $license =~ s/ and / AND /g;
     $spdx->{'licenseConcluded'} = $license;
-    $spdx->{'licenseDeclared'} = $license;
+    if (queryconfig('buildflags', 'spdx-declared-license')eq "NOASSERTION") {
+      $spdx->{'licenseDeclared'} = 'NOASSERTION';
+    } else {
+      $spdx->{'licenseDeclared'} = $license;
+    }
   }
   $spdx->{'copyrightText'} = 'NOASSERTION';
+  my $copyrightText = $p->{'COPYRIGHTTEXT'};
+  if ($copyrightText) {
+    $spdx->{'copyrightText'} = $copyrightText;
+  }
   $spdx->{'homepage'} = $p->{'URL'} if $p->{'URL'};
-  my $purlurl = gen_purl_rpm($p, $distro);
+  my $purlurl = gen_purl($p, $distro, $type);
   push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator', $purlurl } if $purlurl;
   if (!$p->{'spdx_id'}) {
     $p->{'spdx_id'} = "SPDXRef-Package-$p->{'NAME'}-" . gen_pkg_id($p);
@@ -540,6 +668,16 @@ sub spdx_encode_header {
   return $spdx;
 }
 
+sub queryconfig {
+  my ($type, $argument) = @_;
+  my $cf = Build::read_config_dist($::ENV{'BUILD_DIST'}, $::ENV{'BUILD_ARCH'}, $::ENV{'CONFIG_DIR'});
+  if ($type eq 'eval') {
+    return Build::Rpm::expandmacros($cf, $argument) || "";
+  } elsif ($type eq 'buildflags') {
+      return $cf->{"buildflags:$argument"} || "";
+  }
+}
+
 ##################################################################################################
 
 
@@ -550,6 +688,7 @@ my $istar;
 my $distro;
 my $rpmmd;
 my $format;
+my $vendorstring=queryconfig('eval','%vendor');
 
 while (@ARGV && $ARGV[0] =~ /^-/) {
   my $opt = shift @ARGV;
@@ -575,6 +714,7 @@ while (@ARGV && $ARGV[0] =~ /^-/) {
     die("unknown option: $opt\n");
   }
 }
+
 $format ||= 'spdx';
 die("unknown format $format\n") unless $format eq 'spdx' || $format eq 'cyclonedx';
 
@@ -583,7 +723,7 @@ sub echo_help {
 The Software Bill of Materials (SBOM) generation tool
 =====================================================
 
-This tool generates SBOM data based on data from rpm packages.
+This tool generates SBOM data based on data from rpm and deb packages.
 
 Output formats
 ==============
@@ -602,8 +742,8 @@ Supported content
 =================
 
   --dir DIRECTORY
-     The RPM database of the system below DIRECTORY will be evaluated, also all
-     files will be referenced in the SBOM.
+     The RPM/Dpkg database of the system below DIRECTORY will be evaluated, also all
+     files will be referenced in the SBOM if RPM is used.
 
   --product DIRECTORY
      An installation medium. All .rpm files in any sub directory will be scanned.
@@ -624,6 +764,8 @@ my $tmpdir = File::Temp::tempdir( CLEANUP => 1 );
 my $files;
 my $pkgs;
 my $dist;
+my $pkgtype = "rpm";
+
 if ($isproduct) {
   # product case
   #$files = gen_filelist($toprocess);
@@ -643,17 +785,33 @@ if ($isproduct) {
   die("$toprocess: $!\n") unless -e $toprocess;
   $pkgs = read_pkgs_from_rpmmd($toprocess);
 } elsif ($isdir) {
-  dump_rpmdb($toprocess, "$tmpdir/rpmdb");
-  $files = gen_filelist($toprocess) if $format eq 'spdx';
-  $pkgs = read_pkgs_rpmdb("$tmpdir/rpmdb");
   $dist = read_dist($toprocess);
+  #if it is a ubuntu id_like contains debian
+  if (grep { $_ eq "debian" } @{$dist->{'id_like'}} or $dist->{'id'} eq "debian" ) {
+    $pkgtype = "deb";
+    $pkgs = read_pkgs_deb($toprocess, $vendorstring);
+    if (queryconfig('buildflags', 'spdx-files-generation') ne "no") {
+      $files = gen_filelist($toprocess) if $format eq 'spdx';
+    }
+  } else {
+    $pkgtype = "rpm";
+    dump_rpmdb($toprocess, "$tmpdir/rpmdb");
+    $pkgs = read_pkgs_rpmdb("$tmpdir/rpmdb");
+    $files = gen_filelist($toprocess) if $format eq 'spdx';
+  }
 } else { # no check for $istar to stay backward compatible
   # container tar case
   my $unpackdir = unpack_container($tmpdir, $toprocess);
-  dump_rpmdb($unpackdir, "$tmpdir/rpmdb");
-  $files = gen_filelist($unpackdir) if $format eq 'spdx';
-  $pkgs = read_pkgs_rpmdb("$tmpdir/rpmdb");
   $dist = read_dist($unpackdir);
+  if (grep { $_ eq "debian" } @{$dist->{'id_like'}} or $dist->{'id'} eq "debian" ) {
+    $pkgtype = "deb";
+    $pkgs = read_pkgs_deb($unpackdir, $vendorstring);
+  } else {
+    $pkgtype = "rpm";
+    dump_rpmdb($unpackdir, "$tmpdir/rpmdb");
+    $pkgs = read_pkgs_rpmdb("$tmpdir/rpmdb");
+  }
+  $files = gen_filelist($unpackdir) if $format eq 'spdx';
 }
 
 my $subjectname = $toprocess;
@@ -674,7 +832,7 @@ if ($format eq 'spdx') {
   $intoto_type = 'https://spdx.dev/Document';
   $doc = spdx_encode_header($subjectname);
   for my $p (@$pkgs) {
-    push @{$doc->{'packages'}}, spdx_encode_pkg($p, $distro);
+    push @{$doc->{'packages'}}, spdx_encode_pkg($p, $distro, $pkgtype);
   }
   for my $f (@$files) {
     next if $f->{'SKIP'};
@@ -711,7 +869,7 @@ if ($format eq 'spdx') {
   $intoto_type = 'https://cyclonedx.org/bom';
   $doc = cyclonedx_encode_header($subjectname);
   for my $p (@$pkgs) {
-    push @{$doc->{'components'}}, cyclonedx_encode_pkg($p, $distro);
+    push @{$doc->{'components'}}, cyclonedx_encode_pkg($p, $distro, $pkgtype);
   }
   if ($dist && %$dist) {
     push @{$doc->{'components'}}, cyclonedx_encode_dist($dist);

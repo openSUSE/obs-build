@@ -3,7 +3,9 @@
 # Debian live-build specific functions.
 #
 # Copyright (c) 2014,2015 Brocade Communications Systems, Inc.
+# Copyright (c) 2024 Ciena Corporation
 # Author: Jan Blunck <jblunck@infradead.org>
+# Author: Christian Schneemann <schneemann@b1-systems.de>
 #
 # This file is part of build.
 #
@@ -261,6 +263,22 @@ recipe_build_livebuild() {
 	    BUILD_SUCCEEDED=true
 	done
     done
+
+    BASE_NAME="${RECIPEFILE%.livebuild}-${ARCH}${buildnum}"
+    for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom | sort -u) ; do
+        echo "Generating $format sbom file"
+	    pushd $BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT >/dev/null
+
+        # ensure pretty subjectname in SBOM
+        ln -sf "chroot" "${BASE_NAME}"
+
+        generate_sbom --format "$format" --dir "${BASE_NAME}"  > "$BUILD_ROOT/$TOPDIR/OTHER/${BASE_NAME}.${format/cyclonedx/cdx}.json"
+        popd >/dev/null
+
+        pushd $BUILD_ROOT/$TOPDIR/OTHER >/dev/null
+        /usr/bin/sha256sum "${BASE_NAME}.${format/cyclonedx/cdx}.json" > "${BASE_NAME}.${format/cyclonedx/cdx}.json".sha256
+        popd >/dev/null
+     done
 
     # copy recipe source tarball so that it can be published
     cp "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" \
