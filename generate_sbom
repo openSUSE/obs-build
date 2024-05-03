@@ -324,11 +324,8 @@ sub parse_debian_copyright_file {
     $ret{'copyright'} = join('\n ', sort @copyright_uniq);
     %seen = ();
     my @license_uniq = grep { !$seen{$_} ++ } @license;
-    if ( @license_uniq > 1 ) {
-      $ret{'license'} = join(' AND ', sort @license_uniq);
-    } else {
-      $ret{'license'} = @license_uniq[0];
-    }
+    $ret{'license'} = join(' AND ', sort @license_uniq);
+
   } else {
     %ret = undef;
   }
