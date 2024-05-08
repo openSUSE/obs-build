@@ -50,10 +50,14 @@ recipe_prepare_productcompose() {
     :
 }
 
+productcompose_query_recipe() {
+    perl -I$BUILD_DIR -MBuild::ProductCompose -e Build::ProductCompose::show "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$1" "${BUILD_ARCH%%:*}" "$BUILD_FLAVOR"
+}
+
 recipe_build_productcompose() {
     echo "running product composer..."
 
-    local milestone=$(kiwi_query_recipe milestone)
+    local milestone=$(productcompose_query_recipe milestone)
     extra_args=
     if test -n "$RELEASE" ; then
 	extra_args=" $extra_args --release $RELEASE"

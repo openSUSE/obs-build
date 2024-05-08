@@ -119,8 +119,8 @@ sub parse {
   my $data = _load_yaml_file($fn);
   return { error => "Failed to parse file '$fn'" } unless defined $data;
   my $ret = {};
-  $ret->{version} = $data->{'version'};
-  $ret->{name} = $data->{'name'} or die "OBS Product name is missing";
+  $ret->{'version'} = $data->{'version'};
+  $ret->{'name'} = $data->{'name'} or die "OBS Product name is missing";
 
   # Do we need source or debug packages?
   $ret->{'sourcemedium'} = 1 unless ($data->{'source'} || '') eq 'drop';
@@ -135,7 +135,8 @@ sub parse {
   }
   $ret->{'error'} = 'excluded' unless @architectures;
   $ret->{'exclarch'} = \@architectures if @architectures;
-  $ret->{bcntsynctag} = $data->{'bcntsynctag'} if $data->{'bcntsynctag'};
+  $ret->{'bcntsynctag'} = $data->{'bcntsynctag'} if $data->{'bcntsynctag'};
+  $ret->{'milestone'} = $data->{'milestone'} if $data->{'milestone'};
 
   my $flavor = $data->{'flavors'} ? $cf->{'buildflavor'} : undef;
 
@@ -151,10 +152,10 @@ sub parse {
       $pkgs = add_pkgset($pkgs, get_pkgset_compat($data->{'unpack_packages'}, $arch, $flavor));
     }
   }
-  $ret->{deps} = $pkgs;
+  $ret->{'deps'} = $pkgs;
 
   # We have currently no option to configure own path list for the product on purpose
-  $ret->{path} = [ { project => '_obsrepositories', repository => '' } ];
+  $ret->{'path'} = [ { project => '_obsrepositories', repository => '' } ];
 
   return $ret;
 }
