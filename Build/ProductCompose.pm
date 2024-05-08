@@ -135,6 +135,7 @@ sub parse {
   }
   $ret->{'error'} = 'excluded' unless @architectures;
   $ret->{'exclarch'} = \@architectures if @architectures;
+  $ret->{bcntsynctag} = $data->{'bcntsynctag'} if $data->{'bcntsynctag'};
 
   my $flavor = $data->{'flavors'} ? $cf->{'buildflavor'} : undef;
 
