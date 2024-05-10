@@ -272,7 +272,12 @@ recipe_build_livebuild() {
         # ensure pretty subjectname in SBOM
         ln -sf "chroot" "${BASE_NAME}"
 
-        generate_sbom --format "$format" --dir "${BASE_NAME}"  > "$BUILD_ROOT/$TOPDIR/OTHER/${BASE_NAME}.${format/cyclonedx/cdx}.json"
+        generate_sbom \
+          --dist "$BUILD_DIST" \
+          --configdir "$CONFIG_DIR" \
+          --archpath "$BUILD_ARCH" \
+          --format "$format" \
+          --dir "${BASE_NAME}"  > "$BUILD_ROOT/$TOPDIR/OTHER/${BASE_NAME}.${format/cyclonedx/cdx}.json"
         popd >/dev/null
 
         pushd $BUILD_ROOT/$TOPDIR/OTHER >/dev/null
