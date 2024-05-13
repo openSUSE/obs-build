@@ -346,7 +346,7 @@ sub query {
   my $src = $name;
   if ($res{'SOURCE'}) {
     $src = $res{'SOURCE'};
-    $data->{'sourcedep'} = $src;
+    $data->{'sourcedep'} = $src if $opts{'source'};
     $src =~ s/\s.*$//;
   }
   $data->{'source'} = $src if $src ne '';

@@ -1426,7 +1426,6 @@ sub query {
   my %res = rpmq($handle, @tags);
   return undef unless %res;
   my $src = $res{'SOURCERPM'}->[0];
-  $res{'sourcerpm'} = $src if $src;
   $src = '' unless defined $src;
   $src =~ s/-[^-]*-[^-]*\.[^\.]*\.rpm//;
   add_flagsvers(\%res, 'PROVIDENAME', 'PROVIDEFLAGS', 'PROVIDEVERSION');
@@ -1435,6 +1434,7 @@ sub query {
     name => $res{'NAME'}->[0],
     hdrmd5 => unpack('H32', $res{'SIGTAG_MD5'}->[0]),
   };
+  $data->{'sourcerpm'} = $res{'SOURCERPM'}->[0] if $opts{'source'} && $res{'SOURCERPM'}->[0];
   if ($opts{'alldeps'}) {
     $data->{'provides'} = [ @{$res{'PROVIDENAME'} || []} ];
     $data->{'requires'} = [ @{$res{'REQUIRENAME'} || []} ];
