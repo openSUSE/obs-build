@@ -1,4 +1,24 @@
 -------------------------------------------------------------------
+Thu May 16 08:16:56 UTC 2024 - Adrian Schröter <adrian@suse.de>
+
+- tumbleweed build config update
+- 15.6 build config fixes
+- sourcerpm & sourcedep handling fixes
+- productcompose:
+  - Fix milestone handling
+  - Support bcntsynctag
+- Adding debian support to generate_sbom
+- Add syscall for personality switch on loongarch64 kernel
+- vm-build: ext3 & ext4: fix disk space allocation
+- mkosi format updates, not fully working yet
+- pbuild exception fixes
+- Fixes for current fedora and centos distros
+- Don't copy original dsc sources if OBS-DCH-RELEASE set
+- Unbreak parsing of sources/patches
+- Support ForceMultiVersion in the dockerfile parser
+- Support %bcond of rpm 4.17.1
+
+-------------------------------------------------------------------
 Wed Mar 13 09:46:13 UTC 2024 - Adrian Schröter <adrian@suse.de>
 
 - Add a hack for systemd 255.3, creating an empty /etc/os-release
