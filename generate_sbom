@@ -283,9 +283,63 @@ sub read_pkgs_rpmdb {
   return \@rpms;
 }
 
+sub spdx_license_mapping {
+  my ($mapping_file) = @_;
+  local *F;
+  my $json_t = do {
+    unless (open(F, '<', $mapping_file)) {
+      warn("Could not read license mapping file $mapping_file, $!");
+      return {};
+    }
+    local $/;
+    <F>
+  };
+  my $license_mapping = eval { JSON::XS::decode_json($json_t) };
+  if ($@) {
+    warn("Failed to parse $mapping_file: $@");
+    return {};
+  }
+  return $license_mapping;
+}
+
+sub map_license {
+  my ($license, $license_mapping, $pkg) = @_;
+  if ( $license =~ /\sor\s/i ) {
+    my @licenses_or;
+    foreach my $l (split(/\sor\s/i, $license)) {
+      push(@licenses_or, map_license($l, $license_mapping, $pkg));
+    }
+    $license = join(' OR ', @licenses_or);
+  } elsif ( $license =~ /\swith\s/i ) {
+    my @licenses_with;
+    foreach my $l (split(/\swith\s/i, $license)) {
+      push(@licenses_with, map_license($l, $license_mapping, $pkg));
+    }
+    $license = join(' WITH ', @licenses_with);
+  } elsif ( $license =~ /\sand\s/i ) {
+    my @licenses_and;
+    foreach my $l (split(/\sand\s/i, $license)) {
+      push(@licenses_and, map_license($l, $license_mapping, $pkg));
+    }
+    $license = join(' AND ', @licenses_and);
+  } elsif (defined $license_mapping->{$license}) {
+    $license = $license_mapping->{$license};
+  } else {
+    warn("SPDX-License-Mapping: License for package \"$pkg\" not found in mapping: $license\n");
+    $license = "NOASSERTION";
+  }
+  if ( $license =~ /NOASSERTION/) {
+      $license = "NOASSERTION";
+  }
+  return $license;
+}
+
 sub parse_debian_copyright_file {
   my ($root, $pkg) = @_;
   my $file = "$root/usr/share/doc/$pkg/copyright";
+  if ( -l $file ) {
+      $file = $root . readlink $file;
+  }
   local *F;
   return {} unless open(F, '<', $file);
   my $firstline = <F>;
@@ -302,7 +356,6 @@ sub parse_debian_copyright_file {
       push @copyright, $1 if $1 ne '';
     } elsif (/^License:\s*(.*)$/) {
       $crfound = 0;
-      # TODO licenses has to match https://spdx.org/licenses/?
       push @license, $1 if $1 ne '';
     } elsif (/^(Files|Comment|Disclaimer|Source|Upstream-Name|Upstream-Contact):/) {
       $crfound = 0;
@@ -607,7 +660,7 @@ my $spdx_json_template = {
 };
 
 sub spdx_encode_pkg {
-  my ($p, $distro, $pkgtype) = @_;
+  my ($p, $distro, $pkgtype, $license_mapping) = @_;
   my $vr = $p->{'VERSION'};
   $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
   my $evr = $vr;
@@ -631,7 +684,11 @@ sub spdx_encode_pkg {
   my $license = $p->{'LICENSE'};
   if ($license) {
     $license =~ s/ and / AND /g;
-    $spdx->{'licenseConcluded'} = $license;
+    if (%$license_mapping) {
+      $spdx->{'licenseConcluded'} = map_license($license, $license_mapping, $p->{'NAME'});
+    } else {
+      $spdx->{'licenseConcluded'} = $license;
+    }
     $spdx->{'licenseDeclared'} = $license unless ($config->{'buildflags:spdx-declared-license'} || '') eq 'NOASSERTION';
   }
   $spdx->{'copyrightText'} = 'NOASSERTION';
@@ -778,6 +835,26 @@ my $pkgtype = 'rpm';
 $config = Build::read_config_dist($dist_opt, $arch || 'noarch', $configdir) if $dist_opt;
 my $no_files_generation = ($config->{'buildflags:spdx-files-generation'} || '') eq 'no';
 
+my @license_mapping_files = map { /^spdx-license-mapping:(.*)/ ? $1 : () } @{$config->{'buildflags'}};
+my $license_mapping = {};
+my $jsonxs_available=0;
+eval
+{
+  require JSON::XS;
+  $jsonxs_available=1;
+};
+if (@license_mapping_files > 0) {
+  if ($jsonxs_available) {
+    foreach my $mapping_file ( @license_mapping_files ) {
+      my $href = spdx_license_mapping($toprocess . $mapping_file);
+      %$license_mapping = (%$license_mapping, %$href);
+    }
+  } else {
+    warn("No license mapping as JSON::XS is not available!");
+  }
+}
+
+
 if ($isproduct) {
   # product case
   #$files = gen_filelist($toprocess);
@@ -839,7 +916,7 @@ if ($format eq 'spdx') {
   $intoto_type = 'https://spdx.dev/Document';
   $doc = spdx_encode_header($subjectname);
   for my $p (@$pkgs) {
-    push @{$doc->{'packages'}}, spdx_encode_pkg($p, $distro, $pkgtype);
+    push @{$doc->{'packages'}}, spdx_encode_pkg($p, $distro, $pkgtype, $license_mapping);
   }
   for my $f (@$files) {
     next if $f->{'SKIP'};
