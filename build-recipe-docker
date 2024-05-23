@@ -278,7 +278,13 @@ recipe_build_docker() {
     mkdir -p $BUILD_ROOT$TOPDIR/DOCKER
     FILENAME=$(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::show -- "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" filename)
     if test -z "$FILENAME" ; then
-	FILENAME="$FIRSTTAG"
+	# check if there is a version defined. if yes, keep the repository part and overwrite the tag
+	FILENAME=$(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::show -- "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" version)
+	if test -n "$FILENAME" ; then
+	    FILENAME="${FIRSTTAG%%:*}:$FILENAME"
+	else
+	    FILENAME="$FIRSTTAG"
+	fi
     fi
     FILENAME="${FILENAME//[\/:]/-}"
     test -n "$GOOS" -a "$GOOS" != "linux" && FILENAME="${FILENAME}_$GOOS"
