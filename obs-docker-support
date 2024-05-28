@@ -208,6 +208,7 @@ curl() {
 	    ;;
 	-O)
 	    oopt=true
+	    shift
 	    ;;
 	*)
 	    cmd[${#cmd[@]}]="$1"
