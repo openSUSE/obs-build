@@ -122,7 +122,6 @@ pushd \$OUTPUTDIR >/dev/null
 popd >/dev/null
 EOF
         chmod +x $BUILD_ROOT/$TOPDIR/SOURCES/mkosi.conf.d/99-sbom/mkosi.finalize
-        cat $BUILD_ROOT/$TOPDIR/SOURCES/mkosi.conf.d/99-sbom/mkosi.finalize
     done
 
     set -- mkosi \
