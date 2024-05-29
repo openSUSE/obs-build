@@ -100,8 +100,11 @@ recipe_build_mkosi() {
         cp -r "/.build/" "$TOPDIR/scripts"
         chmod +x "$TOPDIR/scripts/.build/generate_sbom"
         mkdir -p $BUILD_ROOT/$TOPDIR/SOURCES/mkosi.conf.d/99-sbom/
-        IMAGENAME=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" eval '%{?mkosi_sbom_name}' || "image")
+        IMAGENAME=$(grep ImageId= "${RECIPEFILE}" | sed "s/\s*ImageId\s*=\s*\(.*\)\s*/\1/")
         IMAGENAME=${IMAGENAME:-image}
+        if [ -n "$RELEASE" ]; then
+            IMAGENAME="${IMAGENAME}_${RELEASE}"
+        fi
         echo "IMAGENAME= $IMAGENAME"
         echo "generating script for sbom $format"
 cat << EOF >> $BUILD_ROOT/$TOPDIR/SOURCES/mkosi.conf.d/99-sbom/mkosi.finalize
@@ -116,10 +119,7 @@ $TOPDIR/scripts/.build/generate_sbom \
   --configdir "$TOPDIR/scripts/$CONFIG_DIR" \
   --archpath "$BUILD_ARCH" \
   --format "$format" \
-  --dir "$IMAGENAME"  > "\$OUTPUTDIR/\${imgname}${buildnum}.${format/cyclonedx/cdx}.json"
-pushd \$OUTPUTDIR >/dev/null
-/usr/bin/sha256sum "\${imgname}${buildnum}.${format/cyclonedx/cdx}.json" > "\${imgname}${buildnum}.${format/cyclonedx/cdx}.json".sha256
-popd >/dev/null
+  --dir "$IMAGENAME"  > "\$OUTPUTDIR/${IMAGENAME}.${format/cyclonedx/cdx}.json"
 EOF
         chmod +x $BUILD_ROOT/$TOPDIR/SOURCES/mkosi.conf.d/99-sbom/mkosi.finalize
     done
