@@ -1728,6 +1728,11 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	    echo 'abuild:*:::::::' >>$BUILD_ROOT/etc/shadow # This is needed on Mandriva 2009
 	    echo 'abuild:*::' >>$BUILD_ROOT/etc/gshadow # This is needed on Ubuntu
 	    echo "abuild:x:${ABUILD_GID}:" >>$BUILD_ROOT/etc/group
+	    # support user namespace uids and gids, useful for test
+	    # environments that rely on unprivileged namespaces
+	    for IDFILE in subuid subgid; do
+		    echo "abuild:100000:65536" >>$BUILD_ROOT/etc/$IDFILE
+	    done
 	    mkdir -p $BUILD_ROOT/home/abuild
 	    chown "$ABUILD_UID:$ABUILD_GID" $BUILD_ROOT/home/abuild
 	else
