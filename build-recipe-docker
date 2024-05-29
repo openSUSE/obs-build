@@ -281,6 +281,8 @@ recipe_build_docker() {
 	# check if there is a version defined. if yes, keep the repository part and overwrite the tag
 	FILENAME=$(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::show -- "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" version)
 	if test -n "$FILENAME" ; then
+	    # append the flavor to the version
+	    test -n "$BUILD_FLAVOR" && FILENAME="$FILENAME-$BUILD_FLAVOR"
 	    FILENAME="${FIRSTTAG%%:*}:$FILENAME"
 	else
 	    FILENAME="$FIRSTTAG"
