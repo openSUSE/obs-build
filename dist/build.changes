@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Wed Jun 12 11:47:43 CEST 2024 - mls@suse.de
+
+- tumbleweed build config update
+- support the %load macro
+- improve container filename generation (docker)
+- fix hanging curl calls during build (docker)
+- productcompose: fix milestone query
+
+-------------------------------------------------------------------
 Thu May 16 08:16:56 UTC 2024 - Adrian Schröter <adrian@suse.de>
 
 - tumbleweed build config update
