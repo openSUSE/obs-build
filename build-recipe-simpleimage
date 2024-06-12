@@ -24,7 +24,7 @@ recipe_setup_simpleimage() {
     for i in SOURCES OTHER ; do
         mkdir -p "$BUILD_ROOT$TOPDIR/$i"
     done
-    if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
+    if test "$MYSRCDIR" = ${BUILD_ROOT%/}/.build-srcdir ; then
         mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
     else
         copy_sources "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"

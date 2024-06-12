@@ -312,7 +312,7 @@ recipe_setup_kiwi() {
     mkdir -p "$BUILD_ROOT$TOPDIR/RPMS"
     mkdir -p "$BUILD_ROOT$TOPDIR/SRPMS"
     
-    if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then 
+    if test "$MYSRCDIR" = ${BUILD_ROOT%/}/.build-srcdir ; then 
 	mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
     else
 	if test -z "$LINKSOURCES" ; then 

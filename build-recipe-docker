@@ -30,7 +30,7 @@ recipe_setup_docker() {
     TOPDIR="/usr/src/packages"
     test "$DO_INIT_TOPDIR" != false && rm -Rf "$BUILD_ROOT/$TOPDIR"
     mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
-    if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
+    if test "$MYSRCDIR" = ${BUILD_ROOT%/}/.build-srcdir ; then
         mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
     else
         if test -z "$LINKSOURCES" ; then 
