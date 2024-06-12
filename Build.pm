@@ -599,17 +599,8 @@ sub read_config {
     s/=$// for @{$config->{'substitute'}->{$l}};
   }
   # add rawmacros to our macro list
-  if ($config->{'rawmacros'} ne '') {
-    for my $rm (split("\n", $config->{'rawmacros'})) {
-      if (@macros && $macros[-1] =~ /\\\z/s) {
-	$macros[-1] = substr($macros[-1], 0, -1)."\n$rm";
-      } elsif ($rm !~ /^%/) {
-	push @macros, $rm;
-      } else {
-	push @macros, "%define ".substr($rm, 1);
-      }
-    }
-  }
+  Build::Rpm::add_macros($config, $config->{'rawmacros'}) if $config->{'rawmacros'} ne '';
+
   # extract some helper hashes for the flags
   my %modules;
   for (@{$config->{'expandflags'} || []}) {

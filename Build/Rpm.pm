@@ -340,8 +340,31 @@ sub builtinmacro {
   }
   return (exists($macros->{"with_$args[0]"}) ? 1 : 0) ^ ($macname eq 'without' ? 1 : 0) if $macname eq 'with' || $macname eq 'without';
   return (exists($macros->{$args[0]}) ? 1 : 0) ^ ($macname eq 'undefined' ? 1 : 0) if $macname eq 'defined' || $macname eq 'undefined';
+  if ($macname eq 'load' && ref($macros->{'load'}) eq 'ARRAY') {
+    my $l = $macros->{'load'};
+    my $c = {};
+    add_macros($c, $l->[0]->($args[0]));
+    initmacros($c, $l->[1], $l->[2]);
+    return '';
+  }
   do_warn($config, "unsupported builtin macro $macname");
   return '';
+}
+
+sub add_macros {
+  my ($config, $rawmacros) = @_;
+  $config->{'macros'} ||= [];
+  return unless defined $rawmacros;
+  my $macros = $config->{'macros'};
+  for my $rm (split("\n", $rawmacros)) {
+    if (@$macros && $macros->[-1] =~ /\\\z/s) {
+        $macros->[-1] = substr($macros->[-1], 0, -1)."\n$rm";
+    } elsif ($rm !~ /^%/) {
+      push @$macros, $rm;
+    } else {
+      push @$macros, "%define ".substr($rm, 1);
+    }
+  }
 }
 
 sub initmacros {
@@ -412,6 +435,7 @@ my %builtin_macros = (
   'dirname' => \&builtinmacro,
   'shrink' => \&builtinmacro,
   'suffix' => \&builtinmacro,
+  'load' => \&builtinmacro,
 
   'gsub' => \&luamacro,
   'len' => \&luamacro,
@@ -714,6 +738,12 @@ sub parse {
   my $multilinedefine;
   my $multilinecondition;
   my $substitute = $config->{'substitute'};
+
+  # setup load macro if we have an include callback
+  if ($includecallback && !$config->{'parsing_config'}) {
+    $macros{'load'} = [ $includecallback, \%macros, \%macros_args ];
+  }
+
   while (1) {
     my $line;
     my $doxspec = $xspec ? 1 : 0;

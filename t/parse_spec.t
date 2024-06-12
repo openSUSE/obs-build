@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 14;
+use Test::More tests => 15;
 
 use Build;
 use Build::Rpm;
@@ -396,3 +396,15 @@ $expected = {
 $result = Build::Rpm::parse($conf, [ split("\n", "%global foo 1\n%global bar 1\n$spec") ]);
 is_deeply($result, $expected, "multiline condition 4");
 
+$Build::Rpm::includecallback = sub { $_[0] eq 'xxx' ? "%mac_foo mac_bar\n": undef };
+$spec = q[
+%{load:xxx}
+Name: %mac_foo
+];
+$expected = {
+  'name' => 'mac_bar',
+  'deps' => [],
+  'subpacks' => ['mac_bar'],
+};
+$result = Build::Rpm::parse($conf, [ split("\n", $spec) ]);
+is_deeply($result, $expected, "multiline condition 4");
