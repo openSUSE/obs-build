@@ -611,7 +611,10 @@ sub handle_rpms {
 	  }
 	}
       } elsif (substr($r, 0, 1) eq '-') {
-	delete $files{$_} for grep {/$rr/} keys %files;
+	for (grep {/$rr/} keys %files) {
+	  delete $files{$_};
+	  delete $moves{$_};
+	}
       } elsif (substr($r, 0, 1) eq '"') {
 	$rr =~ s/\"$//;
 	if ($rr =~ /^(.*?)\s*->\s*(.*?)$/) {
