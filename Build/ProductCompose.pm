@@ -76,6 +76,10 @@ sub get_pkgset {
   $flavor = '' unless defined $flavor;
   my @seenps;
   my $lasts;
+
+  # asterisk is our internal marker for all packages
+  return ['*'] if $setname eq '__all__';
+
   for my $s (@$packagesets) {
     push @seenps, $lasts if defined $lasts;
     $lasts = $s;
