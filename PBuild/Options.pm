@@ -33,6 +33,7 @@ my $pbuild_options = {
   'reponame' => ':',
   'noclean' => '',
   'no-clean' => 'noclean',
+  'checks' => '',
   'nochecks' => '',
   'no-checks' => 'nochecks',
   'arch' => ':',

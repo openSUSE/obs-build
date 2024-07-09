@@ -72,7 +72,7 @@ BUILD_OPTIONS_PARSED=
 DO_INIT=true
 DO_INIT_TOPDIR=true
 DO_LINT=
-DO_CHECKS=true
+DO_CHECKS=
 CLEAN_BUILD=
 GENBUILDREQS_CLEAN_BUILD=
 RECIPEFILES=()
@@ -1065,6 +1065,9 @@ while test -n "$1"; do
 	test "$DO_INIT" = false && DO_INIT_TOPDIR=false
 	DO_INIT=false
       ;;
+      -checks)
+	DO_CHECKS=true # default, but to overwrite possible config setting
+      ;;
       -nochecks|-no-checks)
 	DO_CHECKS=false
       ;;
@@ -1377,7 +1380,6 @@ test "$CONFIG_DIR" != "$BUILD_DIR/configs" && validate_param "--configdir" "$CON
 # validate the buildroot
 validate_buildroot "$BUILD_ROOT"
 
-
 if test -n "$VM_TYPE" -a -z "$RUNNING_IN_VM" ; then
     vm_verify_options
     vm_set_defaults
@@ -1415,6 +1417,8 @@ if test -n "$SEND_SYSRQ" ; then
     sysrq_running_build "$SEND_SYSRQ"
     cleanup_and_exit
 fi
+
+recipe_checks_config
 
 # done option parsing
 BUILD_OPTIONS_PARSED=true
