@@ -313,6 +313,7 @@ sub createjob {
   }
 
   push @args, '--clean' unless $opts->{'noclean'};
+  push @args, '--checks' if $opts->{'checks'};
   push @args, '--nochecks' if $opts->{'nochecks'};
   push @args, '--shell' if $opts->{'shell'};
   push @args, '--shell-after-fail' if $opts->{'shell-after-fail'};

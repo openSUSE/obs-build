@@ -312,6 +312,16 @@ recipe_build_time_statistics() {
     fi
 }
 
+recipe_checks_config() {
+    if test -z "$DO_CHECKS"; then
+        local nochecks=$(queryconfig \
+                --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" \
+                --archpath "$BUILD_ARCH" buildflags nochecks
+            )
+        test -n "$nochecks" && DO_CHECKS=false || DO_CHECKS=true
+    fi
+}
+
 recipe_gendiff() {
     local obsgendiff=$(queryconfig \
             --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" \
