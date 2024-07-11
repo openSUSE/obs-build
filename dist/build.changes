@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Thu Jul 11 13:00:30 UTC 2024 - Adrian Schröter <adrian@suse.de>
+
+- productcompose: support __all__ option
+- config update: tumbleweed using preinstallexpand
+- minor improvements
+
+-------------------------------------------------------------------
 Wed Jun 12 11:47:43 CEST 2024 - mls@suse.de
 
 - tumbleweed build config update
