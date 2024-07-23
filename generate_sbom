@@ -37,8 +37,10 @@ use Build::Rpm;
 use Build::Deb;
 use Build::SimpleJSON;
 
+use Build::IntrospectGolang;
+
 my $tool_name = 'obs_build_generate_sbom';
-my $tool_version = '1.0';
+my $tool_version = '1.1';
 
 my $config = {};
 
@@ -251,6 +253,52 @@ sub gen_filelist {
     $f->{'sha256sum'} = sha256file("$dir/$f->{'name'}");
   }
   return \@files;
+}
+
+sub add_golang_mod {
+  my ($m, $exeinfos) = @_;
+  my $g = $exeinfos->{"$m->{'path'}\@\@$m->{'version'}"};
+  return $g if $g;
+  $g = { 'NAME' => $m->{'path'}, 'VERSION' => $m->{'version'}, 'pkgtype' => 'golang' };
+  $exeinfos->{"$m->{'path'}\@\@$m->{'version'}"} = $g;
+  return $g;
+}
+
+sub introspect_golang_exe {
+  my ($fd, $fname, $exeinfos) = @_;
+  my $buildinfo = Build::IntrospectGolang::buildinfo($fd);
+  return unless $buildinfo && $buildinfo->{'main'};
+  my $g = add_golang_mod($buildinfo->{'main'}, $exeinfos);
+  push @{$g->{'filenames'}}, $fname;
+  my @deps = @{$g->{'deps'} || []};
+  if ($buildinfo->{'goversion'}) {
+    my $gg = add_golang_mod({'path' => 'stdlib', 'version' => $buildinfo->{'goversion'}}, $exeinfos);
+    push @{$gg->{'filenames'}}, $fname;
+    push @deps, $gg unless grep {$_ eq $gg} @deps;
+  }
+  for my $dep (@{$buildinfo->{'deps'} || []}) {
+    my $gg = add_golang_mod($dep, $exeinfos);
+    push @{$gg->{'filenames'}}, $fname;
+    push @deps, $gg unless grep {$_ eq $gg} @deps;
+  }
+  $g->{'deps'} = \@deps;
+}
+
+sub introspect_filelist {
+  my ($dir, $files) = @_;
+  return undef unless $files;
+  my %exeinfos;
+  for my $f (@$files) {
+    my $fd;
+    next unless open($fd, '<', "$dir/$f->{'name'}");
+    my $buf;
+    next unless read($fd, $buf, 16) == 16;
+    next unless unpack('N', $buf) == 0x7f454c46;
+    seek($fd, 0, 0);
+    eval { introspect_golang_exe($fd, $f->{'name'}, \%exeinfos) };
+    warn($@) if $@;
+  }
+  return [ map {$exeinfos{$_}} sort keys %exeinfos ];
 }
 
 sub read_rpm {
@@ -467,19 +515,31 @@ sub pkgtype_from_dist {
 sub gen_purl {
   my ($p, $distro, $pkgtype) = @_;
 
+  my $name = $p->{'NAME'};
   my $vr = $p->{'VERSION'};
+  my $subpath;
+  if ($pkgtype eq 'golang') {
+    if ($name =~ /\A([^\/]+\/[^\/]+\/[^\/]+)\/(.+)/s) {
+      $name = $1;
+      $subpath = $2;
+    }
+  }
   $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
-  my $vendor = lc($p->{'VENDOR'});
-  $vendor =~ s/obs:\/\///; # third party OBS builds
-  $vendor =~ s/\ .*//;     # eg. SUSE LLC...
-  $vendor =~ s/\/?$/\//;
-  my $purlurl = "pkg:".urlencode("$pkgtype/$vendor$p->{'NAME'}\@$vr").'?';
+  my $vendor = '';
+  if ($p->{'VENDOR'}) {
+    $vendor = lc($p->{'VENDOR'});
+    $vendor =~ s/obs:\/\///; # third party OBS builds
+    $vendor =~ s/\ .*//;     # eg. SUSE LLC...
+    $vendor =~ s/\/?$/\//;
+  }
+  my $purlurl = "pkg:".urlencode("$pkgtype/$vendor$name\@$vr").'?';
   $purlurl .= '&epoch='.urlencode($p->{'EPOCH'}) if $p->{'EPOCH'};
   $purlurl .= '&arch='.urlencode($p->{'ARCH'}) if $p->{'ARCH'};
   $purlurl .= '&upstream='.urlencode($p->{'SOURCERPM'}) if $p->{'SOURCERPM'};
   $purlurl .= '&distro='.urlencode($distro) if $distro;
   $purlurl =~ s/\?\&/\?/;
   $purlurl =~ s/\?$//;
+  $purlurl .= '#'.urlencode($subpath) if defined $subpath;
   return $purlurl;
 }
 
@@ -500,7 +560,10 @@ sub gen_pkg_id {
     $id =~ s/.*://;
     return substr($id, 0, 32);
   }
-  return Digest::MD5::md5_hex(Build::SimpleJSON::unparse($p));
+  my %p = %$p;
+  delete $p{'RELATION'};
+  delete $p{'deps'};
+  return Digest::MD5::md5_hex(Build::SimpleJSON::unparse(\%p));
 }
 
 ##################################################################################################
@@ -529,11 +592,7 @@ sub cyclonedx_encode_pkg {
   my ($p, $distro, $pkgtype) = @_;
   my $vr = $p->{'VERSION'};
   $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
-  my $cyc = {
-    'type' => 'library',
-    'name' => $p->{'NAME'},
-    'version' => $vr,
-  };
+  my $cyc = { 'type' => 'library', 'name' => $p->{'NAME'}, 'version' => $vr };
   $cyc->{'publisher'} = $p->{'VENDOR'} if $p->{'VENDOR'};
   my $license = $p->{'LICENSE'};
   if ($license) {
@@ -547,9 +606,10 @@ sub cyclonedx_encode_pkg {
   my $purlurl = gen_purl($p, $distro, $pkgtype);
   $cyc->{'purl'} = $purlurl if $purlurl;
   if (!$p->{'cyc_id'}) {
-    $p->{'cyc_id'} = "pkg:$p->{'NAME'}-" . gen_pkg_id($p);
+    $p->{'cyc_id'} = "$p->{'NAME'}-" . gen_pkg_id($p);
     $p->{'cyc_id'} =~ s/[^a-zA-Z0-9\.\-]/-/g;
-    $p->{'cyc_id'} =~ s/-/:/;
+    $p->{'cyc_id'} = "pkg:$pkgtype/$p->{'cyc_id'}";
+
   }
   $cyc->{'bom-ref'} = $p->{'cyc_id'};
   return $cyc;
@@ -565,6 +625,18 @@ sub cyclonedx_encode_dist {
   $cyc->{'description'} = $dist->{'pretty_name'} if $dist->{'pretty_name'};
   push @{$cyc->{'externalReferences'}}, { 'url' => $dist->{'bug_report_url'}, 'type' => 'issue-tracker' } if $dist->{'bug_report_url'};
   push @{$cyc->{'externalReferences'}}, { 'url' => $dist->{'home_url'}, 'type' => 'website' } if $dist->{'home_url'};
+  return $cyc;
+}
+
+sub cyclonedx_encode_relations {
+  my ($p) = @_;
+  return unless $p->{'cyc_id'};
+  my @r = grep {$_->[0]->{'cyc_id'} && $_->[1] eq 'DEPENDS_ON'} @{$p->{'RELATION'} || []};
+  return unless @r;
+  my $cyc = {
+    'ref' => $p->{'cyc_id'},
+    'dependsOn' => [ map {$_->[0]->{'cyc_id'}} @r ],
+  };
   return $cyc;
 }
 
@@ -620,10 +692,11 @@ sub spdx_encode_pkg {
     $spdx->{'originator'} = "Organization: $p->{'VENDOR'}";
     $spdx->{'supplier'} = $spdx->{'originator'}; # same as originator OBS-247
   }
+  $spdx->{'supplier'} = 'NOASSERTION';
   $spdx->{'downloadLocation'} = 'NOASSERTION';
   if ($pkgtype eq 'deb') {
     $spdx->{'sourceInfo'} = 'acquired package info from DPKG DB';
-  } else {
+  } elsif ($pkgtype eq 'rpm') {
     $spdx->{'sourceInfo'} = 'acquired package info from RPM DB';
   }
   $spdx->{'licenseConcluded'} = 'NOASSERTION';
@@ -640,7 +713,9 @@ sub spdx_encode_pkg {
   my $purlurl = gen_purl($p, $distro, $pkgtype);
   push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator', $purlurl } if $purlurl;
   if (!$p->{'spdx_id'}) {
-    $p->{'spdx_id'} = "SPDXRef-Package-$p->{'NAME'}-" . gen_pkg_id($p);
+    my $spdxtype = "Package-$pkgtype";
+    $spdxtype = "Package-go-module" if $pkgtype eq 'golang';
+    $p->{'spdx_id'} = "SPDXRef-$spdxtype-$p->{'NAME'}-" . gen_pkg_id($p);
     $p->{'spdx_id'} =~ s/[^a-zA-Z0-9\.\-]/-/g;
   }
   $spdx->{'SPDXID'} = $p->{'spdx_id'};
@@ -657,9 +732,37 @@ sub spdx_encode_file {
   my @chks;
   push @chks, { 'algorithm' => 'SHA256', 'checksumValue' => $f->{'sha256sum'} } if $f->{'sha256sum'};
   $spdx->{'checksums'} = \@chks if @chks;
-  $f->{'spdx_id'} = "SPDXRef-".Digest::MD5::md5_hex($f->{'name'}.($f->{'sha256sum'} || ''));
+  if (!$f->{'spdx_id'}) {
+    my $fn = $f->{'name'};
+    $fn =~ s/\A\/+//s;
+    $fn =~ s/\/+\z//s;
+    if (length($fn) > 42) {
+      1 while length($fn) > 42 && $fn =~ s/.*?\///;
+      $fn = "...".substr($fn, -42);
+    }
+    $f->{'spdx_id'} = "SPDXRef-File-$fn-".Digest::MD5::md5_hex($f->{'name'}.($f->{'sha256sum'} || ''));
+    $f->{'spdx_id'} =~ s/[^a-zA-Z0-9\.\-]/-/g;
+  }
   $spdx->{'SPDXID'} = $f->{'spdx_id'};
   return $spdx;
+}
+
+sub spdx_encode_one_relation {
+  my ($p, $op, $type) = @_;
+  return unless $p->{'spdx_id'} && $op->{'spdx_id'};
+  return if $type eq 'DEPENDS_ON';
+  my $spdx = { 'spdxElementId' => $p->{'spdx_id'}, 'relatedSpdxElement' => $op->{'spdx_id'}, 'relationshipType' => $type };
+  if ($type ne 'DEPENDENCY_OF' && $type ne 'DESCRIBES' && $type ne 'CONTAINS') {
+    $spdx->{'relationshipType'} = 'OTHER';
+    $spdx->{'comment'} = $type;
+  }
+  return $spdx;
+}
+
+sub spdx_encode_relations {
+  my ($p) = @_;
+  return unless $p->{'spdx_id'};
+  return map {spdx_encode_one_relation($p, $_->[0], $_->[1])} @{$p->{'RELATION'} || []};
 }
 
 sub spdx_encode_header {
@@ -692,6 +795,7 @@ my $format;
 my $dist_opt;
 my $arch;
 my $configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
+my $no_files_generation;
 
 while (@ARGV && $ARGV[0] =~ /^-/) {
   my $opt = shift @ARGV;
@@ -718,6 +822,8 @@ while (@ARGV && $ARGV[0] =~ /^-/) {
     $arch = shift @ARGV;
   } elsif ($opt eq '--configdir') {
     $configdir = shift @ARGV;
+  } elsif ($opt eq '--no-files-generation') {
+    $no_files_generation = 1;
   } else {
     last if $opt eq '--';
     die("unknown option: $opt\n");
@@ -770,13 +876,14 @@ my $toprocess = $ARGV[0];
 
 my $tmpdir = File::Temp::tempdir( CLEANUP => 1 );
 
+my $filepkgs;
 my $files;
 my $pkgs;
 my $dist;
 my $pkgtype = 'rpm';
 
 $config = Build::read_config_dist($dist_opt, $arch || 'noarch', $configdir) if $dist_opt;
-my $no_files_generation = ($config->{'buildflags:spdx-files-generation'} || '') eq 'no';
+$no_files_generation = ($config->{'buildflags:spdx-files-generation'} || '') eq 'no' unless defined $no_files_generation;
 
 if ($isproduct) {
   # product case
@@ -806,7 +913,8 @@ if ($isproduct) {
     dump_rpmdb($toprocess, "$tmpdir/rpmdb");
     $pkgs = read_pkgs_rpmdb("$tmpdir/rpmdb");
   }
-  $files = gen_filelist($toprocess) if $format eq 'spdx' && !$no_files_generation;
+  $files = gen_filelist($toprocess);
+  $filepkgs = introspect_filelist($toprocess, $files);
 } else { # no check for $istar to stay backward compatible
   # container tar case
   my $unpackdir = unpack_container($tmpdir, $toprocess);
@@ -818,7 +926,55 @@ if ($isproduct) {
     dump_rpmdb($unpackdir, "$tmpdir/rpmdb");
     $pkgs = read_pkgs_rpmdb("$tmpdir/rpmdb");
   }
-  $files = gen_filelist($unpackdir) if $format eq 'spdx' && !$no_files_generation;
+  $files = gen_filelist($unpackdir);
+  $filepkgs = introspect_filelist($unpackdir, $files);
+}
+
+# generate relations
+if (!$no_files_generation && @{$files || {}}) {
+  my %f2p;
+  for my $p (@$pkgs) {
+    push @{$f2p{$_}}, $p for @{$p->{'FILENAMES'} || []};
+  }
+  for my $f (@$files) {
+    next if $f->{'SKIP'};
+    #warn("unpackaged file: $f->{'name'}\n") unless @{$f2p{$f->{'name'}} || []};
+    for my $p (@{$f2p{$f->{'name'}} || []}) {
+      push @{$p->{'RELATION'}}, [ $f, 'CONTAINS' ];
+    }
+  }
+}
+if (@{$filepkgs || {}}) {
+  my %f2f;
+  if (!$no_files_generation) {
+    for my $f (@{$files || []}) {
+      next if $f->{'SKIP'};
+      $f2f{$f->{'name'}} = $f;
+    }
+  }
+  my %f2p;
+  for my $p (@$pkgs) {
+    push @{$f2p{$_}}, $p for @{$p->{'FILENAMES'} || []};
+  }
+  for my $p (@{$filepkgs || {}}) {
+    for my $fn (@{$p->{'filenames'}}) {
+      my $f = $f2f{$fn};
+      push @{$p->{'RELATION'}}, [ $f, "evident-by: indicates the package's existence is evident by the given file" ] if $f;
+    }
+    for my $p2 (@{$p->{'deps'} || []}) {
+      push @{$p2->{'RELATION'}}, [ $p, 'DEPENDENCY_OF' ];
+      push @{$p->{'RELATION'}}, [ $p2, 'DEPENDS_ON' ];
+    }
+    my @overp;
+    for my $fn (@{$p->{'filenames'}}) {
+      for my $pp (@{$f2p{$fn}}) {
+	push @overp, $pp unless grep {$_ == $pp} @overp;
+      }
+    }
+    for my $pp (@overp) {
+      push @{$pp->{'RELATION'}}, [ $p, "ownership-by-file-overlap: indicates that the parent package claims ownership of a child package since the parent metadata indicates overlap with a location that a cataloger found the child package by" ];
+    }
+  }
 }
 
 my $subjectname = $toprocess;
@@ -841,28 +997,24 @@ if ($format eq 'spdx') {
   for my $p (@$pkgs) {
     push @{$doc->{'packages'}}, spdx_encode_pkg($p, $distro, $pkgtype);
   }
-  for my $f (@$files) {
-    next if $f->{'SKIP'};
-    push @{$doc->{'files'}}, spdx_encode_file($f);
+  for my $p (@{$filepkgs || {}}) {
+    push @{$doc->{'packages'}}, spdx_encode_pkg($p, undef, $p->{'pkgtype'});
   }
-
-  if (@$files) {
-    my %f2p;
-    for my $p (@$pkgs) {
-      push @{$f2p{$_}}, $p for @{$p->{'FILENAMES'} || []};
-    }
-    for my $f (@$files) {
+  if (!$no_files_generation) {
+    for my $f (@{$files || []}) {
       next if $f->{'SKIP'};
-      #warn("unpackaged file: $f->{'name'}\n") unless @{$f2p{$f->{'name'}} || []};
-      for my $p (@{$f2p{$f->{'name'}} || []}) {
-	next unless $f->{'spdx_id'} && $p->{'spdx_id'};
-	my $rel = {
-	  'spdxElementId' => $p->{'spdx_id'},
-	  'relatedSpdxElement' => $f->{'spdx_id'},
-	  'relationshipType', 'CONTAINS',
-	};
-	push @{$doc->{'relationships'}}, $rel;
-      }
+      push @{$doc->{'files'}}, spdx_encode_file($f);
+    }
+  }
+  for my $p (@$pkgs) {
+    push @{$doc->{'relationships'}}, spdx_encode_relations($p);
+  }
+  for my $p (@{$filepkgs || {}}) {
+    push @{$doc->{'relationships'}}, spdx_encode_relations($p);
+  }
+  if (!$no_files_generation) {
+    for my $f (@{$files || []}) {
+      push @{$doc->{'relationships'}}, spdx_encode_relations($f) unless $f->{'SKIP'};
     }
   }
   push @{$doc->{'relationships'}}, {
@@ -878,8 +1030,17 @@ if ($format eq 'spdx') {
   for my $p (@$pkgs) {
     push @{$doc->{'components'}}, cyclonedx_encode_pkg($p, $distro, $pkgtype);
   }
+  for my $p (@{$filepkgs || {}}) {
+    push @{$doc->{'components'}}, cyclonedx_encode_pkg($p, undef, $p->{'pkgtype'});
+  }
   if ($dist && %$dist) {
     push @{$doc->{'components'}}, cyclonedx_encode_dist($dist);
+  }
+  for my $p (@$pkgs) {
+    push @{$doc->{'dependencies'}}, cyclonedx_encode_relations($p);
+  }
+  for my $p (@{$filepkgs || {}}) {
+    push @{$doc->{'dependencies'}}, cyclonedx_encode_relations($p);
   }
   $doc->{'serialNumber'} = 'urn:uuid:'.gen_uuid($doc);
 } else {
