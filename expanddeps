@@ -27,6 +27,7 @@ BEGIN {
 use strict;
 
 use Build;
+use Build::Expand;
 
 my ($dist, $rpmdeps, $archs, $configdir, $useusedforbuild, $installonly, $noinstall, $isvm);
 my ($obspackage, $buildflavor);
@@ -91,6 +92,11 @@ while (@ARGV)  {
   if ($ARGV[0] eq '--obspackage') {
     shift @ARGV;
     $obspackage = shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--debug') {
+    shift @ARGV;
+    $Build::Expand::expand_dbg = 1;
     next;
   }
   last;
