@@ -37,6 +37,7 @@ use Build::Rpm;
 use Build::Deb;
 use Build::SimpleJSON;
 
+use Build::SPDX;
 use Build::IntrospectGolang;
 
 my $tool_name = 'obs_build_generate_sbom';
@@ -310,6 +311,7 @@ sub read_rpm {
     die("bad rpm entry for $_\n") unless ref($r{$_}) eq 'ARRAY' && @{$r{$_}} == 1;
     $r{$_} = $r{$_}->[0];
   }
+  delete $r{'LICENSE'} if $r{'NAME'} eq 'gpg-pubkey' && ($r{'LICENSE'} || '') eq 'pubkey';
   return \%r;
 }
 
@@ -596,7 +598,10 @@ sub cyclonedx_encode_pkg {
   $cyc->{'publisher'} = $p->{'VENDOR'} if $p->{'VENDOR'};
   my $license = $p->{'LICENSE'};
   if ($license) {
+    $license =~ s/\s+/ /g;
     $license =~ s/ and / AND /g;
+    $license =~ s/ or / OR /g;
+    $license =~ s/ with / WITH /g;
     if ($license =~ /\s+/) {
       push @{$cyc->{'licenses'}}, { 'expression' => $license };
     } else {
@@ -660,7 +665,7 @@ sub cyclonedx_encode_header {
 #
 
 my $spdx_json_template = {
-  '_order' => [ qw{spdxVersion dataLicense SPDXID name documentNamespace creationInfo packages files relationships} ],
+  '_order' => [ qw{spdxVersion dataLicense SPDXID name documentNamespace creationInfo packages files hasExtractedLicensingInfos relationships} ],
   'creationInfo' => {
     '_order' => [ qw{created creators licenseListVersion} ],
   },
@@ -673,13 +678,98 @@ my $spdx_json_template = {
   'files' => {
     '_order' => [ qw{fileName SPDXID checksums licenseConcluded copyrightText comment} ],
   },
+  'hasExtractedLicensingInfos' => {
+    '_order' => [ qw{licenseId extractedText} ],
+  },
   'relationships' => {
     '_order' => [ qw{spdxElementId relatedSpdxElement relationshipType} ],
   },
 };
 
+sub spdx_encode_license_id {
+  my ($name, $spdx_licenses, $spdx_license_exceptions) = @_;
+  my $l = $spdx_licenses->{lc($name)};
+  return $l->{'name'} if $l;
+  $l = {'name' => $name};
+  $l->{'name'} = "LicenseRef-".lc($name);
+  $l->{'name'} =~ s/[^a-zA-Z0-9\.\-]/-/g;
+  $l->{'text'} = $name;
+  $spdx_licenses->{lc($name)} = $l;
+  return $l->{'name'};
+}
+
+sub spdx_encode_license_exception_id {
+  my ($name, $spdx_licenses, $spdx_license_exceptions) = @_;
+  my $l = $spdx_license_exceptions->{lc($name)};
+  return $l->{'name'} if $l;
+  $l = {'name' => $name};
+  $l->{'name'} = "AdditionRef-".lc($name);
+  $l->{'name'} =~ s/[^a-zA-Z0-9\.\-]/-/g;
+  $l->{'text'} = $name;
+  $spdx_license_exceptions->{lc($name)} = $l;
+  return $l->{'name'};
+}
+
+sub spdx_encode_license_r {
+  my ($name, $spdx_licenses, $spdx_license_exceptions) = @_;
+  $name =~ s/^\s+//;
+  my $ret = '';
+  while (1) {
+    my $t;
+    if ($name =~ s/^\(//) {
+      ($t, $name) = spdx_encode_license_r($name, $spdx_licenses, $spdx_license_exceptions);
+      return unless defined($name) && $name =~ s/^\s*\)//;
+      $t = "($t)";
+    } else {
+      return unless $name =~ /^([^\s\+\(\)]+)/;
+      $t = $1;
+      $name = substr($name, length($t));
+      if ($name =~ /^(\+?\s*WITH\s+([^\s\+\(\)]+))/i && !$spdx_license_exceptions->{lc($2)}) {
+	# the exception is not known, encode license with exception
+	$t = "$t WITH $2";
+	$name = substr($name, length($1));
+      }
+      $t = spdx_encode_license_id($t, $spdx_licenses, $spdx_license_exceptions);
+      $t = "$t+" if $name =~ s/^\+//;
+      $name =~ s/^\s+//;
+      if ($name =~ s/^WITH\s+//i) {
+	return unless $name =~ /^([^\s\+\(\)]+)/;
+	my $t2 = $1;
+        $name = substr($name, length($t2));
+	return unless $spdx_license_exceptions->{lc($t2)};
+        $t2 = spdx_encode_license_exception_id($t2, $spdx_licenses, $spdx_license_exceptions);
+        $t .= " WITH $t2";
+      }
+    }
+    $ret .= $t;
+    $name =~ s/^\s+//;
+    return $ret, $name if $name eq '' || $name =~ /^\)/;
+    if ($name =~ s/^AND\s+//i) {
+      $ret .= " AND ";
+    } elsif ($name =~ s/^OR\s+//i) {
+      $ret .= " OR ";
+    } else {
+      return;
+    }
+  }
+}
+
+sub spdx_encode_license {
+  my ($name, $spdx_licenses, $spdx_license_exceptions) = @_;
+  my ($ret, $rest) = spdx_encode_license_r($name, $spdx_licenses, $spdx_license_exceptions);
+  return $ret if defined($rest) && $rest eq '';
+  # parse error, encode complete string as new license
+  return spdx_encode_license_id($name, $spdx_licenses, $spdx_license_exceptions);
+}
+
+sub spdx_encode_extracted_license {
+  my ($l) = @_;
+  my $spdx = { 'licenseId' => $l->{'name'}, 'extractedText' => $l->{'text'} };
+  return $spdx;
+}
+
 sub spdx_encode_pkg {
-  my ($p, $distro, $pkgtype) = @_;
+  my ($p, $distro, $pkgtype, $spdx_licenses, $spdx_license_exceptions) = @_;
   my $vr = $p->{'VERSION'};
   $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
   my $evr = $vr;
@@ -703,7 +793,11 @@ sub spdx_encode_pkg {
   $spdx->{'licenseDeclared'} = 'NOASSERTION';
   my $license = $p->{'LICENSE'};
   if ($license) {
+    $license =~ s/\s+/ /g;
     $license =~ s/ and / AND /g;
+    $license =~ s/ or / OR /g;
+    $license =~ s/ with / WITH /g;
+    $license = spdx_encode_license($license, $spdx_licenses, $spdx_license_exceptions);
     $spdx->{'licenseConcluded'} = $license;
     $spdx->{'licenseDeclared'} = $license unless ($config->{'buildflags:spdx-declared-license'} || '') eq 'NOASSERTION';
   }
@@ -991,20 +1085,25 @@ my $intoto_type;
 my $doc;
 
 if ($format eq 'spdx') {
+  my %spdx_licenses = map {lc($_) => {'name' => $_, 'known' => 1}} @$Build::SPDX::licenses;
+  my %spdx_license_exceptions = map {lc($_) => {'name' => $_, 'known' => 1}} @$Build::SPDX::license_exceptions;
   $json_template = $spdx_json_template;
   $intoto_type = 'https://spdx.dev/Document';
   $doc = spdx_encode_header($subjectname);
   for my $p (@$pkgs) {
-    push @{$doc->{'packages'}}, spdx_encode_pkg($p, $distro, $pkgtype);
+    push @{$doc->{'packages'}}, spdx_encode_pkg($p, $distro, $pkgtype, \%spdx_licenses, \%spdx_license_exceptions);
   }
   for my $p (@{$filepkgs || {}}) {
-    push @{$doc->{'packages'}}, spdx_encode_pkg($p, undef, $p->{'pkgtype'});
+    push @{$doc->{'packages'}}, spdx_encode_pkg($p, undef, $p->{'pkgtype'}, \%spdx_licenses, \%spdx_license_exceptions);
   }
   if (!$no_files_generation) {
     for my $f (@{$files || []}) {
       next if $f->{'SKIP'};
       push @{$doc->{'files'}}, spdx_encode_file($f);
     }
+  }
+  for (grep {!$spdx_licenses{$_}->{'known'}} sort keys %spdx_licenses) {
+    push @{$doc->{'hasExtractedLicensingInfos'}}, spdx_encode_extracted_license($spdx_licenses{$_});
   }
   for my $p (@$pkgs) {
     push @{$doc->{'relationships'}}, spdx_encode_relations($p);
