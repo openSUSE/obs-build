@@ -117,7 +117,7 @@ sub parse {
 	chomp;
 	last if /^-\Q$tag\E/;
 	next if $tag eq 'Req' && /^rpmlib\(/;
-	$_ = Build::Rpm::testcaseformat($_) if /^\(/ && $options{'testcaseformat'};
+	$_ = Build::Rpm::testcaseformat($_) if /^\(|^packageand\(|^otherproviders\(/ && $options{'testcaseformat'};
 	push @{$cur->{$tmap{$tag}}}, $_;
       }
     } elsif ($tag eq 'Pkg') {

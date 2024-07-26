@@ -1775,6 +1775,23 @@ sub testcaseformat_rec {
 
 sub testcaseformat {
   my ($dep) = @_;
+  if ($dep =~ /^otherproviders\(/) {
+    return $dep unless $dep =~ /^otherproviders\((.*)\)$/;
+    return "namespace:otherproviders($1)";
+  }
+  if ($dep =~ /^packageand\(/) {
+    return $dep unless $dep =~ /^packageand\((.+)\)$/;
+    my @d;
+    for (split(':', $1)) {
+      if (@d && $d[-1] eq 'pattern') {
+	$d[-1] = "pattern:$_";
+	next;
+      }
+      push @d, $_;
+    }
+    return $dep unless @d;
+    return join(' & ', @d);
+  }
   my $r = parse_rich_dep($dep);
   return $dep unless $r;
   return testcaseformat_rec($r);

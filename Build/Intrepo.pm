@@ -131,6 +131,9 @@ sub parse {
 	push @ss, Build::Rpm::shiftrich(\@s);
 	$ss[-1] = Build::Rpm::testcaseformat($ss[-1]) if $testcaseformat;
 	next;
+      } elsif ($testcaseformat && $s[0] =~ /^packageand\(|^otherproviders\(/) {
+	push @ss, Build::Rpm::testcaseformat(shift @s);
+	next;
       }
       push @ss, shift @s;
       while (@s && $s[0] =~ /^\(?[<=>|]/) {

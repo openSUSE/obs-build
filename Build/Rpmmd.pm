@@ -192,7 +192,7 @@ sub primary_handle_dep {
     $evr .= "-$attr{'rel'}" if defined $attr{'rel'};
     $dep .= " $flagmap{$attr{'flags'}} $evr";
   }
-  $dep = Build::Rpm::testcaseformat($dep) if ($dep =~ /^\(/) && ($c->[0]->[5] || {})->{'testcaseformat'};
+  $dep = Build::Rpm::testcaseformat($dep) if ($dep =~ /^\(|^packageand\(|^otherproviders\(/) && ($c->[0]->[5] || {})->{'testcaseformat'};
   my $data = $c->[0]->[4];
   push @{$data->{$h->{'_tag'}}}, $dep;
 }
