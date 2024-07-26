@@ -39,6 +39,7 @@ use Build::SimpleJSON;
 
 use Build::SPDX;
 use Build::IntrospectGolang;
+use Build::IntrospectRust;
 
 my $tool_name = 'obs_build_generate_sbom';
 my $tool_version = '1.1';
@@ -258,10 +259,10 @@ sub gen_filelist {
 
 sub add_golang_mod {
   my ($m, $exeinfos) = @_;
-  my $g = $exeinfos->{"$m->{'path'}\@\@$m->{'version'}"};
+  my $g = $exeinfos->{"golang:$m->{'path'}\@\@$m->{'version'}"};
   return $g if $g;
   $g = { 'NAME' => $m->{'path'}, 'VERSION' => $m->{'version'}, 'pkgtype' => 'golang' };
-  $exeinfos->{"$m->{'path'}\@\@$m->{'version'}"} = $g;
+  $exeinfos->{"golang:$m->{'path'}\@\@$m->{'version'}"} = $g;
   return $g;
 }
 
@@ -285,6 +286,25 @@ sub introspect_golang_exe {
   $g->{'deps'} = \@deps;
 }
 
+sub add_rust_pkg {
+  my ($m, $exeinfos) = @_;
+  my $g = $exeinfos->{"rust:$m->{'name'}\@\@$m->{'version'}"};
+  return $g if $g;
+  $g = { 'NAME' => $m->{'name'}, 'VERSION' => $m->{'version'}, 'pkgtype' => 'rust' };
+  $exeinfos->{"rust:$m->{'name'}\@\@$m->{'version'}"} = $g;
+  return $g;
+}
+
+sub introspect_rust_exe {
+  my ($fd, $fname, $exeinfos) = @_;
+  my $versioninfo = Build::IntrospectRust::versioninfo($fd);
+  return unless $versioninfo && $versioninfo->{'packages'};
+  for my $p (@{$versioninfo->{'packages'}}) {
+    my $gg = add_rust_pkg($p, $exeinfos) if ($p->{'kind'} || 'runtime') eq 'runtime';
+    push @{$gg->{'filenames'}}, $fname;
+  }
+}
+
 sub introspect_filelist {
   my ($dir, $files) = @_;
   return undef unless $files;
@@ -297,6 +317,8 @@ sub introspect_filelist {
     next unless unpack('N', $buf) == 0x7f454c46;
     seek($fd, 0, 0);
     eval { introspect_golang_exe($fd, $f->{'name'}, \%exeinfos) };
+    warn($@) if $@;
+    eval { introspect_rust_exe($fd, $f->{'name'}, \%exeinfos) };
     warn($@) if $@;
   }
   return [ map {$exeinfos{$_}} sort keys %exeinfos ];
@@ -520,6 +542,7 @@ sub gen_purl {
   my $name = $p->{'NAME'};
   my $vr = $p->{'VERSION'};
   my $subpath;
+  $pkgtype = 'cargo' if $pkgtype eq 'rust';
   if ($pkgtype eq 'golang') {
     if ($name =~ /\A([^\/]+\/[^\/]+\/[^\/]+)\/(.+)/s) {
       $name = $1;
@@ -784,11 +807,25 @@ sub spdx_encode_pkg {
   }
   $spdx->{'supplier'} = 'NOASSERTION';
   $spdx->{'downloadLocation'} = 'NOASSERTION';
+
   if ($pkgtype eq 'deb') {
     $spdx->{'sourceInfo'} = 'acquired package info from DPKG DB';
   } elsif ($pkgtype eq 'rpm') {
     $spdx->{'sourceInfo'} = 'acquired package info from RPM DB';
+  } elsif ($pkgtype eq 'golang') {
+    if (@{$p->{'filenames'} || []}) {
+      $spdx->{'sourceInfo'} = 'acquired package info from go module information: '.join(', ', @{$p->{'filenames'}});
+    } else {
+      $spdx->{'sourceInfo'} = 'acquired package info from go module information';
+    }
+  } elsif ($pkgtype eq 'rust') {
+    if (@{$p->{'filenames'} || []}) {
+      $spdx->{'sourceInfo'} = 'acquired package info from rust cargo manifest: '.join(', ', @{$p->{'filenames'}});
+    } else {
+      $spdx->{'sourceInfo'} = 'acquired package info from rust cargo manifest';
+    }
   }
+
   $spdx->{'licenseConcluded'} = 'NOASSERTION';
   $spdx->{'licenseDeclared'} = 'NOASSERTION';
   my $license = $p->{'LICENSE'};
@@ -809,6 +846,7 @@ sub spdx_encode_pkg {
   if (!$p->{'spdx_id'}) {
     my $spdxtype = "Package-$pkgtype";
     $spdxtype = "Package-go-module" if $pkgtype eq 'golang';
+    $spdxtype = "Package-rust-crate" if $pkgtype eq 'rust';
     $p->{'spdx_id'} = "SPDXRef-$spdxtype-$p->{'NAME'}-" . gen_pkg_id($p);
     $p->{'spdx_id'} =~ s/[^a-zA-Z0-9\.\-]/-/g;
   }
