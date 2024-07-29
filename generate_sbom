@@ -283,7 +283,7 @@ sub introspect_golang_exe {
     push @{$gg->{'filenames'}}, $fname;
     push @deps, $gg unless grep {$_ eq $gg} @deps;
   }
-  $g->{'deps'} = \@deps;
+  $g->{'deps'} = \@deps if @deps;
 }
 
 sub add_rust_pkg {
@@ -300,8 +300,20 @@ sub introspect_rust_exe {
   my $versioninfo = Build::IntrospectRust::versioninfo($fd);
   return unless $versioninfo && $versioninfo->{'packages'};
   for my $p (@{$versioninfo->{'packages'}}) {
-    my $gg = add_rust_pkg($p, $exeinfos) if ($p->{'kind'} || 'runtime') eq 'runtime';
+    next unless ($p->{'kind'} || 'runtime') eq 'runtime';
+    my $gg = add_rust_pkg($p, $exeinfos);
     push @{$gg->{'filenames'}}, $fname;
+    my @deps = @{$gg->{'deps'} || []};
+    for my $dep (@{$p->{'dependencies'} || []}) {
+      my $d = int($dep);
+      next if $d < 0 || $d >= @{$versioninfo->{'packages'}};
+      my $p2 = $versioninfo->{'packages'}->[$d];
+      next unless ($p2->{'kind'} || 'runtime') eq 'runtime';
+      my $gg2 = add_rust_pkg($p2, $exeinfos);
+      next if $gg2 == $gg;
+      push @deps, $gg2 unless grep {$_ eq $gg2} @deps;
+    }
+    $gg->{'deps'} = \@deps if @deps;
   }
 }
 
