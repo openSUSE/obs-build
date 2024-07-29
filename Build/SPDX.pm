@@ -761,6 +761,10 @@ our $license_exceptions = [
   "x11vnc-openssl-exception",
 ];
 
+
+my %known_licenses = map { lc($_) => $_} @$licenses;
+my %known_license_exceptions = map { lc($_) => $_} @$license_exceptions;
+
 sub _tokenize_license_r {
   my ($name) = @_;
   $name =~ s/^\s+//;
@@ -800,6 +804,48 @@ sub tokenize_license {
   return $ret && defined($rest) && $rest eq '' ? $ret : undef;
 }
 
+sub normalize_tokenized_license {
+  my ($n, $unknown_license_cb, $unknown_exception_cb) = @_;
+  my @n = ('START', @$n);
+  my $l = '';
+  while (@n) {
+    my ($op, $t) = splice(@n, 0, 2);
+    $l .= " $op " if $op ne 'START' && $op ne 'PLUS';
+    if ($op eq 'PLUS') {
+      $t = '+';
+    } elsif ($op eq 'WITH') {
+      my $nt = $known_license_exceptions{lc($t)};
+      $t = $nt ? $nt : $unknown_exception_cb ? $unknown_exception_cb->($t) : undef;
+    } elsif (ref $t) {
+      $t = normalize_tokenized_license($t, $spdx_licenses, $spdx_license_exceptions);
+      $t = "($t)" if defined $t;
+    } else {
+      my $plusidx = @n && $n[0] eq 'PLUS' ? 2 : 0;
+      if (!$unknown_exception_cb && @n > $plusidx + 1 && $n[$plusidx] eq 'WITH' && !$known_license_exceptions{lc($n[$plusidx + 1])}) {
+        # the exception is not known, encode complete license with exception
+        $t .= ($plusidx ? '+' : '') . " WITH $n[$plusidx + 1]";
+        splice(@n, 0, $plusidx + 2);
+      }
+      my $nt = $known_licenses{lc($t)};
+      $t = $nt ? $nt : $unknown_license_cb ? $unknown_license_cb->($t) : undef;
+    }
+    return undef unless defined $t;
+    $l .= $t;
+  }
+  return $l;
+}
 
+sub normalize_license {
+  my ($name, $unknown_license_cb, $unknown_exception_cb) = @_;
+  $name =~ s/\s+/ /g;
+  $name =~ s/ and / AND /g;
+  $name =~ s/ or / OR /g;
+  $name =~ s/ with / WITH /g;
+  my $n = tokenize_license($name);
+  $n = $n ? normalize_tokenized_license($n, $unknown_license_cb, $unknown_exception_cb) : undef;
+  return $n if defined $n;
+  # parse/normalization error, encode complete string as new license
+  return $unknown_license_cb ? $unknown_license_cb->($name) : undef;
+}
 
 1;
