@@ -613,8 +613,49 @@ my $cyclonedx_json_template = {
   'dependencies' => { '_order' => [ qw{ref dependsOn} ] }
 };
 
+sub cyclonedx_encode_license_id {
+  my ($name, $spdx_licenses, $spdx_license_exceptions) = @_;
+  my $l = $spdx_licenses->{lc($name)};
+  return $l ? $l->{'name'} : $name;
+}
+
+sub cyclonedx_encode_license_exception_id {
+  my ($name, $spdx_licenses, $spdx_license_exceptions) = @_;
+  my $l = $spdx_license_exceptions->{lc($name)};
+  return $l ? $l->{'name'} : $name;
+}
+
+sub cyclonedx_normalize_license {
+  my ($n, $spdx_licenses, $spdx_license_exceptions) = @_;
+  my @n = ('START', @$n);
+  my $l = '';
+  while (@n) {
+    my ($op, $t) = splice(@n, 0, 2);
+    $l .= " $op " if $op ne 'START' && $op ne 'PLUS';
+    if ($op eq 'PLUS') {
+      $t = '+';
+    } elsif ($op eq 'WITH') {
+      $t = cyclonedx_encode_license_exception_id($t, $spdx_licenses, $spdx_license_exceptions);
+    } elsif (ref $t) {
+      $t = '(' . cyclonedx_normalize_license($t, $spdx_licenses, $spdx_license_exceptions) . ')';
+    } else {
+      $t = cyclonedx_encode_license_id($t, $spdx_licenses, $spdx_license_exceptions);
+    }
+    return undef unless defined $t;
+    $l .= $t;
+  }
+  return $l;
+}
+
+sub cyclonedx_encode_license {
+  my ($name, $spdx_licenses, $spdx_license_exceptions) = @_;
+  my $n = Build::SPDX::tokenize_license($name);
+  $n = $n ? cyclonedx_normalize_license($n, $spdx_licenses, $spdx_license_exceptions) : undef;
+  return defined($n) ? $n : $name;
+}
+
 sub cyclonedx_encode_pkg {
-  my ($p, $distro, $pkgtype) = @_;
+  my ($p, $distro, $pkgtype, $spdx_licenses, $spdx_license_exceptions) = @_;
   my $vr = $p->{'VERSION'};
   $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
   my $cyc = { 'type' => 'library', 'name' => $p->{'NAME'}, 'version' => $vr };
@@ -625,6 +666,7 @@ sub cyclonedx_encode_pkg {
     $license =~ s/ and / AND /g;
     $license =~ s/ or / OR /g;
     $license =~ s/ with / WITH /g;
+    $license = cyclonedx_encode_license($license, $spdx_licenses, $spdx_license_exceptions);
     if ($license =~ /\s+/) {
       push @{$cyc->{'licenses'}}, { 'expression' => $license };
     } else {
@@ -1101,9 +1143,10 @@ my $json_template;
 my $intoto_type;
 my $doc;
 
+my %spdx_licenses = map {lc($_) => {'name' => $_, 'known' => 1}} @$Build::SPDX::licenses;
+my %spdx_license_exceptions = map {lc($_) => {'name' => $_, 'known' => 1}} @$Build::SPDX::license_exceptions;
+
 if ($format eq 'spdx') {
-  my %spdx_licenses = map {lc($_) => {'name' => $_, 'known' => 1}} @$Build::SPDX::licenses;
-  my %spdx_license_exceptions = map {lc($_) => {'name' => $_, 'known' => 1}} @$Build::SPDX::license_exceptions;
   $json_template = $spdx_json_template;
   $intoto_type = 'https://spdx.dev/Document';
   $doc = spdx_encode_header($subjectname);
@@ -1144,10 +1187,10 @@ if ($format eq 'spdx') {
   $intoto_type = 'https://cyclonedx.org/bom';
   $doc = cyclonedx_encode_header($subjectname);
   for my $p (@$pkgs) {
-    push @{$doc->{'components'}}, cyclonedx_encode_pkg($p, $distro, $pkgtype);
+    push @{$doc->{'components'}}, cyclonedx_encode_pkg($p, $distro, $pkgtype, \%spdx_licenses, \%spdx_license_exceptions);
   }
   for my $p (@{$filepkgs || {}}) {
-    push @{$doc->{'components'}}, cyclonedx_encode_pkg($p, undef, $p->{'pkgtype'});
+    push @{$doc->{'components'}}, cyclonedx_encode_pkg($p, undef, $p->{'pkgtype'}, \%spdx_licenses, \%spdx_license_exceptions);
   }
   if ($dist && %$dist) {
     push @{$doc->{'components'}}, cyclonedx_encode_dist($dist);
