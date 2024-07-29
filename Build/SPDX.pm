@@ -761,4 +761,45 @@ our $license_exceptions = [
   "x11vnc-openssl-exception",
 ];
 
+sub _tokenize_license_r {
+  my ($name) = @_;
+  $name =~ s/^\s+//;
+  my @ret;
+  while (1) {
+    if ($name =~ s/^\(//) {
+      my $t;
+      ($t, $name) = _tokenize_license_r($name);
+      return unless $t && defined($name) && $name =~ s/^\s*\)//;
+      push @ret, $t;
+    } else {
+      return unless $name =~ /^([^\s\+\(\)]+)/;
+      push @ret, $1;
+      $name = substr($name, length($1));
+      push @ret, 'PLUS', '+' if $name =~ s/^\+//;
+      $name =~ s/^\s+//;
+      if ($name =~ s/^WITH\s+//i) {
+	return unless $name =~ /^([^\s\+\(\)]+)/;
+	push @ret, 'WITH', $1;
+	$name = substr($name, length($1));
+      }
+    }
+    $name =~ s/^\s+//;
+    return \@ret, $name if $name eq '' || $name =~ /^\)/;
+    if ($name =~ s/^AND(?:\s+|(?=\())//i) {
+      push @ret, 'AND';
+    } elsif ($name =~ s/^OR(?:\s+|(?=\())//i) {
+      push @ret, 'OR';
+    } else {
+      return;
+    }
+  }
+}
+
+sub tokenize_license {
+  my ($ret, $rest) = _tokenize_license_r($_[0]);
+  return $ret && defined($rest) && $rest eq '' ? $ret : undef;
+}
+
+
+
 1;

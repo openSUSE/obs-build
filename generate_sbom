@@ -724,64 +724,43 @@ sub spdx_encode_license_id {
 sub spdx_encode_license_exception_id {
   my ($name, $spdx_licenses, $spdx_license_exceptions) = @_;
   my $l = $spdx_license_exceptions->{lc($name)};
-  return $l->{'name'} if $l;
-  $l = {'name' => $name};
-  $l->{'name'} = "AdditionRef-".lc($name);
-  $l->{'name'} =~ s/[^a-zA-Z0-9\.\-]/-/g;
-  $l->{'text'} = $name;
-  $spdx_license_exceptions->{lc($name)} = $l;
-  return $l->{'name'};
+  return $l ? $l->{'name'} : undef;
 }
 
-sub spdx_encode_license_r {
-  my ($name, $spdx_licenses, $spdx_license_exceptions) = @_;
-  $name =~ s/^\s+//;
-  my $ret = '';
-  while (1) {
-    my $t;
-    if ($name =~ s/^\(//) {
-      ($t, $name) = spdx_encode_license_r($name, $spdx_licenses, $spdx_license_exceptions);
-      return unless defined($name) && $name =~ s/^\s*\)//;
-      $t = "($t)";
+sub spdx_normalize_license {
+  my ($n, $spdx_licenses, $spdx_license_exceptions) = @_;
+  my @n = ('START', @$n);
+  my $l = '';
+  while (@n) {
+    my ($op, $t) = splice(@n, 0, 2);
+    $l .= " $op " if $op ne 'START' && $op ne 'PLUS';
+    if ($op eq 'PLUS') {
+      $t = '+';
+    } elsif ($op eq 'WITH') {
+      $t = spdx_encode_license_exception_id($t, $spdx_licenses, $spdx_license_exceptions);
+    } elsif (ref $t) {
+      $t = '(' . spdx_normalize_license($t, $spdx_licenses, $spdx_license_exceptions) . ')';
     } else {
-      return unless $name =~ /^([^\s\+\(\)]+)/;
-      $t = $1;
-      $name = substr($name, length($t));
-      if ($name =~ /^(\+?\s*WITH\s+([^\s\+\(\)]+))/i && !$spdx_license_exceptions->{lc($2)}) {
-	# the exception is not known, encode license with exception
-	$t = "$t WITH $2";
-	$name = substr($name, length($1));
+      my $plusidx = @n && $n[0] eq 'PLUS' ? 2 : 0;
+      if (@n > $plusidx + 1 && $n[$plusidx] eq 'WITH' && !$spdx_license_exceptions->{lc($n[$plusidx + 1])}) {
+	# the exception is not known, encode complete license with exception
+	$t .= ($plusidx ? '+' : '') . " WITH $n[$plusidx + 1]";
+	splice(@n, 0, $plusidx + 2);
       }
       $t = spdx_encode_license_id($t, $spdx_licenses, $spdx_license_exceptions);
-      $t = "$t+" if $name =~ s/^\+//;
-      $name =~ s/^\s+//;
-      if ($name =~ s/^WITH\s+//i) {
-	return unless $name =~ /^([^\s\+\(\)]+)/;
-	my $t2 = $1;
-        $name = substr($name, length($t2));
-	return unless $spdx_license_exceptions->{lc($t2)};
-        $t2 = spdx_encode_license_exception_id($t2, $spdx_licenses, $spdx_license_exceptions);
-        $t .= " WITH $t2";
-      }
     }
-    $ret .= $t;
-    $name =~ s/^\s+//;
-    return $ret, $name if $name eq '' || $name =~ /^\)/;
-    if ($name =~ s/^AND\s+//i) {
-      $ret .= " AND ";
-    } elsif ($name =~ s/^OR\s+//i) {
-      $ret .= " OR ";
-    } else {
-      return;
-    }
+    return undef unless defined $t;
+    $l .= $t;
   }
+  return $l;
 }
 
 sub spdx_encode_license {
   my ($name, $spdx_licenses, $spdx_license_exceptions) = @_;
-  my ($ret, $rest) = spdx_encode_license_r($name, $spdx_licenses, $spdx_license_exceptions);
-  return $ret if defined($rest) && $rest eq '';
-  # parse error, encode complete string as new license
+  my $n = Build::SPDX::tokenize_license($name);
+  $n = $n ? spdx_normalize_license($n, $spdx_licenses, $spdx_license_exceptions) : undef;
+  return $n if defined $n;
+  # parse/normalization error, encode complete string as new license
   return spdx_encode_license_id($name, $spdx_licenses, $spdx_license_exceptions);
 }
 
