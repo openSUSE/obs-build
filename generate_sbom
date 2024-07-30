@@ -231,6 +231,36 @@ sub dump_rpmdb {
   die("could not dump rpm database\n");
 }
 
+sub detect_mime {
+  my ($filename) = @_;
+  my $fd;
+  return undef unless open($fd, '<', $filename);
+  my $prefix = '';
+  if (read($fd, $prefix, 64) >= 8) {
+    my $first = unpack('N', $prefix);
+    if ($first == 0x7f454c46) {
+      my $t = unpack('@16n', $prefix);
+      return 'application/x-sharedlib' if $t == 0x0300 || $t == 0x0003;
+      return 'application/x-elf';
+    }
+    if ($first == 0xcafebabe && unpack('@7C', $prefix) < 20) {
+      return 'application/x-mach-binary';	# fat macho
+    }
+    if ($first == 0xfeedface || $first == 0xfeedfacf || $first == 0xcefaedfe || $first == 0xcffaedfe) {
+      return 'application/x-mach-binary';
+    }
+    if (($first & 0xffff0000) == 0x4d5a0000) {
+      my $o = unpack('\@60V', $prefix);
+      my $type = '';
+      if (seek($fd, $o, 0) && read($fd, $type, 4) == 4 && unpack('N', $type) == 0x50450000) {
+	return 'application/vnd.microsoft.portable-executable';
+      }
+    }
+  }
+  close($fd);
+  return undef;
+}
+
 sub gen_filelist {
   my ($dir) = @_;
   my $fd;
@@ -252,8 +282,11 @@ sub gen_filelist {
       $f->{'SKIP'} = 1;
       next;
     }
+    my $mime = detect_mime("$dir/$f->{'name'}");
+    $f->{'mime'} = $mime if $mime;
     $f->{'sha256sum'} = sha256file("$dir/$f->{'name'}");
   }
+  @files = sort {$a->{'name'} cmp $b->{'name'}} @files;
   return \@files;
 }
 
@@ -322,12 +355,10 @@ sub introspect_filelist {
   return undef unless $files;
   my %exeinfos;
   for my $f (@$files) {
+    my $mime = $f->{'mime'};
+    next unless $mime && ($mime eq 'application/x-sharedlib' || $mime eq 'application/x-elf' || $mime eq 'application/x-mach-binary' || $mime eq 'application/vnd.microsoft.portable-executable');
     my $fd;
     next unless open($fd, '<', "$dir/$f->{'name'}");
-    my $buf;
-    next unless read($fd, $buf, 16) == 16;
-    next unless unpack('N', $buf) == 0x7f454c46;
-    seek($fd, 0, 0);
     eval { introspect_golang_exe($fd, $f->{'name'}, \%exeinfos) };
     warn($@) if $@;
     eval { introspect_rust_exe($fd, $f->{'name'}, \%exeinfos) };
@@ -708,7 +739,7 @@ my $spdx_json_template = {
     },
   },
   'files' => {
-    '_order' => [ qw{fileName SPDXID checksums licenseConcluded copyrightText comment} ],
+    '_order' => [ qw{fileName SPDXID fileTypes checksums licenseConcluded licenseInfoInFiles copyrightText comment} ],
   },
   'hasExtractedLicensingInfos' => {
     '_order' => [ qw{licenseId extractedText} ],
@@ -800,8 +831,13 @@ sub spdx_encode_file {
   my $spdx = {
     'fileName' => $f->{'name'},
     'licenseConcluded' => 'NOASSERTION',
+    'licenseInfoInFiles' => [ 'NOASSERTION' ],
     'copyrightText' => '',
   };
+  my $mime = $f->{'mime'};
+  if ($mime && ($mime eq 'application/x-sharedlib' || $mime eq 'application/x-elf' || $mime eq 'application/x-mach-binary' || $mime eq 'application/vnd.microsoft.portable-executable')) {
+    push @{$spdx->{'fileTypes'}}, 'BINARY';
+  }
   my @chks;
   push @chks, { 'algorithm' => 'SHA256', 'checksumValue' => $f->{'sha256sum'} } if $f->{'sha256sum'};
   $spdx->{'checksums'} = \@chks if @chks;
