@@ -139,6 +139,12 @@ sub systemq {
   exit($?) if $?;
 }
 
+
+##################################################################################################
+#
+# Container unpacking
+#
+
 sub uncompress_container {
   my ($container, $outfile) = @_;
   my @decompressor;
@@ -174,62 +180,11 @@ sub unpack_container {
   return "$dir/unpack/rootfs";
 }
 
-sub dump_rpmdb {
-  my ($root, $outfile) = @_;
-  my $dbpath;
-  for my $phase (0, 1) {
-    if (can_run($root, '/usr/bin/rpmdb')) {
-      # check if we have the exportdb option
-      if (system_chroot($root, 'quiet', '/usr/bin/rpmdb', '--exportdb', '--version') == 0) {
-        if ($dbpath) {
-          system_chroot($root, 'stdout', $outfile, '/usr/bin/rpmdb', '--dbpath', $dbpath, '--exportdb');
-        } else {
-          system_chroot($root, 'stdout', $outfile, '/usr/bin/rpmdb', '--exportdb');
-        }
-        exit($?) if $?;
-        return;
-      }
-    }
-    # try to get the dbpath from the root if we can
-    if (!$dbpath && can_run($root, '/usr/bin/rpm')) {
-      my $fd = popen_chroot($root, '/usr/bin/rpm', '--eval', '%_dbpath');
-      my $path = <$fd>;
-      close($fd);
-      chomp $path;
-      $dbpath = $path if $path && $path =~ /^\//;
-    }
-    $dbpath ||= '/var/lib/rpm';           # guess
-    # try to dump with rpmdb_dump
-    if (-s "$root$dbpath/Packages" && can_run($root, '/usr/lib/rpm/rpmdb_dump')) {
-      my $outfh;
-      open($outfh, '>', $outfile) || die("$outfile: $!\n");
-      my $fd = popen_chroot($root, '/usr/lib/rpm/rpmdb_dump', "$dbpath/Packages");
-      while (<$fd>) {
-	next unless /^\s*[0-9a-fA-F]{8}/;
-	chomp;
-	my $v = <$fd>;
-	die("unexpected EOF\n") unless $v;
-	chomp $v;
-	substr($v, 0, 1, '') while substr($v, 0, 1) eq ' ';
-	$v = pack('H*', $v);
-	next if length($v) < 16;
-	my ($il, $dl) = unpack('NN', $v);
-	die("bad header length\n") unless length($v) == 8 + $il * 16 + $dl;
-	die("print: $!\n") unless print $outfh pack('H*', '8eade80100000000');
-	die("print: $!\n") unless print $outfh $v;
-      }
-      close($fd) || die("rpmdb_dump: $!\n");
-      close($outfh) || die("close: $!\n");
-      return;
-    }
 
-    last unless $root;
-    # try with the system rpm and a dbpath
-    $dbpath = "$root$dbpath";
-    $root = '';
-  }
-  die("could not dump rpm database\n");
-}
+##################################################################################################
+#
+# Filelist generation and file introspection
+#
 
 sub detect_mime {
   my ($filename) = @_;
@@ -367,6 +322,69 @@ sub introspect_filelist {
   return [ map {$exeinfos{$_}} sort keys %exeinfos ];
 }
 
+
+##################################################################################################
+#
+# RPM package database support
+#
+
+sub dump_rpmdb {
+  my ($root, $outfile) = @_;
+  my $dbpath;
+  for my $phase (0, 1) {
+    if (can_run($root, '/usr/bin/rpmdb')) {
+      # check if we have the exportdb option
+      if (system_chroot($root, 'quiet', '/usr/bin/rpmdb', '--exportdb', '--version') == 0) {
+        if ($dbpath) {
+          system_chroot($root, 'stdout', $outfile, '/usr/bin/rpmdb', '--dbpath', $dbpath, '--exportdb');
+        } else {
+          system_chroot($root, 'stdout', $outfile, '/usr/bin/rpmdb', '--exportdb');
+        }
+        exit($?) if $?;
+        return;
+      }
+    }
+    # try to get the dbpath from the root if we can
+    if (!$dbpath && can_run($root, '/usr/bin/rpm')) {
+      my $fd = popen_chroot($root, '/usr/bin/rpm', '--eval', '%_dbpath');
+      my $path = <$fd>;
+      close($fd);
+      chomp $path;
+      $dbpath = $path if $path && $path =~ /^\//;
+    }
+    $dbpath ||= '/var/lib/rpm';           # guess
+    # try to dump with rpmdb_dump
+    if (-s "$root$dbpath/Packages" && can_run($root, '/usr/lib/rpm/rpmdb_dump')) {
+      my $outfh;
+      open($outfh, '>', $outfile) || die("$outfile: $!\n");
+      my $fd = popen_chroot($root, '/usr/lib/rpm/rpmdb_dump', "$dbpath/Packages");
+      while (<$fd>) {
+	next unless /^\s*[0-9a-fA-F]{8}/;
+	chomp;
+	my $v = <$fd>;
+	die("unexpected EOF\n") unless $v;
+	chomp $v;
+	substr($v, 0, 1, '') while substr($v, 0, 1) eq ' ';
+	$v = pack('H*', $v);
+	next if length($v) < 16;
+	my ($il, $dl) = unpack('NN', $v);
+	die("bad header length\n") unless length($v) == 8 + $il * 16 + $dl;
+	die("print: $!\n") unless print $outfh pack('H*', '8eade80100000000');
+	die("print: $!\n") unless print $outfh $v;
+      }
+      close($fd) || die("rpmdb_dump: $!\n");
+      close($outfh) || die("close: $!\n");
+      return;
+    }
+
+    last unless $root;
+    # try with the system rpm and a dbpath
+    $dbpath = "$root$dbpath";
+    $root = '';
+  }
+  die("could not dump rpm database\n");
+}
+
 sub read_rpm {
   my ($rpm) = @_;
   my %r = Build::Rpm::rpmq($rpm, qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL FILENAMES URL VENDOR FILEMODES FILEDIGESTS FILEDIGESTALGO SIGMD5});
@@ -397,6 +415,12 @@ sub read_pkgs_rpmdb {
   @rpms = sort {$a->{'NAME'} cmp $b->{'NAME'} || $a->{'VERSION'} cmp $b->{'VERSION'} || $a->{'RELEASE'} cmp $b->{'RELEASE'}} @rpms;
   return \@rpms;
 }
+
+
+##################################################################################################
+#
+# Debian package database support
+#
 
 sub parse_debian_copyright_file {
   my ($root, $pkg) = @_;
@@ -514,6 +538,12 @@ sub read_pkgs_deb {
   return \@pkgs;
 }
 
+
+##################################################################################################
+#
+# Product support
+#
+
 sub read_pkgs_from_product_directory {
   my ($dir) = @_;
   my @rpms;
@@ -546,6 +576,12 @@ sub read_pkgs_from_rpmmd {
   close($fh);
   return \@rpms;
 }
+
+
+##################################################################################################
+#
+# Small helpers
+#
 
 sub read_dist {
   my ($dir) = @_;
@@ -629,6 +665,7 @@ sub gen_pkg_id {
   delete $p{'deps'};
   return Digest::MD5::md5_hex(Build::SimpleJSON::unparse(\%p));
 }
+
 
 ##################################################################################################
 #
@@ -717,6 +754,7 @@ sub cyclonedx_encode_header {
   };
   return $cyc;
 }
+
 
 ##################################################################################################
 #
@@ -881,8 +919,50 @@ sub spdx_encode_header {
   return $spdx;
 }
 
-##################################################################################################
 
+##################################################################################################
+#
+# Main
+#
+
+sub echo_help {
+    print "\n
+The Software Bill of Materials (SBOM) generation tool
+=====================================================
+
+This tool generates SBOM data based on data from rpm and deb packages.
+
+Output formats
+==============
+
+  --format spdx
+     Generates SPDX 2.3 formated data. This is the default.
+
+  --format cyclonedx
+     Generates CycloneDX 1.4 formated data
+
+  --intoto
+     Can be used optional to wrap the generated data into in-toto.io
+     specified format.
+
+Supported content
+=================
+
+  --dir DIRECTORY
+     The RPM/Dpkg database of the system below DIRECTORY will be evaluated, also all
+     files will be referenced in the SBOM if RPM is used.
+
+  --product DIRECTORY
+     An installation medium. All .rpm files in any sub directory will be scanned.
+
+  --rpmmd DIRECTORY
+     A directory providing rpm-md meta data. A 'repodata/repomd.xml' file is expected.
+
+  --container-archive CONTAINER_ARCHIVE
+     An container providing a system
+
+";
+}
 
 my $wrap_intoto;
 my $isproduct;
@@ -932,44 +1012,7 @@ while (@ARGV && $ARGV[0] =~ /^-/) {
 $format ||= 'spdx';
 die("unknown format $format\n") unless $format eq 'spdx' || $format eq 'cyclonedx';
 
-sub echo_help {
-    print "\n
-The Software Bill of Materials (SBOM) generation tool
-=====================================================
 
-This tool generates SBOM data based on data from rpm and deb packages.
-
-Output formats
-==============
-
-  --format spdx
-     Generates SPDX 2.3 formated data. This is the default.
-
-  --format cyclonedx
-     Generates CycloneDX 1.4 formated data
-
-  --intoto
-     Can be used optional to wrap the generated data into in-toto.io
-     specified format.
-
-Supported content
-=================
-
-  --dir DIRECTORY
-     The RPM/Dpkg database of the system below DIRECTORY will be evaluated, also all
-     files will be referenced in the SBOM if RPM is used.
-
-  --product DIRECTORY
-     An installation medium. All .rpm files in any sub directory will be scanned.
-
-  --rpmmd DIRECTORY
-     A directory providing rpm-md meta data. A 'repodata/repomd.xml' file is expected.
-
-  --container-archive CONTAINER_ARCHIVE
-     An container providing a system
-
-";
-}
 die("usage: generate_sbom [--distro NAME] [--format spdx|cyclonedx] [--intoto] [--dir DIRECTORY]|[--product DIRECTORY]|[--rpmmd DIRECTORY]|[--container-archive CONTAINER_ARCHIVE]\n") unless @ARGV == 1;
 my $toprocess = $ARGV[0];
 
