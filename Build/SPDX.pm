@@ -20,7 +20,7 @@
 
 package Build::SPDX;
 
-# licenseListVersion: e3543ef, releaseDate: 2024-07-24
+our $licenseListVersion = "3.24";
 
 our $licenses = [
   "0BSD",
@@ -327,7 +327,6 @@ our $licenses = [
   "Gutmann",
   "HaskellReport",
   "hdparm",
-  "HIDAPI",
   "Hippocratic-2.1",
   "HP-1986",
   "HP-1989",
@@ -577,7 +576,6 @@ our $licenses = [
   "RSA-MD",
   "RSCPL",
   "Ruby",
-  "Ruby-pty",
   "SAX-PD",
   "SAX-PD-2.0",
   "Saxpath",
@@ -661,7 +659,6 @@ our $licenses = [
   "wxWindows",
   "X11",
   "X11-distribute-modifications-variant",
-  "X11-swapped",
   "Xdebug-1.03",
   "Xerox",
   "Xfig",
@@ -744,7 +741,6 @@ our $license_exceptions = [
   "Qt-GPL-exception-1.0",
   "Qt-LGPL-exception-1.1",
   "Qwt-exception-1.0",
-  "romic-exception",
   "RRDtool-FLOSS-exception-2.0",
   "SANE-exception",
   "SHL-2.0",

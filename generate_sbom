@@ -920,7 +920,7 @@ sub spdx_encode_header {
   my $creationinfo = {
     'created' => rfc3339time(time()),
     'creators' => [ "Tool: $tool_name-$tool_version" ],
-    'licenseListVersion' => '3.19',
+    'licenseListVersion' => $Build::SPDX::licenseListVersion,
   };
   $spdx->{'creationInfo'} = $creationinfo;
   return $spdx;
