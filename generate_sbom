@@ -698,11 +698,17 @@ sub cyclonedx_encode_pkg {
   $cyc->{'publisher'} = $p->{'VENDOR'} if $p->{'VENDOR'};
   my $license = $p->{'LICENSE'};
   if ($license) {
-    $license = Build::SPDX::normalize_license($license, sub { $_[0] }, sub { $_[0] });
-    if ($license =~ /\s+/) {
-      push @{$cyc->{'licenses'}}, { 'expression' => $license };
+    $license = Build::SPDX::normalize_license($license);
+    if (defined $license) {
+      if ($license =~ /\s+/) {
+        push @{$cyc->{'licenses'}}, { 'expression' => $license };
+      } else {
+        push @{$cyc->{'licenses'}}, { 'license' => {'id' => $license } };
+      }
     } else {
-      push @{$cyc->{'licenses'}}, { 'license' => {'id' => $p->{'LICENSE'} } };
+      # non-standard (sub-)license found, normalize and encode as name
+      $license = Build::SPDX::normalize_license($p->{'LICENSE'}, sub { $_[0] }, sub { $_[0] });
+      push @{$cyc->{'licenses'}}, { 'license' => {'name' => $license } };
     }
   }
   my $purlurl = gen_purl($p, $distro, $pkgtype);
@@ -742,14 +748,15 @@ sub cyclonedx_encode_relations {
 }
 
 sub cyclonedx_encode_header {
-  my ($subjectname) = @_;
+  my ($subjectname, $type) = @_;
   my $cyc = {
     'bomFormat' => 'CycloneDX',
-    'specVersion' => '1.4',
+    'specVersion' => '1.5',
     'version' => 1,
     'metadata' => {
       'timestamp' => rfc3339time(time()),
       'tools' => [ {'name' => $tool_name, 'version' => $tool_version } ],
+      'component' => [ { 'bom-ref' => 'root', 'type' => ($type || 'application'), 'name' => $subjectname } ],
     },
   };
   return $cyc;
@@ -1026,12 +1033,15 @@ my $pkgtype = 'rpm';
 
 $config = Build::read_config_dist($dist_opt, $arch || 'noarch', $configdir) if $dist_opt;
 $no_files_generation = ($config->{'buildflags:spdx-files-generation'} || '') eq 'no' unless defined $no_files_generation;
+my $targettype;
 
 if ($isproduct) {
   # product case
+  $targettype = 'library';
   #$files = gen_filelist($toprocess);
   $pkgs = read_pkgs_from_product_directory($toprocess);
 } elsif ($rpmmd) {
+  $targettype = 'library';
   require Build::Rpmmd;
   my $primary;
   if (-d $toprocess) {
@@ -1046,6 +1056,7 @@ if ($isproduct) {
   die("$toprocess: $!\n") unless -e $toprocess;
   $pkgs = read_pkgs_from_rpmmd($toprocess);
 } elsif ($isdir) {
+  $targettype = 'application';
   $dist = read_dist($toprocess);
   $pkgtype = pkgtype_from_dist($dist);
   #if it is a ubuntu id_like contains debian
@@ -1059,6 +1070,7 @@ if ($isproduct) {
   $filepkgs = introspect_filelist($toprocess, $files);
 } else { # no check for $istar to stay backward compatible
   # container tar case
+  $targettype = 'container';
   my $unpackdir = unpack_container($tmpdir, $toprocess);
   $dist = read_dist($unpackdir);
   $pkgtype = pkgtype_from_dist($dist);
@@ -1136,7 +1148,7 @@ if ($format eq 'spdx') {
   my %unknown_spdx_licenses;
   $json_template = $spdx_json_template;
   $intoto_type = 'https://spdx.dev/Document';
-  $doc = spdx_encode_header($subjectname);
+  $doc = spdx_encode_header($subjectname, $targettype);
   for my $p (@$pkgs) {
     push @{$doc->{'packages'}}, spdx_encode_pkg($p, $distro, $pkgtype, \%unknown_spdx_licenses);
   }
@@ -1172,7 +1184,7 @@ if ($format eq 'spdx') {
 } elsif ($format eq 'cyclonedx') {
   $json_template = $cyclonedx_json_template;
   $intoto_type = 'https://cyclonedx.org/bom';
-  $doc = cyclonedx_encode_header($subjectname);
+  $doc = cyclonedx_encode_header($subjectname, $targettype);
   for my $p (@$pkgs) {
     push @{$doc->{'components'}}, cyclonedx_encode_pkg($p, $distro, $pkgtype);
   }
