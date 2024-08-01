@@ -756,7 +756,7 @@ sub cyclonedx_encode_header {
     'metadata' => {
       'timestamp' => rfc3339time(time()),
       'tools' => [ {'name' => $tool_name, 'version' => $tool_version } ],
-      'component' => [ { 'bom-ref' => 'root', 'type' => ($type || 'application'), 'name' => $subjectname } ],
+      'component' => { 'bom-ref' => 'root', 'type' => ($type || 'application'), 'name' => $subjectname },
     },
   };
   return $cyc;
