@@ -828,8 +828,18 @@ recipe_build_kiwi() {
     ln -sf $TOPDIR/SOURCES/repos $BUILD_ROOT/repos
     test -d $BUILD_ROOT/$TOPDIR/SOURCES/containers && ln -sf $TOPDIR/SOURCES/containers $BUILD_ROOT/containers
     cd $BUILD_ROOT/$TOPDIR/SOURCES/repos
+    
+    local binarytype
+    if test -s "$BUILD_ROOT/var/lib/dpkg/status" -o -x "$BUILD_ROOT/usr/sbin/debootstrap" ; then
+	binarytype=deb
+    elif test -x "$BUILD_ROOT/usr/bin/repo-add" ; then
+	binarytype=arch
+    else
+	binarytype=rpm
+    fi
+
     DEBDIST=
-    if test -x "$BUILD_ROOT/usr/sbin/debootstrap" ; then
+    if test "$binarytype" = deb ; then
 	DEBDIST=$(sed -ne 's/.*<repository.*distribution="\([^"]*\)".*/\1/p' <"$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" | head -n 1)
 	echo "using distribution '$DEBDIST'"
     fi
@@ -847,15 +857,15 @@ recipe_build_kiwi() {
 	    repo="$TOPDIR/SOURCES/repos/${rc%/*}/${rc##*/}/"
         fi
         if test "$imagetype" != product -a "$DO_INIT" != "false" ; then
-	    if test -x "$BUILD_ROOT/usr/sbin/debootstrap" ; then
+	    if test "$binarytype" = deb ; then
 		echo "creating debian repodata for $r"
 		createrepo_debian_kiwi "$repo" "$r"
 		test -n "$DEBDIST" && createrepo_debian_dist_kiwi "$repo" "$r" "$DEBDIST"
-	    elif test -x "$BUILD_ROOT/usr/bin/repo-add" ; then
+	    elif test "$binarytype" = arch ; then
 		echo "creating Arch Linux repodata for $r"
 		r_db="${repo}/${r//[:|\/]/_}.db.tar.gz"
 		chroot $BUILD_ROOT su -c "repo-add ${r_db} ${repo}*"
-	    else
+	    elif test "$binarytype" = rpm ; then
 		echo "creating repodata for $r"
 		if chroot $BUILD_ROOT createrepo --no-database --simple-md-filenames --help >/dev/null 2>&1 ; then
 		    chroot $BUILD_ROOT createrepo --no-database --simple-md-filenames "$repo"
