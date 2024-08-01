@@ -118,6 +118,7 @@ spec_init_topdir() {
     local d keepbuild keepbuildroot
     case "${rpmstages[0]}" in
 	-b[ci]\ --short-circuit) keepbuild=BUILD ;;
+	--noprep\ -b[ciba]) keepbuild=BUILD ;;
 	-bb\ --short-circuit | -bl) keepbuild=BUILD keepbuildroot=BUILDROOT ;;
     esac
     test -n "$RPM_BUILD_IN_PLACE" && unset keepbuild
