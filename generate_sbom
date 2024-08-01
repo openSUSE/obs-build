@@ -311,7 +311,7 @@ sub introspect_filelist {
   my %exeinfos;
   for my $f (@$files) {
     my $mime = $f->{'mime'};
-    next unless $mime && ($mime eq 'application/x-sharedlib' || $mime eq 'application/x-elf' || $mime eq 'application/x-mach-binary' || $mime eq 'application/vnd.microsoft.portable-executable');
+    next unless $mime && ($mime eq 'application/x-sharedlib' || $mime eq 'application/x-elf');
     my $fd;
     next unless open($fd, '<', "$dir/$f->{'name'}");
     eval { introspect_golang_exe($fd, $f->{'name'}, \%exeinfos) };
