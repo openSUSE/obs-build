@@ -35,7 +35,8 @@ recipe_setup_arch() {
 	echo 'source /etc/makepkg.conf'
 	printf '%s=%s\n' \
 	    BUILDDIR $TOPDIR/BUILD \
-	    PKGDEST $TOPDIR/ARCHPKGS
+	    PKGDEST $TOPDIR/ARCHPKGS \
+	    PACKAGER "\"$HOST <abuild@$HOST>\""
     } > $BUILD_ROOT$TOPDIR/makepkg.conf
 }
 
