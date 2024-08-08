@@ -47,6 +47,7 @@ sub containerinfo2obsbinlnk {
   my $lnk = containerinfo2nevra($d);
   # need to have a source so that it goes into the :full tree
   $lnk->{'source'} = $lnk->{'name'};
+  $lnk->{'source'} =~ s/^container://;
   # add self-provides
   push @{$lnk->{'provides'}}, "$lnk->{'name'} = $lnk->{'version'}";
   for my $tag (@{$d->{tags}}) {
