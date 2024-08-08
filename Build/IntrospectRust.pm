@@ -23,10 +23,12 @@ package Build::IntrospectRust;
 use strict;
 
 use Build::ELF;
-use Compress::Zlib ();
 
 eval { require JSON::XS };
 *JSON::XS::decode_json = sub {die("JSON::XS is not available\n")} unless defined &JSON::XS::decode_json;
+eval { require Compress::Zlib };
+*Compress::Zlib::uncompress = sub {die("Compress::Zlib is not available\n")} unless defined &Compress::Zlib::uncompress;
+
 
 sub rawversioninfo {
   my ($fh) = @_;
