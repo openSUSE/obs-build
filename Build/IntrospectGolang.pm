@@ -23,7 +23,6 @@ package Build::IntrospectGolang;
 use strict;
 
 use Build::ELF;
-use Encode;
 
 sub unpackgoaddr {
   my ($d, $le, $sz) = @_;
@@ -142,8 +141,8 @@ my %parsequoted_special = (
 
 sub parsequoted_special {
   my ($s) = @_;
-  return encode('UTF-8', chr(oct($s))) if $s =~ /^[0-7]+/;
-  return encode('UTF-8', chr(hex(substr($s, 1))));
+  return pack('C0U', oct($s)) if $s =~ /^[0-7]+/;
+  return pack('C0U', hex(substr($s, 1)));
 }
 
 sub parsequoted {
