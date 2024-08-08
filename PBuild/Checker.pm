@@ -315,7 +315,7 @@ sub genmeta_image {
 }
 
 #
-# Generate the dependency tracking data for a image/container
+# Generate the dependency tracking data for a productcompose build
 #
 sub genmeta_product {
   my ($ctx, $p, $edeps) = @_;
@@ -433,6 +433,9 @@ sub check_image {
   return check_meta($ctx, $p, $new_meta);
 }
 
+#
+# Check th status of a single productcompose build
+#
 sub check_product {
   my ($ctx, $p) = @_;
   my $notready = $ctx->{'notready'};
