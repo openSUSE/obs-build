@@ -267,12 +267,12 @@ recipe_build_livebuild() {
     BASE_NAME="${RECIPEFILE%.livebuild}-${ARCH}${buildnum}"
     for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom | sort -u) ; do
         echo "Generating $format sbom file"
-	    pushd $BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT >/dev/null
+	pushd $BUILD_ROOT/$TOPDIR/$LIVEBUILD_ROOT >/dev/null
 
         # ensure pretty subjectname in SBOM
         ln -sf "chroot" "${BASE_NAME}"
 
-        generate_sbom --format "$format" --dir "${BASE_NAME}"  > "$BUILD_ROOT/$TOPDIR/OTHER/${BASE_NAME}.${format/cyclonedx/cdx}.json"
+        generate_sbom --format "$format" --dir "${BASE_NAME}"  > "$BUILD_ROOT/$TOPDIR/OTHER/${BASE_NAME}.${format/cyclonedx/cdx}.json" || cleanup_and_exit 1 "generate_sbom failed!"
         popd >/dev/null
 
         pushd $BUILD_ROOT/$TOPDIR/OTHER >/dev/null

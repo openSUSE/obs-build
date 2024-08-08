@@ -517,9 +517,7 @@ perform_image_bundle() {
         if test "$imgtype" != docker; then	# done in postprocess_kiwi_containers
             for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom | sort -u) ; do
                 echo "Generating $format sbom file for KIWIROOT-$imgtype"
-                if ! generate_sbom --format "$format" --dir "$BUILD_ROOT/$TOPDIR/KIWIROOT-$imgtype" > "$BUILD_ROOT/$TOPDIR/OTHER/kiwi-sbom.json" ; then
-                    cleanup_and_exit 1 "generate_sbom script failed!"
-                fi
+                generate_sbom --format "$format" --dir "$BUILD_ROOT/$TOPDIR/KIWIROOT-$imgtype" > "$BUILD_ROOT/$TOPDIR/OTHER/kiwi-sbom.json" || cleanup_and_exit 1 "generate_sbom failed!"
                 for packages in "$BUILD_ROOT/$TOPDIR/KIWI.bundle/"*.packages; do
                     cp "$BUILD_ROOT/$TOPDIR/OTHER/kiwi-sbom.json" "${packages%.packages}.${format/cyclonedx/cdx}.json"
                 done
