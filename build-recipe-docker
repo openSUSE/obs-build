@@ -294,12 +294,20 @@ recipe_build_docker() {
     test -n "$RELEASE" && FILENAME="$FILENAME-$RELEASE"
     echo "Saving image $FIRSTTAG to $FILENAME.tar"
     local compression_format
+    local buildformat
     if test "$BUILDENGINE" = podman; then
 	compression_format=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags container-compression-format)
+	buildformat=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags container-build-format)
     fi
-    if test "$BUILDENGINE" = podman -a -n "$compression_format" -a "$compression_format" != gzip ; then
-	if ! $DOCKER_CMD push --compression-format="$compression_format" "$FIRSTTAG" "oci-archive:$TOPDIR/DOCKER/$FILENAME.tar"; then
-	    cleanup_and_exit 1 "$DOCKER_TOOL push command failed"
+    if test "$BUILDENGINE" = podman; then
+	if test -n "$compression_format" -a "$compression_format" != gzip ; then
+	    if ! $DOCKER_CMD push --compression-format="$compression_format" "$FIRSTTAG" "oci-archive:$TOPDIR/DOCKER/$FILENAME.tar"; then
+		cleanup_and_exit 1 "$DOCKER_TOOL push command failed"
+	    fi
+	elif test "$buildformat" = "oci"; then
+	    if ! $DOCKER_CMD save --format oci-archive --output "$TOPDIR/DOCKER/$FILENAME.tar" "$FIRSTTAG" ; then
+		cleanup_and_exit 1 "$DOCKER_TOOL save command failed"
+	    fi
 	fi
     else
 	if ! $DOCKER_CMD save --output "$TOPDIR/DOCKER/$FILENAME.tar" "$FIRSTTAG" ; then
