@@ -332,7 +332,12 @@ sub createjob {
   push @args, '--dist', "$buildroot/.build.config";
   push @args, '--rpmlist', "$buildroot/.build.rpmlist";
   push @args, '--logfile', "$buildroot/.build.log";
-  #push @args, '--release', "$release" if defined $release;
+  my $release = $bconf->{'release'};
+  if (defined $release) {
+    $release =~ s/<CI_CNT>/1/g;
+    $release =~ s/<B_CNT>/1/g;
+    push @args, '--release', $release;
+  }
   push @args, '--debuginfo' if $ctx->{'debuginfo'} || $opts->{'debuginfo'};
   push @args, "--arch=$arch";
   push @args, '--jobs', $opts->{'jobs'} if $opts->{'jobs'};
