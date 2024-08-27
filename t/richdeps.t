@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 46;
+use Test::More tests => 47;
 
 require 't/testlib.pm';
 
@@ -201,3 +201,7 @@ is_deeply(\@r, [1, 'wa'], 'install (wa without nnn)');
 
 @r = expand($config, 'foo', 'bar');
 is_deeply(\@r, [undef, 'nothing provides (baz if foo) needed by bar'], 'install foo bar');
+
+@r = expand($config, 'bar', '--directdepsend--', 'foo');
+is_deeply(\@r, [undef, '(provider foo conflicts with (baz if foo) needed by bar)', 'conflict for providers of foo'], 'install bar --directdepsend-- foo');
+

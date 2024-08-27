@@ -285,6 +285,14 @@ sub check_conddeps_inst {
     } else {
       if (!@q && @cx == 1) { 
 	next if $rtype == 2;
+	if (!$rtype) {
+	  if (defined($p)) {
+	    $aconflicts->{$cx[0]} = "conflicts with $r needed by $p";
+	  } else {
+	    $aconflicts->{$cx[0]} = "conflicts with $r";
+	  }
+	  next;
+	}
 	if (defined($p)) {
           $aconflicts->{$cx[0]} = "is in conflict with $p";
 	} else {
