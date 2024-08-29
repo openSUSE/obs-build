@@ -72,10 +72,12 @@ BuildRequires:  perl(YAML::LibYAML)
 # None of them are actually required for core features.
 # Perl helper scripts use them.
 Recommends:     perl(Archive::Tar)
-Recommends:     /sbin/mkfs.ext3
+Recommends:     /sbin/mkfs.ext4
 Recommends:     /usr/bin/qemu-kvm
 Recommends:     bsdtar
+Recommends:     hostname
 Recommends:     qemu-linux-user
+Recommends:     xfsprogs
 Recommends:     zstd
 Recommends:     perl(Config::IniFiles)
 Recommends:     perl(Date::Language)
