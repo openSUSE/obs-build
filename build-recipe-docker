@@ -40,6 +40,10 @@ recipe_setup_docker() {
         fi
     fi  
     chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+    if test -z "$ABUILD_TARGET"; then
+        ABUILD_TARGET=$(queryconfig target --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" )
+        test -z "$ABUILD_TARGET" || echo "build target is $ABUILD_TARGET"
+    fi
 }
 
 recipe_prepare_docker() {
@@ -238,6 +242,20 @@ recipe_build_docker() {
     patchdockerfile < "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" > "$BUILD_ROOT/$TOPDIR/SOURCES/.$RECIPEFILE" && \
        mv "$BUILD_ROOT/$TOPDIR/SOURCES/.$RECIPEFILE" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
     test -n "$DISTURL" && echo "LABEL org.openbuildservice.disturl=$DISTURL" >> "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
+
+    # setup binfmt handler for cross builds
+    if test -n "$ABUILD_TARGET" ; then
+	local target="${ABUILD_TARGET%%-*}"
+	if test -n "$target" && ! check_native_arch "$target" ; then
+	    local initvm=/usr/lib/build/initvm.`uname -m`
+	    if test -x $initvm ; then
+		echo "setting up cross building support"
+		$initvm
+	    else
+		echo "warning: $initvm is missing, cross building may not work"
+	    fi
+	fi
+    fi
 
     # now do the build
     squashopt=--squash
