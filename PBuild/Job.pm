@@ -332,10 +332,11 @@ sub createjob {
   push @args, '--dist', "$buildroot/.build.config";
   push @args, '--rpmlist', "$buildroot/.build.rpmlist";
   push @args, '--logfile', "$buildroot/.build.log";
-  #push @args, '--release', "$release" if defined $release;
+  push @args, '--baselibs' if $opts->{'baselibs'};
   push @args, '--debuginfo' if $ctx->{'debuginfo'} || $opts->{'debuginfo'};
   push @args, "--arch=$arch";
   push @args, '--jobs', $opts->{'jobs'} if $opts->{'jobs'};
+  push @args, '--release', $opts->{'release'} if $opts->{'release'};
   push @args, '--threads', $opts->{'threads'} if $opts->{'threads'};
   push @args, "--buildflavor=$p->{'flavor'}" if $p->{'flavor'};
   push @args, "--obspackage=".($p->{'originpackage'} || $p->{'pkg'}) if $needobspackage;
