@@ -165,6 +165,10 @@ sub unparse {
 	$r .= " ".unparse_escape($sa);
 	$r .= '="'.unparse_escape($se->{$sa}).'"' if defined $se->{$sa};
       }
+      if (!@se && !defined($se->{'_content'})) {
+	$r .= " />$nl";
+	next;
+      }
       $r .= ">";
       $r .= unparse_escape($se->{'_content'}) if defined $se->{'_content'};
       $r .= $nl . unparse($se, %opts, 'indent' => "  $indent") . "$indent" if @se;
