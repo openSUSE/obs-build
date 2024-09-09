@@ -241,6 +241,7 @@ sub parse {
   my @requiredarch;
   my @badarch;
   my @containerrepos;
+  my $basecontainer;
 
   while (@lines) {
     my $line = shift @lines;
@@ -340,6 +341,7 @@ sub parse {
     # process commands
     if ($cmd eq 'FROM') {
       shift @args if @args && $args[0] =~ /^--platform=/;
+      $basecontainer = undef;
       if (@args && !$as_container{$args[0]}) {
         $as_container{$args[2]} = $args[0] if @args > 2 && lc($args[1]) eq 'as';
         my $container = $args[0];
@@ -350,9 +352,8 @@ sub parse {
 	  }
           $container .= ':latest' unless $container =~ /:[^:\/]+$/;
           $container = "container:$container";
-          if ($container && !grep {$_ eq $container} @{$ret->{'deps'}}) {
-            push @{$ret->{'deps'}}, $container;
-          }
+          $basecontainer = $container;
+          push @{$ret->{'deps'}}, $container unless grep {$_ eq $container} @{$ret->{'deps'}};
         }
       }
       $vars_env = {};		# should take env from base container
@@ -409,6 +410,7 @@ sub parse {
   $ret->{'name'} = 'docker' if !defined($ret->{'name'}) && !$cf->{'__dockernoname'};
   $ret->{'path'} = [ { 'project' => '_obsrepositories', 'repository' => '' } ] if $useobsrepositories;
   $ret->{'nosquash'} = 1 if $nosquash;
+  $ret->{'basecontainer'} = $basecontainer if $basecontainer;
   if (@containerrepos) {
     for (unify(@containerrepos)) {
       my @s = split('/', $_, 2);
@@ -422,12 +424,12 @@ sub showcontainerinfo {
   my ($disturl, $release);
   while (@ARGV) {
     if (@ARGV > 2 && $ARGV[0] eq '--disturl') {
-      (undef, $disturl) = splice(@ARGV, 0, 2); 
+      (undef, $disturl) = splice(@ARGV, 0, 2);
     } elsif (@ARGV > 2 && $ARGV[0] eq '--release') {
-      (undef, $release) = splice(@ARGV, 0, 2); 
+      (undef, $release) = splice(@ARGV, 0, 2);
     } else {
       last;
-    }   
+    }
   }
   my ($fn, $image, $taglist, $annotationfile) = @ARGV;
   local $Build::Kiwi::urlmapper = sub { return $_[0] };
@@ -444,13 +446,21 @@ sub showcontainerinfo {
       $d->{'version'} = $1 unless defined $d->{'version'};
     }
   }
-  my @repos = @{$d->{'imagerepos'} || []};
+
+  # parse annotation file
+  my $annotation;
   if ($annotationfile) {
-    my $annotation = slurp($annotationfile);
-    $annotation = Build::SimpleXML::parse($annotation) if $annotation;
+    $annotation = slurp($annotationfile);
+    $annotation = $annotation ? Build::SimpleXML::parse($annotation) : undef;
     $annotation = $annotation && ref($annotation) eq 'HASH' ? $annotation->{'annotation'} : undef;
     $annotation = $annotation && ref($annotation) eq 'ARRAY' ? $annotation->[0] : undef;
-    my $annorepos = $annotation && ref($annotation) eq 'HASH' ? $annotation->{'repo'} : undef;
+    $annotation = undef unless ref($annotation) eq 'HASH';
+  }
+
+  my @repos = @{$d->{'imagerepos'} || []};
+  # add repos from annotation
+  if ($annotation) {
+    my $annorepos = $annotation->{'repo'};
     $annorepos = undef unless $annorepos && ref($annorepos) eq 'ARRAY';
     for my $annorepo (@{$annorepos || []}) {
       next unless $annorepo && ref($annorepo) eq 'HASH' && $annorepo->{'url'};
@@ -471,6 +481,13 @@ sub showcontainerinfo {
   $containerinfo->{'version'} = $d->{'version'} if defined $d->{'version'};
   $containerinfo->{'release'} = $release if defined $release;
   $containerinfo->{'milestone'} = $d->{'milestone'} if defined $d->{'milestone'};
+  if ($annotation && $d->{'basecontainer'}) {
+    # XXX: verify that the annotation matches?
+    for (qw{registry_refname registry_digest registry_fatdigest}) {
+      next unless $annotation->{$_} && ref($annotation->{$_}) eq 'ARRAY';
+      $containerinfo->{"base_$_"} = $annotation->{$_}->[0] if $annotation->{$_}->[0];
+    }
+  }
   print Build::SimpleJSON::unparse($containerinfo)."\n";
 }
 
@@ -478,10 +495,10 @@ sub show {
   my ($release);
   while (@ARGV) {
     if (@ARGV > 2 && $ARGV[0] eq '--release') {
-      (undef, $release) = splice(@ARGV, 0, 2); 
+      (undef, $release) = splice(@ARGV, 0, 2);
     } else {
       last;
-    }   
+    }
   }
   my ($fn, $field) = @ARGV;
   local $Build::Kiwi::urlmapper = sub { return $_[0] };
