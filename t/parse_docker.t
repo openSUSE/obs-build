@@ -22,10 +22,11 @@ FROM opensuse/leap:15.2
 };
 
 $expected = {
-  'path' => [],
+  'name' => 'docker',
   'deps' => ['container:opensuse/tumbleweed:latest', 'container:opensuse/leap:15.2'],
+  'path' => [],
   'imagerepos' => [],
-  'name' => 'docker'
+  'basecontainer' => 'container:opensuse/leap:15.2',
 };
 
 $result = Build::Docker::parse($conf, \$dockerfile);
