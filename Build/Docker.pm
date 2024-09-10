@@ -342,8 +342,9 @@ sub parse {
     if ($cmd eq 'FROM') {
       shift @args if @args && $args[0] =~ /^--platform=/;
       $basecontainer = undef;
-      if (@args && !$as_container{$args[0]}) {
-        $as_container{$args[2]} = $args[0] if @args > 2 && lc($args[1]) eq 'as';
+      if (@args && $as_container{$args[0]}) {
+	$basecontainer = $as_container{$args[0]}->[1];
+      } elsif (@args && !$as_container{$args[0]}) {
         my $container = $args[0];
         if ($container ne 'scratch') {
 	  if ($Build::Kiwi::urlmapper && $container =~ /^([^\/]+\.[^\/]+)\/[a-zA-Z0-9]/) {
@@ -355,6 +356,7 @@ sub parse {
           $basecontainer = $container;
           push @{$ret->{'deps'}}, $container unless grep {$_ eq $container} @{$ret->{'deps'}};
         }
+	$as_container{$args[2]} = [ $args[0], $basecontainer ] if @args > 2 && lc($args[1]) eq 'as';
       }
       $vars_env = {};		# should take env from base container
       $vars = { %$vars_env };
