@@ -487,7 +487,9 @@ sub showcontainerinfo {
     # XXX: verify that the annotation matches?
     for (qw{registry_refname registry_digest registry_fatdigest}) {
       next unless $annotation->{$_} && ref($annotation->{$_}) eq 'ARRAY';
-      $containerinfo->{"base_$_"} = $annotation->{$_}->[0] if $annotation->{$_}->[0];
+      my $v = $annotation->{$_}->[0];
+      $v = $v->{'_content'} if $v && ref($v) eq 'HASH';
+      $containerinfo->{"base_$_"} = $v if $v;
     }
   }
   print Build::SimpleJSON::unparse($containerinfo)."\n";
