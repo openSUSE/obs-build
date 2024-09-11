@@ -400,6 +400,11 @@ sub parse {
       }
     }
   }
+  if ($basecontainer) {
+    # always put the base container last
+    @{$ret->{'deps'}} = grep {$_ ne $basecontainer} @{$ret->{'deps'}};
+    push @{$ret->{'deps'}}, $basecontainer;
+  }
   push @{$ret->{'deps'}}, '--dorecommends--', '--dosupplements--' if $plusrecommended;
   push @{$ret->{'deps'}}, '--unorderedimagerepos' if $unorderedrepos;
   my $version = $ret->{'version'};
