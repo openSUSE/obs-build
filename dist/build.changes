@@ -1,4 +1,29 @@
 -------------------------------------------------------------------
+Fri Sep 13 08:18:51 UTC 2024 - Adrian Schröter <adrian@suse.de>
+
+- SBOM generation:
+  - Adding golang introspection support
+  - Adding rust binary introspection support
+  - Keep track of unknwon licenses and add a "hasExtractedLicensingInfos"
+    section
+  - Also normalize licenses for cyclonedx
+  - Make generate_sbom errors fatal
+  - general improvements
+- Fix noprep building not working because the buildir is removed
+- kiwi image: also detect a debian build if /var/lib/dpkg/status is present
+- Do not use the Encode module to convert a code point to utf8
+- Fix personality syscall number for riscv
+- add more required recommendations for KVM builds
+- set PACKAGER field in build-recipe-arch
+- fix writing _modulemd.yaml
+- pbuild: support --release and --baselibs option
+- container:
+  - copy base container information from the annotation into the
+    containerinfo
+  - track base containers over multiple stages
+  - always put the base container last in the dependencies
+
+-------------------------------------------------------------------
 Tue Jul 23 08:53:20 UTC 2024 - Adrian Schröter <adrian@suse.de>
 
 - providing fileprovides in createdirdeps tool
