@@ -158,23 +158,66 @@ sub parse_suse {
   $tdt += 12 * 3600 unless $dt =~ /\d:\d/;	# 12:00 if not specified
   my $ok = 1;
   my $change = '';
+  my($state, $lead, $entry) = (0, 0, undef);
   while(<>) {
     chomp;
     last if /^(?:\* )?([A-Za-z]+\s+[A-Za-z]+\s+[0-9][^-]*?[0-9][0-9][0-9][0-9])(.*\@.*$)/;
-    next if (/^--------------/);
-    next if (/^========================/);
     s/\s+$//;
-    next if $_ eq '';
-    s/^\s*-/-/ if $ok == 1;	# obsolete?
-    s/^\s*\*\s*/  * /;
-    if (!/^-/) {
-      s/^\s+-\s*/  - /;
-      s/^\s*/  / unless s/^    \s*/    /;
+    if ($_ eq "" || /^--------------/ || /^========================/) {
+      $state = 0;
+      next;
     }
-    $change .= "$_\n";
-    $ok = 2;
+    if ($state == 0 && /^-\s\s*/) {
+      $entry = "- $'";
+      $state = 1;
+      $lead  = 2;
+    } elsif ($state == 0) {
+      die "Log must begin with a 1st level bullet point.\n";
+    } elsif ($state == 1 && /^-\s\s*/) {
+      # New 1st level bullet point
+      $change .= &wrap("$entry\n"); # commit away working entry to changelog string
+      $entry = "- $'";
+      $lead = 2;
+    } elsif ($state == 1 && /^(\s{0,2}[*+]\s)\s*/) {
+      # New 2nd level bullet point
+      $change .= &wrap("$entry\n"); # commit
+      $entry = "  * $'";
+      $lead = length($1);
+    } elsif ($state == 1 && /^\s{$lead}/) {
+      # Continuation of the previous line
+      s/^\s*//;
+      $entry .= " $_";
+    } else {
+      die "Don't know what to do with line $.\n";
+    }
+  }
+  if (length($entry) != 0) {
+    $change .= &wrap("$entry\n");
   }
   return ($_, $tdt, $dline, $who, $change);
+}
+
+sub wrap
+{
+	my $rem = shift @_;
+	# Handle initial unwrappable part
+	$rem =~ /^((\s*)(?:[-*]\s*\S+|\S+))\s*/;
+	my $curr = $1;
+	my $lead = length($2) + 2;
+	$rem = $';
+	my @rem = split(/ /, $rem);
+	my $ret = "";
+
+	while (scalar(@rem) > 0) {
+		if (length($curr) + length($rem[0]) > 67) {
+			$ret .= "$curr\n";
+			$curr = (" " x $lead).shift(@rem);
+		} else {
+			$curr .= " ".shift(@rem);
+		}
+	}
+	$ret .= $curr;
+	return $ret;
 }
 
 sub parse_debian {
