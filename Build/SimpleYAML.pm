@@ -64,7 +64,7 @@ sub unparse_string {
     return "'$d'";
   } elsif ($d =~ /: / || $d =~ / #/ || $d =~ /[: \t]\z/) {
     return "'$d'";
-  } elsif ($d eq '~' || $d eq 'null' || $d eq 'true' || $d eq 'false' && $d =~ /^(?:---|\.\.\.)/s) {
+  } elsif ($d eq '~' || $d eq 'null' || $d eq 'true' || $d eq 'false' || $d =~ /^(?:---|\.\.\.)/s) {
     return "'$d'";
   } elsif ($d =~ /^[-?:](?:\s|\z)/s) {
     return "'$d'";
