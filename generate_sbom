@@ -551,7 +551,7 @@ sub read_pkgs_from_product_directory {
     my $fn = $File::Find::name;
     push @rpms, read_rpm($fn) if $fn =~ /\.rpm$/;
   };
-  find($addrpmfile, $dir);
+  find({'wanted' => $addrpmfile, 'no_chdir' => 1}, $dir); 
   return \@rpms;
 }
 
