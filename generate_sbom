@@ -1085,7 +1085,7 @@ if ($isproduct) {
 }
 
 # generate relations
-if (!$no_files_generation && @{$files || {}}) {
+if (!$no_files_generation && @{$files || []}) {
   my %f2p;
   for my $p (@$pkgs) {
     push @{$f2p{$_}}, $p for @{$p->{'FILENAMES'} || []};
@@ -1098,7 +1098,7 @@ if (!$no_files_generation && @{$files || {}}) {
     }
   }
 }
-if (@{$filepkgs || {}}) {
+if (@{$filepkgs || []}) {
   my %f2f;
   if (!$no_files_generation) {
     for my $f (@{$files || []}) {
@@ -1110,7 +1110,7 @@ if (@{$filepkgs || {}}) {
   for my $p (@$pkgs) {
     push @{$f2p{$_}}, $p for @{$p->{'FILENAMES'} || []};
   }
-  for my $p (@{$filepkgs || {}}) {
+  for my $p (@{$filepkgs || []}) {
     for my $fn (@{$p->{'filenames'}}) {
       my $f = $f2f{$fn};
       push @{$p->{'RELATION'}}, [ $f, "evident-by: indicates the package's existence is evident by the given file" ] if $f;
@@ -1152,7 +1152,7 @@ if ($format eq 'spdx') {
   for my $p (@$pkgs) {
     push @{$doc->{'packages'}}, spdx_encode_pkg($p, $distro, $pkgtype, \%unknown_spdx_licenses);
   }
-  for my $p (@{$filepkgs || {}}) {
+  for my $p (@{$filepkgs || []}) {
     push @{$doc->{'packages'}}, spdx_encode_pkg($p, undef, $p->{'pkgtype'}, \%unknown_spdx_licenses);
   }
   if (!$no_files_generation) {
@@ -1167,7 +1167,7 @@ if ($format eq 'spdx') {
   for my $p (@$pkgs) {
     push @{$doc->{'relationships'}}, spdx_encode_relations($p);
   }
-  for my $p (@{$filepkgs || {}}) {
+  for my $p (@{$filepkgs || []}) {
     push @{$doc->{'relationships'}}, spdx_encode_relations($p);
   }
   if (!$no_files_generation) {
@@ -1188,7 +1188,7 @@ if ($format eq 'spdx') {
   for my $p (@$pkgs) {
     push @{$doc->{'components'}}, cyclonedx_encode_pkg($p, $distro, $pkgtype);
   }
-  for my $p (@{$filepkgs || {}}) {
+  for my $p (@{$filepkgs || []}) {
     push @{$doc->{'components'}}, cyclonedx_encode_pkg($p, undef, $p->{'pkgtype'});
   }
   if ($dist && %$dist) {
@@ -1197,7 +1197,7 @@ if ($format eq 'spdx') {
   for my $p (@$pkgs) {
     push @{$doc->{'dependencies'}}, cyclonedx_encode_relations($p);
   }
-  for my $p (@{$filepkgs || {}}) {
+  for my $p (@{$filepkgs || []}) {
     push @{$doc->{'dependencies'}}, cyclonedx_encode_relations($p);
   }
   $doc->{'serialNumber'} = 'urn:uuid:'.gen_uuid($doc);
