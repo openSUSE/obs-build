@@ -672,18 +672,27 @@ sub gen_pkg_id {
 # CycloneDX support
 #
 
+my $cyclonedx_json_template_supplier = {
+  '_order' => [ qw{bom-ref name address url contact} ],
+  'contact' => { '_order' => [ qw{name email} ] },
+};
+
 my $cyclonedx_json_template_component = {
-  '_order' => [ qw{bom-ref type name version description cpe purl externalReferences properties } ],
+  '_order' => [ qw{bom-ref type supplier manufacturer authors name version description cpe purl externalReferences properties } ],
   'externalReferences' => { '_order' => [ qw{url comment type} ] },
+  'supplier' => $cyclonedx_json_template_supplier,
+  'manufacturer' => $cyclonedx_json_template_supplier,
 };
 
 my $cyclonedx_json_template = {
   '_order' => [ qw{bomFormat specVersion serialNumber version metadata components services externalReferences dependencies compositions vulnerabilities signature} ],
   'version' => 'number',
   'metadata' => {
-    '_order' => [ qw{timestamp tools component} ],
+    '_order' => [ qw{timestamp tools manufacturer authors component supplier} ],
     'tools' => { '_order' => [ qw{vendor name version } ] }.
     'component' => $cyclonedx_json_template_component,
+    'supplier' => $cyclonedx_json_template_supplier,
+    'manufacturer' => $cyclonedx_json_template_supplier,
   },
   'components' => $cyclonedx_json_template_component,
   'dependencies' => { '_order' => [ qw{ref dependsOn} ] }
@@ -818,11 +827,11 @@ sub spdx_encode_pkg {
     'name' => $p->{'NAME'},
     'versionInfo' => $evr,
   };
+  $spdx->{'supplier'} = 'NOASSERTION';
   if ($p->{'VENDOR'}) {
     $spdx->{'originator'} = "Organization: $p->{'VENDOR'}";
     $spdx->{'supplier'} = $spdx->{'originator'}; # same as originator OBS-247
   }
-  $spdx->{'supplier'} = 'NOASSERTION';
   $spdx->{'downloadLocation'} = 'NOASSERTION';
 
   if ($pkgtype eq 'deb') {
