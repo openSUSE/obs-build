@@ -465,6 +465,7 @@ sub expand {
       next;
     }
     my @q = @{$whatprovides->{$r} || Build::addproviders($config, $r)};
+    @q = grep {!$aconflicts{$_}} @q if @q > 1;
     my $pn = $r;
     $pn =~ s/ .*//;
     @q = grep {$_ eq $pn} @q;
