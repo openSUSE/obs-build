@@ -1581,13 +1581,18 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 		recipe=*) RECIPEFILE="${k#*=}" ;;
 		release=*) test -z "$RELEASE" && RELEASE="${k#*=}" ;;
 		debuginfo=*) BUILD_DEBUG=1 ;;
+		disturl=*) test -z "$DISTURL" && DISTURL="${k#*=}" ;;
+		vcs=*) test -z "$BUILD_VCSURL" && BUILD_VCSURL="${k#*=}" ;;
+		buildflavor=*) test -z "$BUILD_FLAVOR" && BUILD_FLAVOR="${k#*=}" ;;
 	    esac
 	done < .build.params
 	test -z "$RECIPEFILE" && cleanup_and_exit 1 "recipe not set in build parameters"
 	RECIPEPATH="$SRCDIR/$RECIPEFILE"
 	RPMLIST="--rpmlist $MYSRCDIR/.build.rpmlist"
 	BUILD_RPMS=
-	BUILD_DIST="$SRCDIR/.build.config"
+	rm -f "$BUILD_ROOT/.build.config"
+	mv "$SRCDIR/.build.config" "$BUILD_ROOT/.build.config"
+	BUILD_DIST="$BUILD_ROOT/.build.config"
 	repos=()
     fi
 

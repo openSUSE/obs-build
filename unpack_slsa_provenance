@@ -64,6 +64,22 @@ sub check_existing {
   return 0;
 }
 
+sub download_materials {
+  my ($materials, $dir, $subdir) = @_;
+  if ($subdir) {
+    mkdir("$dir/$subdir") || die("mkdir $dir/$subdir: $!\n") unless -d "$dir/$subdir";
+    $subdir .= "/";
+  }
+  $subdir ||= '';
+  for my $material (@{$materials || []}) {
+    my $fn = $material->{'filename'};
+    $fn = '.build.config' if $material->{'intent'} eq 'buildconfig';
+    my $digest = material2digest($material);
+    next if check_existing("$dir/$subdir$fn", $digest);
+    Build::Download::download($material->{'uri'}, "$dir/$subdir$fn", undef, 'digest' => $digest);
+  }
+}
+
 die("usage: unpack_slsa_provenance <provenance.json> <dir>\n") unless @ARGV == 2;
 my ($provenance_file, $dir) = @ARGV;
 
@@ -77,86 +93,150 @@ if ($provenance->{'payload'}) {
   $provenance = MIME::Base64::decode_base64($provenance->{'payload'});
   $provenance = Build::SimpleJSON::parse($provenance);
 }
+my $predicate_type = $provenance->{'predicateType'};
+die("no predicateType in provenance?\n") unless $predicate_type;
+die("unsupported predicate type '$predicate_type'\n") unless $predicate_type eq 'https://slsa.dev/provenance/v0.1' || $predicate_type eq 'https://slsa.dev/provenance/v0.2' || $predicate_type eq 'https://slsa.dev/provenance/v1';
+
 my $predicate = $provenance->{'predicate'};
 die("no predicate in provenance?\n") unless ref($predicate) eq 'HASH';
 
-my $materials = $predicate->{'materials'};
+my ($materials, $recipefile, $parameters);
+
+if ($predicate_type eq 'https://slsa.dev/provenance/v1') {
+  my $build_definition = $predicate->{'buildDefinition'};
+  die("no buildDefinition in predicate?\n") unless ref($build_definition) eq 'HASH';
+  my $build_type = $build_definition->{'buildType'} || '';
+  die("Unsupported buildType '$build_type'\n") unless $build_type eq 'https://open-build-service.org/worker';
+  my $external_parameters = $build_definition->{'externalParameters'};
+  die("no externalParameters in buildDefinition?\n") unless ref($build_definition) eq 'HASH';
+  $recipefile = $external_parameters->{'recipeFile'};
+  die("no recipeFile in externalParameters?\n") unless defined($recipefile) && ref($recipefile) eq '';
+  $materials = $build_definition->{'resolvedDependencies'};
+  $parameters = $external_parameters;
+} else {
+  my $build_type = $predicate->{'buildType'} || '';
+  die("Unsupported buildType '$build_type'\n") unless $build_type eq 'https://open-build-service.org/worker';
+  $materials = $predicate->{'materials'};
+  my $invocation = $predicate->{'invocation'};
+  die("no invocation in predicate?\n") unless ref($invocation) eq 'HASH';
+  my $configsource = $invocation->{'configSource'};
+  die("no configSource in invocation?\n") unless ref($configsource) eq 'HASH';
+  $recipefile = $configsource->{'entryPoint'};
+  die("no entryPoint in configSource?\n") unless defined($recipefile) && ref($recipefile) eq '';
+  $parameters = $invocation->{'parameters'};
+  die("bad parameters in invocation?\n") unless !$parameters || ref($parameters) eq 'HASH';
+}
+
+
 die("no materials in predicate?\n") unless ref($materials) eq 'ARRAY';
 
-my $invocation = $predicate->{'invocation'};
-die("no invocation in predicate?\n") unless ref($invocation) eq 'HASH';
+# add name/intent to all materials
+for (@$materials) {
+  my $intent = $_->{'intent'};
+  $intent = $_->{'annotations'}->{'intent'} if $_->{'annotations'};
+  if (!$intent && $_->{'uri'}) {
+    # autodetect sources/buildconfig
+    $intent = 'source' unless $_->{'uri'} =~ /\/_slsa\//;
+    $intent = 'buildconfig' if $_->{'uri'} =~ /\/_slsa\// && $_->{'uri'} =~ /\/_config\/[^\/]+$/
+  }
+  $intent ||= 'buildenv';
+  die("unknown intent in material: '$intent'\n") unless $intent eq 'buildenv' || $intent eq 'buildconfig' || $intent eq 'source' || $intent eq 'repos' || $intent eq 'containers';
 
-my $configsource = $invocation->{'configSource'};
-die("no configSource in invocation?\n") unless ref($configsource) eq 'HASH';
+  my $filename = $_->{'name'};
+  if (!$filename && $_->{'uri'}) {
+    $filename = $_->{'uri'};
+    $filename =~ s/%([a-fA-F0-9]{2})/chr(hex($1))/sge;
+    $filename =~ s/\/[^\/]+$// if $filename =~ /\/_slsa\//;
+    $filename =~ s/.*\///;
+  }
+  die("cannot determine file name for material\n") unless defined $filename;
+  die("bad file name $filename\n") if $filename eq '.' || $filename eq '..' || $filename eq '' || $filename =~ /[\000-\037\/]/ || $filename =~ /^\.build\./s;
 
-my $recipefile = $configsource->{'entryPoint'};
-die("no entryPoint in configSource?\n") unless defined($recipefile) && ref($recipefile) eq '';
+  $_->{'intent'} = $intent;
+  $_->{'filename'} = $filename;
+}
 
-my @rpmlist;
+# classify materials by intent
+my %materials;
+push @{$materials{$_->{'intent'}}}, $_ for @$materials;
+
+# check for missing materials
+for my $needed_intent ('source', 'buildconfig', 'buildenv') {
+  die("missing materials for '$needed_intent'\n") unless $materials{$needed_intent};
+}
+die("more than one buildconfig material\n") if @{$materials{'buildconfig'}} != 1;
+die("recipefile $recipefile is missing from source\n") unless grep {$_->{'filename'} eq $recipefile} @{$materials{'source'}};
 
 $| = 1;
 
 print "fetching sources\n";
-my $recipe_found;
-for my $material (@$materials) {
-  my $uri = $material->{'uri'};
-  next if $uri =~ /\/_slsa\//;
-  my $digest = material2digest($material);
-  my $fn = $uri;
-  $fn =~ s/%([a-fA-F0-9]{2})/chr(hex($1))/sge;
-  $fn =~ s/.*\///;
-  die("bad file name $fn\n") if $fn eq '.' || $fn eq '..' || $fn eq '';
-  die("bad file name $fn\n") if $fn =~ /^\.build\./;
-  $recipe_found = 1 if $fn eq $recipefile;
-  next if check_existing("$dir/$fn", $digest);
-  Build::Download::download($uri, "$dir/$fn", undef, 'digest' => $digest);
-}
-die("recipefile $recipefile is missing from source\n") unless $recipe_found;
+download_materials($materials{'source'}, $dir);
 
 print "fetching build environment\n";
-mkdir("$dir/.build.binaries") || die("mkdir $dir/.build.binaries: $!\n") unless -d "$dir/.build.binaries";
-for my $material (@$materials) {
-  my $uri = $material->{'uri'};
-  next unless $uri =~ /\/_slsa\//;
-  next if $uri =~ /\/_config\/[^\/]+$/;
-  my $digest = material2digest($material);
-  my $fn = $uri;
-  $fn =~ s/%([a-fA-F0-9]{2})/chr(hex($1))/sge;
-  $fn =~ s/\/[^\/]+$//;
-  $fn =~ s/.*\///;
-  die("bad file name $fn\n") if $fn eq '.' || $fn eq '..' || $fn eq '';
-  if ($fn =~ /^(.*)\.rpm$/) {
-    push @rpmlist, "$1 $dir/.build.binaries/$fn";
-  }
-  next if check_existing("$dir/.build.binaries/$fn", $digest);
-  Build::Download::download($uri, "$dir/.build.binaries/$fn", undef, 'digest' => $digest);
+download_materials($materials{'buildenv'}, $dir, '.build.binaries');
+
+if ($materials{'sysroot'}) {
+  print "fetching sysroot binaries\n";
+  download_materials($materials{'buildenv'}, $dir, '.sysroot.binaries');
+}
+
+if ($materials{'repos'}) {
+  print "fetching repository binaries\n";
+  download_materials($materials{'repos'}, $dir, 'repos');
+}
+
+if ($materials{'containers'}) {
+  print "fetching containers\n";
+  download_materials($materials{'containers'}, $dir, 'containers');
 }
 
 print "fetching build config\n";
-for my $material (@$materials) {
-  my $uri = $material->{'uri'};
-  next unless $uri =~ /\/_slsa\//;
-  next unless $uri =~ /\/_config\/[^\/]+$/;
-  my $digest = material2digest($material);
-  next if check_existing("$dir/.build.config", $digest);
-  Build::Download::download($uri, "$dir/.build.config", undef, 'digest' => $digest);
+download_materials($materials{'buildconfig'}, $dir);
+
+my %flags;
+if ($predicate_type eq 'https://slsa.dev/provenance/v1') {
+  # get preinstall/vminstall/runscripts information from the annotations
+  for my $material (@{$materials{'buildenv'}}) {
+    my $flags = ($material->{'annotations'} || {})->{'flags'};
+    next unless $flags;
+    my $fn = $material->{'filename'};
+    my $n;
+    $n = $1 if $fn =~ /^(.*)\.(?:rpm|deb|pkg\.tar\.gz|pkg\.tar\.xz|pkg\.tar.zst)$/;
+    next unless $n;
+    push @{$flags{$_}}, $n for split(',', $flags);
+  }
+} else {
+  # parse the config to get preinstall/vminstall/runscripts information
+  my $bconf = Build::read_config('noarch', "$dir/.build.config");
+  die("cannot expand preinstalls\n") if $bconf->{'expandflags:preinstallexpand'};
+  $flags{'preinstall'} = [ Build::get_preinstalls($bconf) ];
+  $flags{'vminstall'} = [ Build::get_vminstalls($bconf) ];
+  $flags{'runscripts'} = [ Build::get_runscripts($bconf) ];
 }
 
-# parse the config to get preinstall/vminstall/runscripts information
-my $bconf = Build::read_config('noarch', "$dir/.build.config");
-die("cannot expand preinstalls\n") if $bconf->{'expandflags:preinstallexpand'};
-my @preinstalls = Build::get_preinstalls($bconf);
-my @vminstalls = Build::get_vminstalls($bconf);
-my @runscripts = Build::get_runscripts($bconf);
-push @rpmlist, "preinstall: @preinstalls";
-push @rpmlist, "vminstall: @vminstalls";
-push @rpmlist, "runscripts: @runscripts";
+# add all buildenv materials to the rpmlist
+my @rpmlist;
+for my $material (@{$materials{'buildenv'} || []}) {
+  my $fn = $material->{'filename'};
+  my $n;
+  $n = $1 if $fn =~ /^(.*)\.(?:rpm|deb|pkg\.tar\.gz|pkg\.tar\.xz|pkg\.tar.zst)$/;
+  push @rpmlist, "$n $dir/.build.binaries/$fn" if $n;
+}
+for my $material (@{$materials{'sysroot'} || []}) {
+  my $fn = $material->{'filename'};
+  my $n;
+  $n = $1 if $fn =~ /^(.*)\.(?:rpm|deb|pkg\.tar\.gz|pkg\.tar\.xz|pkg\.tar.zst)$/;
+  next unless $n;
+  push @rpmlist, "sysroot: $n $dir/.sysroot.binaries/$fn" if $n;
+}
 
+for (qw{preinstall vminstall runscripts installonly noinstall}) {
+  push @rpmlist, "$_: @{$flags{$_}}" if $flags{$_};
+}
 writestr("$dir/.build.rpmlist", undef, join("\n", @rpmlist)."\n");
 
 my @params;
-if (ref($invocation->{'parameters'}) eq 'HASH') {
-  my $parameters = $invocation->{'parameters'};
+if ($parameters) {
   for my $k (sort keys %$parameters) {
     next unless defined $parameters->{$k} && !ref($parameters->{$k});
     push @params, 'release', $parameters->{$k} if $k eq 'release';
