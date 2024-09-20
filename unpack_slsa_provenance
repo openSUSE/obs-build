@@ -4,12 +4,12 @@ BEGIN {
   unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
 }
 
-use JSON::XS ();
 use MIME::Base64 ();
 use Data::Dumper;
 
 use Build;
 use Build::Download;
+use Build::SimpleJSON;
 
 use strict;
 
@@ -72,10 +72,10 @@ die("$dir: $!\n") unless -e $dir;
 die("$dir: Not a directory\n") unless -d $dir;
 
 my $provenance = readstr($provenance_file);
-$provenance = JSON::XS::decode_json($provenance);
+$provenance = Build::SimpleJSON::parse($provenance);
 if ($provenance->{'payload'}) {
   $provenance = MIME::Base64::decode_base64($provenance->{'payload'});
-  $provenance = JSON::XS::decode_json($provenance);
+  $provenance = Build::SimpleJSON::parse($provenance);
 }
 my $predicate = $provenance->{'predicate'};
 die("no predicate in provenance?\n") unless ref($predicate) eq 'HASH';
