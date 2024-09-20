@@ -29,25 +29,28 @@ eval { require JSON::XS };
 
 use strict;
 
+sub read_manifest_json {
+  my ($fn) = @_;
+  my $json_fh;
+  if (!open($json_fh, '<', $fn)) {
+    warn("Error opening $fn: $!\n");
+    return undef;
+  }
+  if ($fn =~ /\.gz$/) {
+    $json_fh = IO::Uncompress::Gunzip->new($json_fh) or die("Error opening $fn: $IO::Uncompress::Gunzip::GunzipError\n");
+  }
+  local $/;
+  return scalar(<$json_fh>);
+}
+
 sub manifest2obsbinlnk {
   my ($dir, $file, $prefix, $packid) = @_;
-  my $json_fh;
-  my $image;
-  my $json_text = do {
-      unless (open($json_fh, "<", "$dir/$file")) {
-          warn("Error opening $dir/$file: $!\n");
-          return {};
-      }
-      if ($file =~ /\.gz$/) {
-        $json_fh = IO::Uncompress::Gunzip->new($json_fh) or die("Error opening $dir/$file: $IO::Uncompress::Gunzip::GunzipError\n");
-      }
-      local $/;
-      <$json_fh>
-  };
-
+  my $json_text = read_manifest_json("$dir/$file");
+  return unless $json_text;
   my $metadata = eval { JSON::XS::decode_json($json_text) };
   return unless $metadata && $metadata->{'config'} && ref($metadata->{'config'}) eq 'HASH';
 
+  my $image;
   for my $ext ("", ".raw", ".gz", ".xz", ".zst", ".zstd") {
     my $fn = "$dir/$prefix$ext";
     if (-e $fn) {
@@ -78,12 +81,12 @@ sub manifest2obsbinlnk {
   my @provides = ("mkosi:$distribution:$distrelease", "mkosi:$name = $version-$release");
 
   my $lnk = {
-      'name' => "mkosi:$name",
-      'version' => $version,
-      'release' => $release,
-      'arch' => 'noarch',
-      'provides' => \@provides,
-      'source' => $packid,
+    'name' => "mkosi:$name",
+    'version' => $version,
+    'release' => $release,
+    'arch' => 'noarch',
+    'provides' => \@provides,
+    'source' => $packid,
   };
   eval { PBuild::Verify::verify_nevraquery($lnk) };
   return undef if $@;
