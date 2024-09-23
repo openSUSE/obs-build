@@ -63,14 +63,6 @@ recipe_build_flatpak() {
       [[ -d $pkg ]] || tar xf $i
     done
 
-#    env | sort
-
-#    perl -v
-#    perl -wE'use JSON::PP 99' || true
-#    perl -wE'use YAML::XS 99' || true
-#    perl -wE'use YAML::PP 99' || true
-#    perl -wE'use URI 99' || true
-
     ls -l $BUILD_ROOT$TOPDIR/SOURCES
     cd "$BUILD_ROOT$TOPDIR/FLATPAK_ROOT"
     cp $BUILD_ROOT$TOPDIR/SOURCES/* .
