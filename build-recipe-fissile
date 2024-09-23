@@ -108,7 +108,7 @@ recipe_build_fissile() {
 
     # Save the resulting images to tarballs.
     mkdir -p $BUILD_ROOT$TOPDIR/FISSILE
-    non_built_images=$(perl -MYAML::XS -e "print join('|', @{YAML::XS::LoadFile('$BUILD_ROOT$TOPDIR/SOURCES/fissile.yml')->{'DockerImageDeps'}})")
+    non_built_images=$(perl -MYAML::XS -e "$YAML::XS::LoadBlessed = 0; print join('|', @{YAML::XS::LoadFile('$BUILD_ROOT$TOPDIR/SOURCES/fissile.yml')->{'DockerImageDeps'}})")
 
     for image in $(chroot $BUILD_ROOT docker images --format "{{.Repository}}:{{.Tag}}" | grep -v $non_built_images); do
         echo "Saving image $image"
