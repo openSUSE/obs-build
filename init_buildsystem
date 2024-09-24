@@ -282,6 +282,11 @@ preinstall_image() {
 
     TAR_EXCLUDES="--exclude .build --exclude .init_b_cache"
 
+    if [ -f "/run/.containerenv" ]; then
+        # we're running in a podman container and we probably don't have sufficient capabilities to create special files
+        TAR_EXCLUDES="$TAR_EXCLUDES --exclude dev/* --exclude proc/* --exclude run/* --exclude sys/*"
+    fi
+
     if test -x /usr/bin/bsdtar ; then
 	TAR="/usr/bin/bsdtar $TAR_EXCLUDES -P --chroot --numeric-owner -x"
     else
