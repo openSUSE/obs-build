@@ -955,7 +955,7 @@ Output formats
      Generates SPDX 2.3 formated data. This is the default.
 
   --format cyclonedx
-     Generates CycloneDX 1.4 formated data
+     Generates CycloneDX 1.5 formated data
 
   --intoto
      Can be used optional to wrap the generated data into in-toto.io
