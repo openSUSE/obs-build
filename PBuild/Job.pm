@@ -188,6 +188,18 @@ sub export_origtar {
 }
 
 #
+# Find which package is providing the base container in a container build
+#
+sub findbasecontainer {
+  my ($ctx, $p, $bdeps) = @_;
+  my $cname = (grep {/^container:/} @{$p->{'dep'} || []})[-1];
+  return undef unless $cname;
+  my $bconf = $ctx->{'bconf'};
+  my %providers = map {$_ => 1} @{$bconf->{'whatprovidesh'}->{$cname} || []};
+  return (grep {$providers{$_}} @{$bdeps || []})[0];
+}
+
+#
 # Create a new build job
 #
 # ctx usage: opts hostarch bconf arch repos dep2pkg buildconfig debuginfo
@@ -347,6 +359,8 @@ sub createjob {
   if ($kiwimode || $p->{'buildtype'} eq 'mkosi') {
     # now setup the repos/containers directories
     $ctx->{'repomgr'}->copyimagebinaries($ctx->dep2bins(@$bdeps), $srcdir);
+    my $basecontainer = findbasecontainer($ctx, $p, $bdeps);
+    $ctx->{'repomgr'}->writecontainerannotation($ctx->dep2bins($basecontainer)->[0], $srcdir) if $basecontainer;
     # and tell kiwi how to use them
     if ($p->{'buildtype'} eq 'kiwi') {
       my @kiwiargs;

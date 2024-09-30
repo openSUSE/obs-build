@@ -207,6 +207,19 @@ sub copyimagebinaries {
 }
 
 #
+# Write the container annotation of the basecontainer into the containers directory
+#
+sub writecontainerannotation {
+  my ($repos, $q, $dstdir) = @_;
+  my $repo = $repos->{$q->{'repoid'}};
+  die("package $q->{'name'} has no repo\n") unless $repo;
+  if ($q->{'name'} =~ /^container:/ && $repo->{'type'} eq 'registry') {
+    PBuild::Util::mkdir_p("$dstdir/containers");
+    PBuild::RemoteRegistry::construct_containerannotation($repo->{'meta'}, $q, "$dstdir/containers/annotation");
+  }
+}
+
+#
 # Return the on-disk locations for a set of binary names
 #
 sub getbinarylocations {

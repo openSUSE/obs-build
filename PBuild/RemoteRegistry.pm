@@ -113,6 +113,8 @@ sub fetch_manifest {
   return Build::Download::fetch(@args) unless $digest;
   my $content = PBuild::Util::readstr("$repodir/manifest.$digest", 1);
   if ($content) {
+    my %opts = ('url', @args);
+    ${$opts{'replyheaders'}} = $data if $opts{'replyheaders'};
     Build::Download::checkdigest($content, $digest);
     return ($content, $ct);
   }
@@ -129,26 +131,37 @@ sub fetch_manifest {
 #
 sub queryremotecontainer {
   my ($ua, $arch, $repodir, $registry, $repotag) = @_;
-  $repotag .= ":latest" unless $repotag =~ /:[^\/:]+$/;
-  die unless $repotag =~ /^(.*):([^\/:]+)$/;
-  my ($repository, $tag) = ($1, $2);
-  $repository = "library/$repository" if $repository !~ /\// && $registry =~ /docker.io\/?$/;
-  # strip domain part if it matches the registry url
   my $registrydomain = $registry;
   $registrydomain =~ s/^[^\/]+\/\///;
   $registrydomain =~ s/\/.*//;
-  $repository = $2 if $repository =~ /^([^\/]+)\/(.+)$/s && $1 eq $registrydomain;
+  $repotag .= ":latest" unless $repotag =~ /:[^\/:]+$/;
+  die unless $repotag =~ /^(.*):([^\/:]+)$/;
+  my ($repository, $tag) = ($1, $2);
+  my $refname = "$repository:$tag";
+  if ($repository !~ /\//) {
+    $repository = "library/$repository" if $registry =~ /docker\.io\/?$/;
+  } else {
+    # strip domain part if it matches the registry url
+    $repository = $2 if $repository =~ /^([^\/]+)\/(.+)$/s && $1 eq $registrydomain;
+    $refname = "$repository:$tag";
+  }
 
   my @accept = ($mt_docker_manifestlist, $mt_docker_manifest, $mt_oci_index, $mt_oci_manifest);
+  my $replyheaders;
   my ($data, $ct) = fetch_manifest($repodir, $registry, "$registry/v2/$repository/manifests/$tag",
-	'ua' => $ua, 'accept' => \@accept, 'missingok' => 1);
+	'ua' => $ua, 'accept' => \@accept, 'missingok' => 1, 'replyheaders' => \$replyheaders);
   return undef unless defined $data;
   die("no content type set in answer\n") unless $ct;
+  my $digest = $replyheaders->{'docker-content-digest'};
+  die("no docker-content-digest set in answer\n") unless $digest;
+  my $fatdigest;
   if ($ct eq $mt_docker_manifestlist || $ct eq $mt_oci_index) {
     # fat manifest, select the one we want
+    $fatdigest = $digest;
     my $r = JSON::XS::decode_json($data);
     my $manifest = select_manifest($arch, $r->{'manifests'} || []);
     return undef unless $manifest;
+    $digest = $manifest->{'digest'};
     @accept = ($mt_docker_manifest, $mt_oci_manifest);
     ($data, $ct) = fetch_manifest($repodir, $registry, "$registry/v2/$repository/manifests/$manifest->{'digest'}",
 	'ua' => $ua, 'accept' => \@accept);
@@ -166,6 +179,7 @@ sub queryremotecontainer {
   $id = substr($id, 0, 32);
   my $name = $repotag;
   $name =~ s/[:\/]/-/g;
+  $name = "_$name" if $name =~ /^_/;    # just in case
   $name = "container:$name";
   my $version = 0;
   my @provides = ("$name = $version");
@@ -180,7 +194,10 @@ sub queryremotecontainer {
     'location' => $repository,
     'blobs' => \@blobs,
     'containertags' => [ $repotag ],
+    'registry_refname' => ($registrydomain =~ /docker\.io/ ? 'docker.io/' : "$registrydomain/") . $refname,
+    'registry_digest' => $digest,
   };
+  $q->{'registry_fatdigest'} = $fatdigest if $fatdigest;
   return $q;
 }
 
@@ -304,6 +321,16 @@ sub construct_containertar {
   my ($head, $pad) = maketarhead('manifest.json', length($manifest_json), $mtime);
   print $fd "$head$manifest_json$pad".maketarhead();
   close($fd) || die;
+}
+
+sub construct_containerannotation {
+  my ($meta, $q, $dst) = @_;
+  my $annotation = {};
+  $annotation->{'registry_refname'} = [ $q->{'registry_refname'} ];
+  $annotation->{'registry_digest'} = [ $q->{'registry_digest'} ];
+  $annotation->{'registry_fatdigest'} = [ $q->{'registry_fatdigest'} ];
+  my $annotationxml = Build::SimpleXML::unparse( { 'annotation' => [ $annotation ] });
+  PBuild::Util::writestr($dst, undef, $annotationxml);
 }
 
 1;
