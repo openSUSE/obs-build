@@ -125,6 +125,11 @@ sub fetch {
   my $data = $res->decoded_content('charset' => 'none');
   my $ct = $res->header('content_type');
   checkdigest($data, $opt{'digest'}) if $opt{'digest'};
+  if ($opt{'replyheaders'}) {
+    my $data = { $res->flatten() };
+    $data = { map {lc($_) => $data->{$_}} sort keys %$data };
+    ${$opt{'replyheaders'}} = $data;
+  }
   return ($data, $ct);
 }
 
