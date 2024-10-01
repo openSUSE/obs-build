@@ -1139,6 +1139,11 @@ sub addproviders {
   return \@p;
 }
 
+sub whatprovides {
+  my ($config, $r) = @_;
+  return @{$config->{'whatprovidesh'}->{$r} || addproviders($config, $r)};
+}
+
 sub expand;
 *expand = \&Build::Expand::expand;
 
