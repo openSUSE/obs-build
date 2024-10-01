@@ -339,6 +339,7 @@ sub kiwiparse {
   }
 
   my $containerconfig;
+  my $basecontainer;
   for my $pref (@{$preferences || []}) {
     if ($obsprofiles && $pref->{'profiles'}) {
       next unless grep {$usedprofiles{$_}} split(",", $pref->{'profiles'});
@@ -394,6 +395,7 @@ sub kiwiparse {
 	}
 	die("derived_from url not using obs:/ scheme: $derived\n") unless defined $name;
 	push @packages, "container:$name";
+	$basecontainer = "container:$name";
 	push @containerrepos, $prp if $prp;
       }
 
@@ -554,6 +556,7 @@ sub kiwiparse {
     push @containertags, @extratags if @extratags;
     $ret->{'container_tags'} = [ unify(@containertags) ] if @containertags;
   }
+  $ret->{'basecontainer'} = $basecontainer if $basecontainer;
   if ($obsprofiles) {
     if (@$obsprofiles) {
       $ret->{'profiles'} = [ unify(@$obsprofiles) ];
