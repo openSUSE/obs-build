@@ -154,11 +154,12 @@ sub parse {
   if ($p->{'files'}->{'_service'}) {
     push @{$p->{'buildtimeservice'}}, $_ for PBuild::Service::get_buildtimeservices($p);
   }
-  my $imagetype = $bt eq 'kiwi' && $d->{'imagetype'} ? ($d->{'imagetype'}->[0] || '') : '';
-  if ($bt eq 'kiwi' && $imagetype eq 'product') {
+  my $kiwi_imagetype = $bt eq 'kiwi' && $d->{'imagetype'} ? ($d->{'imagetype'}->[0] || '') : '';
+  if ($kiwi_imagetype eq 'product' || $bt eq 'productcompose') {
     $p->{'nodbgpkgs'} = 1 if defined($d->{'debugmedium'}) && $d->{'debugmedium'} <= 0;
     $p->{'nosrcpkgs'} = 1 if defined($d->{'sourcemedium'}) && $d->{'sourcemedium'} <= 0;
   }
+  $p->{'basecontainer'} = $d->{'basecontainer'} if $d->{'basecontainer'};
   my $myarch = $bconf->{'target'} ? (split('-', $bconf->{'target'}))[0] : $arch;
   $p->{'error'} = 'excluded' if $d->{'exclarch'} && !grep {$_ eq $myarch} @{$d->{'exclarch'}};
   $p->{'error'} = 'excluded' if $d->{'badarch'} && grep {$_ eq $myarch} @{$d->{'badarch'}};
@@ -166,7 +167,7 @@ sub parse {
 
   $p->{'remoteassets'} = $d->{'remoteassets'} if $d->{'remoteassets'};
   # check if we can build this
-  if ($bt eq 'kiwi' && $imagetype eq 'product') {
+  if ($kiwi_imagetype eq 'product') {
     $p->{'error'} = 'cannot build kiwi products yet';
     return;
   }

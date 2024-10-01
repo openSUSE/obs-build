@@ -192,10 +192,8 @@ sub export_origtar {
 #
 sub findbasecontainer {
   my ($ctx, $p, $bdeps) = @_;
-  my $cname = (grep {/^container:/} @{$p->{'dep'} || []})[-1];
-  return undef unless $cname;
-  my $bconf = $ctx->{'bconf'};
-  my %providers = map {$_ => 1} @{$bconf->{'whatprovidesh'}->{$cname} || []};
+  return undef unless $p->{'basecontainer'};
+  my %providers = map {$_ => 1} Build::whatprovides($ctx->{'bconf'}, $p->{'basecontainer'});
   return (grep {$providers{$_}} @{$bdeps || []})[0];
 }
 
