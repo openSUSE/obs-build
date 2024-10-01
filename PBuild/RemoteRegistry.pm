@@ -231,7 +231,8 @@ sub maketarhead {
   my $pad = '';
   return ("$h$h") unless defined $name;
   my $tartype = '0';
-  die("name too big\n") if length($name) > 100;
+  die("tar entry name too big\n") if length($name) > 100;
+  die("tar entry size too big\n") if $size >= 8589934592;
   my $mode = sprintf("%07o", 0x81a4);
   my $fsize = sprintf("%011o", $size);
   my $fmtime = sprintf("%011o", $mtime);
