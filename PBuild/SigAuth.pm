@@ -117,3 +117,5 @@ sub authenticate {
 # install handler
 no warnings;
 *LWP::Authen::Signature::authenticate = \&authenticate;
+
+1;

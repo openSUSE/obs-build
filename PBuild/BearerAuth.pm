@@ -61,3 +61,5 @@ sub bearer_authenticate {
 # install handler
 no warnings;
 *LWP::Authen::Bearer::authenticate = \&bearer_authenticate;
+
+1;
