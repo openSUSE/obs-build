@@ -22,12 +22,10 @@ package PBuild::RemoteRegistry;
 
 use strict;
 
-use LWP::UserAgent;
-use URI;
-
 use Build::Download;
 use Build::SimpleJSON;
 
+use PBuild::BearerAuth;
 use PBuild::Verify;
 
 eval { require JSON::XS };
@@ -40,38 +38,6 @@ my $mt_docker_manifest     = 'application/vnd.docker.distribution.manifest.v2+js
 my $mt_docker_manifestlist = 'application/vnd.docker.distribution.manifest.list.v2+json';
 my $mt_oci_manifest        = 'application/vnd.oci.image.manifest.v1+json';
 my $mt_oci_index           = 'application/vnd.oci.image.index.v1+json';
-
-# 
-# simple anon bearer authenticator
-# 
-sub bearer_authenticate {
-  my($class, $ua, $proxy, $auth_param, $response, $request, $arg, $size) = @_;
-  return $response if $ua->{'bearer_authenticate_norecurse'};
-  local $ua->{'bearer_authenticate_norecurse'} = 1;
-  my $realm = $auth_param->{'realm'};
-  die("bearer auth did not provide a realm\n") unless $realm;
-  die("bearer realm is not http/https\n") unless $realm =~ /^https?:\/\//i;
-  my $auri = URI->new($realm);
-  my @afields;
-  for ('service', 'scope') {
-    push @afields, $_, $auth_param->{$_} if defined $auth_param->{$_};
-  }
-  print "requesting bearer auth from $realm [@afields]\n";
-  $auri->query_form($auri->query_form, @afields);
-  my $ares = $ua->get($auri);
-  return $response unless $ares->is_success;
-  my $reply = JSON::XS::decode_json($ares->decoded_content);
-  my $token = $reply->{'token'} || $reply->{'access_token'};
-  return $response unless $token;
-  my $url = $proxy ? $request->{proxy} : $request->uri_canonical;
-  my $host_port = $url->host_port;
-  my $h = $ua->get_my_handler('request_prepare', 'm_host_port' => $host_port, sub {
-    $_[0]{callback} = sub { $_[0]->header('Authorization' => "Bearer $token") };
-  });
-  return $ua->request($request->clone, $arg, $size, $response);
-}
-
-*LWP::Authen::Bearer::authenticate = \&bearer_authenticate;
 
 #
 # convert arch to goarch/govariant
@@ -89,19 +55,25 @@ sub arch2goarch {
 # select a matching manifest from a manifest index (aka fat manifest)
 #
 sub select_manifest {
-  my ($arch, $manifests) = @_;
+  my ($manifests, $arch) = @_;
   my ($goarch, $govariant) = arch2goarch($arch);
+  my $goos = 'linux';
   for my $m (@{$manifests || []}) {
     next unless $m->{'digest'};
-    if ($m->{'platform'}) {
-      next if $m->{'platform'}->{'architecture'} ne $goarch;
-      next if $m->{'platform'}->{'variant'} && $govariant && $m->{'platform'}->{'variant'} ne $govariant;
+    my $platform = $m->{'platform'};
+    if ($platform) {
+      next if $goarch && $platform->{'architecture'} && $platform->{'architecture'} ne $goarch;
+      next if $govariant && $platform->{'variant'} && $platform->{'variant'} ne $govariant;
+      next if $goos && $platform->{'os'} && $govariant && $platform->{'os'} ne $goos;
     }
     return $m;
   }
   return undef;
 }
 
+#
+# retrieve a manifest using a HEAD request first for the docker registry
+#
 sub fetch_manifest {
   my ($repodir, $registry, @args) = @_;
   return Build::Download::fetch(@args) if $registry !~ /docker.io\/?$/;
@@ -159,7 +131,7 @@ sub queryremotecontainer {
     # fat manifest, select the one we want
     $fatdigest = $digest;
     my $r = JSON::XS::decode_json($data);
-    my $manifest = select_manifest($arch, $r->{'manifests'} || []);
+    my $manifest = select_manifest($r->{'manifests'}, $arch);
     return undef unless $manifest;
     $digest = $manifest->{'digest'};
     @accept = ($mt_docker_manifest, $mt_oci_manifest);
@@ -323,12 +295,15 @@ sub construct_containertar {
   close($fd) || die;
 }
 
+#
+# write the annotation for a container binary pulled from a registry
+#
 sub construct_containerannotation {
   my ($meta, $q, $dst) = @_;
   my $annotation = {};
   $annotation->{'registry_refname'} = [ $q->{'registry_refname'} ];
   $annotation->{'registry_digest'} = [ $q->{'registry_digest'} ];
-  $annotation->{'registry_fatdigest'} = [ $q->{'registry_fatdigest'} ];
+  $annotation->{'registry_fatdigest'} = [ $q->{'registry_fatdigest'} ] if $q->{'registry_fatdigest'};
   my $annotationxml = Build::SimpleXML::unparse( { 'annotation' => [ $annotation ] });
   PBuild::Util::writestr($dst, undef, $annotationxml);
 }
