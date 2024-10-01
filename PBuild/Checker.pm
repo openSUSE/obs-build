@@ -434,7 +434,7 @@ sub check_image {
 }
 
 #
-# Check th status of a single productcompose build
+# Check the status of a single productcompose build
 #
 sub check_product {
   my ($ctx, $p) = @_;
