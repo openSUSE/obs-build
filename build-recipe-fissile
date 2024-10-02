@@ -120,7 +120,8 @@ recipe_build_fissile() {
 	args=()
 	test -n "$DISTURL" && args=("${args[@]}" --disturl "$DISTURL")
 	test -n "$RELEASE" && args=("${args[@]}" --release "$RELEASE")
-	perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo -- "${args[@]}" '' "$filename.tar" "$image" containers/annotation > "$BUILD_ROOT$TOPDIR/FISSILE/$filename.containerinfo"
+	test -s "containers/annotation" && args=("${args[@]}" --annotationfile containers/annotation)
+	perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo -- "${args[@]}" '' "$filename.tar" "$image" > "$BUILD_ROOT$TOPDIR/FISSILE/$filename.containerinfo"
     done
 
     recipe_cleanup_fissile

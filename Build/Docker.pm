@@ -428,17 +428,19 @@ sub parse {
 }
 
 sub showcontainerinfo {
-  my ($disturl, $release);
+  my ($disturl, $release, $annotationfile);
   while (@ARGV) {
     if (@ARGV > 2 && $ARGV[0] eq '--disturl') {
       (undef, $disturl) = splice(@ARGV, 0, 2);
     } elsif (@ARGV > 2 && $ARGV[0] eq '--release') {
       (undef, $release) = splice(@ARGV, 0, 2);
+    } elsif (@ARGV > 2 && $ARGV[0] eq '--annotationfile') {
+      (undef, $annotationfile) = splice(@ARGV, 0, 2);
     } else {
       last;
     }
   }
-  my ($fn, $image, $taglist, $annotationfile) = @ARGV;
+  my ($fn, $image, $taglist) = @ARGV;
   local $Build::Kiwi::urlmapper = sub { return $_[0] };
   my $cf = { '__dockernoname' => 1 };
   $cf->{'buildrelease'} = $release if defined $release;

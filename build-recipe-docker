@@ -329,7 +329,8 @@ recipe_build_docker() {
     args=()
     test -n "$DISTURL" && args=("${args[@]}" --disturl "$DISTURL")
     test -n "$RELEASE" && args=("${args[@]}" --release "$RELEASE")
-    perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo -- "${args[@]}" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$ALLTAGS" containers/annotation > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
+    test -s "containers/annotation" && args=("${args[@]}" --annotationfile containers/annotation)
+    perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo -- "${args[@]}" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$ALLTAGS" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
 
     # copy over .packages files
     for i in basepackages packages ; do

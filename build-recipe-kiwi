@@ -704,6 +704,8 @@ postprocess_kiwi_containers() {
     local args=(--arch "${BUILD_ARCH%%:*}" --buildflavor "$BUILD_FLAVOR")
     test -n "$DISTURL" && args=("${args[@]}" --disturl "$DISTURL")
     test -n "$RELEASE" && args=("${args[@]}" --release "$RELEASE")
+    test -s "containers/annotation" && args=("${args[@]}" --annotationfile containers/annotation)
+
     for r in $BUILD_ROOT/$TOPDIR/KIWI/*.tar ; do
 	test -e "$r" && perl -I$BUILD_DIR -MBuild::Kiwi -e Build::Kiwi::showcontainerinfo -- "${args[@]}" $BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE "$r" > "${r%.tar}.containerinfo"
 	if test -s "${r%.tar}.containerinfo" ; then

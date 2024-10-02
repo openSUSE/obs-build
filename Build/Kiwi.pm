@@ -33,6 +33,16 @@ sub unify {
   return grep(delete($h{$_}), @_);
 }
 
+sub slurp {
+  my ($fn) = @_;
+  local *F;
+  return undef unless open(F, '<', $fn);
+  local $/ = undef;     # Perl slurp mode
+  my $content = <F>;
+  close F;
+  return $content;
+}
+
 sub expandFallBackArchs {
   my ($fallbackArchXML, @archs) = @_;
   my %fallbacks;
@@ -607,7 +617,7 @@ sub show {
 }
 
 sub showcontainerinfo {
-  my ($disturl, $arch, $buildflavor, $release);
+  my ($disturl, $arch, $buildflavor, $release, $annotationfile);
   while (@ARGV) {
     if (@ARGV > 2 && $ARGV[0] eq '--disturl') {
       (undef, $disturl) = splice(@ARGV, 0, 2);
@@ -617,6 +627,8 @@ sub showcontainerinfo {
       (undef, $buildflavor) = splice(@ARGV, 0, 2);
     } elsif (@ARGV > 2 && $ARGV[0] eq '--release') {
       (undef, $release) = splice(@ARGV, 0, 2);
+    } elsif (@ARGV > 2 && $ARGV[0] eq '--annotationfile') {
+      (undef, $annotationfile) = splice(@ARGV, 0, 2);
     } else {
       last;
     }
@@ -644,6 +656,16 @@ sub showcontainerinfo {
     $profile = $d->{'profiles'}->[0];
   }
 
+  # parse annotation file
+  my $annotation;
+  if ($annotationfile) {
+    $annotation = slurp($annotationfile);
+    $annotation = $annotation ? Build::SimpleXML::parse($annotation) : undef;
+    $annotation = $annotation && ref($annotation) eq 'HASH' ? $annotation->{'annotation'} : undef;
+    $annotation = $annotation && ref($annotation) eq 'ARRAY' ? $annotation->[0] : undef;
+    $annotation = undef unless ref($annotation) eq 'HASH';
+  }
+
   my @repos;
   for my $repo (@{$d->{'imagerepos'} || []}) {
     push @repos, { 'url' => $repo->{'url'}, '_type' => {'priority' => 'number'} };
@@ -663,6 +685,14 @@ sub showcontainerinfo {
   $containerinfo->{'file'} = $image if defined $image;
   $containerinfo->{'disturl'} = $disturl if defined $disturl;
   $containerinfo->{'milestone'} = $d->{'milestone'} if defined $d->{'milestone'};
+  if ($annotation && $d->{'basecontainer'}) {
+    for (qw{registry_refname registry_digest registry_fatdigest}) {
+      next unless $annotation->{$_} && ref($annotation->{$_}) eq 'ARRAY';
+      my $v = $annotation->{$_}->[0];
+      $v = $v->{'_content'} if $v && ref($v) eq 'HASH';
+      $containerinfo->{"base_$_"} = $v if $v;
+    }
+  }
   print Build::SimpleJSON::unparse($containerinfo)."\n";
 }
 
