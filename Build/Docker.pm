@@ -305,8 +305,6 @@ sub parse {
       }
       next;
     }
-    $ret->{'exclarch'} = [ unify(@requiredarch) ] if @requiredarch;
-    $ret->{'badarch'} = [ unify(@badarch) ] if @badarch;
     # add continuation lines
     while (@lines && $line =~ s/\\[ \t]*$//) {
       shift @lines while @lines && $lines[0] =~ /^\s*#/;
@@ -418,6 +416,8 @@ sub parse {
   $ret->{'path'} = [ { 'project' => '_obsrepositories', 'repository' => '' } ] if $useobsrepositories;
   $ret->{'nosquash'} = 1 if $nosquash;
   $ret->{'basecontainer'} = $basecontainer if $basecontainer;
+  $ret->{'exclarch'} = [ unify(@requiredarch) ] if @requiredarch;
+  $ret->{'badarch'} = [ unify(@badarch) ] if @badarch;
   if (@containerrepos) {
     for (unify(@containerrepos)) {
       my @s = split('/', $_, 2);
