@@ -75,8 +75,7 @@ sub ua_get {
     my $oldmaxsize = $ua->max_size($maxsize);
     $res = $ua->get($url, @hdrs);
     $ua->max_size($oldmaxsize);
-    die("download of $url failed: ".$res->header('X-Died')) if $res->header('Client-Aborted') && $res->header('X-Died');
-    die("download of $url failed: max size exceeded\n") if $res->header('Client-Aborted');
+    die("download of $url failed: ".($res->header('X-Died') || "max size exceeded\n")) if $res->header('Client-Aborted');
   } else {
     $res = $ua->get($url, @hdrs);
   }
