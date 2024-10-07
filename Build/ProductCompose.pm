@@ -165,18 +165,18 @@ sub parse {
 }
 
 sub show {
-    my ($fn, $field, $arch, $buildflavor) = @ARGV;
-    my $cf = {'arch' => $arch};
-    $cf->{'buildflavor'} = $buildflavor if defined $buildflavor;
-    my $d = parse($cf, $fn);
-    die "$d->{error}\n" if $d->{error};
-    my $value = $d->{ $field };
-    if (ref $value eq 'ARRAY') {
-        print "$_\n" for @$value;
-    }
-    else {
-        print "$value\n";
-    }
+  my ($fn, $field, $arch, $buildflavor) = @ARGV;
+  my $cf = {'arch' => $arch};
+  $cf->{'buildflavor'} = $buildflavor if defined $buildflavor;
+  my $d = parse($cf, $fn);
+  die "$d->{error}\n" if $d->{error};
+  my $value = $d->{ $field };
+  if (ref $value eq 'ARRAY') {
+    print "$_\n" for @$value;
+  }
+  else {
+    print "$value\n";
+  }
 }
 
 1;
