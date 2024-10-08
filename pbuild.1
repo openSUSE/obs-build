@@ -18,8 +18,15 @@ pbuild \- build a project consisting of a set of packages
 .RB [ --dist
 .IR dist ]
 .B --result
-.RB [ --details ]
 .RI [ dir ]
+.br
+.B pbuild
+.RB [ --preset
+.IR preset ]
+.RB [ --dist
+.IR dist ]
+.B --repoquery
+.RI [ deptype: ] dep
 
 .SH DESCRIPTION
 The pbuild tool builds a project consisting of a set of packages stored
@@ -141,6 +148,11 @@ Otherwise it is assumed that the argument is a package name.
 .B "\-\-terse"
 Do not show detailed information about the package state.
 
+.SH REPOQUERY OPTIONS
+.TP
+.B "\-\-details"
+Show detailed information about the packages.
+
 .SH MISC OPTIONS
 .TP
 .BI "\-\-hostarch " arch
@@ -148,6 +160,13 @@ Assume the specified host architecture instead of using "uname -m".
 .TP
 .BI "\-\-configdir " dir
 Specify a different directory containing distribution configurations.
+.TP
+.B "\-\-no-repo-refresh"
+Do not check if the cached repository metadata is up to date.
+.TP
+.BI "\-\-debugflags " types
+Enable debug output. Multipe debug types can be concatenanted with a comma.
+Use "expansion" to debug the dependency expansion.
 .TP
 .BI "\-\-help"
 Print a short help text.
