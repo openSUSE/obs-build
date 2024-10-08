@@ -404,7 +404,7 @@ push @hostrepos, $repomgr->addlocalrepo($bconf_host, $hostarch, $builddir, \%pkg
 print "fetching metadata of ".PBuild::Util::plural(scalar(@{$opts->{'repo'}}) + ($cross ? scalar(@{$opts->{'hostrepo'}}) : 0), 'remote repo')."\n";
 for my $repourl (@{$opts->{'repo'}}) {
   if ($repourl =~ /^registry@(.+)/) {
-    push @repos, $repomgr->addremoteregistry($bconf, $myarch, $builddir, $1, \@containertags);
+    push @repos, $repomgr->addremoteregistry($bconf, $myarch, $builddir, $1, \@containertags, $opts);
   } else {
     push @repos, $repomgr->addremoterepo($bconf, $myarch, $builddir, $repourl, $buildtype, $opts);
   }
@@ -416,9 +416,9 @@ if ($cross) {
 }
 
 if (@{$opts->{'registry'} || []} && @containertags) {
-  print "fetching remote registry metadata\n";
+  print "fetching remote registry metadata of ".PBuild::Util::plural(scalar(@containertags), 'tag')."\n";
   for my $registry (@{$opts->{'registry'} || []}) {
-    push @repos, $repomgr->addremoteregistry($bconf, $myarch, $builddir, $registry, \@containertags);
+    push @repos, $repomgr->addremoteregistry($bconf, $myarch, $builddir, $registry, \@containertags, $opts);
   }
 }
 

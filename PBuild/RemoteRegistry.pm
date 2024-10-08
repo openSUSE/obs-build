@@ -106,7 +106,6 @@ sub queryremotecontainer {
   my $registrydomain = $registry;
   $registrydomain =~ s/^[^\/]+\/\///;
   $registrydomain =~ s/\/.*//;
-  $repotag .= ":latest" unless $repotag =~ /:[^\/:]+$/;
   die unless $repotag =~ /^(.*):([^\/:]+)$/;
   my ($repository, $tag) = ($1, $2);
   my $refname = "$repository:$tag";
@@ -177,14 +176,33 @@ sub queryremotecontainer {
 # get data from a registry for a set of containers
 #
 sub fetchrepo {
-  my ($bconf, $arch, $repodir, $url, $repotags) = @_;
-  my @bins;
-  my $ua = Build::Download::create_ua();
-  for my $repotag (@{$repotags || []}) {
-    my $bin = queryremotecontainer($ua, $arch, $repodir, $url, $repotag);
-    push @bins, $bin if $bin;
+  my ($bconf, $arch, $repodir, $url, $repotags, $opts) = @_;
+  my $oldtags = {};
+  if ($opts->{'single'} || $opts->{'no-repo-refresh'}) {
+    my $oldmetadata = (-s "$repodir/_metadata") ? PBuild::Util::retrieve("$repodir/_metadata", 1) : undef;
+    $oldtags = $oldmetadata->{'tags'} if $oldmetadata && $oldmetadata->{'tags'};
   }
+  my $ua;
+  my %tags;
+  %tags = %$oldtags if $oldtags && $opts->{'single'};	# repotags is incomplete
+  my @bins;
+  for my $repotag (@{$repotags || []}) {
+    my $rt = $repotag;
+    $rt .= ":latest" unless $rt =~ /:[^\/:]+$/;
+    my $bin;
+    if ($opts->{'no-repo-refresh'} && exists $oldtags->{$rt}) {
+      $bin = $oldtags->{$rt};
+    } else {
+      $ua ||= Build::Download::create_ua();
+      $bin = queryremotecontainer($ua, $arch, $repodir, $url, $rt);
+    }
+    push @bins, $bin if $bin;
+    $tags{$rt} = $bin;
+  }
+  my $metadata = { 'tags' => \%tags };
   my $meta = { 'repodir' => $repodir, 'url' => $url };
+  PBuild::Util::mkdir_p($repodir);
+  PBuild::Util::store("$repodir/._metadata.$$", "$repodir/_metadata", $metadata);
   return (\@bins, $meta);
 }
 

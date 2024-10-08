@@ -56,13 +56,13 @@ sub addremoterepo {
 # Add a remote registry to the manager
 #
 sub addremoteregistry {
-  my ($repos, $bconf, $myarch, $builddir, $registry, $tags) = @_;
+  my ($repos, $bconf, $myarch, $builddir, $registry, $tags, $opts) = @_;
   my $repourl = $registry;
   $repourl = "https://$repourl" unless $repourl =~ /^[^\/]+\/\//;
   my $id = Digest::MD5::md5_hex("$myarch/$repourl");
   return $repos->{$id} if $repos->{$id};
   my $repodir = "$builddir/.pbuild/_base/$id";
-  my ($bins, $meta) = PBuild::RemoteRegistry::fetchrepo($bconf, $myarch, $repodir, $repourl, $tags);
+  my ($bins, $meta) = PBuild::RemoteRegistry::fetchrepo($bconf, $myarch, $repodir, $repourl, $tags, $opts);
   $_->{'repoid'} = $id for @$bins;
   my $repo = { 'dir' => $repodir, 'bins' => $bins, 'meta' => $meta, 'url' => $repourl, 'arch' => $myarch, 'type' => 'registry', 'repoid' => $id };
   $repos->{$id} = $repo;
