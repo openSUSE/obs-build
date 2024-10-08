@@ -17,7 +17,8 @@ pbuild \- build a project consisting of a set of packages
 .IR preset ]
 .RB [ --dist
 .IR dist ]
-.B --result
+.B "--result "
+.RI [ code|pkg ]
 .RI [ dir ]
 .br
 .B pbuild
@@ -27,6 +28,7 @@ pbuild \- build a project consisting of a set of packages
 .IR dist ]
 .B --repoquery
 .RI [ deptype: ] dep
+.RI [ dir ]
 
 .SH DESCRIPTION
 The pbuild tool builds a project consisting of a set of packages stored
