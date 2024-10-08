@@ -34,7 +34,7 @@ sub create_ua {
   my $agent = $opt{'agent'} || 'openSUSE build script';
   my $timeout = $opt{'timeout'} || 60;
   my $ssl_opts = $opt{'ssl_opts'} || { verify_hostname => 1 };
-  my $ua = LWP::UserAgent->new(agent => $agent, timeout => $timeout, ssl_opts => $ssl_opts);
+  my $ua = LWP::UserAgent->new(agent => $agent, timeout => $timeout, ssl_opts => $ssl_opts, keep_alive => 3);
   $ua->env_proxy;
   $ua->cookie_jar($opt{'cookie_jar'}) if $opt{'cookie_jar'};
   return $ua;
