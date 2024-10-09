@@ -2001,11 +2001,12 @@ exitcode=0
 # post build work
 # TODO: don't hardcode. instead run scripts in a directory as it's done for the checks
 if test -n "$RPMS" -a -d "$BUILD_ROOT/.build.oldpackages" ; then
+    rm -f "$BUILD_ROOT/.build/.same_result_marker"
     TIME_BUILDCMP=$SECONDS
     recipe_compare_oldpackages
     TIME_BUILDCMP=$(( $SECONDS - $TIME_BUILDCMP ))
     # no need to create deltas if the build is the same
-    if test ! -e $BUILD_ROOT/.build/.same_result_marker ; then
+    if test ! -e "$BUILD_ROOT/.build/.same_result_marker" ; then
 	TIME_DELTARPMS=$SECONDS
 	recipe_create_deltarpms
 	TIME_DELTARPMS=$(( $SECONDS - $TIME_DELTARPMS ))
