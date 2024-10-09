@@ -370,11 +370,11 @@ recipe_compare_oldpackages() {
 	echo "... comparing built packages with the former built"
 	if chroot $BUILD_ROOT /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/RPMS" "$TOPDIR/SRPMS"; then 
 	    chroot $BUILD_ROOT touch /.build/.same_result_marker
-	    # XXX: dirty build service hack. fix bs_worker. Search for
-	    # 'same_result_marker' for traces of a first try to get rid of this
-	    if test -n "$REASON" -a -n "$DISTURL" ; then 
-		exitcode=2
-	    fi
+	    chroot $BUILD_ROOT touch /.build.packages/same_result_marker
+	    # dirty build service hack. return exit status 2 to bs_worker for unchanged builds
+	    case "$REASON" in
+		Building\ *\ for\ project\ *\ repository\ *\ srcmd5\ *) exitcode=2 ;;
+	    esac
 	fi
     fi   
 }
