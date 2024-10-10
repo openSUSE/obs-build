@@ -124,10 +124,6 @@ recipe_build_mkosi() {
         rmdir "$d"
     done
 
-    # copy recipe source file so that it can be published
-    cp "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" \
-        "$BUILD_ROOT/$TOPDIR/OTHER/"
-
     # if present, compress the manifest file(s) which can be quite large
     for f in "$BUILD_ROOT/$TOPDIR"/OTHER/*.manifest; do
         if [ ! -f "$f" ]; then
