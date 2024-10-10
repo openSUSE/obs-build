@@ -128,9 +128,11 @@ sub repoquery {
     } else {
       $_->[2] = $1;
     }
+    $_->[2] = qr/^\Q$_->[2]\E/ if defined $_->[2];
     if ($_->[0] ne 'name' && $_->[0] ne 'provides') {
       die("provides '$_->[1]' cannot be complex\n") if $_->[3];
       die("provides '$_->[1]' cannot use debian or\n") if $_->[1] =~ /\|/;
+      die("provides '$_->[1]' not supported\n") unless defined $_->[2];
     }
   }
   my $binarytype = $bconf->{'binarytype'};
@@ -163,24 +165,24 @@ sub repoquery {
 	    }
 	    next;
 	  }
-	  if ($q->[1] =~ /\|/) {
-	    # debian or, cannot pre-filter
+	  if (!defined($q->[2])) {
+	    # cannot pre-filter (e.g. debian or)
 	    for my $d (@$dd) {
 	      if (matchdep($d, $q->[1], $binarytype)) {
 	        $match = 1;
 	        last;
 	      }
 	    }
-	    next;
-	  }
-	  for my $d (grep {/^\Q$q->[2]\E/} @$dd) {
-	    if (matchdep($d, $q->[1], $binarytype)) {
-	      $match = 1;
-	      last;
+	  } else {
+	    for my $d (grep {/$q->[2]/} @$dd) {
+	      if (matchdep($d, $q->[1], $binarytype)) {
+	        $match = 1;
+	        last;
+	      }
 	    }
 	  }
 	} else {
-	  for my $d (grep {/^\Q$q->[2]\E/} @$dd) {
+	  for my $d (grep {/$q->[2]/} @$dd) {
 	    if (matchdep($q->[1], $d, $binarytype)) {
 	      $match = 1;
 	      last;
