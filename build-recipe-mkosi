@@ -92,6 +92,9 @@ recipe_build_mkosi() {
     local image_version=""
     if [ -n "$RELEASE" ]; then
         image_version="--image-version=${RELEASE}"
+    else
+        # Provide some fallback value for %v specifiers
+        image_version="--image-version=0"
     fi
     set -- mkosi \
         --directory "$TOPDIR/SOURCES" \
