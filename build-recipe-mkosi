@@ -132,6 +132,16 @@ recipe_build_mkosi() {
         gzip -9 -f "$f"
     done
 
+    cat <<-EOF > "$BUILD_ROOT/checksum.sh"
+	echo "Create sha256 files..."
+	cd "/$TOPDIR"/OTHER
+	for f in *; do
+	    [ -f "\$f" ] || continue
+	    /usr/bin/sha256sum "\$f" > "\$f.sha256"
+	done
+	EOF
+    chroot "$BUILD_ROOT" sh /checksum.sh
+
     # shellcheck disable=SC2034
     BUILD_SUCCEEDED=true
 }
