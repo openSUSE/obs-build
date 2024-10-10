@@ -67,13 +67,11 @@ sub prepare {
   my ($ctx, $repos, $hostrepos) = @_;
   my $dep2pkg = PBuild::Expand::configure_repos($ctx->{'bconf'}, $repos);
   my %dep2src;
-  my %subpacks;
   for my $n (sort keys %$dep2pkg) {
-    my $bin = $dep2pkg->{$n};
-    my $sn = $bin->{'source'};
-    $sn = $n unless defined $n;
-    $dep2src{$n} = $sn;
+    my $sn = $dep2pkg->{$n}->{'source'};
+    $dep2src{$n} = defined($sn) ? $sn : $n;
   }
+  my %subpacks;
   push @{$subpacks{$dep2src{$_}}}, $_ for keys %dep2src;
   $ctx->{'dep2src'} = \%dep2src;
   $ctx->{'dep2pkg'} = $dep2pkg;
