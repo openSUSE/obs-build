@@ -442,17 +442,19 @@ sub finishjob {
     die("fatal build error, see $buildroot/.build.log for more information\n");
   }
   if ($ret == 3) {
-    $ret = 1;
+    $ret = 1;	# map badhost to build failure
   }
-  if ($ret == 9) {
-    rename_build_result($vm, $buildroot);
-    die("XXX: dynamic buildreqs not implemented yet");
-  }
-  
+
+  rename_build_result($vm, $buildroot) if $ret == 0 || $ret == 9;
+
   if (!$ret && (-l "$buildroot/.build.log" || ! -s _)) {
     unlink("$buildroot/.build.log");
     PBuild::Util::writestr("$buildroot/.build.log", undef, "build created no logfile!\n");
     $ret = 1;
+  }
+
+  if ($ret == 9) {
+    die("XXX: dynamic buildreqs not implemented yet");
   }
   if ($ret) {
     my $result = { '_log' => "$buildroot/.build.log" };
