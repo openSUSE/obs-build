@@ -142,8 +142,8 @@ sub vm_type_special {
   my ($opts, $opt, $origopt, $args) = @_;
   my $arg;
   $arg = Build::Options::getarg($origopt, $args, 1) unless $opt eq 'zvm' || $opt eq 'lxc';
-  $opts->{'vm-disk'} = $arg if defined $arg;
   $opts->{'vm-type'} = $opt;
+  $opts->{'vm-disk'} = $arg if defined $arg;
 }
 
 sub ccache_special {
@@ -160,7 +160,7 @@ my %known_codes = map {$_ => 1} @codes;
 sub result_rebuild_special {
   my ($opts, $opt, $origopt, $args) = @_;
   my $arg;
-  $arg = Build::Options::getarg($origopt, $args, 1) if @$args && (ref($args->[0]) || $args->[0] !~ /\//);
+  $arg = Build::Options::getarg($origopt, $args, 1) if @$args && (ref($args->[0]) || $args->[0] !~ /^\.|\//);
   if (!defined($arg) || $arg eq 'all') {
     push @{$opts->{"$opt-code"}}, 'all';
   } elsif ($known_codes{$arg}) {
