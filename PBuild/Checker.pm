@@ -346,7 +346,7 @@ sub genmeta_product {
 sub genmeta {
   my ($ctx, $p, $edeps, $hdeps) = @_;
   my $buildtype = $p->{'buildtype'};
-  return genmeta_image($ctx, $p, $edeps) if $buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'preinstallimage';
+  return genmeta_image($ctx, $p, $edeps) if $buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'preinstallimage' || $buildtype eq 'mkosi' || $buildtype eq 'simpleimage';
   return genmeta_product($ctx, $p, $edeps) if $buildtype eq 'productcompose';
   my $dep2pkg = $p->{'native'} ? $ctx->{'dep2pkg_host'} : $ctx->{'dep2pkg'};
   my $metacache = $ctx->{'metacache'};
@@ -550,7 +550,7 @@ sub check {
   my ($ctx, $p, $incycle) = @_;
 
   my $buildtype = $p->{'buildtype'};
-  return check_image($ctx, $p) if $buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'preinstallimage';
+  return check_image($ctx, $p) if $buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'preinstallimage' || $buildtype eq 'mkosi' || $buildtype eq 'simpleimage';
   return check_product($ctx, $p) if $buildtype eq 'productcompose';
 
   my $packid = $p->{'pkg'};
@@ -829,7 +829,7 @@ sub build {
       $jobopts{'ccache-type'} = $opts->{'ccache-type'};
     }
   }
-  if ($kiwimode || $buildtype eq 'buildenv' || $buildtype eq 'preinstallimage') {
+  if ($kiwimode || $buildtype eq 'buildenv' || $buildtype eq 'preinstallimage' || $buildtype eq 'mkosi' || $buildtype eq 'simpleimage') {
     @bdeps = (1, @$edeps);      # reuse edeps packages, no need to expand again
   } else {
     print "=== builddeps expansion\n" if $expand_dbg;
