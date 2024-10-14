@@ -115,7 +115,7 @@ sub expand_deps {
   my ($p, $bconf, $subpacks, $cross) = @_;
   my $buildtype = $p->{'buildtype'} || '';
   return expand_deps_product($p, $bconf, $subpacks, $cross) if $buildtype eq 'productcompose';
-  return expand_deps_image($p, $bconf, $subpacks, $cross) if $buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'fissile' || $buildtype eq 'preinstallimage' || $buildtype eq 'mkosi' || $buildtype eq 'simpleimage';
+  return expand_deps_image($p, $bconf, $subpacks, $cross) if $buildtype eq 'kiwi' || $buildtype eq 'docker' || $buildtype eq 'fissile' || $buildtype eq 'preinstallimage' || $buildtype eq 'mkosi' || $buildtype eq 'simpleimage' || $buildtype eq 'appimage' || $buildtype eq 'livebuild';
   delete $p->{'dep_experror'};
   if ($p->{'error'}) {
     $p->{'dep_expanded'} = [];
