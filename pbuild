@@ -518,7 +518,7 @@ while (1) {
       $details = ": $result->{$pkg}->{'details'}" if $result->{$pkg}->{'details'};
     }
     print "$pkg: $code$details\n";
-    exit($code eq 'broken' || $code eq 'failed' || $code eq 'unresolvable' ? 1 : 0);
+    exit PBuild::Result::has_failed_code($opts, $code);
   }
 
   # mix in old result from other packages if in single package mode
@@ -571,14 +571,13 @@ while (1) {
 
   # if the build was successful, update artifact information and the local repo
   if ($bininfo) {
-    PBuild::LocalRepo::update_gbininfo($builddir, $p->{'pkg'}, $bininfo);
-    delete $repos[0]->{'gbininfo'};
+    $repomgr->updatelocalgbininfo($myarch, $p->{'pkg'}, $bininfo);
     if ($p->{'useforbuildenabled'}) {
       # update with new local bin information
       if ($p->{'native'}) {
-        $repomgr->updatelocalrepo($bconf, $hostarch, $builddir, \%pkgsrc, \@pkgs_native);
+        $repomgr->updatelocalrepo($bconf, $hostarch, \%pkgsrc, \@pkgs_native);
       } else {
-        $repomgr->updatelocalrepo($bconf, $myarch, $builddir, \%pkgsrc, \@pkgs_target);
+        $repomgr->updatelocalrepo($bconf, $myarch, \%pkgsrc, \@pkgs_target);
       }
       # we also need a new checker
       undef $ctx;

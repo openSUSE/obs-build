@@ -69,12 +69,16 @@ sub print_result {
   return $found_failures;
 }
 
+sub has_failed_code {
+  my ($opts, $code) = @_;
+  return $code_failures{$code || 'unknown'} ? 1 : 0;
+}
+
 sub has_failed {
   my ($opts, $builddir, $pkg) = @_;
   my $r = PBuild::Util::retrieve("$builddir/.pbuild/_result", 1);
   die("pbuild has not run yet for $builddir\n") unless $r;
-  my $code = $r->{$pkg}->{'code'} || 'unknown';
-  return $code_failures{$code} ? 1 : 0;
+  return has_failed_code($opts, $r->{$pkg}->{'code'});
 }
 
 1;

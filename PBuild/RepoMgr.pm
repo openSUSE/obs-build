@@ -23,6 +23,7 @@ package PBuild::RepoMgr;
 use strict;
 
 use PBuild::Util;
+use PBuild::LocalRepo;
 use PBuild::RemoteRepo;
 use PBuild::RemoteRegistry;
 use PBuild::Verify;
@@ -99,11 +100,11 @@ sub addemptyrepo {
 # Update the local reposiory with new binary data
 #
 sub updatelocalrepo {
-  my ($repos, $bconf, $myarch, $builddir, $pkgsrc, $pkgs) = @_;
+  my ($repos, $bconf, $myarch, $pkgsrc, $pkgs) = @_;
   my $id = "$myarch/local";
   my $repo = $repos->{$id};
   die("local repo does not exist\n") unless $repo;
-  my $bins = PBuild::LocalRepo::fetchrepo($bconf, $myarch, $builddir, $pkgsrc, $pkgs);
+  my $bins = PBuild::LocalRepo::fetchrepo($bconf, $myarch, $repo->{'dir'}, $pkgsrc, $pkgs);
   $_->{'repoid'} = $id for @$bins;
   $repo->{'bins'} = $bins;
 }
@@ -261,6 +262,18 @@ sub get_gbininfo {
   $repo->{'gbininfo'} = $gbininfo;
   $repo->{'gbininfo_meta'} = $meta;
   return $gbininfo;
+}
+
+#
+# Update the local reposiory with the artifact information of a succeeded build
+#
+sub updatelocalgbininfo {
+  my ($repos, $myarch, $pkg, $bininfo) = @_;
+  my $id = "$myarch/local";
+  my $repo = $repos->{$id};
+  die("local repo does not exist\n") unless $repo;
+  PBuild::LocalRepo::update_gbininfo($repo->{'dir'}, $pkg, $bininfo);
+  delete $repo->{'gbininfo'};		# flush our cache
 }
 
 1;
