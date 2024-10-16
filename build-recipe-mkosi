@@ -92,6 +92,9 @@ recipe_build_mkosi() {
     local image_version=""
     if [ -n "$RELEASE" ]; then
         image_version="--image-version=${RELEASE}"
+    else
+        # Provide some fallback value for %v specifiers
+        image_version="--image-version=0"
     fi
     set -- mkosi \
         --directory "$TOPDIR/SOURCES" \
@@ -121,10 +124,6 @@ recipe_build_mkosi() {
         rmdir "$d"
     done
 
-    # copy recipe source file so that it can be published
-    cp "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" \
-        "$BUILD_ROOT/$TOPDIR/OTHER/"
-
     # if present, compress the manifest file(s) which can be quite large
     for f in "$BUILD_ROOT/$TOPDIR"/OTHER/*.manifest; do
         if [ ! -f "$f" ]; then
@@ -132,6 +131,16 @@ recipe_build_mkosi() {
         fi
         gzip -9 -f "$f"
     done
+
+    cat <<-EOF > "$BUILD_ROOT/checksum.sh"
+	echo "Create sha256 files..."
+	cd "/$TOPDIR"/OTHER
+	for f in *; do
+	    [ -f "\$f" ] || continue
+	    /usr/bin/sha256sum "\$f" > "\$f.sha256"
+	done
+	EOF
+    chroot "$BUILD_ROOT" sh /checksum.sh
 
     # shellcheck disable=SC2034
     BUILD_SUCCEEDED=true
