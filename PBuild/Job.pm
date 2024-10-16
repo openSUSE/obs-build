@@ -460,7 +460,6 @@ sub finishjob {
     my $result = { '_log' => "$buildroot/.build.log" };
     return ('failed', $result);
   }
-  rename_build_result($vm, $buildroot);
   my $result = collect_result($p, $buildroot);
   $result->{'_log'} = "$buildroot/.build.log";
   return ('succeeded', $result);
