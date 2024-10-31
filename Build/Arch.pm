@@ -248,7 +248,7 @@ sub queryfiles {
   # we use filter_cb here so that Archive::Tar skips the file contents
   $tar->read($handle, 1, {'filter_cb' => sub {
     my ($entry) = @_;
-    push @files, $entry->name unless $entry->is_longlink || (@files && $files[-1] eq $entry->name);
+    push @files, $entry->full_path unless $entry->is_longlink || (@files && $files[-1] eq $entry->full_path);
     return 0;
   }});
   shift @files if @files && $files[0] eq '.PKGINFO';
