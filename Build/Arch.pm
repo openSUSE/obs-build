@@ -159,13 +159,12 @@ sub parse {
     my @assets = get_assets(\%vars, $asuf);
     push @{$ret->{'remoteassets'}}, @assets if @assets;
   }
-  my @exclarch;
-  push @exclarch, @{$vars{'arch'}};
-  @exclarch = grep {$_ ne "any"} @exclarch;
-  # unify
-  my %exclarch = map {$_ => 1} @exclarch;
-  @exclarch = sort keys %exclarch;
-  $ret->{'exclarch'} = \@exclarch if @exclarch;
+  my %exclarch = map {$_ => 1} @{$vars{'arch'} || []};
+  if (%exclarch && !$exclarch{'any'}) {
+    # map to obs scheduler names
+    $exclarch{'i386'} = $exclarch{'i486'} = $exclarch{'i586'} = $exclarch{'i686'} = 1 if $exclarch{'i386'} || $exclarch{'i486'} || $exclarch{'i586'} || $exclarch{'i686'};
+    $ret->{'exclarch'} = [ sort keys %exclarch ];
+  }
   return $ret;
 }
 
