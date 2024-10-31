@@ -45,7 +45,7 @@ zypper() {
 	    globalopts[${#globalopts[@]}]="$1"
 	    shift
 	    ;;
-	*)  
+	*)
 	    cmd=$1
 	    shift
 	    break
@@ -103,7 +103,7 @@ apt_get() {
 	    globalopts[${#globalopts[@]}]="$1"
 	    shift
 	    ;;
-	*)  
+	*)
 	    cmd=$1
 	    shift
 	    break
@@ -136,7 +136,7 @@ dnf() {
 	    globalopts[${#globalopts[@]}]="$1"
 	    shift
 	    ;;
-	*)  
+	*)
 	    cmd=$1
 	    shift
 	    break
@@ -166,7 +166,7 @@ yum() {
 	    globalopts[${#globalopts[@]}]="$1"
 	    shift
 	    ;;
-	*)  
+	*)
 	    cmd=$1
 	    shift
 	    break
@@ -342,6 +342,12 @@ apt-get)
     ;;
 curl)
     curl "$@"
+    ;;
+dnf)
+    dnf "$@"
+    ;;
+yum)
+    yum "$@"
     ;;
 *)
     echo "obs-docker-support: unsupported mode ${0##*/}" >&2
