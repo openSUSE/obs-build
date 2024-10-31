@@ -159,6 +159,13 @@ sub parse {
     my @assets = get_assets(\%vars, $asuf);
     push @{$ret->{'remoteassets'}}, @assets if @assets;
   }
+  my @exclarch;
+  push @exclarch, @{$vars{'arch'}};
+  @exclarch = grep {$_ ne "any"} @exclarch;
+  # unify
+  my %exclarch = map {$_ => 1} @exclarch;
+  @exclarch = sort keys %exclarch;
+  $ret->{'exclarch'} = \@exclarch if @exclarch;
   return $ret;
 }
 
