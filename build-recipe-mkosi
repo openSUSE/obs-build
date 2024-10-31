@@ -141,6 +141,7 @@ recipe_build_mkosi() {
 	done
 	EOF
     chroot "$BUILD_ROOT" sh /checksum.sh
+    rm -f "$BUILD_ROOT/checksum.sh"
 
     # shellcheck disable=SC2034
     BUILD_SUCCEEDED=true
