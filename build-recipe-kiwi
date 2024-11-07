@@ -829,8 +829,8 @@ kiwi_setup_extracontainers() {
 		test -f _tmp_oci || cleanup_and_exit 1 "oci-archive creation failed for $c"
 		d="/$t"
 		mkdir -p "_obsrepositories${d%/*}"	# kiwi is weird
-		mv _tmp_oci "_obsrepositories$d"
-		echo "created oci-archive container _obsrepositories$d"
+		mv _tmp_oci "_obsrepositories$d.ociarchive"
+		echo "created oci-archive container _obsrepositories$d.ociarchive"
 	    fi
 	done
     done
