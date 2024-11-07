@@ -819,15 +819,16 @@ kiwi_setup_extracontainers() {
     if test -z "$extracontainers" ; then
 	return
     fi
+    test -x /usr/bin/skopeo || cleanup_and_exit 1 "need skopeo for container conversion"
     extracontainers=" $extracontainers "
     local c t d
     for c in $(find . -name \*.tar -print -o -name \*.tar.gz -print) ; do
-	for t in $(skopeo list-tags "docker-archive:$c" | sed -n -e 's/.*"\(.*\)".*/\1/' -e '/:/p') ; do
+	for t in $(/usr/bin/skopeo list-tags "docker-archive:$c" | sed -n -e 's/.*"\(.*\)".*/\1/' -e '/:/p') ; do
 	    if test "$extracontainers" != "${extracontainers/ $t }" ; then
-		skopeo copy "docker-archive:$c" "oci-archive:_tmp_oci:$t"
+		/usr/bin/skopeo copy "docker-archive:$c" "oci-archive:_tmp_oci:$t"
 		test -f _tmp_oci || cleanup_and_exit 1 "oci-archive creation failed for $c"
 		d="/$t"
-		mkdir -p "_obsrepositories${d%/*}"	# bah! kiwi is weird
+		mkdir -p "_obsrepositories${d%/*}"	# kiwi is weird
 		mv _tmp_oci "_obsrepositories$d"
 		echo "created oci-archive container _obsrepositories$d"
 	    fi
