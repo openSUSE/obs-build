@@ -814,6 +814,27 @@ createrepo_debian_dist_kiwi() {
     done
 }
 
+kiwi_setup_extracontainers() {
+    extracontainers=$(kiwi_query_recipe extracontainers)
+    if test -z "$extracontainers" ; then
+	return
+    fi
+    extracontainers=" $extracontainers "
+    local c t d
+    for c in $(find . -name \*.tar -print -o -name \*.tar.gz -print) ; do
+	for t in $(skopeo list-tags "docker-archive:$c" | sed -n -e 's/.*"\(.*\)".*/\1/' -e '/:/p') ; do
+	    if test "$extracontainers" != "${extracontainers/ $t }" ; then
+		skopeo copy "docker-archive:$c" "oci-archive:_tmp_oci:$t"
+		test -f _tmp_oci || cleanup_and_exit 1 "oci-archive creation failed for $c"
+		d="/$t"
+		mkdir -p "_obsrepositories${d%/*}"	# bah! kiwi is weird
+		mv _tmp_oci "_obsrepositories$d"
+		echo "created oci-archive container _obsrepositories$d"
+	    fi
+	done
+    done
+}
+
 recipe_build_kiwi() {
     imagetype=$(kiwi_query_recipe imagetype)
     imagename=$(kiwi_query_recipe filename)
@@ -875,6 +896,12 @@ recipe_build_kiwi() {
 	    fi
         fi
     done
+
+    if test "$imagetype" != product -a -d $BUILD_ROOT/$TOPDIR/SOURCES/containers ; then
+	cd $BUILD_ROOT/$TOPDIR/SOURCES/containers
+	kiwi_setup_extracontainers
+	cd $BUILD_ROOT/$TOPDIR/SOURCES/repos
+    fi
 
     # unpack root tar
     for t in $BUILD_ROOT/$TOPDIR/SOURCES/root.tar* ; do

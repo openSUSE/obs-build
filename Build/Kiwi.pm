@@ -477,10 +477,37 @@ sub kiwiparse {
     $repoprio{$prp} = $repository->{'sortprio'} if defined $repository->{'priority'};
   }
 
+  # Find containers for the image
+  my @extracontainers;
+  for my $containers (@{$kiwi->{'containers'} || []}) {
+    my $source = $containers->{'source'};
+    my $prp;
+    if ($source eq 'obsrepositories:/') {
+      $prp = '_obsrepositories/';
+    } elsif ($source =~ /^obs:\/{1,3}([^\/]+)\/([^\/]+)\/?$/) {
+      $prp = "$1/$2";
+      $prp = "obs:/$prp" if defined($urlmapper) && !$urlmapper;
+    } elsif ($source =~ /:/) {
+      $prp = $urlmapper->($source);
+    }
+    $source = '' if $source =~ /:/;
+    push @containerrepos, $prp if $prp && $prp ne '_obsrepositories/';
+    for my $container (@{$containers->{'container'} || []}) {
+      my ($path, $name, $tag) = ($container->{'path'}, $container->{'name'}, $container->{'tag'});
+      $name = "$path/$name" if defined $path;
+      $name = "$source/$name" if $source;
+      $name =~ s/\/+/\//g;
+      $name =~ s/^\/+//;
+      $name .= defined($tag) ? ":$tag" : ':latest';
+      push @packages, "container:$name";
+      push @extracontainers, $name;
+    }
+  }
+
   # Find packages for the image
   my @pkgs;
   my $patterntype;
-  for my $packages (@{$kiwi->{'packages'}}) {
+  for my $packages (@{$kiwi->{'packages'} || []}) {
     next if $packages->{'type'} && $packages->{'type'} ne 'image' && $packages->{'type'} ne 'bootstrap';
     # we could skip the sections also when no profile is used,
     # but don't to stay backward compatible
@@ -574,6 +601,7 @@ sub kiwiparse {
       $ret->{'exclarch'} = [];		# all profiles excluded
     }
   }
+  $ret->{'extracontainers'} = [ unify(@extracontainers) ] if @extracontainers;
   return $ret;
 }
 
