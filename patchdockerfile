@@ -23,10 +23,6 @@
 use strict;
 use warnings;
 
-my $install_docker_support = "COPY .obs-docker-support /usr/local/sbin/obs-docker-support\n" .
-                             "RUN obs-docker-support --install\n";
-my $uninstall_docker_support = "RUN obs-docker-support --uninstall\n";
-
 my @sections = ( [] );
 while (<STDIN>) {
   $_ .= "\n" unless /\n$/s;
@@ -43,9 +39,9 @@ for my $s (@sections) {
     print join('', @$s);
     next;
   }
-  # do not install docker support if no RUN is used
-  # (we always do it for the last stage to get the basepackage list)
-  if ($s != $sections[-1] && !grep {/^\s*RUN/i} @$s) {
+  my $do_upload_packages = $s == $sections[-1] ? '--upload-packages ' : '';
+  # do not install docker support if no RUN is used and we do not want the package list
+  if (!$do_upload_packages && !grep {/^\s*RUN/i} @$s) {
     print join('', @$s);
     next;
   }
@@ -62,6 +58,11 @@ for my $s (@sections) {
     }
     $idx++;
   }
+
+  my $install_docker_support = "COPY .obs-docker-support /usr/local/sbin/obs-docker-support\n" .
+                               "RUN obs-docker-support $do_upload_packages--install\n";
+  my $uninstall_docker_support = "RUN obs-docker-support $do_upload_packages--uninstall\n";
+
   # patch in docker support commands
   $s->[$install_idx || 0] .= $install_docker_support;
   substr($s->[$uninstall_idx], 0, 0, $uninstall_docker_support) if defined $uninstall_idx;

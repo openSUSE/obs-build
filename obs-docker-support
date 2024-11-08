@@ -275,6 +275,11 @@ remove_links() {
 }
 
 obs_docker_support() {
+    local do_upload_packages
+    if test "x$1" == x--upload-packages ; then
+	do_upload_packages=true
+	shift
+    fi
     case "$1" in
     --install|-i)
 	data_url=http://localhost:80
@@ -300,7 +305,9 @@ EOF
 	    test -e /var/lib/apt && mv /var/lib/apt /var/lib/apt.obssave
 	    /usr/bin/apt-get -o Dir::Etc::SourceList=$LOCAL_APTREPOS_D/obssource -o Dir::Etc::SourceParts=$LOCAL_APTREPOS_D update
 	fi
-	upload_packages basepackages
+	if test -n "$do_upload_packages" ; then
+	    upload_packages basepackages
+	fi
     ;;
     --uninstall|-u)
 	rm -rf "$LOCAL_REPOS_D"
@@ -311,8 +318,10 @@ EOF
 	    rm -rf /var/lib/apt
 	    mv /var/lib/apt.obssave /var/lib/apt
 	fi
-	upload_packages packages
-	upload_packages pkgsummaries
+	if test -n "$do_upload_packages" ; then
+	    upload_packages packages
+	    upload_packages pkgsummaries
+	fi
 	rm -f /usr/local/sbin/obs-docker-support
     ;;
     esac
