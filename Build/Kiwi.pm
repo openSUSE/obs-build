@@ -405,7 +405,7 @@ sub kiwiparse {
 	}
 	die("derived_from url not using obs:/ scheme: $derived\n") unless defined $name;
 	push @packages, "container:$name";
-	$basecontainer = "container:$name";
+	$basecontainer = $name;
 	push @containerrepos, $prp if $prp;
       }
 

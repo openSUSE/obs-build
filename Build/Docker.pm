@@ -350,8 +350,8 @@ sub parse {
 	    push @containerrepos, $prp if $prp;
 	  }
           $container .= ':latest' unless $container =~ /:[^:\/]+$/;
-          $container = "container:$container";
           $basecontainer = $container;
+          $container = "container:$container";
           push @{$ret->{'deps'}}, $container unless grep {$_ eq $container} @{$ret->{'deps'}};
         }
 	$as_container{$args[2]} = [ $args[0], $basecontainer ] if @args > 2 && lc($args[1]) eq 'as';
@@ -400,8 +400,9 @@ sub parse {
   }
   if ($basecontainer) {
     # always put the base container last
-    @{$ret->{'deps'}} = grep {$_ ne $basecontainer} @{$ret->{'deps'}};
-    push @{$ret->{'deps'}}, $basecontainer;
+    my $container = "container:$basecontainer";
+    @{$ret->{'deps'}} = grep {$_ ne $container} @{$ret->{'deps'}};
+    push @{$ret->{'deps'}}, $container;
   }
   push @{$ret->{'deps'}}, '--dorecommends--', '--dosupplements--' if $plusrecommended;
   push @{$ret->{'deps'}}, '--unorderedimagerepos' if $unorderedrepos;
