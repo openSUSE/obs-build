@@ -189,7 +189,8 @@ recipe_build_docker() {
 	test -e "$i" && ln -f "$i" "$BUILD_ROOT/$TOPDIR/SOURCES/repos/build-webcache/${i##*/build-webcache-}"
     done
 
-    # exclude repos directory
+    # exclude repos/containers directory
+    echo containers >> "$BUILD_ROOT/$TOPDIR/SOURCES/.dockerignore"
     echo repos >> "$BUILD_ROOT/$TOPDIR/SOURCES/.dockerignore"
 
     # find tags, first look into recipe file
@@ -332,21 +333,39 @@ recipe_build_docker() {
     test -s "containers/annotation" && args=("${args[@]}" --annotationfile containers/annotation)
     perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::showcontainerinfo -- "${args[@]}" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" "$FILENAME.tar" "$ALLTAGS" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.containerinfo"
 
-    # copy over .packages files
-    for i in basepackages packages ; do
-	test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" && cp "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.$i"
-    done
-    if test -e "$BUILD_ROOT/$TOPDIR/SOURCES/repos/.pkgsummaries" ; then
-	for i in pkgsummaries ; do
+    if test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/packages" ; then
+	# copy over .packages files
+	for i in basepackages packages ; do
 	    test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" && cp "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.$i"
 	done
+	if test -e "$BUILD_ROOT/$TOPDIR/SOURCES/repos/.pkgsummaries" ; then
+	    for i in pkgsummaries ; do
+		test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" && cp "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD/$i" "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.$i"
+	    done
+	fi
+    else
+	# build did not create packages file, try introspection
+	cp --remove-destination "$BUILD_DIR/create_container_package_list" "$BUILD_ROOT/tmp/create_container_package_list"
+	echo "creating package information"
+	chroot "$BUILD_ROOT" /bin/bash /tmp/create_container_package_list "$TOPDIR/DOCKER/$FILENAME.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.packages"
+	if test -e "$BUILD_ROOT/$TOPDIR/SOURCES/repos/.pkgsummaries" ; then
+	    echo "creating package summaries information"
+	    chroot "$BUILD_ROOT" /bin/bash /tmp/create_container_package_list --summaries "$TOPDIR/DOCKER/$FILENAME.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.pkgsummaries"
+	fi
+	local basecontainer=$(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::show -- "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" basecontainer)
+	if test -n "$basecontainer" ; then
+	    echo "creating base package information for base container $basecontainer"
+	    $DOCKER_CMD save --output "/tmp/basecontainer.tar" "$basecontainer"
+	    chroot "$BUILD_ROOT" /bin/bash /tmp/create_container_package_list "/tmp/basecontainer.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.basepackages"
+	fi
+	rm -f "$BUILD_ROOT/tmp/create_container_package_list"
     fi
     rm -rf "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD"
 
     # create sbom if requested
     for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom | sort -u) ; do
 	echo "Generating $format sbom file"
-	generate_sbom --format "$format" --container-archive "$TOPDIR/DOCKER/$FILENAME.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.${format/cyclonedx/cdx}.json" || cleanup_and_exit 1 "generate_sbom failed!"
+	generate_sbom --format "$format" --container-archive "$BUILD_ROOT/$TOPDIR/DOCKER/$FILENAME.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.${format/cyclonedx/cdx}.json" || cleanup_and_exit 1 "generate_sbom failed!"
 	test -s "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.${format/cyclonedx/cdx}.json" || rm -f "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.${format/cyclonedx/cdx}.json"
     done
  
