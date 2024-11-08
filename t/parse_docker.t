@@ -26,7 +26,7 @@ $expected = {
   'deps' => ['container:opensuse/tumbleweed:latest', 'container:opensuse/leap:15.2'],
   'path' => [],
   'imagerepos' => [],
-  'basecontainer' => 'container:opensuse/leap:15.2',
+  'basecontainer' => 'opensuse/leap:15.2',
 };
 
 $result = Build::Docker::parse($conf, \$dockerfile);
