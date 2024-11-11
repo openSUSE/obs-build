@@ -38,6 +38,7 @@ sub get_pristine_commit {
 
 sub export_blob {
   my ($blob, $out) = @_;
+  unlink($out);		# just in case
   my $fd;
   my $pid = open($fd, '|-');
   die("fork: $!\n") unless defined $pid;
@@ -86,6 +87,9 @@ my ($name, $version) = get_name_version();
 die("Could not determine name and version\n") unless defined $version;
 $version =~ s/-.*?$//;	# strip release
 
+# verify name/version and construct tar filename
+die("Bad package name in changelog\n") unless $name =~ /^[a-zA-Z][a-zA-Z0-9+\-\.]+$/s;
+die("Bad package version in changelog\n") unless $version =~ /^[a-zA-Z0-9][a-zA-Z0-9:~+\-\.]*$/s;
 my $tarfile = "${name}_$version.orig.tar";
 
 my $tag = $version;
@@ -94,6 +98,7 @@ $tag =~ s/:/%/g;
 $tag = "upstream/$tag";
 
 # export the (uncompressed) tar archive
+unlink("$to/$tarfile");		# just in case
 system('git', 'archive', '--format=tar', "--prefix=$name-$version/", "--output=$to/$tarfile", $tag) && die("git archive $tag failed: $?\n");
 
 # export pristine-tar entries if present

@@ -867,6 +867,7 @@ copy_sources() {
 	done
 	if test -f "$1/debian/control" ; then
 	    echo "exporting debian orig tarballs"
+	    rm -rf "$2/build.origtar"
 	    $BUILD_DIR/export_debian_orig_from_git "$1" "$2/build.origtar" || cleanup_and_exit 1 "export_debian_orig_from_git failed"
 	fi
     else
