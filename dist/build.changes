@@ -1,4 +1,25 @@
 -------------------------------------------------------------------
+Thu Nov 14 08:59:54 UTC 2024 - Adrian Schröter <adrian@suse.de>
+
+- container related:
+  * Implement support for the new <containers> element in kiwi recipes
+  * Fixes for SBOM and dependencies of multi stage container builds
+  * obs-docker-support: enable dnf and yum substitutions
+- Arch Linux:
+  * fix file path for Arch repo
+  * exclude unsupported arch
+  * Use root as download user
+- build-vm-qemu: force sv48 satp mode on riscv64
+- mkosi:
+  * Create .sha256 files after mkosi builds
+  * Always pass --image-version to mkosi
+- General improvements and bugfixes (mkosi, pbuild, appimage/livebuild,
+                                     obs work detection, documention, SBOM)
+- Support slsa v1 in unpack_slsa_provenance
+- generate_sbom: do not clobber spdx supplier
+- Harden export_debian_orig_from_git (boo#1230469)
+
+-------------------------------------------------------------------
 Fri Sep 13 08:18:51 UTC 2024 - Adrian Schröter <adrian@suse.de>
 
 - SBOM generation:
