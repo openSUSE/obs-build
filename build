@@ -1043,6 +1043,7 @@ run_shell() {
     fi
 }
 
+parse_args() {
 validate_init "$BUILD_CONF"
 
 while test -n "$1"; do
@@ -1366,6 +1367,14 @@ while test -n "$1"; do
 	validate_param "$PARAM" "$ARG"
     fi
 done
+}
+buildparams=()
+if [ -e _buildparams ] ; then
+    while read ARG ; do
+        buildparams+=("$ARG")
+    done < _buildparams
+fi
+parse_args "$@" "${buildparams[@]}"
 
 # validate params coming from the environment
 test -n "$BUILD_ARCH" && validate_param "--arch" "$BUILD_ARCH" BUILD_ARCH
