@@ -1043,9 +1043,8 @@ run_shell() {
     fi
 }
 
-parse_args() {
 validate_init "$BUILD_CONF"
-
+parse_args() {
 while test -n "$1"; do
     PARAM="$1"
     ARG="$2"
@@ -1368,8 +1367,14 @@ while test -n "$1"; do
     fi
 done
 }
+parse_args "$@"
+recipedir=.
+if [[ -n ${RECIPEFILES[0]} ]] ; then
+        recipedir=$(dirname "${RECIPEFILES[0]}")
+fi
+
 buildparams=()
-if [ -e _buildparams ] ; then
+if [ -e $recipedir/_buildparams ] ; then
     local n=0
     while read ARG ; do
         let n++
@@ -1380,9 +1385,9 @@ if [ -e _buildparams ] ; then
             continue
         fi
         buildparams+=("$ARG")
-    done < _buildparams
+    done < $recipedir/_buildparams
 fi
-parse_args "$@" "${buildparams[@]}"
+parse_args "${buildparams[@]}"
 
 # validate params coming from the environment
 test -n "$BUILD_ARCH" && validate_param "--arch" "$BUILD_ARCH" BUILD_ARCH
