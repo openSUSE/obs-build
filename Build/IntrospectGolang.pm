@@ -168,6 +168,8 @@ sub buildinfo  {
   my ($fh) = @_;
   my ($vers, $mod) = rawbuildinfo($fh);
   return undef unless defined $vers;
+  $vers =~ s/^go(.*)/\1/;
+
   my $buildinfo = { 'goversion' => $vers };
   my $lastmod;
   for my $l (split("\n", $mod || '')) {
