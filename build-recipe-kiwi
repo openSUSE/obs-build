@@ -377,7 +377,7 @@ build_kiwi_product() {
     # runs always as abuild user
     mkdir -p "$BUILD_ROOT/$TOPDIR/KIWIROOT"
     # XXX: again?
-    chroot "$BUILD_ROOT" chown -R abuild.abuild "$TOPDIR"
+    chroot "$BUILD_ROOT" chown -R abuild:abuild "$TOPDIR"
     chroot "$BUILD_ROOT" rm -rf "$TOPDIR/KIWIROOT"
     local checksums
     if test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/.createrepo_checksums" ; then
