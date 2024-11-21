@@ -860,10 +860,12 @@ sub spdx_encode_pkg {
   $spdx->{'homepage'} = $p->{'URL'} if $p->{'URL'};
 
   # Let the caller control the presence of external refs
-  if($p->{'external_refs'} // 1) {
+  if(!$p->{'skip_external_refs'}) {
     my $purlurl = gen_purl($p, $distro, $pkgtype);
     push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator', $purlurl } if $purlurl;
   }
+
+  $spdx->{'primaryPackagePurpose'} = $p->{'primaryPackagePurpose'} if $p->{'primaryPackagePurpose'};
 
   if (!$p->{'spdx_id'}) {
     my $spdxtype = "Package-$pkgtype";
@@ -948,7 +950,8 @@ sub spdx_encode_dist {
     NAME => $dist->{id},
     VERSION => $dist->{version_id},
     spdx_id => sprintf('SPDXRef-OperatingSystem-%s', gen_pkg_id($dist)),
-    external_refs => 0
+    primaryPackagePurpose => 'OPERATING-SYSTEM',
+    skip_external_refs => 1
   }, undef, undef, {});
 
 }
