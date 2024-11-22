@@ -21,7 +21,7 @@
 #
 ################################################################
 
-for i in rpm deb arch ; do
+for i in rpm deb arch apk ; do
     . "$BUILD_DIR/build-pkg-$i"
 done
 
@@ -73,6 +73,7 @@ pkg_autodetect_type() {
     test -e $BUILD_ROOT/.init_b_cache/rpms/rpm.rpm && PSUF=rpm
     test -e $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb && PSUF=deb
     test -e $BUILD_ROOT/.init_b_cache/rpms/pacman.arch && PSUF=arch
+    test -e $BUILD_ROOT/.init_b_cache/rpms/apk.apk && PSUF=apk
     if test -z "$PSUF" ; then
 	cleanup_and_exit 1 "could not autodetect package type"
     fi
@@ -82,7 +83,7 @@ pkg_set_type() {
     PSUF=`queryconfig binarytype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
     test "$PSUF" = UNDEFINED && PSUF=
     case "$PSUF" in
-	rpm|deb|arch)
+	rpm|deb|arch|apk)
 	    ;;
 	'')
 	    pkg_autodetect_type

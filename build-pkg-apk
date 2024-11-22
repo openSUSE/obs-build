@@ -1,0 +1,76 @@
+#
+# Apk specific functions.
+#
+################################################################
+#
+# Copyright (c) 2024 SUSE LLC
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+pkg_initdb_apk() {
+    mkdir -p $BUILD_ROOT/lib/apk/db
+    touch $BUILD_ROOT/lib/apk/db/installed
+    chroot $BUILD_ROOT apk add --initdb --no-progress
+}
+
+pkg_prepare_apk() {
+    :
+}
+
+pkg_erase_apk() {
+    exit 1
+}
+
+pkg_verify_installed_apk() {
+    return 1
+}
+
+pkg_cumulate_apk() {
+    return 1
+}
+
+pkg_install_apk() {
+    ( chroot $BUILD_ROOT apk add --allow-untrusted --no-progress .init_b_cache/$PKG.$PSUF || touch $BUILD_ROOT/exit ) | perl -ne '$|=1;/^(?:\(1\/1\) Installing |OK: )/||print'
+}
+
+pkg_finalize_apk() {
+    :
+}
+
+pkg_preinstall_apk() {
+    mkdir -p "$BUILD_INIT_CACHE/scripts"
+    $TAR < "$BUILD_INIT_CACHE/rpms/$PKG.apk"
+    rm -rf "$BUILD_INIT_CACHE/scripts/$PKG.post"
+    if test -e "$BUILD_INIT_CACHE/scripts/$PKG.run" -a -f .post-install -a ! -L .post-install ; then
+        cat .post-install > "$BUILD_INIT_CACHE/scripts/$PKG.post"
+	chmod 755 "$BUILD_INIT_CACHE/scripts/$PKG.post"
+    fi
+    rm -rf .PKGINFO
+    if test "$PKG" = busybox ; then
+	echo HELLO
+	for i in mount umount mkdir ls ln rm touch date sync sleep stat ldconfig mkswap swapon uname ; do
+	    test -e "bin/$i" || ln -fs busybox "bin/$i"
+	done
+    fi
+}
+
+pkg_runscripts_apk() {
+    if test -e "$BUILD_INIT_CACHE/scripts/$PKG.post" ; then
+        echo "running $PKG postinstall script"
+	( cd $BUILD_ROOT && chroot $BUILD_ROOT ".init_b_cache/scripts/$PKG.post" < /dev/null )
+    fi
+}

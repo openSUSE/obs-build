@@ -45,6 +45,7 @@ our $do_helm;
 our $do_flatpak;
 our $do_mkosi;
 our $do_productcompose;
+our $do_apk;
 
 sub import {
   for (@_) {
@@ -62,8 +63,9 @@ sub import {
     $do_flatpak = 1 if $_ eq ':flatpak';
     $do_mkosi = 1 if $_ eq ':mkosi';
     $do_productcompose = 1 if $_ eq ':productcompose';
+    $do_apk = 1 if $_ eq ':apk';
   }
-  $do_rpm = $do_deb = $do_kiwi = $do_productcompose = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = $do_fissile = $do_helm = $do_flatpak = $do_mkosi = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker && !$do_fissile && !$do_helm && !$do_flatpak && !$do_mkosi && !$do_productcompose;
+  $do_rpm = $do_deb = $do_kiwi = $do_productcompose = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = $do_fissile = $do_helm = $do_flatpak = $do_mkosi = $do_apk = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker && !$do_fissile && !$do_helm && !$do_flatpak && !$do_mkosi && !$do_productcompose && !$do_apk;
 
   if ($do_deb) {
     require Build::Deb;
@@ -103,6 +105,9 @@ sub import {
   }
   if ($do_productcompose) {
     require Build::ProductCompose;
+  }
+  if ($do_apk) {
+    require Build::Apk;
   }
 }
 
@@ -570,6 +575,8 @@ sub read_config {
       $config->{'type'} = 'dsc';
     } elsif (grep {$_ eq 'pacman'} @{$config->{'preinstall'} || []}) {
       $config->{'type'} = 'arch';
+    } elsif (grep {$_ eq 'apk-tools'} @{$config->{'preinstall'} || []}) {
+      $config->{'type'} = 'apk';
     }
     $config->{'type'} ||= 'UNDEFINED';
   }
@@ -577,6 +584,7 @@ sub read_config {
     $config->{'binarytype'} = 'rpm' if $config->{'type'} eq 'spec';
     $config->{'binarytype'} = 'deb' if $config->{'type'} eq 'dsc' || $config->{'type'} eq 'collax' || $config->{'type'} eq 'livebuild';
     $config->{'binarytype'} = 'arch' if $config->{'type'} eq 'arch';
+    $config->{'binarytype'} = 'apk' if $config->{'type'} eq 'apk';
     if (grep {$_ eq $config->{'type'}} qw{snapcraft appimage docker fissile kiwi mkosi}){
       if (grep {$_ eq 'rpm'} @{$config->{'preinstall'} || []}) {
         $config->{'binarytype'} = 'rpm';
@@ -1126,6 +1134,8 @@ sub addproviders {
       my $vv;
       if ($binarytype eq 'deb') {
 	$vv = Build::Deb::verscmp($pv, $rv, 1);
+      } elsif ($binarytype eq 'apk') {
+	$vv = Build::Apk::verscmp($pv, $rv, 1);
       } else {
 	$vv = Build::Rpm::verscmp($pv, $rv, 1);
       }
@@ -1271,6 +1281,7 @@ sub recipe2buildtype {
   $recipe =~ s/.*\///;
   $recipe =~ s/^_service:.*://;
   return 'arch' if $recipe eq 'PKGBUILD';
+  return 'apk' if $recipe eq 'APKBUILD';
   return 'collax' if $recipe eq 'build.collax';
   return 'snapcraft' if $recipe eq 'snapcraft.yaml';
   return 'appimage' if $recipe eq 'appimage.yml';
@@ -1343,6 +1354,7 @@ sub parse_typed {
   return Build::Fissile::parse($cf, $fn, @args) if $do_fissile && $buildtype eq 'fissile';
   return parse_simpleimage($cf, $fn, @args) if $buildtype eq 'simpleimage';
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $buildtype eq 'arch';
+  return Build::Apk::parse($cf, $fn, @args) if $do_apk && $buildtype eq 'apk';
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $buildtype eq 'collax';
   return parse_preinstallimage($cf, $fn, @args) if $buildtype eq 'preinstallimage';
   return Build::Helm::parse($cf, $fn, @args) if $buildtype eq 'helm';
@@ -1363,6 +1375,7 @@ sub query {
   return Build::Kiwi::queryiso($handle, %opts) if $do_kiwi && $binname =~ /\.iso$/;
   return Build::Arch::query($handle, %opts) if $do_arch && $binname =~ /\.pkg\.tar(?:\.gz|\.xz|\.zst)?$/;
   return Build::Arch::query($handle, %opts) if $do_arch && $binname =~ /\.arch$/;
+  return Build::Apk::query($handle, %opts) if $do_arch && $binname =~ /\.apk$/;
   return undef;
 }
 
@@ -1393,6 +1406,7 @@ sub queryhdrmd5 {
   return Build::Kiwi::queryhdrmd5(@_) if $do_kiwi && $binname =~ /\.raw.install$/;
   return Build::Arch::queryhdrmd5(@_) if $do_arch && $binname =~ /\.pkg\.tar(?:\.gz|\.xz|\.zst)?$/;
   return Build::Arch::queryhdrmd5(@_) if $do_arch && $binname =~ /\.arch$/;
+  return Build::Apk::queryhdrmd5(@_) if $do_apk && $binname =~ /\.apk$/;
   return undef;
 }
 
@@ -1401,6 +1415,7 @@ sub queryinstalled {
   return Build::Rpm::queryinstalled(@args) if $binarytype eq 'rpm';
   return Build::Deb::queryinstalled(@args) if $binarytype eq 'deb';
   return Build::Arch::queryinstalled(@args) if $binarytype eq 'arch';
+  return Build::Apk::queryinstalled(@args) if $binarytype eq 'apk';
   return undef;
 }
 

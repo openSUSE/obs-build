@@ -27,6 +27,7 @@ our $do_deb;
 our $do_arch;
 our $do_susetags;
 our $do_mdk;
+our $do_apk;
 
 sub import {
   for (@_) {
@@ -35,8 +36,9 @@ sub import {
     $do_arch = 1 if $_ eq ':arch';
     $do_susetags = 1 if $_ eq ':susetags';
     $do_mdk = 1 if $_ eq ':mdk';
+    $do_apk = 1 if $_ eq ':apk';
   }
-  $do_rpmmd = $do_deb = $do_arch = $do_susetags = $do_mdk = 1 unless $do_rpmmd || $do_deb || $do_arch || $do_susetags || $do_mdk;
+  $do_rpmmd = $do_deb = $do_arch = $do_susetags = $do_mdk = $do_apk = 1 unless $do_rpmmd || $do_deb || $do_arch || $do_susetags || $do_mdk || $do_apk;
   if ($do_rpmmd) {
     require Build::Rpmmd;
   }
@@ -52,6 +54,9 @@ sub import {
   if ($do_mdk) {
     require Build::Mdkrepo;
   }
+  if ($do_apk) {
+    require Build::Apkrepo;
+  }
 }
 
 sub parse {
@@ -61,6 +66,7 @@ sub parse {
   return Build::Debrepo::parse(@args) if $do_deb && $type eq 'deb';
   return Build::Archrepo::parse(@args) if $do_arch && $type eq 'arch';
   return Build::Mdkrepo::parse(@args) if $do_arch && $type eq 'mdk';
+  return Build::Apkrepo::parse(@args) if $do_apk && $type eq 'apk';
   die("parse repo: unknown type '$type'\n");
 }
 

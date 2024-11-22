@@ -1503,18 +1503,20 @@ if test -n "$LOGFILE" -a -z "$RUN_SHELL" ; then
     # set start time, to be substracted for build log timestamps
     STARTTIME=`perl -e 'print time()'`
 
+    exec_a_opt=(-a 'build logging')
+    (exec -a /bin/false /bin/true) || exec_a_opt=()
     if test -n "$RUN_SHELL_AFTER_FAIL" ; then
         # we may run a shell, so no stdout wrapper
 	:
     elif test -n "$RUNNING_IN_VM" -o -n "$NO_TIMESTAMPS" ; then
         # no additional timestamps in inner vm build system
-	exec 1> >(echo "$BASHPID" > $LOGFILE.pid ; exec -a 'build logging' tee -a $LOGFILE) 2>&1
+	exec 1> >(echo "$BASHPID" > $LOGFILE.pid ; exec "${exec_a_opt[@]}" tee -a $LOGFILE) 2>&1
     elif test -n "$VM_ROOT" ; then
         # external run of virtualization build
-	exec 1> >(exec -a 'build logging' perl -e 'open(F,">>",$ARGV[0])||die("$ARGV[0]: $!\n");$|=1;select(F);$|=1;while(<STDIN>){my $p=sprintf("[%5ds] ", time()-'$STARTTIME');print STDOUT $p.$_;s/^\r//s;s/\r\n/\n/gs;print F $p.$_}' $LOGFILE) 2>&1
+	exec 1> >(exec "${exec_a_opt[@]}" perl -e 'open(F,">>",$ARGV[0])||die("$ARGV[0]: $!\n");$|=1;select(F);$|=1;while(<STDIN>){my $p=sprintf("[%5ds] ", time()-'$STARTTIME');print STDOUT $p.$_;s/^\r//s;s/\r\n/\n/gs;print F $p.$_}' $LOGFILE) 2>&1
     else
         # plain chroot
-	exec 1> >(exec -a 'build logging' perl -e 'open(F,">>",$ARGV[0])||die("$ARGV[0]: $!\n");$|=1;select(F);$|=1;while(<STDIN>){my $p=sprintf("[%5ds] ", time()-'$STARTTIME');print STDOUT $p.$_;print F $p.$_}' $LOGFILE) 2>&1
+	exec 1> >(exec "${exec_a_opt[@]}" perl -e 'open(F,">>",$ARGV[0])||die("$ARGV[0]: $!\n");$|=1;select(F);$|=1;while(<STDIN>){my $p=sprintf("[%5ds] ", time()-'$STARTTIME');print STDOUT $p.$_;print F $p.$_}' $LOGFILE) 2>&1
     fi
 fi
 

@@ -80,7 +80,7 @@ my %bins;
 
 for my $p (@p) {
   my $q;
-  for my $suf ('rpm', 'deb', 'arch') {
+  for my $suf ('rpm', 'deb', 'arch', 'apk') {
     next unless -f "$cachedir/$p.$suf";
     if (! -s "$cachedir/$p.$suf") {
       $q = {'provides' => [], 'requires' => []}; # package from preinstallimage, no need to order

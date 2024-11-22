@@ -1,0 +1,67 @@
+#
+# Apk specific functions.
+#
+################################################################
+#
+# Copyright (c) 2024 SUSE LLC
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+recipe_setup_apk() {
+    TOPDIR=/usr/src/packages
+    test "$DO_INIT_TOPDIR" = false || rm -rf "$BUILD_ROOT$TOPDIR"
+    mkdir -p "$BUILD_ROOT$TOPDIR"
+    mkdir -p "$BUILD_ROOT$TOPDIR/OTHER"
+    mkdir -p "$BUILD_ROOT$TOPDIR/SOURCES"
+    mkdir -p "$BUILD_ROOT/$TOPDIR/APKS"
+    mkdir -p "$BUILD_ROOT/$TOPDIR/BUILD"
+    copy_sources "$MYSRCDIR" "$BUILD_ROOT$TOPDIR/SOURCES/"
+    chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
+}
+
+recipe_prepare_apk() {
+    echo "creating ephemeral signing key"
+    chroot $BUILD_ROOT su -lc "cd $TOPDIR/SOURCES && PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin abuild-keygen -a -n" $BUILD_USER
+    mkdir -p $BUILD_ROOT/root/.abuild
+    echo "DISTFILES_MIRROR=$TOPDIR/SOURCES" >> $BUILD_ROOT/root/.abuild/abuild.conf
+    echo "SRCDEST=$TOPDIR/BUILD" >> $BUILD_ROOT/root/.abuild/abuild.conf
+    echo "REPODEST=$TOPDIR/APKS" >> $BUILD_ROOT/root/.abuild/abuild.conf
+    echo "ABUILD_APK_INDEX_OPTS=--allow-untrusted" >> $BUILD_ROOT/root/.abuild/abuild.conf
+    if test $BUILD_USER = abuild ; then
+	mkdir -p $BUILD_ROOT/home/abuild/.abuild
+	cat $BUILD_ROOT/root/.abuild/abuild.conf >> $BUILD_ROOT/home/abuild/.abuild/abuild.conf
+    fi
+}
+
+recipe_build_apk() {
+    chroot $BUILD_ROOT su -lc "cd $TOPDIR/SOURCES && PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin abuild -m" $BUILD_USER && BUILD_SUCCEEDED=true
+    if test -n "$BUILD_SUCCEEDED" ; then
+	for apk in "$BUILD_ROOT/$TOPDIR"/APKS/packages/*/*.apk ; do
+	    mv "$apk" "$BUILD_ROOT/$TOPDIR/APKS"
+	done
+    fi
+    rm -rf "$BUILD_ROOT/$TOPDIR/APKS/packages"
+}
+
+recipe_resultdirs_apk() {
+    echo APKS
+}
+
+recipe_cleanup_apk() {
+    :
+}
+

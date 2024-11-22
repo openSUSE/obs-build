@@ -427,6 +427,7 @@ create_cache_file() {
 	    case "$BINTYPE" in
 		arch) REPOTYPE=arch ;;
 		deb)  REPOTYPE=debian ;;
+		apk)  REPOTYPE=apk ;;
 	    esac
 	fi
     fi
@@ -439,6 +440,8 @@ create_cache_file() {
 		REPOTYPE=debian ;;
 	    */PKGBUILD|PKGBUILD|*/_service:*:PKGBUILD|_service:*:PKGBUILD)
 		REPOTYPE=arch ;;
+	    */APKBUILD|APKBUILD|*/_service:*:APKBUILD|_service:*:APKBUILD)
+		REPOTYPE=apk ;;
 	esac
     fi
     for SRC in "${repos[@]}" -- ${BUILD_RPMS//:/ /}; do
@@ -448,7 +451,7 @@ create_cache_file() {
 	fi
 	SRCREPOTYPE=$REPOTYPE
 	case $SRC in
-	    arch@* | debian@* | hdlist2@* | rpmmd@* | rpm-md@* | suse@*)
+	    arch@* | debian@* | hdlist2@* | rpmmd@* | rpm-md@* | suse@* | apk@*)
 		SRCREPOTYPE=${SRC%%@*}
 		SRC=${SRC#*@}
 		;;
@@ -563,7 +566,7 @@ getcachedir() {
     for repo in "${repos[@]}" ; do
 	case $repo in
 	    debian@http*) repo=$(getdebianbaseurl "${repo#*@}") ;;
-	    arch@* | debian@* | hdlist2@* | rpmmd@* | rpm-md@* | suse@*) repo=${repo#*@} ;;
+	    arch@* | debian@* | hdlist2@* | rpmmd@* | rpm-md@* | suse@* | apk@*) repo=${repo#*@} ;;
 	esac
 	test "${repo#obs:/}" != "$repo" && repo=$(getobslocation "$repo")
 	if test "${url:0:${#repo}}" == "$repo" ; then

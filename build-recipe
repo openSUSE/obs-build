@@ -32,7 +32,7 @@ RPM_NOPREP=
 BUILD_CHANGELOG_TIMESTAMP=
 BUILD_VCSURL=
 
-for i in spec dsc kiwi productcompose arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild appimage docker podman fissile helm flatpak mkosi; do
+for i in spec dsc kiwi productcompose arch collax preinstallimage simpleimage mock livebuild snapcraft debootstrap debbuild appimage docker podman fissile helm flatpak mkosi apk; do
     . "$BUILD_DIR/build-recipe-$i"
 done
 
@@ -124,6 +124,7 @@ recipe_set_buildtype() {
         *.kiwi) BUILDTYPE=kiwi ;;
         *.productcompose) BUILDTYPE=productcompose ;;
         PKGBUILD) BUILDTYPE=arch ;;
+        APKBUILD) BUILDTYPE=apk ;;
         snapcraft.yaml) BUILDTYPE=snapcraft ;;
         appimage.yml) BUILDTYPE=appimage ;;
         Dockerfile|Dockerfile.*) BUILDTYPE=docker ;;
@@ -187,13 +188,14 @@ expand_recipe_directories() {
 			kiwi) types=".kiwi" ;;
 			productcompose) types=".productcompose" ;;
 			arch) types="PKGBUILD" ;;
+			apk) types="APKBUILD" ;;
 			collax) types="build.collax" ;;
 			livebuild) types=".livebuild" ;;
 			snapcraft) types="snapcraft.yaml" ;;
 			mkosi) types="mkosi." ;;
 		    esac
 		fi
-		types="$types .spec _specsubdir:package _specsubdir:dist .dsc PKGBUILD Dockerfile build.collax .kiwi .productcompose .src.rpm .nosrc.rpm simpleimage snapcraft.yaml Chart.yaml flatpak.yaml flatpak.json mkosi."
+		types="$types .spec _specsubdir:package _specsubdir:dist .dsc PKGBUILD APKBUILD Dockerfile build.collax .kiwi .productcompose .src.rpm .nosrc.rpm simpleimage snapcraft.yaml Chart.yaml flatpak.yaml flatpak.json mkosi."
 	    fi
 	    for t in $types ; do
 		found=

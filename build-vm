@@ -697,7 +697,7 @@ vm_detect_2nd_stage() {
 	fi
 	# Do not rely on external system writing the signature, it might differ...
 	mkswap "$VM_SWAP"
-	swapon -v "$VM_SWAP" || exit 1
+	swapon "$VM_SWAP" || exit 1
     fi
     HOST="$VM_HOSTNAME"
 
