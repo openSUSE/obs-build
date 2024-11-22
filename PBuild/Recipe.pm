@@ -43,6 +43,7 @@ sub find_recipe {
   return $files{'Chart.yaml'} if $type eq 'helm' && $files{'Chart.yaml'};
   return (grep {/flatpak\.(?:ya?ml|json)$/} sort keys %files)[0] if $type eq 'flatpak';
   return $files{'PKGBUILD'} ? $files{'PKGBUILD'} : undef if $type eq 'arch';
+  return $files{'APKBUILD'} ? $files{'APKBUILD'} : undef if $type eq 'apk';
   my $pkg = $p->{'pkg'};
   $pkg = $p->{'flavor'} if $p->{'flavor'};
   return $files{"Dockerfile.$pkg"} if $type eq 'docker' && $files{"Dockerfile.$pkg"};
@@ -218,6 +219,7 @@ sub looks_like_packagedir {
     return 1 if $file eq 'snapcraft.yaml' || $file eq 'appimage.yml';
     return 1 if $file eq 'Dockerfile' || $file eq 'fissile.yml' || $file eq 'Chart.yml';
     return 1 if $file eq 'PKGBUILD';
+    return 1 if $file eq 'APKBUILD';
   }
   return 0;
 }

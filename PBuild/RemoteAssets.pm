@@ -66,13 +66,14 @@ sub recipe_parse {
   my @assets;
   for my $s (@{$p->{'remoteassets'} || []}) {
     my $url = $s->{'url'};
+    my $file = $s->{'file'};
     if ($url && $url =~ /^git(?:\+https?)?:.*\/([^\/]+?)(?:.git)?(?:\#[^\#\/]+)?$/) {
-      my $file = $1;
+      $file = $1 unless defined $file;
+      next unless $file =~ /^([^\.\/][^\/]+)$/s;
       next if $p->{'files'}->{$file};
       push @assets, { 'file' => $file, 'url' => $url, 'type' => 'url', 'isdir' => 1 };
       next;
     }
-    my $file = $s->{'file'};
     if (($s->{'type'} || '' eq 'webcache')) {
       next unless $s->{'url'};
       $file = 'build-webcache-'.Digest::SHA::sha256_hex($s->{'url'});
@@ -336,9 +337,12 @@ sub url_fetch {
       my $assetid = $asset->{'assetid'};
       my $adir = "$assetdir/".substr($assetid, 0, 2);
       PBuild::Util::mkdir_p($adir);
-      if (Build::Download::download($asset->{'url'}, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1)) {
-        rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
-      }
+      eval {
+        if (Build::Download::download($asset->{'url'}, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1)) {
+          rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
+	}
+      };
+      warn($@) if $@;
     }
   }
 }

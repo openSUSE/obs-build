@@ -33,7 +33,7 @@ use PBuild::SigAuth;
 
 my $cookie_jar;
 
-my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst};
+my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst apk};
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
 
 my @dtd_disableenable = (

@@ -30,7 +30,7 @@ use PBuild::Verify;
 use PBuild::Container;
 use PBuild::Mkosi;
 
-my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst};
+my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst apk};
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
 
 #

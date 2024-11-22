@@ -29,6 +29,7 @@ use Digest::MD5 ();
 use Build;
 use Build::Rpmmd;
 use Build::Archrepo;
+use Build::Apkrepo;
 use Build::Debrepo;
 use Build::Deb;
 use Build::Susetags;
@@ -41,7 +42,7 @@ use PBuild::Verify;
 use PBuild::OBS;
 use PBuild::Cando;
 
-my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst};
+my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst apk};
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
 
 sub open_uncompressed {
@@ -97,6 +98,15 @@ sub fetchrepo_arch {
   download("$url$reponame.db", "$tmpdir/repo.db");
   my @bins;
   Build::Archrepo::parse("$tmpdir/repo.db", sub { addpkg(\@bins, $_[0], $url) }, 'addselfprovides' => 1, 'normalizedeps' => 1);
+  return \@bins;
+}
+
+sub fetchrepo_apk {
+  my ($url, $tmpdir, %opts) = @_;
+  $url .= '/' unless $url =~ /\/$/;
+  download("${url}APKINDEX.tar.gz", "$tmpdir/APKINDEX.tar.gz");
+  my @bins;
+  Build::Apkrepo::parse("$tmpdir/APKINDEX.tar.gz", sub { addpkg(\@bins, $_[0], $url) }, 'addselfprovides' => 1, 'normalizedeps' => 1);
   return \@bins;
 }
 
@@ -236,7 +246,8 @@ sub calc_binname {
   my $binname = $bin->{'version'};
   $binname = "$bin->{'epoch'}:$binname" if $bin->{'epoch'};
   $binname .= "-$bin->{'release'}" if defined $bin->{'release'};
-  $binname .= ".$bin->{'arch'}" if $bin->{'arch'};
+  # for apk the arch entry in the repo metadata does not match the binary
+  $binname .= ".$bin->{'arch'}" if $bin->{'arch'} && $suf ne 'apk';
   $binname = "$bin->{'name'}-$binname.$suf";
   $binname = "$bin->{'hdrmd5'}-$binname" if $binname =~ s/^container:// && $bin->{'hdrmd5'};
   return $binname;
@@ -328,10 +339,11 @@ sub guess_repotype {
   my ($bconf, $buildtype) = @_;
   return undef unless $bconf;
   for (@{$bconf->{'repotype'} || []}) {
-    return $_ if $_ eq 'arch' || $_ eq 'debian' || $_ eq 'hdlist2' || $_ eq 'rpm-md';
+    return $_ if $_ eq 'arch' || $_ eq 'debian' || $_ eq 'hdlist2' || $_ eq 'rpm-md' || $_ eq 'apk';
   }
   return 'arch' if ($bconf->{'binarytype'} || '') eq 'arch';
   return 'debian' if ($bconf->{'binarytype'} || '') eq 'deb';
+  return 'apk' if ($bconf->{'binarytype'} || '') eq 'apk';
   $buildtype ||= $bconf->{'type'};
   return 'rpm-md' if ($buildtype || '') eq 'spec';
   return 'debian' if ($buildtype || '') eq 'dsc';
@@ -348,7 +360,7 @@ sub fetchrepo {
   $repotype = 'zypp' if $url =~ /^zypp:/;
   $repotype = 'obs' if $url =~ /^obs:/;
   my $archfilter;
-  if ($url =~ /^(arch|debian|hdlist2|rpmmd|rpm-md|suse)(?:\+archfilter=([^\@\/]+))?\@(.*)$/) {
+  if ($url =~ /^(arch|debian|hdlist2|rpmmd|rpm-md|suse|apk)(?:\+archfilter=([^\@\/]+))?\@(.*)$/) {
     $repotype = $1;
     $archfilter = [ split(',', $2) ] if $2;
     $url = $3;
@@ -388,6 +400,8 @@ sub fetchrepo {
     $repo = fetchrepo_debian($url, $tmpdir, %opts);
   } elsif ($repotype eq 'arch') {
     $repo = fetchrepo_arch($url, $tmpdir, %opts);
+  } elsif ($repotype eq 'apk') {
+    $repo = fetchrepo_apk($url, $tmpdir, %opts);
   } elsif ($repotype eq 'suse') {
     $repo = fetchrepo_susetags($url, $tmpdir, %opts);
   } elsif ($repotype eq 'zypp') {
@@ -468,6 +482,7 @@ sub fetchbinaries_replace {
   my ($repodir, $tmpname, $binname, $bin) = @_;
   Build::Download::checkfiledigest("$repodir/$tmpname", $bin->{'checksum'}) if $bin->{'checksum'};
   my $q = querybinary($repodir, $tmpname);
+  $bin->{'arch'} = $q->{'arch'} if $binname =~ /\.apk$/;	# see comment in calc_binname
   die("downloaded binary $binname does not match repository metadata\n") unless is_matching_binary($bin, $q);
   rename("$repodir/$tmpname", "$repodir/$binname") || die("rename $repodir/$tmpname $repodir/$binname\n");
   $q->{'filename'} = $binname;

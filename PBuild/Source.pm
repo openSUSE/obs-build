@@ -132,6 +132,8 @@ sub list_package {
 	next if -d _ || $file =~ /^\./;
 	@s = stat("$dir/$file");
 	next unless @s && -f _;		# follow links to files
+	$files{$file} = gendigest("$dir/$file");
+	next;
       }
     }
     if (-l _) {

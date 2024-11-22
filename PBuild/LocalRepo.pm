@@ -27,7 +27,7 @@ use PBuild::Util;
 use PBuild::BuildResult;
 use PBuild::ExportFilter;
 
-my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst};
+my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst apk};
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
 my $binsufsre_binlnk = join('|', map {"\Q$_\E"} (@binsufs, 'obsbinlnk'));
 

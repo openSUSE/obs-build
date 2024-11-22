@@ -126,6 +126,7 @@ sub collect_result {
     push @d, 'SDEBS';
   }
   @d = ('ARCHPKGS') if $p->{'recipe'} =~ /PKGBUILD$/;
+  @d = ('APKS') if $p->{'recipe'} =~ /APKBUILD$/;
   @d = ('KIWI') if $p->{'recipe'} =~ /\.kiwi$/;
   @d = ('DOCKER') if $p->{'recipe'} =~ /Dockerfile(\.|$)/;
   @d = ('FISSILE') if $p->{'recipe'} =~ /fissile\.yml$/;

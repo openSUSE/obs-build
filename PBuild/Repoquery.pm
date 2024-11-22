@@ -211,6 +211,8 @@ sub repoquery {
 	print "$nevra\n";
 	print "  repo: $from\n";
 	print "  excluded: $excluded\n" if $excluded;
+	#print "  location: $bin->{'location'}\n" if $bin->{'location'};
+	#print "  checksum: $bin->{'checksum'}\n" if $bin->{'checksum'};
 	my @modules;
 	@modules = PBuild::Modules::getmodules($moduledata, $bin) if $moduledata;
 	if (@modules) {
