@@ -618,7 +618,6 @@ sub gen_purl {
   my ($p, $distro, $pkgtype) = @_;
   my $name = $p->{'NAME'};
   my $vr = $p->{'VERSION'};
-  $vr =~ s/^go//;
   my $purltype = $pkgtype eq 'rust' ? 'cargo' : $pkgtype;
   my $subpath;
   if ($pkgtype eq 'golang' && $name =~ /\A([^\/]+\/[^\/]+\/[^\/]+)\/(.+)/s) {
