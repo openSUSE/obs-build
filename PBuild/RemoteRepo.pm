@@ -29,6 +29,7 @@ use Digest::MD5 ();
 use Build;
 use Build::Rpmmd;
 use Build::Archrepo;
+use Build::Apk;
 use Build::Apkrepo;
 use Build::Debrepo;
 use Build::Deb;
@@ -466,7 +467,7 @@ sub querybinary {
   my $data;
   my $leadsigmd5;
   die("$dir/$file: no hdrmd5\n") unless Build::queryhdrmd5("$dir/$file", \$leadsigmd5);
-  $data = Build::query("$dir/$file", 'evra' => 1, 'conflicts' => 1, 'weakdeps' => 1, 'addselfprovides' => 1, 'filedeps' => 1, 'normalizedeps' => 1);
+  $data = Build::query("$dir/$file", 'evra' => 1, 'conflicts' => 1, 'weakdeps' => 1, 'addselfprovides' => 1, 'filedeps' => 1, 'normalizedeps' => 1, 'apkdatachksum' => 1);
   die("$dir/$file: query failed\n") unless $data;
   PBuild::Verify::verify_nevraquery($data);
   $data->{'leadsigmd5'} = $leadsigmd5 if $leadsigmd5;
@@ -481,8 +482,19 @@ sub querybinary {
 sub fetchbinaries_replace {
   my ($repodir, $tmpname, $binname, $bin) = @_;
   Build::Download::checkfiledigest("$repodir/$tmpname", $bin->{'checksum'}) if $bin->{'checksum'};
+  my $apkdataoff;
+  if ($bin->{'apkchksum'}) {
+    die("Unsupported apk checksum bin->{'apkchksum'}\n") unless $bin->{'apkchksum'} =~ /^Q1/;
+    my ($apkchksum, @offs) = Build::Apk::calcapkchksum("$repodir/$tmpname", 'Q1');
+    die("downloaded binary $binname does not match apk checksum: $bin->{'apkchksum'} != $apkchksum\n") if $bin->{'apkchksum'} ne $apkchksum;
+    $apkdataoff = $offs[1];
+  }
   my $q = querybinary($repodir, $tmpname);
   $bin->{'arch'} = $q->{'arch'} if $binname =~ /\.apk$/;	# see comment in calc_binname
+  if ($q->{'apkdatachksum'}) {
+    my $apkdatachksum = Build::Apk::calcapkdatachecksum("$repodir/$tmpname", $apkdataoff);
+    die("downloaded binary $binname does not match apk data checksum: $q->{'apkdatachksum'} != $apkdatachksum\n") if $q->{'apkdatachksum'} ne $apkdatachksum;
+  }
   die("downloaded binary $binname does not match repository metadata\n") unless is_matching_binary($bin, $q);
   rename("$repodir/$tmpname", "$repodir/$binname") || die("rename $repodir/$tmpname $repodir/$binname\n");
   $q->{'filename'} = $binname;
