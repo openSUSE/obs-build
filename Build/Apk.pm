@@ -23,8 +23,16 @@ package Build::Apk;
 use strict;
 
 use Digest::MD5;
-eval { require Archive::Tar; };
+use Digest::SHA;
+
+eval { require Archive::Tar };
 *Archive::Tar::new = sub {die("Archive::Tar is not available\n")} unless defined &Archive::Tar::new;
+eval { require Compress::Raw::Zlib };
+*Compress::Raw::Zlib::Inflate = sub {die("MIME::Base64 is not available\n")} unless defined &Compress::Raw::Zlib::Inflate;
+
+eval { require MIME::Base64 };
+*MIME::Base64::encode_base64 = sub {die("MIME::Base64 is not available\n")} unless defined &MIME::Base64::encode_base64;
+
 
 sub expandvars_cplx {
   my ($v, $vars) = @_;
@@ -323,6 +331,7 @@ my %pkginfomap = (
 #  'replaces' => [ 'obsoletes' ],
   'provides' => [ 'provides' ],
   'install_if' => [ 'supplements' ],
+  'datahash' => 'apkdatachksum',
 );
 
 sub query {
@@ -365,6 +374,7 @@ sub query {
   $q{'source'} ||= $q{'name'} if defined $q{'name'};
   delete $q{'supplements'} unless $opts{'weakdeps'};
   delete $q{'buildtime'} unless $opts{'buildtime'};
+  delete $q{'apkdatachksum'} unless $opts{'apkdatachksum'};
   return \%q;
 }
 
@@ -376,7 +386,7 @@ my %idxinfomap = (
   't' => 'buildtime',
   'A' => 'arch',
   'L' => 'license',
-  'C' => 'apk_chksum',
+  'C' => 'apkchksum',
   'o' => 'source',
   'D' => [ 'requires' ],
 #  'r' => [ 'obsoletes' ],
@@ -447,6 +457,66 @@ sub queryhdrmd5 {
   my $pkginfo = $read[0]->get_content;
   die("$handle: not an apk package file\n") unless defined $pkginfo;
   return Digest::MD5::md5_hex($pkginfo);
+}
+
+# this calculates the checksum of the second compressed section.
+sub calcapkchksum {
+  my ($handle, $type) = @_; 
+  $type ||= 'Q1';
+  die("unsupported apkchksum type $type\n") unless $type eq 'Q1' || $type eq 'sha1' || $type eq 'sha256' || $type eq 'sha512' || $type eq 'md5';
+  my $fd;
+  open($fd, '<', $handle) or die("$handle: $!\n");
+  my $z = new Compress::Raw::Zlib::Inflate(-WindowBits => 15 + Compress::Raw::Zlib::WANT_GZIP_OR_ZLIB(), LimitOutput => 1);
+  my $ctx;
+  $ctx = Digest::SHA->new(1) if $type eq 'Q1' || $type eq 'sha1';
+  $ctx = Digest::SHA->new(256) if $type eq 'sha256';
+  $ctx = Digest::SHA->new(512) if $type eq 'sha512';
+  $ctx = Digest::MD5->new() if $type eq 'md5';
+  die("unsupported apkchksum type $type\n") unless $ctx;
+  my $section = 0;
+  my $input = '';
+  my @offs;
+  my $off = 0;
+  while (1) {
+    if (!length($input)) {
+      read($fd, $input, 4096);
+      die("unexpected EOF\n") unless length($input);
+      $off += length($input);
+    }
+    my $oldinput = $input;
+    my $output;
+    my $status = $z->inflate($input, $output);
+    $ctx->add(substr($oldinput, 0, length($oldinput) - length($input))) if $section == 1;
+    next if $status == Compress::Raw::Zlib::Z_BUF_ERROR() && length($input);
+    if ($status == Compress::Raw::Zlib::Z_STREAM_END()) {
+      push @offs, $off - length($input);
+      $section++;
+      last if $section == 2;
+      $z->inflateReset();
+    } elsif ($status != Compress::Raw::Zlib::Z_OK()) {
+      die("decompression error\n");
+    }
+  }
+  my $chk = $ctx->digest();
+  return 'Q1'.MIME::Base64::encode_base64($chk, ''), @offs if $type eq 'Q1';
+  return "$type:".unpack('H*');
+}
+
+sub calcapkdatachecksum {
+  my ($handle, $apkdataoffset, $type) = @_; 
+  $apkdataoffset ||= (calcapkchksum($handle))[2];
+  $type ||= 'sha256';
+  die("unsupported apkchksum type $type\n") unless $type eq 'sha256';
+  die("missing apkdataoffset\n") unless $apkdataoffset;
+  my $fd;
+  open($fd, '<', $handle) || die("$handle: $!\n");
+  my $ctx;
+  $ctx = Digest::SHA->new(256) if $type eq 'sha256';
+  die("unsupported apkchksum type $type\n") unless $ctx;
+  seek($fd, $apkdataoffset, 0) || die("$handle seek $apkdataoffset: $!\n");
+  $ctx->addfile($fd);
+  close($fd);
+  return $ctx->hexdigest();
 }
 
 my %verscmp_class = ( '.' => 1, 'X' => 2, '_' => 3, '~' => 4, '-' => 5, '$' => 6, '!' => 7 );
