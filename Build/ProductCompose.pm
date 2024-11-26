@@ -156,6 +156,9 @@ sub parse {
       $pkgs = add_pkgset($pkgs, get_pkgset_compat($data->{'unpack_packages'}, $arch, $flavor));
     }
   }
+  # Unordered repositories is disabling repository layering. This will
+  # offer all binary versions of all reprositories to the build tool:
+  push @{$pkgs}, '--unorderedproductrepos' if grep {$_ eq 'OBS_unordered_product_repos'} @{$data->{'build_options'}};
   $ret->{'deps'} = $pkgs;
 
   # We have currently no option to configure own path list for the product on purpose
