@@ -482,17 +482,15 @@ sub querybinary {
 sub fetchbinaries_replace {
   my ($repodir, $tmpname, $binname, $bin) = @_;
   Build::Download::checkfiledigest("$repodir/$tmpname", $bin->{'checksum'}) if $bin->{'checksum'};
-  my $apkdataoff;
   if ($bin->{'apkchksum'}) {
     die("Unsupported apk checksum bin->{'apkchksum'}\n") unless $bin->{'apkchksum'} =~ /^Q1/;
-    my ($apkchksum, @offs) = Build::Apk::calcapkchksum("$repodir/$tmpname", 'Q1');
+    my $apkchksum = Build::Apk::calcapkchksum("$repodir/$tmpname", 'Q1');
     die("downloaded binary $binname does not match apk checksum: $bin->{'apkchksum'} != $apkchksum\n") if $bin->{'apkchksum'} ne $apkchksum;
-    $apkdataoff = $offs[1];
   }
   my $q = querybinary($repodir, $tmpname);
   $bin->{'arch'} = $q->{'arch'} if $binname =~ /\.apk$/;	# see comment in calc_binname
   if ($q->{'apkdatachksum'}) {
-    my $apkdatachksum = Build::Apk::calcapkdatachecksum("$repodir/$tmpname", $apkdataoff);
+    my $apkdatachksum = Build::Apk::calcapkchksum("$repodir/$tmpname", 'sha256', 'data', 1);
     die("downloaded binary $binname does not match apk data checksum: $q->{'apkdatachksum'} != $apkdatachksum\n") if $q->{'apkdatachksum'} ne $apkdatachksum;
   }
   die("downloaded binary $binname does not match repository metadata\n") unless is_matching_binary($bin, $q);

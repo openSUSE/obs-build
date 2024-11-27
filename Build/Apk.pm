@@ -459,63 +459,52 @@ sub queryhdrmd5 {
   return Digest::MD5::md5_hex($pkginfo);
 }
 
-# this calculates the checksum of the second compressed section.
+# this calculates the checksum of a compressed section.
 sub calcapkchksum {
-  my ($handle, $type) = @_; 
+  my ($handle, $type, $section, $toeof) = @_; 
+  $section ||= 'ctrl';
   $type ||= 'Q1';
   die("unsupported apkchksum type $type\n") unless $type eq 'Q1' || $type eq 'sha1' || $type eq 'sha256' || $type eq 'sha512' || $type eq 'md5';
+  die("unsupported apkchksum section $section\n") unless $section eq 'ctrl' || $section eq 'data';
+  $section = $section eq 'ctrl' ? 1 : 2;
   my $fd;
   open($fd, '<', $handle) or die("$handle: $!\n");
-  my $z = new Compress::Raw::Zlib::Inflate(-WindowBits => 15 + Compress::Raw::Zlib::WANT_GZIP_OR_ZLIB(), LimitOutput => 1);
   my $ctx;
   $ctx = Digest::SHA->new(1) if $type eq 'Q1' || $type eq 'sha1';
   $ctx = Digest::SHA->new(256) if $type eq 'sha256';
   $ctx = Digest::SHA->new(512) if $type eq 'sha512';
   $ctx = Digest::MD5->new() if $type eq 'md5';
   die("unsupported apkchksum type $type\n") unless $ctx;
-  my $section = 0;
+  my $z = new Compress::Raw::Zlib::Inflate(-WindowBits => 15 + Compress::Raw::Zlib::WANT_GZIP_OR_ZLIB(), LimitOutput => 1);
+  my $sec = 0;
   my $input = '';
-  my @offs;
-  my $off = 0;
   while (1) {
     if (!length($input)) {
       read($fd, $input, 4096);
       die("unexpected EOF\n") unless length($input);
-      $off += length($input);
     }
     my $oldinput = $input;
     my $output;
     my $status = $z->inflate($input, $output);
-    $ctx->add(substr($oldinput, 0, length($oldinput) - length($input))) if $section == 1;
-    next if $status == Compress::Raw::Zlib::Z_BUF_ERROR() && length($input);
+    while ($status == Compress::Raw::Zlib::Z_BUF_ERROR() && length($output)) {
+      undef $output;
+      $status = $z->inflate($input, $output);
+    }
+    $ctx->add(substr($oldinput, 0, length($oldinput) - length($input))) if $sec == $section;
+    next if $status == Compress::Raw::Zlib::Z_BUF_ERROR();
     if ($status == Compress::Raw::Zlib::Z_STREAM_END()) {
-      push @offs, $off - length($input);
-      $section++;
-      last if $section == 2;
+      $sec++;
+      last if $sec > $section || ($sec == $section && $toeof);
       $z->inflateReset();
     } elsif ($status != Compress::Raw::Zlib::Z_OK()) {
       die("decompression error\n");
     }
   }
-  my $chk = $ctx->digest();
-  return 'Q1'.MIME::Base64::encode_base64($chk, ''), @offs if $type eq 'Q1';
-  return "$type:".unpack('H*');
-}
-
-sub calcapkdatachecksum {
-  my ($handle, $apkdataoffset, $type) = @_; 
-  $apkdataoffset ||= (calcapkchksum($handle))[2];
-  $type ||= 'sha256';
-  die("unsupported apkchksum type $type\n") unless $type eq 'sha256';
-  die("missing apkdataoffset\n") unless $apkdataoffset;
-  my $fd;
-  open($fd, '<', $handle) || die("$handle: $!\n");
-  my $ctx;
-  $ctx = Digest::SHA->new(256) if $type eq 'sha256';
-  die("unsupported apkchksum type $type\n") unless $ctx;
-  seek($fd, $apkdataoffset, 0) || die("$handle seek $apkdataoffset: $!\n");
-  $ctx->addfile($fd);
-  close($fd);
+  if ($toeof) {
+    $ctx->add($input);
+    $ctx->addfile($fd);
+  }
+  return 'Q1'.MIME::Base64::encode_base64($ctx->digest(), '') if $type eq 'Q1';
   return $ctx->hexdigest();
 }
 
