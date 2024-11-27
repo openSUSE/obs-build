@@ -41,6 +41,20 @@ recipe_setup_arch() {
 }
 
 recipe_prepare_arch() {
+    echo "Replacing the pkgrel variable..."
+    ARCH_RELEASE=`grep -Eo '^[0-9]+(\.[0-9]+){0,1}' <<< "$RELEASE"`
+    [ -z "$ARCH_RELEASE" ] && ARCH_RELEASE=1
+    ARCH_RELEASE1=`cut -d. -f1 <<< "$ARCH_RELEASE"`
+    ARCH_RELEASE2=`cut -d. -f2 <<< "$ARCH_RELEASE"`
+    chroot $BUILD_ROOT su -c /bin/sh <<EOF
+cd $TOPDIR/SOURCES
+[ ! -f PKGBUILD ] && exit 0
+sed -e "s/^pkgrel=@RELEASE@$/pkgrel=$ARCH_RELEASE/" \
+    -e "s/^pkgrel=@RELEASE1@$/pkgrel=$ARCH_RELEASE1/" \
+    -e "s/^pkgrel=@RELEASE2@$/pkgrel=$ARCH_RELEASE2/" \
+    -i PKGBUILD
+EOF
+
     echo "Preparing sources..."
     if ! _arch_recipe_makepkg -so --skippgpcheck "2>&1" ">/dev/null" ; then
 	cleanup_and_exit 1 "failed to prepare sources"
