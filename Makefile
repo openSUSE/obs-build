@@ -2,6 +2,7 @@ VERSION=0.1
 SCM=$(shell if test -d .svn; then echo svn; elif test -d .git; then echo git; fi)
 DATE=$(shell date +%Y%m%d%H%M)
 BUILD=build
+CFLAGS=-Wall -g -O2
 
 INITVM_ARCH=$(shell bash -c '. common_functions ; build_host_arch; echo $$BUILD_INITVM_ARCH')
 
@@ -21,7 +22,7 @@ DESTDIR=
 
 all:
 
-.PHONY:	test test-debtransform doc
+.PHONY:	test test-debtransform doc install clean initvm initvm-all initvm-build initvm-install
 
 test:
 	[ "$(SCM)" != "git" ] || git --no-pager diff --check origin/master..HEAD -- || [ -f /.buildenv ]
@@ -123,8 +124,11 @@ install:
 # is useful because it is distributed as a static binary package (e.g.
 # build-initvm-static) whereas the build scripts package is noarch.
 
-initvm: initvm.c
-	$(CC) -o $@.$(INITVM_ARCH) -static $(CFLAGS) initvm.c
+initvm.$(INITVM_ARCH): initvm.c
+	$(CROSS_COMPILE)$(CC) -o $@ -static $(CFLAGS) initvm.c
+
+initvm: initvm.$(INITVM_ARCH)
+	@: # need to cancel default action which is building initvm from initvm.c
 
 initvm-all: initvm
 
@@ -134,6 +138,8 @@ initvm-install: initvm
 	install -m755 -d $(DESTDIR)$(pkglibdir)
 	install -m755 initvm.$(INITVM_ARCH) $(DESTDIR)$(pkglibdir)/initvm.$(INITVM_ARCH)
 
+clean:
+	rm -f initvm.$(INITVM_ARCH)
 
 dist:
 ifeq ($(SCM),svn)
