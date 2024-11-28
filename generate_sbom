@@ -619,6 +619,7 @@ sub gen_purl {
   my ($p, $distro, $pkgtype) = @_;
   my $name = $p->{'NAME'};
   my $vr = $p->{'VERSION'};
+  $vr =~ s/^go// if $pkgtype eq 'golang' && $name eq 'stdlib';
   my $purltype = $pkgtype eq 'rust' ? 'cargo' : $pkgtype;
   my $subpath;
   if ($pkgtype eq 'golang' && $name =~ /\A([^\/]+\/[^\/]+\/[^\/]+)\/(.+)/s) {
@@ -858,8 +859,15 @@ sub spdx_encode_pkg {
   }
   $spdx->{'copyrightText'} = $p->{'COPYRIGHTTEXT'} ? $p->{'COPYRIGHTTEXT'} : 'NOASSERTION';
   $spdx->{'homepage'} = $p->{'URL'} if $p->{'URL'};
-  my $purlurl = gen_purl($p, $distro, $pkgtype);
-  push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator', $purlurl } if $purlurl;
+
+  # Let the caller control the presence of external refs
+  if(!$p->{'skip_external_refs'}) {
+    my $purlurl = gen_purl($p, $distro, $pkgtype);
+    push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator', $purlurl } if $purlurl;
+  }
+
+  $spdx->{'primaryPackagePurpose'} = $p->{'primaryPackagePurpose'} if $p->{'primaryPackagePurpose'};
+
   if (!$p->{'spdx_id'}) {
     my $spdxtype = "Package-$pkgtype";
     $spdxtype = "Package-go-module" if $pkgtype eq 'golang';
@@ -936,6 +944,18 @@ sub spdx_encode_header {
   return $spdx;
 }
 
+sub spdx_encode_dist {
+  my ($dist) = @_;
+
+  return spdx_encode_pkg({
+    NAME => $dist->{id},
+    VERSION => $dist->{version_id},
+    spdx_id => sprintf('SPDXRef-OperatingSystem-%s', gen_pkg_id($dist)),
+    primaryPackagePurpose => 'OPERATING-SYSTEM',
+    skip_external_refs => 1
+  }, undef, undef, {});
+
+}
 
 ##################################################################################################
 #
@@ -1171,6 +1191,9 @@ if ($format eq 'spdx') {
       push @{$doc->{'files'}}, spdx_encode_file($f);
     }
   }
+
+  push @{$doc->{'packages'}}, spdx_encode_dist($dist);
+
   for (sort keys %unknown_spdx_licenses) {
     push @{$doc->{'hasExtractedLicensingInfos'}}, spdx_encode_extracted_license($unknown_spdx_licenses{$_});
   }
