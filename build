@@ -1438,7 +1438,7 @@ if test -n "$CCACHE" ; then
 fi
 
 if test -z "$RPMLIST" -a -z "$RUNNING_IN_VM" ; then
-    if test -z "$repos" -a -z "$BUILD_RPMS" -a "$BUILD_DIST" = "${BUILD_DIST#obs:/}"; then
+    if test -z "$repos" -a -z "$BUILD_RPMS" -a "$BUILD_DIST" = "${BUILD_DIST#obs:/}" -a -d "/etc/zypp/repos.d"; then
 	repos=(--repository 'zypp://')
     fi
 else
