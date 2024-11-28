@@ -352,6 +352,7 @@ sub dump_rpmdb {
       chomp $path;
       $dbpath = $path if $path && $path =~ /^\//;
     }
+    $dbpath ||= '/usr/lib/sysimage/rpm' if -e "$root/usr/lib/sysimage/rpm/Packages" || -e "$root/usr/lib/sysimage/rpm/Package.db";
     $dbpath ||= '/var/lib/rpm';           # guess
     # try to dump with rpmdb_dump
     if (-s "$root$dbpath/Packages" && can_run($root, '/usr/lib/rpm/rpmdb_dump')) {
