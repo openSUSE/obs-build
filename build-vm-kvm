@@ -117,7 +117,7 @@ vm_verify_options_kvm() {
 	ppc|ppcle|ppc64|ppc64le)
 	    kvm_bin="/usr/bin/qemu-system-ppc64"
 	    kvm_console=hvc0
-	    kvm_options="-enable-kvm -M pseries"
+	    kvm_options="-enable-kvm -M pseries,cap-htm=off"
 	    if grep -q POWER8 /proc/cpuinfo ; then
 	        # This option only exists with QEMU 5.0 or newer
 		if $kvm_bin -machine 'pseries,?' 2>&1 | grep -q cap-ccf-assist ; then
