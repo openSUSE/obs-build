@@ -34,10 +34,50 @@ eval { require MIME::Base64 };
 *MIME::Base64::encode_base64 = sub {die("MIME::Base64 is not available\n")} unless defined &MIME::Base64::encode_base64;
 
 
+
+# can only do numeric + and - for now
+sub expandvars_expr {
+  my ($v, $vars) = @_;
+  my $l = '+' . expandvars($v, $vars);
+  my $r = 0;
+  my $op = '';
+  while ($l ne '') {
+    next if $l =~ s/^\s+//;
+    my $num;
+    if ($l =~ s/^([0-9]+)//) {
+      $num = $1;
+    } elsif ($l =~ s/^([_a-zA-Z]+)//) {
+      $num = $vars->{$1};
+    } elsif ($l =~ s/^([\+\-])//) {
+      $op = $1;
+      next;
+    } else {
+      last;
+    }
+    $r += $num if $op eq '+';
+    $r -= $num if $op eq '-';
+    $op = '';
+  }
+  return $r;
+}
+
+sub expandvars_sh {
+  my ($v, $vars) = @_;
+  $v =~ s/%25/%/g;
+  return expandvars_expr($1, $vars) if $v =~ /^\((.*)\)$/;
+  my @l = unquotesplit($v, $vars);
+  #print "SH ".join(', ', @l)."\n";
+  if ($l[0] eq 'printf') {
+    return sprintf $l[1], $l[2] if $l[1] =~ /^%[0-9]*d$/;
+  }
+  return '';
+}
+
 sub expandvars_cplx {
   my ($v, $vars) = @_;
   $v =~ s/%([a-fA-F0-9]{2})/$1 ne '00' ? chr(hex($1)) : ''/ge;
   return $vars->{$v} if defined $vars->{$v};
+  $v = expandvars($v, $vars) if $v =~ /\$/;
   if ($v =~ /^([^\/#%]+):(\d+):(\d+)$/) {
     my ($v1, $v2, $v3) = ($vars->{$1}, $2, $3);
     return defined($v1) ? substr($v1, $v2, $v3) : '';
@@ -93,7 +133,7 @@ sub expandvars_cplx {
 
 sub expandvars {
   my ($str, $vars) = @_;
-  $str =~ s/\$([a-zA-Z0-9_]+|\{([^\}]+)\})/defined($vars->{$2 || $1}) ? $vars->{$2 || $1} : expandvars_cplx($2 || $1, $vars)/ge;
+  $str =~ s/\$([a-zA-Z0-9_]+|\{(.+?)\}(?!\})|\((.+?)\)(?!\)))/defined($3) ? expandvars_sh($3, $vars) : defined($vars->{$2 || $1}) ? $vars->{$2 || $1} : expandvars_cplx($2 || $1, $vars)/ge;
   return $str;
 }
 
@@ -182,14 +222,34 @@ sub do_test {
     $t = $args[1] ne '' ? 1 : 0;
   } elsif (($args[1] eq '=' || $args[1] eq '==') && @args > 2) {
     $t = $args[0] eq $args[2] ? 1 : 0;
+  } elsif (($args[1] eq '-ne') && @args > 2) {
+    $t = $args[0] != $args[2] ? 1 : 0;
   } elsif (($args[1] eq '-eq') && @args > 2) {
     $t = $args[0] == $args[2] ? 1 : 0;
   } elsif (($args[1] eq '-lt') && @args > 2) {
     $t = $args[0] < $args[2] ? 1 : 0;
+  } elsif (($args[1] eq '-le') && @args > 2) {
+    $t = $args[0] <= $args[2] ? 1 : 0;
+  } elsif (($args[1] eq '-gt') && @args > 2) {
+    $t = $args[0] > $args[2] ? 1 : 0;
+  } elsif (($args[1] eq '-ge') && @args > 2) {
+    $t = $args[0] >= $args[2] ? 1 : 0;
   } elsif (@args == 1) {
     $t = $args[0] ne '' ? 1 : 0;
   }
   return $t;
+}
+
+sub readloopbody {
+  my ($fh) = @_;
+  my @body;
+  while (<$fh>) {
+    last if $_ =~ /^\s*done/;
+    s/^\s*//;
+    push @body, $_;
+  }
+  push @body, 'done';
+  return @body > 1 ? \@body : undef;
 }
 
 sub parse {
@@ -204,14 +264,36 @@ sub parse {
   my @ifs;
   my $preamble = 1;
   my $incase;
-  my $inwhile;
+  my $inloop;
 
   my ($arch, $os) = Build::gettargetarchos($config);
   $arch = 'x86' if $arch =~ /^i[3456]86$/;
   $vars{'CARCH'} = $arch;
 
-  while (<PKG>) {
+  my @pushback;
+
+  while (defined($_ = (@pushback ? shift @pushback : <PKG>))) {
     chomp;
+
+    if ($inloop && !@pushback) {
+      if ($inloop->[0]++ < 100) {
+	if ($inloop->[1] eq 'for') {
+	  if (@{$inloop->[3]}) {
+	    $vars{$inloop->[2]} = shift @{$inloop->[3]};
+	    push @pushback, @{$inloop->[4]};
+	    next;
+	  }
+	} elsif ($inloop->[1] eq 'while') {
+	  if (do_test(unquotesplit($inloop->[3], \%vars))) {
+	    push @pushback, @{$inloop->[4]};
+	    next;
+	  }
+	}
+      }
+      $inloop = undef;
+      next;
+    }
+    
     if (defined $incase) {
       if (/^esac/) {
 	undef $incase;
@@ -226,10 +308,7 @@ sub parse {
       next unless $incase->[0];
       $incase = [ 0 ] if s/;;\s*$//;
     }
-    if (defined $inwhile) {
-      undef $inwhile if /^done/;
-      next;
-    }
+
     next if /^\s*$/;
     next if /^\s*#/;
     s/^\s+//;
@@ -263,10 +342,20 @@ sub parse {
       $incase = (unquotesplit($1, \%vars))[0];
       next;
     }
-    if ($preamble && /^while /) {
-      $inwhile = 1;	# cannot handle
+    if ($preamble && !$inloop && !@pushback && /^for ([a-zA-Z_][a-zA-Z0-9]*) in (.*);\s*do\s*$/) {
+      my $var = $1;
+      my @vals = unquotesplit($2, \%vars);
+      my $body = readloopbody(\*PKG);
+      $inloop = [ 0, 'for', $var, \@vals, $body ] if $body && @vals;
       next;
     }
+    if ($preamble && !$inloop && !@pushback && /^while\s+\[\s(.+)\s+]\s*;\s*do\s*$/) {
+      my $cond = $1;
+      my $body = readloopbody(\*PKG);
+      $inloop = [ 0, 'while', undef, $cond, $body ] if $body;
+      next;
+    }
+
     if (!/^([a-zA-Z0-9_]*)=([\"\']?)(.*?)$/) {
       $preamble = 0 if /^[a-z]+\(\)/;	# preamble ends at first function definition
       next;
@@ -281,7 +370,7 @@ sub parse {
       while (1) {
 	my @words = unquotesplit($val, \%vars, 1);
 	if (@words && !defined($words[0])) {
-	  my $nextline = <PKG>;
+	  my $nextline = @pushback ? shift @pushback : <PKG>;
 	  last unless defined $nextline;
 	  chomp $nextline;
 	  $val .= "\n" . $nextline;
@@ -291,7 +380,8 @@ sub parse {
 	last;
       }
     } else {
-      $vars{$var} = (unquotesplit($val, \%vars))[0];
+      my @words = unquotesplit($val, \%vars);
+      $vars{$var} = $words[0];
     }
   }
   close PKG;
