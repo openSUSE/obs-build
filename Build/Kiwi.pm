@@ -369,44 +369,47 @@ sub kiwiparse {
 
       # add derived container dependency
       if ($type->{'derived_from'}) {
-	my $derived = $type->{'derived_from'};
-	my ($name, $prp);
-	if ($derived =~ /^obs:\/{1,3}([^\/]+)\/([^\/]+)\/(.*?)(?:#([^\#\/]+))?$/) {
-	  $name = defined($4) ? "$3:$4" : "$3:latest";
-	  $prp = "$1/$2";
-	  $prp = "obs:/$prp" if defined($urlmapper) && !$urlmapper;
-	} elsif ($derived =~ /^obsrepositories:\/{1,3}([^\/].*?)(?:#([^\#\/]+))?$/) {
-	  $name = defined($2) ? "$1:$2" : "$1:latest";
-	} elsif ($derived =~ /^file:/) {
-	  next;		# just ignore and hope
-	} elsif (defined($urlmapper) && !$urlmapper) {
-	  if ($derived =~ /^https:\/\/([^\/]+)\/(.*?)(?:#([^\#\/]+))?$/) {
-	    $prp = $1;
-	    $name = defined($3) ? "$2:$3" : "$2:latest";
-	  } elsif ($derived =~ /([^\/]+\.[^\/]+)\/(.*?)(?:#([^\#\/]+))?$/) {
-	    $prp = "https://$1";
-	    $name = defined($3) ? "$2:$3" : "$2:latest";
-	  } elsif ($derived =~ /^(.*?)(?:#([^\#\/]+))?$/) {
+        my $numderived = 0;
+	for my $derived (split(',', $type->{'derived_from'})) {
+	  $numderived++;
+	  my ($name, $prp);
+	  if ($derived =~ /^obs:\/{1,3}([^\/]+)\/([^\/]+)\/(.*?)(?:#([^\#\/]+))?$/) {
+	    $name = defined($4) ? "$3:$4" : "$3:latest";
+	    $prp = "$1/$2";
+	    $prp = "obs:/$prp" if defined($urlmapper) && !$urlmapper;
+	  } elsif ($derived =~ /^obsrepositories:\/{1,3}([^\/].*?)(?:#([^\#\/]+))?$/) {
 	    $name = defined($2) ? "$1:$2" : "$1:latest";
-	  } else {
-	    die("cannot decode derived_from: $derived\n");
-	  }
-	} elsif ($derived =~ /^(.*)\/([^\/]+?)(?:#([^\#\/]+))?$/) {
-	  my $url = $1;
-	  $name = defined($3) ? "$2:$3" : "$2:latest";
-	  $prp = $urlmapper->($url) if $urlmapper;
-	  # try again with one element moved from url to name
-	  if (!$prp && $derived =~ /^(.*)\/([^\/]+\/[^\/]+?)(?:#([^\#\/]+))?$/) {
-	    $url = $1;
+	  } elsif ($derived =~ /^file:/) {
+	    next;		# just ignore and hope
+	  } elsif (defined($urlmapper) && !$urlmapper) {
+	    if ($derived =~ /^https:\/\/([^\/]+)\/(.*?)(?:#([^\#\/]+))?$/) {
+	      $prp = $1;
+	      $name = defined($3) ? "$2:$3" : "$2:latest";
+	    } elsif ($derived =~ /([^\/]+\.[^\/]+)\/(.*?)(?:#([^\#\/]+))?$/) {
+	      $prp = "https://$1";
+	      $name = defined($3) ? "$2:$3" : "$2:latest";
+	    } elsif ($derived =~ /^(.*?)(?:#([^\#\/]+))?$/) {
+	      $name = defined($2) ? "$1:$2" : "$1:latest";
+	    } else {
+	      die("cannot decode derived_from: $derived\n");
+	    }
+	  } elsif ($derived =~ /^(.*)\/([^\/]+?)(?:#([^\#\/]+))?$/) {
+	    my $url = $1;
 	    $name = defined($3) ? "$2:$3" : "$2:latest";
 	    $prp = $urlmapper->($url) if $urlmapper;
+	    # try again with one element moved from url to name
+	    if (!$prp && $derived =~ /^(.*)\/([^\/]+\/[^\/]+?)(?:#([^\#\/]+))?$/) {
+	      $url = $1;
+	      $name = defined($3) ? "$2:$3" : "$2:latest";
+	      $prp = $urlmapper->($url) if $urlmapper;
+	    }
+	    undef $name unless $prp;
 	  }
-	  undef $name unless $prp;
+	  die("derived_from url not using obs:/ scheme: $derived\n") unless defined $name;
+	  push @packages, "container:$name";
+	  $basecontainer = $name if $numderived == 1;
+	  push @containerrepos, $prp if $prp;
 	}
-	die("derived_from url not using obs:/ scheme: $derived\n") unless defined $name;
-	push @packages, "container:$name";
-	$basecontainer = $name;
-	push @containerrepos, $prp if $prp;
       }
 
       push @packages, "kiwi-filesystem:$type->{'filesystem'}" if $type->{'filesystem'};
