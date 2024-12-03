@@ -28,7 +28,7 @@ use Digest::SHA;
 eval { require Archive::Tar };
 *Archive::Tar::new = sub {die("Archive::Tar is not available\n")} unless defined &Archive::Tar::new;
 eval { require Compress::Raw::Zlib };
-*Compress::Raw::Zlib::Inflate = sub {die("MIME::Base64 is not available\n")} unless defined &Compress::Raw::Zlib::Inflate;
+*Compress::Raw::Zlib::Inflate::new = sub {die("Compress::Raw::Zlib is not available\n")} unless defined &Compress::Raw::Zlib::Inflate::new;
 
 eval { require MIME::Base64 };
 *MIME::Base64::encode_base64 = sub {die("MIME::Base64 is not available\n")} unless defined &MIME::Base64::encode_base64;
