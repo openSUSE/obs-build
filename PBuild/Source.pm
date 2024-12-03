@@ -155,4 +155,11 @@ sub calc_srcmd5 {
   return Digest::MD5::md5_hex($meta);
 }
 
+sub calc_dir_srcmd5 {
+  my ($dir) = @_;
+  die("$dir: $!\n") unless -e $dir;
+  die("$dir: Not a directory\n") unless -d _;
+  return gendirdigest($dir);
+}
+
 1;

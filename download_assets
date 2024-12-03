@@ -26,6 +26,13 @@ BEGIN {
     $::ENV{'BUILD_DIR'} = $p if $p =~ s/\/[^\/]+$// && $p ne '/usr/lib/build' && -d "$p/PBuild";
   }
   unshift @INC, ($::ENV{'BUILD_DIR'} && ! -e '/etc/build.conf' ? $::ENV{'BUILD_DIR'} : '/usr/lib/build');
+
+  # speed up the --show-dir-srcmd5 option by handling it here
+  if (@ARGV == 3 && $ARGV[0] eq '--show-dir-srcmd5' && $ARGV[1] eq '--') {
+    require PBuild::Source;
+    print PBuild::Source::calc_dir_srcmd5($ARGV[2])."\n";
+    exit(0);
+  }
 }
 
 use strict;
@@ -114,10 +121,7 @@ if ($opts->{'create-cpio'}) {
 
 if ($opts->{'show-dir-srcmd5'}) {
   die("Please specify a directory\n") unless @dirs == 1;
-  my $dir = shift @dirs;
-  die("$dir: $!\n") unless -e $dir;
-  die("$dir: Not a directory\n") unless -d _;
-  print PBuild::Source::gendirdigest($dir)."\n";
+  print PBuild::Source::calc_dir_srcmd5($dirs[0])."\n";
   exit(0);
 }
 
