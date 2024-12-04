@@ -222,6 +222,8 @@ sub do_test {
     $t = $args[1] ne '' ? 1 : 0;
   } elsif (($args[1] eq '=' || $args[1] eq '==') && @args > 2) {
     $t = $args[0] eq $args[2] ? 1 : 0;
+  } elsif ($args[1] eq '!=' && @args > 2) {
+    $t = $args[0] ne $args[2] ? 1 : 0;
   } elsif (($args[1] eq '-ne') && @args > 2) {
     $t = $args[0] != $args[2] ? 1 : 0;
   } elsif (($args[1] eq '-eq') && @args > 2) {
