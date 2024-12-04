@@ -61,7 +61,6 @@ pkg_preinstall_apk() {
     fi
     rm -rf .PKGINFO
     if test "$PKG" = busybox ; then
-	echo HELLO
 	for i in mount umount mkdir ls ln rm touch date sync sleep stat ldconfig mkswap swapon uname ; do
 	    test -e "bin/$i" || ln -fs busybox "bin/$i"
 	done
