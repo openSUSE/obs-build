@@ -397,6 +397,9 @@ sub expand {
   my $usesupplementsforchoices;
   my $dorecommends = $config->{'expandflags:dorecommends'};
 
+  my $binarytype = $config->{'binarytype'} || 'rpm';
+  $keepfilerequires = 1 if $binarytype ne 'rpm' && $binarytype ne 'UNDEFINED';
+
   my $whatprovides = $config->{'whatprovidesh'};
   my $requires = $config->{'requiresh'};
 
