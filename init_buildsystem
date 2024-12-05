@@ -470,6 +470,8 @@ create_cache_file() {
 		set -- $BUILD_DIR/createyastdeps --cachedir="$CACHE_DIR" "$SRC"
 	    elif test "$SRCREPOTYPE" = hdlist2 ; then
 		set -- $BUILD_DIR/createmdkdeps --cachedir="$CACHE_DIR" "$SRC"
+	    elif test "$SRCREPOTYPE" = apk ; then
+		set -- $BUILD_DIR/createapkdeps --cachedir="$CACHE_DIR" "$SRC"
 	    else
 		set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
 	    fi
