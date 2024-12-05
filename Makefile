@@ -66,6 +66,7 @@ install:
 	    listinstalled \
 	    call-flatpak-builder \
 	    createzyppdeps \
+	    createapkdeps \
 	    createarchdeps \
 	    createdebdeps \
 	    createrepomddeps \
