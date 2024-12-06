@@ -789,6 +789,11 @@ sub expand {
 	  if ($rs =~ /^\(.*\)$/) {
 	    my $rd = Build::Rpm::parse_rich_dep($rs);
 	    next unless $rd && fulfilled_cplx_rec($config, \%p, $rd);
+	  } elsif ($rs =~ / \& /) {
+	    my @sups = split(/\s+\&\s+/, $rs);
+	    my $rd;
+	    $rd = $rd ? [1, [ 0, $_], $rd] : [0, $_] for reverse @sups;
+	    next unless $rd && fulfilled_cplx_rec($config, \%p, $rd);
 	  } else {
 	    next unless grep {$p{$_}} @{$whatprovides->{$rs} || Build::addproviders($config, $rs)};
 	  }
