@@ -140,7 +140,7 @@ sub expandvars {
 sub quote {
   my ($str, $q, $vars) = @_;
   $str = expandvars($str, $vars) if $q ne "'" && $str =~ /\$/;
-  $str =~ s/([ \t\"\'\$])/sprintf("%%%02X", ord($1))/ge;
+  $str =~ s/([ \t\"\'\$#])/sprintf("%%%02X", ord($1))/ge;
   $str = "%00" if $str eq '';	# so that split sees something
   return $str;
 }
@@ -149,7 +149,9 @@ sub unquotesplit {
   my ($str, $vars, $unbalanced) = @_;
   $str =~ s/%/%25/g;
   $str =~ s/^[ \t]+//;
-  while ($str =~ /([\"\'])/) {
+  my $re = $unbalanced ? qr{([\"\'\#])} : qr{([\"\'])}; 
+  while ($str =~ /$re/) {
+    last if $1 eq '#';
     my $q = $1;
     if ($str !~ s/$q(.*?)$q/quote($1, $q, $vars)/se) {
       return (undef) if $unbalanced;
