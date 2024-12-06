@@ -422,7 +422,7 @@ my %pkginfomap = (
   'depend' => [ 'requires' ],
 #  'replaces' => [ 'obsoletes' ],
   'provides' => [ 'provides' ],
-  'install_if' => [ 'supplements' ],
+  'install_if' => [ 'install_if' ],
   'datahash' => 'apkdatachksum',
 );
 
@@ -464,6 +464,8 @@ sub query {
   $q{'release'} = $1 if $q{'version'} =~ s/-([^-]*)$//;
   $q{'hdrmd5'} = Digest::MD5::md5_hex($pkginfo);
   $q{'source'} ||= $q{'name'} if defined $q{'name'};
+  my $install_if = delete $q{'install_if'};
+  $q{'supplements'} = [ join(' & ', @$install_if) ] if @{$install_if || []} && $opts{'weakdeps'};
   delete $q{'supplements'} unless $opts{'weakdeps'};
   delete $q{'buildtime'} unless $opts{'buildtime'};
   delete $q{'apkdatachksum'} unless $opts{'apkdatachksum'};
@@ -483,7 +485,7 @@ my %idxinfomap = (
   'D' => [ 'requires' ],
 #  'r' => [ 'obsoletes' ],
   'p' => [ 'provides' ],
-  'i' => [ 'supplements' ],
+  'i' => [ 'install_if' ],
 );
 
 sub parseidx {

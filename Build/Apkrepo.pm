@@ -38,7 +38,7 @@ sub addpkg {
   }
   if ($options->{'normalizedeps'}) {
     # our normalized dependencies have spaces around the op
-    for my $dep (qw {provides requires conflicts obsoletes supplements}) {
+    for my $dep (qw {provides requires conflicts obsoletes supplements install_if}) {
       next unless $data->{$dep};
       for (@{$data->{$dep}}) {
         s/^([a-zA-Z0-9\._+-]+)~/$1=~/;
@@ -46,6 +46,9 @@ sub addpkg {
       }
     }
   }
+  my $install_if = delete $data->{'install_if'};
+  $data->{'supplements'} = [ join(' & ', @$install_if) ] if @{$install_if || []};
+
   $data->{'location'} = "$data->{'name'}-$data->{'version'}.apk";
   $data->{'release'} = $1 if $data->{'version'} =~ s/-([^-]*)$//s;
   my $apk_chksum = delete $data->{'apk_chksum'};
