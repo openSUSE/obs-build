@@ -140,7 +140,7 @@ sub expandvars {
 sub quote {
   my ($str, $q, $vars) = @_;
   $str = expandvars($str, $vars) if $q ne "'" && $str =~ /\$/;
-  $str =~ s/([ \t\"\'\$#])/sprintf("%%%02X", ord($1))/ge;
+  $str =~ s/([ \n\t\"\'\$#])/sprintf("%%%02X", ord($1))/ge;
   $str = "%00" if $str eq '';	# so that split sees something
   return $str;
 }
@@ -159,7 +159,7 @@ sub unquotesplit {
     }
   }
   $str = expandvars($str, $vars) if $str =~ /\$/;
-  my @args = split(/[ \t]+/, $str);
+  my @args = split(/[ \t\n]+/, $str);
   for (@args) {
     s/%([a-fA-F0-9]{2})/$1 ne '00' ? chr(hex($1)) : ''/ge;
   }
