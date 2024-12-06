@@ -1735,6 +1735,8 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 
     # fixup passwd/group
     if test $BUILD_USER = abuild ; then
+	# switch to gid 300 for alpine
+	test "$BUILDTYPE" = apk -a $ABUILD_GID = 399 && ABUILD_GID=300
 	if ! grep -E '^abuild:' >/dev/null <$BUILD_ROOT/etc/passwd ; then
 	    echo "abuild:x:${ABUILD_UID}:${ABUILD_GID}:Autobuild:/home/abuild:/bin/bash" >>$BUILD_ROOT/etc/passwd
 	    echo 'abuild:*:::::::' >>$BUILD_ROOT/etc/shadow # This is needed on Mandriva 2009
