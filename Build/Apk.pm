@@ -351,12 +351,14 @@ sub parse {
       my @vals = unquotesplit($2, \%vars);
       my $body = readloopbody(\*PKG);
       $inloop = [ 0, 'for', $var, \@vals, $body ] if $body && @vals;
+      push @pushback, 'done' if $inloop;
       next;
     }
     if ($preamble && !$inloop && !@pushback && /^while\s+\[\s(.+)\s+]\s*;\s*do\s*$/) {
       my $cond = $1;
       my $body = readloopbody(\*PKG);
       $inloop = [ 0, 'while', undef, $cond, $body ] if $body;
+      push @pushback, 'done' if $inloop;
       next;
     }
 
