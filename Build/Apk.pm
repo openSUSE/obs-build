@@ -206,7 +206,7 @@ sub glob2re {
   $g =~ s/\\\-/-/g;
   $g =~ s/\\\*/.*$nogreed/g;
   $g =~ s/\\\?/./g;
-  $g =~ s/\\\[([^\[\]\\]*?)\\\]/[$1]/g;
+  $g =~ s/\\\[([^\[\]]*?)\\\]/[$1]/g;
   return $g;
 }
 
@@ -405,6 +405,13 @@ sub parse {
   push @dnames, 'checkdepends' unless grep {$_ eq '!check'} split(' ', $vars{'options'} || '');
   for (@dnames) {
     push @{$ret->{'deps'}}, split(" ", $vars{$_} ) if defined $vars{$_};
+  }
+
+  if ($vars{'subpackages'}) {
+    $ret->{'subpacks'} = [ $ret->{'name'} ];
+    for (split(' ', $vars{'subpackages'})) {
+      push @{$ret->{'subpacks'}}, /^(.*?):/ ? $1 : $_;
+    }
   }
 
   # convert name~ver to name=~ver
