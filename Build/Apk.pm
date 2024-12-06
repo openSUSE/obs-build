@@ -128,6 +128,11 @@ sub expandvars_cplx {
     $v1 =~ s/^$v2//;
     return $v1;
   }
+  if ($v =~ /^([^:]+):-(.*)$/) {
+    my ($v1, $v2) = ($vars->{$1}, $2);
+    $v1 = $v2 if !defined($v1) || $v1 eq '';
+    return $v1;
+  }
   return '';
 }
 
