@@ -395,12 +395,10 @@ sub parse {
   $ret->{'version'} = $vars{'pkgver'} if defined $vars{'pkgver'};
   $ret->{'release'} = "r$vars{'pkgrel'}" if defined $vars{'pkgrel'};
   $ret->{'deps'} = [];
-  if (!defined $vars{'makedepends'}) {
-    for (qw{makedepends_build makedepends_host}) {
-      push @{$ret->{'deps'}}, split(" ", $vars{$_} ) if defined $vars{$_};
-    }
-  }
-  for (qw{makedepends checkdepends depends}) {
+  my @dnames = qw{depends makedepends};
+  push @dnames, qw{makedepends_build makedepends_host} unless defined $vars{'makedepends'};
+  push @dnames, 'checkdepends' unless grep {$_ eq '!check'} split(' ', $vars{'options'} || '');
+  for (@dnames) {
     push @{$ret->{'deps'}}, split(" ", $vars{$_} ) if defined $vars{$_};
   }
 
