@@ -1816,7 +1816,7 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	echo "#!/bin/sh -e" > $BUILD_ROOT/.unpack.command
 	shellquote cd "$TOPDIR/SOURCES" >> $BUILD_ROOT/.unpack.command
 	echo >> $BUILD_ROOT/.unpack.command
-	if test -L $BUILD_ROOT/usr/bin/cpio -a $(readlink $BUILD_ROOT/usr/bin/cpio) = /bin/busybox ; then
+	if test -L $BUILD_ROOT/usr/bin/cpio && test "$(readlink $BUILD_ROOT/usr/bin/cpio)" = /bin/busybox ; then
 	    rm -f $BUILD_ROOT/.build.unpackarchive
 	    cp "$BUILD_DIR/unpackarchive" $BUILD_ROOT/.build.unpackarchive
 	    echo -n 'perl /.build.unpackarchive --cpio < ' >> $BUILD_ROOT/.unpack.command
