@@ -33,6 +33,7 @@ use Time::Zone;
 
 use strict;
 
+$ENV{TZ} = "UTC";
 my @wday = qw{Sun Mon Tue Wed Thu Fri Sat};
 my @mon = qw{Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec};
 
