@@ -572,9 +572,9 @@ sub calcapkchksum {
   my ($handle, $type, $section, $toeof) = @_; 
   $section ||= 'ctrl';
   $type ||= 'Q1';
-  die("unsupported apkchksum type $type\n") unless $type eq 'Q1' || $type eq 'sha1' || $type eq 'sha256' || $type eq 'sha512' || $type eq 'md5';
-  die("unsupported apkchksum section $section\n") unless $section eq 'ctrl' || $section eq 'data';
-  $section = $section eq 'ctrl' ? 1 : 2;
+  die("unsupported apkchksum type $type\n") unless $type eq 'Q1' || $type eq 'sha1' || $type eq 'sha256' || $type eq 'sha512' || $type eq 'md5' || $type eq 'raw';
+  die("unsupported apkchksum section $section\n") unless $section eq 'sig' || $section eq 'ctrl' || $section eq 'data';
+  $section = $section eq 'sig' ? 0 : $section eq 'ctrl' ? 1 : 2;
   my $fd;
   open($fd, '<', $handle) or die("$handle: $!\n");
   my $ctx;
@@ -582,7 +582,8 @@ sub calcapkchksum {
   $ctx = Digest::SHA->new(256) if $type eq 'sha256';
   $ctx = Digest::SHA->new(512) if $type eq 'sha512';
   $ctx = Digest::MD5->new() if $type eq 'md5';
-  die("unsupported apkchksum type $type\n") unless $ctx;
+  $ctx = '' if $type eq 'raw';
+  die("unsupported apkchksum type $type\n") unless defined $ctx;
   my $z = new Compress::Raw::Zlib::Inflate(-WindowBits => 15 + Compress::Raw::Zlib::WANT_GZIP_OR_ZLIB(), LimitOutput => 1);
   my $sec = 0;
   my $input = '';
@@ -598,7 +599,11 @@ sub calcapkchksum {
       undef $output;
       $status = $z->inflate($input, $output);
     }
-    $ctx->add(substr($oldinput, 0, length($oldinput) - length($input))) if $sec == $section;
+    if ($type eq 'raw') {
+      $ctx .= substr($oldinput, 0, length($oldinput) - length($input));
+    } else {
+      $ctx->add(substr($oldinput, 0, length($oldinput) - length($input))) if $sec == $section;
+    }
     next if $status == Compress::Raw::Zlib::Z_BUF_ERROR();
     if ($status == Compress::Raw::Zlib::Z_STREAM_END()) {
       $sec++;
@@ -612,8 +617,68 @@ sub calcapkchksum {
     $ctx->add($input);
     $ctx->addfile($fd);
   }
+  return $ctx if $type eq 'raw';
   return 'Q1'.MIME::Base64::encode_base64($ctx->digest(), '') if $type eq 'Q1';
   return $ctx->hexdigest();
+}
+
+# return the to-be-signed data of a package
+sub gettbsdata {
+  my ($handle) = @_;
+  return calcapkchksum($handle, 'raw');
+}
+
+sub mktar {
+  my ($fn, $type, $time, $data) = @_;
+  if (length($fn) > 100) {
+    my $pe = "path=$fn";
+    my $paxdata;
+    my $l = length($pe) + 3;
+    $l++ while length($paxdata = sprintf("%d %s\n", $l, $pe)) > $l;
+    my $ph = mktar(substr("./PaxHeaders/$fn", 0, 100), 'x', $time, $paxdata);
+    return $ph . mktar(substr($fn, 0, 100), $type, $time, $data);
+  }
+  die("oversized tar file name\n") if length($fn) > 100;
+  my $size = length($data);
+  my $sizestr = sprintf("%011o", $size);
+  my $timestr = sprintf("%011o", $time);
+  my $h = "\0\0\0\0\0\0\0\0" x 64;
+  substr($h, 0, length($fn), $fn);
+  substr($h, 100, 7, '0000644');
+  substr($h, 108, 15, "0000000\0000000000");	# uid/gid
+  substr($h, 124, length($sizestr), $sizestr);
+  substr($h, 136, length($timestr), $timestr);
+  substr($h, 148, 8, '        ');
+  substr($h, 156, 1, $type);
+  substr($h, 257, 8, "ustar\00000");
+  substr($h, 148, 7, sprintf("%06o\0", unpack("%16C*", $h)));
+  return $h . $data . ($size % 512 ? "\0" x (512 - $size % 512) : '');
+}
+
+sub replacesignature {
+  my ($handle, $ohandle, $signature, $time, $algo, $hash, $keyname, $keyid) = @_;
+  my $sigtype;
+  $sigtype = 'RSA' if $algo eq 'rsa' && $hash eq 'sha1';
+  $sigtype = 'RSA256' if $algo eq 'rsa' && $hash eq 'sha256';
+  $sigtype = 'RSA512' if $algo eq 'rsa' && $hash eq 'sha512';
+  die("replacesignature: unsupported algo/hash combination: $algo/$hash\n") unless $sigtype;
+  # create dummy tar entry
+  my $te = mktar(".SIGN.$sigtype.$keyname", '0', $time, $signature);
+  # compress
+  require Compress::Zlib;
+  $te = Compress::Zlib::memGzip($te);
+  # get size of old signature
+  my $oldsigsize = length(calcapkchksum($handle, 'raw', 'sig'));
+  my $h;
+  open($h, '<', $handle) || die("$handle: $!\n");
+  sysseek($h, $oldsigsize, 0) || die("seek failed\n");
+  my $oh;
+  open($oh, '>', $ohandle) || die("$ohandle: $!\n");
+  print $oh $te or die("write: $!\n");
+  my $buf;
+  print $oh $buf or die("write: $!\n") while sysread($h, $buf, 65536) > 0;
+  close($oh) || die("close: $!\n");
+  close($h);
 }
 
 my %verscmp_class = ( '.' => 1, 'X' => 2, '_' => 3, '~' => 4, '-' => 5, '$' => 6, '!' => 7 );
