@@ -245,6 +245,211 @@ sub tar_readhead {
 
 
 #
+# APKv3 handling
+#
+
+# schema definitions stripped to what we need
+my $apkv3_acl_schema = [
+  [ 'i', 'mode' ],
+];
+
+my $apkv3_file_schema = [
+  [ 'b', 'name' ],
+  [ 'o', '', $apkv3_acl_schema ],
+  [ 'i', 'size' ],
+  [ 'i', 'mtime' ],
+  [ undef ],
+  [ 'b', 'target' ],
+];
+
+my $apkv3_dir_schema = [
+  [ 'b', 'name' ],
+  [ 'o', '', $apkv3_acl_schema ],
+  [ 'o*', 'files', $apkv3_file_schema ],
+];
+
+my $apkv3_scripts_schema = [
+  [ 'b', 'trigger' ],
+  [ 'b', 'preinstall' ],
+  [ 'b', 'postinstall' ],
+  [ 'b', 'preuninstall' ],
+  [ 'b', 'postuninstall' ],
+  [ 'b', 'preupgrade' ],
+  [ 'b', 'postupgrade' ],
+];
+
+my $apkv3_pkg_schema = [
+  [ undef ],
+  [ 'o*', 'dirs', $apkv3_dir_schema ],
+  [ 'o', '', $apkv3_scripts_schema ],
+];
+
+sub apkv3_walk {
+  #my ($adb, $data, $schema, $vals, $multi) = @_;
+  my @s = @{$_[2]};
+  my @vals = @{$_[3]};
+  my $multi = $_[4];
+  while (@vals && @s) {
+    my $s = shift @s;
+    my $v = shift @vals;
+    next if !defined($s) || !defined($s->[0]);
+    my $t = ($v >> 28) & 0x0f;
+    $v &= 0xfffffff;
+    next if $t == 0 && $v == 0; # NULL
+    my ($st, $name, $oschema, $cvt) = @$s;
+    next unless defined $st && defined $name;
+    if ($st =~ s/\*$// && !$multi) {
+      my $num = unpack("\@${v}V", $_[0]);
+      my @v = unpack("\@${v}V$num", $_[0]);
+      die unless @v && @v == $num;
+      shift @v;
+      apkv3_walk($_[0], $_[1], [ ($s) x ($num - 1) ], \@v, 1);
+      next;
+    }
+    if ($st eq 'b') {
+      die("wrong type for blob ($t)\n") if $t != 8 && $t != 9 && $t != 10;
+      my $l;
+      $l = unpack("\@${v}C", $_[0]) if $t == 8;
+      $l = unpack("\@${v}v", $_[0]) if $t == 9;
+      $l = unpack("\@${v}V", $_[0]) if $t == 10;
+      $v = substr($_[0], $v + $t - 7 + ($t == 10 ? 1 : 0), $l);
+    } elsif ($st eq 'i') {
+      die("wrong type for int ($t)\n") if $t != 1 && $t != 2 && $t != 3;
+      $v = unpack("\@${v}V", $_[0]) if $t == 2;
+      $v = unpack("\@${v}V", $_[0]) + (unpack("\@${v}VV", $_[0]))[1] * 65536 * 65536 if $t == 3;
+    } elsif ($st eq 'o') {
+      die("wrong type for obj ($t)\n") if $t != 14;
+      my $num = unpack("\@${v}V", $_[0]);
+      my @v = unpack("\@${v}V$num", $_[0]);
+      die unless @v && @v == $num;
+      shift @v;
+      $v = $name eq '' ? $_[1]: {};
+      apkv3_walk($_[0], $v, $s->[2], \@v);
+      next if $name eq '';
+    } else {
+      die("unsupported type $st in schema\n");
+    }
+    $v = $s->[3]->($v) if $cvt;
+    if ($multi) {
+      push @{$_[1]->{$name}}, $v;
+    } else {
+      $_[1]->{$name} = $v;
+    }
+  }
+}
+
+sub apkv3_walk_root {
+  my $data = {};
+  my $v = unpack('@4V', $_[0]);
+  apkv3_walk($_[0], $data, [[ 'o', '', $_[1]]], [ $v ]);
+  return $data;
+}
+
+sub apkv3_handle_decompression {
+  my ($prepend) = @_;
+  die unless length($prepend) == 16;
+  my ($alg, $level);
+  if (substr($prepend, 0, 4) eq 'ADBc') {
+    ($alg, $level) = unpack('@4CC', $prepend);
+    substr($prepend, 0, 6, '');
+  } elsif (substr($prepend, 0, 4) eq 'ADBd') {
+    $alg = 1;
+    substr($prepend, 0, 4, '');
+  } elsif (substr($prepend, 0, 4) eq 'ADB.') {
+    $alg = 0;
+  } else {
+    die("not an apkv3 file\n");
+  }
+  die("unsupported compression $alg\n") if $alg > 2;
+  $prepend = "\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\x00$prepend" if $alg == 1;
+  die("zstd decompression error\n") if $alg == 2 && substr($prepend, 0, 3) ne "\x28\xb5\x2f";
+  handle_decompression($prepend, 1);
+}
+
+sub apkv3_read_blk_header {
+  my $type_size = unpack('V', readdata(4));
+  my ($type, $size) = ((($type_size >> 30) & 3), ($type_size & 0x3fffffff));
+  my $pad = $size & 7;;
+  if ($type == 3) {
+    $type = $size;
+    my @s = unpack('VVV', readdata(12));
+    $size = $s[1] + $s[2] * 65536 * 65536;
+    $pad = $s[1] & 7;
+    $size -= 12;
+  }
+  $size -= 4;
+  die("bad apkv3 block size\n") if $size < 0;
+  return ($type, $size, $pad ? 8 - $pad : 0);
+}
+
+sub apkv3_setup {
+  my ($prepend) = @_;
+  apkv3_handle_decompression($prepend);
+  # read file header
+  my $file_header = readdata(8);
+  die("not an apk package $file_header\n") unless $file_header eq "\x41\x44\x42\x2e\x70\x63\x6b\x67";
+
+  #read adb
+  my ($adbtype, $adbsize, $adbpad) = apkv3_read_blk_header();
+  die("bad adb block type\n") unless $adbtype == 0;
+  die("oversized adb block\n") if $adbsize > 0x10000000;	# 256 MB
+  my $adb = readdata($adbsize);
+  readdata($adbpad) if $adbpad;
+  # read sig
+  my ($sigtype, $sigsize, $sigpad) = apkv3_read_blk_header();
+  die("bad sig block type $sigtype\n") unless $sigtype == 1;
+  die("oversized sig block\n") if $sigsize > 0x100000;		# 1 MB
+  readdata($sigsize + $sigpad);
+
+  # parse adb
+  my $data = apkv3_walk_root($adb, $apkv3_pkg_schema);
+  my @ents;
+
+  # generate entries for the scripts
+  for my $script (qw{trigger preinstall postinstall preuninstall postuninstall preupgrade postupgrade}) {
+    my $scr = $data->{$script};
+    next unless defined $scr;
+    my $fn = ".$script";
+    $fn =~ s/(pre|post)/$1-/;
+    push @ents, { 'type' => 'f', 'name' => $fn, 'size' => length($scr), 'mode' => 0644, 'data' => $scr };
+  }
+
+  # generate entries for the file list
+  my $diridx = 0;
+  for my $d (@{$data->{'dirs'} || []}) {
+    push @ents, { 'type' => 'd', 'name' => (defined($d->{'name'}) ? $d->{'name'}  : '.'), 'mode' => ($d->{'mode'} || 0755), 'diridx' => ++$diridx };
+    my $fileidx = 0;
+    for my $f (@{$d->{'files'} || []}) {
+      my $fn = defined($d->{'name'}) ? "$d->{'name'}/$f->{'name'}" : $f->{'name'};
+      my $ff = { 'type' => 'f', 'name' => $fn, 'size' => $f->{'size'}, 'mode' => ($f->{'mode'} || 0644), 'mtime' => $f->{'mtime'}, 'diridx' => $diridx, 'fileidx' => ++$fileidx };
+      my $target = $f->{'target'};
+      if (defined($target)) {
+        my $tmode = unpack('v', substr($target, 0, 2, ''));
+        next unless $tmode == 0xa000 || $tmode == 0x8000;
+	$ff->{'type'} = $tmode == 0xa000 ? 'l' : 'L';
+	$ff->{'linkname'} = $target;
+      }
+      push @ents, $ff;
+    }
+  }
+  return sub { apkv3_readhead(\@ents) };
+}
+
+sub apkv3_readhead {
+  my ($ents) = @_;
+  my $ent = shift @$ents;
+  return unless defined $ent;
+  return ($ent, 0, 0) unless $ent->{'type'} eq 'f' && $ent->{'size'} != 0 && !defined($ent->{'data'});
+  my ($datatype, $datasize, $datapad) = apkv3_read_blk_header();
+  die("bad data block type\n") unless $datatype == 2;
+  die("bad data block size\n") unless $datasize == 8 + $ent->{'size'};
+  my ($diridx, $fileidx) = unpack('VV', readdata(8));
+  die("mismatched data block\n") unless $diridx == $ent->{'diridx'} && $fileidx == $ent->{'fileidx'};
+  return ($ent, $ent->{'size'}, $datapad);
+}
+  
+
+#
 # Path resolving
 #
 my %cache;	# name => resolved_dir
@@ -320,8 +525,10 @@ sub detect_decompressor {
 }
 
 sub handle_decompression {
-  my $first16bytes = readdata(16);
+  my ($first16bytes, $force_pipe) = @_;
+  $first16bytes = readdata(16) unless defined $first16bytes;
   my @decomp = detect_decompressor($first16bytes);
+  @decomp = ('cat') if $force_pipe && !@decomp;
   return $first16bytes unless @decomp;
   local *F;
   open(F, "<&STDIN") || die("stdin dup: $!\n");
@@ -345,6 +552,7 @@ sub handle_decompression {
       print G $d;
     }
     close(G) || die("pipe close: $!\n");
+    exit 0;
   }
   close(F);
   return undef;
@@ -354,7 +562,7 @@ sub handle_decompression {
 #
 # Main
 #
-die("usage: unpackarchive --cpio|--tar [-C <root>]\n") unless @ARGV;
+die("usage: unpackarchive --cpio|--tar|--apk [-C <root>]\n") unless @ARGV;
 my $format = shift @ARGV;
 my $root = '.';
 while (@ARGV) {
@@ -365,7 +573,7 @@ while (@ARGV) {
   } elsif ($ARGV[0] =~ /^-/) {
     die("unpackarchive: unsupported option $ARGV[0]\n");
   } else {
-    die("usage: unpackarchive --cpio|--tar [-C <root>]\n");
+    die("usage: unpackarchive --cpio|--tar|--apk [-C <root>]\n");
   }
 }
 
@@ -373,11 +581,15 @@ die("$root: No such file or directory\n") unless -d $root;
 my $readhead;
 $readhead = \&cpio_readhead if $format eq '--cpio';
 $readhead = \&tar_readhead if $format eq '--tar';
+$readhead = \&tar_readhead if $format eq '--apk';
 die("unknown format option $format\n") unless $readhead;
 
 umask(0);	# do not mess with the modes
 
 my $prepend = handle_decompression();
+
+$readhead = apkv3_setup($prepend) if $format eq '--apk' && $prepend && substr($prepend, 0, 3) eq 'ADB';
+
 while (1) {
   my ($ent, $size, $pad) = $readhead->($prepend);
   undef $prepend;
@@ -444,7 +656,11 @@ while (1) {
   } elsif ($type eq 'f') {
     my $fd;
     sysopen($fd, "$root$name", O_WRONLY|O_CREAT|O_TRUNC, $ent->{'mode'} & 07777) || die("$root$name: $!\n");
-    copydata($fd, $size);
+    if (defined $ent->{'data'}) {
+      writedata($fd, $ent->{'data'});
+    } else {
+      copydata($fd, $size);
+    }
     close($fd) || die("close $name: $!\n");
     utime($ent->{'mtime'}, $ent->{'mtime'}, "$root$name");
     skipdata($pad);
