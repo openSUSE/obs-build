@@ -423,25 +423,14 @@ sub parse {
   return $ret;
 }
 
-
-my %pkginfomap = (
-  'pkgname' => 'name',
-  'pkgver' => 'version',
-  'pkgdesc' => 'summary',
-  'url' => 'url',
-  'builddate' => 'buildtime',
-  'arch' => 'arch',
-  'license' => 'license',
-  'origin' => 'source',
-  'depend' => [ 'requires' ],
-#  'replaces' => [ 'obsoletes' ],
-  'provides' => [ 'provides' ],
-  'install_if' => [ 'install_if' ],
-  'datahash' => 'apkdatachksum',
+my %pkginfo_array = (
+  'depend' => 1,
+  'replaces' => 1,
+  'provides' => 1,
 );
 
-sub query {
-  my ($handle, %opts) = @_;
+sub queryvars {
+  my ($handle, $withhdrmd5) = @_;
   my $tar = Archive::Tar->new;
   my @read = $tar->read($handle, 1, {'filter' => '^\.PKGINFO$', 'limit' => 1});
   die("$handle: not an apk package file\n") unless @read == 1;
@@ -453,18 +442,47 @@ sub query {
     my $l = shift @lines;
     next if $l eq '' || substr($l, 0, 1) eq '#';
     next unless $l =~ /^(.+?) = (.*)$/;
-    my $m = $pkginfomap{$1};
-    if (ref($m)) {
-      push @{$q{$m->[0]}}, $2;
-    } elsif ($m) {
-      $q{$m} = $2;
+    if ($pkginfo_array{$1}) {
+      push @{$q{$1}}, $2;
+    } else {
+      $q{$1} = $2;
     }
+  }
+  $q{'hdrmd5'} = Digest::MD5::md5_hex($pkginfo) if $withhdrmd5;
+  $q{'install_if'} = [ split(' ', $q{'install_if'}) ] if $q{'install_if'};
+  return \%q;
+}
+
+my %pkginfomap = (
+  'pkgname' => 'name',
+  'pkgver' => 'version',
+  'pkgdesc' => 'summary',
+  'url' => 'url',
+  'builddate' => 'buildtime',
+  'arch' => 'arch',
+  'license' => 'license',
+  'origin' => 'source',
+  'depend' => 'requires',
+#  'replaces' => 'obsoletes',
+  'provides' => 'provides',
+  'datahash' => 'apkdatachksum',
+  'hdrmd5' => 'hdrmd5',
+);
+
+sub query {
+  my ($handle, %opts) = @_;
+  my $qq = queryvars($handle, 1);
+  my %q;
+  for (keys %$qq) {
+    my $m = $pkginfomap{$_};
+    $q{$m} = $qq->{$_} if $m;
   }
   my @conflicts = grep {/^\!/} @{$q{'requires'} || []};
   if (@conflicts) {
     substr($_, 0, 1, '') for @conflicts;
     $q{'conflicts'} = \@conflicts;
     $q{'requires'} = [ grep {!/^\!/} @{$q{'requires'} || []} ];
+    delete $q{'requires'} unless @{$q{'requires'}};
   }
   if ($q{'name'} && $opts{'addselfprovides'}) {
     my $selfprovides = $q{'name'};
@@ -472,15 +490,12 @@ sub query {
     push @{$q{'provides'}}, $selfprovides unless @{$q{'provides'} || []} && $q{'provides'}->[-1] eq $selfprovides;
   }
   if ($opts{'normalizedeps'}) {
-    s/^([a-zA-Z0-9\._+-]+)~/$1=~/ for @{$q{'requires'} || []}, @{$q{'conflicts'} || []};
+    s/^([a-zA-Z0-9\._+-]+)~/$1=~/ for @{$q{'requires'} || []}, @{$q{'conflicts'} || []}, @{$qq->{'install_if'} || []};
   }
   $q{'version'} = 0 unless defined $q{'version'};
   $q{'release'} = $1 if $q{'version'} =~ s/-([^-]*)$//;
-  $q{'hdrmd5'} = Digest::MD5::md5_hex($pkginfo);
   $q{'source'} ||= $q{'name'} if defined $q{'name'};
-  my $install_if = delete $q{'install_if'};
-  $q{'supplements'} = [ join(' & ', @$install_if) ] if @{$install_if || []} && $opts{'weakdeps'};
-  delete $q{'supplements'} unless $opts{'weakdeps'};
+  $q{'supplements'} = [ join(' & ', @{$qq->{'install_if'}}) ] if $opts{'weakdeps'} && $qq->{'install_if'};
   delete $q{'buildtime'} unless $opts{'buildtime'};
   delete $q{'apkdatachksum'} unless $opts{'apkdatachksum'};
   return \%q;
@@ -600,7 +615,7 @@ sub calcapkchksum {
       $status = $z->inflate($input, $output);
     }
     if ($type eq 'raw') {
-      $ctx .= substr($oldinput, 0, length($oldinput) - length($input));
+      $ctx .= substr($oldinput, 0, length($oldinput) - length($input)) if $sec == $section;
     } else {
       $ctx->add(substr($oldinput, 0, length($oldinput) - length($input))) if $sec == $section;
     }
