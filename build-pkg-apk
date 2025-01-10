@@ -53,7 +53,7 @@ pkg_finalize_apk() {
 
 pkg_preinstall_apk() {
     mkdir -p "$BUILD_INIT_CACHE/scripts"
-    $TAR < "$BUILD_INIT_CACHE/rpms/$PKG.apk"
+    $BUILD_DIR/unpackarchive --apk < "$BUILD_INIT_CACHE/rpms/$PKG.apk"
     rm -rf "$BUILD_INIT_CACHE/scripts/$PKG.post"
     if test -e "$BUILD_INIT_CACHE/scripts/$PKG.run" -a -f .post-install -a ! -L .post-install ; then
         cat .post-install > "$BUILD_INIT_CACHE/scripts/$PKG.post"

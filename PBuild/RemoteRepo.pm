@@ -482,9 +482,9 @@ sub querybinary {
 sub fetchbinaries_replace {
   my ($repodir, $tmpname, $binname, $bin) = @_;
   Build::Download::checkfiledigest("$repodir/$tmpname", $bin->{'checksum'}) if $bin->{'checksum'};
-  if ($bin->{'apkchksum'}) {
-    die("Unsupported apk checksum bin->{'apkchksum'}\n") unless $bin->{'apkchksum'} =~ /^Q1/;
-    my $apkchksum = Build::Apk::calcapkchksum("$repodir/$tmpname", 'Q1');
+  if ($bin->{'apkchksum'} && $bin->{'apkchksum'} !~ /^X1/) {
+    die("Unsupported apk checksum $bin->{'apkchksum'}\n") unless $bin->{'apkchksum'} =~ /^([QX][12])/;
+    my $apkchksum = Build::Apk::calcapkchksum("$repodir/$tmpname", $1);
     die("downloaded binary $binname does not match apk checksum: $bin->{'apkchksum'} != $apkchksum\n") if $bin->{'apkchksum'} ne $apkchksum;
   }
   my $q = querybinary($repodir, $tmpname);

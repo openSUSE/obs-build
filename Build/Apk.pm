@@ -469,9 +469,25 @@ my %pkginfomap = (
   'hdrmd5' => 'hdrmd5',
 );
 
+sub is_apkv3 {
+  my ($file) = @_;
+  my $fd;
+  open($fd, '<', $file) || die("$file: $!\n");
+  my $first;
+  read($fd, $first, 3);
+  close $fd;
+  return $first && substr($first, 0, 3) eq 'ADB' ? 1 : 0;
+}
+
 sub query {
   my ($handle, %opts) = @_;
-  my $qq = queryvars($handle, 1);
+  my $qq;
+  if (is_apkv3($handle)) {
+    require Build::Apkv3 unless defined &Build::Apkv3::querypkginfo;
+    $qq = Build::Apkv3::querypkginfo($handle, 1);
+  } else {
+    $qq = queryvars($handle, 1);
+  }
   my %q;
   for (keys %$qq) {
     my $m = $pkginfomap{$_};
@@ -574,6 +590,10 @@ sub queryinstalled {
 
 sub queryhdrmd5 {
   my ($handle) = @_; 
+  if (is_apkv3($handle)) {
+    require Build::Apkv3 unless defined &Build::Apkv3::calcapkchksum;
+    return Build::Apkv3::calcapkchksum($handle, 'md5', 'ctrl');
+  }
   my $tar = Archive::Tar->new;
   my @read = $tar->read($handle, 1, {'filter' => '^\.PKGINFO$', 'limit' => 1});
   die("$handle: not an apk package file\n") unless @read == 1;
@@ -585,16 +605,20 @@ sub queryhdrmd5 {
 # this calculates the checksum of a compressed section.
 sub calcapkchksum {
   my ($handle, $type, $section, $toeof) = @_; 
+  if (is_apkv3($handle)) {
+    require Build::Apkv3 unless defined &Build::Apkv3::querypkginfo;
+    return Build::Apkv3::calcapkchksum(@_);
+  }
   $section ||= 'ctrl';
   $type ||= 'Q1';
-  die("unsupported apkchksum type $type\n") unless $type eq 'Q1' || $type eq 'sha1' || $type eq 'sha256' || $type eq 'sha512' || $type eq 'md5' || $type eq 'raw';
+  die("unsupported apkchksum type $type\n") unless $type eq 'Q1' || $type eq 'Q2' || $type eq 'sha1' || $type eq 'sha256' || $type eq 'sha512' || $type eq 'md5' || $type eq 'raw' || $type eq 'X1' || $type eq 'X2';
   die("unsupported apkchksum section $section\n") unless $section eq 'sig' || $section eq 'ctrl' || $section eq 'data';
   $section = $section eq 'sig' ? 0 : $section eq 'ctrl' ? 1 : 2;
   my $fd;
   open($fd, '<', $handle) or die("$handle: $!\n");
   my $ctx;
-  $ctx = Digest::SHA->new(1) if $type eq 'Q1' || $type eq 'sha1';
-  $ctx = Digest::SHA->new(256) if $type eq 'sha256';
+  $ctx = Digest::SHA->new(1) if $type eq 'Q1' || $type eq 'X1' || $type eq 'sha1';
+  $ctx = Digest::SHA->new(256) if $type eq 'Q2' || $type eq 'X2' || $type eq 'sha256';
   $ctx = Digest::SHA->new(512) if $type eq 'sha512';
   $ctx = Digest::MD5->new() if $type eq 'md5';
   $ctx = '' if $type eq 'raw';
@@ -633,7 +657,8 @@ sub calcapkchksum {
     $ctx->addfile($fd);
   }
   return $ctx if $type eq 'raw';
-  return 'Q1'.MIME::Base64::encode_base64($ctx->digest(), '') if $type eq 'Q1';
+  return $type.MIME::Base64::encode_base64($ctx->digest(), '') if $type eq 'Q1' || $type eq 'Q2';
+  return $type.$ctx->hexdigest() if $type eq 'X1' || $type eq 'X2';
   return $ctx->hexdigest();
 }
 

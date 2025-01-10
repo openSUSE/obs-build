@@ -51,16 +51,16 @@ sub addpkg {
 
   $data->{'location'} = "$data->{'name'}-$data->{'version'}.apk";
   $data->{'release'} = $1 if $data->{'version'} =~ s/-([^-]*)$//s;
-  my $apk_chksum = delete $data->{'apk_chksum'};
-  if ($options->{'withapkchecksum'} && $apk_chksum) {
-    if (substr($apk_chksum, 0, 2) eq 'Q1' && defined &MIME::Base64::decode_base64) {
-      my $c = MIME::Base64::decode_base64(substr($apk_chksum, 2));
-      $data->{'apkchecksum'} = "sha1:" . unpack('H*', $c) if $c && length($c) == 20;
-    } elsif (substr($apk_chksum, 0, 2) eq 'Q2' && defined &MIME::Base64::decode_base64) {
-      my $c = MIME::Base64::decode_base64(substr($apk_chksum, 2));
-      $data->{'apkchecksum'} = "sha256:" . unpack('H*', $c) if $c && length($c) == 32;
-    }
-  }
+  #my $apk_chksum = delete $data->{'apk_chksum'};
+  #if ($options->{'withapkchecksum'} && $apk_chksum) {
+  #  if (substr($apk_chksum, 0, 2) eq 'Q1' && defined &MIME::Base64::decode_base64) {
+  #    my $c = MIME::Base64::decode_base64(substr($apk_chksum, 2));
+  #    $data->{'apkchecksum'} = "sha1:" . unpack('H*', $c) if $c && length($c) == 20;
+  #  } elsif (substr($apk_chksum, 0, 2) eq 'Q2' && defined &MIME::Base64::decode_base64) {
+  #    my $c = MIME::Base64::decode_base64(substr($apk_chksum, 2));
+  #    $data->{'apkchecksum'} = "sha256:" . unpack('H*', $c) if $c && length($c) == 32;
+  #  }
+  #}
   if (ref($res) eq 'CODE') {
     $res->($data);
   } else {
@@ -68,8 +68,50 @@ sub addpkg {
   }
 }
 
+my %pkginfomap = (
+  'pkgname' => 'name',
+  'pkgver' => 'version',
+  'pkgdesc' => 'summary',
+  'url' => 'url',
+  'builddate' => 'buildtime',
+  'arch' => 'arch',
+  'license' => 'license',
+  'origin' => 'source',
+  'depend' => 'requires',
+  'provides' => 'provides',
+  'datahash' => 'apkdatachksum',
+  'hdrmd5' => 'hdrmd5',
+);
+
+sub apkv3_parse {
+  my ($in, $res, %options) = @_;
+  require Build::Apkv3 unless defined &Build::Apkv3::querypkgindex;
+  my $q = Build::Apkv3::querypkgindex($in);
+  for my $qq (@{$q->{'packages'} || []}) {
+    my %q;
+    for (keys %$qq) {
+      my $m = $pkginfomap{$_};
+      $q{$m} = $qq->{$_} if $m;
+    }
+    if ($qq->{'apkchksum'}) {
+      $q{'apkchksum'} = 'X1'.$qq->{'apkchksum'} if length($qq->{'apkchksum'}) == 40;
+      $q{'apkchksum'} = 'X2'.$qq->{'apkchksum'} if length($qq->{'apkchksum'}) == 64;
+    }
+    my @conflicts = grep {/^\!/} @{$q{'requires'} || []};
+    if (@conflicts) {
+      substr($_, 0, 1, '') for @conflicts;
+      $q{'conflicts'} = \@conflicts;
+      $q{'requires'} = [ grep {!/^\!/} @{$q{'requires'} || []} ];
+      delete $q{'requires'} unless @{$q{'requires'}};
+    }
+    addpkg($res, \%q, \%options);
+  }
+}
+
 sub parse {
   my ($in, $res, %options) = @_;
+  die("Build::Apkrepo::parse needs a filename\n") if ref($in);
+  return apkv3_parse(@_) if Build::Apk::is_apkv3($in);
   $res ||= [];
   my $tar = Archive::Tar->new;
   my @read = $tar->read($in, 1, {'filter' => '^APKINDEX$', 'limit' => 1});
