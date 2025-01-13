@@ -1,4 +1,18 @@
 -------------------------------------------------------------------
+Mon Jan 13 07:36:16 UTC 2025 - Adrian Schröter <adrian@suse.de>
+
+- debian: Support installation of foreign architecture packages
+          (required for armv7l setups)
+- Parse unknown timezones as UTC
+- Apk (Alpine Linux) format support added
+- Implement default value in parameter expansion
+- Also support supplements that use & as "and"
+- Add workaround for skopeo's argument parser
+- add cap-htm=off on power9
+- Fixed usage of chown calls
+- Remove leading `go` from `purl` locators
+
+-------------------------------------------------------------------
 Thu Nov 14 08:59:54 UTC 2024 - Adrian Schröter <adrian@suse.de>
 
 - container related:
