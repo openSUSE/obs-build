@@ -316,9 +316,9 @@ recipe_setup_kiwi() {
 	mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
     else
 	if test -z "$LINKSOURCES" ; then 
-	    cp -dLR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/ || cleanup_and_exit 1 "source copy failed"
+	    cp -pdLR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/ || cleanup_and_exit 1 "source copy failed"
 	else
-	    cp -lR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/ || cleanup_and_exit 1 "source copy failed"
+	    cp -plR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/ || cleanup_and_exit 1 "source copy failed"
 	fi
     fi
     chown -hR "$ABUILD_UID:$ABUILD_GID" "$BUILD_ROOT$TOPDIR"
