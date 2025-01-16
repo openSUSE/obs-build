@@ -460,16 +460,16 @@ sub is_matching_binary {
 # Query dependencies of a downloaded binary package
 #
 sub querybinary {
-  my ($dir, $file) = @_;
+  my ($dir, $file, $apkchksum) = @_;
   my @s = stat("$dir/$file");
   die("$dir/$file: $!\n") unless @s;
   my $id = "$s[9]/$s[7]/$s[1]";
   my $data;
   my $leadsigmd5;
-  die("$dir/$file: no hdrmd5\n") unless Build::queryhdrmd5("$dir/$file", \$leadsigmd5);
-  $data = Build::query("$dir/$file", 'evra' => 1, 'conflicts' => 1, 'weakdeps' => 1, 'addselfprovides' => 1, 'filedeps' => 1, 'normalizedeps' => 1, 'apkdatachksum' => 1);
+  $data = Build::query("$dir/$file", 'evra' => 1, 'conflicts' => 1, 'weakdeps' => 1, 'addselfprovides' => 1, 'filedeps' => 1, 'normalizedeps' => 1, 'verifyapkchksum' => $apkchksum, 'verifyapkdatasection' => 1);
   die("$dir/$file: query failed\n") unless $data;
   PBuild::Verify::verify_nevraquery($data);
+  die("$dir/$file: no hdrmd5\n") unless Build::queryhdrmd5("$dir/$file", \$leadsigmd5);
   $data->{'leadsigmd5'} = $leadsigmd5 if $leadsigmd5;
   $data->{'filename'} = $file;
   $data->{'id'} = $id;
@@ -482,17 +482,8 @@ sub querybinary {
 sub fetchbinaries_replace {
   my ($repodir, $tmpname, $binname, $bin) = @_;
   Build::Download::checkfiledigest("$repodir/$tmpname", $bin->{'checksum'}) if $bin->{'checksum'};
-  if ($bin->{'apkchksum'} && $bin->{'apkchksum'} !~ /^X1/) {
-    die("Unsupported apk checksum $bin->{'apkchksum'}\n") unless $bin->{'apkchksum'} =~ /^([QX][12])/;
-    my $apkchksum = Build::Apk::calcapkchksum("$repodir/$tmpname", $1);
-    die("downloaded binary $binname does not match apk checksum: $bin->{'apkchksum'} != $apkchksum\n") if $bin->{'apkchksum'} ne $apkchksum;
-  }
-  my $q = querybinary($repodir, $tmpname);
+  my $q = querybinary($repodir, $tmpname, $bin->{'apkchksum'});
   $bin->{'arch'} = $q->{'arch'} if $binname =~ /\.apk$/;	# see comment in calc_binname
-  if ($q->{'apkdatachksum'}) {
-    my $apkdatachksum = Build::Apk::calcapkchksum("$repodir/$tmpname", 'sha256', 'data', 1);
-    die("downloaded binary $binname does not match apk data checksum: $q->{'apkdatachksum'} != $apkdatachksum\n") if $q->{'apkdatachksum'} ne $apkdatachksum;
-  }
   die("downloaded binary $binname does not match repository metadata\n") unless is_matching_binary($bin, $q);
   rename("$repodir/$tmpname", "$repodir/$binname") || die("rename $repodir/$tmpname $repodir/$binname\n");
   $q->{'filename'} = $binname;
