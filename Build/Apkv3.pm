@@ -52,6 +52,7 @@ sub Build::Apkv3::decomp::READ {
   my $l = $_[2];
   my $off = $_[3];
   $off = 0 unless defined $off;
+  $_[1] = '' unless defined $_[1];
   substr($_[1], $off) = '';
   return 0 unless $l > 0;
   my $r = 0;
@@ -94,11 +95,11 @@ my @dep_ops = ( undef, '=', '<', '<=', '>', '>=', undef, undef,
 
 sub dep_postprocess {
   my ($v) = @_;
-  my $evr = $v->{'evr'};
-  return $v->{'name'} unless defined $evr;
-  my $match = $v->{'match'};
-  $match = defined($match) ? ($dep_ops[$match] || '?') : '=';
-  return "$v->{'name'}$match$evr";
+  my ($name, $evr, $match) = ($v->{'name'}, $v->{'evr'}, $v->{'match'});
+  $name = "!$name" if defined($match) && ($match & 16 != 0);
+  return $name unless defined $evr;
+  $match = defined($match) ? ($dep_ops[$match & 15] || '?') : '=';
+  return "$name$match$evr";
 }
 
 sub hash_postprocess {
@@ -177,10 +178,40 @@ my $pkg_schema = [
   [ 'i', 'replaces_prio' ],
 ];
 
+my $apkdatachksum_file_schema = [
+  [ undef ],
+  [ undef ],
+  [ 'i', 'size' ],
+  [ undef ],
+  [ 'b', 'hash' ],
+  [ 'b', 'target' ],
+];
+
+my $apkdatachksum_dir_schema = [
+  [ undef ],
+  [ undef ],
+  [ 'o*', 'files', $apkdatachksum_file_schema ],
+];
+
+my $apkdatachksum_schema = [
+  undef, 
+  [ 'o*', 'dirs', $apkdatachksum_dir_schema ],
+];
+
 my $index_schema = [
   [ 'b', 'description' ],
   [ 'o*', 'packages', $pkg_info_schema ],
 ];
+
+my $installed_schema = [ 
+  [ 'b*', 'packages', undef, \&installed_postprocess ],
+];
+
+sub installed_postprocess {
+  my ($v) = @_; 
+  substr($v, 0, 4, '');
+  return walk_root($v, $pkg_schema);
+}
 
 sub walk {
   #my ($adb, $data, $schema, $vals, $multi) = @_;
@@ -326,21 +357,64 @@ sub open_apk {
       return $h;
     }
   }
-  my $h = \do { local *F };
+  my $h = do { local *F; \*F };
   tie(*{$h}, 'Build::Apkv3::decomp', $fd, $decomp);
   return $h;
 }
 
+sub verifydatasection {
+  my ($fd, $files) = @_;
+  my $diridx = 0;
+  for my $dir (@{$files->{'dirs'} || []}) {
+    $diridx++;
+    my $fileidx = 0;
+    for my $file (@{$dir->{'files'} || []}) {
+      $fileidx++;
+      next unless $file->{'size'} && !defined($file->{'target'});
+      die("missing file hash\n") unless $file->{'hash'};
+      my $ctx;
+      $ctx = Digest::SHA->new(256) if length($file->{'hash'}) == 32;
+      $ctx = Digest::SHA->new(512) if length($file->{'hash'}) == 64;
+      die("unsupported file hashn") unless $file->{'hash'};
+      my ($datatype, $datasize, $datapad) = read_blk_header($fd);
+      die("missing data block\n") unless $datatype == 2;
+      die("data size mismatch\n") unless $datasize == 8 + $file->{'size'};
+      die("data header mismatch\n") unless doread($fd, 8) eq pack('VV', $diridx, $fileidx);
+      $datasize -= 8;
+      while ($datasize > 0) {
+        my $chunk = $datasize > 4096 ? 4096 : $datasize;
+        $ctx->add(doread($fd, $chunk));
+        $datasize -= $chunk;
+      }
+      die("data checksum mismatch\n") unless $file->{'hash'} eq $ctx->digest();
+      doread($fd, $datapad);
+    }
+  }
+}
+
 sub querypkginfo {
-  my ($file) = @_;
+  my ($file, $withhdrmd5, $verifyapkchksum, $verifydatasection) = @_;
   my $fd = open_apk($file);
-  die("nor an apk package file\n") unless read_file_header($fd) eq 'pckg';
+  die("$file: nor an apk package file\n") unless read_file_header($fd) eq 'pckg';
   my ($adbtype, $adbsize, $adbpad) = read_blk_header($fd);
-  die("bad adb block type\n") unless $adbtype == 0;
-  die("oversized adb block\n") if $adbsize > 0x10000000;        # 256 MB
+  die("$file: bad adb block type\n") unless $adbtype == 0;
+  die("$file: oversized adb block\n") if $adbsize > 0x10000000;        # 256 MB
   my $adb = doread($fd, $adbsize);
+  die("$file: calculated checksum does not match $verifyapkchksum\n") if $verifyapkchksum && !verifyapkchksum_adb($adb, $verifyapkchksum);
+  if ($verifydatasection) {
+    doread($fd, $adbpad);
+    my ($sigtype, $sigsize, $sigpad) = read_blk_header($fd);
+    die("$file: missing signature block\n") unless $sigtype == 1;
+    doread($fd, $sigsize + $sigpad);
+    eval { verifydatasection($fd, walk_root($adb, $apkdatachksum_schema)) };
+    die("$file: apkv3 verifydatasection: $@") if $@;
+    my $buf;
+    die("$file: trailing garbage (".unpack('H*', $buf).")\n") if read($fd, $buf, 4);
+  }
   close($fd);
-  return walk_root($adb, $pkg_schema_justinfo);
+  my $r = walk_root($adb, $pkg_schema_justinfo);
+  $r->{'hdrmd5'} = Digest::MD5::md5_hex($adb) if $withhdrmd5;
+  return $r;
 }
 
 sub querypkgindex {
@@ -353,6 +427,35 @@ sub querypkgindex {
   my $adb = doread($fd, $adbsize);
   close($fd);
   return walk_root($adb, $index_schema);
+}
+
+sub trunc_apkchksum {
+  my ($chk) = @_;
+  return 'X1'.substr($chk, 2, 40) if $chk =~ /^X2/;
+  if ($chk =~ /^Q2/) {
+    substr($chk, 28, 1) =~ tr!BCDFGHJKLNOPRSTVWXZabdefhijlmnpqrtuvxyz1235679+/!AAAEEEIIIMMMQQQUUUYYYcccgggkkkooossswww000444888!;
+    return 'Q1'.substr($chk, 2, 27).'=';
+  }
+  die("trunc_chksum: don't know how to truncate $chk\n");
+}
+
+sub calcapkchksum_adb {
+  my ($type) = $_[1];
+  die("unsupported apkchksum type $type\n") unless $type eq 'Q1' || $type eq 'Q2' || $type eq 'X1' || $type eq 'X2' || $type eq 'md5';
+  return 'Q1'.Digest::SHA::sha1_base64($_[0]) if $type eq 'Q1';
+  return 'Q2'.Digest::SHA::sha256_base64($_[0]) if $type eq 'Q2';
+  return 'X1'.Digest::SHA::sha1_hex($_[0]) if $type eq 'X1';
+  return 'X2'.Digest::SHA::sha256_hex($_[0]) if $type eq 'X2';
+  return Digest::MD5::md5_hex($_[0]) if $type eq 'md5';
+  die("unsupported apkchksum type $type\n");
+}
+
+sub verifyapkchksum_adb {
+  my ($chksum) = $_[1];
+  die("unsupported apk checksum $chksum\n") unless $chksum =~ /^([QX][12])/;
+  return 1 if calcapkchksum_adb($_[0], $1) eq $chksum;
+  return 1 if $chksum =~ /^([QX])1/ && trunc_apkchksum(calcapkchksum_adb($_[0], "${1}2")) eq $chksum;
+  return 0;
 }
 
 sub calcapkchksum {
@@ -368,12 +471,7 @@ sub calcapkchksum {
   die("oversized adb block\n") if $adbsize > 0x10000000;        # 256 MB
   my $adb = doread($fd, $adbsize);
   close($fd);
-  return 'Q1'.Digest::SHA::sha1_base64($adb) if $type eq 'Q1';
-  return 'Q2'.Digest::SHA::sha256_base64($adb) if $type eq 'Q2';
-  return 'X1'.Digest::SHA::sha1_hex($adb) if $type eq 'X1';
-  return 'X2'.Digest::SHA::sha256_hex($adb) if $type eq 'X2';
-  return Digest::MD5::md5_hex($adb) if $type eq 'md5';
-  die("unsupported apkchksum type $type\n");
+  return calcapkchksum_adb($adb, $type);
 }
 
 1;
