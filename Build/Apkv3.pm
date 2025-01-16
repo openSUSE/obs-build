@@ -442,7 +442,7 @@ sub trunc_apkchksum {
 sub calcapkchksum_adb {
   my ($type) = $_[1];
   die("unsupported apkchksum type $type\n") unless $type eq 'Q1' || $type eq 'Q2' || $type eq 'X1' || $type eq 'X2' || $type eq 'md5';
-  return 'Q1'.Digest::SHA::sha1_base64($_[0]) if $type eq 'Q1';
+  return 'Q1'.Digest::SHA::sha1_base64($_[0]).'=' if $type eq 'Q1';
   return 'Q2'.Digest::SHA::sha256_base64($_[0]) if $type eq 'Q2';
   return 'X1'.Digest::SHA::sha1_hex($_[0]) if $type eq 'X1';
   return 'X2'.Digest::SHA::sha256_hex($_[0]) if $type eq 'X2';

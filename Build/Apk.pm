@@ -655,7 +655,7 @@ sub calcapkchksum {
     $ctx->addfile($fd);
   }
   return $ctx if $type eq 'raw';
-  return $type.$ctx->b64digest() if $type eq 'Q1' || $type eq 'Q2';
+  return $type.$ctx->b64digest().($type eq 'Q1' ? '=' : '') if $type eq 'Q1' || $type eq 'Q2';
   return $type.$ctx->hexdigest() if $type eq 'X1' || $type eq 'X2';
   return $ctx->hexdigest();
 }
