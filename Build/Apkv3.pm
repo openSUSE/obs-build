@@ -375,7 +375,7 @@ sub verifydatasection {
       my $ctx;
       $ctx = Digest::SHA->new(256) if length($file->{'hash'}) == 32;
       $ctx = Digest::SHA->new(512) if length($file->{'hash'}) == 64;
-      die("unsupported file hashn") unless $file->{'hash'};
+      die("unsupported file hash\n") unless $ctx;
       my ($datatype, $datasize, $datapad) = read_blk_header($fd);
       die("missing data block\n") unless $datatype == 2;
       die("data size mismatch\n") unless $datasize == 8 + $file->{'size'};
