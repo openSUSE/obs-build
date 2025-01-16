@@ -30,10 +30,6 @@ eval { require Archive::Tar };
 eval { require Compress::Raw::Zlib };
 *Compress::Raw::Zlib::Inflate::new = sub {die("Compress::Raw::Zlib is not available\n")} unless defined &Compress::Raw::Zlib::Inflate::new;
 
-eval { require MIME::Base64 };
-*MIME::Base64::encode_base64 = sub {die("MIME::Base64 is not available\n")} unless defined &MIME::Base64::encode_base64;
-
-
 
 # can only do numeric + and - for now
 sub expandvars_expr {
@@ -484,8 +480,9 @@ sub query {
   my $qq;
   if (is_apkv3($handle)) {
     require Build::Apkv3 unless defined &Build::Apkv3::querypkginfo;
-    $qq = Build::Apkv3::querypkginfo($handle, 1);
+    $qq = Build::Apkv3::querypkginfo($handle, 1, $opts{'verifyapkchksum'}, $opts{'verifyapkdatasection'});
   } else {
+    die("$handle: calculated checksum does not match $opts{'verifyapkchksum'}\n") if $opts{'verifyapkchksum'} && !verifyapkchksum($handle, $opts{'verifyapkchksum'});
     $qq = queryvars($handle, 1);
   }
   my %q;
@@ -513,6 +510,7 @@ sub query {
   $q{'source'} ||= $q{'name'} if defined $q{'name'};
   $q{'supplements'} = [ join(' & ', @{$qq->{'install_if'}}) ] if $opts{'weakdeps'} && $qq->{'install_if'};
   delete $q{'buildtime'} unless $opts{'buildtime'};
+  die("$handle: calculated data checksum does not match $q{'apkdatachksum'}\n") if $opts{'verifyapkdatasection'} && $q{'apkdatachksum'} && !verifyapkdatachksum($handle, 'X2'.$q{'apkdatachksum'});
   delete $q{'apkdatachksum'} unless $opts{'apkdatachksum'};
   return \%q;
 }
@@ -657,9 +655,35 @@ sub calcapkchksum {
     $ctx->addfile($fd);
   }
   return $ctx if $type eq 'raw';
-  return $type.MIME::Base64::encode_base64($ctx->digest(), '') if $type eq 'Q1' || $type eq 'Q2';
+  return $type.$ctx->b64digest() if $type eq 'Q1' || $type eq 'Q2';
   return $type.$ctx->hexdigest() if $type eq 'X1' || $type eq 'X2';
   return $ctx->hexdigest();
+}
+
+sub trunc_apkchksum {
+  my ($chk) = @_;
+  return 'X1'.substr($chk, 2, 40) if $chk =~ /^X2/;
+  if ($chk =~ /^Q2/) {
+    substr($chk, 28, 1) =~ tr!BCDFGHJKLNOPRSTVWXZabdefhijlmnpqrtuvxyz1235679+/!AAAEEEIIIMMMQQQUUUYYYcccgggkkkooossswww000444888!;
+    return 'Q1'.substr($chk, 2, 27).'=';
+  }
+  die("trunc_chksum: don't know how to truncate $chk\n");
+}
+
+sub verifyapkchksum {
+  my ($handle, $chksum) = @_; 
+  die("unsupported apk checksum $chksum\n") unless $chksum =~ /^([QX][12])/;
+  return 1 if calcapkchksum($handle, $1) eq $chksum;
+   # also check for a truncated sha256 sum
+  return 1 if $chksum =~ /^([QX])1/ && trunc_apkchksum(calcapkchksum($handle, "${1}2")) eq $chksum;
+  return 0;
+}
+
+sub verifyapkdatachksum {
+  my ($handle, $chksum) = @_; 
+  die("unsupported apk data checksum $chksum\n") unless $chksum =~ /^([QX][12])/;
+  return 1 if calcapkchksum($handle, $1, 'data', 1) eq $chksum;
+  return 0;
 }
 
 # return the to-be-signed data of a package
