@@ -539,6 +539,9 @@ sub handle_decompression {
     my $pid2 = open(G, '|-');
     die("fork: $!\n") unless defined $pid2;
     if (!$pid2) {
+      # suppress errors if we use gzip to decode raw deflate data,
+      # as we do not have the gzip trailer in this case
+      open(STDERR, '>', '/dev/null') if $decomp[0] eq 'gzip' && length($first16bytes) > 16;
       exec(@decomp);
       die("$decomp[0]: $!\n");
     }
