@@ -207,6 +207,16 @@ my $installed_schema = [
   [ 'b*', 'packages', undef, \&installed_postprocess ],
 ];
 
+my $pkg_info_schema_zerochksum = [
+  [ undef ],
+  [ undef ],
+  [ '!', 'apkchksum', undef,  sub { substr($_[0], $_[1] + 1, 20, "\0\0\0\0" x 5) if $_[2] == 8 && substr($_[0], $_[1], 1) eq "\x14" } ],
+];
+
+my $pkg_schema_zerochksum = [
+  [ 'o', '', $pkg_info_schema_zerochksum ],
+];
+
 sub installed_postprocess {
   my ($v) = @_; 
   substr($v, 0, 4, '');
@@ -255,10 +265,13 @@ sub walk {
       $v = $name eq '' ? $_[1]: {};
       walk($_[0], $v, $s->[2], \@v);
       next if $name eq '';
+    } elsif ($st eq '!') {
+      $cvt->($_[0], $v, $t, $_[1], $name, $multi);
+      next;
     } else {
       die("unsupported type $st in schema\n");
     }
-    $v = $s->[3]->($v) if $cvt;
+    $v = $cvt->($v) if $cvt;
     if ($multi) {
       push @{$_[1]->{$name}}, $v;
     } else {
@@ -455,6 +468,13 @@ sub verifyapkchksum_adb {
   die("unsupported apk checksum $chksum\n") unless $chksum =~ /^([QX][12])/;
   return 1 if calcapkchksum_adb($_[0], $1) eq $chksum;
   return 1 if $chksum =~ /^([QX])1/ && trunc_apkchksum(calcapkchksum_adb($_[0], "${1}2")) eq $chksum;
+  # last resort: check for old style package identifier
+  if ($chksum =~ /^([QX])1/) {
+     my $adb_cpy = $_[0];
+     walk_root($adb_cpy, $pkg_schema_zerochksum);
+     return 1 if calcapkchksum_adb($adb_cpy, substr($chksum, 0, 2)) eq $chksum;
+     return 1 if trunc_apkchksum(calcapkchksum_adb($adb_cpy, substr($chksum, 0, 1).'2')) eq $chksum;
+  }
   return 0;
 }
 
