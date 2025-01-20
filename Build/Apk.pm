@@ -23,7 +23,6 @@ package Build::Apk;
 use strict;
 
 use Digest::MD5;
-use Digest::SHA;
 
 eval { require Archive::Tar };
 *Archive::Tar::new = sub {die("Archive::Tar is not available\n")} unless defined &Archive::Tar::new;
@@ -614,6 +613,7 @@ sub calcapkchksum {
   $section = $section eq 'sig' ? 0 : $section eq 'ctrl' ? 1 : 2;
   my $fd;
   open($fd, '<', $handle) or die("$handle: $!\n");
+  require Digest::SHA;
   my $ctx;
   $ctx = Digest::SHA->new(1) if $type eq 'Q1' || $type eq 'X1' || $type eq 'sha1';
   $ctx = Digest::SHA->new(256) if $type eq 'Q2' || $type eq 'X2' || $type eq 'sha256';
