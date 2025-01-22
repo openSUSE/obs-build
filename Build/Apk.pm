@@ -721,6 +721,9 @@ sub mktar {
 
 sub replacesignature {
   my ($handle, $ohandle, $signature, $time, $algo, $hash, $keyname, $keyid) = @_;
+  if (is_apkv3($handle)) {
+    die("replacesignature: apkv3 support is not implemented\n");
+  }
   my $sigtype;
   $sigtype = 'RSA' if $algo eq 'rsa' && $hash eq 'sha1';
   $sigtype = 'RSA256' if $algo eq 'rsa' && $hash eq 'sha256';

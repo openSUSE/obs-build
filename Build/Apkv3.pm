@@ -482,7 +482,7 @@ sub calcapkchksum {
   my ($file, $type, $section) = @_;
   $section ||= 'ctrl';
   $type ||= 'Q1';
-  die("unsupported apkchksum type $type\n") unless $type eq 'Q1' || $type eq 'Q2' || $type eq 'X1' || $type eq 'X2' || $type eq 'md5';
+  die("unsupported apkchksum type $type\n") unless $type eq 'Q1' || $type eq 'Q2' || $type eq 'X1' || $type eq 'X2' || $type eq 'md5' || $type eq 'raw';
   die("unsupported apkchksum section $section\n") unless $section eq 'ctrl';
   my $fd = open_apk($file);
   die("nor an apk package file\n") unless read_file_header($fd) eq 'pckg';
@@ -491,6 +491,7 @@ sub calcapkchksum {
   die("oversized adb block\n") if $adbsize > 0x10000000;        # 256 MB
   my $adb = doread($fd, $adbsize);
   close($fd);
+  return $adb if $type eq 'raw';
   return calcapkchksum_adb($adb, $type);
 }
 
