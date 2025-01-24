@@ -1075,6 +1075,8 @@ sub matchsingledep {
   my $vv;
   if ($binarytype eq 'deb') {
     $vv = Build::Deb::verscmp($pv, $dv, 1);
+  } elsif ($binarytype eq 'apk') {
+    $vv = Build::Apk::verscmp($pv, $dv, 1);
   } else {
     $vv = Build::Rpm::verscmp($pv, $dv, 1);
   }
