@@ -1201,6 +1201,14 @@ test -c $BUILD_ROOT/dev/null || create_devs
 
 cd $BUILD_ROOT || cleanup_and_exit 1
 
+# exit early if we want to create a preinstall image
+if test -n "$CREATE_PREINSTALL_DATA" ; then
+    rm -rf "$BUILD_INIT_CACHE"
+    rm -f $BUILD_IS_RUNNING
+    rm -f $TMPFILE
+    cleanup_and_exit 0
+fi
+
 #
 # setup /etc/mtab
 #
