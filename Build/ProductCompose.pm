@@ -129,14 +129,19 @@ sub parse {
   # Do we need source or debug packages?
   $ret->{'sourcemedium'} = 1 unless ($data->{'source'} || '') eq 'drop';
   $ret->{'debugmedium'} = 1 unless ($data->{'debug'} || '') eq 'drop';
+
+  $ret->{'baseiso'} = $data->{'iso'}->{'base'} if $data->{'iso'} && $data->{'iso'}->{'base'};
+
   my @architectures = @{$data->{'architectures'} || []};
   if ($data->{'flavors'}) {
     if ($cf->{'buildflavor'}) {
       my $f = $data->{'flavors'}->{$cf->{'buildflavor'}};
       return { error => "Flavor '$cf->{'buildflavor'}' not found" } unless defined $f;
       @architectures = @{$f->{'architectures'} || []} if $f->{'architectures'};
+      $ret->{'baseiso'} = $f->{'iso'}->{'base'} if $f->{'iso'} && $f->{'iso'}->{'base'};
     }
   }
+
   $ret->{'error'} = 'excluded' unless @architectures;
   $ret->{'exclarch'} = \@architectures if @architectures;
   $ret->{'bcntsynctag'} = $data->{'bcntsynctag'} if $data->{'bcntsynctag'};

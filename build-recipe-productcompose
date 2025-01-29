@@ -58,6 +58,7 @@ recipe_build_productcompose() {
     echo "running product composer..."
 
     local milestone=$(productcompose_query_recipe milestone)
+    local baseiso=$(productcompose_query_recipe baseiso)
     extra_args=
     if test -n "$RELEASE" ; then
 	extra_args=" $extra_args --release $RELEASE"
@@ -71,7 +72,11 @@ recipe_build_productcompose() {
     if test -n "$BUILD_VCSURL" ; then
 	extra_args=" $extra_args --vcs $BUILD_VCSURL"
     fi
-    chroot "$BUILD_ROOT" su -c "/usr/bin/product-composer build $extra_args -v --clean $TOPDIR/SOURCES/$RECIPEFILE $TOPDIR/PRODUCT" - abuild < /dev/null && BUILD_SUCCEEDED=true
+    if test -n "$baseiso"; then
+        BUILD_USER=root
+    fi
+
+    chroot "$BUILD_ROOT" su -c "/usr/bin/product-composer build $extra_args -v --clean $TOPDIR/SOURCES/$RECIPEFILE $TOPDIR/PRODUCT" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
     pushd "$BUILD_ROOT/$TOPDIR/PRODUCT"
     for i in * ; do
 	test -e "$i" || continue
