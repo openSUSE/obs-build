@@ -183,9 +183,10 @@ sub show {
   my $value = $d->{ $field };
   if (ref $value eq 'ARRAY') {
     print "$_\n" for @$value;
-  }
-  else {
+  } elsif ($value) {
     print "$value\n";
+  } else {
+    print "\n";
   }
 }
 
