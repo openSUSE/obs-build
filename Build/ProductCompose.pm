@@ -164,6 +164,8 @@ sub parse {
   # Unordered repositories is disabling repository layering. This will
   # offer all binary versions of all reprositories to the build tool:
   push @{$pkgs}, '--unorderedproductrepos' if grep {$_ eq 'OBS_unordered_product_repos'} @{$data->{'build_options'}};
+  # require the configured baseiso
+  push @{$pkgs}, "baseiso($ret->{'baseiso'})" if $ret->{'baseiso'};
   $ret->{'deps'} = $pkgs;
 
   # We have currently no option to configure own path list for the product on purpose
