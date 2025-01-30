@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Thu Jan 30 12:52:23 UTC 2025 - Adrian Schröter <adrian@suse.de>
+
+- productcompose: support of building against a baseiso
+- preinstallimage: avoid inclusion of build script generated files
+- preserve timestamps on sources copy-in for kiwi and productcompose
+- alpine package support updates
+- tumbleweed config update
+
+-------------------------------------------------------------------
 Mon Jan 13 07:36:16 UTC 2025 - Adrian Schröter <adrian@suse.de>
 
 - debian: Support installation of foreign architecture packages
