@@ -1294,6 +1294,21 @@ test -e $BUILD_ROOT/etc/hosts || echo "127.0.0.1 localhost" > $BUILD_ROOT/etc/ho
 if ! grep -F "127.0.0.1 $HOST" $BUILD_ROOT/etc/hosts > /dev/null ; then
     # this makes a reverse lookup on 127.0.0.1 return the host name,
     # which is bad, but 127.0.0.2 does not work on all unix systems
+    #
+    # For any address added to the a netdev, kernels normally add a
+    # corresponding network route implicitly.
+    #
+    # Linux adds the RTF_LOCAL flag to such implicit routes if they are for lo.
+    # Packets whose dstaddr matches a RTF_LOCAL routes are locally-delivered,
+    # and so those dstaddrs effectively appear "live" even if the address is
+    # nowhere assigned :-/
+    #
+    # Classic Unixes do not add implicit network routes for addresses added to
+    # lo. Nor do they set a LOCAL flag for lo's network routes.
+    #
+    # Long story short: if you need 127.0.0.2, explicitly add it as an address
+    # on the interface no matter the OS!
+    #
     echo "127.0.0.1 $HOST" > $BUILD_ROOT/etc/hosts.new
     test -f $BUILD_ROOT/etc/hosts && cat $BUILD_ROOT/etc/hosts >> $BUILD_ROOT/etc/hosts.new
     mv $BUILD_ROOT/etc/hosts.new $BUILD_ROOT/etc/hosts
