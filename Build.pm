@@ -158,38 +158,14 @@ my %subst_defaults = (
   'system-packages:livebuild' => [
     'apt-utils', 'cpio', 'dpkg-dev', 'live-build', 'lsb-release', 'tar',
   ],
-  'build-packages:mkosi:rpm' => [
-    'btrfs-progs | btrfsprogs', 'dracut', 'e2fsprogs', 'systemd',
-    'systemd-networkd | systemd-network', 'systemd-udev | udev', 'xfsprogs',
-  ],
-  'build-packages:mkosi:deb' => [
-    'apt', 'btrfs-progs', 'ca-certificates', 'dracut', 'e2fsprogs', 'file',
-    'libpam-systemd', 'mawk', 'systemd', 'systemd-boot', 'systemd-resolved',
-    'systemd-sysv', 'tar', 'xfsprogs',
-  ],
-  'build-packages:mkosi:arch' => [
-    'base', 'btrfs-progs', 'cryptsetup', 'device-mapper', 'dracut', 'e2fsprogs',
-    'linux', 'systemd', 'xfsprogs',
-  ],
   'system-packages:mkosi:rpm' => [
-    'mkosi', 'binutils', 'btrfs-progs | btrfsprogs', 'cpio', 'createrepo',
-    'cryptsetup', 'dnf', 'dosfstools', 'e2fsprogs', 'integritysetup', 'gnupg',
-    'python3dist(cryptography)', 'squashfs-tools | squashfs',
-    'system-release | openSUSE-release', 'systemd-container', 'util-linux',
-    'veritysetup', 'tar', 'xz', 'xfsprogs', 'zstd', 'zypper',
+    'mkosi',
   ],
   'system-packages:mkosi:deb' => [
-    'mkosi', 'apt', 'btrfs-progs', 'cpio', 'cryptsetup-bin', 'dctrl-tools',
-    'debootstrap', 'debconf', 'dosfstools', 'dpkg-dev', 'e2fsprogs', 'fdisk',
-    'gnupg', 'linux-base', 'lsb-release', 'python3-cryptography',
-    'squashfs-tools', 'systemd-container', 'tar', 'xz-utils', 'xfsprogs',
-    'zstd',
+    'mkosi',
   ],
   'system-packages:mkosi:arch' => [
-    'mkosi', 'arch-install-scripts', 'binutils', 'btrfs-progs', 'cpio',
-    'cryptsetup', 'dosfstools', 'e2fsprogs', 'gnupg', 'gzip',
-    'python-cryptography', 'squashfs-tools', 'systemd', 'util-linux', 'tar',
-    'xfsprogs', 'xz', 'zstd',
+    'mkosi',
   ],
   'system-packages:mock' => [
     'mock', 'system-packages:repo-creation',
