@@ -245,9 +245,11 @@ sub copy_assets {
     my $adir = "$assetdir/".substr($assetid, 0, 2);
     die("asset $assetid is gone\n") unless -e "$adir/$assetid";
     if ($asset->{'isdir'} && $unpack) {
+      PBuild::Util::rm_rf("$srcdir/$file");
       unpack_obscpio_asset($assetmgr, "$adir/$assetid", $srcdir, $file);
       next;
     }
+    unlink($asset->{'isdir'} ? "$srcdir/$file.obscpio" : "$srcdir/$file");
     PBuild::Util::cp("$adir/$assetid", $asset->{'isdir'} ? "$srcdir/$file.obscpio" : "$srcdir/$file");
   }
   if (has_mutable_assets($assetmgr, $p) && update_srcmd5($assetmgr, $p)) {
@@ -269,6 +271,7 @@ sub move_assets {
     die("asset $assetid is gone\n") unless -e "$adir/$assetid";
     if ($asset->{'isdir'}) {
       if ($unpack && ! -d "$adir/$assetid") {
+	PBuild::Util::rm_rf("$srcdir/$file");
 	unpack_obscpio_asset($assetmgr, "$adir/$assetid", $srcdir, $file);
 	next;
       }

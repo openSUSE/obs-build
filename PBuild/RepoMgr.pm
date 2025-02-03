@@ -154,10 +154,12 @@ sub getremoteproductbinaries {
 }
 
 #
-# Setup the repo/containers directories used for image/container builds
+# Setup the repos/containers directories used for image/container builds
 #
 sub copyimagebinaries {
   my ($repos, $bins, $dstdir) = @_;
+  PBuild::Util::rm_rf("$dstdir/repos");
+  PBuild::Util::rm_rf("$dstdir/containers");
   PBuild::Util::mkdir_p("$dstdir/repos/pbuild/pbuild");
   my %provenance;
   for my $q (@$bins) {
