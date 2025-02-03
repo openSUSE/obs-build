@@ -118,13 +118,6 @@ do not specify this option so you should almost never need it.
 
 .SH RPM BUILD SPECIFIC OPTIONS
 .TP
-.B --useusedforbuild
-Tell build not to do dependency expansion, but to extract the
-list of packages to install from "# usedforbuild" lines or, if none
-are found, from all "BuildRequires" lines.  This option is useful
-if you want to re-build a package from a srcrpm with exactly the
-same packages used for the srcrpm build.
-.TP
 .B --stage
 Set stage for rpmbuild. Defaults to '\fBa\fP'. Append a trailing '\fB=\fP'
 to only run the specified stage. Append a trailing '\fB+\fP' to run
