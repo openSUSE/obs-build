@@ -842,20 +842,20 @@ copy_oldpackages() {
 }
 
 copy_sources() {
-    local include_directories
-    if test -n "$RUNNING_IN_VM" -o "$BUILDTYPE" = kiwi -o "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman  -o "$BUILDTYPE" = productcompose ; then
-        include_directories=true
+    local image_mode i
+    if test "$BUILDTYPE" = kiwi -o "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman  -o "$BUILDTYPE" = productcompose ; then
+        image_mode=true
     fi
     if test -n "$RUNNING_IN_VM" -o -n "$COPY_SOURCES_ASIS" -o -n "$RPM_BUILD_IN_PLACE" ; then
+	image_mode=
 	( shopt -s nullglob ; cp -pRd "$1/".[^.]* "$1/"..?* "$1"/* "$2" )
-    elif test -n "$include_directories" ; then
-        cp -pRL "$1"/* "$2"
     elif test -e "$1/.git" ; then
 	# check which directory belongs to the git repository and only copy those
 	type -p git >& /dev/null || cleanup_and_exit 1 "need git to check file status"
 	for i in "$1/".* "$1"/* ; do
 	    local ii="${i##*/}"
 	    test "$ii" = . -o "$ii" = .. -o "$ii" = .git && continue
+	    test -n "$image_mode" -a \( "$ii" = repos -o "$ii" = containers \) && continue
 	    if test -L "$i" -o -d "$i" -o "${ii#.}" != "$ii" ; then
 		if test -e "$i/.build.asset" || git -C "$1" --noglob-pathspecs -c safe.directory="$ii" ls-files --error-unmatch -- "$ii" >& /dev/null ; then
 		    cp -pRd "$i" "$2"
@@ -871,7 +871,21 @@ copy_sources() {
 	    $BUILD_DIR/export_debian_orig_from_git "$1" "$2/build.origtar" || cleanup_and_exit 1 "export_debian_orig_from_git failed"
 	fi
     else
-	cp -p "$1"/* "$2"
+	if test -n "$image_mode" ; then
+	    for i in "$1"/* ; do
+		local ii="${i##*/}"
+		test -n "$image_mode" -a \( "$ii" = repos -o "$ii" = containers \) && continue
+		cp -p "$i" "$2"
+	    done
+	else
+	    cp -p "$1"/* "$2"
+	fi
+    fi
+    if test -n "$image_mode" ; then
+	rm -rf "$2/repos" "$2/containers"
+	for i in "$1/repos" "$1/containers" ; do
+	    test -d "$i" && cp -pRL "$i" "$2"
+        done
     fi
     test -n "$RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" && cp -f "$RECIPEPATH" "$2"
 }
