@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Thu Feb  6 13:50:34 UTC 2025 - Adrian Schröter <adrian@suse.de>
+
+- mkosi: drop most systemd/build-packages deps and use obs_scm
+         directory as source if present
+- improve source copy handling
+- Introduce --repos-directory and --containers-directory options
+
+-------------------------------------------------------------------
 Thu Jan 30 12:52:23 UTC 2025 - Adrian Schröter <adrian@suse.de>
 
 - productcompose: support of building against a baseiso
