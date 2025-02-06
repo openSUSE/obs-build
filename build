@@ -122,6 +122,8 @@ CACHE_DIR=
 BUILD_DIST_TMP=
 BUILD_SUCCEEDED=
 COPY_SOURCES_ASIS=
+REPOS_DIRECTORY=
+CONTAINERS_DIRECTORY=
 
 RECIPE_BUILD_START_TIME=
 CCACHE_SETUP_START_TIME=
@@ -883,9 +885,16 @@ copy_sources() {
     fi
     if test -n "$image_mode" ; then
 	rm -rf "$2/repos" "$2/containers"
-	for i in "$1/repos" "$1/containers" ; do
-	    test -d "$i" && cp -pRL "$i" "$2"
-        done
+	if test -z "$REPOS_DIRECTORY" ; then
+	    test -d "$1/repos" && cp -pRL "$1/repos" "$2"
+	elif "x$REPOS_DIRECTORY" != x- ; then
+	    cp -pRL "$REPOS_DIRECTORY" "$2/repos"
+	fi
+	if test -z "$CONTAINERS_DIRECTORY" ; then
+	    test -d "$1/containers" && cp -pRL "$1/containers" "$2"
+	elif "x$CONTAINERS_DIRECTORY" != x- ; then
+	    cp -pRL "$CONTAINERS_DIRECTORY" "$2/containers"
+	fi
     fi
     test -n "$RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" && cp -f "$RECIPEPATH" "$2"
 }
@@ -1357,6 +1366,16 @@ while test -n "$1"; do
       ;;
       -copy-sources-asis)
 	COPY_SOURCES_ASIS=true
+      ;;
+      -repos-directory)
+	needarg
+	REPOS_DIRECTORY=$ARG
+	shift
+      ;;
+      -containers-directory)
+	needarg
+	CONTAINERS_DIRECTORY=$ARG
+	shift
       ;;
       ---noarg)
 	cleanup_and_exit 1 "$ARG does not take an argument"
