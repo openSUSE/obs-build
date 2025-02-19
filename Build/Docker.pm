@@ -201,6 +201,23 @@ sub cmd_curl {
   }
 }
 
+sub cmd_wget {
+  my ($ret, @args) = @_;
+  my @urls;
+  while (@args) {
+    my $arg = shift @args;
+    if ($arg =~ /^-/) {
+      shift @args if $arg eq '-F' || $arg =~ /--post-data/ || $arg eq '-T' || $arg =~ /--timeout/ || $arg eq '-O' || $arg eq '--output-document' || $arg eq '-t' || $arg =~ /--tries/ || $arg eq '--user' || $arg eq '--password' || $arg eq '-U' || $arg eq '--user-agent' || $arg eq '--header';
+    } else {
+      push @urls, $arg if $arg =~ /^https?:\/\//;
+    }
+  }
+  for my $url (@urls) {
+    my $asset = { 'url' => $url, 'type' => 'webcache' };
+    push @{$ret->{'remoteassets'}}, $asset;
+  }
+}
+
 sub parse {
   my ($cf, $fn) = @_;
 
@@ -378,6 +395,8 @@ sub parse {
 	  cmd_apt_get($ret, @args);
 	} elsif ($rcmd eq 'curl') {
 	  cmd_curl($ret, @args);
+	} elsif ($rcmd eq 'wget') {
+	  cmd_wget($ret, @args);
 	} elsif ($rcmd eq 'obs_pkg_mgr') {
 	  cmd_obs_pkg_mgr($ret, @args);
 	}
