@@ -785,7 +785,7 @@ sub handle_rpms {
     if (@cfl) {
       if ($prefix ne '') {
 	print SPEC "mkdir -p \$RPM_BUILD_ROOT$prefix\n";
-	print SPEC "pushd \$RPM_BUILD_ROOT$prefix\n";
+	print SPEC "cd \$RPM_BUILD_ROOT$prefix\n";
       }
       print SPEC "cat <<EOFL >.filelist\n";
       print SPEC "$_\n" for map {$cpiopre.substr($_, 1)} @cfl;
@@ -802,17 +802,17 @@ sub handle_rpms {
 	}
       }
       if ($prefix ne '') {
-	print SPEC "popd\n";
+	print SPEC "cd -\n";
       }
     }
     if (%cfiles || %moves) {
       print SPEC "mkdir -p .cfiles\n";
-      print SPEC "pushd .cfiles\n";
+      print SPEC "cd .cfiles\n";
       print SPEC "cat <<EOFL >.filelist\n";
       print SPEC "$_\n" for map {$cpiopre.substr($_, 1)} grep {$cfiles{$_} || $moves{$_}} sort keys %files;
       print SPEC "EOFL\n";
       print SPEC "rpm2cpio $rpm | cpio -i -d -v -E .filelist\n";
-      print SPEC "popd\n";
+      print SPEC "cd -\n";
       if (%cfiles) {
 	print SPEC "mkdir -p \$RPM_BUILD_ROOT$configdir\n";
 	print SPEC "mv .cfiles$_ \$RPM_BUILD_ROOT$configdir\n" for sort keys %cfiles;
