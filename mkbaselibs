@@ -778,27 +778,27 @@ sub handle_rpms {
     print SPEC "%prep\n";
     print SPEC "%build\n";
     print SPEC "%install\n";
-    print SPEC "rm -rf \$RPM_BUILD_ROOT\n";
-    print SPEC "mkdir \$RPM_BUILD_ROOT\n";
-    print SPEC "cd \$RPM_BUILD_ROOT\n";
+    print SPEC "rm -Rf \"\%buildroot\"\n";
+    print SPEC "mkdir \"\%buildroot\"\n";
+    print SPEC "cd \"\%buildroot\"\n";
     my @cfl = grep {!$cfiles{$_} && !$moves{$_}} sort keys %files;
     if (@cfl) {
       if ($prefix ne '') {
-	print SPEC "mkdir -p \$RPM_BUILD_ROOT$prefix\n";
-	print SPEC "cd \$RPM_BUILD_ROOT$prefix\n";
+	print SPEC "mkdir -p \"\%buildroot/$prefix\"\n";
+	print SPEC "cd \"\%buildroot/$prefix\"\n";
       }
       print SPEC "cat <<EOFL >.filelist\n";
       print SPEC "$_\n" for map {$cpiopre.substr($_, 1)} @cfl;
       print SPEC "EOFL\n";
-      print SPEC "mkdir -p \$RPM_BUILD_ROOT$prefix$_\n" for sort keys %cpiodirs;
-      print SPEC "rpm2cpio $rpm | cpio -i -d -v -E .filelist\n";
+      print SPEC "mkdir -p \"\%buildroot/$prefix$_\"\n" for sort keys %cpiodirs;
+      print SPEC "rpm2cpio \"$rpm\" | cpio -i -d -v -E .filelist\n";
       print SPEC "rm .filelist\n";
       if (%ghosts) {
 	for my $fn (grep {$ghosts{$_}} @cfl) {
 	  my $fnm = $fn;
 	  $fnm = '.' unless $fnm =~ s/\/[^\/]+$//;
-	  print SPEC "mkdir -p \$RPM_BUILD_ROOT$prefix$fnm\n";
-	  print SPEC "touch \$RPM_BUILD_ROOT$prefix$fn\n";
+	  print SPEC "mkdir -p \"\%buildroot/$prefix$fnm\"\n";
+	  print SPEC "touch \"\%buildroot/$prefix$fn\"\n";
 	}
       }
       if ($prefix ne '') {
@@ -811,25 +811,25 @@ sub handle_rpms {
       print SPEC "cat <<EOFL >.filelist\n";
       print SPEC "$_\n" for map {$cpiopre.substr($_, 1)} grep {$cfiles{$_} || $moves{$_}} sort keys %files;
       print SPEC "EOFL\n";
-      print SPEC "rpm2cpio $rpm | cpio -i -d -v -E .filelist\n";
+      print SPEC "rpm2cpio \"$rpm\" | cpio -i -d -v -E .filelist\n";
       print SPEC "cd -\n";
       if (%cfiles) {
-	print SPEC "mkdir -p \$RPM_BUILD_ROOT$configdir\n";
-	print SPEC "mv .cfiles$_ \$RPM_BUILD_ROOT$configdir\n" for sort keys %cfiles;
+	print SPEC "mkdir -p \"\%buildroot/$configdir\"\n";
+	print SPEC "mv \".cfiles$_\" \"\%buildroot/$configdir\"\n" for sort keys %cfiles;
       }
       for my $fn (sort keys %moves) {
 	my $fnm = $moves{$fn};
 	$fnm = '.' unless $fnm =~ s/\/[^\/]+$//;
-	print SPEC "mkdir -p \$RPM_BUILD_ROOT$fnm\n";
-	print SPEC "mv .cfiles$fn \$RPM_BUILD_ROOT$moves{$fn}\n";
+	print SPEC "mkdir -p \"\%buildroot/$fnm\"\n";
+	print SPEC "mv \".cfiles$fn\" \"\%buildroot/$moves{$fn}\"\n";
       }
       print SPEC "rm -rf .cfiles\n";
     }
     for my $fn (sort keys %symlinks) {
       my $fnm = $fn;
       $fnm = '.' unless $fnm =~ s/\/[^\/]+$//;
-      print SPEC "mkdir -p \$RPM_BUILD_ROOT$fnm\n";
-      print SPEC "ln -s $symlinks{$fn} \$RPM_BUILD_ROOT$fn\n";
+      print SPEC "mkdir -p \"\%buidroot/$fnm\"\n";
+      print SPEC "ln -s \"$symlinks{$fn}\" \"\%buildroot/$fn\"\n";
     }
     if ($prefix ne '' && grep {/\.so.*$/} @cfl) {
       @postin = () if @postin == 1 && $postin[0] =~ /^\"-p.*ldconfig/;
