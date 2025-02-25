@@ -114,7 +114,7 @@ recipe_build_mkosi() {
         $image_version \
         --nspawn-keep-unit \
         --output-dir "$TOPDIR/OTHER" \
-        --checksum \
+        --checksum=yes \
         --repository-key-check=no \
         --with-network=never \
         --local-mirror file:///.build.binaries/ \
