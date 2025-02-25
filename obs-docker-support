@@ -25,6 +25,11 @@
 #
 ################################################################
 
+if test -x /bin/bash -a -z "$BASH_VERSION"; then
+    # switch to bash if available, avoiding dash esp.
+    exec /bin/bash "$0" "$@"
+fi
+
 LOCAL_REPOS_D="/etc/repos_obs_dockersupport.d/"
 LOCAL_APTREPOS_D="/etc/aptrepos_obs_dockersupport.d/"
 DATA_DIR=
@@ -276,7 +281,7 @@ remove_links() {
 
 obs_docker_support() {
     local do_upload_packages
-    if test "x$1" == x--upload-packages ; then
+    if test "x$1" = x--upload-packages ; then
 	do_upload_packages=true
 	shift
     fi
@@ -301,7 +306,7 @@ EOF
 	fi
 	if test -e /usr/bin/apt-get ; then
 	    mkdir -p "$LOCAL_APTREPOS_D"
-	    echo "deb $data_url ./" > $LOCAL_APTREPOS_D/obssource
+	    echo "deb [trusted=yes] $data_url ./" > $LOCAL_APTREPOS_D/obssource
 	    test -e /var/lib/apt && mv /var/lib/apt /var/lib/apt.obssave
 	    /usr/bin/apt-get -o Dir::Etc::SourceList=$LOCAL_APTREPOS_D/obssource -o Dir::Etc::SourceParts=$LOCAL_APTREPOS_D update
 	fi
