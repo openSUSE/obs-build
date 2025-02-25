@@ -159,13 +159,13 @@ my %subst_defaults = (
     'apt-utils', 'cpio', 'dpkg-dev', 'live-build', 'lsb-release', 'tar',
   ],
   'system-packages:mkosi:rpm' => [
-    'mkosi',
+    'mkosi', 'createrepo', 'gzip',
   ],
   'system-packages:mkosi:deb' => [
-    'mkosi',
+    'mkosi', 'dpkg-dev', 'lsb-release', 'gzip',
   ],
   'system-packages:mkosi:arch' => [
-    'mkosi',
+    'mkosi', 'arch-install-scripts', 'gzip',
   ],
   'system-packages:mock' => [
     'mock', 'system-packages:repo-creation',
