@@ -113,20 +113,20 @@ sub fetchrepo_apk {
 
 sub fetchrepo_debian {
   my ($url, $tmpdir, %opts) = @_;
-  my ($baseurl, $disturl, $components) = Build::Debrepo::parserepourl($url);
+  my ($baseurl, $disturl, $components, $compression) = Build::Debrepo::parserepourl($url);
   die("fetchrepo_debian needs an architecture\n") unless $opts{'arch'};
   my $basearch = Build::Deb::basearch($opts{'arch'});
   my @bins;
   for my $component (@$components) {
     unlink("$tmpdir/Packages.gz");
     if ($component eq '.') {
-      download("${disturl}Packages.gz", "$tmpdir/Packages.gz");
-      die("Packages.gz missing\n") unless -s "$tmpdir/Packages.gz";
+      download("${disturl}Packages.$compression", "$tmpdir/Packages.$compression");
+      die("Packages.gz missing\n") unless -s "$tmpdir/Packages.$compression";
     } else {
-      download("$disturl$component/binary-$basearch/Packages.gz", "$tmpdir/Packages.gz");
-      die("Packages.gz missing for basearch $basearch, component $component\n") unless -s "$tmpdir/Packages.gz";
+      download("$disturl$component/binary-$basearch/Packages.$compression", "$tmpdir/Packages.$compression");
+      die("Packages.$compression missing for basearch $basearch, component $component\n") unless -s "$tmpdir/Packages.$compression";
     }
-    Build::Debrepo::parse("$tmpdir/Packages.gz", sub { addpkg(\@bins, $_[0], $baseurl) }, 'addselfprovides' => 1, 'withchecksum' => 1, 'normalizedeps' => 1);
+    Build::Debrepo::parse("$tmpdir/Packages.$compression", sub { addpkg(\@bins, $_[0], $baseurl) }, 'addselfprovides' => 1, 'withchecksum' => 1, 'normalizedeps' => 1);
   }
   return \@bins;
 }

@@ -95,6 +95,8 @@ sub parse {
   } else {
     if ($in =~ /\.gz$/) {
       open($fd, '-|', "gzip", "-dc", $in) || die("$in: $!\n");
+    } elsif ($in =~ /\.xz$/) {
+      open($fd, '-|', "xz", "-dc", $in) || die("$in: $!\n");
     } else {
       open($fd, '<', $in) || die("$in: $!\n");
     }
@@ -141,6 +143,7 @@ sub parserepourl {
   my ($url) = @_;
   my @components;
   my $baseurl;
+  my $compression = 'gz';
   if ($url =~ /\?/) {
     my ($base, $query) = split(/\?/, $url, 2);
     if ("&$query" =~ /\&dist=/) {
@@ -151,10 +154,12 @@ sub parserepourl {
         $v = urldecode($v, 1);
         $dist = $v if $k eq 'dist';
         push @components, split(/[,+]/, $v) if $k eq 'component';
+        $compression = $v if $k eq 'compression';
       }
       $baseurl = $base;
       $baseurl .= '/' unless $baseurl =~ /\/$/;
-      $url = "${baseurl}dists/${dist}/";
+      $url = $baseurl;
+      $url .= "dists/${dist}/" if $dist;
       push @components, 'main' unless @components;
     }
   }
@@ -177,7 +182,7 @@ sub parserepourl {
     $url =~ s/([^\/]+\/)$/dists\/$1/;
     $baseurl =~ s/([^\/]+\/)$//;
   }
-  return $baseurl, $url, \@components;
+  return $baseurl, $url, \@components, $compression;
 }
 
 1;
