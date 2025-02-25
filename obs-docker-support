@@ -228,6 +228,49 @@ curl() {
     exec /usr/bin/curl "${cmd[@]}"
 }
 
+wget() {
+    local cmd
+    typeset -a cmd
+    local oopt
+    local oname
+    local fname
+    while test -n "$1"; do
+    case "$1" in
+    http://* | https://*)
+        url=$1
+        urlsha256=$(echo -n "$url" | sha256sum -)
+        urlsha256="${urlsha256%% *}"
+        if test -n "$DATA_DIR"; then
+            cmd[${#cmd[@]}]="file:$DATA_DIR/build-webcache/$urlsha256"
+        else
+            cmd[${#cmd[@]}]="http://localhost:80/build-webcache/$urlsha256"
+        fi
+        fname="${url%%\?*}"
+        fname="${url##*/}"
+        shift
+        ;;
+    -O|--output-document)
+        oopt=true
+        oname="$2"
+        shift 2
+        ;;
+    *)
+        cmd[${#cmd[@]}]="$1"
+        shift
+        ;;
+    esac
+    done
+
+    cmd[${#cmd[@]}]="-O"
+    if test -n "$oopt" -a -n "$oname"; then
+    cmd[${#cmd[@]}]="$oname"
+    else
+    cmd[${#cmd[@]}]="$fname"
+    fi
+
+    exec /usr/bin/wget "${cmd[@]}"
+}
+
 upload_with_perl='
 use Socket;
 $/ = undef;
@@ -269,6 +312,7 @@ setup_links() {
     test -e /usr/bin/dnf -a ! -e /usr/local/sbin/dnf && ln -s obs-docker-support /usr/local/sbin/dnf
     test -e /usr/bin/apt-get -a ! -e /usr/local/sbin/apt-get && ln -s obs-docker-support /usr/local/sbin/apt-get
     test -e /usr/bin/curl -a ! -e /usr/local/sbin/curl && ln -s obs-docker-support /usr/local/sbin/curl
+    test -e /usr/bin/wget -a ! -e /usr/local/sbin/wget && ln -s obs-docker-support /usr/local/sbin/wget
 }
 
 remove_links() {
@@ -277,6 +321,7 @@ remove_links() {
     rm -f /usr/local/sbin/dnf
     rm -f /usr/local/sbin/apt-get
     rm -f /usr/local/sbin/curl
+    rm -f /usr/local/sbin/wget
 }
 
 obs_docker_support() {
@@ -356,6 +401,9 @@ apt-get)
     ;;
 curl)
     curl "$@"
+    ;;
+wget)
+    wget "$@"
     ;;
 dnf)
     dnf "$@"
