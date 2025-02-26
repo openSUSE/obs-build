@@ -181,6 +181,16 @@ sub cmd_apt_get {
   }
 }
 
+sub cmd_apk {
+  my ($ret, @args) = @_;
+  shift @args while @args && $args[0] =~ /^-/;
+  return unless @args;
+  if ($args[0] eq 'add') {
+    shift @args;
+    push @{$ret->{'deps'}}, grep {/^[a-zA-Z_0-9]/} @args;
+  }
+}
+
 sub cmd_curl {
   my ($ret, @args) = @_;
   my @urls;
@@ -393,6 +403,8 @@ sub parse {
 	  cmd_dnf($ret, @args);
 	} elsif ($rcmd eq 'apt-get') {
 	  cmd_apt_get($ret, @args);
+	} elsif ($rcmd eq 'apk') {
+	  cmd_apk($ret, @args);
 	} elsif ($rcmd eq 'curl') {
 	  cmd_curl($ret, @args);
 	} elsif ($rcmd eq 'wget') {
