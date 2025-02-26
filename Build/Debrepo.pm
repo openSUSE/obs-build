@@ -95,6 +95,8 @@ sub parse {
   } else {
     if ($in =~ /\.gz$/) {
       open($fd, '-|', "gzip", "-dc", $in) || die("$in: $!\n");
+    } elsif ($in =~ /\.xz$/) {
+      open($fd, '-|', "xz", "-dc", $in) || die("$in: $!\n");
     } else {
       open($fd, '<', $in) || die("$in: $!\n");
     }
@@ -178,6 +180,21 @@ sub parserepourl {
     $baseurl =~ s/([^\/]+\/)$//;
   }
   return $baseurl, $url, \@components;
+}
+
+sub parserelease {
+  my ($release) = @_;
+  my %csums = ('md5sum' => 'md5', 'sha1' => 'sha1', 'sha256' => 'sha256', 'sha512' => 'sha512');
+  my %files;
+  my $csum;
+  for (split("\n", $release)) {
+    $csum = $csums{lc($1)} if /^(\S+):/;
+    next unless $csum;
+    next unless /^ (\S+) +\d+ +(.*)$/s;
+    next if $files{$2} && length($files{$2}) > length("$csum:$1");	# bigger is better...
+    $files{$2} = "$csum:$1";
+  }
+  return \%files;
 }
 
 1;

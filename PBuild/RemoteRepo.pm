@@ -74,9 +74,14 @@ sub download_zypp {
 }
 
 sub download {
-  my ($url, $dest, $destfinal, $digest, $ua) = @_;
+  my ($url, $dest, $destfinal, $digest, %opts) = @_;
   return download_zypp($url, $destfinal || $dest, $digest) if $url =~ /^zypp:\/\//;
-  Build::Download::download($url, $dest, $destfinal, 'digest' => $digest, 'ua' => $ua, 'retry' => 3);
+  Build::Download::download($url, $dest, $destfinal, 'digest' => $digest, 'retry' => 3, %opts);
+}
+
+sub fetch {
+  my ($url, $digest, %opts) = @_;
+  return Build::Download::fetch($url, 'digest' => $digest, 'retry' => 3, %opts);
 }
 
 sub addpkg {
@@ -116,17 +121,25 @@ sub fetchrepo_debian {
   my ($baseurl, $disturl, $components) = Build::Debrepo::parserepourl($url);
   die("fetchrepo_debian needs an architecture\n") unless $opts{'arch'};
   my $basearch = Build::Deb::basearch($opts{'arch'});
+  my $files = {};
+  if (grep {$_ ne '.'} @$components) {
+    my ($release) = fetch("${disturl}Release");
+    $files = Build::Debrepo::parserelease($release);
+  }
   my @bins;
   for my $component (@$components) {
+    unlink("$tmpdir/Packages.xz");
     unlink("$tmpdir/Packages.gz");
+    my $pfile = 'Packages.gz';
     if ($component eq '.') {
-      download("${disturl}Packages.gz", "$tmpdir/Packages.gz");
-      die("Packages.gz missing\n") unless -s "$tmpdir/Packages.gz";
+      download("${disturl}Packages.gz", "$tmpdir/$pfile");
+      die("Packages.gz missing\n") unless -s "$tmpdir/$pfile";
     } else {
-      download("$disturl$component/binary-$basearch/Packages.gz", "$tmpdir/Packages.gz");
-      die("Packages.gz missing for basearch $basearch, component $component\n") unless -s "$tmpdir/Packages.gz";
+      $pfile = 'Packages.xz' if $files->{"$component/binary-$basearch/Packages.xz"};
+      download("$disturl$component/binary-$basearch/$pfile", "$tmpdir/$pfile", undef, $files->{"$component/binary-$basearch/$pfile"});
+      die("$pfile missing for basearch $basearch, component $component\n") unless -s "$tmpdir/$pfile";
     }
-    Build::Debrepo::parse("$tmpdir/Packages.gz", sub { addpkg(\@bins, $_[0], $baseurl) }, 'addselfprovides' => 1, 'withchecksum' => 1, 'normalizedeps' => 1);
+    Build::Debrepo::parse("$tmpdir/$pfile", sub { addpkg(\@bins, $_[0], $baseurl) }, 'addselfprovides' => 1, 'withchecksum' => 1, 'normalizedeps' => 1);
   }
   return \@bins;
 }
@@ -537,12 +550,12 @@ sub fetchbinaries {
     if ($bin->{'name'} =~ /^container:/) {
       # we cannot query containers, just download and set the filename
       die("container has no hdrmd5\n") unless $bin->{'hdrmd5'};
-      download($location, "$repodir/$tmpname", "$repodir/$binname", "md5:$bin->{'hdrmd5'}", $ua);
+      download($location, "$repodir/$tmpname", "$repodir/$binname", "md5:$bin->{'hdrmd5'}", 'ua' => $ua);
       delete $bin->{'id'};
       $bin->{'filename'} = $binname;
       next;
     }
-    download($location, "$repodir/$tmpname", undef, undef, $ua);
+    download($location, "$repodir/$tmpname", undef, undef, 'ua' => $ua);
     fetchbinaries_replace($repodir, $tmpname, $binname, $bin);
   }
   # update _metadata
@@ -590,7 +603,7 @@ sub fetchproductbinaries {
     PBuild::Verify::verify_filename($binname);
     my $tmpname = ".$$.$binname";
     $ua ||= Build::Download::create_ua();
-    download($location, "$repodir/$tmpname", undef, undef, $ua);
+    download($location, "$repodir/$tmpname", undef, undef, 'ua' => $ua);
     fetchproductbinaries_replace($repodir, $tmpname, $binname, $bin);
   }
   # copy filename into real gbininfo as we clone the bininfo in the Checker
