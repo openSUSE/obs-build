@@ -794,8 +794,8 @@ sub get_sysroot {
 # be used instead.
 sub get_sysbuild {
   my ($config, $buildtype, $extradeps) = @_;
-  my $engine = $config->{'buildengine'} || '';
   $buildtype ||= $config->{'type'} || '';
+  my $engine = $config->{'buildengine'} || $config->{"buildflags:buildengine.$buildtype"} || '';
   my @sysdeps;
   if ($engine eq 'mock' && $buildtype eq 'spec') {
     @sysdeps = @{$config->{'substitute'}->{'system-packages:mock'} || []};

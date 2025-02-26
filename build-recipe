@@ -150,6 +150,10 @@ recipe_set_buildtype() {
 	if test -n "$BUILD_DIST" ; then
 	    BUILDENGINE=`queryconfig buildengine --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
 	    test "$BUILDENGINE" = UNDEFINED && BUILDENGINE=
+	    if test -z "$BUILDENGINE" ; then
+		BUILDENGINE=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags "buildengine.$BUILDTYPE"`
+		test "$BUILDENGINE" = UNDEFINED && BUILDENGINE=
+	    fi
 	fi
     fi
     # tweak buildtype according to engine
