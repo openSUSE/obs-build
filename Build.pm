@@ -203,6 +203,9 @@ my %subst_defaults = (
   'system-packages:repo-creation:arch' => [
     'pacman',
   ],
+  'system-packages:repo-creation:apk' => [
+    'apk-tools',
+  ],
 );
 
 sub unify {

@@ -129,8 +129,8 @@ recipe_build_docker() {
     base_image_tag=$(grep "^\s*FROM" "$RECIPEFILE" | head -n 1 | cut -d" " -f2)
 
     if test "$base_image_tag" != scratch ; then
-        base_image_path=$(find containers -regextype egrep -regex ".*\.(tgz|tar|tar\.xz|tar\.gz)$" -print -quit)
-        test -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
+        base_image_path=$(find containers -name \*.tgz -print -quit -o -name \*.tar -print -quit -o -name \*.tar.\[gx\]z -print -quit)
+        test -n "$base_image_path" -a -f "$base_image_path" || cleanup_and_exit 1 "base image not found"
     fi
 
     mkdir -p "$BUILD_ROOT/$TOPDIR/SOURCES/repos"
@@ -153,7 +153,7 @@ recipe_build_docker() {
     fi
     chmod 755 "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"
 
-    for base_image_path in $(find containers -regextype egrep -regex "containers/.*\.(tgz|tar|tar\.xz|tar\.gz)$" -print) ; do
+    for base_image_path in $(find containers -name \*.tgz -print -o -name \*.tar -print -o -name \*.tar.\[gx\]z -print) ; do
 	echo "Loading base image ${base_image_path##*/}"
 	if test -L "$base_image_path" ; then
 	    # copy into build root
@@ -180,6 +180,15 @@ recipe_build_docker() {
     fi
     if chroot $BUILD_ROOT test -x /usr/bin/dpkg-scanpackages ; then
 	chroot $BUILD_ROOT bash -c "cd $TOPDIR/SOURCES/repos && dpkg-scanpackages -m . | gzip > Packages.gz"
+    fi
+    if chroot $BUILD_ROOT test -x /sbin/apk ; then
+	apk_arch=$(chroot $BUILD_ROOT apk --print-arch)
+	test -n "$apk_arch" || cleanup_and_exit 1 "could not determine apk arch"
+	mkdir -p "$BUILD_ROOT/$TOPDIR/SOURCES/repos/$apk_arch"
+	find "$BUILD_ROOT/$TOPDIR/SOURCES/repos" -name \*.apk -print | while read apk ; do
+	    ln -f $apk "$BUILD_ROOT/$TOPDIR/SOURCES/repos/$apk_arch"
+	done
+	chroot $BUILD_ROOT bash -c "cd $TOPDIR/SOURCES/repos/$apk_arch && apk index --allow-untrusted --rewrite-arch $apk_arch *.apk" > "$BUILD_ROOT/$TOPDIR/SOURCES/repos/$apk_arch/APKINDEX.tar.gz"
     fi
     mkdir -p "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD"
 
