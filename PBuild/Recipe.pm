@@ -42,8 +42,8 @@ sub find_recipe {
   return $files{'fissile.yml'} if $type eq 'fissile' && $files{'fissile.yml'};
   return $files{'Chart.yaml'} if $type eq 'helm' && $files{'Chart.yaml'};
   return (grep {/flatpak\.(?:ya?ml|json)$/} sort keys %files)[0] if $type eq 'flatpak';
-  return $files{'PKGBUILD'} ? $files{'PKGBUILD'} : undef if $type eq 'arch';
-  return $files{'APKBUILD'} ? $files{'APKBUILD'} : undef if $type eq 'apk';
+  return $files{'PKGBUILD'} if $type eq 'arch' && $files{'PKGBUILD'};
+  return $files{'APKBUILD'} if $type eq 'apk' && $files{'APKBUILD'};
   my $pkg = $p->{'pkg'};
   $pkg = $p->{'flavor'} if $p->{'flavor'};
   return $files{"Dockerfile.$pkg"} if $type eq 'docker' && $files{"Dockerfile.$pkg"};
