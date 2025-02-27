@@ -719,6 +719,30 @@ sub mktar {
   return $h . $data . ($size % 512 ? "\0" x (512 - $size % 512) : '');
 }
 
+sub getsignatures_cb {
+  my ($sigs, $entry) = @_;
+  die("end of sigs reached\n") unless $entry->is_file;
+  my $name = $entry->name;
+  die("end of sigs reached\n") unless $name =~ /^\.SIGN\./;
+  my $content = $entry->data;
+  return 1 unless $content;
+  push @$sigs, { 'signature' => $content, 'algo' => 'rsa', 'hash' => 'sha1', 'keyname' => $1 } if $name =~ /^\.SIGN\.RSA\.(.+)$/;
+  push @$sigs, { 'signature' => $content, 'algo' => 'rsa', 'hash' => 'sha256', 'keyname' => $1 } if $name =~ /^\.SIGN\.RSA256\.(.+)$/;
+  push @$sigs, { 'signature' => $content, 'algo' => 'rsa', 'hash' => 'sha512', 'keyname' => $1 } if $name =~ /^\.SIGN\.RSA512\.(.+)$/;
+  return 1;
+}
+
+sub getsignatures {
+  my ($handle) = @_;
+  if (is_apkv3($handle)) {
+    die("getsignatures: apkv3 support is not implemented\n");
+  }
+  my $tar = Archive::Tar->new;
+  my @sigs;
+  eval { $tar->read($handle, 1, { 'filter_cb' => sub {getsignatures_cb(\@sigs, @_)} }) };
+  return @sigs;
+}
+
 sub replacesignature {
   my ($handle, $ohandle, $signature, $time, $algo, $hash, $keyname, $keyid) = @_;
   if (is_apkv3($handle)) {
