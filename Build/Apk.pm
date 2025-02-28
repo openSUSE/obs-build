@@ -819,4 +819,19 @@ sub verscmp {
   }
 }
 
+sub canonname {
+  my ($handle) = @_;
+  my $qq;
+  if (is_apkv3($handle)) {
+    require Build::Apkv3 unless defined &Build::Apkv3::querypkginfo;
+    $qq = Build::Apkv3::querypkginfo($handle);
+  } else {
+    $qq = queryvars($handle);
+  }
+  die("bad apk package\n") unless $qq && defined($qq->{'pkgname'}) && defined($qq->{'pkgver'});
+  my $cn = "$qq->{'pkgname'}-$qq->{'pkgver'}.apk";
+  die("bad apk package\n") if $cn =~ /^\./ || $cn =~ /\// || $cn =~ /--/;
+  return $cn;
+}
+
 1;

@@ -186,7 +186,8 @@ recipe_build_docker() {
 	test -n "$apk_arch" || cleanup_and_exit 1 "could not determine apk arch"
 	mkdir -p "$BUILD_ROOT/$TOPDIR/SOURCES/repos/$apk_arch"
 	find "$BUILD_ROOT/$TOPDIR/SOURCES/repos" -name \*.apk -print | while read apk ; do
-	    ln -f $apk "$BUILD_ROOT/$TOPDIR/SOURCES/repos/$apk_arch"
+	    apk_cn=$(perl -I$BUILD_DIR -MBuild::Apk -e 'print Build::Apk::canonname($ARGV[0])' $apk)
+	    test -n "$apk_cn" && ln -f $apk "$BUILD_ROOT/$TOPDIR/SOURCES/repos/$apk_arch/$apk_cn"
 	done
 	chroot $BUILD_ROOT bash -c "cd $TOPDIR/SOURCES/repos/$apk_arch && apk index --allow-untrusted --rewrite-arch $apk_arch *.apk" > "$BUILD_ROOT/$TOPDIR/SOURCES/repos/$apk_arch/APKINDEX.tar.gz"
     fi
