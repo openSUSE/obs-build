@@ -25,16 +25,13 @@
 #
 ################################################################
 
-if test -x /bin/bash -a -z "$BASH_VERSION"; then
-    # switch to bash if available, avoiding dash esp.
-    exec /bin/bash "$0" "$@"
-fi
 
 LOCAL_REPOS_D="/etc/repos_obs_dockersupport.d/"
 LOCAL_APTREPOS_D="/etc/aptrepos_obs_dockersupport.d/"
 LOCAL_APKREPOS="/etc/apkrepos_obs_dockersupport"
 DATA_DIR=
 
+sentinel="oBs-d--s--"
 
 setup_repos() {
     local data_url="$1"
@@ -80,55 +77,57 @@ finish_apkrepos() {
 }
 
 
-findcmd() {
-    local $i
-    for i ; do
-	case "$i" in
-	    -*) continue ;;
-	    *) echo "$i" ; return ;;
-	esac
-    done
-}
-
-zypper() {
-    local cmd
-    # try to find the command
-    local globalopts
-    typeset -a globalopts
-    while test -n "$1"; do
-        case $1 in
+# add a -C after the ar command and replace remove "/*.repo" from
+# the args
+zypper_ar() {
+    set -- "$@" "$sentinel"
+    local o
+    while test "$sentinel" != "$1" ; do
+	o="$1" ; shift ; set -- "$@" $o
+	test "$sentinel" = "$1" && break
+	case "$o" in
         -R|--root|--installroot)
-	    globalopts[${#globalopts[@]}]="$1"
-	    globalopts[${#globalopts[@]}]="$2"
-	    shift 2
+	    o="$1" ; shift ; set -- "$@" $o
 	    ;;
-        -*)
-	    globalopts[${#globalopts[@]}]="$1"
-	    shift
-	    ;;
-	*)
-	    cmd=$1
-	    shift
+	ar|addrepo)
+	    set -- "$@" -C
 	    break
 	    ;;
 	esac
     done
+    while test "$sentinel" != "$1" ; do
+	o="$1"
+	shift
+	set -- "$@" "${o%/*.repo}"
+    done
+    shift
+    exec /usr/bin/zypper "$@"
+}
+
+zypper() {
+    local cmd skip i
+    # try to find the command
+    for i ; do
+	case "$skip$i" in
+	-R|--root|--installroot) skip='-x' ;;
+	-*) skip= ;;
+	*) cmd="$i" ; break ;;
+	esac
+    done
     case $cmd in
     in|install|rm|remove|up|update|if|info)
-	/usr/bin/zypper -D $LOCAL_REPOS_D "${globalopts[@]}" "$cmd" "$@"
-	s=$?
-	setup_links
-	exit $s
+	/usr/bin/zypper -D $LOCAL_REPOS_D "$@"
+	setup_links_and_exit $?
 	;;
     ar|addrepo)
-	exec /usr/bin/zypper "${globalopts[@]}" "$cmd" -C "${@%/*.repo}"
+	zypper_ar "$@"
 	;;
     ref|refresh)
 	echo "skipping zypper refresh"
 	exit 0
 	;;
     *)
-	exec /usr/bin/zypper "${globalopts[@]}" "$cmd" "$@"
+	exec /usr/bin/zypper "$@"
 	;;
     esac
 }
@@ -138,9 +137,7 @@ obs_pkg_mgr() {
     install|remove)
 	shift
 	/usr/bin/zypper -D $LOCAL_REPOS_D --no-gpg-checks -n in "$@"
-	s=$?
-	setup_links
-	exit $s
+	setup_links_and_exit $?
 	;;
     add_repo)
 	shift
@@ -154,21 +151,12 @@ obs_pkg_mgr() {
 }
 
 apt_get() {
-    local cmd
+    local cmd i
     # try to find the command
-    local globalopts
-    typeset -a globalopts
-    while test -n "$1"; do
-        case $1 in
-        -*)
-	    globalopts[${#globalopts[@]}]="$1"
-	    shift
-	    ;;
-	*)
-	    cmd=$1
-	    shift
-	    break
-	    ;;
+    for i ; do
+	case "$i" in
+        -*) ;;
+	*) cmd="$i" ; break ;;
 	esac
     done
     case $cmd in
@@ -176,79 +164,65 @@ apt_get() {
 	exit 0
 	;;
     install|upgrade)
-	/usr/bin/apt-get -o Dir::Etc::SourceList=$LOCAL_APTREPOS_D/obssource -o Dir::Etc::SourceParts=$LOCAL_APTREPOS_D --allow-unauthenticated "${globalopts[@]}" "$cmd" "$@"
-	s=$?
-	setup_links
-	exit $s
+	/usr/bin/apt-get -o Dir::Etc::SourceList=$LOCAL_APTREPOS_D/obssource -o Dir::Etc::SourceParts=$LOCAL_APTREPOS_D --allow-unauthenticated "$@"
+	setup_links_and_exit $?
 	;;
     *)
-	exec /usr/bin/apt-get "${globalopts[@]}" "$cmd" "$@"
+	exec /usr/bin/apt-get "$@"
 	;;
     esac
 }
 
 dnf() {
-    # try to find command
-    local globalopts
-    typeset -a globalopts
-    while test -n "$1"; do
-        case $1 in
-        -*)
-	    globalopts[${#globalopts[@]}]="$1"
-	    shift
-	    ;;
-	*)
-	    cmd=$1
-	    shift
-	    break
-	    ;;
+    local cmd i
+    # try to find the command
+    for i ; do
+	case "$i" in
+        -*) ;;
+	*) cmd="$i" ; break ;;
 	esac
     done
     case $cmd in
     in|install|up|update)
-	/usr/bin/dnf --setopt=reposdir=$LOCAL_REPOS_D "${globalopts[@]}" "$cmd" "$@"
-	s=$?
-	setup_links
-	exit $s
+	/usr/bin/dnf --setopt=reposdir=$LOCAL_REPOS_D "$@"
+	setup_links_and_exit $?
 	;;
     *)
-	exec /usr/bin/dnf "${globalopts[@]}" "$cmd" "$@"
+	exec /usr/bin/dnf "$@"
 	;;
     esac
 }
 
 yum() {
-    # try to find command
-    local globalopts
-    typeset -a globalopts
-    while test -n "$1"; do
-        case $1 in
-        -*)
-	    globalopts[${#globalopts[@]}]="$1"
-	    shift
-	    ;;
-	*)
-	    cmd=$1
-	    shift
-	    break
-	    ;;
+    local cmd i
+    # try to find the command
+    for i ; do
+	case "$i" in
+        -*) ;;
+	*) cmd="$i" ; break ;;
 	esac
     done
     case $cmd in
     in|install|up|update)
-	/usr/bin/yum --setopt=reposdir=$LOCAL_REPOS_D "${globalopts[@]}" "$cmd" "$@"
-	s=$?
-	setup_links
-	exit $s
+	/usr/bin/yum --setopt=reposdir=$LOCAL_REPOS_D "$@"
+	setup_links_and_exit $?
 	;;
     *)
-	exec /usr/bin/yum "${globalopts[@]}" "$cmd" "$@"
+	exec /usr/bin/yum "$@"
 	;;
     esac
 }
 
 apk() {
-    case $(findcmd "$@")  in
+    local cmd i
+    # try to find the command
+    for i ; do
+	case "$i" in
+        -*) ;;
+	*) cmd="$i" ; break ;;
+	esac
+    done
+    case $cmd  in
     add|del)
 	/sbin/apk --repositories-file ../../../../$LOCAL_APKREPOS --allow-untrusted "$@"
 	;;
@@ -259,83 +233,68 @@ apk() {
 }
 
 curl() {
-    local cmd
-    typeset -a cmd
-    local oopt
-    local oname
-    while test -n "$1" ; do
-	case "$1" in
+    local o
+    local coopt fname
+    set -- "$@" "$sentinel"
+    while test "$sentinel" != "$1" ; do
+	o="$1" ; shift
+	case "$o" in
 	http://* | https://*)
-	    url=$1
-	    urlsha256=$(echo -n $url | sha256sum -)
+	    fname="${o%%\?*}"
+	    fname="${o##*/}"
+	    urlsha256=$(echo -n "$o" | sha256sum -)
 	    urlsha256="${urlsha256%% *}"
 	    if test -n "$DATA_DIR" ; then
-		cmd[${#cmd[@]}]="file:$DATA_DIR/build-webcache/$urlsha256"
+		o="file:$DATA_DIR/build-webcache/$urlsha256"
 	    else
-		cmd[${#cmd[@]}]="localhost:80/build-webcache/$urlsha256"
+		o="localhost:80/build-webcache/$urlsha256"
 	    fi
-	    oname="${url%%\?*}"
-	    oname="${url##*/}"
-	    shift
+	    set -- "$@" "$o"
 	    ;;
 	-O)
-	    oopt=true
-	    shift
+	    coopt=true
 	    ;;
-	*)
-	    cmd[${#cmd[@]}]="$1"
-	    shift
-	    ;;
+	*) set -- "$@" "$o" ;;
 	esac
     done
-    if test -n "$oopt" -a -n "$oname" ; then
-	cmd[${#cmd[@]}]="-o"
-	cmd[${#cmd[@]}]="$oname"
+    shift
+    if test -n "$coopt" -a -n "$fname" ; then
+	set "$@" "-o" "$fname"
     fi
-    exec /usr/bin/curl "${cmd[@]}"
+    exec /usr/bin/curl "$@"
 }
 
 wget() {
-    local cmd
-    typeset -a cmd
-    local oopt
-    local oname
-    local fname
-    while test -n "$1"; do
-    case "$1" in
-    http://* | https://*)
-        url=$1
-        urlsha256=$(echo -n "$url" | sha256sum -)
-        urlsha256="${urlsha256%% *}"
-        if test -n "$DATA_DIR"; then
-            cmd[${#cmd[@]}]="file:$DATA_DIR/build-webcache/$urlsha256"
-        else
-            cmd[${#cmd[@]}]="http://localhost:80/build-webcache/$urlsha256"
-        fi
-        fname="${url%%\?*}"
-        fname="${url##*/}"
-        shift
-        ;;
-    -O|--output-document)
-        oopt=true
-        oname="$2"
-        shift 2
-        ;;
-    *)
-        cmd[${#cmd[@]}]="$1"
-        shift
-        ;;
-    esac
+    local o
+    local oopt fname
+    set -- "$@" "$sentinel"
+    while test "$sentinel" != "$1" ; do
+	o="$1" ; shift
+	case "$o" in
+	http://* | https://*)
+            fname="${o%%\?*}"
+            fname="${o##*/}"
+	    urlsha256=$(echo -n "$o" | sha256sum -)
+	    urlsha256="${urlsha256%% *}"
+	    if test -n "$DATA_DIR" ; then
+		o="file:$DATA_DIR/build-webcache/$urlsha256"
+	    else
+		o="localhost:80/build-webcache/$urlsha256"
+	    fi
+	    set -- "$@" "$o"
+	    ;;
+	-O|--output-document)
+	    oopt=true
+	    set -- "$@" "$o"
+	    ;;
+	*) set -- "$@" "$o" ;;
+	esac
     done
-
-    cmd[${#cmd[@]}]="-O"
-    if test -n "$oopt" -a -n "$oname"; then
-    cmd[${#cmd[@]}]="$oname"
-    else
-    cmd[${#cmd[@]}]="$fname"
+    shift
+    if test -z "$oopt" -a -n "$fname" ; then
+	set "$@" "-O" "$fname"
     fi
-
-    exec /usr/bin/wget "${cmd[@]}"
+    exec /usr/bin/wget "$@"
 }
 
 upload_with_perl='
@@ -381,6 +340,11 @@ setup_links() {
     test -e /sbin/apk -a ! -e /usr/local/sbin/apk && ln -s obs-docker-support /usr/local/sbin/apk
     test -e /usr/bin/curl -a ! -e /usr/local/sbin/curl && ln -s obs-docker-support /usr/local/sbin/curl
     test -e /usr/bin/wget -a ! -e /usr/local/sbin/wget && ln -s obs-docker-support /usr/local/sbin/wget
+}
+
+setup_links_and_exit() {
+    setup_links
+    exit $1
 }
 
 remove_links() {
@@ -433,8 +397,8 @@ obs_docker_support() {
     esac
 }
 
-if test `id -u` != "0"; then
-    echo <<EOF
+if test `id -u` != 0 ; then
+    cat <<EOF
 obs-docker-support: not executed as root user!
 
 This can happen if your base container (see FROM line) is setting USER already, then builds in dependent container run as that user/group.
