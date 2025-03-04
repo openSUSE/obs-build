@@ -1,4 +1,16 @@
 -------------------------------------------------------------------
+Tue Mar  4 10:15:35 UTC 2025 - Adrian Schröter <adrian@suse.de>
+
+- fixes for POSIX compatibility for obs-docker-support adn
+  mkbaselibs
+- Add support for apk in docker/podman builds
+- Add support for 'wget' in Docker images
+- Fix debian support for Dockerfile builds
+- Fix preinstallimages in containers
+- mkosi: add back system-packages used by build-recipe directly
+- pbuild: parse the Release files for debian repos
+
+-------------------------------------------------------------------
 Thu Feb  6 13:50:34 UTC 2025 - Adrian Schröter <adrian@suse.de>
 
 - mkosi: drop most systemd/build-packages deps and use obs_scm
