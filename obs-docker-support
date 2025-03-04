@@ -32,6 +32,7 @@ LOCAL_APKREPOS="/etc/apkrepos_obs_dockersupport"
 DATA_DIR=
 
 sentinel="oBs-d--s--"
+testmode=
 
 setup_repos() {
     local data_url="$1"
@@ -76,6 +77,16 @@ finish_apkrepos() {
     rm -f "$LOCAL_APKREPOS"
 }
 
+testdone() {
+    local i
+    test exec = "$1" && shift
+    echo -n $1
+    shift
+    for i ; do echo -n ' "'"$i"'"' ; done
+    echo
+    exit 0
+}
+
 
 # add a -C after the ar command and replace remove "/*.repo" from
 # the args
@@ -101,7 +112,7 @@ zypper_ar() {
 	set -- "$@" "${o%/*.repo}"
     done
     shift
-    exec /usr/bin/zypper "$@"
+    $testmode exec /usr/bin/zypper "$@"
 }
 
 zypper() {
@@ -116,7 +127,7 @@ zypper() {
     done
     case $cmd in
     in|install|rm|remove|up|update|if|info)
-	/usr/bin/zypper -D $LOCAL_REPOS_D "$@"
+	$testmode /usr/bin/zypper -D $LOCAL_REPOS_D "$@"
 	setup_links_and_exit $?
 	;;
     ar|addrepo)
@@ -127,7 +138,7 @@ zypper() {
 	exit 0
 	;;
     *)
-	exec /usr/bin/zypper "$@"
+	$testmode exec /usr/bin/zypper "$@"
 	;;
     esac
 }
@@ -136,12 +147,12 @@ obs_pkg_mgr() {
     case "$1" in
     install|remove)
 	shift
-	/usr/bin/zypper -D $LOCAL_REPOS_D --no-gpg-checks -n in "$@"
+	$testmode /usr/bin/zypper -D $LOCAL_REPOS_D --no-gpg-checks -n in "$@"
 	setup_links_and_exit $?
 	;;
     add_repo)
 	shift
-	exec /usr/bin/zypper ar -C "$@"
+	$testmode exec /usr/bin/zypper ar -C "$@"
 	;;
     *)
 	echo "Usage: obs_pkg_mgr (install|add_repo) args" >&2
@@ -164,11 +175,11 @@ apt_get() {
 	exit 0
 	;;
     install|upgrade)
-	/usr/bin/apt-get -o Dir::Etc::SourceList=$LOCAL_APTREPOS_D/obssource -o Dir::Etc::SourceParts=$LOCAL_APTREPOS_D --allow-unauthenticated "$@"
+	$testmode /usr/bin/apt-get -o Dir::Etc::SourceList=$LOCAL_APTREPOS_D/obssource -o Dir::Etc::SourceParts=$LOCAL_APTREPOS_D --allow-unauthenticated "$@"
 	setup_links_and_exit $?
 	;;
     *)
-	exec /usr/bin/apt-get "$@"
+	$testmode exec /usr/bin/apt-get "$@"
 	;;
     esac
 }
@@ -184,11 +195,11 @@ dnf() {
     done
     case $cmd in
     in|install|up|update)
-	/usr/bin/dnf --setopt=reposdir=$LOCAL_REPOS_D "$@"
+	$testmode /usr/bin/dnf --setopt=reposdir=$LOCAL_REPOS_D "$@"
 	setup_links_and_exit $?
 	;;
     *)
-	exec /usr/bin/dnf "$@"
+	$testmode exec /usr/bin/dnf "$@"
 	;;
     esac
 }
@@ -204,11 +215,11 @@ yum() {
     done
     case $cmd in
     in|install|up|update)
-	/usr/bin/yum --setopt=reposdir=$LOCAL_REPOS_D "$@"
+	$testmode /usr/bin/yum --setopt=reposdir=$LOCAL_REPOS_D "$@"
 	setup_links_and_exit $?
 	;;
     *)
-	exec /usr/bin/yum "$@"
+	$testmode exec /usr/bin/yum "$@"
 	;;
     esac
 }
@@ -224,10 +235,11 @@ apk() {
     done
     case $cmd  in
     add|del)
-	/sbin/apk --repositories-file ../../../../$LOCAL_APKREPOS --allow-untrusted "$@"
+	$testmode /sbin/apk --repositories-file ../../../../$LOCAL_APKREPOS --allow-untrusted "$@"
+	setup_links_and_exit $?
 	;;
     *)
-	/sbin/apk "$@"
+	$testmode exec /sbin/apk "$@"
 	;;
     esac
 }
@@ -261,7 +273,7 @@ curl() {
     if test -n "$coopt" -a -n "$fname" ; then
 	set "$@" "-o" "$fname"
     fi
-    exec /usr/bin/curl "$@"
+    $testmode exec /usr/bin/curl "$@"
 }
 
 wget() {
@@ -294,7 +306,7 @@ wget() {
     if test -z "$oopt" -a -n "$fname" ; then
 	set "$@" "-O" "$fname"
     fi
-    exec /usr/bin/wget "$@"
+    $testmode exec /usr/bin/wget "$@"
 }
 
 upload_with_perl='
@@ -397,7 +409,14 @@ obs_docker_support() {
     esac
 }
 
-if test `id -u` != 0 ; then
+prg=${0##*/}
+if test "$prg" = obs-docker-support -a "x$1" = x--testmode ; then
+    testmode=testdone
+    prg="$2"
+    shift 2
+fi
+
+if test `id -u` != 0 && test -z "$testmode" ; then
     cat <<EOF
 obs-docker-support: not executed as root user!
 
@@ -406,7 +425,7 @@ EOF
     exit 1
 fi
 
-case ${0##*/} in
+case "$prg" in
 obs-docker-support)
     obs_docker_support "$@"
     ;;
