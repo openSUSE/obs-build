@@ -836,6 +836,7 @@ vm_setup() {
 	    rm -f "$VM_ROOT"
 	fi
     fi
+    local clean_build="$CLEAN_BUILD"
     # Check for populating filesystem during mkfs
     if test -n "$VM_USE_MKFS_COPYIN" ; then
 	echo "Using mkfs copyin mode to populate the root filesystem"
@@ -845,11 +846,23 @@ vm_setup() {
 	fi
 	rm -rf "$BUILD_ROOT"/* "$BUILD_ROOT"/.[^.]*
         if test -z "$CLEAN_BUILD" -a -e "$VM_ROOT" ; then
-           echo "Recovering former build root"
-           debugfs -f <(echo rdump / "$BUILD_ROOT") "$VM_ROOT" 2>/dev/null
+	    if test "$UID" = 0 ; then
+	        echo "Recovering former build root"
+	        debugfs -f <(echo rdump / "$BUILD_ROOT") "$VM_ROOT" 2>/dev/null
+	    else
+		vm_do_partial_copyout
+		if test -d "$BUILD_ROOT/installed-pkg" ; then
+		    # preinstall was already done, continue with caution
+		    echo "Reusing former build root"
+		    VM_USE_MKFS_COPYIN=partial
+		else
+		    # start over from scratch
+		    clean_build=true
+		    rm -rf "$BUILD_ROOT"/* "$BUILD_ROOT"/.[^.]*
+		fi
+	    fi
         fi
     fi
-    local clean_build="$CLEAN_BUILD"
     if test "$VM_ROOT_TYPE" = file ; then
 	if test -z "$clean_build" ; then
 	    local origrootsize
@@ -919,6 +932,49 @@ vm_update_hostarch() {
 	BUILD_HOST_ARCH="$newhostarch"
 	# update BUILD_INITVM_ARCH
 	build_host_arch
+    fi
+}
+
+vm_do_partial_copyout() {
+    local vm_type="$VM_TYPE"
+    test "$vm_type" = "qemu" && vm_type=kvm
+    mkdir -p "$BUILD_ROOT/etc"
+    debugfs -f /dev/fd/0 "$VM_ROOT" <<EOF >/dev/null 2>&1
+rdump /installed-pkg $BUILD_ROOT
+rdump /.build.kernel.$vm_type $BUILD_ROOT
+rdump /.build.hostarch.$vm_type $BUILD_ROOT
+rdump /.build.initrd.$vm_type $BUILD_ROOT
+rdump /.build.console.$vm_type $BUILD_ROOT
+rdump /.build.cmdline.$vm_type $BUILD_ROOT
+rdump /etc/os-release $BUILD_ROOT
+EOF
+    # make the find in vm_first_stage happy
+    mkdir -p $BUILD_ROOT/{bin,sbin,usr/bin,usr/sbin}
+}
+
+vm_setup_partial_copyin() {
+    rm -f "$BUILD_ROOT/.build.extract.tar"
+    local to_extract=
+    to_extract="$to_extract .build-srcdir"
+    test -d $BUILD_ROOT/.init_b_cache && to_extract="$to_extract .init_b_cache"
+    test -f $BUILD_ROOT/.guessed_dist && to_extract="$to_extract .guessed_dist"
+    (cd $BUILD_ROOT; tar -cf .build.extract.tar .build $to_extract)
+    cat > $BUILD_ROOT/.build/build.data.extract <<'EOF'
+echo "Exxtracting build.extract.tar"
+rm -f /.build.unpackarchive
+cp /.build/unpackarchive /.build.unpackarchive
+(rm -rf /.build ; perl /.build.unpackarchive --tar) < /.build/build.extract.tar
+rm -f /.build.unpackarchive
+exec /.build/build
+EOF
+    debugfs -w -f /dev/fd/0 "$VM_ROOT" >/dev/null 2>&1 <<EOF
+rm .build/build.data
+write $BUILD_ROOT/.build/build.data.extract .build/build.data
+write $BUILD_ROOT/.build.extract.tar .build/build.extract.tar
+EOF
+    rm -f "$BUILD_ROOT/.build.extract.tar" "$BUILD_ROOT/.build/build.data.extract"
+    if test -e $BUILD_ROOT/etc/os-release && ! test -s $BUILD_ROOT/etc/os-release ; then
+	debugfs -w -f <(echo write "$BUILD_ROOT/etc/os-release etc/os-release") "$VM_ROOT" >/dev/null 2>&1
     fi
 }
 
@@ -1093,7 +1149,9 @@ vm_first_stage() {
 	    fi
 	fi
 	check_exit
-	if test -n "$VM_USE_MKFS_COPYIN" ; then
+	if test "$VM_USE_MKFS_COPYIN" = partial ; then
+	    vm_setup_partial_copyin || cleanup_and_exit 4
+	elif test -n "$VM_USE_MKFS_COPYIN" ; then
 	    vm_img_mkfs "$VMDISK_FILESYSTEM" "$VM_ROOT" "$VMDISK_FILESYSTEM_OPTIONS" "$BUILD_ROOT" || cleanup_and_exit 4
         else
 	    # needs to work otherwise we have a corrupted file system
