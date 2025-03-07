@@ -110,6 +110,7 @@ my $pbuild_options = {
   'vm-netdev' => '::',
   'vm-device' => '::',
   'vm-custom-opt' => ':',
+  'vm-cmdline' => ':',
   'vm-openstack-flavor' => ':',
   'openstack-flavor' => 'vm-openstack-flavor:',
   'vm-emulator-script' => ':',
