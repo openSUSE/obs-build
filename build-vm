@@ -846,20 +846,15 @@ vm_setup() {
 	fi
 	rm -rf "$BUILD_ROOT"/* "$BUILD_ROOT"/.[^.]*
         if test -z "$CLEAN_BUILD" -a -e "$VM_ROOT" ; then
-	    if test "$UID" = 0 ; then
-	        echo "Recovering former build root"
-	        debugfs -f <(echo rdump / "$BUILD_ROOT") "$VM_ROOT" 2>/dev/null
+	    vm_do_partial_copyout
+	    if test -d "$BUILD_ROOT/installed-pkg" ; then
+		# preinstall was already done, continue with caution
+		echo "Reusing former build root"
+		VM_USE_MKFS_COPYIN=partial
 	    else
-		vm_do_partial_copyout
-		if test -d "$BUILD_ROOT/installed-pkg" ; then
-		    # preinstall was already done, continue with caution
-		    echo "Reusing former build root"
-		    VM_USE_MKFS_COPYIN=partial
-		else
-		    # start over from scratch
-		    clean_build=true
-		    rm -rf "$BUILD_ROOT"/* "$BUILD_ROOT"/.[^.]*
-		fi
+		# start over from scratch
+		clean_build=true
+		rm -rf "$BUILD_ROOT"/* "$BUILD_ROOT"/.[^.]*
 	    fi
         fi
     fi
