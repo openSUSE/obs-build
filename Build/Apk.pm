@@ -724,8 +724,10 @@ sub getsignatures_cb {
   die("end of sigs reached\n") unless $entry->is_file;
   my $name = $entry->name;
   die("end of sigs reached\n") unless $name =~ /^\.SIGN\./;
+  die("insane signature size\n") if $entry->size > 1024*1024;
   my $content = $entry->data;
   return 1 unless $content;
+  die("max numer of signatures reached\n") if @$sigs >= 100;
   push @$sigs, { 'signature' => $content, 'algo' => 'rsa', 'hash' => 'sha1', 'keyname' => $1 } if $name =~ /^\.SIGN\.RSA\.(.+)$/;
   push @$sigs, { 'signature' => $content, 'algo' => 'rsa', 'hash' => 'sha256', 'keyname' => $1 } if $name =~ /^\.SIGN\.RSA256\.(.+)$/;
   push @$sigs, { 'signature' => $content, 'algo' => 'rsa', 'hash' => 'sha512', 'keyname' => $1 } if $name =~ /^\.SIGN\.RSA512\.(.+)$/;
