@@ -262,10 +262,10 @@ recipe_setup_macros() {
     fi
 
     if test -n "$BUILD_JOBS" ; then
-	cat >> $BUILD_ROOT/root/$rawcfgmacros <<-EOF
-		%jobs $BUILD_JOBS
-		%_smp_mflags -j$BUILD_JOBS
-		EOF
+	local jobsmacro=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" eval '%{?jobs}')
+	test "$jobsmacro" != '${RPM_BUILD_NCPUS}' && echo "%jobs $BUILD_JOBS" >> $BUILD_ROOT/root/$rawcfgmacros
+	local smpmflagsmacro=$(chroot rpm --eval '%_smp_mflags' 2>/dev/null)
+	if test "$smpmflags" != '-j${RPM_BUILD_NCPUS}' && echo "_smp_mflags -j$BUILD_JOBS" >> $BUILD_ROOT/root/$rawcfgmacros
     fi
     test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/$rawcfgmacros $BUILD_ROOT/home/abuild/$rawcfgmacros
 }

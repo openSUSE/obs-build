@@ -279,12 +279,17 @@ recipe_build_spec() {
     for rpmstage in "${rpmstages[@]}" ; do
 	# su involves a shell which would require even more
 	# complicated quoting to bypass than this
+	echo "#!/bin/sh" > $BUILD_ROOT/.build.command
+	if test -n "$BUILD_JOBS" ; then
+	    echo "export RPM_BUILD_NCPUS=$BUILD_JOBS" >> $BUILD_ROOT/.build.command
+	fi
+	echo "set -x" >> $BUILD_ROOT/.build.command
 	toshellscript $rpmbuild \
 		"${definesnstuff[@]}" \
 		$rpmstage \
 		"${rpmbopts[@]}" \
 		"$TOPDIR/SOURCES/$RECIPEFILE" \
-		> $BUILD_ROOT/.build.command
+		>> $BUILD_ROOT/.build.command
 	chmod 755 $BUILD_ROOT/.build.command
 	check_exit
 	local build_command="/.build.command"
