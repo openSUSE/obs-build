@@ -459,18 +459,18 @@ vm_img_mkfs() {
     fi
     local mkfs_populate_options
     if test -n "$populate"; then
-      if test "$fs" = "ext2" -o "$fs" = "ext3" -o "$fs" = "ext4"; then
-        mkfs_populate_options="-d $populate"
-        # mkfs needs to see the files it copies into the fs as owned by root.
-        # Otherwise the whole fs tree would be owned by the calling user.
-        # Doesn't matter too much when setting up the build root initially as
-        # rpm is called inside anway to fix everything. However, when reusing
-        # an image suddenly all ownerships would change.
-        test $UID != 0 -a -x /usr/bin/unshare && mkfs="unshare --user --map-root-user $mkfs"
-      else
-        print "ERROR: populating the filesystem is only supported with ext file systems"
-        cleanup_and_exit 1
-      fi
+	if test "$fs" = "ext2" -o "$fs" = "ext3" -o "$fs" = "ext4"; then
+	    mkfs_populate_options="-d $populate"
+	    # mkfs needs to see the files it copies into the fs as owned by root.
+	    # Otherwise the whole fs tree would be owned by the calling user.
+	    # Doesn't matter too much when setting up the build root initially as
+	    # rpm is called inside anway to fix everything. However, when reusing
+	    # an image suddenly all ownerships would change.
+	    test $UID != 0 -a -x /usr/bin/unshare && mkfs="unshare --user --map-root-user $mkfs"
+	else
+	    print "ERROR: populating the filesystem is only supported with ext file systems"
+	    cleanup_and_exit 1
+	fi
     fi
 
     if test -z "$mkfs"; then
@@ -516,7 +516,6 @@ background_monitor_process() {
 	# disk storage usage
 	if type -p df >& /dev/null; then
 	    c=(`df -m / 2>/dev/null | tail -n 1`)
-
 	    if test ${c[2]} -gt $max_disk ; then
 		max_disk="${c[2]}"
 		echo -n $max_disk > /.build/_statistics.df.new && mv /.build/_statistics.df.new /.build/_statistics.df
@@ -747,8 +746,8 @@ vm_set_filesystem_type() {
     # use either commandline specified fs or ext3 as fallback
     test -n "$VMDISK_FILESYSTEM" || VMDISK_FILESYSTEM=ext3
     if test -n "$VM_USE_MKFS_COPYIN"; then
-       test "${VMDISK_FILESYSTEM:0:3}" == "ext" || cleanup_and_exit 4 "mkfs copyin works only with ext filesystems"
-       /sbin/mkfs.ext3 -d /var/lib/empty -V >& /dev/null || cleanup_and_exit 4 "mkfs is missing the -d option needed for copyin files"
+        test "${VMDISK_FILESYSTEM:0:3}" == "ext" || cleanup_and_exit 4 "mkfs copyin works only with ext filesystems"
+        /sbin/mkfs.ext3 -d /var/lib/empty -V >& /dev/null || cleanup_and_exit 4 "mkfs is missing the -d option needed for copyin files"
     fi
 }
 
