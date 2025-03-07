@@ -32,6 +32,7 @@ vm_startup_podman() {
     podman rm "$name" >/dev/null 2>&1 || true
     local podman_opts=
     test -n "$VM_TYPE_PRIVILEGED" && podman_opts="--privileged --cap-add=SYS_ADMIN --cap-add=MKNOD"
+    test -n "$RUN_SHELL" -o -n "$RUN_SHELL_AFTER_FAIL" && podman_opts="$podman_opts -it"
     podman run \
         --runtime=runc \
         --rm --name "$name" --net=none $podman_opts \
