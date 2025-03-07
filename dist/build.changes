@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Fri Mar  7 08:18:07 UTC 2025 - Adrian Schröter <adrian@suse.de>
+
+- Fixed behaviour when using "--shell" aka "osc shell" option
+  in a VM build. Startup is faster and permissions stay intact
+  now.
+
+-------------------------------------------------------------------
 Tue Mar  4 10:15:35 UTC 2025 - Adrian Schröter <adrian@suse.de>
 
 - fixes for POSIX compatibility for obs-docker-support adn
