@@ -836,7 +836,19 @@ vm_setup() {
 	    rm -f "$VM_ROOT"
 	fi
     fi
+
     local clean_build="$CLEAN_BUILD"
+
+    # Do a clean build if the size of the image has changed
+    if test "$VM_ROOT_TYPE" = file -a -z "$clean_build" ; then
+	local origrootsize
+	test -e "$VM_ROOT" -a -e "${VM_ROOT}.size" && origrootsize=$(cat "${VM_ROOT}.size" 2>/dev/null)
+	if test -z "$origrootsize" -o "$origrootsize" != "$VMDISK_ROOTSIZE" ; then
+	    # the size has changed, re-create file system
+	    clean_build=true
+	fi
+    fi
+
     # Check for populating filesystem during mkfs
     if test -n "$VM_USE_MKFS_COPYIN" ; then
 	echo "Using mkfs copyin mode to populate the root filesystem"
@@ -845,7 +857,7 @@ vm_setup() {
 	    find "$BUILD_ROOT" -type d -not -perm /200 -print0 | xargs -0 --no-run-if-empty chmod +w
 	fi
 	rm -rf "$BUILD_ROOT"/* "$BUILD_ROOT"/.[^.]*
-        if test -z "$CLEAN_BUILD" -a -e "$VM_ROOT" ; then
+        if test -z "$clean_build" -a -e "$VM_ROOT" ; then
 	    vm_do_partial_copyout
 	    if test -d "$BUILD_ROOT/installed-pkg" ; then
 		# preinstall was already done, continue with caution
@@ -853,23 +865,12 @@ vm_setup() {
 		VM_USE_MKFS_COPYIN=partial
 	    else
 		# start over from scratch
-		clean_build=true
 		rm -rf "$BUILD_ROOT"/* "$BUILD_ROOT"/.[^.]*
 	    fi
         fi
     fi
-    if test "$VM_ROOT_TYPE" = file ; then
-	if test -z "$clean_build" ; then
-	    local origrootsize
-	    test -e "$VM_ROOT" -a -e "${VM_ROOT}.size" && origrootsize=$(cat "${VM_ROOT}.size" 2>/dev/null)
-	    if test -z "$origrootsize" -o "$origrootsize" != "$VMDISK_ROOTSIZE" ; then
-		# the size has changed, re-create file system
-		clean_build=true
-	    fi
-	fi
-	if test -n "$clean_build" ; then
-	    vm_img_create "$VM_ROOT" "$VMDISK_ROOTSIZE"
-	fi
+    if test "$VM_ROOT_TYPE" = file -a  -n "$clean_build" ; then
+	vm_img_create "$VM_ROOT" "$VMDISK_ROOTSIZE"
     fi
     if test ! -e "$VM_ROOT" ; then
 	cleanup_and_exit 4 "you need to create $VM_ROOT first"
