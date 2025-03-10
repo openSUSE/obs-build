@@ -1,0 +1,291 @@
+#!/usr/bin/perl -w
+
+################################################################
+#
+# Copyright (c) 1995-2025 SUSE Linux Products GmbH
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see the file COPYING); if not, write to the
+# Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+#
+################################################################
+
+BEGIN {
+  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+}
+
+use strict;
+
+use Digest::MD5 ();
+use File::Path ();
+
+use Build ':none';
+use Build::Options;
+use Build::Download;
+
+my $cachedir = "/var/cache/build";
+
+my $options = {
+  'cachedir' => ':',
+  'archpath' => ':',
+  'type' => ':',
+};
+
+sub slurp {
+  my ($fn) = @_;
+  my $fd;
+  return undef unless open($fd, '<', $fn);
+  local $/ = undef;     # Perl slurp mode
+  my $content = <$fd>;
+  close $fd;
+  return $content;
+}
+
+sub rpmmd_open_primary {
+  my ($fn) = @_;
+  my $fh;
+  open($fh, '<', $fn) or die "Error opening $fn: $!\n";
+  if ($fn =~ /\.gz$/) {
+    require IO::Uncompress::Gunzip;
+    $fh = new IO::Uncompress::Gunzip $fh or die "Error opening $fn: $IO::Uncompress::Gunzip::GunzipError\n";
+  } elsif ($fn =~ /\.zst$/) {
+    close($fh);
+    $fh = undef;
+    open($fh, "-|", "zstd", "-dc", $fn) or die "Error opening $fn: $!\n";
+  }
+  return $fh;
+}
+
+sub rpmmd_get_location {
+  my ($f) = @_;
+  my $u = $f->{'location'};
+  if ($] > 5.007) {
+    require Encode;
+    utf8::downgrade($u);
+  }
+  $u =~ s/.*\///;     # strip "repodata" part
+  return $u;
+}
+
+
+my ($opts, @args) = Build::Options::parse_options($options, @ARGV);
+
+my $type = $opts->{'type'};
+my $archpath = $opts->{'archpath'};
+$cachedir = $opts->{'cachedir'} if $opts->{'cachedir'};
+
+my $url = $args[0];
+my $qtype = $args[1];
+die("Please specify what to query\n") unless defined $url;
+die("Please specify the repository type\n") unless $type;
+die("Please specify the query type\n") unless $qtype;
+
+my $zyppcachedir;
+
+# zypp repotype hack
+if ($type eq 'zypp') {
+  require Build::Zypp;
+  if ($qtype eq 'repos') {
+    die("need 'zypp:' url for repos query\n") unless $url eq 'zypp:';
+    require Build::Zypp;
+    for my $r (Build::Zypp::parseallrepos()) {
+      print "$r->{'name'}\n" if $r->{'enabled'};
+    }
+    exit(0);
+  }
+  die("unsupported query type '$qtype'\n") unless $qtype eq 'intrepo';
+  die("zypp url must start with 'zypp://'\n") unless $url =~ /^zypp:\/\/([^\/]*)/;
+  my $repo = Build::Zypp::parserepo($1);
+  $type = $repo->{'type'};
+  $zyppcachedir = "/var/cache/zypp/raw/$repo->{'name'}";
+  die("zypp repo $url is not up to date, please refresh first\n") unless -d $zyppcachedir;
+  if (!$type) {
+    $type = 'suse' if -e "$zyppcachedir/suse/setup/descr";
+    $type = 'rpm-md' if -e "$zyppcachedir/repodata";
+  }
+  $type = 'suse' if $type eq 'yast2';
+  die("could not determine repo type for '$repo->{'name'}'\n") unless $type;
+}
+
+die("unsupported query type '$qtype'\n") unless $qtype eq 'intrepo';
+
+#
+# handle local repositories
+# 
+
+if ($url !~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/) {
+  my $dir = $url;
+  $dir = $zyppcachedir if $zyppcachedir;
+  die("local repository $url does not exist\n") unless -d $dir;
+  $url .= '/' unless $url =~ /\/$/;
+  $dir =~ s/\/$//;
+
+  if ($type eq 'apk') {
+    require Build::Apkrepo;
+    Build::Apkrepo::parse("$dir/APKINDEX.tar.gz", sub { Build::writedeps(\*STDOUT, $_[0], $url) }, 'addselfprovides' => 1, 'normalizedeps' => 1);
+  } elsif ($type eq 'arch') {
+    require Build::Archrepo;
+    die("could not determine reponame from url $url\n") unless "/$url/" =~ /.*\/([^\/]+)\/os\//;
+    my $reponame = $1;
+    Build::Archrepo::parse("$dir/$reponame.db", sub { Build::writedeps(\*STDOUT, $_[0], $url) }, 'addselfprovides' => 1);
+  } elsif ($type eq 'mdk' || $type eq 'hdlist2') {
+    require Build::Mdkrepo;
+    Build::Mdkrepo::parse("$dir/synthesis.hdlist.cz", sub { Build::writedeps(\*STDOUT, $_[0], $url) }, 'addselfprovides' => 1);
+  } elsif ($type eq 'rpmmd' || $type eq 'rpm-md') {
+    require Build::Rpmmd;
+    die("local repository $url does not contain a repomd.xml file\n") unless -s "${dir}/repodata/repomd.xml";
+    my @primaryfiles;
+    Build::Rpmmd::parse_repomd("${dir}/repodata/repomd.xml", \@primaryfiles);
+    @primaryfiles = grep {$_->{'type'} eq 'primary' && defined($_->{'location'})} @primaryfiles;
+    for my $f (@primaryfiles) {
+      my $u = rpmmd_get_location($f);
+      if (! -e "${dir}/repodata/$u" || (exists($f->{'size'}) && $f->{'size'} != (-s _))) {
+        die("zypp repo $url is not up to date, please refresh first\n") if $zyppcachedir;
+        die("inconsistent repodata in $dir\n");
+      }
+      my $fh = rpmmd_open_primary("${dir}/repodata/$u");
+      binmode STDOUT, ":utf8";
+      Build::Rpmmd::parse($fh, sub {
+        return if $opts->{'nosrc'} && ($_[0]->{'arch'} eq 'src' || $_[0]->{'arch'} eq 'nosrc');
+        Build::writedeps(\*STDOUT, $_[0], $url) }, 'addselfprovides' => 1);
+    }
+  } elsif ($type eq 'yast' || $type eq 'suse') {
+    require Build::Susetags;
+    # XXX: use descrdir/datadir from content file
+    my $descrdir = 'suse/setup/descr';
+    my $datadir = 'suse';
+    my $packages = "$dir/$descrdir/packages";
+    $packages = "$packages.gz" if ! -e $packages && -e "$packages.gz";
+    Build::Susetags::parse($packages, sub {
+      my $xurl = $url;
+      # multi cd support hack
+      $xurl =~ s/1\/$/$_[0]->{'medium'}/ if $_[0]->{'medium'};
+      $xurl .= "$datadir/" if $datadir;
+      Build::writedeps(\*STDOUT, $_[0], $xurl);
+    }, 'addselfprovides' => 1);
+  } else {
+    die("Unsupported local repository type '$type'\n");
+  }
+  exit(0);
+}
+
+
+#
+# handle remote repositories
+# 
+
+
+my $ua = Build::Download::create_ua();
+
+die("$url: not an remote repository") unless $url =~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/;
+my $repoid = Digest::MD5::md5_hex($url);
+my $dir = "$cachedir/$repoid";
+
+if ($type eq 'apk') {
+  require Build::Apkrepo;
+  File::Path::mkpath($dir);
+  $url .= '/' unless $url =~ /\/$/;
+  Build::Download::download("${url}APKINDEX.tar.gz", "$dir/.APKINDEX.tar.gz$$", "$dir/APKINDEX.tar.gz", 'ua' => $ua, 'retry' => 3);
+  Build::Apkrepo::parse("$dir/APKINDEX.tar.gz", sub { Build::writedeps(\*STDOUT, $_[0], $url) }, 'addselfprovides' => 1, 'normalizedeps' => 1);
+} elsif ($type eq 'arch') {
+  require Build::Archrepo;
+  die("could not determine reponame from url $url\n") unless "/$url/" =~ /.*\/([^\/]+)\/os\//;
+  my $reponame = $1;
+  File::Path::mkpath($dir);
+  $url .= '/' unless $url =~ /\/$/;
+  Build::Download::download("$url$reponame.db", "$dir/.$reponame.db.$$", "$dir/$reponame.db", 'ua' => $ua, 'retry' => 3);
+  Build::Archrepo::parse("$dir/$reponame.db", sub { Build::writedeps(\*STDOUT, $_[0], $url) }, 'addselfprovides' => 1);
+} elsif ($type eq 'debian') {
+  require Build::Deb;
+  require Build::Debrepo;
+  my ($baseurl, $disturl, $components) = Build::Debrepo::parserepourl($url);
+  $archpath ||= `uname -p` || 'unknown';
+  chomp $archpath;
+  my $basearch = $archpath;
+  $basearch =~ s/:.*//;
+  $basearch = Build::Deb::basearch($basearch);
+  File::Path::mkpath($dir);
+  my $files = {};
+  if (grep {$_ ne '.'} @$components) {
+    Build::Download::download("${disturl}Release", "$dir/.Release.$$", "$dir/Release", 'ua' => $ua, 'retry' => 3);
+    my $release = slurp("$dir/Release");
+    $files = Build::Debrepo::parserelease($release);
+  }
+  my $pkgnum = 0;
+  for my $component (@$components) {
+    unlink("$dir/Packages.xz");
+    unlink("$dir/Packages.gz");
+    my $pfile = 'Packages.gz';
+    if ($component eq '.') {
+      Build::Download::download("${disturl}Packages.gz", "$dir/.$pfile.$$", "$dir/$pfile", 'ua' => $ua, 'retry' => 3);
+      die("$pfile missing\n") unless -s "$dir/$pfile";
+    } else {
+      $pfile = 'Packages.xz' if $files->{"$component/binary-$basearch/Packages.xz"};
+      Build::Download::download("$disturl$component/binary-$basearch/$pfile", "$dir/.$pfile.$$", "$dir/$pfile", 'ua' => $ua, 'retry' => 3, 'digest' => $files->{"$component/binary-$basearch/$pfile"});
+      die("$pfile missing for basearch $basearch, component $component\n") unless -s "$dir/$pfile";
+    }
+    Build::Debrepo::parse("$dir/$pfile", sub {
+      $pkgnum++;
+      $_[0]->{'id'} = "$pkgnum/0/0";
+      Build::writedeps(\*STDOUT, $_[0], $baseurl);
+    }, 'addselfprovides' => 1);
+  }
+} elsif ($type eq 'mdk' || $type eq 'hdlist2') {
+  require Build::Mdkrepo;
+  File::Path::mkpath($dir);
+  $url .= '/' unless $url =~ /\/$/;
+  Build::Download::download("${url}media_info/synthesis.hdlist.cz", "$dir/.synthesis.hdlist.cz$$", "$dir/synthesis.hdlist.cz", 'ua' => $ua, 'retry' => 3);
+  Build::Mdkrepo::parse("$dir/synthesis.hdlist.cz", sub { Build::writedeps(\*STDOUT, $_[0], $url) }, 'addselfprovides' => 1);
+} elsif ($type eq 'yast' || $type eq 'suse') {
+  require Build::Susetags;
+  File::Path::mkpath($dir);
+  $url .= '/' unless $url =~ /\/$/;
+  # XXX: use descrdir/datadir from content file
+  my $descrdir = 'suse/setup/descr';
+  my $datadir = 'suse';
+  Build::Download::download("${url}$descrdir/packages.gz", "$dir/.packages.gz$$", "$dir/packages.gz", 'ua' => $ua, 'retry' => 3);
+  Build::Susetags::parse("$dir/packages.gz", sub {
+    my $xurl = $url;
+    $xurl =~ s/1\/$/$_[0]->{'medium'}/ if $_[0]->{'medium'};	# multi cd support hack
+    $xurl .= "$datadir/" if $datadir;
+    Build::writedeps(\*STDOUT, $_[0], $xurl);
+  }, 'addselfprovides' => 1);
+} elsif ($type eq 'rpmmd' || $type eq 'rpm-md') {
+  require Build::Rpmmd;
+  File::Path::mkpath("$dir/repodata");
+  $url .= '/' unless $url =~ /\/$/;
+  Build::Download::download("${url}repodata/repomd.xml", "$dir/repodata/.repomd.xml.$$", "$dir/repodata/repomd.xml", 'ua' => $ua, 'retry' => 3);
+  my @primaryfiles;
+  Build::Rpmmd::parse_repomd("${dir}/repodata/repomd.xml", \@primaryfiles);
+  @primaryfiles = grep {$_->{'type'} eq 'primary' && defined($_->{'location'})} @primaryfiles;
+  for my $f (@primaryfiles) {
+    my $u = rpmmd_get_location($f);
+    my $cached;
+    if (-e "${dir}/repodata/$u") {
+      $cached = 1;
+      $cached = 0 if exists($f->{'size'}) && $f->{'size'} != (-s _);
+      $cached = 0 if !exists($f->{'size'}) && $u !~ /[0-9a-f]{32}-primary/;
+    }
+    if (!$cached) {
+      Build::Download::download("${url}repodata/$u", "${dir}/repodata/.$u.$$", "${dir}/repodata/$u", 'ua' => $ua, 'retry' => 3, 'digest' => $f->{'checksum'});
+    }
+    my $fh = rpmmd_open_primary("${dir}/repodata/$u");
+    binmode STDOUT, ":utf8";
+    Build::Rpmmd::parse($fh, sub {
+        return if $opts->{'nosrc'} && ($_[0]->{'arch'} eq 'src' || $_[0]->{'arch'} eq 'nosrc');
+        Build::writedeps(\*STDOUT, $_[0], $url) }, 'addselfprovides' => 1);
+  }
+} else {
+  die("Unsupported repository type '$type'\n");
+}
+

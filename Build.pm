@@ -46,6 +46,7 @@ our $do_flatpak;
 our $do_mkosi;
 our $do_productcompose;
 our $do_apk;
+our $do_none;
 
 sub import {
   for (@_) {
@@ -64,8 +65,9 @@ sub import {
     $do_mkosi = 1 if $_ eq ':mkosi';
     $do_productcompose = 1 if $_ eq ':productcompose';
     $do_apk = 1 if $_ eq ':apk';
+    $do_none = 1 if $_ eq ':none';
   }
-  $do_rpm = $do_deb = $do_kiwi = $do_productcompose = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = $do_fissile = $do_helm = $do_flatpak = $do_mkosi = $do_apk = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker && !$do_fissile && !$do_helm && !$do_flatpak && !$do_mkosi && !$do_productcompose && !$do_apk;
+  $do_rpm = $do_deb = $do_kiwi = $do_productcompose = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = $do_fissile = $do_helm = $do_flatpak = $do_mkosi = $do_apk = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker && !$do_fissile && !$do_helm && !$do_flatpak && !$do_mkosi && !$do_productcompose && !$do_apk && !$do_none;
 
   if ($do_deb) {
     require Build::Deb;

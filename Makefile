@@ -54,6 +54,7 @@ install:
 	    killchroot \
 	    queryconfig \
 	    queryrecipe \
+	    queryrepo \
 	    common_functions \
 	    init_buildsystem \
 	    substitutedeps \
