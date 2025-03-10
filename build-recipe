@@ -243,31 +243,10 @@ expand_recipe_directories() {
     fi
 }
 
-# extract rpm macros from configuration
+# extract macros from configuration
 # these are potentialy also used in non-rpm builds
 recipe_setup_macros() {
-    local rawcfgmacros=.rpmmacros
-    test "$BUILDTYPE" = debbuild && rawcfgmacros=.debmacros
-    queryconfig rawmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" > $BUILD_ROOT/root/$rawcfgmacros
-    if test -n "$BUILD_DEBUG" && test "$BUILDTYPE" != debbuild ; then
-	echo '
-%prep %{?!__debug_package:%{?_build_create_debug:%?_build_insert_debug_package}}%%prep
-%package %{?!__debug_package:%{?_build_create_debug:%?_build_insert_debug_package}}%%package
-%_build_insert_debug_package \
-%global __debug_package 1 \
-%undefine _enable_debug_packages \
-%debug_package
-
-' >> $BUILD_ROOT/root/$rawcfgmacros
-    fi
-
-    if test -n "$BUILD_JOBS" ; then
-	local jobsmacro=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" eval '%{?jobs}')
-	test "$jobsmacro" != '${RPM_BUILD_NCPUS}' && echo "%jobs $BUILD_JOBS" >> $BUILD_ROOT/root/$rawcfgmacros
-	local smpmflagsmacro=$(chroot rpm --eval '%_smp_mflags' 2>/dev/null)
-	if test "$smpmflags" != '-j${RPM_BUILD_NCPUS}' && echo "_smp_mflags -j$BUILD_JOBS" >> $BUILD_ROOT/root/$rawcfgmacros
-    fi
-    test $BUILD_USER = abuild && cp -p $BUILD_ROOT/root/$rawcfgmacros $BUILD_ROOT/home/abuild/$rawcfgmacros
+    spec_setup_macros
 }
 
 # generate a .build-changelog file from a .changes file
