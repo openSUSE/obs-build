@@ -66,10 +66,6 @@ install:
 	    mkdrpms \
 	    listinstalled \
 	    call-flatpak-builder \
-	    createzyppdeps \
-	    createapkdeps \
-	    createarchdeps \
-	    createdebdeps \
 	    createrepomddeps \
 	    createyastdeps \
 	    changelog2spec \
