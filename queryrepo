@@ -97,7 +97,6 @@ if ($type eq 'zypp') {
   require Build::Zypp;
   if ($qtype eq 'repos') {
     die("need 'zypp:' url for repos query\n") unless $url eq 'zypp:';
-    require Build::Zypp;
     for my $r (Build::Zypp::parseallrepos()) {
       print "$r->{'name'}\n" if $r->{'enabled'};
     }

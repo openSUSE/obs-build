@@ -379,7 +379,7 @@ expand_plain_zypp_repo() {
     r=()
     for i in "${repos[@]}"; do
 	if test "$i" = "zypp://" ; then
-	    for j in $($BUILD_DIR/createzyppdeps --listrepos) ; do
+	    for j in $($BUILD_DIR/queryrepo --type zypp zypp: repos) ; do
 		r=("${r[@]}" "zypp://$j")
 	    done
 	else
@@ -470,22 +470,10 @@ create_cache_file() {
 	    local cachedir="$(getcachedir "$SRC")"
 	    test -z "$cachedir" && cleanup_and_exit 1 "could not determine cachedir for $SRC"
 	    mkdir -p "$cachedir"
-	    if test "$SRCREPOTYPE" = arch ; then
-		set -- $BUILD_DIR/createarchdeps --cachedir="$CACHE_DIR" "$SRC"
-	    elif test "$SRCREPOTYPE" = debian ; then
-		set -- $BUILD_DIR/createdebdeps --cachedir="$CACHE_DIR" --archpath "$BUILD_ARCH" "$SRC"
-	    elif test "$SRCREPOTYPE" = suse ; then
-		set -- $BUILD_DIR/createyastdeps --cachedir="$CACHE_DIR" "$SRC"
-	    elif test "$SRCREPOTYPE" = hdlist2 ; then
-		set -- $BUILD_DIR/createmdkdeps --cachedir="$CACHE_DIR" "$SRC"
-	    elif test "$SRCREPOTYPE" = apk ; then
-		set -- $BUILD_DIR/createapkdeps --cachedir="$CACHE_DIR" "$SRC"
-	    else
-		set -- $BUILD_DIR/createrepomddeps --cachedir="$CACHE_DIR" "$SRC"
-	    fi
+	    set -- $BUILD_DIR/queryrepo --cachedir="$CACHE_DIR" --archpath "$BUILD_ARCH" --type "$SRCREPOTYPE" "$SRC" intrepo
 	elif test "${SRC#zypp://}" != "$SRC" ; then
 	    # special zypp repo
-	    set -- $BUILD_DIR/createzyppdeps --cachedir="$CACHE_DIR" "$SRC"
+	    set -- $BUILD_DIR/queryrepo --cachedir="$CACHE_DIR" --type zypp "$SRC" intrepo
 	elif test "${SRC#obs:/}" != "$SRC" ; then
 	    # open build service repo
 	    test -n "$OBSURL" || cleanup_and_exit 1 "Please use the --obs option to specify the url of the obs instance"
@@ -493,9 +481,9 @@ create_cache_file() {
 	elif test ! -e "$SRC" ; then
 	    cleanup_and_exit 1 "*** $SRC does not exist"
 	elif test -z "$findonly" -a \( -e "$SRC"/suse/setup/descr/packages -o -e "$SRC"/suse/setup/descr/packages.gz \) ; then
-	    set -- $BUILD_DIR/createyastdeps "$SRC"
+	    set -- $BUILD_DIR/queryrepo --type suse "$SRC" intrepo
 	elif test -z "$findonly" -a -e "$SRC"/repodata/repomd.xml ; then
-	    set -- $BUILD_DIR/createrepomddeps "$SRC"
+	    set -- $BUILD_DIR/queryrepo --type rpmmd "$SRC" intrepo
 	else
 	    set -- $BUILD_DIR/createdirdeps --oldfile "$CACHE_FILE" "$SRC"
 	fi

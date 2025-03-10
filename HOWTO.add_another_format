@@ -78,9 +78,9 @@ Build code running inside of environment.
    This functions are called to create the build result
 
 7) For standalone build support (actually not needed for OBS integration, but
-   it makes development easier) we need a "createxyzdeps" helper script.
-   For xyz://<...> repos it needs to download the repository metadata
-   and convert it to build's representation. See createyastdeps and createrepomddeps.
+   it makes development easier) we need support for the repository format in
+   the queryrepo tool. This tool downloads the repository metadata and converts
+   it to the internal representation.
 
 
 Special notes for non-OSS systems
