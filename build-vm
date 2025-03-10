@@ -955,10 +955,10 @@ vm_setup_partial_copyin() {
     test -f $BUILD_ROOT/.guessed_dist && to_extract="$to_extract .guessed_dist"
     (cd $BUILD_ROOT; tar -cf .build.extract.tar .build $to_extract)
     cat > $BUILD_ROOT/.build/build.data.extract <<'EOF'
-echo "Exxtracting build.extract.tar"
+echo "Extracting build.extract.tar"
 rm -f /.build.unpackarchive
 cp /.build/unpackarchive /.build.unpackarchive
-(rm -rf /.build ; perl /.build.unpackarchive --tar) < /.build/build.extract.tar
+(rm -rf /.build /.init_b_cache ; perl /.build.unpackarchive --tar) < /.build/build.extract.tar
 rm -f /.build.unpackarchive
 exec /.build/build
 EOF
