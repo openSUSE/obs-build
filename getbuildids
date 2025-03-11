@@ -53,10 +53,15 @@ if (@ARGV && $ARGV[0] eq 'cachecheck') {
       if ($buildid) {
 	my $bid = getbuildid($cpkg);
 	next unless $bid;
+	# deal with missing buildtime in the id
 	if ($bid =~ / 0-/) {
 	  my $buildid2 = $buildid;
 	  $buildid2 =~ s/ .*?-/ 0-/;
 	  next if $bid ne $buildid2;
+	} elsif ($buildid =~ / 0-/) {
+	  my $buildid2 = $bid;
+	  $buildid2 =~ s/ .*?-/ 0-/;
+	  next if $buildid2 ne $buildid;
 	} else {
 	  next if $bid ne $buildid;
  	}
