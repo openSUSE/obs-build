@@ -37,8 +37,10 @@ my $cachedir = "/var/cache/build";
 
 my $options = {
   'cachedir' => ':',
-  'archpath' => ':',
+  'arch' => ':',
   'type' => ':',
+
+  'archpath' => 'arch:',
 };
 
 sub slurp {
@@ -87,8 +89,30 @@ $cachedir = $opts->{'cachedir'} if $opts->{'cachedir'};
 my $url = $args[0];
 my $qtype = $args[1];
 die("Please specify what to query\n") unless defined $url;
-die("Please specify the repository type\n") unless $type;
 die("Please specify the query type\n") unless $qtype;
+
+
+if ($qtype eq 'cachedir') {
+  if ($url =~ /^(:?ftps?|https?|zypp):\/\/([^\/]*)\/?/) {
+    my $repoid = Digest::MD5::md5_hex($url);
+    my $dir = "$cachedir/$repoid";
+    print "$dir\n";
+  }
+  exit(0);
+}
+
+if ($qtype eq 'baseurl') {
+  if ($url =~ /^(:?ftps?|https?|zypp):\/\/([^\/]*)\/?/) {
+    if ($type && $type eq 'debian') {
+      require Build::Debrepo;
+      my ($baseurl, $disturl, $components) = Build::Debrepo::parserepourl($url);
+      $url = $baseurl;
+    }
+    $url .= '/' unless $url =~ /\/$/;
+    print "$url\n";
+  }
+  exit(0);
+}
 
 my $zyppcachedir;
 

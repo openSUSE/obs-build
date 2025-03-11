@@ -89,6 +89,50 @@ if ($cmd eq 'config') {
   exit;
 }
 
+if ($cmd eq 'baseurl') {
+  my $options = {
+    'obs' => ':',
+    'arch' => ':',
+    'cachedir' => ':',
+  };
+  my ($opts, @args) = Build::Options::parse_options($options, @ARGV);
+  my $obsurl = $opts->{'obs'};
+  die("please specify a obs url with the --obs option\n")  unless $obsurl;
+  my $arch = $opts->{'arch'};
+  die("please specify a scheduler architecture with the --arch option\n")  unless $arch;
+  $arch =~ s/:.*//;
+  for my $url (@args) {
+    die("$url: not a valid  obs: repo") unless $url =~ /^obs:\/{1,3}([^\/]+\/[^\/]+)\/?$/;
+    my $prp = $1;
+    my $baseurl =$obsurl;
+    $baseurl .= '/' unless $baseurl =~ /\/$/;
+    print "${baseurl}build/$prp/$arch/\n";
+  }
+  exit;
+}
+
+if ($cmd eq 'cachedir') {
+  my $options = {
+    'obs' => ':',
+    'arch' => ':',
+    'cachedir' => ':',
+  };
+  my ($opts, @args) = Build::Options::parse_options($options, @ARGV);
+  $cachedir = $opts->{'cachedir'} if $opts->{'cachedir'};
+  my $obsurl = $opts->{'obs'};
+  die("please specify a obs url with the --obs option\n")  unless $obsurl;
+  my $arch = $opts->{'arch'};
+  die("please specify a scheduler architecture with the --arch option\n")  unless $arch;
+  $arch =~ s/:.*//;
+  for my $url (@args) {
+    die("$url: not a valid  obs: repo") unless $url =~ /^obs:\/{1,3}([^\/]+\/[^\/]+)\/?$/;
+    my $prp = $1;
+    my $repoid = Digest::MD5::md5_hex("$obsurl/build/$prp/$arch");
+    print "$cachedir/$repoid\n";
+  }
+  exit;
+}
+
 die("unknown query command '$cmd'\n") unless $cmd eq 'repo';
 
 my $options = {
