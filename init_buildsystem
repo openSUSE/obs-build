@@ -46,6 +46,8 @@ export SYSTEMD_OFFLINE=1
 browner=0
 definesnstuff=()
 repos=()
+repos_baseurl=()
+repos_cachedir=()
 
 . $BUILD_DIR/common_functions || exit 1
 
@@ -62,6 +64,9 @@ CACHE_DIR=
 OBSURL=
 BUILD_SYSROOT=
 test -z "$CONFIG_DIR" && CONFIG_DIR="$BUILD_DIR/configs"
+
+# default repository type
+REPOTYPE=
 
 while test -n "$1" ; do
     case "$1" in
@@ -389,6 +394,39 @@ expand_plain_zypp_repo() {
     repos=("${r[@]}")
 }
 
+find_default_repotype() {
+    REPOTYPE=
+    if test -n "$BUILD_DIST" ; then
+	for i in `queryconfig repotype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"` ; do
+	    case $i in
+		arch|debian|hdlist2|rpm-md|apk) REPOTYPE=$i ;;
+	    esac
+	    test -n "$REPOTYPE" && break
+	done
+	if test -z "$REPOTYPE"; then
+	    local BINTYPE=`queryconfig binarytype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
+	    case "$BINTYPE" in
+		arch) REPOTYPE=arch ;;
+		deb)  REPOTYPE=debian ;;
+		apk)  REPOTYPE=apk ;;
+	    esac
+	fi
+    fi
+    if test -z "$REPOTYPE" ; then
+	# check the first init_buildsystem arg, maybe it is a recipe
+	case ${PKGS[0]} in
+	    *.spec)
+		REPOTYPE=rpm-md ;;
+	    *.dsc)
+		REPOTYPE=debian ;;
+	    */PKGBUILD|PKGBUILD|*/_service:*:PKGBUILD|_service:*:PKGBUILD)
+		REPOTYPE=arch ;;
+	    */APKBUILD|APKBUILD|*/_service:*:APKBUILD|_service:*:APKBUILD)
+		REPOTYPE=apk ;;
+	esac
+    fi
+}
+
 create_cache_file() {
     local findonly=
     expand_plain_zypp_repo
@@ -422,36 +460,8 @@ create_cache_file() {
     test -z "$LIST_STATE" && echo initializing $CACHE_FILE ...
 
     # figure out a repository type default
-    REPOTYPE=
-    if test -n "$BUILD_DIST" ; then
-	for i in `queryconfig repotype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"` ; do
-	    case $i in
-		arch|debian|hdlist2|rpm-md) REPOTYPE=$i ;;
-	    esac
-	    test -n "$REPOTYPE" && break
-	done
-	if test -z "$REPOTYPE"; then
-	    BINTYPE=`queryconfig binarytype --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`
-	    case "$BINTYPE" in
-		arch) REPOTYPE=arch ;;
-		deb)  REPOTYPE=debian ;;
-		apk)  REPOTYPE=apk ;;
-	    esac
-	fi
-    fi
-    if test -z "$REPOTYPE" ; then
-	# check the first init_buildsystem arg, maybe it is a recipe
-	case ${PKGS[0]} in
-	    *.spec)
-		REPOTYPE=rpm-md ;;
-	    *.dsc)
-		REPOTYPE=debian ;;
-	    */PKGBUILD|PKGBUILD|*/_service:*:PKGBUILD|_service:*:PKGBUILD)
-		REPOTYPE=arch ;;
-	    */APKBUILD|APKBUILD|*/_service:*:APKBUILD|_service:*:APKBUILD)
-		REPOTYPE=apk ;;
-	esac
-    fi
+    find_default_repotype
+
     for SRC in "${repos[@]}" -- ${BUILD_RPMS//:/ /}; do
 	if test "$SRC" = '--' ; then
 	    findonly=1
@@ -467,9 +477,6 @@ create_cache_file() {
 	test -z "$SRC" && SRC=`pwd`
 	if test "${SRC#http://}" != "$SRC" -o "${SRC#https://}" != "$SRC" -o "${SRC#ftp://}" != "$SRC" -o "${SRC#ftps://}" != "$SRC" ; then
 	    # remote repo, cache binary packages
-	    local cachedir="$(getcachedir "$SRC")"
-	    test -z "$cachedir" && cleanup_and_exit 1 "could not determine cachedir for $SRC"
-	    mkdir -p "$cachedir"
 	    set -- $BUILD_DIR/queryrepo --cachedir="$CACHE_DIR" --archpath "$BUILD_ARCH" --type "$SRCREPOTYPE" "$SRC" intrepo
 	elif test "${SRC#zypp://}" != "$SRC" ; then
 	    # special zypp repo
@@ -510,8 +517,8 @@ downloadpkg() {
     esac
 
     local cachedir="$(getcachedir "$url")"
-    local name="$(basename "$url")"
     test -z "$cachedir" && cleanup_and_exit 1 "could not determine cachedir for $url"
+    local name="$(basename "$url")"
     name=${name/%.pkg.tar.zst/.arch}
     name=${name/%.pkg.tar.?z/.arch}
     SRC="$cachedir/$name"
@@ -537,42 +544,49 @@ downloadpkg() {
     mv "$destfile" "$SRC" || cleanup_and_exit 1
 }
 
-getobslocation() {
-    local url=$1
-    local obsurl="${OBSURL%/}"
-    test -n "$obsurl" || cleanup_and_exit 1 "Please use the --obs option to specify the url of the obs instance"
-    url="${url#obs:/}"
-    url="${url#/}"
-    url="${url#/}"
-    url="${url%/}"
-    url="$obsurl/build/$url/${BUILD_ARCH%%:*}"
-    echo "$url"
-}
-
-getdebianbaseurl() {
-    local url=$1
-    case $url in
-	*[?]*) url="${url%%[?]*]}" ; echo "${url%/}/" ;;
-	*/./*|*/. ) echo "${url%/.*}/" ;;
-	*) url="${url%/*}"; echo "${url%/*}/" ;;
-    esac
-}
-
-getcachedir() {
-    local url=$1
-    local repoid dummy
+setup_repos_baseurl_cachedir() {
+    repos_baseurl=()
+    repos_cachedir=()
+    test -z "$REPOTYPE" && find_default_repotype
+    local repotype baseurl cachedir
     for repo in "${repos[@]}" ; do
+        repotype=$REPOTYPE
+	baseurl=
+	cachedir=
 	case $repo in
-	    debian@http*) repo=$(getdebianbaseurl "${repo#*@}") ;;
-	    arch@* | debian@* | hdlist2@* | rpmmd@* | rpm-md@* | suse@* | apk@*) repo=${repo#*@} ;;
+	    arch@* | debian@* | hdlist2@* | rpmmd@* | rpm-md@* | suse@* | apk@*)
+		repotype="${repo%%@*}"
+		repo="${repo#*@}"
+		;;
 	esac
-	test "${repo#obs:/}" != "$repo" && repo=$(getobslocation "$repo")
-	if test "${url:0:${#repo}}" == "$repo" ; then
-	    read repoid dummy < <(echo -n "$repo" | md5sum)
+        case $repo in
+	    obs:/*)
+		test -n "$OBSURL" || cleanup_and_exit 1 "Please use the --obs option to specify the url of the obs instance"
+		baseurl=$($BUILD_DIR/queryobs baseurl --arch "${BUILD_ARCH%%:*}" --obs "${OBSURL%/}" $repo)
+		cachedir=$($BUILD_DIR/queryobs cachedir --arch "${BUILD_ARCH%%:*}" --obs "${OBSURL%/}" $repo)
+		;;
+	    zypp://* | http://* | https://* | ftp://* | ftps://*)
+		baseurl=$($BUILD_DIR/queryrepo --arch "${BUILD_ARCH%%:*}" --type "$repotype" "$repo" baseurl)
+		cachedir=$($BUILD_DIR/queryrepo --arch "${BUILD_ARCH%%:*}" --type "$repotype" "$repo" cachedir)
+		;;
+	esac
+        repos_baseurl[${#repos_baseurl[@]}]="$baseurl"
+        repos_cachedir[${#repos_cachedir[@]}]="$cachedir"
+    done
+}
+
+# find the cachedir for a download location
+getcachedir() {
+    local url="$1"
+    test "${#repos_baseurl[@]}" = 0 && setup_repos_baseurl_cachedir
+    local baseurl
+    for baseurl in "${repos_baseurl[@]}" ; do
+	if test "${url:0:${#baseurl}}" == "$baseurl" ; then
+	    test -n "${repos_cachedir[$idx]}" && echo "${repos_cachedir[$idx]}"
 	    break
 	fi
+	idx=$(( $idx + 1 ))
     done
-    test -n "$repoid" && echo "$CACHE_DIR/$repoid"
 }
 
 set_build_arch
@@ -816,6 +830,8 @@ else
     # use cached packages where possible
     if test -s $BUILD_INIT_CACHE/rpmlist.download ; then
 	echo "calculating packages to download..."
+	# do this first as we're in a subshell below
+	test "${#repos_baseurl[@]}" = 0 && setup_repos_baseurl_cachedir
         while read PKG SRC ; do
 	    SRCSUF=${SRC/%.pkg.tar.zst/.arch}
 	    SRCSUF=${SRCSUF/%.pkg.tar.?z/.arch}
