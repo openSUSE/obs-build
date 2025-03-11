@@ -477,7 +477,7 @@ create_cache_file() {
 	test -z "$SRC" && SRC=`pwd`
 	if test "${SRC#http://}" != "$SRC" -o "${SRC#https://}" != "$SRC" -o "${SRC#ftp://}" != "$SRC" -o "${SRC#ftps://}" != "$SRC" ; then
 	    # remote repo, cache binary packages
-	    set -- $BUILD_DIR/queryrepo --cachedir="$CACHE_DIR" --archpath "$BUILD_ARCH" --type "$SRCREPOTYPE" "$SRC" intrepo
+	    set -- $BUILD_DIR/queryrepo --cachedir="$CACHE_DIR" --arch "${BUILD_ARCH%%:*}" --type "$SRCREPOTYPE" "$SRC" intrepo
 	elif test "${SRC#zypp://}" != "$SRC" ; then
 	    # special zypp repo
 	    set -- $BUILD_DIR/queryrepo --cachedir="$CACHE_DIR" --type zypp "$SRC" intrepo
