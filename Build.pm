@@ -800,6 +800,7 @@ sub get_sysroot {
 sub get_sysbuild {
   my ($config, $buildtype, $extradeps) = @_;
   $buildtype ||= $config->{'type'} || '';
+  $buildtype = 'kiwi-image' if $buildtype eq 'kiwi';
   my $engine = $config->{'buildengine'} || $config->{"buildflags:buildengine.$buildtype"} || '';
   my @sysdeps;
   if ($engine eq 'mock' && $buildtype eq 'spec') {
