@@ -346,10 +346,6 @@ if ($useusedforbuild) {
 
 #######################################################################
 
-my $subpacks = [];
-
-my $extrasysdeps;
-
 sub includecallback {
   my ($recipe, $file) = @_;
   $file =~ s/.*\///;
@@ -365,14 +361,46 @@ sub includecallback {
   return $str;
 }
 
+sub parse_servicefile {
+  my ($bconf, $servicefile) = @_;
+  require Build::SimpleXML;
+  my $s = Build::SimpleXML::parse($servicefile) || {};
+  my %servicenames;
+  for my $services (@{$s->{'services'} || []}) {
+    for my $service (@{$services->{'service'} || []}) {
+      next unless $service->{'mode'} && $service->{'mode'} eq 'buildtime';
+      $servicenames{$service->{'name'}} = 1 if $service->{'name'};
+    }
+  }
+  my @btdeps;
+  for my $service (sort keys %servicenames) {
+    if ($bconf->{'substitute'}->{"obs-service:$service"}) {
+      push @btdeps, @{$bconf->{'substitute'}->{"obs-service:$service"}};
+    } else {
+      my $pkgname = "obs-service-$service";
+      $pkgname =~ s/_/-/g if $bconf->{'binarytype'} eq 'deb';
+      push @btdeps, $pkgname;
+    }
+  }
+  return Build::unify(@btdeps);
+}
+
+my $subpacks = [];
+my @sysdeps;
+my @btdeps;
+
 if ($recipe) {
   local $Build::Rpm::includecallback = sub { includecallback($recipe, @_) };
   my $d = Build::parse($cf, $recipe) || {};
   $cf->{'type'} = $buildtype if $buildtype;
+  my $servicefile = includecallback($recipe, '_service');
+  @btdeps = parse_servicefile($cf, $servicefile) if $servicefile;
+
+  @sysdeps = @btdeps;
   if ($buildtype eq 'kiwi') {
     # lets see if this is a product or image build
     $buildtype = $d->{'imagetype'} && $d->{'imagetype'}->[0] eq 'product' ? 'kiwi-product' : 'kiwi-image';
-    $extrasysdeps = [ grep {/^kiwi-.*:/} @{$d->{'deps'} || []} ];
+    unshift @sysdeps, grep {/^kiwi-.*:/} @{$d->{'deps'} || []} if $buildtype eq 'kiwi-image';
   }
   $subpacks = $d->{'subpacks'};
   unshift @extradeps, @{$d->{'deps'} || []};
@@ -382,11 +410,14 @@ if ($recipe) {
   }
 }
 
+$buildtype = 'kiwi-image' if $buildtype eq 'kiwi';	# hmm
+
 Build::readdeps($cf, undef, \%repo);
 
 #######################################################################
 
-my @sysdeps = Build::get_sysbuild($cf, $buildtype, $extrasysdeps);
+@sysdeps = Build::get_sysbuild($cf, $buildtype, [ @sysdeps ]);
+@btdeps = () if @sysdeps;	# already included in sysdeps
 
 if ($buildtype eq 'kiwi-image' || $buildtype eq 'kiwi-product' || $buildtype eq 'productcompose') {
   if (!shift @sysdeps) {
@@ -399,8 +430,8 @@ if ($buildtype eq 'kiwi-image' || $buildtype eq 'kiwi-product' || $buildtype eq 
   exit(0);
 }
 
-push @extradeps, '--ignoreignore--' if @sysdeps;
-my @bdeps = Build::get_build($cf, $subpacks, @extradeps);
+push @extradeps, '--ignoreignore--' if @sysdeps || $buildtype eq 'simpleimage';
+my @bdeps = Build::get_build($cf, $subpacks, @btdeps, @extradeps);
 
 if (!shift @bdeps) {
   print STDERR "expansion error\n";
