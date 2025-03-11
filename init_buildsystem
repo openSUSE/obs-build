@@ -581,7 +581,7 @@ getcachedir() {
     local baseurl
     local idx=0
     for baseurl in "${repos_baseurl[@]}" ; do
-	if test "${url:0:${#baseurl}}" == "$baseurl" ; then
+	if test -n "$baseurl" -a "${url:0:${#baseurl}}" == "$baseurl" ; then
 	    test -n "${repos_cachedir[$idx]}" && echo "${repos_cachedir[$idx]}"
 	    break
 	fi
