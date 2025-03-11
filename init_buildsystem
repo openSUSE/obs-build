@@ -518,10 +518,9 @@ downloadpkg() {
 
     local cachedir="$(getcachedir "$url")"
     test -z "$cachedir" && cleanup_and_exit 1 "could not determine cachedir for $url"
-    local name="$(basename "$url")"
-    name=${name/%.pkg.tar.zst/.arch}
-    name=${name/%.pkg.tar.?z/.arch}
-    SRC="$cachedir/$name"
+    SRC="$cachedir/${url##*/}"
+    SRC=${SRC/%.pkg.tar.zst/.arch}
+    SRC=${SRC/%.pkg.tar.?z/.arch}
     local destdir="$cachedir/tmp"
     mkdir -p "$destdir"
     echo "downloading $url ... ";
