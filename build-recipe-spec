@@ -411,9 +411,11 @@ spec_setup_macros() {
 
     if test -n "$BUILD_JOBS" ; then
 	local jobsmacro=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" eval '%{?jobs}')
+	local smpmflagsmacro=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" eval '%{?_smp_mflags}')
+	test -z "$jobsmacro" && jobsmacro=$(chroot $BUILD_ROOT rpm --eval '%{?jobs}' 2>/dev/null)
+	test -z "$smpmflagsmacro" && smpmflagsmacro=$(chroot $BUILD_ROOT rpm --eval '%{?_smp_mflags}' 2>/dev/null)
 	test "$jobsmacro" != '${RPM_BUILD_NCPUS}' && echo "%jobs $BUILD_JOBS" >> $BUILD_ROOT/root/$rawcfgmacros
-	local smpmflagsmacro=$(chroot rpm --eval '%_smp_mflags' 2>/dev/null)
-	test "$smpmflags" != '-j${RPM_BUILD_NCPUS}' && echo "_smp_mflags -j$BUILD_JOBS" >> $BUILD_ROOT/root/$rawcfgmacros
+	test "$smpmflagsmacro" != '-j${RPM_BUILD_NCPUS}' && echo "%_smp_mflags -j$BUILD_JOBS" >> $BUILD_ROOT/root/$rawcfgmacros
     fi
     test $BUILD_USER = abuild && cp -p "$BUILD_ROOT/root/$rawcfgmacros" "$BUILD_ROOT/home/abuild/$rawcfgmacros"
 }
