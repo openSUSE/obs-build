@@ -122,15 +122,16 @@ for my $arg (@ARGV) {
 }
 
 my @archs = split(':', $archs);
-my $binarytype;
-$binarytype = 'arch' if $buildtype eq 'arch';
-$binarytype = 'deb' if $buildtype eq 'dsc';
-$binarytype ||= 'rpm';
 
 # read dist if we can
 my $cf;
 $cf = Build::read_config_dist($dist, $archs[0] || 'noarch', $configdir) if defined($dist) && $dist ne '';
+
+my $binarytype;
 $binarytype = $cf->{'binarytype'} if $cf && $cf->{'binarytype'} && $cf->{'binarytype'} ne 'UNDEFINED';
+$binarytype ||= 'arch' if $buildtype eq 'arch';
+$binarytype ||= 'deb' if $buildtype eq 'dsc';
+$binarytype ||= 'rpm';
 
 my $noarch;
 $noarch = 'any' if $binarytype eq 'arch';
@@ -138,6 +139,15 @@ $noarch = 'all' if $binarytype eq 'deb';
 $noarch ||= 'noarch';
 push @archs, $noarch unless grep {$_ eq $noarch} @archs;
 
+my $verscmp = \&Build::Rpm::verscmp;
+$verscmp = \&Build::Deb::verscmp if $binarytype eq 'deb' && defined &Build::Deb::verscmp;
+$verscmp = \&Build::Apk::verscmp if $binarytype eq 'apk' && defined &Build::Apk::verscmp;
+
+if ($binarytype eq 'deb') {
+  for my $arch (@archs) {
+    $arch = Build::Deb::basearch($arch) unless $arch =~ /^i[456]86$/;
+  }
+}
 
 my (%fn, %prov, %req, %con, %obs, %rec, %sup);
 
@@ -151,15 +161,6 @@ my %packs_done;
 open(F, '<', $rpmdeps) || die("$rpmdeps: $!\n");
 # WARNING: the following code assumes that the 'I' tag comes last
 my ($pkgF, $pkgP, $pkgR, $pkgC, $pkgO, $pkgr, $pkgs);
-
-my $verscmp = \&Build::Rpm::verscmp;
-
-if ($binarytype && $binarytype eq 'deb') {
-  $verscmp = \&Build::Deb::verscmp;
-  for my $arch (@archs) {
-    $arch = Build::Deb::basearch($arch) unless $arch =~ /^i[456]86$/;
-  }
-}
 
 while(<F>) {
   chomp;
@@ -219,7 +220,7 @@ for my $arch (@archs) {
 }
 
 # XXX: move to separate tool
-if (!defined($dist) || $dist eq '') {
+if (!$dist) {
   my $rpmarch = (grep {$fn{"rpm.$_"}} @archs)[0];
   if (!$rpmarch) {
     $dist = 'default';
@@ -257,7 +258,7 @@ $cf->{'no_vminstall_expand'} = 1 unless $isvm;
 Build::add_distmacro($cf, $_) for @distmacros;
 
 my $dofileprovides = %{$cf->{'fileprovides'}};
-$dofileprovides = 1 if ($binarytype || 'rpm') ne 'rpm';
+$dofileprovides = 1 if $binarytype ne 'rpm';
 
 sub parsedepline {
   return [] unless defined $_[0];
@@ -308,7 +309,7 @@ sub print_rpmlist {
   print "preinstall: @{$cf->{'preinstall'} || []}\n";
   print "vminstall: @{$cf->{'vminstall'} || []}\n";
   print "runscripts: @{$cf->{'runscripts'} || []}\n";
-  print "dist: $dist\n" if defined $dist;
+  print "dist: $dist\n" if $dist;
   print "installonly: $installonly\n" if defined $installonly;
   print "noinstall: $noinstall\n" if defined $noinstall;
 }
