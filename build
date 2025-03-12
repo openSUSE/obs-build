@@ -1452,8 +1452,6 @@ if test -n "$SEND_SYSRQ" ; then
     cleanup_and_exit
 fi
 
-recipe_checks_config
-
 # done option parsing
 BUILD_OPTIONS_PARSED=true
 
@@ -1730,6 +1728,8 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
     if test -z "$BUILD_DIST" -a -e "$BUILD_ROOT/.guessed_dist" ; then
 	read BUILD_DIST < $BUILD_ROOT/.guessed_dist
     fi
+
+    recipe_checks_config
 
     #
     # install dummy sign program if needed
