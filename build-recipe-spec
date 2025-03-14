@@ -185,18 +185,18 @@ recipe_build_spec() {
 	    rpmbopts[${#rpmbopts[@]}]=$opt
         done
     fi
-    if test "$DO_CHECKS" != true ; then
+    if test "$DO_CHECKS" = false ; then
 	if chroot "$BUILD_ROOT" "$rpmbuild" --nocheck --help >/dev/null 2>&1; then
 	    rpmbopts[${#rpmbopts[@]}]="--nocheck"
 	else
 	    echo "warning: --nocheck is not supported by this $rpmbuild version"
 	fi
     fi
-    if test "$rpmbuild" == "debbuild" ; then
+    if test "$rpmbuild" = debbuild ; then
 	rpmbopts[${#rpmbopts[@]}]="-vv"
     fi
-    if test "$rpmbuild" == "rpmbuild" ; then
-	    # use only --nosignature for rpm v4
+    if test "$rpmbuild" = rpmbuild ; then
+	# use only --nosignature for rpm v4
 	rpmbopts[${#rpmbopts[@]}]="--nosignature"
     fi
     if test -n "$RPM_BUILD_IN_PLACE" ; then
