@@ -1,4 +1,15 @@
 -------------------------------------------------------------------
+Fri Mar 14 12:28:07 UTC 2025 - Adrian Schröter <adrian@suse.de>
+
+- Support reprobudicble builds using jobs/smp_mflags handling
+- expanddeps (plain build script usage):
+  * Add support for build-time services
+  * Support apk version comparison
+- Sync tumbleweed build config
+- Delete createrepomddeps and createyastdeps tooling, not used anymore
+- large amount of code refactoring
+
+-------------------------------------------------------------------
 Fri Mar  7 12:21:22 UTC 2025 - Adrian Schröter <adrian@suse.de>
 
 - Fixed --shell option for container builds
