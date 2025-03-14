@@ -1292,7 +1292,6 @@ vm_setup_network() {
         ifconfig lo 127.0.0.1 up
         ifconfig lo add ::1/128
     fi
-    . /.build/build.data
     if test -n "$VM_NETWORK"; then
        echo "Network setup"
        NETDEV=eth0
