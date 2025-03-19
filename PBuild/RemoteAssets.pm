@@ -67,23 +67,30 @@ sub recipe_parse {
   for my $s (@{$p->{'remoteassets'} || []}) {
     my $url = $s->{'url'};
     my $file = $s->{'file'};
-    if ($url && $url =~ /^git(?:\+https?)?:.*\/([^\/]+?)(?:.git)?(?:\#[^\#\/]+)?$/) {
-      $file = $1 unless defined $file;
-      next unless $file =~ /^([^\.\/][^\/]+)$/s;
+    if ($url && $url =~ /^git(?:\+https?)?:.*\/([^\/]+?)(?:\#[^\#\/]+)?$/) {
+      if (!defined($file)) {
+	$file = $1;
+	$file =~ s/\?.*//;
+	$file =~ s/\.git$//;
+      }
+      next unless defined($file) && $file =~ /^([^\.\/][^\/]+)$/s;
       next if $p->{'files'}->{$file};
       push @assets, { 'file' => $file, 'url' => $url, 'type' => 'url', 'isdir' => 1 };
       next;
     }
     if (($s->{'type'} || '' eq 'webcache')) {
-      next unless $s->{'url'};
-      $file = 'build-webcache-'.Digest::SHA::sha256_hex($s->{'url'});
+      next unless $url;
+      $file = 'build-webcache-'.Digest::SHA::sha256_hex($url);
     }
-    next unless $s->{'url'} =~ /(?:^|\/)([^\.\/][^\/]+)$/s;
-    $file = $1 unless defined $file;
+    next unless $url =~ /(?:^|\/)([^\.\/][^\/]+)$/s;
+    if (!defined($file)) {
+      $file = $1;
+      $file =~ s/\?.*// if $url =~ /^https?:\/\//;
+    }
     undef $url unless $url =~ /^https?:\/\/.*\/([^\.\/][^\/]+)$/s;
     my $digest = $s->{'digest'};
     next unless $digest || $url;
-    next unless $file =~ /^([^\.\/][^\/]+)$/s;
+    next unless defined($file) && $file =~ /^([^\.\/][^\/]+)$/s;
     my $asset = { 'file' => $file };
     $asset->{'digest'} = $digest if $digest;
     $asset->{'url'} = $url if $url;
@@ -295,6 +302,14 @@ sub fetch_git_asset {
   $url =~ s/^git\+//;
   my $branch;
   $branch = $1 if $url =~ s/#([^#]+)$//;
+  my $keepmeta;
+  if ($url =~ /(.*?)\?(.*)$/) {
+    my ($urlpath, $urlquery) = ($1, "&$2&");
+    $keepmeta = defined($1) ? $1 : 1 if $urlquery =~ s/\&keepmeta(?:=([01]))?\&/\&/;
+    $urlquery =~ s/\&$//;
+    $urlquery =~ s/^\&/?/;
+    $url = "$urlpath$urlquery";
+  }
   if ($branch =~ /^[0-9a-fA-F]{40,}$/) {
     my $objectformat = length($branch) == 64 ? 'sha256' : 'sha1';
     my @cmd = ('git', 'init', '-q', "--object-format=$objectformat", "$tmpdir/$file");
@@ -326,7 +341,7 @@ sub fetch_git_asset {
   chomp $t;
   $t = undef unless $t && $t > 0;
   # get rid of .git directory (need to make this optional)
-  PBuild::Util::rm_rf("$tmpdir/$file/.git");
+  PBuild::Util::rm_rf("$tmpdir/$file/.git") unless $keepmeta;
   if ($asset->{'donotpack'}) {
     rename("$tmpdir/$file", "$adir/$assetid") || die("rename $tmpdir $adir/$assetid: $!\n");
   } else {
