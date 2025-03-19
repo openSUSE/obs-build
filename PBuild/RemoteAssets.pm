@@ -293,10 +293,31 @@ sub fetch_git_asset {
   my $url = $asset->{'url'};
   die unless $url =~ /^git(?:\+https?)?:/;
   $url =~ s/^git\+//;
-  my @cmd = ('git', 'clone', '-q', '--recurse-submodules');
-  push @cmd, '-b', $1 if $url =~ s/#([^#]+)$//;
-  push @cmd, '--', $url, "$tmpdir/$file";
-  system(@cmd) && die("git clone failed: $!\n");
+  my $branch;
+  $branch = $1 if $url =~ s/#([^#]+)$//;
+  if ($branch =~ /^[0-9a-fA-F]{40,}$/) {
+    my $objectformat = length($branch) == 64 ? 'sha256' : 'sha1';
+    my @cmd = ('git', 'init', '-q', "--object-format=$objectformat", "$tmpdir/$file");
+    system(@cmd) && die("git init failed: $?\n");
+    @cmd = ('git', '-C', "$tmpdir/$file", 'remote', 'add', 'origin', $url);
+    system(@cmd) && die("git remote failed: $?\n");
+    @cmd = ('git', '-C', "$tmpdir/$file", 'fetch', '-q', 'origin', $branch);
+    if (system(@cmd)) {
+      @cmd = ('git', '-C', "$tmpdir/$file", 'fetch', '-q', 'origin');
+      system(@cmd) && die("git fetch failed: $?\n");
+    }
+    @cmd = ('git', '-C', "$tmpdir/$file", 'checkout', '-q', $branch);
+    system(@cmd) && die("git checkout failed: $?\n");
+    @cmd = ('git', '-C', "$tmpdir/$file", 'submodule', 'init');
+    system(@cmd) && die("git submodule init failed: $?\n");
+    @cmd = ('git', '-C', "$tmpdir/$file", 'submodule', 'update', '--recursive');
+    system(@cmd) && die("git submodule update failed: $?\n");
+  } else {
+    my @cmd = ('git', 'clone', '-q', '--recurse-submodules');
+    push @cmd, '-b', $branch if defined $branch;
+    push @cmd, '--', $url, "$tmpdir/$file";
+    system(@cmd) && die("git clone failed: $?\n");
+  }
   # get timestamp of last commit
   my $pfd;
   open($pfd, '-|', 'git', '-C', "$tmpdir/$file", 'log', '--pretty=format:%ct', '-1') || die("open: $!\n");
@@ -304,6 +325,8 @@ sub fetch_git_asset {
   close($pfd);
   chomp $t;
   $t = undef unless $t && $t > 0;
+  # get rid of .git directory (need to make this optional)
+  PBuild::Util::rm_rf("$tmpdir/$file/.git");
   if ($asset->{'donotpack'}) {
     rename("$tmpdir/$file", "$adir/$assetid") || die("rename $tmpdir $adir/$assetid: $!\n");
   } else {
