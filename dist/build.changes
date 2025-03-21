@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Fri Mar 21 15:46:58 UTC 2025 - Adrian Schröter <adrian@suse.de>
+
+- RemoteAsset support:
+   * Implement automatic packaging of directories into tar balls
+   * Support a 'keepmeta' query parameter in git assets
+   * Support git checkout by commit like with the obs scm bridge
+
+-------------------------------------------------------------------
 Fri Mar 14 12:28:07 UTC 2025 - Adrian Schröter <adrian@suse.de>
 
 - Support reprobudicble builds using jobs/smp_mflags handling
