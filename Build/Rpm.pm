@@ -712,6 +712,7 @@ sub parse {
   my $ret = {};
   my $ifdeps;
   my %autonum = (patch => 0, source => 0);
+  my %moveassets;
 
   my $specdata;
   local *SPEC;
@@ -919,8 +920,13 @@ sub parse {
         $arg = (split(' ', $arg, 2))[0];
         $ret->{'multiversion'} = 1 if @subpacks && exists($ret->{'version'}) && $ret->{'version'} ne $arg;
       } elsif ($keyword eq '#!remoteasset') {
-        $remoteasset = {};
-        $remoteasset->{'digest'} = $arg if $arg =~ /^[a-z0-9]+:[0-9a-f]+$/;
+	$remoteasset = {};
+	my @args = split(' ', $arg);
+	if (@args && $args[0] =~ /^(?:git\+)?https?:\/\//) {
+	  $remoteasset->{'url'} = $args[0];
+	  shift @args;
+	}
+	$remoteasset->{'digest'} = $args[0] if @args && $args[0] =~ /^[a-z0-9]+:[0-9a-f]+$/;
       } elsif ($keyword eq '#!remoteasseturl') {
         $arg = (split(' ', $arg, 2))[0];
         $remoteasset->{'url'} = $arg;
@@ -1050,7 +1056,18 @@ sub parse {
       $macros{uc($tagtype) . "URL$num"} = $val;
       $ret->{$tag} = $val;
       if ($remoteasset) {
-        $remoteasset->{'url'} = $val;
+	if ($remoteasset->{'url'} && !defined($remoteasset->{'file'}) && $val =~ /([^\/\.][^\/]+$)/) {
+	  my $fn = $1;
+	  if ($remoteasset->{'url'} =~ /^git(?:\+https?)?:.*\/([^\/]+?)(?:\#[^\#\/]+)?$/) {
+	    my $gfn = $1;
+	    $gfn =~ s/\?.*//;
+	    $gfn =~ s/\.git$//;
+	    $moveassets{$gfn} = $fn if $fn ne $gfn;
+	  } else {
+	    $remoteasset->{'file'} = $fn;
+	  }
+	}
+        $remoteasset->{'url'} ||= $val;
         push @{$ret->{'remoteassets'}}, $remoteasset;
       }
       $remoteasset = undef;
@@ -1090,6 +1107,8 @@ sub parse {
   $ret->{'onlynative'} = \@onlynative if @onlynative;
   $ret->{'alsonative'} = \@alsonative if @alsonative;
   $ret->{'configdependent'} = 1 if $ifdeps;
+  $ret->{'moveassets'} = [ map {"$_/$moveassets{$_}"} sort keys %moveassets] if %moveassets;
+  $ret->{'dirassets'} = [ sort keys %moveassets ] if %moveassets;
   do_warn($config, "unterminated if/ifarch/ifos statement") if $skip && $config->{'parsing_config'};
   return $ret;
 }
