@@ -10,6 +10,11 @@ Supported protocols for resources using an url are:
  * git+http
  * git+https
 
+URLs for git support a revision specified as URL fragment. This can be a commit hash
+or a branch name. For example git+https://github.com/openSUSE/example#main
+The default is not to include the .git directory. If it is needed at build time, the
+"withmeta" pseudo query parameter can be added.
+
 This depends on the build description format as described below.
 
 ==== rpm spec files
@@ -24,6 +29,15 @@ It is also possible to specify a checksum to make sure that the asset is correct
 
  #!RemoteAsset: <CHECKSUM>
  Source: <URL>
+
+If the source file name should be different from the last component of the url path, the
+url can also be specified as argument of the RemoteAsset line:
+
+ #!RemoteAsset: <URL> [<CHECKSUM>]
+ Source: <FILENAME>
+
+A tar ball will be created at build time automatically, if the source is a directory
+(like with git URLs) and the FILENAME is a tar ball.
 
 An alternative is just to use the
 

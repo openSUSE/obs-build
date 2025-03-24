@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
-<meta name="generator" content="AsciiDoc" />
+<meta name="generator" content="AsciiDoc 10.2.1" />
 <title>pbuild Reference Guide</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
@@ -986,6 +986,10 @@ git+https
 </p>
 </li>
 </ul></div>
+<div class="paragraph"><p>URLs for git support a revision specified as URL fragment. This can be a commit hash
+or a branch name. For example git+https://github.com/openSUSE/example#main
+The default is not to include the .git directory. If it is needed at build time, the
+"withmeta" pseudo query parameter can be added.</p></div>
 <div class="paragraph"><p>This depends on the build description format as described below.</p></div>
 <div class="sect3">
 <h4 id="_rpm_spec_files">2.4.1. rpm spec files</h4>
@@ -1002,6 +1006,15 @@ Source: &lt;URL&gt;</code></pre>
 <pre><code>#!RemoteAsset: &lt;CHECKSUM&gt;
 Source: &lt;URL&gt;</code></pre>
 </div></div>
+<div class="paragraph"><p>If the source file name should be different from the last component of the url path, the
+url can also be specified as argument of the RemoteAsset line:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>#!RemoteAsset: &lt;URL&gt; [&lt;CHECKSUM&gt;]
+Source: &lt;FILENAME&gt;</code></pre>
+</div></div>
+<div class="paragraph"><p>A tar ball will be created at build time automatically, if the source is a directory
+(like with git URLs) and the FILENAME is a tar ball.</p></div>
 <div class="paragraph"><p>An alternative is just to use the</p></div>
 <div class="literalblock">
 <div class="content">
@@ -1036,8 +1049,14 @@ disabled via</p></div>
 comment <code>#!RemoteAssetUrl: https://my.url/asset.tar</code>. <code>pbuild</code> will fetch the
 asset before the build and will make it available in the buildroot so that the
 asset can copied into the container as follows:</p></div>
-<div class="listingblock">
-<div class="content"></div></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>----
+#!RemoteAssetUrl: https://my.url/asset.tar
+COPY asset.tar .
+RUN tar -xvzf asset.tar
+----</code></pre>
+</div></div>
 </div>
 <div class="sect3">
 <h4 id="_arch_linux_pkgbuild">2.4.4. Arch Linux PKGBUILD</h4>
@@ -1875,7 +1894,7 @@ In this case the base system for the target system can manually get configured v
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2022-03-31 15:07:19 CEST
+ 2022-09-26 10:26:57 CEST
 </div>
 </div>
 </body>
