@@ -39,13 +39,6 @@ url can also be specified as argument of the RemoteAsset line:
 A tar ball will be created at build time automatically, if the source is a directory
 (like with git URLs) and the FILENAME is a tar ball.
 
-An alternative is just to use the
-
- #!RemoteAssetUrl: <URL>
-
-marker without any Source: tag when the downloaded file should not become
-part of the source rpm.
-
 ==== kiwi build description
 
 The kiwi format is not supporting remote source specifications, but they can be
