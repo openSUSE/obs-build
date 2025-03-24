@@ -919,19 +919,19 @@ sub parse {
       if ($keyword eq 'version') {
         $arg = (split(' ', $arg, 2))[0];
         $ret->{'multiversion'} = 1 if @subpacks && exists($ret->{'version'}) && $ret->{'version'} ne $arg;
-      } elsif ($keyword eq '#!remoteasset') {
+      } elsif ($keyword eq '#!remoteasset' || $keyword eq '#!remoteasseturl') {
 	$remoteasset = {};
-	my @args = split(' ', $arg);
-	if (@args && $args[0] =~ /^(?:git\+)?https?:\/\//) {
-	  $remoteasset->{'url'} = $args[0];
-	  shift @args;
+	for (split(' ', $arg)) {
+	  if (/\/\//) {
+	    $remoteasset->{'url'} = $_;
+	  } elsif (/^[a-z0-9]+:/) {
+	    $remoteasset->{'digest'} = $_;
+	  }
 	}
-	$remoteasset->{'digest'} = $args[0] if @args && $args[0] =~ /^[a-z0-9]+:[0-9a-f]+$/;
-      } elsif ($keyword eq '#!remoteasseturl') {
-        $arg = (split(' ', $arg, 2))[0];
-        $remoteasset->{'url'} = $arg;
-        push @{$ret->{'remoteassets'}}, $remoteasset;
-        $remoteasset = undef;
+	if ($keyword ne '#!remoteasset') {
+          push @{$ret->{'remoteassets'}}, $remoteasset;
+          $remoteasset = undef;
+	}
       } elsif ($keyword eq '#!buildtarget') {
         $arg = (split(' ', $arg, 2))[0];
         if ($arg =~ s/(.*?)://) {
