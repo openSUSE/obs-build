@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
-<meta name="generator" content="AsciiDoc 10.2.1" />
+<meta name="generator" content="AsciiDoc" />
 <title>pbuild Reference Guide</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
@@ -994,7 +994,8 @@ The default is not to include the .git directory. If it is needed at build time,
 <div class="sect3">
 <h4 id="_rpm_spec_files">2.4.1. rpm spec files</h4>
 <div class="paragraph"><p>Source lines in spec files can declare remote assets. Rpm is already supporting to use
-an URL as source definition. A comment before such a line marks it as remote asset for pbuild:</p></div>
+an URL as source definition. A comment before such a line marks the next source
+definition as remote asset for pbuild:</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><code>#!RemoteAsset
@@ -1013,7 +1014,7 @@ url can also be specified as argument of the RemoteAsset line:</p></div>
 <pre><code>#!RemoteAsset: &lt;URL&gt; [&lt;CHECKSUM&gt;]
 Source: &lt;FILENAME&gt;</code></pre>
 </div></div>
-<div class="paragraph"><p>A tar ball will be created at build time automatically, if the source is a directory
+<div class="paragraph"><p>A tar ball will be created automatically at build time if the source is a directory
 (like with git URLs) and the FILENAME is a tar ball.</p></div>
 </div>
 <div class="sect3">
@@ -1039,13 +1040,13 @@ disabled via</p></div>
 <div class="sect3">
 <h4 id="_dockerfile_description">2.4.3. Dockerfile description</h4>
 <div class="paragraph"><p>Remote assets that will be downloaded before the build can be added via the
-comment <code>#!RemoteAssetUrl: https://my.url/asset.tar</code>. <code>pbuild</code> will fetch the
+comment <code>#!RemoteAsset: https://my.url/asset.tar</code>. <code>pbuild</code> will fetch the
 asset before the build and will make it available in the buildroot so that the
 asset can copied into the container as follows:</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><code>----
-#!RemoteAssetUrl: https://my.url/asset.tar
+#!RemoteAsset: https://my.url/asset.tar
 COPY asset.tar .
 RUN tar -xvzf asset.tar
 ----</code></pre>
@@ -1887,7 +1888,7 @@ In this case the base system for the target system can manually get configured v
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2022-09-26 10:26:57 CEST
+ 2022-03-31 15:07:19 CEST
 </div>
 </div>
 </body>
