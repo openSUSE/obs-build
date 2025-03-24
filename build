@@ -1881,38 +1881,8 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	rm -f $BUILD_ROOT/.unpack.command $BUILD_ROOT/.build.unpackarchive
     done
 
-    for i in $(queryrecipe --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" "$BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE" moveassets) ; do
-	mvf="${i%%/*}"
-	mvt="${i##*/}"
-	if test -d "$mvf" ; then
-	    compressor=()
-	    case $i in
-		*.tar.xz) compressor=(xz --threads=2) ;;
-		*.tar.gz) compressor=(gzip -c -n --rsyncable) ;;
-		*.tar.zst) compressor=(zstd --rsyncable -15 --threads=0 -c) ;;
-	    esac
-	    case "$mvt" in
-		*.tar.gz | *.tar.xz | *.tar.zst) 
-		    echo "Creating $mvt from directory $mvf"
-		    mv -f "$mvf" "${mvt%.tar.*}"
-		    rm -f $BUILD_ROOT/.unpack.command
-		    echo "#!/bin/sh -e" > $BUILD_ROOT/.unpack.command
-		    shellquote cd "$TOPDIR/SOURCES" >> $BUILD_ROOT/.unpack.command
-		    echo >> $BUILD_ROOT/.unpack.command
-		    shellquote tar -cf - --owner=root:0 --group=root:0 -- "${mvt%*.tar.*}" >> $BUILD_ROOT/.unpack.command
-		    echo -n ' | ' >> $BUILD_ROOT/.unpack.command
-		    shellquote "${compressor[@]}" >> $BUILD_ROOT/.unpack.command
-		    echo -n ' > ' >> $BUILD_ROOT/.unpack.command
-		    shellquote "$mvt" >> $BUILD_ROOT/.unpack.command
-		    echo >> $BUILD_ROOT/.unpack.command
-		    chmod 0755 $BUILD_ROOT/.unpack.command
-		    chroot $BUILD_ROOT su -c /.unpack.command - $BUILD_USER || cleanup_and_exit 1
-		    rm -f $BUILD_ROOT/.unpack.command
-		    continue
-	    esac
-	    mv "$mvf" "${mvt}"
-	fi
-    done
+    # move assets as specified in the recipe
+    recipe_move_assets
 
     # macros may be used by buildtime services or non-rpm build types
     recipe_setup_macros

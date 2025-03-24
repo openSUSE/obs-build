@@ -323,3 +323,49 @@ recipe_gendiff() {
     fi
 }
 
+recipe_create_tar_from_dir() {
+    local f="$1"
+    local t="$2"
+    local compressor
+    case "$t" in
+	*.tar.xz) compressor=(xz --threads=2) ;;
+	*.tar.gz) compressor=(gzip -c -n --rsyncable) ;;
+	*.tar.zst) compressor=(zstd --rsyncable -15 --threads=0 -c) ;;
+        *) cleanup_and_exit 1 ;;
+    esac
+    echo "Creating $t from directory $f"
+    rm -rf "${t%.tar.*}"
+    mv -f "$f" "${t%.tar.*}"
+    rm -f $BUILD_ROOT/.unpack.command
+    echo "#!/bin/sh -e" > $BUILD_ROOT/.unpack.command
+    shellquote cd "$TOPDIR/SOURCES" >> $BUILD_ROOT/.unpack.command
+    echo >> $BUILD_ROOT/.unpack.command
+    shellquote tar -cf - --owner=root:0 --group=root:0 -- "${t%*.tar.*}" >> $BUILD_ROOT/.unpack.command
+    echo -n ' | ' >> $BUILD_ROOT/.unpack.command
+    shellquote "${compressor[@]}" >> $BUILD_ROOT/.unpack.command
+    echo -n ' > ' >> $BUILD_ROOT/.unpack.command
+    shellquote "$t" >> $BUILD_ROOT/.unpack.command
+    echo >> $BUILD_ROOT/.unpack.command
+    chmod 0755 $BUILD_ROOT/.unpack.command
+    chroot $BUILD_ROOT su -c /.unpack.command - $BUILD_USER || cleanup_and_exit 1
+    rm -f $BUILD_ROOT/.unpack.command
+}
+
+recipe_move_assets() {
+    local i mvf mvt compressor
+    for i in $(queryrecipe --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" "$BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE" moveassets) ; do
+	mvf="${i%%/*}"
+	mvt="${i##*/}"
+	test -e "$mvt" && continue
+	if test -d "$mvf" ; then
+	    case "$mvt" in
+		*.tar.gz | *.tar.xz | *.tar.zst)
+		    recipe_create_tar_from_dir "$mvf" "$mvt"
+		    continue
+		    ;;
+	    esac
+	fi
+	mv "$mvf" "${mvt}"
+    done
+}
+
