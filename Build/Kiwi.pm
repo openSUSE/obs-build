@@ -268,11 +268,18 @@ sub kiwiparse {
   for ($xml =~ /^\s*<!--\s+OBS-IgnorePackage:\s+(.*)\s+-->\s*$/img) {
     push @ignorepackages, split(' ', $_);
   }
-  for ($xml =~ /^\s*<!--\s+OBS-RemoteAsset:\s+(.*)\s+-->\s*$/img) {
-    my @s = split(' ', $_);
-    my $remoteasset = { 'url' => $s[0] };
-    $remoteasset->{'digest'} = $s[1] if $s[1] && $s[1] =~ /^[a-z0-9]+:[0-9a-f]+$/;
-    push @{$ret->{'remoteassets'}}, $remoteasset;
+  for my $arg ($xml =~ /^\s*<!--\s+OBS-RemoteAsset:\s+(.*)\s+-->\s*$/img) {
+    my $remoteasset = {};
+    for (split(' ', $arg)) {
+      if (/\/\//) {
+	$remoteasset->{'url'} = $_;
+      } elsif (/^[a-z0-9]+:/) {
+	$remoteasset->{'digest'} = $_;
+      } elsif (/^[^\.\/][^\/]+$/s) {
+	$remoteasset->{'file'} = $_;
+      }
+    }
+    push @{$ret->{'remoteassets'}}, $remoteasset if %$remoteasset;
   }
   for ($xml =~ /^\s*<!--\s+OBS-CopyToImage:\s+(.*)\s+-->\s*$/img) {
     my @s = split(' ', $_);
