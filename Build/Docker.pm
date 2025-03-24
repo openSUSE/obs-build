@@ -328,6 +328,8 @@ sub parse {
 	    $remoteasset->{'url'} = $_;
 	  } elsif (/^[a-z0-9]+:/) {
 	    $remoteasset->{'digest'} = $_;
+	  } elsif (/^[^\.\/][^\/]+$/s) {
+	    $remoteasset->{'file'} = $_;
 	  }
 	}
         push @{$ret->{'remoteassets'}}, $remoteasset if %$remoteasset;

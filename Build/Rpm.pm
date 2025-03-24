@@ -926,10 +926,12 @@ sub parse {
 	    $remoteasset->{'url'} = $_;
 	  } elsif (/^[a-z0-9]+:/) {
 	    $remoteasset->{'digest'} = $_;
+	  } elsif (/^[^\.\/][^\/]+$/s) {
+	    $remoteasset->{'file'} = $1 if $keyword ne '#!remoteasset';
 	  }
 	}
 	if ($keyword ne '#!remoteasset') {
-          push @{$ret->{'remoteassets'}}, $remoteasset;
+          push @{$ret->{'remoteassets'}}, $remoteasset if %$remoteasset;
           $remoteasset = undef;
 	}
       } elsif ($keyword eq '#!buildtarget') {
@@ -1068,7 +1070,7 @@ sub parse {
 	  }
 	}
         $remoteasset->{'url'} ||= $val;
-        push @{$ret->{'remoteassets'}}, $remoteasset;
+        push @{$ret->{'remoteassets'}}, $remoteasset if %$remoteasset;
       }
       $remoteasset = undef;
       next;
