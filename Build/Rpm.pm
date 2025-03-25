@@ -713,6 +713,7 @@ sub parse {
   my $ifdeps;
   my %autonum = (patch => 0, source => 0);
   my %moveassets;
+  my %dirassets;
 
   my $specdata;
   local *SPEC;
@@ -932,6 +933,12 @@ sub parse {
 	}
 	if ($keyword ne '#!remoteasset') {
           push @{$ret->{'remoteassets'}}, $remoteasset if %$remoteasset;
+	  if ($remoteasset->{'url'} && $remoteasset->{'url'} =~ /^git(?:\+https?)?:.*\/([^\/]+?)(?:\#[^\#\/]+)?$/) {
+	    my $gfn = $1;
+	    $gfn =~ s/\?.*//;
+	    $gfn =~ s/\.git$//;
+	    $dirassets{$remoteasset->{'file'} || $gfn} = 1;
+	  }
           $remoteasset = undef;
 	}
       } elsif ($keyword eq '#!buildtarget') {
@@ -1065,6 +1072,7 @@ sub parse {
 	    $gfn =~ s/\?.*//;
 	    $gfn =~ s/\.git$//;
 	    $moveassets{$gfn} = $fn if $fn ne $gfn;
+	    $dirassets{$gfn} = 1;
 	  } else {
 	    $remoteasset->{'file'} = $fn;
 	  }
@@ -1110,7 +1118,7 @@ sub parse {
   $ret->{'alsonative'} = \@alsonative if @alsonative;
   $ret->{'configdependent'} = 1 if $ifdeps;
   $ret->{'moveassets'} = [ map {"$_/$moveassets{$_}"} sort keys %moveassets] if %moveassets;
-  $ret->{'dirassets'} = [ sort keys %moveassets ] if %moveassets;
+  $ret->{'dirassets'} = [ sort keys %dirassets ] if %dirassets;
   do_warn($config, "unterminated if/ifarch/ifos statement") if $skip && $config->{'parsing_config'};
   return $ret;
 }
