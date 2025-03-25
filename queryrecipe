@@ -78,6 +78,10 @@ if (!defined $type) {
   print Data::Dumper::Dumper($q);
   exit(0);
 }
+if (($type eq 'sources' || $type eq 'patches') && !exists($q->{$type})) {
+  $q->{'sources'} = [ map {ref($q->{$_}) ? @{$q->{$_}} : $q->{$_}} grep {/^source/} sort keys %$q ];
+  $q->{'patches'} = [ map {ref($q->{$_}) ? @{$q->{$_}} : $q->{$_}} grep {/^patch/} sort keys %$q ];
+}
 if (ref($q->{$type}) eq 'ARRAY') {
   print "$_\n" for @{$q->{$type}};
 } elsif (ref($q->{$type}) eq '') {
