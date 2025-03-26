@@ -20,8 +20,10 @@ This depends on the build description format as described below.
 ==== rpm spec files
 
 Source lines in spec files can declare remote assets. Rpm is already supporting to use
-an URL as source definition. A comment before such a line marks the next source
-definition as remote asset for pbuild:
+an URL as source definition.
+
+A comment before such a line marks the next source definition as remote asset, so that
+it will be automatically downloaded:
 
  #!RemoteAsset
  Source: <URL>
@@ -37,8 +39,20 @@ url can also be specified as argument of the RemoteAsset line:
  #!RemoteAsset: <URL> [<CHECKSUM>]
  Source: <FILENAME>
 
-A tar ball will be created automatically at build time if the source is a directory
-(like with git URLs) and the FILENAME is a tar ball.
+A tar ball can be created automatically at build time when adding
+
+ #!CreateArchive
+
+in front of the Source line. The directory name is taken from the archive name by
+default. It can be optionally provided as argument:
+
+ #!CreateArchive: <DIRECTORY>
+
+Common mechanics to provide the directory are either
+
+ * part of the package sources
+ * a git submodule
+ * a RemoteAsset pointing to a remote git repository
 
 ==== kiwi build description
 
