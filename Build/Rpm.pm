@@ -737,6 +737,7 @@ sub parse {
   my $obspackage = defined($config->{'obspackage'}) ? $config->{'obspackage'} : '@OBS_PACKAGE@';
   my $buildflavor = defined($config->{'buildflavor'}) ? $config->{'buildflavor'} : '';
   my $remoteasset;
+  my $createarchive;
   my $multilinedefine;
   my $multilinecondition;
   my $substitute = $config->{'substitute'};
@@ -941,6 +942,9 @@ sub parse {
 	  }
           $remoteasset = undef;
 	}
+      } elsif ($keyword eq '#!createarchive') {
+	$createarchive = {};
+	$createarchive->{'dir'} = $arg if $arg =~ /^[^\.\/][^\/]*$/s;
       } elsif ($keyword eq '#!buildtarget') {
         $arg = (split(' ', $arg, 2))[0];
         if ($arg =~ s/(.*?)://) {
@@ -1044,6 +1048,8 @@ sub parse {
         $ret->{'nativebuild'} = 1;
       } elsif ($keyword eq '#!remoteasset') {
         $remoteasset = {};
+      } elsif ($keyword eq '#!createarchive') {
+        $createarchive = {};
       }
       next;
     }
@@ -1080,6 +1086,18 @@ sub parse {
         $remoteasset->{'url'} ||= $val;
         push @{$ret->{'remoteassets'}}, $remoteasset if %$remoteasset;
       }
+      if ($createarchive) {
+	if ($val =~ /([^\/\.][^\/]+$)/) {
+	  my $fn = $1;
+	  my $gfn = $createarchive->{'dir'};
+	  $gfn = $1 if !$gfn && $fn =~ /^(.+)\.tar\.(?:gz|xz|zst)$/;
+	  if ($fn && $gfn) {
+	    $dirassets{$gfn} = 1;
+	    $moveassets{$gfn} = $fn if $fn ne $gfn;
+	  }
+	}
+      }
+      $createarchive = undef;
       $remoteasset = undef;
       next;
     }

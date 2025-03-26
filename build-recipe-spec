@@ -104,20 +104,6 @@ recipe_prepare_spec() {
 	test -z "$ABUILD_TARGET" && ABUILD_TARGET=$(queryconfig target --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH")
 	test -z "$ABUILD_TARGET" || echo "build target is $ABUILD_TARGET"
     fi
-
-    # create missing source tar balls from existing directories
-    local i j
-    for i in $(queryrecipe --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" "$BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE" sources) ; do
-	i="${i##*/}"
-	case "$i" in
-	    .*) continue ;;
-	    *.tar.gz | *.tar.xz | *.tar.zst)
-		j="${i%tar.*}"
-		test -d "$j" || j="${j%-*}"
-		test -n "$j" -a -d "$j" || continue
-		recipe_create_tar_from_dir "$j" "$i"
-	esac
-    done
 }
 
 spec_is_empty_dir() {
