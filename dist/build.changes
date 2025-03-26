@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Wed Mar 26 09:19:40 UTC 2025 - Adrian Schröter <adrian@suse.de>
+
+- Supporting automatic tar ball creation also when just
+  provided via git (no need for RemoteAsset in that case)
+
+-------------------------------------------------------------------
 Fri Mar 21 15:46:58 UTC 2025 - Adrian Schröter <adrian@suse.de>
 
 - RemoteAsset support:
