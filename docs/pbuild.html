@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
-<meta name="generator" content="AsciiDoc" />
+<meta name="generator" content="AsciiDoc 10.2.1" />
 <title>pbuild Reference Guide</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
@@ -753,18 +753,62 @@ asciidoc.install(2);
 pbuild is managing the dependencies between this build jobs. Both can get executed on any Linux system directly.</p></div>
 <div class="paragraph"><p>pbuild is processing local sources, but may download remote sources and binaries when referenced.
 The local sources can get managed by any source revision management tool (eg. git).</p></div>
-<div class="paragraph"><p>The tasks of the build script are:
-* Building a defined and reproducable environement for one build job
-* Calling the build tool for any supported format (rpm, deb, kiwi image, docker, &#8230;)
-* Calling validations as provided by the build environement
-* Extract build results
-* Parse dependencies in binaries and build description files</p></div>
-<div class="paragraph"><p>The tasks of pbuild are:
-* calculating the dependencies between the build jobs for a build order
-* calculating the need of rebuilds due to changed sources or dependencies
-* manage multiple running build jobs in the background
-* organize build results on the disk
-* download remote assets (sources or binaries)</p></div>
+<div class="paragraph"><p>The tasks of the build script are:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+Building a defined and reproducable environement for one build job
+</p>
+</li>
+<li>
+<p>
+Calling the build tool for any supported format (rpm, deb, kiwi image, docker, &#8230;)
+</p>
+</li>
+<li>
+<p>
+Calling validations as provided by the build environement
+</p>
+</li>
+<li>
+<p>
+Extract build results
+</p>
+</li>
+<li>
+<p>
+Parse dependencies in binaries and build description files
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>The tasks of pbuild are:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+calculating the dependencies between the build jobs for a build order
+</p>
+</li>
+<li>
+<p>
+calculating the need of rebuilds due to changed sources or dependencies
+</p>
+</li>
+<li>
+<p>
+manage multiple running build jobs in the background
+</p>
+</li>
+<li>
+<p>
+organize build results on the disk
+</p>
+</li>
+<li>
+<p>
+download remote assets (sources or binaries)
+</p>
+</li>
+</ul></div>
 <div class="sect2">
 <h3 id="_filesystem_structure">2.1. Filesystem Structure</h3>
 <div class="paragraph"><p>pbuild expects to get call in a directory where it&#8217;s project configuration files are living. Package sources
@@ -1888,7 +1932,7 @@ In this case the base system for the target system can manually get configured v
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2022-03-31 15:07:19 CEST
+ 2025-03-26 14:23:36 CET
 </div>
 </div>
 </body>

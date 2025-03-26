@@ -15,6 +15,7 @@ pbuild is processing local sources, but may download remote sources and binaries
 The local sources can get managed by any source revision management tool (eg. git).
 
 The tasks of the build script are:
+
 * Building a defined and reproducable environement for one build job
 * Calling the build tool for any supported format (rpm, deb, kiwi image, docker, ...)
 * Calling validations as provided by the build environement
@@ -22,6 +23,7 @@ The tasks of the build script are:
 * Parse dependencies in binaries and build description files
 
 The tasks of pbuild are:
+
 * calculating the dependencies between the build jobs for a build order
 * calculating the need of rebuilds due to changed sources or dependencies
 * manage multiple running build jobs in the background
