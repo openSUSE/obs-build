@@ -245,16 +245,10 @@ sub copy_assets {
     my $adir = "$assetdir/".substr($assetid, 0, 2);
     die("asset $assetid is gone\n") unless -e "$adir/$assetid";
     if ($asset->{'isdir'} && $unpack) {
-      if ($asset->{'type'} eq 'golang') {
-	for my $part (sort keys %{$asset->{'parts'}}) {
-	  $file = "build-gomodcache/$asset->{'modprefix'}$part";
-	  PBuild::Util::rm_rf("$srcdir/$file");
-	  unpack_obscpio_asset($assetmgr, "$adir/$assetid", $srcdir, $file);
-	}
-	next;
+      for my $unpackfile (@{$asset->{'filelist'} || [ $file ]}) {
+        PBuild::Util::rm_rf("$srcdir/$unpackfile");
+        unpack_obscpio_asset($assetmgr, "$adir/$assetid", $srcdir, $unpackfile);
       }
-      PBuild::Util::rm_rf("$srcdir/$file");
-      unpack_obscpio_asset($assetmgr, "$adir/$assetid", $srcdir, $file);
       next;
     }
     unlink($asset->{'isdir'} ? "$srcdir/$file.obscpio" : "$srcdir/$file");

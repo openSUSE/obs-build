@@ -130,7 +130,8 @@ sub golang_parse {
     next unless $l->{'mod'};	# need at least the go.mod file
     my $k = "$mod";
     $k .= " $_ $mods{$mod}->{$_}" for sort keys %{$mods{$mod}};
-    my $file = "build-gomodcache/$mod";
+    my $cname = "build-gomodcache";
+    my $file = "$cname/$mod";
     $file =~ s/\//:/g;
     my $moddir = $mod;
     $moddir =~ s/\/[^\/]+$//;
@@ -138,8 +139,9 @@ sub golang_parse {
     my $vers = $mod;
     $vers =~ s/.*\///;
     $vers =~ s/([A-Z])/'!'.lc($1)/ge;
+    my @filelist = map {"$cname/$moddir/\@v/$vers.$_"} sort keys %$l;
     my $assetid = Digest::MD5::md5_hex($k);
-    my $asset = { 'type' => 'golang', 'file' => $file, 'mod' => $mod, 'modprefix' => "$moddir/\@v/$vers.", 'parts' => $mods{$mod}, 'isdir' => 1, 'immutable' => 1, 'assetid' => $assetid };
+    my $asset = { 'type' => 'golang', 'file' => $file, 'mod' => $mod, 'modprefix' => "$moddir/\@v/$vers.", 'filelist' => \@filelist, 'parts' => $mods{$mod}, 'isdir' => 1, 'immutable' => 1, 'assetid' => $assetid };
     push @assets, $asset;
   }
   close $fd;
