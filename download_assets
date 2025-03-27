@@ -210,8 +210,12 @@ for my $dir (@dirs) {
   # mark directories as assets for build script
   if ($opts->{'unpack'}) {
     my $af = $p->{'asset_files'} || {};
-    for (keys %$af) {
-      PBuild::Util::touch("$outdir/$_/.build.asset") if $af->{$_}->{'isdir'};
+    for (grep {$af->{$_}->{'isdir'}} keys %$af) {
+      if ($af->{$_}->{'type'} eq 'golang') {
+	PBuild::Util::touch("$outdir/build-gomodcache/.build.asset");
+	next;
+      }
+      PBuild::Util::touch("$outdir/$_/.build.asset");
     }
   }
 }

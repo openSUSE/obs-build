@@ -132,8 +132,14 @@ sub golang_parse {
     $k .= " $_ $mods{$mod}->{$_}" for sort keys %{$mods{$mod}};
     my $file = "build-gomodcache/$mod";
     $file =~ s/\//:/g;
+    my $moddir = $mod;
+    $moddir =~ s/\/[^\/]+$//;
+    $moddir =~ s/([A-Z])/'!'.lc($1)/ge;
+    my $vers = $mod;
+    $vers =~ s/.*\///;
+    $vers =~ s/([A-Z])/'!'.lc($1)/ge;
     my $assetid = Digest::MD5::md5_hex($k);
-    my $asset = { 'type' => 'golang', 'file' => $file, 'mod' => $mod, 'parts' => $mods{$mod}, 'isdir' => 1, 'immutable' => 1, 'assetid' => $assetid };
+    my $asset = { 'type' => 'golang', 'file' => $file, 'mod' => $mod, 'modprefix' => "$moddir/\@v/$vers.", 'parts' => $mods{$mod}, 'isdir' => 1, 'immutable' => 1, 'assetid' => $assetid };
     push @assets, $asset;
   }
   close $fd;
@@ -188,21 +194,16 @@ sub golang_fetch {
     my $tmpdir = "$assetdir/.tmpdir.$$";
     PBuild::Util::rm_rf($tmpdir);
     my $mod = $asset->{'mod'};
-    my $moddir = $mod;
-    $moddir =~ s/\/[^\/]+$//;
-    $moddir =~ s/([A-Z])/'!'.lc($1)/ge;
-    my $vers = $mod;
-    $vers =~ s/.*\///;
-    $vers =~ s/([A-Z])/'!'.lc($1)/ge;
     my $cname = "build-gomodcache";
-    PBuild::Util::mkdir_p("$tmpdir/$cname/$moddir/\@v");
+    my $modprefix = $asset->{'modprefix'};
+    PBuild::Util::mkdir_p("$tmpdir/$cname/$1") if $modprefix =~ /(.*)\//;
     my $parts = $asset->{'parts'};
     for my $part (sort keys %$parts) {
-      my $proxyurl = "$url/$moddir/\@v/$vers.$part";
+      my $proxyurl = "$url/$modprefix$part";
       my $maxsize = $part eq 'zip' ? 500000000 : 16000000;
-      Build::Download::download($proxyurl, "$tmpdir/$cname/$moddir/\@v/$vers.$part", undef, 'retry' => 3, 'maxsize' => $maxsize);
+      Build::Download::download($proxyurl, "$tmpdir/$cname/$modprefix$part", undef, 'retry' => 3, 'maxsize' => $maxsize);
       my $h1 = $parts->{$part};
-      verify_golang_h1("$tmpdir/$cname/$moddir/\@v/$vers.$part", $part, $h1) if defined $h1;
+      verify_golang_h1("$tmpdir/$cname/$modprefix$part", $part, $h1) if defined $h1;
     }
     my $mtime = 0;	# we want reproducible cpio archives
     create_asset_from_dir($assetdir, $asset, $tmpdir, $mtime);
