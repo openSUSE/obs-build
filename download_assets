@@ -207,15 +207,17 @@ for my $dir (@dirs) {
   } else {
     $assetmgr->copy_assets($p, $outdir, $opts->{'unpack'});
   }
-  # mark directories as assets for build script
+  # mark directories as assets for the build script
   if ($opts->{'unpack'}) {
     my $af = $p->{'asset_files'} || {};
-    for (grep {$af->{$_}->{'isdir'}} keys %$af) {
-      if ($af->{$_}->{'type'} eq 'golang') {
-	PBuild::Util::touch("$outdir/build-gomodcache/.build.asset");
-	next;
+    for my $file (grep {$af->{$_}->{'isdir'}} keys %$af) {
+      my $asset = $af->{$file};
+      for my $unpackfile (@{$asset->{'filelist'} || [ $file ]}) {
+	my $dir = $unpackfile;
+	$dir =~ s/\/.*//;
+	next if -l "$outdir/$dir" || ! -d _;
+        PBuild::Util::touch("$outdir/$dir/.build.asset") unless -l "$outdir/$dir/.build.asset" || -e _;
       }
-      PBuild::Util::touch("$outdir/$_/.build.asset");
     }
   }
 }
