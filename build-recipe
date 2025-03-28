@@ -340,7 +340,7 @@ recipe_create_tar_from_dir() {
     echo "#!/bin/sh -e" > $BUILD_ROOT/.unpack.command
     shellquote cd "$TOPDIR/SOURCES" >> $BUILD_ROOT/.unpack.command
     echo >> $BUILD_ROOT/.unpack.command
-    shellquote tar -cf - --owner=root:0 --group=root:0 -- "${t%*.tar.*}" >> $BUILD_ROOT/.unpack.command
+    shellquote tar -cf - --owner=root:0 --group=root:0 --exclude=.git -- "${t%*.tar.*}" >> $BUILD_ROOT/.unpack.command
     echo -n ' | ' >> $BUILD_ROOT/.unpack.command
     shellquote "${compressor[@]}" >> $BUILD_ROOT/.unpack.command
     echo -n ' > ' >> $BUILD_ROOT/.unpack.command
