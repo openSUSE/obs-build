@@ -181,6 +181,10 @@ make DESTDIR=%{buildroot} install
 cd %{buildroot}/usr/lib/build/configs/
 SUSE_V=%{?suse_version}
 SLE_V=%{?sle_version}
+%if %suse_version == 1600
+# We should switch to some slfo_version code stream definition maybe
+ln -s slfo1.2.conf default.conf
+%endif
 %if 0%{?sle_version} && 0%{?is_opensuse} && %suse_version == 1315
 # this is SUSE Leap 42.X
 ln -s sl42.${SLE_V:3:1}.conf default.conf
