@@ -147,6 +147,7 @@ sub parse {
   $p->{'dep'} = $d->{'deps'};
   $p->{'onlynative'} = $d->{'onlynative'} if $d->{'onlynative'};
   $p->{'alsonative'} = $d->{'alsonative'} if $d->{'alsonative'};
+  $p->{'disableuseforbuild'} = $d->{'disableuseforbuild'} if $d->{'disableuseforbuild'};
   if ($d->{'prereqs'}) {
     my %deps = map {$_ => 1} (@{$d->{'deps'} || []}, @{$d->{'subpacks'} || []});
     my @prereqs = grep {!$deps{$_} && !/^%/} @{$d->{'prereqs'}};

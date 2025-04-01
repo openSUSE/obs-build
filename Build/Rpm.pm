@@ -1050,6 +1050,8 @@ sub parse {
         $remoteasset = {};
       } elsif ($keyword eq '#!createarchive') {
         $createarchive = {};
+      } elsif ($keyword eq '#!disableuseforbuild') {
+        $ret->{'disableuseforbuild'} = 1;
       }
       next;
     }

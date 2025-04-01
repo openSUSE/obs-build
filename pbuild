@@ -367,10 +367,9 @@ for my $pkg (@pkgs) {
   $assetmgr->find_assets($pkgsrc{$pkg});
 }
 
-#FIXME
 for my $pkg (@pkgs) {
   my $p = $pkgsrc{$pkg};
-  $p->{'useforbuildenabled'} = 1;
+  $p->{'useforbuildenabled'} = 1 unless $p->{'disableuseforbuild'};
 }
 # force rebuilds if requested
 if ($opts->{'rebuild-code'} || $opts->{'rebuild-pkg'}) {
