@@ -367,10 +367,18 @@ for my $pkg (@pkgs) {
   $assetmgr->find_assets($pkgsrc{$pkg});
 }
 
+# calculate useforbuildenabled flag
 for my $pkg (@pkgs) {
   my $p = $pkgsrc{$pkg};
   $p->{'useforbuildenabled'} = 1 unless $p->{'nouseforbuild'};
 }
+if ($bconf->{'buildflags:nouseforbuild'}) {
+  my %buildflags = map {$_ => 1} @{$bconf->{'buildflags'} || []};
+  for my $pkg (grep {$buildflags{"nouseforbuild:$_"}} @pkgs) {
+    delete $pkgsrc{$pkg}->{'useforbuildenabled'};
+  }
+}
+
 # force rebuilds if requested
 if ($opts->{'rebuild-code'} || $opts->{'rebuild-pkg'}) {
   my %codefilter = map {$_ => 1} @{$opts->{'rebuild-code'} || []};
