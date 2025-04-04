@@ -334,8 +334,10 @@ recipe_create_tar_from_dir() {
         *) cleanup_and_exit 1 ;;
     esac
     echo "Creating $t from directory $f"
-    rm -rf "${t%.tar.*}"
-    mv -f "$f" "${t%.tar.*}"
+    if test "${t%.tar.*}" != "$f" ; then
+	rm -rf "${t%.tar.*}"
+	mv -f "$f" "${t%.tar.*}"
+    fi
     rm -f $BUILD_ROOT/.unpack.command
     echo "#!/bin/sh -e" > $BUILD_ROOT/.unpack.command
     shellquote cd "$TOPDIR/SOURCES" >> $BUILD_ROOT/.unpack.command
@@ -349,6 +351,9 @@ recipe_create_tar_from_dir() {
     chmod 0755 $BUILD_ROOT/.unpack.command
     chroot $BUILD_ROOT su -c /.unpack.command - $BUILD_USER || cleanup_and_exit 1
     rm -f $BUILD_ROOT/.unpack.command
+    if test "${t%.tar.*}" != "$f" ; then
+	mv -f "${t%.tar.*}" "$f"
+    fi
 }
 
 recipe_move_assets() {
