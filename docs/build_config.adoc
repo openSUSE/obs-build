@@ -94,6 +94,11 @@ Exclude a package from building. If a package builds multiple flavors
 ("multibuild"), the corresponding flavor can be specified via the
 `package:flavor` syntax.
 
+* nouseforbuild:PACKAGE
+
+This can be used to configure that package is build, but not used
+for building other packages.
+
 * onlybuild:PACKAGE
 
 This can be used to maintain a whitelist of packages to be built.
