@@ -254,18 +254,18 @@ sub createjob {
   PBuild::Util::writestr("$buildroot/.build.config", undef, $ctx->{'buildconfig'});
 
   my $needsbinariesforbuild;
-  my $needobspackage;
-  my $needsslcert;
-  my $needappxsslcert;
+  my $needsobspackage;
+  my $needssslcert;
+  my $needsappxsslcert;
   if ($p->{'buildtype'} ne 'kiwi') {
     my $fd;
     if (open($fd, '<', "$p->{'dir'}/$p->{'recipe'}")) {
       while(<$fd>) {
 	chomp;
 	$needsbinariesforbuild = 1 if /^#\s*needsbinariesforbuild\s*$/s;
-	$needobspackage = 1 if /\@OBS_PACKAGE\@/;
-	$needsslcert = 1 if /^(?:#|Obs:)\s*needsslcertforbuild\s*$/s;
-	$needappxsslcert = 1 if /^(?:#|Obs:)\s*needsappxsslcertforbuild\s*$/s;
+	$needsobspackage = 1 if /\@OBS_PACKAGE\@/;
+	$needssslcert = 1 if /^(?:#|Obs:)\s*needssslcertforbuild\s*$/s;
+	$needsappxsslcert = 1 if /^(?:#|Obs:)\s*needsappxsslcertforbuild\s*$/s;
       }
       close($fd);
     }
@@ -350,7 +350,7 @@ sub createjob {
   push @args, '--release', $opts->{'release'} if $opts->{'release'};
   push @args, '--threads', $opts->{'threads'} if $opts->{'threads'};
   push @args, "--buildflavor=$p->{'flavor'}" if $p->{'flavor'};
-  push @args, "--obspackage=".($p->{'originpackage'} || $p->{'pkg'}) if $needobspackage;
+  push @args, "--obspackage=".($p->{'originpackage'} || $p->{'pkg'}) if $needsobspackage;
   push @args, "--copy-sources-asis" if $copy_sources_asis;
   push @args, "--rpm-recipe-in-subdir" if $p->{'recipe'} =~ /^(?:package|dist)\/.*\.spec$/;
   push @args, "$srcdir/$p->{'recipe'}";
