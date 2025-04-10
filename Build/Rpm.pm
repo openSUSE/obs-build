@@ -1147,6 +1147,8 @@ sub parse {
 
 my %rpmstag = (
   "SIGMD5"         => 261,
+  "SIGSHA256"      => 273,
+  "SIGTAG_SHA256"  => 273,      # SHA256 hash over Header
   "SIGTAG_SIZE"    => 1000,     # Header+Payload size in bytes. */
   "SIGTAG_PGP"     => 1002,     # RSA signature over Header+Payload
   "SIGTAG_MD5"     => 1004,     # MD5 hash over Header+Payload
@@ -1211,6 +1213,7 @@ my %rpmstag = (
   "ENHANCEFLAGS"   => 5057,
   "MODULARITYLABEL" => 5096,
   "UPSTREAMRELEASES" => 5101,
+  "LEAD" => -2,		# internal
 );
 
 sub rpmq {
@@ -1371,6 +1374,7 @@ sub rpmq {
     }
   }
 
+  $res{$stags{-2}} = $lead if $lead && $stags{-2};
   return %res;
 }
 
@@ -1490,7 +1494,7 @@ sub verscmp {
 sub query {
   my ($handle, %opts) = @_;
 
-  my @tags = qw{NAME SOURCERPM NOSOURCE NOPATCH SIGTAG_MD5 PROVIDENAME PROVIDEFLAGS PROVIDEVERSION REQUIRENAME REQUIREFLAGS REQUIREVERSION SOURCEPACKAGE};
+  my @tags = qw{NAME SOURCERPM NOSOURCE NOPATCH SIGTAG_MD5 SIGTAG_SHA256 PROVIDENAME PROVIDEFLAGS PROVIDEVERSION REQUIRENAME REQUIREFLAGS REQUIREVERSION SOURCEPACKAGE};
   push @tags, qw{EPOCH VERSION RELEASE ARCH};
   push @tags, qw{FILENAMES} if $opts{'filelist'};
   push @tags, qw{SUMMARY DESCRIPTION} if $opts{'description'};
@@ -1509,11 +1513,10 @@ sub query {
   $src =~ s/-[^-]*-[^-]*\.[^\.]*\.rpm//;
   add_flagsvers(\%res, 'PROVIDENAME', 'PROVIDEFLAGS', 'PROVIDEVERSION');
   add_flagsvers(\%res, 'REQUIRENAME', 'REQUIREFLAGS', 'REQUIREVERSION');
-  my $data = {
-    name => $res{'NAME'}->[0],
-    hdrmd5 => unpack('H32', $res{'SIGTAG_MD5'}->[0]),
-  };
-  $data->{'sourcerpm'} = $res{'SOURCERPM'}->[0] if $opts{'source'} && $res{'SOURCERPM'}->[0];
+  my $data = { name => $res{'NAME'}->[0] };
+  $data->{'hdrmd5'} = unpack('H32', $res{'SIGTAG_MD5'}->[0]) if $res{'SIGTAG_MD5'};
+  $data->{'hdrmd5'} = substr($res{'SIGTAG_SHA256'}->[0], 0, 32) if !$data->{'hdrmd5'} && $res{'SIGTAG_SHA256'};
+  $data->{'sourcerpm'} = $res{'SOURCERPM'}->[0] if $opts{'source'} && ($res{'SOURCERPM'} || [])->[0];
   if ($opts{'alldeps'}) {
     $data->{'provides'} = [ @{$res{'PROVIDENAME'} || []} ];
     $data->{'requires'} = [ @{$res{'REQUIRENAME'} || []} ];
@@ -1631,17 +1634,25 @@ sub queryhdrmd5 {
   close F;
   $$leadsigp = Digest::MD5::md5_hex(substr($buf, 0, $hlen)) if $leadsigp;
   my $idxarea = substr($buf, 96 + 16, $cnt * 16);
-  if ($idxarea !~ /\A(?:.{16})*\000\000\003\354\000\000\000\007(....)\000\000\000\020/s) {
-    warn("$bin: no md5 signature header\n");
-    return undef;
+  if ($idxarea =~ /\A(?:.{16})*\000\000\003\354\000\000\000\007(....)\000\000\000\020/s) {
+    my $off = unpack('N', $1);
+    if ($off + 16 > $cntdata) {
+      warn("$bin: bad offset of md5 tag\n");
+      return undef;
+    }
+    $off += 96 + 16 + $cnt * 16;
+    return unpack("\@${off}H32", $buf);
+  } elsif ($idxarea =~ /\A(?:.{16})*\000\000\001\021\000\000\000\006(....)\000\000\000\001/s) {
+    my $off = unpack('N', $1);
+    if ($off + 64 > $cntdata) {
+      warn("$bin: bad offset of sha256 tag\n");
+      return undef;
+    }
+    $off += 96 + 16 + $cnt * 16;
+    return substr($buf, $off, 32);
   }
-  my $md5off = unpack('N', $1);
-  if ($md5off >= $cntdata) {
-    warn("$bin: bad md5 offset\n");
-    return undef;
-  }
-  $md5off += 96 + 16 + $cnt * 16;
-  return unpack("\@${md5off}H32", $buf);
+  warn("$bin: no md5/sha256 signature header\n");
+  return undef;
 }
 
 sub queryinstalled {
@@ -1712,11 +1723,19 @@ sub getrpmheaders {
   }
   if ($withhdrmd5) {
     my $idxarea = substr($buf, 96 + 16, $cnt * 16);
-    die("$path: no md5 signature header\n") unless $idxarea =~ /\A(?:.{16})*\000\000\003\354\000\000\000\007(....)\000\000\000\020/s;
-    my $md5off = unpack('N', $1);
-    die("$path: bad md5 offset\n") unless $md5off;
-    $md5off += 96 + 16 + $cnt * 16;
-    $hdrmd5 = unpack("\@${md5off}H32", $buf);
+    if ($idxarea =~ /\A(?:.{16})*\000\000\003\354\000\000\000\007(....)\000\000\000\020/s) {
+      my $off = unpack('N', $1);
+      die("$path: bad md5 offset\n") if $off + 16 > $cntdata;
+      $off += 96 + 16 + $cnt * 16;
+      $hdrmd5 = unpack("\@${off}H32", $buf);
+    } elsif ($idxarea =~ /\A(?:.{16})*\000\000\001\021\000\000\000\006(....)\000\000\000\001/s) {
+      my $off = unpack('N', $1);
+      die("$path: bad sha256 offset\n") if $off + 64 > $cntdata;
+      $off += 96 + 16 + $cnt * 16;
+      $hdrmd5 = substr($buf, $off, 32);
+    } else {
+      die("$path: no md5/sha256 signature header\n")
+    }
   }
   ($headmagic, $cnt, $cntdata) = unpack('N@8NN', substr($buf, $hlen));
   die("$path: not a rpm (bad header)\n") unless $headmagic == 0x8eade801 && $cnt < 1048576 && $cntdata < 33554432;
