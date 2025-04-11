@@ -568,10 +568,17 @@ sub handle_decompression {
 die("usage: unpackarchive --cpio|--tar|--apk [-C <root>]\n") unless @ARGV;
 my $format = shift @ARGV;
 my $root = '.';
+my $do_chroot;
 while (@ARGV) {
   if (@ARGV > 1 && $ARGV[0] eq '-C') {
     (undef, $root) = splice(@ARGV, 0, 2);
   } elsif ($ARGV[0] eq '-j' || $ARGV[0] eq '-J' || $ARGV[0] eq '-z') {
+    shift @ARGV;
+  } elsif ($ARGV[0] eq '--chroot') {
+    $do_chroot = 2;
+    shift @ARGV;
+  } elsif ($ARGV[0] eq '--try-chroot') {
+    $do_chroot = 1;
     shift @ARGV;
   } elsif ($ARGV[0] =~ /^-/) {
     die("unpackarchive: unsupported option $ARGV[0]\n");
@@ -592,6 +599,15 @@ umask(0);	# do not mess with the modes
 my $prepend = handle_decompression();
 
 $readhead = apkv3_setup($prepend) if $format eq '--apk' && $prepend && substr($prepend, 0, 3) eq 'ADB';
+
+if ($do_chroot) {
+  if ($root ne '/' && !chroot($root)) {
+    die("chroot $root: $!\n") if $do_chroot > 1;
+  } else {
+    chdir('/') || die("chdir /: $!\n");
+    $root = '.';
+  }
+}
 
 while (1) {
   my ($ent, $size, $pad) = $readhead->($prepend);
