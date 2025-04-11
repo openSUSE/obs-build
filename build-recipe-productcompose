@@ -76,7 +76,12 @@ recipe_build_productcompose() {
         BUILD_USER=root
     fi
 
-    chroot "$BUILD_ROOT" su -c "/usr/bin/product-composer build $extra_args -v --clean $TOPDIR/SOURCES/$RECIPEFILE $TOPDIR/PRODUCT" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+    local checksums
+    if test -f "$BUILD_ROOT/$TOPDIR/SOURCES/repos/.createrepo_checksums" ; then
+	checksums="CREATEREPO_CHECKSUMS=$TOPDIR/SOURCES/repos/.createrepo_checksums"
+    fi
+
+    chroot "$BUILD_ROOT" su -c "$checksums /usr/bin/product-composer build $extra_args -v --clean $TOPDIR/SOURCES/$RECIPEFILE $TOPDIR/PRODUCT" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
     pushd "$BUILD_ROOT/$TOPDIR/PRODUCT"
     for i in * ; do
 	test -e "$i" || continue
