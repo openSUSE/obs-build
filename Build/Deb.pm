@@ -25,6 +25,8 @@ use Digest::MD5;
 
 my $have_zlib;
 my $have_rawlzma;
+my $have_zstd;
+
 eval {
   require Compress::Zlib;
   $have_zlib = 1;
@@ -32,6 +34,10 @@ eval {
 eval {
   require Compress::Raw::Lzma;
   $have_rawlzma = 1;
+};
+eval {
+  require Compress::Stream::Zstd;
+  $have_zstd = 1;
 };
 
 my %obs2debian = (
@@ -196,6 +202,7 @@ sub uncompress {
   return $data if $tool eq 'cat';
   return Compress::Zlib::memGunzip($data) if $have_zlib && $tool eq 'gunzip';
   return uncompress_rawlzma($data) if $have_rawlzma && $tool eq 'unxz';
+  return Compress::Stream::Zstd::decompress($data) if $have_zstd && $tool eq 'unzstd';
   local (*TMP, *TMP2);
   open(TMP, "+>", undef) or die("could not open tmpfile\n");
   syswrite TMP, $data;
