@@ -148,7 +148,7 @@ sub fetch_config {
   my $ua = create_ua();
   my ($config) = Build::Download::fetch("${baseurl}source/$projid2/_config", 'ua' => $ua, 'missingok' => 1);
   $config = '' unless defined $config;
-  $config = "\n### from $projid\n%define _repository $repoid\n$config" if $config;
+  $config = "\n### from $projid\n%define _repository $repoid\n%define _is_this_project 0\n%define _is_in_project 0\n$config" if $config;
   return $config;
 }
 
