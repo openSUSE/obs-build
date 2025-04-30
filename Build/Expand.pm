@@ -45,7 +45,12 @@ sub checkconflicts {
       $ret = 1 if check_conddeps_notinst($q, $n, $eq, $ins);
       next;
     }
-    my @eq = grep {$ins->{$_}} @{$whatprovides->{$r} || Build::addproviders($config, $r)};
+    my @eq;
+    if ($r =~ /^otherproviders\((.*)\)$/) {
+      @eq = grep {$ins->{$_}} @{$whatprovides->{$1} || Build::addproviders($config, $1)};
+    } else {
+      @eq = grep {$ins->{$_}} @{$whatprovides->{$r} || Build::addproviders($config, $r)};
+    }
     next unless @eq;
     push @$eq, map {"(provider $q conflicts with $_)"} @eq;
     $ret = 1;
@@ -554,6 +559,9 @@ sub expand {
 	    if ($r =~ /^\(.*\)$/) {
 	      my $n = normalizerich($config, $p, $r, 1, \@error);
 	      check_conddeps_inst($p, $n, \@error, \%p, \%naconflicts, \@todo, \%todo_cond);
+	      next;
+	    } elsif ($r =~ /^otherproviders\((.*)\)$/) {
+	      $naconflicts{$_} = "is in conflict with $p" for @{$whatprovides->{$1} || Build::addproviders($config, $1)};
 	      next;
 	    }
 	    $naconflicts{$_} = "is in conflict with $p" for @{$whatprovides->{$r} || Build::addproviders($config, $r)};
