@@ -237,6 +237,7 @@ sub parse_testcasedep_rec {
     $r .= ')' if $d =~ /^\)/ && $r =~ /\([^\)]+$/ && $d =~ s/^\)//;
     $r = "$r$1" if $d =~ s/^( (?:<|<=|>|>=|<=>|=) [^\s\)]+)//;
     $r =~ s/\\([A-Fa-f2-9][A-Fa-f0-9])/chr(hex($1))/sge;
+    $r =~ s/^namespace:otherproviders\(/otherproviders(/;
     $r = [0, $r];
   }
   $d =~ s/^\s+//;
@@ -285,7 +286,7 @@ sub rpmdepformat_rec {
 sub recode_deps {
   my ($b) = @_;
   for my $dep (@{$b->{'requires'} || []}, @{$b->{'conflicts'} || []}, @{$b->{'recommends'} || []}, @{$b->{'supplements'} || []}) {
-    next unless $dep =~ / (?:<[A-Z]|[\-\+\|\&\.])/;
+    next unless $dep =~ / (?:<[A-Z]|[\-\+\|\&\.\\])/ || $dep =~ /^namespace:/;
     my ($d, $r) = parse_testcasedep_rec($dep);
     next if !$r || $d ne '';
     $dep = rpmdepformat_rec($r, 1);	# currently only rpm supported
