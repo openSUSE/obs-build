@@ -324,6 +324,7 @@ sub builtinmacro {
   return $args[0] =~ /\/([^\/]*)$/ ? $1 : $args[0] if $macname eq 'basename';
   return $args[0] =~ /(.*)\// ? $1 : $args[0] if $macname eq 'dirname';
   return $args[0] =~ /\.([^\.]*)$/ ? $1 : '' if $macname eq 'suffix';
+  return $args[0] if $macname eq 'span';
   if ($macname eq 'shrink') {
     $args[0] =~ s/[ \t]+/ /g;
     $args[0] =~ s/^ //;
@@ -436,6 +437,7 @@ my %builtin_macros = (
   'shrink' => \&builtinmacro,
   'suffix' => \&builtinmacro,
   'load' => \&builtinmacro,
+  'span' => \&builtinmacro,
 
   'gsub' => \&luamacro,
   'len' => \&luamacro,
