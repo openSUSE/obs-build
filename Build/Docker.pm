@@ -321,7 +321,7 @@ sub parse {
 	my $arch = gettargetarch($cf);
 	$excludedline = (grep {$_ eq $arch} split(' ', $1)) ? 1 : undef;
       }
-      if ($line =~ /^#!RemoteAsset(?:Url)?:\s*(\S+)\s*$/i) {
+      if ($line =~ /^#!RemoteAsset(?:Url)?:\s*(.*?)\s*$/i) {
 	my $remoteasset = {};
 	for (split(' ', $1)) {
 	  if (/\/\//) {
