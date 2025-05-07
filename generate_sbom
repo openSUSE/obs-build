@@ -388,13 +388,15 @@ sub dump_rpmdb {
 
 sub read_rpm {
   my ($rpm) = @_;
-  my %r = Build::Rpm::rpmq($rpm, qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL FILENAMES URL VENDOR FILEMODES FILEDIGESTS FILEDIGESTALGO SIGMD5});
+  my $sigmd5tag = ref($rpm) ? 'SIGMD5' : 'SIGTAG_MD5';
+  my %r = Build::Rpm::rpmq($rpm, qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL FILENAMES URL VENDOR FILEMODES FILEDIGESTS FILEDIGESTALGO}, $sigmd5tag);
   delete $r{$_} for qw{BASENAMES DIRNAMES DIRINDEXES};	# save mem
-  for (qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL URL VENDOR FILEDIGESTALGO SIGMD5}) {
+  for (qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL URL VENDOR FILEDIGESTALGO}, $sigmd5tag) {
     next unless $r{$_};
     die("bad rpm entry for $_\n") unless ref($r{$_}) eq 'ARRAY' && @{$r{$_}} == 1;
     $r{$_} = $r{$_}->[0];
   }
+  $r{'SIGMD5'} = delete $r{$sigmd5tag} if $sigmd5tag eq 'SIGTAG_MD5' && exists($r{$sigmd5tag});
   delete $r{'LICENSE'} if $r{'NAME'} eq 'gpg-pubkey' && ($r{'LICENSE'} || '') eq 'pubkey';
   return \%r;
 }
