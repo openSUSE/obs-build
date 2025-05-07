@@ -106,7 +106,7 @@ my %neg = map {$_ => 1} @neg;
 @sdeps = grep {!$neg{$_}} @sdeps;
 my %sdeps = map {$_ => 1} @sdeps;
 
-open(F, '>', $newspec) || die("$newspec: $!\n");
+open(my $fd, '>', $newspec) || die("$newspec: $!\n");
 
 my $inchangelog = 0;
 my $mainpkg = '';
@@ -193,15 +193,15 @@ for my $line (@$xspec) {
 	if ($file =~ /\//s || $file =~ /^\./) {
 	  $suffix = "error:illegal release suffix";
 	} else {
-	  if (open(RP, '<', "$specdir$file")) {
+	  if (open(my $rpfd, '<', "$specdir$file")) {
 	    $suffix = "error:no suffix in $file";
-	    for (<RP>) {
+	    for (<$rpfd>) {
 	      chomp;
 	      s/^\s+//;
 	      s/\s+$//;
 	      $suffix = $_ if $_ && !/^#/;
 	    }
-	    close RP;
+	    close $rpfd;
 	  } else {
 	    $suffix = "error:$file file does not exist";
 	  }
@@ -230,9 +230,9 @@ for my $line (@$xspec) {
       $::ENV{'BUILD_OLDRELEASE'} = $oldl;
       my @nl;
       my $interpreter = "/bin/bash";
-      if (open(RP, '<', "$specdir$cf->{'releaseprg'}")) {
-	@nl = <RP>;
-	close RP;
+      if (open(my $rpfd, '<', "$specdir$cf->{'releaseprg'}")) {
+	@nl = <$rpfd>;
+	close $rpfd;
 	if (@nl && $nl[0] =~ /^#!\s*(\S*)/) {
 	  $interpreter = $1;
 	}
@@ -288,13 +288,13 @@ for my $line (@$xspec) {
 
   if (!$used || ($line !~ /^(?:Requires|BuildRequires|PreReq)(?:\([^\)]+\))?:/i)) {
     $line = $origline if defined $origline;
-    print F "$line\n";
+    print $fd "$line\n";
     next;
   }
   if ($line =~ /%\(/) {
     # too hard for us
     $line = $origline if defined $origline;
-    print F "$line\n";
+    print $fd "$line\n";
     next;
   }
 
@@ -305,7 +305,7 @@ for my $line (@$xspec) {
   if ($r =~ /^\(/) {
     # no rich dependency support for now
     $line = $origline if defined $origline;
-    print F "$line\n";
+    print $fd "$line\n";
     next;
   }
   my @deps = $r =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?[\s,]*/g;
@@ -340,24 +340,24 @@ for my $line (@$xspec) {
   }
   if ($replace) {
     $line =~ /^(.*?:\s*)/;
-    print F $1.join(' ', @ndeps) if @ndeps;
-    print F "\n";
+    print $fd $1.join(' ', @ndeps) if @ndeps;
+    print $fd "\n";
   } else {
     $line = $origline if defined $origline;
-    print F "$line\n";
+    print $fd "$line\n";
   }
 }
 
 if ($changelog) {
-  print F "%changelog\n";
-  if (open(CF, '<', $changelog)) {
-    while(<CF>) {
-      print F $_;
+  print $fd "%changelog\n";
+  if (open(my $cf, '<', $changelog)) {
+    while(<$cf>) {
+      print $fd $_;
     }
-    close CF;
+    close $cf;
   }
 }
 
-close(F) || die("close: $!\n");
+close($cf) || die("close: $!\n");
 
 exit(0);

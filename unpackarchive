@@ -530,8 +530,7 @@ sub handle_decompression {
   my @decomp = detect_decompressor($first16bytes);
   @decomp = ('cat') if $force_pipe && !@decomp;
   return $first16bytes unless @decomp;
-  local *F;
-  open(F, "<&STDIN") || die("stdin dup: $!\n");
+  open(my $fd, "<&STDIN") || die("stdin dup: $!\n");
   my $pid = open(STDIN, '-|');
   die("fork: $!\n") unless defined $pid;
   if (!$pid) {
@@ -548,7 +547,7 @@ sub handle_decompression {
     print G $first16bytes if $first16bytes ne '';
     while (1) {
       my $d = '';
-      my $r = read(F, $d, 8192);
+      my $r = read($fd, $d, 8192);
       next if !defined($r) && $! == POSIX::EINTR;
       die("read error: $!\n") unless defined $r;
       exit(0) unless $r;
@@ -557,7 +556,7 @@ sub handle_decompression {
     close(G) || die("pipe close: $!\n");
     exit 0;
   }
-  close(F);
+  close($fd);
   return undef;
 }
 

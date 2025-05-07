@@ -87,14 +87,14 @@ sub get_assets {
 sub parse {
   my ($config, $pkgbuild) = @_;
   my $ret;
-  local *PKG;
-  if (!open(PKG, '<', $pkgbuild)) {
+  my $pkgfd;
+  if (!open($pkgfd, '<', $pkgbuild)) {
     $ret->{'error'} = "$pkgbuild: $!";
     return $ret;
   }
   my %vars;
   my @ifs;
-  while (<PKG>) {
+  while (<$pkgfd>) {
     chomp;
     next if /^\s*$/;
     next if /^\s*#/;
@@ -127,7 +127,7 @@ sub parse {
     my $val = $4;
     if ($3) {
       while ($val !~ s/\)\s*(?:#.*)?$//s) {
-	my $nextline = <PKG>;
+	my $nextline = <$pkgfd>;
 	last unless defined $nextline;
 	chomp $nextline;
 	$val .= ' ' . $nextline;
@@ -139,7 +139,7 @@ sub parse {
       $vars{$var} = [ unquotesplit($val, \%vars) ];
     }
   }
-  close PKG;
+  close $pkgfd;
   $ret->{'name'} = $vars{'pkgname'}->[0] if $vars{'pkgname'};
   $ret->{'version'} = $vars{'pkgver'}->[0] if $vars{'pkgver'};
   $ret->{'deps'} = [];
@@ -170,21 +170,19 @@ sub parse {
 
 sub islzma {
   my ($fn) = @_;
-  local *F;
-  return 0 unless open(F, '<', $fn);
+  return 0 unless open(my $fd, '<', $fn);
   my $h;
-  return 0 unless read(F, $h, 5) == 5;
-  close F;
+  return 0 unless read($fd, $h, 5) == 5;
+  close $fd;
   return $h eq "\3757zXZ";
 }
 
 sub iszstd {
   my ($fn) = @_;
-  local *F;
-  return 0 unless open(F, '<', $fn);
+  return 0 unless open(my $fd, '<', $fn);
   my $h;
-  return 0 unless read(F, $h, 4) == 4;
-  close F;
+  return 0 unless read($fd, $h, 4) == 4;
+  close $fd;
   return $h eq "(\265\057\375";
 }
 
@@ -367,17 +365,15 @@ sub queryinstalled {
   my ($root, %opts) = @_; 
 
   $root = '' if !defined($root) || $root eq '/';
-  local *D;
-  local *F;
-  opendir(D, "$root/var/lib/pacman/local") || return [];
-  my @pn = sort(grep {!/^\./} readdir(D));
-  closedir(D);
+  opendir(my $dirfd, "$root/var/lib/pacman/local") || return [];
+  my @pn = sort(grep {!/^\./} readdir($dirfd));
+  closedir($dirfd);
   my @pkgs;
   for my $pn (@pn) {
-    next unless open(F, '<', "$root/var/lib/pacman/local/$pn/desc");
+    next unless open(my $fd, '<', "$root/var/lib/pacman/local/$pn/desc");
     my $data = '';
-    1 while sysread(F, $data, 8192, length($data));
-    close F;
+    1 while sysread($fd, $data, 8192, length($data));
+    close $fd;
     my $d = parserepodata(undef, $data);
     next unless defined $d->{'name'};
     my $q = {};

@@ -81,10 +81,9 @@ sub parse {
   if (ref($fn) eq 'ARRAY') {
     @control = @$fn;
   } else {
-    local *F;
-    return { 'error' => "$fn: $!" } unless open(F, '<', $fn);
-    @control = <F>;
-    close F;
+    return { 'error' => "$fn: $!" } unless open(my $fd, '<', $fn);
+    @control = <$fd>;
+    close $fd;
     chomp @control;
   }
   splice(@control, 0, 3) if @control > 3 && $control[0] =~ /^-----BEGIN/;

@@ -63,10 +63,9 @@ if ($manifest) {
   if ($manifest eq '-') {
     @p = <STDIN>;
   } else {
-    local *F;
-    open(F, '<', $manifest) || die("$manifest: $!\n");
-    @p = <F>;
-    close F;
+    open(my $fd, '<', $manifest) || die("$manifest: $!\n");
+    @p = <$fd>;
+    close $fd;
   }
   chomp @p;
 }

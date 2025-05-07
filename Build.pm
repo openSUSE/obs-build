@@ -336,10 +336,9 @@ sub find_config_file {
 
 sub slurp_config_file {
   my ($file, $seen) = @_;
-  local *CONF;
-  die("$file: $!\n") unless open(CONF, '<', $file);
-  my @config = <CONF>;
-  close CONF;
+  die("$file: $!\n") unless open(my $conffd, '<', $file);
+  my @config = <$conffd>;
+  close $conffd;
   chomp @config;
   if (@config && $config[0] =~ /^#!PrependConfigFile:\s*([^\.\/][^\/]*?)\s*$/) {
     my $otherfile = $1;
@@ -379,10 +378,9 @@ sub read_config {
   if (ref($cfile)) {
     @config = @$cfile;
   } elsif (defined($cfile)) {
-    local *CONF;
-    return undef unless open(CONF, '<', $cfile);
-    @config = <CONF>;
-    close CONF;
+    return undef unless open(my $conffd, '<', $cfile);
+    @config = <$conffd>;
+    close $conffd;
     chomp @config;
   }
   # create verbatim macro blobs

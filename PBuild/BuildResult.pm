@@ -41,11 +41,10 @@ sub read_bininfo {
   my ($dir, $withid) = @_;
   my $bininfo;
   my @bininfo_s;
-  local *BI;
-  if (open(BI, '<', "$dir/.bininfo")) {
-    @bininfo_s = stat(BI);
-    $bininfo = PBuild::Util::retrieve(\*BI, 1) if @bininfo_s && $bininfo_s[7];
-    close BI;
+  if (open(my $bifd, '<', "$dir/.bininfo")) {
+    @bininfo_s = stat($bifd);
+    $bininfo = PBuild::Util::retrieve($bifd, 1) if @bininfo_s && $bininfo_s[7];
+    close $bifd;
     if ($bininfo) {
       $bininfo->{'.bininfo'} = {'id' => "$bininfo_s[9]/$bininfo_s[7]/$bininfo_s[1]"} if $withid;
       return $bininfo;
@@ -65,13 +64,12 @@ sub read_bininfo {
         my $r = {%$d, 'filename' => $file, 'id' => "$s[9]/$s[7]/$s[1]"};
         $bininfo->{$file} = $r;
       } elsif ($file =~ /[-.]appdata\.xml$/) {
-        local *F;
-        open(F, '<', "$dir/$file") || next;
-        my @s = stat(F);
+        open(my $fd, '<', "$dir/$file") || next;
+        my @s = stat($fd);
         next unless @s;
         my $ctx = Digest::MD5->new;
-        $ctx->addfile(*F);
-        close F;
+        $ctx->addfile($fd);
+        close $fd;
         $bininfo->{$file} = {'md5sum' => $ctx->hexdigest(), 'filename' => $file, 'id' => "$s[9]/$s[7]/$s[1]"};
       }
       next;
