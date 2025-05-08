@@ -247,6 +247,7 @@ sub gen_filelist {
 
 sub add_golang_mod {
   my ($m, $exeinfos) = @_;
+  $m = $m->{'rep'} if $m->{'rep'};
   my $g = $exeinfos->{"golang:$m->{'path'}\@\@$m->{'version'}"};
   return $g if $g;
   $g = { 'NAME' => $m->{'path'}, 'VERSION' => $m->{'version'}, 'pkgtype' => 'golang' };

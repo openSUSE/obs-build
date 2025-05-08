@@ -185,8 +185,9 @@ sub buildinfo  {
       push @{$buildinfo->{'deps'}}, $lastmod if $s eq 'dep';
     } elsif ($s eq '=>') {
       @s = split("\t", $d);
-      next unless @s == 3 && $lastmod;
-      $lastmod->{'rep'} = { 'path' => $s[0], 'version' => $s[1], 'sum' => $s[2] };
+      next unless (@s == 2 || @s == 3) && $lastmod;
+      $lastmod->{'rep'} = { 'path' => $s[0], 'version' => $s[1] };
+      $lastmod->{'rep'}->{'sum'} = $s[2] if @s == 3;
       $lastmod = undef;
     } elsif ($s eq 'build') {
       my $k;
