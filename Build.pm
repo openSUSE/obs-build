@@ -1039,7 +1039,7 @@ sub matchsingledep {
   return 0 unless $df;
   $dn =~ s/:any$// if $binarytype eq 'deb';
   if ($p !~ /^\Q$dn\E\s*([<=>]{1,2})\s*(.*?)$/) {
-    # p is bare or not matching 
+    # p is bare or not matching
     return 0 if $binarytype eq 'deb';
     return $p eq $dn ? 1 : 0;
   }
@@ -1277,7 +1277,7 @@ sub recipe2buildtype {
   return 'flatpak' if $recipe =~ m/flatpak\.(?:ya?ml|json)$/;
   return 'dsc' if $recipe eq 'debian.control';
   return 'dsc' if $recipe eq 'control' && $_[0] =~ /(?:^|\/)debian\/[^\/]+$/s;
-  return 'mkosi' if $recipe =~ m/^mkosi\./;
+  return 'mkosi' if $recipe =~ m/^mkosi(?:\..*)\.conf/;
   return undef;
 }
 

@@ -83,7 +83,7 @@ sub find_recipe {
     }
   }
   if (1) {
-    @files = grep {/^mkosi\./} keys %files;
+    @files = grep {/^mkosi(?:\..*)\.conf/} keys %files;
     return $files{$files[0]} if @files == 1;
     if (@files > 1) {
       @files = sort @files;
@@ -175,7 +175,7 @@ sub parse {
   }
 }
 
-# split host deps from deps if cross building 
+# split host deps from deps if cross building
 sub split_hostdeps {
   my ($p, $bconf) = @_;
   return if $p->{'buildtype'} eq 'kiwi' || $p->{'buildtype'} eq 'docker' || $p->{'buildtype'} eq 'fissile';
