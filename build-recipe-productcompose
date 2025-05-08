@@ -60,6 +60,15 @@ recipe_build_productcompose() {
     local milestone=$(productcompose_query_recipe milestone)
     local baseiso=$(productcompose_query_recipe baseiso)
     extra_args=
+
+    while read kv ; do
+        case "$kv" in
+            [a-zA-Z0-9_]*)
+                extra_args="$extra_args --build-option=$kv"
+                ;;
+        esac
+    done < <( queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" --decode buildflags+ productcompose-buildoption )
+
     if test -n "$RELEASE" ; then
 	extra_args=" $extra_args --release $RELEASE"
     fi
@@ -82,6 +91,7 @@ recipe_build_productcompose() {
     fi
 
     chroot "$BUILD_ROOT" su -c "$checksums /usr/bin/product-composer build $extra_args -v --clean $TOPDIR/SOURCES/$RECIPEFILE $TOPDIR/PRODUCT" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+
     pushd "$BUILD_ROOT/$TOPDIR/PRODUCT"
     for i in * ; do
 	test -e "$i" || continue
