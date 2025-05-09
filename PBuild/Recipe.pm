@@ -83,7 +83,7 @@ sub find_recipe {
     }
   }
   if (1) {
-    @files = grep {/^mkosi(?:\..*)\.conf/} keys %files;
+    @files = grep {/^mkosi(?:\..*)?\.conf$/} keys %files;
     return $files{$files[0]} if @files == 1;
     if (@files > 1) {
       @files = sort @files;
