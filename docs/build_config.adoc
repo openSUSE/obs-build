@@ -152,6 +152,12 @@ For podman container builds, it specifies the container config format. Possible 
 are 'docker' and 'oci'. The default is 'docker'. The 'docker' format allows a few
 extensions like ONBUILD, SHELL, DOMAINNAME, COMMENT, HEALTHCHECK amongst others.
 
+* productcompose-buildoption:OPTION
+
+To enable build options during productcompose builds. For example
+to build reduced products via updateinfo_packages_only for maintenance
+testing.
+
 ==== Conflict: PACKAGE
 
 Specify that a package must not be installed in the build environment.
