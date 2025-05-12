@@ -1358,6 +1358,16 @@ container-build-format:FORMAT
 <div class="paragraph"><p>For podman container builds, it specifies the container config format. Possible values
 are <em>docker</em> and <em>oci</em>. The default is <em>docker</em>. The <em>docker</em> format allows a few
 extensions like ONBUILD, SHELL, DOMAINNAME, COMMENT, HEALTHCHECK amongst others.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+productcompose-buildoption:OPTION
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>To enable build options during productcompose builds. For example
+to build reduced products via updateinfo_packages_only for maintenance
+testing.</p></div>
 </div>
 <div class="sect3">
 <h4 id="_conflict_package">3.2.5. Conflict: PACKAGE</h4>
@@ -1969,7 +1979,7 @@ In this case the base system for the target system can manually get configured v
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2025-03-26 14:23:36 CET
+ 2025-03-31 13:38:18 CEST
 </div>
 </div>
 </body>
