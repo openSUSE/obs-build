@@ -646,9 +646,9 @@ vm_detect_2nd_stage() {
         # need to remount rw explicitly.
         mount -o remount,rw sysfs /sys
     fi
-    # mount selinuxfs
-    if ! test -e /sys/fs/selinux/status; then
-        mount -orw -n -tselinuxfs selinuxfs /sys/fs/selinux 2>/dev/null || :
+    # Hide selinux fstype (compatible with how mock does it)
+    if test -d /sys/fs/selinux; then
+        mount -orw -n -ttmpfs mock_hide_selinux_fs /sys/fs/selinux 2>/dev/null || :
     fi
 
     # mount securityfs
