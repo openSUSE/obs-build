@@ -41,11 +41,10 @@ sub gettargetarch {
 
 sub slurp {
   my ($fn) = @_;
-  local *F;
-  return undef unless open(F, '<', $fn);
+  return undef unless open(my $fd, '<', $fn);
   local $/ = undef;	# Perl slurp mode
-  my $content = <F>;
-  close F;
+  my $content = <$fd>;
+  close $fd;
   return $content;
 }
 
