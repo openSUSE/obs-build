@@ -1319,6 +1319,7 @@ if ! grep -F "127.0.0.1 $HOST" $BUILD_ROOT/etc/hosts > /dev/null ; then
     # on the interface no matter the OS!
     #
     echo "127.0.0.1 $HOST" > $BUILD_ROOT/etc/hosts.new
+	echo "::1 $HOST" >> $BUILD_ROOT/etc/hosts.new
     test -f $BUILD_ROOT/etc/hosts && cat $BUILD_ROOT/etc/hosts >> $BUILD_ROOT/etc/hosts.new
     mv $BUILD_ROOT/etc/hosts.new $BUILD_ROOT/etc/hosts
 fi
