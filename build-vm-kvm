@@ -318,7 +318,18 @@ vm_startup_kvm() {
 	# use qemu user by default if available
 	getent passwd qemu >/dev/null && VM_USER=qemu
     fi
-    [ -n "$VM_USER" ] && kvm_options="$kvm_options -runas $VM_USER"
+    if test -n "$VM_USER" ; then
+	# version 10.0 removed the "-runas" option
+	V=$($qemu_bin -version 2>/dev/null | head -1)
+	case "$V" in
+	    *"version 1"*)
+		kvm_options="$kvm_options -run-with user=$VM_USER"
+		;;
+	    *)
+		kvm_options="$kvm_options -runas $VM_USER"
+		;;
+	esac
+    fi
     if test -n "$VM_SWAP" ; then
 	qemu_args=("${qemu_args[@]}" -drive file="$VM_SWAP",format=raw,if=none,id=swap,$kvm_drive_opts -device "$kvm_device$kvm_device_opts",drive=swap,serial=1)
     fi
