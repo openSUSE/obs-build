@@ -158,7 +158,14 @@ vm_startup_qemu() {
         # use qemu user by default if available
         getent passwd qemu >/dev/null && VM_USER=qemu
     fi
-    [ -n "$VM_USER" ] && qemu_options="$qemu_options -runas $VM_USER"
+    if test -n "$VM_USER" ; then
+        if $qemu_bin -run-with "user=0:0" -version >/dev/null 2>&1; then
+            # new syntax since version 10.0 required
+            qemu_options="$qemu_options -run-with user=$VM_USER"
+        else
+            qemu_options="$qemu_options -runas $VM_USER"
+        fi
+    fi
     if test -n "$VM_SWAP" ; then
         qemu_args=("${qemu_args[@]}" -drive file="$VM_SWAP",format=raw,if=none,id=swap,cache=unsafe -device "$qemu_device",drive=swap,serial=1)
     fi
