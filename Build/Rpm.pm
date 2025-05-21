@@ -203,9 +203,19 @@ sub expr {
 
 sub do_warn {
   my ($config, $err) = @_;
-  if ($config && $config->{'parsing_config'}) {
+  return unless $config;
+  my $linestr = $config->{'__pw_file'} || '';
+  if ($config->{'__pw_lineref'} && ${$config->{'__pw_lineref'}}) {
+    $linestr .= ':' if $linestr ne '';
+    $linestr = "line $linestr${$config->{'__pw_lineref'}}";
+  }
+  my $prefix = $config->{'__pw_prefix'} || '';
+  $prefix .= ' ' if $prefix ne '' && $linestr ne '';
+  $prefix .= $linestr;
+  $err = "$prefix: $err" if $prefix ne '';
+  if ($config->{'parsing_config'}) {
     $config->{'parse_error'} ||= $err;
-  } elsif ($config && $config->{'warnings'}) {
+  } elsif ($config->{'warnings'}) {
     warn("$err\n");
   }
 }
@@ -348,7 +358,7 @@ sub builtinmacro {
     initmacros($c, $l->[1], $l->[2]);
     return '';
   }
-  do_warn($config, "unsupported builtin macro $macname");
+  do_warn($config, "unsupported builtin macro %$macname");
   return '';
 }
 
@@ -449,7 +459,7 @@ my %builtin_macros = (
 );
 
 sub expandmacros {
-  my ($config, $line, $lineno, $macros, $macros_args, $tries) = @_;
+  my ($config, $line, $macros, $macros_args, $tries) = @_;
 
   if (!$macros) {
     $macros = {};
@@ -464,7 +474,7 @@ sub expandmacros {
 reexpand:
   while ($line =~ /^(.*?)%(\{([^\}]+)\}|[\?\!]*[0-9a-zA-Z_]+|%|\*\*?|#|\(|\[)(.*?)\z/s) {
     if ($tries++ > 1000) {
-      do_warn($config, "spec file parser".($lineno?" line $lineno":'').": macro too deeply nested");
+      do_warn($config, 'macro too deeply nested');
       $line = 'MACRO';
       last;
     }
@@ -504,7 +514,7 @@ reexpand:
     }
     $macname =~ s/^[\!\?]+//s;
     if ($macname eq '(') {
-      do_warn($config, "spec file parser".($lineno?" line $lineno":'').": can't expand %(...)");
+      do_warn($config, 'cannot expand %(...)');
       $line = 'MACRO';
       last;
     } elsif ($macname eq '[') {
@@ -512,7 +522,7 @@ reexpand:
       $line = substr($line, length($macalt) - 2);
       $macalt =~ s/^%\[//;
       $macalt =~ s/\]$//;
-      my $xp = sub {expandmacros($config, $_[0], $lineno, $macros, $macros_args, $tries)};
+      my $xp = sub {expandmacros($config, $_[0], $macros, $macros_args, $tries)};
       $expandedline .= expr_stringify(do_expr($config, $macalt, $xp));
     } elsif ($macname eq 'define' || $macname eq 'global') {
       my $isglobal = $macname eq 'global' ? 1 : 0;
@@ -524,7 +534,7 @@ reexpand:
 	my $macname = $1;
 	my $macargs = $2;
 	my $macbody = $3;
-	$macbody = expandmacros($config, $macbody, $lineno, $macros, $macros_args, $tries) if $isglobal;
+	$macbody = expandmacros($config, $macbody, $macros, $macros_args, $tries) if $isglobal;
 	if (defined $macargs) {
 	  $macros_args->{$macname} = $macargs;
 	} else {
@@ -552,7 +562,7 @@ reexpand:
       # check for simple non-parametric macros
       if (!exists($builtin_macros{$macname}) && exists($macros->{$macname})) {
         if (!defined($macros->{$macname})) {
-	  do_warn($config, "spec file parser".($lineno?" line $lineno":'').": can't expand '$macname'");
+	  do_warn($config, "cannot expand %$macname");
 	  $line = 'MACRO';
 	  last;
         }
@@ -571,7 +581,7 @@ reexpand:
       # builtin macro or parametric marco, get arguments
       my @args;
       if (defined $macalt) {
-	$macalt = expandmacros($config, $macalt, $lineno, $macros, $macros_args, $tries);
+	$macalt = expandmacros($config, $macalt, $macros, $macros_args, $tries);
 	push @args, $macalt;
       } else {
 	if (!defined($macdata)) {
@@ -579,7 +589,7 @@ reexpand:
 	  $macdata = $1;
 	  $line = '';
 	}
-	$macdata = expandmacros($config, $macdata, $lineno, $macros, $macros_args, $tries);
+	$macdata = expandmacros($config, $macdata, $macros, $macros_args, $tries);
 	push @args, split(' ', $macdata);
       }
 
@@ -733,6 +743,7 @@ sub parse {
   my $skip = 0;
   my $preamble = 1;
   my $hasif = 0;
+  my $linenoprefix = '';
   my $lineno = 0;
   my @includelines;
   my $includenum = 0;
@@ -743,6 +754,10 @@ sub parse {
   my $multilinedefine;
   my $multilinecondition;
   my $substitute = $config->{'substitute'};
+
+  local $config->{'__pw_prefix'} = $config->{'parsing_config'} ? '' : 'spec file parser';
+  local $config->{'__pw_file'} = '';
+  local $config->{'__pw_lineref'} = \$lineno;
 
   # setup load macro if we have an include callback
   if ($includecallback && !$config->{'parsing_config'}) {
@@ -809,7 +824,7 @@ sub parse {
 
     # expand macros unless we are ignoring the line due to an %if
     if (!$skip && index($line, '%') >= 0) {
-      $line = expandmacros($config, $line, $lineno, \%macros, \%macros_args);
+      $line = expandmacros($config, $line, \%macros, \%macros_args);
       $line = splitexpansionresult($line, \@includelines) if $line =~ /\n/s;
     }
 
@@ -829,7 +844,7 @@ sub parse {
       next if $skip;
       $line =~ s/^(\s*%)el/$1/;
       # skip was set before, so we did not expand macros
-      $line = expandmacros($config, $line, $lineno, \%macros, \%macros_args);
+      $line = expandmacros($config, $line, \%macros, \%macros_args);
       $line = splitexpansionresult($line, \@includelines) if $line =~ /\n/s;
     } elsif ($skip) {
       $skip += 2 if $line =~ /^\s*%if/;		# increase nesting level for %if statements
@@ -868,6 +883,10 @@ sub parse {
 
     # just save the expanded line if we're parsing the config
     if ($config->{'parsing_config'}) {
+      if ($line =~ /^#!!line (?:(\S*?):)?(\d+)\s*$/) {
+	$config->{'__pw_file'} = $1 if defined $1;
+	$lineno = $2;
+      }
       $xspec->[-1] = [ $xspec->[-1], $line ] if $doxspec;
       next;
     }
@@ -1070,7 +1089,7 @@ sub parse {
         # but hopefully good enough :-)
         $ret->{'patch'} = delete $ret->{$tag};
       }
-      do_warn($config, "spec file parser: $tag already exists") if exists $ret->{$tag};
+      do_warn($config, "$tag already exists") if exists $ret->{$tag};
       $autonum{$tagtype} = $num + 1 if $num >= $autonum{$tagtype};
       $macros{uc($tagtype) . "URL$num"} = $val;
       $ret->{$tag} = $val;
@@ -1107,7 +1126,7 @@ sub parse {
     }
 
     if (!$preamble && ($line =~ /^(Source\d*|Patch\d*|Url|Icon|BuildRequires|BuildPrereq|BuildConflicts|\#\!BuildIgnore|\#\!BuildConflicts|\#\!BuildRequires)\s*:\s*(\S.*)$/i)) {
-      do_warn($config, "spec file parser ".($lineno ? " line $lineno" : '').": Ignoring $1 used beyond the preamble");
+      do_warn($config, "ignoring $1 used beyond the preamble");
     }
 
     if ($line =~ /^\s*%package\s+(-n\s+)?(\S+)/) {

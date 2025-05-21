@@ -348,11 +348,13 @@ sub slurp_config_file {
       $seen->{$1} = 1 if $file =~ /([^\/]*)$/;
     }
     if (!$seen->{$otherfile}++) {
+      unshift @config, "#!!line $1:0" if @config && $file =~ /([^\/]+)$/;
       $file =~ s/[^\/]*$/$otherfile/;
       my $otherconfig = slurp_config_file($file, $seen) || [];
       return [ split("\n", combine_configs(join("\n", @$otherconfig), join("\n", @config))) ];
     }
   }
+  unshift @config, "#!!line $1:0" if @config && $file =~ /([^\/]+)$/;
   return \@config;
 }
 

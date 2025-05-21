@@ -94,7 +94,7 @@ while (@tests) {
   my %macros = ( 'nil' => '' );
   my %macros_args;
   my $actual = '';
-  $actual .= Build::Rpm::expandmacros({}, $_, undef, \%macros, \%macros_args) for split("\n", $in);
+  $actual .= Build::Rpm::expandmacros({}, $_, \%macros, \%macros_args) for split("\n", $in);
   is($actual, $expected, $in);
 }
 
