@@ -241,6 +241,9 @@ if ($parameters) {
     next unless defined $parameters->{$k} && !ref($parameters->{$k});
     push @params, 'release', $parameters->{$k} if $k eq 'release';
     push @params, 'debuginfo', 1 if $k eq 'debuginfo' && $parameters->{$k};
+    push @params, 'buildflavor', $parameters->{$k} if $k eq 'buildflavor' && $parameters->{$k};
+    push @params, 'disturl', $parameters->{$k} if $k eq 'disturl' && $parameters->{$k};
+    push @params, 'vcs', $parameters->{$k} if $k eq 'vcs' && $parameters->{$k};
   }
 }
 push @params, 'recipe', $recipefile;
