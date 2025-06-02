@@ -147,18 +147,22 @@ sub parse {
   $ret->{'bcntsynctag'} = $data->{'bcntsynctag'} if $data->{'bcntsynctag'};
   $ret->{'milestone'} = $data->{'milestone'} if $data->{'milestone'};
 
-  my $flavor = $data->{'flavors'} ? $cf->{'buildflavor'} : undef;
+  my $flavorname = $data->{'flavors'} ? $cf->{'buildflavor'} : undef;
 
   my $pkgs = [];
   for my $arch (@architectures) {
     if ($data->{'packagesets'}) {
-      $pkgs = add_pkgset($pkgs, get_pkgset($data->{'packagesets'}, 'main', $arch, $flavor));
-      for my $setname (@{$data->{'unpack'} || [ 'unpack' ]}) {
-        $pkgs = add_pkgset($pkgs, get_pkgset($data->{'packagesets'}, $setname, $arch, $flavor));
+      my $flavor = {};
+      $flavor = $data->{'flavors'}->{$flavorname} || {} if defined $flavorname;
+      my @setnames = @{$flavor->{'content'} || $data->{'content'} || ['main']};
+      push @setnames, @{$flavor->{'unpack'} || $data->{'unpack'} || []};
+      for (@setnames) {
+        $pkgs = add_pkgset($pkgs, get_pkgset($data->{'packagesets'}, $_, $arch, $flavorname));
       }
     } else {
-      $pkgs = add_pkgset($pkgs, get_pkgset_compat($data->{'packages'}, $arch, $flavor));
-      $pkgs = add_pkgset($pkgs, get_pkgset_compat($data->{'unpack_packages'}, $arch, $flavor));
+      # schema 0.0 ... to be dropped ...
+      $pkgs = add_pkgset($pkgs, get_pkgset_compat($data->{'packages'}, $arch, $flavorname));
+      $pkgs = add_pkgset($pkgs, get_pkgset_compat($data->{'unpack_packages'}, $arch, $flavorname));
     }
   }
   # Unordered repositories is disabling repository layering. This will
