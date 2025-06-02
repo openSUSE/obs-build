@@ -1,4 +1,25 @@
 -------------------------------------------------------------------
+Mon Jun  2 11:02:46 UTC 2025 - Adrian Schröter <adrian@localhost>
+
+- fix slfo 1.2 build config
+- Disable selinuxfs mount during builds (bsc#1231252)
+- productcomposer: support version 0.6.0 extensions
+- mkosi: also fetch InitrdPackages= dependencies
+- qemu 10.0 compability fix
+- rpm 
+  * Fix querying the pkgid from rpm packages
+  * Support new %span macro
+  * Fall back to the sha256 signature header if there is no md5 header
+    for rpm v6
+- pbuild: define _is_this_project/_is_in_project macros
+- support the "nouseforbuild" buildflag
+- Use Compress::Stream::Zstd for zstd decompression of debian binaries
+- Fix parsing of remoteasseturls with digests
+- provenance data handling:
+  * extend SLSA provenance data with buildfalvor, distul and vcs
+  * Fix handling of replaced golang modules
+
+-------------------------------------------------------------------
 Mon Mar 31 11:38:49 UTC 2025 - Adrian Schröter <adrian@suse.de>
 
 - SLE 15 SP7 config
