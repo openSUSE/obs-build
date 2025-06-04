@@ -72,34 +72,50 @@ sub intersect_pkgset {
 }
 
 sub get_pkgset {
-  my ($packagesets, $setname, $arch, $flavor) = @_;
-  $flavor = '' unless defined $flavor;
-  my @seenps;
-  my $lasts;
+  my ($packagesets, $setname, $arch, $flavor, $entrycache, $setcache) = @_;
 
-  # asterisk is our internal marker for all packages
+  $entrycache ||= {};
+  $setcache ||= {};
+  $flavor = '' unless defined $flavor;
+  $setname ||= 'main';
+
+  if ($setname =~ /^(\S+)(?:\s+architecture=(\S+))?(?:\s+flavor=(\S*))?(?:\s+architecture=(\S+))?\s*$/) {
+    $arch = $2 if defined $2;
+    $arch = $4 if defined $4;
+    $flavor = $3 if defined $3;
+    $setname = $1;
+  }
+
   return ['*'] if $setname eq '__all__';
 
-  for my $s (@$packagesets) {
-    push @seenps, $lasts if defined $lasts;
-    $lasts = $s;
-    next unless $setname eq ($s->{'name'} || 'main');
-    next if $s->{'flavors'} && !grep {$_ eq $flavor} @{$s->{'flavors'}};
-    next if $s->{'architectures'} && !grep {$_ eq $arch} @{$s->{'architectures'}};
-    push @seenps, $s;
-    my $pkgset = $s->{'packages'} || [];
-    for my $n (@{$s->{'add'} || []}) {
-      $pkgset = add_pkgset($pkgset, get_pkgset(\@seenps, $n, $arch, $flavor));
+  my $setkey = "$setname/$arch/$flavor";
+  return $setcache->{$setkey} if $setcache->{$setkey};
+
+  my $entries = $entrycache->{"$arch/$flavor"};
+  if (!$entries) {
+    $entrycache->{"$arch/$flavor"} = $entries = {};
+    for my $s (@$packagesets) {
+      next if $s->{'flavors'} && !grep {$_ eq $flavor} @{$s->{'flavors'}};
+      next if $s->{'architectures'} && !grep {$_ eq $arch} @{$s->{'architectures'}};
+      $entries->{$s->{'name'} || 'main'} ||= $s;
     }
-    for my $n (@{$s->{'sub'} || []}) {
-      $pkgset = sub_pkgset($pkgset, get_pkgset(\@seenps, $n, $arch, $flavor));
-    }
-    for my $n (@{$s->{'intersect'} || []}) {
-      $pkgset = intersect_pkgset($pkgset, get_pkgset(\@seenps, $n, $arch, $flavor));
-    }
-    return $pkgset;
   }
-  return [];
+
+  my $s = $entries->{$setname};
+  $setcache->{$setkey} = [];
+  return [] unless $s;
+  my $pkgset = $s->{'packages'} || [];
+  for my $n (@{$s->{'add'} || []}) {
+    $pkgset = add_pkgset($pkgset, get_pkgset($packagesets, $n, $arch, $flavor, $entrycache, $setcache));
+  }
+  for my $n (@{$s->{'sub'} || []}) {
+    $pkgset = sub_pkgset($pkgset, get_pkgset($packagesets, $n, $arch, $flavor, $entrycache, $setcache));
+  }
+  for my $n (@{$s->{'intersect'} || []}) {
+    $pkgset = intersect_pkgset($pkgset, get_pkgset($packagesets, $n, $arch, $flavor, $entrycache, $setcache));
+  }
+  $setcache->{$setkey} = $pkgset;
+  return $pkgset;
 }
 
 sub get_pkgset_compat {
