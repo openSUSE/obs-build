@@ -28,7 +28,7 @@ use strict;
 
 use Build;
 
-my ($dist, $archs, $configdir, $type, $recipe, $buildflavor, $obspackage);
+my ($dist, $archs, $configdir, $type, $recipe, $buildflavor, $obspackage, $format);
 $buildflavor = '';
 
 $configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
@@ -54,6 +54,10 @@ while (@ARGV)  {
     shift @ARGV;
     $obspackage = shift @ARGV;
     next;
+  } elsif ($ARGV[0] eq '--format') {
+    shift @ARGV;
+    $format = shift @ARGV;
+    next;
   } else {
     if (!defined($recipe)) {
       $recipe = shift @ARGV;
@@ -73,9 +77,14 @@ $cf->{'obspackage'} = $obspackage if defined $obspackage;
 my $q = Build::parse($cf, $recipe);
 
 if (!defined $type) {
-  require Data::Dumper;
-  $Data::Dumper::Sortkeys = $Data::Dumper::Sortkeys = 1;
-  print Data::Dumper::Dumper($q);
+  if ($format eq 'json') {
+    require Build::SimpleJSON;
+    print Build::SimpleJSON::unparse($q);
+  } else {
+    require Data::Dumper;
+    $Data::Dumper::Sortkeys = $Data::Dumper::Sortkeys = 1;
+    print Data::Dumper::Dumper($q);
+  }
   exit(0);
 }
 if (($type eq 'sources' || $type eq 'patches') && !exists($q->{$type})) {
