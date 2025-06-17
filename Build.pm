@@ -403,7 +403,7 @@ sub read_config {
   my @spec;
   $config->{'save_expanded'} = 1;
   $config->{'parsing_config'} = 1;
-  Build::Rpm::parse($config, \@newconfig, \@spec);
+  Build::Rpm::parse($config, \@newconfig, 'xspec' => \@spec);
   delete $config->{'save_expanded'};
   delete $config->{'parsing_config'};
   $config->{'preinstall'} = [];

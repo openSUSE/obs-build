@@ -707,8 +707,10 @@ sub dep_qualifier_mismatch {
 #                 line and build deps got modified or 'save_expanded' is set in
 #                 config
 sub parse {
-  my ($config, $specfile, $xspec) = @_;
+  splice(@_, 2, 0, 'xspec') if @_ == 3;		# compat, to be removed
+  my ($config, $specfile, %options) = @_;
 
+  my $xspec = $options{'xspec'};
   my $packname;
   my $exclarch;
   my $badarch;

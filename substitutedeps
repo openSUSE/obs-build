@@ -97,7 +97,7 @@ $cf->{'obspackage'} = $obspackage if defined $obspackage;
 #######################################################################
 
 my $xspec = [];
-my $d = Build::parse($cf, $spec, $xspec) || {};
+my $d = Build::parse($cf, $spec, 'xspec' => $xspec) || {};
 my @sdeps = @{$d->{'deps'} || []};
 my @neg = map {substr($_, 1)} grep {/^-/} @{$d->{'deps'} || []};
 my %neg = map {$_ => 1} @neg;
