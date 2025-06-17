@@ -67,7 +67,7 @@ sub unify {
 }
 
 sub parse {
-  my ($config, $filename, @args) = @_;
+  my ($config, $filename) = @_;
   my $ret = {};
 
   # check that filename is a tar
