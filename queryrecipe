@@ -74,7 +74,10 @@ die("Unable to read config\n") unless $cf;
 $cf->{'buildflavor'} = $buildflavor if defined $buildflavor;
 $cf->{'obspackage'} = $obspackage if defined $obspackage;
 
-my $q = Build::parse($cf, $recipe);
+my %options;
+$options{'withdescription'} = 1 if !defined($type) || $type eq 'description';
+
+my $q = Build::parse($cf, $recipe, %options);
 
 if (!defined $type) {
   if ($format eq 'json') {
