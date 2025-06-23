@@ -285,6 +285,10 @@ sub combine_configs {
   my $macros = '';
   for my $c (@c) {
     $c =~ s/\n?$/\n/s if $c ne '';
+    if ("\n$c" =~ /^(.*?)\nFromScratch:/si && $1 !~ /\n[ \t]*[^\s#]/) {
+      $config = '';
+      $macros = '';
+    }
     if ($c =~ /^\s*:macros\s*$/im) {
       # probably multiple macro sections with %if statements
       # flush out macros
@@ -436,6 +440,7 @@ sub read_config {
   $config->{'repourl'} = [];
   $config->{'registryurl'} = [];
   $config->{'assetsurl'} = [];
+  my $no_from_scratch;
   for my $l (@spec) {
     $l = $l->[1] if ref $l;
     next unless defined $l;
@@ -450,14 +455,10 @@ sub read_config {
       } else {
 	$config->{'rawmacros'} .= $l;
       }
-      next;
-    }
-    if ($l0 eq 'distmacro:') {
+    } elsif ($l0 eq 'distmacro:') {
       @l = split(' ', $l, 2);
       push @macros, "%define $l[1]" if @l == 2;
-      next;
-    }
-    if ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:' || $l0 eq 'expandflags:' || $l0 eq 'buildflags:' || $l0 eq 'publishflags:' || $l0 eq 'repourl:' || $l0 eq 'registryurl:' || $l0 eq 'assetsurl:' || $l0 eq 'onlynative:' || $l0 eq 'alsonative:') {
+    } elsif ($l0 eq 'preinstall:' || $l0 eq 'vminstall:' || $l0 eq 'required:' || $l0 eq 'support:' || $l0 eq 'keep:' || $l0 eq 'prefer:' || $l0 eq 'ignore:' || $l0 eq 'conflict:' || $l0 eq 'runscripts:' || $l0 eq 'expandflags:' || $l0 eq 'buildflags:' || $l0 eq 'publishflags:' || $l0 eq 'repourl:' || $l0 eq 'registryurl:' || $l0 eq 'assetsurl:' || $l0 eq 'onlynative:' || $l0 eq 'alsonative:') {
       my $t = substr($l0, 0, -1);
       for my $l (@l) {
 	if ($l eq '!*') {
@@ -541,9 +542,14 @@ sub read_config {
       }
     } elsif ($l0 eq 'singleexport:') {
       $config->{'singleexport'} = $l[0]; # avoid to export multiple package container in maintenance_release projects
-    } elsif ($l0 !~ /^[#%]/) {
+    } elsif ($l0 eq 'fromscratch:') {
+      $config->{'parse_error'} = 'FromScratch directive must come first' if $no_from_scratch;
+    } elsif ($l0 =~ /^[#%]/) {
+      next;
+    } else {
       warn("unknown keyword in config: $l0\n");
     }
+    $no_from_scratch = 1;
   }
   for my $l (qw{preinstall vminstall required support keep runscripts repotype patterntype}) {
     $config->{$l} = [ unify(@{$config->{$l}}) ];

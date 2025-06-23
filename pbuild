@@ -188,6 +188,8 @@ for my $dist (@{$opts->{'dist'} || []}) {
 push @{$opts->{'repo'}}, @baseobsrepos if @baseobsrepos && !$opts->{'repo'};
 
 my $localconfig = -s "$dir/_config" ? PBuild::Util::readstr("$dir/_config") : '';
+@baseconfigs = () if "\n$localconfig" =~ /^(.*?)\nFromScratch:/si && $1 !~ /\n[ \t]*[^\s#]/;
+$localconfig = "#!!line _config:0\n$localconfig" if $localconfig ne '';
 $localconfig = "\n%define _repository $reponame\n\n$localconfig" if $reponame && $localconfig ne '';
 
 my $buildconfig = Build::combine_configs(reverse(@baseconfigs), $localconfig);
