@@ -747,6 +747,7 @@ sub parse {
   my $hasif = 0;
   my $linenoprefix = '';
   my $lineno = 0;
+  my $parsing_description = 0;
   my @includelines;
   my $includenum = 0;
   my $obspackage = defined($config->{'obspackage'}) ? $config->{'obspackage'} : '@OBS_PACKAGE@';
@@ -896,6 +897,25 @@ sub parse {
     # do this always?
     $xspec->[-1] = [ $xspec->[-1], $line ] if $doxspec && $config->{'save_expanded'};
 
+    # line matches "%description"
+    if ($line =~ /^\s*%description/) {
+        $parsing_description = 1;
+        $ret->{'description'} = "";
+        next;
+    }
+    # we're inside %description
+    if ($parsing_description) {
+        if ($line =~ /^\s*%/) {
+            # found a next section -> remove trailing whitespaces and finish
+            $ret->{'description'} =~ s/\s+$//;
+            $parsing_description = 0;
+        } else {
+            # still inside %description -> append
+            $ret->{'description'} .= $line . "\n";
+        }
+        next;
+    }
+
     # fast check if this is an interesting line
     next if $line !~ /[%:\!]/;
 
@@ -940,6 +960,9 @@ sub parse {
 	  $badarch ||= [];
 	  push @$badarch, split(' ', $arg);
 	}
+      }
+      if ($keyword eq 'summary') {
+        $ret->{$keyword} = $arg;
       }
       if ($keyword eq 'version') {
         $arg = (split(' ', $arg, 2))[0];
