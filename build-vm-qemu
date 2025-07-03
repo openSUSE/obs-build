@@ -87,7 +87,7 @@ vm_startup_qemu() {
             ;;
         x86_64)
             qemu_bin="/usr/bin/qemu-system-x86_64"
-            qemu_cpu="-cpu qemu64"
+            qemu_cpu="-cpu max"
             qemu_device=virtio-blk
             # Use defaults and fallbacks for other values
             ;;
