@@ -555,7 +555,13 @@ sub read_pkgs_from_product_directory {
     my $fn = $File::Find::name;
     push @rpms, read_rpm($fn) if $fn =~ /\.rpm$/;
   };
-  find({'wanted' => $addrpmfile, 'no_chdir' => 1}, $dir); 
+  find({'wanted' => $addrpmfile, 'no_chdir' => 1, 'preprocess' => sub {sort(@_)} }, $dir); 
+  # make sure that the packages are unique
+  my %seen;
+  for my $r (splice @rpms) {
+    my $sigmd5 = $r->{'SIGMD5'};
+    push @rpms, $r unless $sigmd5 && $seen{$sigmd5}++;;
+  }
   return \@rpms;
 }
 
