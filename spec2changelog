@@ -77,9 +77,11 @@ foreach my $time (sort { $b <=> $a } (keys(%items))) {
     my $head = shift(@$item);
     $head =~ s/^\s+//;
     $head =~ s/^\-\s+//;
-    if ($head =~ m/^(.+?)\s*<(.+?\@.+?\..+?)>(\s*.*)$/) {
+    if ($head =~ m/^(.+?)\s*<(.+?\@.+?\..+?)>(\s*.*)$/ ||
+        $head =~ m/^(.+?)\s*<(.+? at .+? dot .+?)>(\s*.*)$/) {
         $head = "$1 <$2>";
-    } elsif ($head =~ m/^<(.+?\@.+?\..+?)>(\s*.*)$/) {
+    } elsif ($head =~ m/^<(.+?\@.+?\..+?)>(\s*.*)$/ ||
+             $head =~ m/^<(.+? at .+? dot .+?)>(\s*.*)$/) {
         $head = $1;
     }
     if ($head =~ m/^\s*-\s*(.+)$/) {
