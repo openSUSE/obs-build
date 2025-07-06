@@ -53,6 +53,7 @@ while (<>) {
     if (/^%changelog/ .. eof()) {
         next if /^%/;
         next if /^\s*#/;
+        next if /^\s*$/;
 
         chomp;
         s/\s+$//;
