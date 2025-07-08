@@ -1,4 +1,16 @@
 -------------------------------------------------------------------
+Tue Jul  8 12:26:21 UTC 2025 - Adrian Schröter <adrian@suse.de>
+
+- Make CreateArchive reproducible
+- Adapt to new product composer package set handling
+- Add support for '--format json' option to queryrecipe
+- LiveBuild: drop unused @args from the parse function
+- Support options in the recipe parsers
+- Support the new FromScratch: directive
+- vm-type=qemu: use cpu=max on x86_64
+- generate_sbom: make sure that no package is listed twice in product mode
+
+-------------------------------------------------------------------
 Mon Jun  2 11:02:46 UTC 2025 - Adrian Schröter <adrian@localhost>
 
 - fix slfo 1.2 build config
