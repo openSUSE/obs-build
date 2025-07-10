@@ -108,7 +108,7 @@ vm_startup_qemu() {
             ;;
         m68k)
             qemu_bin="/usr/bin/qemu-system-m68k"
-            qemu_console=${qemu_console:-ttyAMA0}
+            qemu_console=${qemu_console:-ttyGF}
             qemu_cpu="-cpu m68000"
             qemu_options="$qemu_options -M virt"
             ;;
