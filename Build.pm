@@ -117,11 +117,12 @@ package Build::Features;
 our $preinstallimage = 1;	# on sale now
 package Build;
 
-# this is synced with rpm 4.17.0. The additional architectures of arm behind the spaces are
+# this is synced with rpm 4.20.0. The additional architectures of arm behind the spaces are
 # from MeeGo project. They don't exist elsewhere, but don't conflict either luckily
 my $std_macros = q{
 %define nil
 %define ix86    i386 i486 i586 i686 pentium3 pentium4 athlon geode
+%define x86_64  x86_64 x86_64_v2 x86_64_v3 x86_64_v4 amd64 em64t
 %define arm32   armv3l armv4b armv4l armv4tl armv5tl armv5tel armv5tejl armv6l armv6hl armv7l armv7hl armv7hnl armv8l armv8hl armv8hnl armv8hcnl
 %define arm     %{arm32}
 %define arml    armv3l armv4l armv5l armv5tel armv6l armv6hl armv7l armv7hl armv7hnl
