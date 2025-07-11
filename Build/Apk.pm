@@ -721,6 +721,7 @@ sub mktar {
 
 sub getsignatures_cb {
   my ($sigs, $entry) = @_;
+  return 1 if $entry->type =~ /^(x|g)$/;	# ignore pax headers
   die("end of sigs reached\n") unless $entry->is_file;
   my $name = $entry->name;
   die("end of sigs reached\n") unless $name =~ /^\.SIGN\./;
