@@ -80,6 +80,13 @@ $to ||= 'build.origtar';
 $from eq '.' || chdir($from) || die("chdir $from: $!\n");
 die("$from/debian: $!\n") unless -e "debian";
 die("$from/debian: Not a directory\n") unless -d "debian";
+
+# check if we have an upstream branch
+if (!has_git_branch('refs/heads/upstream') && !has_git_branch('refs/remotes/origin/upstream')) {
+  warn("No 'upstream' branch, cannot export debian orig\n");
+  exit(0);
+}
+
 -d $to || mkdir($to) || die("mkdir $to: $!\n");
 
 # get version from changelog
