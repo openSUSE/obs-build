@@ -65,11 +65,14 @@ my %known_options = (
   'dist' => ':',
   'configdir' => ':',
   'recipe' => ':',
+  'type' => '::',
 
   'create-cpio' => '',
 
   'show-dir-srcmd5' => '',
 );
+
+my $btfilter;
 
 sub find_assets {
   my ($assetmgr, $bconf, $p, $file) = @_;
@@ -81,6 +84,7 @@ sub find_assets {
   }
   my $bt = Build::recipe2buildtype($file);
   return unless $bt;
+  next if $btfilter && !$btfilter->{$bt};
   $p->{'buildtype'} = $bt;
   my $d;
   eval { $d = Build::parse_typed($bconf, "$p->{'dir'}/$file", $bt) };
@@ -134,6 +138,8 @@ die("The --assetdir option conflicts with --noassetdir\n") if $opts->{'assetdir'
 
 my @arch = @{$opts->{'arch'} || []};
 push @arch, 'noarch' unless @arch;
+
+$btfilter = {map {$_ => 1} @{$opts->{'type'}}} if $opts->{'type'};
 
 for my $dir (@dirs) {
   my ($files, $source_assets) = PBuild::Source::list_package($dir);
