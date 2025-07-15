@@ -78,6 +78,8 @@ sub find_assets {
   my ($assetmgr, $bconf, $p, $file) = @_;
   delete $p->{'remoteassets'};
   if ($file eq 'sources' || $file eq 'go.sum') {
+    next if $file eq 'sources' && $btfilter && !$btfilter->{'fedpkg'};
+    next if $file eq 'go.sum' && $btfilter && !$btfilter->{'golang'};
     $p->{'buildtype'} = '';
     $assetmgr->find_assets($p);
     return;
@@ -140,6 +142,7 @@ my @arch = @{$opts->{'arch'} || []};
 push @arch, 'noarch' unless @arch;
 
 $btfilter = {map {$_ => 1} @{$opts->{'type'}}} if $opts->{'type'};
+delete $btfilter->{'none'} if $btfilter;
 
 for my $dir (@dirs) {
   my ($files, $source_assets) = PBuild::Source::list_package($dir);
