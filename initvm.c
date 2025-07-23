@@ -259,7 +259,7 @@ enum okfail binfmt_register(char *datafile, char *regfile)
 		int ret;
                 /* Is an interpreter for this arch already registered? */
 		snprintf(path, sizeof(path), SYSFS_BINFMT_MISC "/%s", f[name]);
-		ret=access(path, X_OK);
+		ret=access(path, F_OK);
 		if (ret == 0) {
 #ifdef DEBUG
 			fprintf(stderr, 
