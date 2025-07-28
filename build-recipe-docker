@@ -249,6 +249,21 @@ recipe_build_docker() {
 	buildargs[${#buildargs[@]}]="BUILD_FLAVOR=$BUILD_FLAVOR"
     fi
 
+    # podman special
+    if test "$BUILDENGINE" = podman; then
+        buildargs[${#buildargs[@]}]='--pull=never'
+        if test "${BUILD_HOST_ARCH#armv8}" != "$BUILD_HOST_ARCH"; then
+            # buildah insists on "v8" variant otherwise
+            if test "${BUILD_ARCH#armv6}" != "$BUILD_ARCH"; then
+                # resets the "v8" variant
+                buildargs[${#buildargs[@]}]='--arch=arm'
+            fi
+            if test "${BUILD_ARCH#armv7}" != "$BUILD_ARCH"; then
+                buildargs[${#buildargs[@]}]='--variant=v7'
+            fi
+        fi
+    fi
+
     # patch in obs-docker-support helper
     patchdockerfile < "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" > "$BUILD_ROOT/$TOPDIR/SOURCES/.$RECIPEFILE" && \
        mv "$BUILD_ROOT/$TOPDIR/SOURCES/.$RECIPEFILE" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE"
