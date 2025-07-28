@@ -250,17 +250,14 @@ recipe_build_docker() {
     fi
 
     # podman special
-    if test "$BUILDENGINE" = podman; then
+    if test "$BUILDENGINE" = podman ; then
         buildargs[${#buildargs[@]}]='--pull=never'
         if test "${BUILD_HOST_ARCH#armv8}" != "$BUILD_HOST_ARCH"; then
             # buildah insists on "v8" variant otherwise
-            if test "${BUILD_ARCH#armv6}" != "$BUILD_ARCH"; then
-                # resets the "v8" variant
-                buildargs[${#buildargs[@]}]='--arch=arm'
-            fi
-            if test "${BUILD_ARCH#armv7}" != "$BUILD_ARCH"; then
-                buildargs[${#buildargs[@]}]='--variant=v7'
-            fi
+	    case "$BUILD_ARCH" in
+		armv7*) buildargs[${#buildargs[@]}]='--variant=v7' ;;
+		armv6*) buildargs[${#buildargs[@]}]='--arch=arm' ;;	# resets the variant
+	    esac
         fi
     fi
 
