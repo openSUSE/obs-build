@@ -843,6 +843,15 @@ copy_oldpackages() {
     done
 }
 
+query_dirassets() {
+    # dirassets are currently only supported in spec files. Don't bother parsing other recipe types.
+    case $1 in
+	*.spec)
+	    queryrecipe --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" "$1" dirassets
+	    ;;
+    esac
+}
+
 copy_sources() {
     local image_mode i
     if test "$BUILDTYPE" = kiwi -o "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman  -o "$BUILDTYPE" = productcompose ; then
@@ -854,7 +863,7 @@ copy_sources() {
     elif test -e "$1/.git" ; then
 	# query recipe for directories to copy
 	local dirassets
-	dirassets=$(queryrecipe --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" "$1/$RECIPEFILE" dirassets)
+	dirassets=$(query_dirassets "$1/$RECIPEFILE")
 	test -n "$dirassets" && dirassets="/${dirassets// /\\/}/"
 	# check which directory belongs to the git repository and only copy those and the dir assets
 	type -p git >& /dev/null || cleanup_and_exit 1 "need git to check file status"
@@ -883,7 +892,7 @@ copy_sources() {
     else
 	# query recipe for directories to copy
 	local dirassets
-	dirassets=$(queryrecipe --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" "$1/$RECIPEFILE" dirassets)
+	dirassets=$(query_dirassets "$1/$RECIPEFILE")
 	test -n "$dirassets" && dirassets="/${dirassets// /\\/}/"
 	if test -n "$image_mode" -o -n "$dirassets" ; then
 	    for i in "$1"/* ; do
