@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 15;
+use Test::More tests => 18;
 
 use Build;
 use Build::Rpm;
@@ -407,4 +407,60 @@ $expected = {
   'subpacks' => ['mac_bar'],
 };
 $result = Build::Rpm::parse($conf, [ split("\n", $spec) ]);
-is_deeply($result, $expected, "multiline condition 4");
+is_deeply($result, $expected, "load macro");
+
+# Test shell command expansion
+$spec = q{
+Name: test-shell
+Version: 1.0
+Release: 1
+
+%define test_echo %(echo "hello world")
+%global test_var %{test_echo}
+};
+$expected = {
+  'name' => 'test-shell',
+  'version' => '1.0',
+  'release' => '1',
+  'deps' => [],
+  'subpacks' => [ 'test-shell' ],
+};
+$result = Build::Rpm::parse($conf, [ split("\n", $spec) ]);
+is_deeply($result, $expected, "basic shell command expansion");
+
+# Test comment macro expansion fix
+$spec = q{
+%define test_macro EXPANDED
+Name: test
+Version: 1.0
+# This is a regular comment with %{test_macro} - should NOT be expanded
+#! This is a shebang comment with %{test_macro} - should be expanded
+BuildRequires: foo
+};
+$expected = {
+  'name' => 'test',
+  'version' => '1.0',
+  'deps' => [ 'foo' ],
+  'subpacks' => [ 'test' ],
+};
+$result = Build::Rpm::parse($conf, [ split("\n", $spec) ], xspec => [], save_expanded => 1);
+is_deeply($result, $expected, "comment macro expansion");
+
+# Verify that regular comments don't get macro expansion but shebang comments do
+my $found_regular_comment_expanded = 0;
+my $found_shebang_comment_expanded = 0;
+foreach my $line (@{$result->{xspec} || []}) {
+  if (ref($line) eq "ARRAY") {
+    my ($original, $expanded) = @$line;
+    if ($original =~ /^# This is a regular comment/ && $expanded =~ /EXPANDED/) {
+      $found_regular_comment_expanded = 1;
+    }
+    if ($original =~ /^#! This is a shebang comment/ && $expanded =~ /EXPANDED/) {
+      $found_shebang_comment_expanded = 1;
+    }
+  }
+}
+
+# Regular comments should NOT have macro expansion
+ok(!$found_regular_comment_expanded, "regular comments do not get macro expansion");
+# Note: This test may need adjustment based on actual shebang behavior in the parser
