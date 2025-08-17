@@ -12,6 +12,17 @@ Fri Aug 29 06:38:57 UTC 2025 - Adrian Schröter <adrian@suse.de>
   * genbuildrequs: set HOME before querying the specfile
 
 -------------------------------------------------------------------
+Sun Aug 17 07:15:00 UTC 2025 - Mohamed Rekiba <muhammad.shaban.dev@gmail.com>
+
+feat: Introduce Lua scripting engine for advanced RPM spec processing
+
+- Implement robust Lua scripting engine to enable sophisticated RPM spec file processing
+- Add comprehensive test suite covering Lua engine functionality and edge cases
+- Seamlessly integrate Lua engine with existing RPM macro expansion system
+- Enable shell command execution through %(command) syntax expansion
+- Prevent macro expansion in regular comments during RPM spec processing
+
+-------------------------------------------------------------------
 Tue Jul  8 12:26:21 UTC 2025 - Adrian Schröter <adrian@suse.de>
 
 - Make CreateArchive reproducible
