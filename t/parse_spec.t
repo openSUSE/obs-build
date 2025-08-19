@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 18;
+use Test::More tests => 19;
 
 use Build;
 use Build::Rpm;
@@ -464,3 +464,34 @@ foreach my $line (@{$result->{xspec} || []}) {
 # Regular comments should NOT have macro expansion
 ok(!$found_regular_comment_expanded, "regular comments do not get macro expansion");
 # Note: This test may need adjustment based on actual shebang behavior in the parser
+
+# Test RPM option macro syntax with negation and multi-line %if expansion
+# Verifies that:
+# 1. %{-m:1} correctly evaluates when -m option is present
+# 2. %{!-m:0} correctly evaluates when -m option is NOT present
+# 3. Multi-line macro expansion preserves %if/%endif directive parsing
+# 4. Combined boolean expressions %{-m:1}%{!-m:0} work in %if conditionals
+$spec = q{
+Name: test-option-macros
+Version: 1.0
+Release: 1
+
+%define test_macro(m) \
+%if %{-m:1}%{!-m:0}\
+BuildRequires: has-m-option\
+%endif\
+%{nil}
+
+%test_macro
+%test_macro -m
+};
+$expected = {
+  'name' => 'test-option-macros',
+  'version' => '1.0',
+  'release' => '1',
+  'deps' => [ 'has-m-option' ],
+  'subpacks' => [ 'test-option-macros' ],
+  'configdependent' => 1,
+};
+$result = Build::Rpm::parse($conf, [ split("\n", $spec) ]);
+is_deeply($result, $expected, "option macros with negation");

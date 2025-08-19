@@ -621,6 +621,10 @@ reexpand:
     my $mactest = 0;
     if ($macname =~ /^\!\?/s || $macname =~ /^\?\!/s) {
       $mactest = -1;
+    } elsif ($macname =~ /^\!(.+)/s) {
+      # Handle negated option macros like !-m
+      $mactest = -1;
+      $macname = $1;
     } elsif ($macname =~ /^[\-\?]/s) {
       $mactest = 1;
     }
@@ -754,7 +758,13 @@ sub splitexpansionresult {
   my ($line, $includelines) = @_;
   my @l = split("\n", $line);
   $line = shift @l;
-  s/%/%%/g for @l;
+  # Escape % characters, but preserve RPM directives like %if, %endif, %else, etc.
+  for (@l) {
+    # Don't escape % for RPM control directives
+    unless (/^\s*%(?:if|endif|else|elif|elifarch|elifos|ifarch|ifnarch|ifos|ifnos|define|global|include|dnl)\b/) {
+      s/%/%%/g;
+    }
+  }
   unshift @$includelines, @l;
   return $line;
 }
