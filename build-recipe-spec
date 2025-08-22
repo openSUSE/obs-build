@@ -266,7 +266,7 @@ recipe_build_spec() {
 	    done
 	    test -n "$reqsfile" || cleanup_and_exit 1 "no buildreqs.nosrc.rpm file?"
 	    chroot $BUILD_ROOT rpm -qp --requires "$TOPDIR/SRPMS/$reqsfile" | grep -v '^rpmlib(' | sort -u > $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp
-	    chroot $BUILD_ROOT rpmspec -q --srpm --requires "$TOPDIR/SOURCES/$RECIPEFILE" >> $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp || cleanup_and_exit 1 "rpm -q --spec failed"
+	    HOME=/root chroot $BUILD_ROOT rpmspec -q --srpm --requires "$TOPDIR/SOURCES/$RECIPEFILE" >> $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp || cleanup_and_exit 1 "rpm -q --spec failed"
 	    sort < $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp | uniq -u > $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs
 	    rm -f $BUILD_ROOT$TOPDIR/OTHER/_generated_buildreqs_tmp
 	    while read db ; do
