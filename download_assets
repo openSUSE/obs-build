@@ -86,7 +86,7 @@ my $btfilter;
 sub calculate_fedora_goname {
   my ($goipath, $gocid) = @_;
   return undef unless $goipath;
-  $goipath .= '/';
+  $goipath = lc($goipath).'/';
   $goipath =~ s/^https?:\/\///;
   $goipath =~ s/\.git\/*$//;
   $goipath =~ s/^git\.//;
