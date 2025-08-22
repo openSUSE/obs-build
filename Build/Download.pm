@@ -26,6 +26,8 @@ use LWP::UserAgent;
 use Digest::MD5 ();
 use Digest::SHA ();
 
+our $debug;
+
 #
 # Create a user agent used to access remote servers
 #
@@ -71,6 +73,7 @@ sub checkdigest {
 sub ua_get {
   my ($ua, $url, $maxsize, @hdrs) = @_;
   my $res;
+  print "GET $url\n" if $debug;
   if (defined($maxsize)) {
     my $oldmaxsize = $ua->max_size($maxsize);
     $res = $ua->get($url, @hdrs);
@@ -84,6 +87,7 @@ sub ua_get {
 
 sub ua_head {
   my ($ua, $url, $maxsize, @hdrs) = @_;
+  print "HEAD $url\n" if $debug;
   return $ua->head($url, @hdrs);
 }
 
