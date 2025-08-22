@@ -560,7 +560,7 @@ reexpand:
       next if $mactest < 0;
 
       # check for simple non-parametric macros
-      if (!exists($builtin_macros{$macname}) && exists($macros->{$macname})) {
+      if (!exists($builtin_macros{$macname})) {
         if (!defined($macros->{$macname})) {
 	  do_warn($config, "cannot expand %$macname");
 	  $line = 'MACRO';
@@ -604,6 +604,8 @@ reexpand:
 	}
       } elsif ($builtin_macros{$macname}) {
         $expandedline .= $builtin_macros{$macname}->($config, $macros, $macname, @args);
+      } elsif (ref($macros_args->{$macname}) eq 'CODE') {
+	$expandedline .= $macros_args->{$macname}->($config, $macros, $macros_args, $macname, @args);
       } else {
 	push @expandstack, $line, $optmacros;
 	$line = $macros->{$macname};
@@ -742,6 +744,12 @@ sub parse {
   }
 
   initmacros($config, \%macros, \%macros_args);
+  if ($options{'extramacros'}) {
+    for (@{$options{'extramacros'}}) {
+      $macros{$_->[0]} = $_->[1];
+      $macros_args{$_->[0]} = $_->[2] if defined $_->[2];
+    }
+  }
   my $skip = 0;
   my $preamble = 1;
   my $hasif = 0;
