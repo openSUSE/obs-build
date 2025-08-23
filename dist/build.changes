@@ -12,6 +12,29 @@ Fri Aug 29 06:38:57 UTC 2025 - Adrian Schröter <adrian@suse.de>
   * genbuildrequs: set HOME before querying the specfile
 
 -------------------------------------------------------------------
+Wed Aug 20 11:09:13 UTC 2025 - Mohamed Rekiba <muhammad.shaban.dev@gmail.com>
+
+  Fix option macro negation parsing and %if directive preservation
+
+  This commit fixes two related issues with RPM spec parsing:
+
+  1. Option macro negation pattern recognition:
+      - Added support for negated option macros like %{-m:0} with negation
+      - Modified expandmacros() to properly detect negation patterns
+      - Sets correct mactest value for negation handling
+
+  2. RPM directive preservation in multi-line expansions:
+      - Fixed splitexpansionresult() escaping %if/%endif directives
+      - Added pattern matching to preserve RPM control directives
+      - Prevents breaking %if/%endif conditional logic
+
+  The fixes enable proper parsing of complex option macro expressions
+  within %if conditionals inside macro definitions.
+
+  Resolves: syntax error in expression parsing issues
+  Tests: All existing tests pass, enhanced test documentation
+
+-------------------------------------------------------------------
 Sun Aug 17 07:15:00 UTC 2025 - Mohamed Rekiba <muhammad.shaban.dev@gmail.com>
 
 feat: Introduce Lua scripting engine for advanced RPM spec processing
