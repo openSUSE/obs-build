@@ -1196,6 +1196,9 @@ sub parse {
   $ret->{'moveassets'} = [ map {"$_/$moveassets{$_}"} sort keys %moveassets] if %moveassets;
   $ret->{'dirassets'} = [ sort keys %dirassets ] if %dirassets;
   do_warn($config, "unterminated if/ifarch/ifos statement") if $skip && $config->{'parsing_config'};
+  # if the name starts with a '%' it's probably caused by an unknown macro.
+  # in that case fall back to the recipename.
+  $ret->{'name'} = $1 if ($ret->{'name'} || '') =~ /^\%/ && ($options{'recipename'} || '') =~ /(.*)\.spec$/;
   return $ret;
 }
 
