@@ -20,6 +20,18 @@
 #
 ################################################################
 
+.log() {
+  local LEVEL=${1}
+  __VERBOSE=${__VERBOSE:-4}
+  # https://en.wikipedia.org/wiki/Syslog#Severity_level
+  LOG_LEVELS=([0]="emerg" [1]="alert" [2]="crit" [3]="err" [4]="warning" [5]="notice" [6]="info" [7]="debug")
+  shift
+  if [ ${__VERBOSE} -ge ${LEVEL} ]; then
+    printf "[%-7s][%s:%s]: " ${LOG_LEVELS[$LEVEL]} ${BASH_SOURCE[1]} "${FUNCNAME[1]}()"
+    echo "$@"
+  fi
+}
+
 build_host_arch() {
     : ${BUILD_HOST_ARCH:=`uname -m`}
     # the linux kernel only knows armv7l, armv7hl is a userland definition
