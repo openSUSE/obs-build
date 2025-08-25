@@ -119,12 +119,12 @@ recipe_prepare_dsc() {
     fi
 
     # run/copy sources
-    chroot $BUILD_ROOT su -c "dpkg-source -x $DEB_SOURCEDIR/$DEB_DSCFILE $TOPDIR/BUILD" - $BUILD_USER
+    deb_chroot $BUILD_ROOT su -c "dpkg-source -x $DEB_SOURCEDIR/$DEB_DSCFILE $TOPDIR/BUILD" - $BUILD_USER
 
     # Alternative to debtransform: apply OBS release number if tag OBS-DCH-RELEASE is set.
     if test -z "$DEB_TRANSFORM" && grep -Eq '^OBS-DCH-RELEASE: 1' $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE; then
         OBS_DCH_RELEASE="+$DEB_RELEASE"
-        chroot $BUILD_ROOT su -c /bin/sh <<EOF
+        deb_chroot $BUILD_ROOT su -c /bin/sh <<EOF
 cd $TOPDIR/BUILD
 [ ! -f debian/changelog ] && exit 0
 # avoid devscripts dependency and mimic dch
@@ -138,6 +138,10 @@ EOF
 
 dsc_build() {
     local buildroot=$1
+    su_deb_chroot "$buildroot" "cat /proc/self/mountinfo" || true
+    su_deb_chroot "$buildroot" "id" || true
+    su_deb_chroot "$buildroot" "env | LC_ALL=C sort -u" || true
+    su_deb_chroot "$buildroot" "dpkg-query -W" || true
 
     DSC_BUILD_OPTIONS=
     if test -n "$BUILD_JOBS" ; then
@@ -180,10 +184,12 @@ dsc_build() {
 	DSC_BUILD_OPTIONS="${DSC_BUILD_OPTIONS# }"
     fi
 
-    chroot $buildroot su -c "export DEB_BUILD_OPTIONS='${DSC_BUILD_OPTIONS}' ; cd $TOPDIR/BUILD && $DSC_BUILD_CMD" - $BUILD_USER < /dev/null && BUILD_SUCCEEDED=true
+    su_deb_chroot $buildroot "export DEB_BUILD_OPTIONS=${DSC_BUILD_OPTIONS} ; cd $TOPDIR/BUILD && $DSC_BUILD_CMD" && BUILD_SUCCEEDED=true
+		    su_deb_chroot "$buildroot" "dpkg-deb --info $(printf '%q' "$TOPDIR/$f")" || true
+		    su_deb_chroot "$buildroot" "dpkg-deb --contents $(printf '%q' "$TOPDIR/$f")" || true
     if test "$BUILD_SUCCEEDED" = true -a "$DO_CHECKS" != "false" && ( chroot $buildroot su -c "which lintian > /dev/null" - $BUILD_USER < /dev/null ); then
 	DEB_CHANGESFILE=${DEB_DSCFILE%.dsc}$OBS_DCH_RELEASE"_"$(chroot $buildroot su -c 'dpkg-architecture -qDEB_BUILD_ARCH')".changes"
-	chroot $buildroot su -c "cd $TOPDIR && echo Running lintian && (set -x && lintian -i $TOPDIR/$DEB_CHANGESFILE)" - $BUILD_USER < /dev/null || BUILD_SUCCEEDED=false
+	su_deb_chroot $buildroot "cd $TOPDIR && echo Running lintian && (set -x && lintian -i $TOPDIR/$DEB_CHANGESFILE)" || BUILD_SUCCEEDED=false
     fi
 }
 
