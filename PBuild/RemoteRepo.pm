@@ -169,7 +169,7 @@ sub fetchrepo_rpmmd {
     } else {
       die("primary file $u does not have a checksum\n") unless $f->{'checksum'} && $f->{'checksum'} =~ /:(.*)/;
       $fn = "$1-$fn";
-      download("${baseurl}/$f->{'location'}", "$tmpdir/$fn", undef, $f->{'checksum'});
+      download("${baseurl}$f->{'location'}", "$tmpdir/$fn", undef, $f->{'checksum'});
     }
     my $fh = open_uncompressed("$tmpdir/$fn");
     Build::Rpmmd::parse($fh, sub { addpkg(\@bins, $_[0], $baseurl, $archfilter) }, 'addselfprovides' => 1, 'withchecksum' => 1);
@@ -184,7 +184,7 @@ sub fetchrepo_rpmmd {
     die("zypp:// repos do not support module data\n") if $opts{'iszypp'};
     die("modules file $u does not have a checksum\n") unless $f->{'checksum'} && $f->{'checksum'} =~ /:(.*)/;
     $fn = "$1-$fn";
-    download("${baseurl}/$f->{'location'}", "$tmpdir/$fn", undef, $f->{'checksum'});
+    download("${baseurl}$f->{'location'}", "$tmpdir/$fn", undef, $f->{'checksum'});
     my $fh = open_uncompressed("$tmpdir/$fn");
     my $moduleinfo = {};
     Build::Modules::parse($fh, $moduleinfo);
