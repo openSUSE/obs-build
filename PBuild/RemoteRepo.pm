@@ -52,7 +52,7 @@ sub open_uncompressed {
   open($fh, '<', $filename) or die("Error opening $filename: $!\n");
   if ($filename =~ /\.gz$/) {
     $fh = IO::Uncompress::Gunzip->new($fh) or die("Error opening $filename: $IO::Uncompress::Gunzip::GunzipError\n");
-  } elsif ($filename =~ /\.$/) {
+  } elsif ($filename =~ /\.xz$/) {
     open($fh, '-|', 'xz', '-d', '-c', '--', $filename) || die("Error opening $filename: $!\n");
   } elsif ($filename =~ /\.zst$/) {
     open($fh, '-|', 'zstd', '-d', '-c', '--', $filename) || die("Error opening $filename: $!\n");
