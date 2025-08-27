@@ -55,17 +55,16 @@ sub containerinfo2obsbinlnk {
   }
   eval { PBuild::Verify::verify_nevraquery($lnk); PBuild::Verify::verify_filename($d->{'file'}) };
   return undef if $@;
-  local *F;
   if ($d->{'tar_md5sum'}) {
     # this is a normalized container
     $lnk->{'hdrmd5'} = $d->{'tar_md5sum'};
     $lnk->{'lnk'} = $d->{'file'};
     return $lnk;
   }
-  return undef unless open(F, '<', "$dir/$d->{'file'}");
+  return undef unless open(my $fd, '<', "$dir/$d->{'file'}");
   my $ctx = Digest::MD5->new;
-  $ctx->addfile(*F);
-  close F;
+  $ctx->addfile($fd);
+  close $fd;
   $lnk->{'hdrmd5'} = $ctx->hexdigest();
   $lnk->{'lnk'} = $d->{'file'};
   return $lnk;

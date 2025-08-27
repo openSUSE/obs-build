@@ -48,20 +48,20 @@ sub queryfromfilename {
 my ($opts, @args) = Build::Options::parse_options($options, @ARGV);
 
 my %old;
-if (defined($opts->{'oldfile'}) && open(F, '<', $opts->{'oldfile'})) {
-  while (<F>) {
+if (defined($opts->{'oldfile'}) && open(my $fd, '<', $opts->{'oldfile'})) {
+  while (<$fd>) {
     chomp;
     $old{$1} = $_ if /^([PRrCOI]:[^ ]+): /;
   }
-  close F;
+  close $fd;
 }
 
 my %seen;
 
 for my $dir (@args) {
   my $cmd = "find $dir -follow -type f \\( -name \"*.rpm\" -o -name \"*.deb\" -o -name \"*.pkg.tar.gz\" -o -name \"*.pkg.tar.xz\" \\) -a ! -name \"*src.rpm\" -printf '\%T@/\%s/\%i \%p\\n'";
-  open(F, '-|', $cmd) or next;
-  while (<F>) {
+  open(my $fd, '-|', $cmd) or next;
+  while (<$fd>) {
     chomp;
     next unless /^([\d\.]+\/\d+\/\d+) (.*)$/;
     my $id = $1;
@@ -94,6 +94,6 @@ for my $dir (@args) {
     $q->{'location'} = $path;
     Build::writedeps(\*STDOUT, $q);
   }
-  close F;
+  close $fd;
 }
 
