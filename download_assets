@@ -83,37 +83,6 @@ my %known_options = (
 
 my $btfilter;
 
-sub calculate_fedora_goname {
-  my ($goipath, $gocid) = @_;
-  return undef unless $goipath;
-  $goipath = lc($goipath).'/';
-  $goipath =~ s/^https?:\/\///;
-  $goipath =~ s/\.git\/*$//;
-  $goipath =~ s/^git\.//;
-  $goipath =~ s/^([^\/]+)\.([^.\/]+)\//$1\//;
-  my $goname = "golang-$goipath";
-  $goname = "compat-$goname-".lc($gocid) if $gocid ne '';
-  1 while $goname =~ s/(\d)\.(\d)/$1:$2/;
-  $goname =~ s/[\._\/\-~]+/-/g;
-  $goname =~ s/-for-go-/-/g;
-  $goname = join('-', PBuild::Util::unify('go', split(/-/, $goname)));
-  $goname =~ s/^go-//;
-  $goname =~ s/^-+//;
-  $goname =~ s/:/./g;
-  $goname =~ s/-v([\.\d]+)$/-$1/;
-  $goname =~ s/-v([\.\d]+-)/-$1/g;
-  return $goname;
-}
-
-sub goname_macro_helper {
-  my ($bconf, $macros, $macros_args) = @_;
-  die("goname_helper recursion\n") if $bconf->{'in_goname_macro_helper'};
-  local $bconf->{'in_goname_macro_helper'} = 1;
-  my $goipath = Build::Rpm::expandmacros($bconf, '%{?goipath}', $macros, $macros_args);
-  my $gocid = Build::Rpm::expandmacros($bconf, '%{?gocid}', $macros, $macros_args);
-  return calculate_fedora_goname($goipath, $gocid) || '%goname';
-}
-
 sub find_assets {
   my ($assetmgr, $bconf, $p, $file) = @_;
   delete $p->{'remoteassets'};
@@ -127,11 +96,7 @@ sub find_assets {
   my $bt = Build::recipe2buildtype($file);
   return unless $bt;
   next if $btfilter && !$btfilter->{$bt};
-  my @options;
-  if ($bt eq 'spec' && $p->{'files'}->{'sources'} && (!$btfilter || $btfilter->{'fedpkg'})) {
-    # we need to have the correct goname to download fedpkg assets
-    push @options, 'extramacros', [[ 'goname', '', \&goname_macro_helper ]];
-  }
+  my @options = ('recipename' => $file);
   $p->{'buildtype'} = $bt;
   my $d = eval { Build::parse_typed($bconf, "$p->{'dir'}/$file", $bt, @options) };
   $p->{'remoteassets'} = $d->{'remoteassets'} if $d && $d->{'remoteassets'};

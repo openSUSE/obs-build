@@ -275,7 +275,7 @@ if ($cross && @{$opts->{'hostrepo'} || []}) {
 }
 print "searching for packages\n";
 my @pkgs = PBuild::Source::find_packages($dir);
-die("no packages found in '$dir'\n") unless @pkgs;
+die("no packages found in '$dir'\n") unless @pkgs || $opts->{'repoquery'} || $opts->{'repoquery-host'};
 print "found ".PBuild::Util::plural(scalar(@pkgs), 'package')."\n";
 
 my $assetmgr = PBuild::AssetMgr::create("$dir/.pbuild/_assets");
