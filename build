@@ -852,11 +852,23 @@ query_dirassets() {
     esac
 }
 
+get_commit_ts_from_obsinfo() {
+    local line ts
+    while read line ; do
+	case $line in
+	    mtime:\ *[^0-9]*) ;;
+	    mtime:\ [0-9]*) ts=${line#mtime: } ;;
+	esac
+    done < "$1"
+    test -n "$ts" && echo $ts
+}
+
 copy_sources() {
     local image_mode i
     if test "$BUILDTYPE" = kiwi -o "$BUILDTYPE" = docker -o "$BUILDTYPE" = fissile -o "$BUILDTYPE" = podman  -o "$BUILDTYPE" = productcompose ; then
         image_mode=true
     fi
+    local set_mtime
     if test -n "$RUNNING_IN_VM" -o -n "$COPY_SOURCES_ASIS" -o -n "$RPM_BUILD_IN_PLACE" ; then
 	image_mode=
 	( shopt -s nullglob ; cp -pRd "$1/".[^.]* "$1/"..?* "$1"/* "$2" )
@@ -867,6 +879,8 @@ copy_sources() {
 	test -n "$dirassets" && dirassets="/${dirassets// /\\/}/"
 	# check which directory belongs to the git repository and only copy those and the dir assets
 	type -p git >& /dev/null || cleanup_and_exit 1 "need git to check file status"
+        # get commit timestamp
+	set_mtime=$(git -C "$1" log -n1 --date=format:%Y%m%d --no-show-signature --pretty=format:%ct)
 	for i in "$1/".* "$1"/* ; do
 	    local ii="${i##*/}"
 	    test "$ii" = . -o "$ii" = .. -o "$ii" = .git && continue
@@ -890,7 +904,11 @@ copy_sources() {
 	    $BUILD_DIR/export_debian_orig_from_git "$1" "$2/build.origtar" || cleanup_and_exit 1 "export_debian_orig_from_git failed"
 	fi
     else
+	# check if there is a _scmsync.obsinfo file and get the commit timestamp
 	# query recipe for directories to copy
+	if test -s "$1/_scmsync.obsinfo" ; then
+	    set_mtime=$(get_commit_ts_from_obsinfo "$1/_scmsync.obsinfo")
+	fi
 	local dirassets
 	dirassets=$(query_dirassets "$1/$RECIPEFILE")
 	test -n "$dirassets" && dirassets="/${dirassets// /\\/}/"
@@ -907,6 +925,10 @@ copy_sources() {
 	else
 	    cp -p "$1"/* "$2"
 	fi
+    fi
+    if test -n "$set_mtime" ; then
+	echo "setting source mtime to $set_mtime"
+	find "$2" -depth -type d -print0 -o -links 1 -print0 | xargs -0 --no-run-if-empty touch -d "@$set_mtime"
     fi
     if test -n "$image_mode" ; then
 	rm -rf "$2/repos" "$2/containers"
