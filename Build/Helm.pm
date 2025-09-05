@@ -25,8 +25,6 @@ use strict;
 use Build::SimpleJSON;
 
 eval { require YAML::XS; $YAML::XS::LoadBlessed = 0; };
-my $jsonxs = eval { require JSON::XS; return 1 };
-
 *YAML::XS::LoadFile = sub {die("YAML::XS is not available\n")} unless defined &YAML::XS::LoadFile;
 
 sub verify_config {
@@ -111,17 +109,9 @@ sub show {
     die("$fn: $!\n") unless open($fd, '<', $fn);
     1 while sysread($fd, $config_yaml, 8192, length($config_yaml));
     close($fd);
-    local $YAML::XS::Boolean = "boolean";
     my $config = YAML::XS::Load($config_yaml);
     verify_config($config);
-    my $config_json;
-    if ($jsonxs) {
-      my $convert = JSON::XS->new->utf8->canonical->pretty;
-      $convert = $convert->convert_blessed(1);
-      $config_json = $convert->encode($config);
-    } else {
-      $config_json = Build::SimpleJSON::unparse($config)."\n";
-    }
+    my $config_json = Build::SimpleJSON::unparse($config)."\n";
     my $helminfo = {};
     $helminfo->{'name'} = $d->{'name'};
     $helminfo->{'version'} = $d->{'version'};
