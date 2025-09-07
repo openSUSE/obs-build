@@ -1322,6 +1322,11 @@ sub parse {
       $$nfbline = [$$nfbline, undef ];
     }
   }
+
+  # if the name is missing or starts with a '%' (probably caused by an unknown macro),
+  # fall back to the recipename.
+  $ret->{'name'} = $1 if (!$ret->{'name'} || $ret->{'name'} =~ /^\%/) && ($options{'recipename'} || '') =~ /(.*)\.spec$/;
+
   unshift @subpacks, $ret->{'name'} if defined $ret->{'name'};
   $ret->{'subpacks'} = \@subpacks;
   $ret->{'exclarch'} = $exclarch if $exclarch;
