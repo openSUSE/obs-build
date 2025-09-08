@@ -1197,8 +1197,8 @@ sub parse {
   $ret->{'dirassets'} = [ sort keys %dirassets ] if %dirassets;
   do_warn($config, "unterminated if/ifarch/ifos statement") if $skip && $config->{'parsing_config'};
   # if the name starts with a '%' it's probably caused by an unknown macro.
-  # in that case fall back to the recipename.
-  $ret->{'name'} = $1 if ($ret->{'name'} || '') =~ /^\%/ && ($options{'recipename'} || '') =~ /(.*)\.spec$/;
+  # in that case fall back to the recipename. Same if it is not defined at all
+  $ret->{'name'} = $1 if (!$ret->{'name'} || $ret->{'name'} =~ /^\%/) && ($options{'recipename'} || '') =~ /(.*)\.spec$/;
   return $ret;
 }
 
