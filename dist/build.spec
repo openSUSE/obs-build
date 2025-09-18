@@ -48,10 +48,14 @@ BuildRequires:  binutils
 BuildRequires:  perl
 BuildRequires:  psmisc
 BuildRequires:  tar
+# For Lua support
+BuildRequires:  perl(Lua::API)
+Requires:       perl(Lua::API)
 # For testcases
 BuildRequires:  perl(Date::Parse)
 BuildRequires:  perl(Test::Harness)
 BuildRequires:  perl(Test::More)
+BuildRequires:  perl(Test::Exception)
 %if 0%{?fedora}
 Requires:       perl(LWP::Protocol::https)
 Requires:       perl(XML::Parser)
