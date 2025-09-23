@@ -76,6 +76,17 @@ sub parse {
   return $res;
 }
 
+my $chart_template = {
+  '_order' => [ 'apiVersion', 'name', 'version', 'kubeVersion', 'description', 'type', 'keywords', 'home', 'sources', 'dependencies', 'maintainers', 'icon', 'appVersion', 'deprecated', 'annotations' ],
+  'dependencies' => {
+    '_order' => [ 'name', 'version', 'repository', 'condition', 'tags', 'import-values', 'alias' ],
+  },
+  'maintainers' => {
+    '_order' => [ 'name', 'email', 'url' ],
+  },
+  'deprecated' => 'bool',
+};
+
 sub show {
   my ($release, $disturl, $chart, $origrecipe);
   while (@ARGV) {
@@ -111,7 +122,7 @@ sub show {
     close($fd);
     my $config = YAML::XS::Load($config_yaml);
     verify_config($config);
-    my $config_json = Build::SimpleJSON::unparse($config)."\n";
+    my $config_json = Build::SimpleJSON::unparse($config, 'template' => $chart_template, 'keepspecial' => 1)."\n";
     my $helminfo = {};
     $helminfo->{'name'} = $d->{'name'};
     $helminfo->{'version'} = $d->{'version'};
