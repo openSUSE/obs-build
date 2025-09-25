@@ -35,6 +35,7 @@ our $do_rpm;
 our $do_deb;
 our $do_kiwi;
 our $do_arch;
+our $do_archsrcinfo;
 our $do_collax;
 our $do_livebuild;
 our $do_snapcraft;
@@ -53,6 +54,7 @@ sub import {
     $do_rpm = 1 if $_ eq ':rpm';
     $do_deb = 1 if $_ eq ':deb';
     $do_kiwi = 1 if $_ eq ':kiwi';
+    $do_archsrcinfo = 1 if $_ eq ':archsrcinfo';
     $do_arch = 1 if $_ eq ':arch';
     $do_collax = 1 if $_ eq ':collax';
     $do_livebuild = 1 if $_ eq ':livebuild';
@@ -67,13 +69,16 @@ sub import {
     $do_apk = 1 if $_ eq ':apk';
     $do_none = 1 if $_ eq ':none';
   }
-  $do_rpm = $do_deb = $do_kiwi = $do_productcompose = $do_arch = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = $do_fissile = $do_helm = $do_flatpak = $do_mkosi = $do_apk = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker && !$do_fissile && !$do_helm && !$do_flatpak && !$do_mkosi && !$do_productcompose && !$do_apk && !$do_none;
+  $do_rpm = $do_deb = $do_kiwi = $do_productcompose = $do_arch = $do_archsrcinfo = $do_collax = $do_livebuild = $do_snapcraft = $do_appimage = $do_docker = $do_fissile = $do_helm = $do_flatpak = $do_mkosi = $do_apk = 1 if !$do_rpm && !$do_deb && !$do_kiwi && !$do_arch && !$do_archsrcinfo && !$do_collax && !$do_livebuild && !$do_snapcraft && !$do_appimage && !$do_docker && !$do_fissile && !$do_helm && !$do_flatpak && !$do_mkosi && !$do_productcompose && !$do_apk && !$do_none;
 
   if ($do_deb) {
     require Build::Deb;
   }
   if ($do_kiwi) {
     require Build::Kiwi;
+  }
+  if ($do_archsrcinfo) {
+    require Build::Archsrcinfo;
   }
   if ($do_arch) {
     require Build::Arch;
@@ -573,6 +578,7 @@ sub read_config {
   if (!$config->{'binarytype'}) {
     $config->{'binarytype'} = 'rpm' if $config->{'type'} eq 'spec';
     $config->{'binarytype'} = 'deb' if $config->{'type'} eq 'dsc' || $config->{'type'} eq 'collax' || $config->{'type'} eq 'livebuild';
+    $config->{'binarytype'} = 'arch' if $config->{'type'} eq 'archsrcinfo';
     $config->{'binarytype'} = 'arch' if $config->{'type'} eq 'arch';
     $config->{'binarytype'} = 'apk' if $config->{'type'} eq 'apk';
     if (grep {$_ eq $config->{'type'}} qw{snapcraft appimage docker fissile kiwi mkosi}){
@@ -1273,6 +1279,7 @@ sub recipe2buildtype {
   return $1 if $recipe =~ /\.(spec|dsc|kiwi|productcompose|livebuild)$/;
   $recipe =~ s/.*\///;
   $recipe =~ s/^_service:.*://;
+  return 'archsrcinfo' if $recipe eq 'SRCINFO';
   return 'arch' if $recipe eq 'PKGBUILD';
   return 'apk' if $recipe eq 'APKBUILD';
   return 'collax' if $recipe eq 'build.collax';
@@ -1346,6 +1353,7 @@ sub parse_typed {
   return Build::Docker::parse($cf, $fn, @args) if $do_docker && $buildtype eq 'docker';
   return Build::Fissile::parse($cf, $fn, @args) if $do_fissile && $buildtype eq 'fissile';
   return parse_simpleimage($cf, $fn, @args) if $buildtype eq 'simpleimage';
+  return Build::Archsrcinfo::parse($cf, $fn, @args) if $do_archsrcinfo && $buildtype eq 'archsrcinfo';
   return Build::Arch::parse($cf, $fn, @args) if $do_arch && $buildtype eq 'arch';
   return Build::Apk::parse($cf, $fn, @args) if $do_apk && $buildtype eq 'apk';
   return Build::Collax::parse($cf, $fn, @args) if $do_collax && $buildtype eq 'collax';
@@ -1368,6 +1376,8 @@ sub query {
   return Build::Kiwi::queryiso($handle, %opts) if $do_kiwi && $binname =~ /\.iso$/;
   return Build::Arch::query($handle, %opts) if $do_arch && $binname =~ /\.pkg\.tar(?:\.gz|\.xz|\.zst)?$/;
   return Build::Arch::query($handle, %opts) if $do_arch && $binname =~ /\.arch$/;
+  return Build::Arch::query($handle, %opts) if $do_archsrcinfo && $binname =~ /\.pkg\.tar(?:\.gz|\.xz|\.zst)?$/;
+  return Build::Arch::query($handle, %opts) if $do_archsrcinfo && $binname =~ /\.arch$/;
   return Build::Apk::query($handle, %opts) if $do_arch && $binname =~ /\.apk$/;
   return undef;
 }
@@ -1399,6 +1409,8 @@ sub queryhdrmd5 {
   return Build::Kiwi::queryhdrmd5(@_) if $do_kiwi && $binname =~ /\.raw.install$/;
   return Build::Arch::queryhdrmd5(@_) if $do_arch && $binname =~ /\.pkg\.tar(?:\.gz|\.xz|\.zst)?$/;
   return Build::Arch::queryhdrmd5(@_) if $do_arch && $binname =~ /\.arch$/;
+  return Build::Arch::queryhdrmd5(@_) if $do_archsrcinfo && $binname =~ /\.pkg\.tar(?:\.gz|\.xz|\.zst)?$/;
+  return Build::Arch::queryhdrmd5(@_) if $do_archsrcinfo && $binname =~ /\.arch$/;
   return Build::Apk::queryhdrmd5(@_) if $do_apk && $binname =~ /\.apk$/;
   return undef;
 }
