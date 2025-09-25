@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 13;
+use Test::More tests => 15;
 
 sub onetest1(@)
 {
@@ -42,4 +42,8 @@ for my $t (@fulltests) {
   my $spec = $t; $spec=~s/\.changes$/.spec/;
   my $expected = `cat $spec`;
   onetest1($expected, $t);
+
+  my $specfull = $t; $specfull=~s/\.changes$/-full.spec/;
+  my $expectedfull = `cat $specfull`;
+  onetest1($expectedfull, '--fulltimestamps', $t);
 }
