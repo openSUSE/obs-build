@@ -1,13 +1,18 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 11;
+use Test::More tests => 15;
 
+sub onetest1(@)
+{
+  my $expected = shift;
+  my $actual = `./changelog2spec @_`;
+  is($actual, $expected, "changelog2spec @_");
+}
 sub onetest(@)
 {
   my $expected = shift;
-  my $actual = `./changelog2spec --selftest @_`;
-  is($actual, $expected, "changelog2spec --selftest @_");
+  onetest1($expected, "--selftest", @_);
 }
 
 my @tests=(
@@ -30,4 +35,15 @@ for my $t (@tests) {
   foreach(0..$#tmp) {$tmp[$_].=".changes"}
   my $expected=shift(@tmp);
   onetest($expected, $file, @tmp);
+}
+
+my @fulltests=glob("t/data/changelog2spec/*.changes");
+for my $t (@fulltests) {
+  my $spec = $t; $spec=~s/\.changes$/.spec/;
+  my $expected = `cat $spec`;
+  onetest1($expected, $t);
+
+  my $specfull = $t; $specfull=~s/\.changes$/-full.spec/;
+  my $expectedfull = `cat $specfull`;
+  onetest1($expectedfull, '--fulltimestamps', $t);
 }
