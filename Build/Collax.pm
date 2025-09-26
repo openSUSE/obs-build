@@ -24,13 +24,13 @@ sub parse {
 	} elsif (ref($fn) ne "") {
 		die "Unhandled ref type in collax";
 	} else {
-		local *FH;
-		if (!open(FH, "<", $fn)) {
+		my $fd;
+		if (!open($fd, "<", $fn)) {
 			return {"error" => "$fn: $!"};
 		}
-		@bscript = <FH>;
+		@bscript = <$fd>;
 		chomp(@bscript);
-		close(FH);
+		close($fd);
 	}
 
 	my $ret = {"deps" => []};

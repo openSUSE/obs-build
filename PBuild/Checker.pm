@@ -598,10 +598,10 @@ sub check {
   my $mylastcheck = $lastcheck->{$packid};
   my @meta;
   if (!@meta_s || !$mylastcheck || substr($mylastcheck, 96) ne "$meta_s[9]/$meta_s[7]/$meta_s[1]") {
-    if (open(F, '<', "$dst/_meta")) {
-      @meta_s = stat F;
-      @meta = <F>;
-      close F;
+    if (open(my $fd, '<', "$dst/_meta")) {
+      @meta_s = stat $fd;
+      @meta = <$fd>;
+      close $fd;
       chomp @meta;
       $mylastcheck = substr($meta[0], 0, 32);
       if (@meta == 2 && $meta[1] =~ /^fake/) {
@@ -661,9 +661,9 @@ sub check {
       goto relsynccheck;
     }
     # something changed, read in old meta (if not already done)
-    if (!@meta && open(F, '<', "$dst/_meta")) {
-      @meta = <F>;
-      close F;
+    if (!@meta && open(my $fd, '<', "$dst/_meta")) {
+      @meta = <$fd>;
+      close $fd;
       chomp @meta;
     }
     if ($incycle == 1) {

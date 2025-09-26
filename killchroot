@@ -65,8 +65,8 @@ my %pids;
 my $pid;
 my $path;
 
-opendir(D, "/proc") || die("/proc: $!\n");
-for $pid (readdir(D)) {
+opendir(my $dirfd, "/proc") || die("/proc: $!\n");
+for $pid (readdir($dirfd)) {
   next unless $pid =~ /^\d+$/;
   $path = readlink("/proc/$pid/root");
   next unless defined $path;
@@ -78,7 +78,7 @@ for $pid (readdir(D)) {
     $pids{$pid} = 1;
   }
 }
-closedir(D);
+closedir($dirfd);
 
 my @pids = sort keys %pids;
 exit 0 unless @pids;
@@ -88,10 +88,10 @@ print "$msg\n" if $msg ne '';
 if ($verbose) {
   my @pidsv = ();
   for $pid (@pids) {
-    open(F, "</proc/$pid/cmdline");
+    open(my $fd, "</proc/$pid/cmdline");
     my $cmd = '';
-    sysread(F, $cmd, 128);
-    close F;
+    sysread($fd, $cmd, 128);
+    close $fd;
     $cmd =~ s/\0.*//;
     #$cmd =~ s/ .*//;
     push @pidsv, "$pid($cmd)";
