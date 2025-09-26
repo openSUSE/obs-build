@@ -263,8 +263,12 @@ recipe_create_changelog() {
 	  */*[1-9]*) CFFORMAT="$CFFORMAT --emailonly" ;;
 	esac
     fi
-    echo "running changelog2spec --target $CFFORMAT --file $1"
-    if ! $BUILD_DIR/changelog2spec --target $CFFORMAT --timestampfile "$BUILD_ROOT/.build-changelog-timestamp" --file "$1" > $BUILD_ROOT/.build-changelog ; then 
+    changelog2specargs="--target $CFFORMAT"
+    if [ "$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags changelogfulltimestamps)" = 1 ] ; then
+        changelog2specargs="--fulltimestamps $changelog2specargs"
+    fi
+    echo "running changelog2spec $changelog2specargs --file $1"
+    if ! $BUILD_DIR/changelog2spec $changelog2specargs --timestampfile "$BUILD_ROOT/.build-changelog-timestamp" --file "$1" > $BUILD_ROOT/.build-changelog ; then
 	rm -f $BUILD_ROOT/.build-changelog $BUILD_ROOT/.build-changelog-timestamp
     fi
     BUILD_CHANGELOG_TIMESTAMP=
