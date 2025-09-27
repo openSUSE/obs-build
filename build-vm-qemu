@@ -44,12 +44,12 @@ vm_startup_qemu() {
             qemu_options="-M virt"
             qemu_device=virtio-blk-device
             qemu_rng_device=virtio-rng-device
-            qemu_cpu="-cpu cortex-a15"
+            qemu_cpu="-cpu max"
             ;;
         armv8l|aarch32|aarch64|aarch64_ilp32)
             qemu_bin="/usr/bin/qemu-system-aarch64"
             qemu_console=${qemu_console:-ttyAMA0}
-            qemu_cpu="-cpu cortex-a72"
+            qemu_cpu="-cpu max"
             qemu_options="$qemu_options -M virt"
             qemu_device=virtio-blk-device
             qemu_rng_device=virtio-rng-device
