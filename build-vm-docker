@@ -28,24 +28,48 @@ vm_verify_options_docker() {
 }
 
 vm_startup_docker() {
-    local name="obsbuild.${BUILD_ROOT##*/}"
+    source $BUILD_ROOT/.build/build.data
+    local name=$CONTAINER_NAME
     docker rm "$name" >/dev/null 2>&1 || true
     local docker_opts=
+    local container_root="/mnt"
+    local build_command=(chroot /mnt "$vm_init_script")
+    local mounts=("--mount" "type=bind,source=$BUILD_ROOT,destination=/mnt")
     test -n "$VM_TYPE_PRIVILEGED" && docker_opts="--privileged --cap-add=SYS_ADMIN --cap-add=MKNOD"
     test -n "$RUN_SHELL" -o -n "$RUN_SHELL_AFTER_FAIL" && docker_opts="$docker_opts -it"
+    local docker_image="busybox"
+    if test -n "$VM_CONTAINER_IMAGE" ; then
+        mkdir -p $BUILD_ROOT/home/abuild
+        # create .build.packages link
+        rm -rf $BUILD_ROOT/.build.packages
+        ln -s home/abuild/rpmbuild $BUILD_ROOT/.build.packages
+        docker_image="$VM_CONTAINER_IMAGE"
+        container_root=
+        mounts+=("--mount" "type=bind,source=$BUILD_ROOT/home/abuild,destination=/home/abuild")
+        local build_command=(bash -c "
+            # Create symlinks for /mnt hidden directories that include build script and data
+            for item in /mnt/.[^.]*; do
+                [ -d \"\$item\" ] && ln -sf \"\$item\" \"/\$(basename \"\$item\")\"
+            done
+            $vm_init_script
+        ")
+    fi
+    mounts+=(
+        "--mount" "type=bind,source=/proc,destination=$container_root/proc"
+        "--mount" "type=bind,source=/dev/pts,destination=$container_root/dev/pts"
+        "--mount" "type=bind,source=/dev/null,destination=$container_root/dev/null"
+    )
     docker run \
         --rm --name "$name" --net=none $docker_opts \
-        --mount "type=bind,source=$BUILD_ROOT,destination=/mnt" \
-        --mount "type=bind,source=/proc,destination=/mnt/proc" \
-        --mount "type=bind,source=/dev/pts,destination=/mnt/dev/pts" \
-        "$@" busybox chroot /mnt "$vm_init_script"
+        "${mounts[@]}" "$@" "$docker_image" "${build_command[@]}"
     BUILDSTATUS="$?"
     test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
     cleanup_and_exit "$BUILDSTATUS"
 }
 
 vm_kill_docker() {
-    local name="obsbuild.${BUILD_ROOT##*/}"
+    source $BUILD_ROOT/.build/build.data
+    local name=$CONTAINER_NAME
     docker stop -t 2 "$name" || true
 }
 
