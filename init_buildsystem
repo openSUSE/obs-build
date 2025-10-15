@@ -1282,6 +1282,7 @@ for PROG in /usr/bin/TeX/texhash /usr/bin/texhash ; do
 done
 
 if test -e $BUILD_ROOT/usr/share/zoneinfo/UTC ; then
+    test -e $BUILD_ROOT/etc/localtime || ln -sf /usr/share/zoneinfo/UTC $BUILD_ROOT/etc/localtime
     for PROG in /usr/sbin/zic /usr/bin/zic /bin/zic /sbin/zic ; do
         test -x $BUILD_ROOT/$PROG  && chroot $BUILD_ROOT bash -c "$PROG -l \$(readlink -f /usr/share/zoneinfo/UTC)"
     done
