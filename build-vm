@@ -612,22 +612,23 @@ vm_detect_2nd_stage() {
     fi
 
     test -n "$VM_WATCHDOG" -a -z "$PERSONALITY_SET" && echo "### VM INTERACTION END ###"
-    echo "2nd stage started in virtual machine"
+    log_info "2nd stage started in virtual machine"
     # fedora packages sometimes do not have the needed links
     ldconfig
     BUILD_ROOT=/
     BUILD_DIR=/.build
-    echo "machine type: `uname -m`"
-    echo "Linux version: `uname -rv`"
-    echo "Time: `date`"
+    log_info "machine type: `uname -m`"
+    log_info "Linux version: `uname -rv`"
+    log_info "Time: `date`"
+
     if test -z "$VM_TYPE_CONTAINER"; then
-        echo "Increasing log level from now on..."
+        log_info "Increasing log level from now on..."
         echo 4 > /proc/sysrq-trigger
-        echo "Enable sysrq operations"
+        log_info "Enable sysrq operations"
         echo 1 > /proc/sys/kernel/sysrq
         if test "$PERSONALITY" != 0 -a -z "$PERSONALITY_SET" ; then
             export PERSONALITY_SET=true
-            echo "switching personality to $PERSONALITY..."
+            log_info "switching personality to $PERSONALITY..."
             # this is 32bit perl/glibc, thus the 32bit syscall number
             exec perl -e 'syscall(136, '$PERSONALITY') == -1 && warn("personality: $!\n");exec "/.build/build" || die("/.build/build: $!\n")'
         fi
