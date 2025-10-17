@@ -23,7 +23,7 @@
 
 
 pkg_initdb_rpm() {
-    echo "initializing rpm db..."
+    log_info "initializing rpm db..."
     mkdir -p $BUILD_ROOT/var/lib/rpm
     # rpm v5 does not have initdb
     if ! test -e $BUILD_ROOT/usr/lib/rpm/cpuinfo.yaml ; then
@@ -174,7 +174,7 @@ pkg_sysrootinstall_rpm() {
 
 pkg_finalize_rpm() {
     if test -n "${CUMULATED_LIST[*]}" ; then
-	echo "now installing cumulated packages"
+	log_info "now installing cumulated packages"
 	for ((num=0; num<=cumulate; num++)) ; do
 	    echo ${CUMULATED_LIST[$num]}
 	    PKG=${CUMULATED_LIST[$num]##*/}

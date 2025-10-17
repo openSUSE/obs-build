@@ -83,7 +83,7 @@ vm_wipe_podman() {
     local name="build_${RECIPEFILE//:/-}"
     podman rm "$name" >/dev/null 2>&1 || true
 
-    echo "Wiping build root: '$BUILD_ROOT'"
+    log_info "Wiping build root: '$BUILD_ROOT'"
     unmount_build_root
     # calling 'podman unshare' is required because podman creates the files with SubUIDs/SubGIDs
     # that differ from user's UID/GID and removing them would normally end up with

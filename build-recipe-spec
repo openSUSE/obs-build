@@ -355,9 +355,9 @@ recipe_run_rpmlint() {
 	-o -name "*-x86-*" -o -name "*-ia32-*" \) -prune \
 	-o -type f -name '*.rpm' -print))
     SRPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/SRPMS -type f -name "*.rpm"))
-    echo 
-    echo "RPMLINT report:"
-    echo "==============="
+    echo
+    log_info "RPMLINT report:"
+    log_info "==============="
     rpmlint_logfile=$TOPDIR/OTHER/rpmlint.log
     rm -f "$BUILD_ROOT$rpmlint_logfile"
     ret=0
