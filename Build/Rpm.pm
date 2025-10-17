@@ -673,7 +673,7 @@ sub splitdeps {
       push @deps, shiftrich(\@s), undef, undef;
       $d = join(' ', @s);
     } else {
-      last unless $d =~ s/([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*//;
+      last unless $d =~ s/([^\s,]+)(\s+[<=>]+\s+[^\s,]+)?(\s+\[[^\]]+\])?[\s,]*//;
       push @deps, $1, $2, $3;
     }
   }
@@ -1023,7 +1023,7 @@ sub parse {
 	if (" $arg" =~ /[\s,]\(/) {
 	  @deps = splitdeps($arg);	# we need to be careful, there could be a rich dep
 	} else {
-	  @deps = $arg =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
+	  @deps = $arg =~ /([^\s,]+)(\s+[<=>]+\s+[^\s,]+)?(\s+\[[^\]]+\])?[\s,]*/g;
 	}
 	my $replace;		# put filtered line into xspec
 	my @ndeps;
