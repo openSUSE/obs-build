@@ -166,9 +166,13 @@ umount_stuff() {
 	buildroot_umount "/proc/sys/fs/binfmt_misc"
 	buildroot_umount "/proc"
 	buildroot_umount "/sys"
-	buildroot_umount "/dev/pts"
-	buildroot_umount "/dev/shm"
 	buildroot_umount "/mnt"
+
+	for f in "$BUILD_ROOT"/dev/*; do
+	    if mountpoint -q "$f"; then
+		buildroot_umount "$f"
+	    fi
+	done
     fi
 }
 
@@ -285,20 +289,21 @@ preinstall_image() {
     echo "unpacking preinstall image${2:+ $2}"
     preinstall_setup
 
-    TAR_EXCLUDES="--exclude .build --exclude .init_b_cache"
+    TAR_EXCLUDES=(.build .init_b_cache)
 
     if [ -f "/run/.containerenv" ]; then
         # we're running in a podman container and we probably don't have sufficient capabilities to create special files
-        TAR_EXCLUDES="$TAR_EXCLUDES --exclude dev/* --exclude proc/* --exclude run/* --exclude sys/*"
+        TAR_EXCLUDES+=("dev/*" "proc/*" "run/*" "sys/*")
     fi
 
     if test -x /usr/bin/bsdtar ; then
-	TAR="/usr/bin/bsdtar $TAR_EXCLUDES -P --chroot --numeric-owner -x"
+	# Undocumented bsdtar feature: ^ at the beginning anchors
+	TAR=(/usr/bin/bsdtar "${TAR_EXCLUDES[@]/#/"--exclude=^"}" -P --chroot --numeric-owner -x)
     else
 	unsafe_preinstall_check
-	TAR="tar $TAR_EXCLUDES -x"
+	TAR=(tar --anchored "${TAR_EXCLUDES[@]/#/"--exclude="}" -x)
     fi
-    if ! $TAR -f "$BUILD_INIT_CACHE/rpms/$1" ; then
+    if ! "${TAR[@]}" -f "$BUILD_INIT_CACHE/rpms/$1" ; then
 	echo "ERROR: unpack failed."
         if test "x$(od -t x4 -A n -N 4 "$BUILD_INIT_CACHE/rpms/$1")" = "x fd2fb528" ; then
             echo "ERROR: This is a .zst compressed preinstallimage and $TAR failed to unpack."
@@ -351,7 +356,12 @@ create_devs() {
 	if test $com = ln ; then
 	    ln -s $arg $BUILD_ROOT/dev/$file
 	elif test $com = mknod ; then
-	    mknod -m $mode $BUILD_ROOT/dev/$file $arg
+	    if test -z "$PREPARE_VM" && test -e /run/.containerenv; then
+		touch $BUILD_ROOT/dev/$file
+		mount --bind /dev/$file $BUILD_ROOT/dev/$file
+	    else
+		mknod -m $mode $BUILD_ROOT/dev/$file $arg
+	    fi
 	fi
     done << DEVLIST
 	mknod null    666 c 1 3
