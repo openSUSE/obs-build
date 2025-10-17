@@ -50,6 +50,7 @@ repos_baseurl=()
 repos_cachedir=()
 
 . $BUILD_DIR/common_functions || exit 1
+setup_color_vars || echo "Failed to setup colored output"
 
 # should RPMs be installed with --force ?
 USE_FORCE=false

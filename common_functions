@@ -202,3 +202,74 @@ detect_cache_dir() {
 	CACHE_DIR=${XDG_CACHE_HOME:-~/.cache}/opensuse.org/build/cache
     fi
 }
+
+COLORS_ENABLED=${COLORS_ENABLED:-auto}
+
+setup_color_vars() {
+
+    # https://no-color.org/
+    if test -n "$NO_COLOR"; then
+        COLORS_ENABLED=false
+    else
+        if test "$COLORS_ENABLED" = auto; then
+            if test -t 1; then
+                COLORS_ENABLED=true
+            else
+                COLORS_ENABLED=false
+            fi
+        fi
+    fi
+
+    if [ "$COLORS_ENABLED" = true ]; then
+        ESC="$(printf '\033')"
+        RED="${ESC}[0;31m"
+        GREEN="${ESC}[0;32m"
+        YELLOW="${ESC}[0;33m"
+        BLUE="${ESC}[0;34m"
+        BOLD="${ESC}[1m"
+        RESET="${ESC}[0m"
+    else
+        RED=''
+        GREEN=''
+        YELLOW=''
+        BLUE=''
+        BOLD=''
+        RESET=''
+    fi
+}
+
+export COLORS_ENABLED
+export -f setup_color_vars >/dev/null 2>&1 || true
+
+##################
+# Logging helpers
+##################
+
+_log_print() {
+    prefix="$1"
+    shift
+    color="$1"
+    shift || true
+    if [ -n "${color}" ]; then
+        printf "%s%s%s %s\n" "${color}" "${prefix}" "${RESET}" "$*"
+    else
+        printf "%s%s\n" "${prefix}" "$*"
+    fi
+}
+
+log_info() { _log_print "build:" "${BOLD-}" "$*"; }
+log_warn() { _log_print "build: WARN:" "${YELLOW-}" "$*"; }
+log_ok() { _log_print "build: OK:" "${GREEN-}" "$*"; }
+log_error() { _log_print "error:" "${BOLD-}${RED-}" "$*" >&2; }
+
+stage_name="unknown"
+stage_start() {
+    stage_name="$1"
+    shift
+    log_info "${BOLD-}==> Starting ${stage_name}${RESET-}"
+}
+
+stage_end() {
+    log_info "${BOLD-}<== Finished ${stage_name}${RESET-}"
+    stage_name="unknown"
+}

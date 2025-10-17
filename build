@@ -1082,6 +1082,8 @@ trap fail_exit EXIT
 
 . $BUILD_DIR/common_functions || exit 1
 
+setup_color_vars || echo "Failed to setup colored output"
+
 detect_cache_dir
 
 shopt -s nullglob
