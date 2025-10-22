@@ -288,7 +288,7 @@ sub luapattern {
 }
 
 sub luamacro {
-  my ($config, $macros, $macname, @args) = @_;
+  my ($config, $macros, $macros_args, $tries, $macname, @args) = @_;
   push @args, '' unless @args;
   return lc($args[0]) if $macname eq 'lower';
   return uc($args[0]) if $macname eq 'upper';
@@ -328,7 +328,7 @@ sub luamacro {
 }
 
 sub builtinmacro {
-  my ($config, $macros, $macname, @args) = @_;
+  my ($config, $macros, $macros_args, $tries, $macname, @args) = @_;
   push @args, '' unless @args;
   return expr_stringify(do_expr($config, $args[0])) if $macname eq 'expr';
   return $args[0] =~ /\/([^\/]*)$/ ? $1 : $args[0] if $macname eq 'basename';
@@ -341,12 +341,18 @@ sub builtinmacro {
     $args[0] =~ s/ $//;
     return $args[0];
   }
-  if ($macname eq 'bcond_with' || ($macname eq 'bcond' && !$args[1])) {
-    $macros->{"with_$args[0]"} = 1 if exists $macros->{"_with_$args[0]"};
+  if ($macname eq 'bcond_override_default') {
+    $macros->{"bcond_override_default_$args[0]"} = $args[1];
     return '';
   }
-  if ($macname eq 'bcond_without' || ($macname eq 'bcond' && $args[1])) {
-    $macros->{"with_$args[0]"} = 1 unless exists $macros->{"_without_$args[0]"};
+  if ($macname eq 'bcond' || $macname eq 'bcond_with' || $macname eq 'bcond_without') {
+    $args[1] = 0 if $macname eq 'bcond_with';
+    $args[1] = 1 if $macname eq 'bcond_without';
+    my $override = $macros->{"bcond_override_default_$args[0]"};
+    $override = expandmacros($config, $override, $macros, $macros_args, $tries) if defined($override) && $override =~ /%/;
+    $override = $args[1] unless defined($override) && $override ne '';
+    $macros->{"with_$args[0]"} = 1 if !$override && exists $macros->{"_with_$args[0]"};
+    $macros->{"with_$args[0]"} = 1 if $override && !exists $macros->{"_without_$args[0]"};
     return '';
   }
   return (exists($macros->{"with_$args[0]"}) ? 1 : 0) ^ ($macname eq 'without' ? 1 : 0) if $macname eq 'with' || $macname eq 'without';
@@ -441,6 +447,7 @@ my %builtin_macros = (
   'bcond' => \&builtinmacro,
   'bcond_with' => \&builtinmacro,
   'bcond_without' => \&builtinmacro,
+  'bcond_override_default' => \&builtinmacro,
   'expr' => \&builtinmacro,
   'basename' => \&builtinmacro,
   'dirname' => \&builtinmacro,
@@ -603,7 +610,7 @@ reexpand:
 	  $expandedline .= $macalt;
 	}
       } elsif ($builtin_macros{$macname}) {
-        $expandedline .= $builtin_macros{$macname}->($config, $macros, $macname, @args);
+        $expandedline .= $builtin_macros{$macname}->($config, $macros, $macros_args, $tries, $macname, @args);
       } elsif (ref($macros_args->{$macname}) eq 'CODE') {
 	$expandedline .= $macros_args->{$macname}->($config, $macros, $macros_args, $macname, @args);
       } else {
