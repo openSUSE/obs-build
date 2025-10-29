@@ -1060,7 +1060,9 @@ sub parse {
 	  die unless $line =~ /(.*?):/;
 	  $xspec->[-1] = $xspec->[-1]->[0] if ref($xspec->[-1]);
 	  $xspec->[-1] = [ $xspec->[-1], @ndeps ? "$1:  ".join(' ', @ndeps) : '' ] if $doxspec;
-	}
+	} elsif ($config->{'save_expanded_deps'} && $doxspec && $line !~ /^#/ && !ref($xspec->[-1])) {
+	  $xspec->[-1] = [ $xspec->[-1], $line ];
+        }
 	if ($keyword eq 'buildrequires' || $keyword eq 'buildprereq' || $keyword eq '#!buildrequires') {
 	  push @packdeps, @ndeps;
 	} elsif ($keyword eq '#!alsonative') {
