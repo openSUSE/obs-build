@@ -435,6 +435,19 @@ sub parse {
 	$vars->{$1} = $build_vars{$1} || (defined($2) ? [ $2 ] : $vars_meta->{$1} || []);
 	$vars_meta->{$1} = $vars->{$1} unless $from_seen;
       }
+    } elsif ($cmd eq 'COPY') {
+      if (@args && $args[0] =~ /--from=(.+)/) {
+	my $container = $1;
+	if (!$as_container{$container} && $container ne 'scratch') {
+	  if ($Build::Kiwi::urlmapper && $container =~ /^([^\/]+\.[^\/]+)\/[a-zA-Z0-9]/) {
+	    my $prp = $Build::Kiwi::urlmapper->("registry://$1/");
+	    push @containerrepos, $prp if $prp;
+	  }
+	  $container .= ':latest' unless $container =~ /:[^:\/]+$/;
+	  $container = "container:$container";
+	  push @{$ret->{'deps'}}, $container unless grep {$_ eq $container} @{$ret->{'deps'}};
+	}
+      }
     }
   }
   if ($basecontainer) {
