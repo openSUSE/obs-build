@@ -235,6 +235,10 @@ recipe_build_docker() {
     done
 
     buildargs=()
+    local targetstage=$(queryrecipe --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" docker_targetstage)
+    if test -n "$targetstage" ; then
+	buildargs[${#buildargs[@]}]="--target=$targetstage"
+    fi
     while read kv ; do
 	case "$kv" in
 	    [a-zA-Z0-9_]*=*)

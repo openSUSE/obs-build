@@ -337,6 +337,16 @@ sub parse {
       if ($line =~ /^#!ForceMultiVersion\s*$/) {
         $ret->{'multiversion'} = 1;
       }
+      if ($line =~ /^#!BuildTargetStage:\s*(\S+)\s*$/) {
+	my $targetstage = $1;
+	if ($targetstage =~ /%/) {
+	  require Build::Rpm;
+	  $targetstage = Build::Rpm::expandmacros($cf, $targetstage);
+	  $targetstage =~ s/^\s+//;
+	  $targetstage =~ s/\s+$//;
+	}
+        $ret->{'docker_targetstage'} = $targetstage if $targetstage ne '';
+      }
       next;
     }
     # add continuation lines
