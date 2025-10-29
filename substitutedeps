@@ -308,7 +308,7 @@ for my $line (@$xspec) {
     print F "$line\n";
     next;
   }
-  my @deps = $r =~ /([^\s\[,]+)(\s+[<=>]+\s+[^\s\[,]+)?[\s,]*/g;
+  my @deps = $r =~ /([^\s,]+)(\s+[<=>]+\s+[^\s,]+)?[\s,]*/g;
   my @ndeps = ();
   my $replace = 0;
   my @f2 = Build::do_subst_vers($cf, @deps);
