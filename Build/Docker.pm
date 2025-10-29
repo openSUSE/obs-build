@@ -376,6 +376,7 @@ sub parse {
       $basecontainer = undef;
       if (@args && $as_container{$args[0]}) {
 	$basecontainer = $as_container{$args[0]}->[1];
+	$as_container{$args[2]} = [ $args[0], $basecontainer ] if @args > 2 && lc($args[1]) eq 'as';
       } elsif (@args && !$as_container{$args[0]}) {
         my $container = $args[0];
         if ($container ne 'scratch') {
