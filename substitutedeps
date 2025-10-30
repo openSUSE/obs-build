@@ -322,25 +322,28 @@ for my $line (@$xspec) {
     # all compat stuff done. we return to your scheduled program
   }
 
+  # do dependency substitutions
+  my $expandedline = $line;	# expanded line
+  $line = $origline if defined $origline;
+
   if (!$used || ($line !~ /^(?:Requires|BuildRequires|PreReq)(?:\([^\)]+\))?:/i)) {
-    $line = $origline if defined $origline;
     print F "$line\n";
     next;
   }
   if ($line =~ /%\(/) {
     # too hard for us
-    $line = $origline if defined $origline;
     print F "$line\n";
     next;
   }
 
   my $isbuildrequires = 0;
   $isbuildrequires = 1 if $line =~ /^BuildRequires/i;
-  my $r = $line;
+
+  # do the substitution on the expanded line first
+  my $r = $expandedline;
   $r =~ s/^[^:]*:\s*//;
   if ($r =~ /^\(/) {
     # no rich dependency support for now
-    $line = $origline if defined $origline;
     print F "$line\n";
     next;
   }
@@ -348,13 +351,13 @@ for my $line (@$xspec) {
   my ($replace, @ndeps) = do_substitute($cf, $isbuildrequires, \@neg, \%sdeps, @deps);
   if (!$replace) {
     # nothing to replace
-    $line = $origline if defined $origline;
     print F "$line\n";
     next
   }
-  # check if we can do the replace on the unexpanded line
-  if (defined($origline) && $line ne $origline) {
-    $r = $origline;
+
+  # now check if we can do the substitution on the unexpanded line as well
+  if ($line ne $expandedline) {
+    $r = $line;
     $r =~ s/^[^:]*:\s*//;
     # protect macros
     my @m;
@@ -367,6 +370,8 @@ for my $line (@$xspec) {
       s/%\{\{(\d+)\}\}/$m[$1]/ge for @ndeps;
     }
   }
+
+  # write out updated line
   $line =~ /^(.*?:\s*)/;
   print F $1.join(' ', @ndeps) if @ndeps;
   print F "\n";
