@@ -125,13 +125,23 @@ recipe_build_mkosi() {
     chroot "$BUILD_ROOT" "$@" || cleanup_and_exit 1
 
     # move the output files from the subdirectory, as only files in the OTHER/ directory
-    # are published, but they get deposited in OTHER/$DIST~$RELEASE/
-    for d in "$BUILD_ROOT/$TOPDIR"/OTHER/*/; do
+    # are published, but with mkosi == v14 they got deposited in OTHER/$DIST~$RELEASE.
+    for d in "$BUILD_ROOT/$TOPDIR"/OTHER/*"~"*/; do
         if [ ! -d "$d" ]; then
             continue
         fi
         mv "$d"/* "$BUILD_ROOT/$TOPDIR/OTHER/"
         rmdir "$d"
+    done
+
+    # Output=directory may be used for building overlays, but OBS can't publish
+    # those. Just delete them to avoid pollution of the output directory and logs.
+    for d in "$BUILD_ROOT/$TOPDIR"/OTHER/*/; do
+        if [ ! -d "$d" ]; then
+            continue
+        fi
+        echo "Deleting $d"
+        rm -r "$d"
     done
 
     # if present, compress the manifest file(s) which can be quite large
