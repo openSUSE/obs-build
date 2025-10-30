@@ -157,14 +157,14 @@ for my $line (@$xspec) {
   }
 
   my $used = 1;
-  my $origline;
+  my $expandedline = $line;	# macro expanded line
   if (ref($line)) {
     if (!defined($line->[1])) {
       $used = 0;
-      $line = $line->[0];
+      $expandedline = $line = $line->[0];
     } else {
-      $origline = $line->[0];
-      $line = $line->[1];
+      $expandedline = $line->[1];
+      $line = $line->[0];
     }
   }
 
@@ -179,12 +179,11 @@ for my $line (@$xspec) {
 
   next if $vcsurl && $line =~ /^VCS\s*:/i;
 
-  if ($line =~ /^Name\s*:\s*(\S+)/i) {
-    $pkg = $mainpkg = $1 unless $mainpkg;
-    $line .= "\nVCS: $vcsurl" if $vcsurl;
+  if ($expandedline =~ /^Name\s*:(\s*)(\S+)/i) {
+    $pkg = $mainpkg = $2 unless $mainpkg;
+    $line .= "\nVCS: $1$vcsurl" if $vcsurl;
   }
-
-  if ($line =~ /^\s*%package\s+(-n\s+)?(\S+)/) {
+  if ($expandedline =~ /^\s*%package\s+(-n\s+)?(\S+)/) {
     if ($1) {
       $pkg = $2;
     } else {
@@ -321,10 +320,6 @@ for my $line (@$xspec) {
     }
     # all compat stuff done. we return to your scheduled program
   }
-
-  # do dependency substitutions
-  my $expandedline = $line;	# expanded line
-  $line = $origline if defined $origline;
 
   if (!$used || ($line !~ /^(?:Requires|BuildRequires|PreReq)(?:\([^\)]+\))?:/i)) {
     print F "$line\n";
