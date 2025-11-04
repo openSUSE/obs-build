@@ -50,6 +50,7 @@ repos_baseurl=()
 repos_cachedir=()
 
 . $BUILD_DIR/common_functions || exit 1
+setup_color_vars || echo "Failed to setup colored output"
 
 # should RPMs be installed with --force ?
 USE_FORCE=false
@@ -140,7 +141,7 @@ done
 PKGS=("$@")
 
 if test -z "$BUILD_ROOT" ; then
-    echo "Please specify a build root!"
+    log_error "Please specify a build root!"
     exit 1
 fi
 test -z "$CACHE_DIR" && detect_cache_dir
@@ -218,10 +219,10 @@ clean_build_root() {
 unsafe_preinstall_check() {
     # cpio isn't safe so we require bsdtar for VMs. chroot is
     # unsafe anyways so it's ok for that.
-    if test -n "$PREPARE_VM" ; then
-	echo "Error: setting up a VM requires bsdtar for security reasons."
-	echo "Please install bsdtar."
-	cleanup_and_exit 1
+    if test -n "$PREPARE_VM"; then
+        log_error "setting up a VM requires bsdtar for security reasons."
+        log_error "Please install bsdtar."
+        cleanup_and_exit 1
     fi
 }
 
@@ -282,7 +283,7 @@ preinstall_integrate() {
 
 preinstall_image() {
     check_exit
-    echo "unpacking preinstall image${2:+ $2}"
+    info "Unpacking preinstall image${2:+ $2}"
     preinstall_setup
 
     TAR_EXCLUDES="--exclude .build --exclude .init_b_cache"
@@ -298,11 +299,11 @@ preinstall_image() {
 	unsafe_preinstall_check
 	TAR="tar $TAR_EXCLUDES -x"
     fi
-    if ! $TAR -f "$BUILD_INIT_CACHE/rpms/$1" ; then
-	echo "ERROR: unpack failed."
-        if test "x$(od -t x4 -A n -N 4 "$BUILD_INIT_CACHE/rpms/$1")" = "x fd2fb528" ; then
-            echo "ERROR: This is a .zst compressed preinstallimage and $TAR failed to unpack."
-            echo "Try to enable zst in $TAR or disable preinstallimage."
+    if ! $TAR -f "$BUILD_INIT_CACHE/rpms/$1"; then
+        log_error "Unpack failed!"
+        if test "x$(od -t x4 -A n -N 4 "$BUILD_INIT_CACHE/rpms/$1")" = "x fd2fb528"; then
+            log_error "This is a .zst compressed preinstallimage and $TAR failed to unpack."
+            log_error "Try to enable zst in $TAR or disable preinstallimage."
         fi
 	cleanup_and_exit 1
     fi
@@ -454,7 +455,7 @@ create_cache_file() {
     fi
 
     # nope, generate a new cache file
-    test -z "$LIST_STATE" && echo initializing $CACHE_FILE ...
+    test -z "$LIST_STATE" && info "Initializing $CACHE_FILE..."
 
     # figure out a repository type default
     find_default_repotype
@@ -520,7 +521,7 @@ downloadpkg() {
     SRC=${SRC/%.pkg.tar.?z/.arch}
     local destdir="$cachedir/tmp"
     mkdir -p "$destdir"
-    echo "downloading $url ... ";
+    info "Downloading $url..."
     $BUILD_DIR/download "$destdir" "$url" || cleanup_and_exit 1
     local destfile="$destdir/${url##*/}"
     if test ! -e "$destfile" ; then
