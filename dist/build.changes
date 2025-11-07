@@ -1,4 +1,26 @@
 -------------------------------------------------------------------
+Fri Nov  7 08:22:30 UTC 2025 - Adrian Schröter <adrian@suse.de>
+
+- Helm: Use bool type for 'deprecated'
+- Distribution config updates
+- rpm: take package name from filename if no name is defined
+- ARM: qemu emulation uses -cpu max now
+- Add BuildFlags for changelogfulltimestamps
+- Fixes for lookaside store download
+- Create a symlink in /etc/localtime before calling zic
+- createarchive: implement fallback for old tar versions
+- Be more strict about the weird [qualifier] dependency extension
+- Implement bcond_override_default
+- Make substitutedeps work on the expanded dependencies
+- Docker: support COPY --from=image
+- Support an experimental "BuildFlags: cgroup2"
+- Support an experimental #!BuildTargetStage directive
+- Support "BuildFlags: rpm-nodebugmagic"
+- mkosi: Don't include preinstall packages
+- mkosi: Don't attempt to publish directory artifacts
+- Fix excluding /dev, /sys, etc. from preinstallimages
+
+-------------------------------------------------------------------
 Fri Aug 29 06:38:57 UTC 2025 - Adrian Schröter <adrian@suse.de>
 
 - Set the source mtime to the commit timestamp for git (boo#1248776)
