@@ -289,7 +289,7 @@ preinstall_image() {
 
     if [ -f "/run/.containerenv" ]; then
         # we're running in a podman container and we probably don't have sufficient capabilities to create special files
-        TAR_EXCLUDES+=("dev/*" "proc/*" "run/*" "sys/*")
+        TAR_EXCLUDES=("${TAR_EXCLUDES[@]}" "dev/*" "proc/*" "run/*" "sys/*")
     fi
 
     if test -x /usr/bin/bsdtar ; then
