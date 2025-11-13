@@ -179,9 +179,9 @@ for my $line (@$xspec) {
 
   next if $vcsurl && $line =~ /^VCS\s*:/i;
 
-  if ($expandedline =~ /^Name\s*:(\s*)(\S+)/i) {
-    $pkg = $mainpkg = $2 unless $mainpkg;
-    $line .= "\nVCS: $1$vcsurl" if $vcsurl;
+  if ($expandedline =~ /^Name\s*:\s*(\S+)/i) {
+    $pkg = $mainpkg = $1 unless $mainpkg;
+    $line .= "\nVCS: $vcsurl" if $vcsurl;
   }
   if ($expandedline =~ /^\s*%package\s+(-n\s+)?(\S+)/) {
     if ($1) {
