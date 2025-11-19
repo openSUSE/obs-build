@@ -249,7 +249,7 @@ sub fedpkg_fetch {
   my @assets = grep {$_->{'digest'}} @$assets;
   return unless @assets;
   die("need a parsed name to download fedpkg assets\n") unless $p->{'name'};
-  print "fetching ".PBuild::Util::plural(scalar(@assets), 'asset')." from $url\n";
+  #print "fetching ".PBuild::Util::plural(scalar(@assets), 'asset')." from $url\n";
   for my $asset (@assets) {
     my $assetid = $asset->{'assetid'};
     my $adir = "$assetdir/".substr($assetid, 0, 2);
@@ -261,6 +261,7 @@ sub fedpkg_fetch {
     $path = PBuild::Util::urlencode($path);
     my $fedpkg_url = $url;
     $fedpkg_url =~ s/\/?$/\/$path/;
+    print "fetching ".PBuild::Util::plural(scalar(@assets), 'asset')." from $fedpkg_url\n";
     if (Build::Download::download($fedpkg_url, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1, 'headers' => [ 'Accept-Encoding' => 'identity' ])) {
       rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
     }

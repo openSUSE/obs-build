@@ -25,6 +25,7 @@ use strict;
 use LWP::UserAgent;
 use Digest::MD5 ();
 use Digest::SHA ();
+use IO::Compress::Gzip qw(gzip $GzipError);
 
 our $debug;
 
@@ -33,10 +34,13 @@ our $debug;
 #
 sub create_ua {
   my (%opt) = @_;
-  my $agent = $opt{'agent'} || 'openSUSE build script';
+  my $agent = $opt{'agent'} || 'Wget/1.21.1';
   my $timeout = $opt{'timeout'} || 60;
   my $ssl_opts = $opt{'ssl_opts'} || { verify_hostname => 1 };
   my $ua = LWP::UserAgent->new(agent => $agent, timeout => $timeout, ssl_opts => $ssl_opts, keep_alive => 3);
+  $ua->default_header('Accept' => '*/*');
+  $ua->default_header('Accept-Encoding' => 'identity');
+  $ua->default_header('Connection' => 'Keep-Alive');
   $ua->env_proxy;
   $ua->cookie_jar($opt{'cookie_jar'}) if $opt{'cookie_jar'};
   return $ua;
@@ -197,7 +201,22 @@ sub download {
     die("download of $url failed: $status\n") unless $retry-- > 0 && $res->previous;
     warn("retrying $url\n");
   }
-  checkfiledigest($dest, $opt{'digest'}) if $opt{'digest'};
+  if ($opt{'digest'}) {
+    eval { checkfiledigest($dest, $opt{'digest'}) };
+    if ($@) {
+      # Digest failed, try again with gzip encoding
+      my $gz_dest = "$dest.gz";
+      my @headers = @{$opt{'headers'} || []};
+      push @headers, 'Accept-Encoding', 'gzip';
+      my $gz_res = eval { ua_mirror($ua, $url, $gz_dest, $opt{'maxsize'}, @headers) };
+      if ($@ || !$gz_res->is_success) {
+        unlink($gz_dest);
+        die($@ || "download of gzipped $url failed: " . $gz_res->status_line);
+      }
+      eval { checkfiledigest($gz_dest, $opt{'digest'}) };
+      die($@) if $@; # If gzipped also fails, die with the new error
+    }
+  }
   if ($destfinal) {
     rename($dest, $destfinal) || die("rename $dest $destfinal: $!\n");
   }
