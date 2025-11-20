@@ -197,7 +197,15 @@ sub download {
     die("download of $url failed: $status\n") unless $retry-- > 0 && $res->previous;
     warn("retrying $url\n");
   }
-  checkfiledigest($dest, $opt{'digest'}) if $opt{'digest'};
+  if ($opt{'digest'}) {
+    eval { checkfiledigest($dest, $opt{'digest'}) };
+    if ($@ && $opt{'gzip_retry'}) {
+      unlink($dest);
+      my @newheaders = (@{$opt{'headers'} || []}, 'Accept-Encoding' => 'gzip');
+      return download($url, $dest, $destfinal, %opt, 'headers' => \@newheaders, 'gzip_retry' => 0);
+    }
+    die($@) if $@;
+  }
   if ($destfinal) {
     rename($dest, $destfinal) || die("rename $dest $destfinal: $!\n");
   }
