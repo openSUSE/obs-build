@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 37;
+use Test::More tests => 40;
 
 use Build::Rpm;
 
@@ -86,6 +86,24 @@ q{%{expand %%%%%%%%}}		=> '%%',
 q{
 %define foo bar
 %{defined:foo}/%{defined:oof}}	=> '1/0',
+q{
+%bcond normally_on 1
+%bcond_with normally_off
+%bcond both_features %[%{with normally_on} && %{with normally_off}]
+%{with normally_on}/%{with normally_off}/%{with both_features}} => '1/0/0',
+q{
+%define _with_normally_on 1
+%define _with_normally_off 1
+%bcond normally_on 1
+%bcond_with normally_off
+%bcond both_features %[%{with normally_on} && %{with normally_off}]
+%{with normally_on}/%{with normally_off}/%{with both_features}} => '1/1/1',
+q{
+%bcond_override_default normally_on 0
+%bcond_override_default normally_off 1
+%bcond normally_on 1
+%bcond_with normally_off
+%{with normally_on}/%{with normally_off}} => '0/1',
 );
 
 while (@tests) {

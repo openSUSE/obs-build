@@ -80,7 +80,7 @@ $options{'withdescription'} = 1 if !defined($type) || $type eq 'description';
 my $q = Build::parse($cf, $recipe, %options);
 
 if (!defined $type) {
-  if ($format eq 'json') {
+  if ($format && $format eq 'json') {
     require Build::SimpleJSON;
     print Build::SimpleJSON::unparse($q);
   } else {

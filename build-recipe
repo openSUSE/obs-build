@@ -346,7 +346,14 @@ recipe_create_tar_from_dir() {
     echo "#!/bin/sh -e" > $BUILD_ROOT/.unpack.command
     shellquote cd "$TOPDIR/SOURCES" >> $BUILD_ROOT/.unpack.command
     echo >> $BUILD_ROOT/.unpack.command
-    shellquote tar -cf - --owner=root:0 --group=root:0 --exclude=.git --sort=name --pax-option=exthdr.name=%d/PaxHeaders/%f,delete=atime,delete=ctime -- "${t%*.tar.*}" >> $BUILD_ROOT/.unpack.command
+    if tar --sort --version >/dev/null 2>&1; then
+        shellquote tar -cf - --owner=root:0 --group=root:0 --exclude=.git --sort=name --pax-option=exthdr.name=%d/PaxHeaders/%f,delete=atime,delete=ctime -- "${t%*.tar.*}" >> $BUILD_ROOT/.unpack.command
+    else
+        # fallback for tar versions before 1.28
+        # neither --sort is supported nor specifing the id for owner and group
+        shellquote find "${t%*.tar.*}" -name .git -o -print0 >> $BUILD_ROOT/.unpack.command
+        echo -n ' | sort -z | tar -cf - --owner=root --group=root --pax-option=exthdr.name=%d/PaxHeaders/%f,delete=atime,delete=ctime --null --no-recursion -T -' >> $BUILD_ROOT/.unpack.command
+    fi
     echo -n ' | ' >> $BUILD_ROOT/.unpack.command
     shellquote "${compressor[@]}" >> $BUILD_ROOT/.unpack.command
     echo -n ' > ' >> $BUILD_ROOT/.unpack.command

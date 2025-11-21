@@ -60,6 +60,7 @@ VMDISK_FILESYSTEM=
 VMDISK_MOUNT_OPTIONS=__default
 VMDISK_CLEAN=
 VM_HOSTNAME=
+BUILD_SETUP_CGROUP2=
 
 # zvm specific?
 VM_WORKER_NO=
@@ -656,6 +657,11 @@ vm_detect_2nd_stage() {
         mount -orw -n -t securityfs securityfs /sys/kernel/security 2>/dev/null || :
     fi
 
+    # mount cgroup2 if requested
+    if test -n "$BUILD_SETUP_CGROUP2" ; then
+	mount -orw,nsdelegate -n -t cgroup2 none /sys/fs/cgroup
+    fi
+
     # delete dummy /etc/os-release file
     test -e /etc/os-release -a ! -s /etc/os-release && rm -f /etc/os-release
 
@@ -1037,6 +1043,8 @@ vm_first_stage() {
 
     # the watchdog needs a log file
     test -n "$LOGFILE" || VM_WATCHDOG=
+    # check if we should setup cgroups2
+    test -n $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags cgroup2) && BUILD_SETUP_CGROUP2=1
     # put our config into .build/build.data
     rm -rf $BUILD_ROOT/.build/build.data
     Q="'\''"
@@ -1109,6 +1117,7 @@ vm_first_stage() {
     echo "RPM_BUILD_IN_PLACE='$RPM_BUILD_IN_PLACE'" >> $BUILD_ROOT/.build/build.data
     echo "RPM_NOPREP='$RPM_NOPREP'" >> $BUILD_ROOT/.build/build.data
     echo "BUILD_CHANGELOG_TIMESTAMP='$BUILD_CHANGELOG_TIMESTAMP'" >> $BUILD_ROOT/.build/build.data
+    echo "BUILD_SETUP_CGROUP2='$BUILD_SETUP_CGROUP2'" >> $BUILD_ROOT/.build/build.data
     # fallback time for broken hosts
     rm -rf $BUILD_ROOT/.build/.date
     date '+@%s' > $BUILD_ROOT/.build/.date

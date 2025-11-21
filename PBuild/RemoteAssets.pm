@@ -261,7 +261,7 @@ sub fedpkg_fetch {
     $path = PBuild::Util::urlencode($path);
     my $fedpkg_url = $url;
     $fedpkg_url =~ s/\/?$/\/$path/;
-    if (Build::Download::download($fedpkg_url, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1)) {
+    if (Build::Download::download($fedpkg_url, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1, 'headers' => [ 'Accept' => '*/*', 'Accept-Encoding' => 'identity' ], 'gzip_retry' => 1)) {
       rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
     }
   }

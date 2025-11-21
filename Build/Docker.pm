@@ -337,6 +337,16 @@ sub parse {
       if ($line =~ /^#!ForceMultiVersion\s*$/) {
         $ret->{'multiversion'} = 1;
       }
+      if ($line =~ /^#!BuildTargetStage:\s*(\S+)\s*$/) {
+	my $targetstage = $1;
+	if ($targetstage =~ /%/) {
+	  require Build::Rpm;
+	  $targetstage = Build::Rpm::expandmacros($cf, $targetstage);
+	  $targetstage =~ s/^\s+//;
+	  $targetstage =~ s/\s+$//;
+	}
+        $ret->{'docker_targetstage'} = $targetstage if $targetstage ne '';
+      }
       next;
     }
     # add continuation lines
@@ -376,6 +386,7 @@ sub parse {
       $basecontainer = undef;
       if (@args && $as_container{$args[0]}) {
 	$basecontainer = $as_container{$args[0]}->[1];
+	$as_container{$args[2]} = [ $args[0], $basecontainer ] if @args > 2 && lc($args[1]) eq 'as';
       } elsif (@args && !$as_container{$args[0]}) {
         my $container = $args[0];
         if ($container ne 'scratch') {
@@ -433,6 +444,19 @@ sub parse {
 	next if $vars_env->{$1};
 	$vars->{$1} = $build_vars{$1} || (defined($2) ? [ $2 ] : $vars_meta->{$1} || []);
 	$vars_meta->{$1} = $vars->{$1} unless $from_seen;
+      }
+    } elsif ($cmd eq 'COPY') {
+      if (@args && $args[0] =~ /--from=(.+)/) {
+	my $container = $1;
+	if (!$as_container{$container} && $container ne 'scratch') {
+	  if ($Build::Kiwi::urlmapper && $container =~ /^([^\/]+\.[^\/]+)\/[a-zA-Z0-9]/) {
+	    my $prp = $Build::Kiwi::urlmapper->("registry://$1/");
+	    push @containerrepos, $prp if $prp;
+	  }
+	  $container .= ':latest' unless $container =~ /:[^:\/]+$/;
+	  $container = "container:$container";
+	  push @{$ret->{'deps'}}, $container unless grep {$_ eq $container} @{$ret->{'deps'}};
+	}
       }
     }
   }

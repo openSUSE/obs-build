@@ -397,8 +397,12 @@ spec_setup_macros() {
     local rawcfgmacros=.rpmmacros
     test "$BUILDTYPE" = debbuild && rawcfgmacros=.debmacros
     queryconfig rawmacros --dist "$BUILD_DIST" --archpath "$BUILD_ARCH" --configdir "$CONFIG_DIR" > $BUILD_ROOT/root/$rawcfgmacros
+
+    # add debug magic unless turned off
     if test -n "$BUILD_DEBUG" && test "$BUILDTYPE" != debbuild ; then
-	echo '
+	local nodebugmagic=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags rpm-nodebugmagic)
+	if test -z "$nodebugmagic" ; then
+	    echo '
 %prep %{?!__debug_package:%{?_build_create_debug:%?_build_insert_debug_package}}%%prep
 %package %{?!__debug_package:%{?_build_create_debug:%?_build_insert_debug_package}}%%package
 %_build_insert_debug_package \
@@ -407,6 +411,7 @@ spec_setup_macros() {
 %debug_package
 
 ' >> $BUILD_ROOT/root/$rawcfgmacros
+	fi
     fi
 
     if test -n "$BUILD_JOBS" ; then
