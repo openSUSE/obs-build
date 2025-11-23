@@ -1008,6 +1008,7 @@ sub parse {
       } elsif ($keyword eq '#!createarchive') {
 	$createarchive = {};
 	$createarchive->{'dir'} = $arg if $arg =~ /^[^\.\/][^\/]*$/s;
+	$createarchive->{'dir'} = $arg if $arg == '.';
       } elsif ($keyword eq '#!buildtarget') {
         $arg = (split(' ', $arg, 2))[0];
         if ($arg =~ s/(.*?)://) {
