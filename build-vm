@@ -665,6 +665,11 @@ vm_detect_2nd_stage() {
     # delete dummy /etc/os-release file
     test -e /etc/os-release -a ! -s /etc/os-release && rm -f /etc/os-release
 
+    # workaround systemd creating a bad /lib64 symlink on debian aarch64
+    if test -L /lib64 -a -d /usr/lib/aarch64-linux-gnu -a ! -d /usr/lib64 ; then
+	ln -sfn usr/lib/aarch64-linux-gnu /lib64
+    fi
+
 # qemu inside of xen does not work, check again with kvm later before enabling this
 #    if test -e /dev/kqemu ; then
 #        # allow abuild user to run qemu
