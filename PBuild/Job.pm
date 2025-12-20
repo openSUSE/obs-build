@@ -125,6 +125,7 @@ sub collect_result {
     @d = map {"DEBS/$_"} sort(PBuild::Util::ls("$buildroot/.build.packages/DEBS"));   # assume debbuild
     push @d, 'SDEBS';
   }
+  @d = ('ARCHPKGS') if $p->{'recipe'} =~ /SRCINFO$/;
   @d = ('ARCHPKGS') if $p->{'recipe'} =~ /PKGBUILD$/;
   @d = ('APKS') if $p->{'recipe'} =~ /APKBUILD$/;
   @d = ('KIWI') if $p->{'recipe'} =~ /\.kiwi$/;
