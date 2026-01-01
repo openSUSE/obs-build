@@ -28,16 +28,37 @@ vm_verify_options_podman() {
 }
 
 vm_startup_podman() {
-    local name="build_${RECIPEFILE//:/-}"
+    source $BUILD_ROOT/.build/build.data
+    local name=$CONTAINER_NAME
     podman rm "$name" >/dev/null 2>&1 || true
     local podman_opts=
+    local container_root="/"
+    local build_command=("$vm_init_script")
+    local mounts=()
     test -n "$VM_TYPE_PRIVILEGED" && podman_opts="--privileged --cap-add=SYS_ADMIN --cap-add=MKNOD"
     test -n "$RUN_SHELL" -o -n "$RUN_SHELL_AFTER_FAIL" && podman_opts="$podman_opts -it"
+    local podman_image="build-scratch:latest"
+    if test -n "$VM_CONTAINER_IMAGE" ; then
+        mkdir -p $BUILD_ROOT/home/abuild
+        # create .build.packages link
+        rm -rf $BUILD_ROOT/.build.packages
+        ln -s home/abuild/rpmbuild $BUILD_ROOT/.build.packages
+        podman_image="$VM_CONTAINER_IMAGE"
+        container_root="/mnt"
+        mounts+=("--mount" "type=bind,source=$BUILD_ROOT/home/abuild,destination=/home/abuild")
+        local build_command=(bash -c "
+            # Create symlinks for /mnt hidden directories that include build script and data
+            for item in /mnt/.[^.]*; do
+                [ -d \"\$item\" ] && ln -sf \"\$item\" \"/\$(basename \"\$item\")\"
+            done
+            $vm_init_script
+        ")
+    fi
+    mounts+=("--mount" "type=bind,source=$BUILD_ROOT,destination=$container_root")
     podman run \
         --runtime=runc \
         --rm --name "$name" --net=none $podman_opts \
-        --mount "type=bind,source=$BUILD_ROOT,destination=/" \
-        "$@" build-scratch:latest "$vm_init_script"
+        "${mounts[@]}" "$@" $podman_image "${build_command[@]}"
     BUILDSTATUS="$?"
     test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
     cleanup_and_exit "$BUILDSTATUS"
@@ -49,9 +70,15 @@ vm_kill_podman() {
 }
 
 vm_fixup_podman() {
-    # create a scratch image for our build environment
-    if ! podman image exists build-scratch:latest ; then
-        echo "FROM scratch"  | podman build -t build-scratch:latest  -
+    if  test -n "$VM_CONTAINER_IMAGE"; then
+        if ! podman image exists "$VM_CONTAINER_IMAGE" ; then
+            cleanup_and_exit 1 "ERROR: Unable to find container preinstallimage ${VM_CONTAINER_IMAGE}"
+        fi
+    else
+        # create a scratch image for our build environment
+        if ! podman image exists build-scratch:latest ; then
+            echo "FROM scratch"  | podman build -t build-scratch:latest  -
+        fi
     fi
 }
 
@@ -80,7 +107,8 @@ vm_sysrq_podman() {
 }
 
 vm_wipe_podman() {
-    local name="build_${RECIPEFILE//:/-}"
+    source $BUILD_ROOT/.build/build.data
+    local name=$CONTAINER_NAME
     podman rm "$name" >/dev/null 2>&1 || true
 
     echo "Wiping build root: '$BUILD_ROOT'"
