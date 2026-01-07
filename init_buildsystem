@@ -1134,6 +1134,7 @@ for PKG in $MAIN_LIST ; do
 	read PKGID < "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF.buildid"
     else
 	PKGID=$(perl -I$BUILD_DIR -MBuild -e Build::showquery "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF" buildid)
+	test -n "$PKGID" || cleanup_and_exit 3 "error: PKGID is empty for $PKG.$PSUF"
     fi
 
     if test -f "$BUILD_INIT_CACHE/alreadyinstalled/$PKG" ; then
@@ -1191,6 +1192,7 @@ if test -n "$PACKAGES_TO_SYSROOTINSTALL" ; then
 	    read PKGID < "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF.buildid"
 	else
 	    PKGID=$(perl -I$BUILD_DIR -MBuild -e Build::showquery "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF" buildid)
+	    test -n "$PKGID" || cleanup_and_exit 3 "error: PKGID is empty for $PKG.$PSUF"
 	fi
 	echo "installing ${PKGID%% *}"
 	if ! test "$BUILD_INIT_CACHE/rpms/$PKG.$PSUF" -ef "$BUILD_INIT_CACHE/$PKG.$PSUF" ; then
