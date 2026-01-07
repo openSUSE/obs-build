@@ -1749,7 +1749,7 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $DLNOSIGNATURE $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$RECIPEPATH" $ADDITIONAL_PACKS
 	echo "$* ..."
         start_time=$SECONDS
-	"$@" || cleanup_and_exit 1
+	"$@" || cleanup_and_exit $?
 	check_exit
         TIME_INSTALL=$(( $SECONDS - $start_time ))
         unset start_time
@@ -1959,7 +1959,7 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
 	umount_stuff
 	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $DLNOSIGNATURE $USEUSEDFORBUILD $CREATE_BUILD_BINARIES $RPMLIST "$MYSRCDIR/$RECIPEFILE" $ADDITIONAL_PACKS "${GEN_BUILDREQS_PACKS[@]}"
 	echo "$* ..."
-	"$@" || cleanup_and_exit 1
+	"$@" || cleanup_and_exit $?
 	check_exit
 	mount_stuff
 	BUILD_SUCCEEDED=false
