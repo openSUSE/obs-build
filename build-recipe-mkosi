@@ -89,16 +89,6 @@ recipe_build_mkosi() {
         fi
     fi
 
-    # If we are running with any source services, the sources might be unpacked in a directory
-    # in SOURCES/, so try to find the right one, by checking where the top level mkosi.conf is.
-    workdir="$TOPDIR/SOURCES/"
-    for d in "$TOPDIR"/SOURCES/*; do
-        if [ ! -d "$d" ]; then continue; fi
-        if [ ! -f "$d/mkosi.conf" ]; then continue; fi
-        workdir="$d"
-        break
-    done
-
     local image_version=""
     if [ -n "$RELEASE" ]; then
         image_version="--image-version=${RELEASE}"
@@ -107,7 +97,7 @@ recipe_build_mkosi() {
         image_version="--image-version=0"
     fi
     set -- mkosi \
-        --directory "$workdir" \
+        --directory "$TOPDIR/SOURCES/" \
         --default \
         "$RECIPEFILE" \
         $RELEASE_ARG \
