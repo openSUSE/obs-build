@@ -127,6 +127,33 @@ zypper() {
     done
     case $cmd in
     in|install|rm|remove|up|update|if|info)
+	set -- "$@" "$sentinel"
+	local prev=""
+	local o
+	while test "$sentinel" != "$1" ; do
+	    o="$1"
+	    shift
+	    if test -n "$prev" ; then
+		if test "$o" = "=" -o "$o" = "!=" -o "$o" = ">=" -o "$o" = "<=" ; then
+		    prev="$prev $o"
+		    continue
+		fi
+		case "$prev" in
+		    *" ="|*" !="|*" >="|*" <=")
+			prev="$prev $o"
+			set -- "$@" "$prev"
+			prev=""
+			continue
+			;;
+		esac
+		set -- "$@" "$prev"
+	    fi
+	    prev="$o"
+	done
+	if test -n "$prev" ; then
+	    set -- "$@" "$prev"
+	fi
+	shift
 	$testmode /usr/bin/zypper -D $LOCAL_REPOS_D "$@"
 	setup_links_and_exit $?
 	;;
