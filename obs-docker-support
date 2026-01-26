@@ -127,7 +127,7 @@ zypper() {
     done
     case $cmd in
     in|install|rm|remove|up|update|if|info)
-	$testmode /usr/bin/zypper -D $LOCAL_REPOS_D "$@"
+	$testmode /usr/bin/zypper --no-refresh -D $LOCAL_REPOS_D "$@"
 	setup_links_and_exit $?
 	;;
     ar|addrepo)
@@ -147,7 +147,7 @@ obs_pkg_mgr() {
     case "$1" in
     install|remove)
 	shift
-	$testmode /usr/bin/zypper -D $LOCAL_REPOS_D --no-gpg-checks -n in "$@"
+	$testmode /usr/bin/zypper --no-refresh -D $LOCAL_REPOS_D --no-gpg-checks -n in "$@"
 	setup_links_and_exit $?
 	;;
     add_repo)
