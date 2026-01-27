@@ -5,9 +5,9 @@ use Test::More tests => 17;
 
 my @t = (
     [ 'zypper', 'rm', 'zypper' ]
-	=> '/usr/bin/zypper "-D" "/etc/repos_obs_dockersupport.d/" "rm" "zypper"',
+	=> '/usr/bin/zypper "--no-refresh" "-D" "/etc/repos_obs_dockersupport.d/" "rm" "zypper"',
     [ 'zypper', 'in', 'foo', 'bar' ]
-	=> '/usr/bin/zypper "-D" "/etc/repos_obs_dockersupport.d/" "in" "foo" "bar"',
+	=> '/usr/bin/zypper "--no-refresh" "-D" "/etc/repos_obs_dockersupport.d/" "in" "foo" "bar"',
     [ 'zypper', '--root', '/tmp/root', 'ar', 'https://xx.foo/zz.repo', 'zz' ]
 	=> '/usr/bin/zypper "--root" "/tmp/root" "ar" "-C" "https://xx.foo" "zz"',
     [ 'zypper', 'ref' ]
