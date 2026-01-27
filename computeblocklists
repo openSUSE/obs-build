@@ -254,6 +254,12 @@ while (1) {
   } else {
     last;
   }
+
+  my @stat = stat($file);
+  die unless @stat;
+  my $filesize = $stat[7];
+  my $filemtime = $stat[9];
+
   my $n = $file;
   $n =~ s/([\000-\037 %])/sprintf("%%%02X", ord($1))/ges;
   if (-l $file) {
@@ -277,11 +283,11 @@ while (1) {
       }
     }
     $c =~ s/([\000-\037 %])/sprintf("%%%02X", ord($1))/ges;
-    print "l $n $c\n";
+    print "l $n $filemtime $c\n";
     next;
   } elsif (-d _) {
     print STDERR "$file\n" if $opt_verbose && ($opt_verbose > 1 || $file =~ /^KIWI\/[^\/]*$/);
-    print "d $n\n";
+    print "d $n $filemtime\n";
     next;
   } elsif (! -f _) {
     print STDERR "$file: unsupported file type, ignored\n";
@@ -295,11 +301,8 @@ while (1) {
     next;
   }
 
-  my @stat = stat($fd);
-  die unless @stat;
-  my $filesize = $stat[7];
   if ($filesize == 0) {
-    print "f $n 0\n";
+    print "f $n $filemtime 0\n";
     close($fd);
     next;
   }
@@ -323,7 +326,7 @@ while (1) {
     warn($@) if $@;
   }
   die "$file: could not get extent list\n" unless defined $exts;
-  print "f $n $filesize $bsize$exts\n";
+  print "f $n $filemtime $filesize $bsize$exts\n";
   close($fd);
 }
 
