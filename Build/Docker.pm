@@ -116,7 +116,7 @@ sub cmd_zypper {
     shift @args;
   }
   return unless @args;
-  if ($args[0] eq 'in' || $args[0] eq 'install') {
+  if ($args[0] eq 'in' || $args[0] eq 'install' || $args[0] eq 'up' || $args[0] eq 'update') {
     shift @args;
     while (@args && $args[0] =~ /^-/) {
       shift @args if $args[0] =~ /^--(?:from|repo|type)$/ || $args[0] =~ /^-[tr]$/;
