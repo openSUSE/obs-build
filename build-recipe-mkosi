@@ -108,17 +108,14 @@ recipe_build_mkosi() {
     fi
     set -- mkosi \
         --directory "$workdir" \
-        --default \
-        "$RECIPEFILE" \
         $RELEASE_ARG \
         $image_version \
-        --nspawn-keep-unit \
         --output-dir "$TOPDIR/OTHER" \
         --checksum=yes \
         --repository-key-check=no \
-        --with-network=never \
         --local-mirror file:///.build.binaries/ \
-        --cache /.build.binaries/ \
+        --cache-only=always \
+        --cache-dir /.build.binaries/ \
         build
 
     echo "running $*"
