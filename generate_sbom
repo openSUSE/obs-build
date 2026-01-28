@@ -170,9 +170,10 @@ sub uncompress_container {
 }
 
 sub unpack_container {
-  my ($dir, $container) = @_;
+  my ($dir, $container, $format) = @_;
+  $format ||= 'docker-archive';
   uncompress_container($container, "$dir/cont");
-  systemq('skopeo', 'copy', "docker-archive:$dir/cont", "oci:$dir/image:latest");
+  systemq('skopeo', 'copy', "$format:$dir/cont", "oci:$dir/image:latest");
   unlink("$dir/cont");
   my @rootless;
   push @rootless, '--rootless' if $>;
@@ -1013,7 +1014,7 @@ Supported content
 my $wrap_intoto;
 my $isproduct;
 my $isdir;
-my $istar;
+my $iscontainer;
 my $distro;
 my $rpmmd;
 my $format;
@@ -1034,8 +1035,10 @@ while (@ARGV && $ARGV[0] =~ /^-/) {
     $isdir = 1;
   } elsif ($opt eq '--rpmmd') {
     $rpmmd = 1;
-  } elsif ($opt eq '--container-archive') {
-    $istar = 1;
+  } elsif ($opt eq '--container-archive' || $opt eq '--container-docker-archive') {
+    $iscontainer = 'docker-archive';
+  } elsif ($opt eq '--container-oci-archive') {
+    $iscontainer = 'oci-archive';
   } elsif ($opt eq '--format') {
     $format = shift @ARGV;
   } elsif ($opt eq '--help') {
@@ -1107,10 +1110,11 @@ if ($isproduct) {
   }
   $files = gen_filelist($toprocess);
   $filepkgs = introspect_filelist($toprocess, $files);
-} else { # no check for $istar to stay backward compatible
+} else { # no check for $iscontainer to stay backward compatible
   # container tar case
+  $iscontainer ||= 'docker-archive';
   $targettype = 'container';
-  my $unpackdir = unpack_container($tmpdir, $toprocess);
+  my $unpackdir = unpack_container($tmpdir, $toprocess, $iscontainer);
   $dist = read_dist($unpackdir);
   $pkgtype = pkgtype_from_dist($dist);
   if ($pkgtype eq 'deb') {
