@@ -1,34 +1,49 @@
 #!/bin/bash
 
 qf='[%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}|%{DISTURL}|%{LICENSE}\n]'
+archive_format=docker-archive
 
-if test "$1" = "--summaries" ; then
-  qf='[%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}|%{SUMMARY}\n]'
-  shift
-fi
+while test -n "$1" ; do
+    if test "$1" = "--summaries" ; then
+	qf='[%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}|%{SUMMARY}\n]'
+	shift
+	continue
+    fi
+    if test "$1" = "--oci" ; then
+	archive_format=oci-archive
+	shift
+	continue
+    fi
+    if test "$1" = "--docker" ; then
+	archive_format=docker-archive
+	shift
+	continue
+    fi
+    break
+done
 
 container="$1"
 
 if test -z "$container" ; then
-  echo "usage: create_container_package_list [--summaries] <container>"
-  exit 1
+    echo "usage: create_container_package_list [--summaries] <container>"
+    exit 1
 fi
 if ! test -s "$container" ; then
-  echo "no such container: $container" >&2
-  exit 1
+    echo "no such container: $container" >&2
+    exit 1
 fi
 
 tmpdir=$(mktemp -d)
 trap "rm -rf $tmpdir" EXIT
 
 case "$container" in
-  *.tar) cat < "$container" > $tmpdir/cont ;;
-  *.tar.gz) gunzip < "$container" > $tmpdir/cont ;;
-  *.tar.xz) xzdec < "$container" > $tmpdir/cont ;;
-  *) echo "unsuppored container name $container" >&2 ; exit 1 ;;
+    *.tar) cat < "$container" > $tmpdir/cont ;;
+    *.tar.gz) gunzip < "$container" > $tmpdir/cont ;;
+    *.tar.xz) xzdec < "$container" > $tmpdir/cont ;;
+    *) echo "unsuppored container name $container" >&2 ; exit 1 ;;
 esac
 
-skopeo copy docker-archive:$tmpdir/cont oci:$tmpdir/image:latest >/dev/null
+skopeo copy $archive_format:$tmpdir/cont oci:$tmpdir/image:latest >/dev/null
 rm -f $tmpdir/cont
 umoci unpack --image $tmpdir/image:latest $tmpdir/unpack >/dev/null
 if test -x "$tmpdir/unpack/rootfs/usr/bin/rpm" ; then
