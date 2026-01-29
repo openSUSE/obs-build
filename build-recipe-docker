@@ -342,7 +342,11 @@ recipe_build_docker() {
     if test "$BUILDENGINE" = podman; then
 	compression_format=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags container-compression-format)
     fi
+    archive_format=docker
     if test "$BUILDENGINE" = podman -a -n "$compression_format" -a "$compression_format" != gzip ; then
+	archive_format=oci
+    fi
+    if test "$archive_format" = oci ; then
 	if ! $DOCKER_CMD push --compression-format="$compression_format" "$FIRSTTAG" "oci-archive:$TOPDIR/DOCKER/$FILENAME.tar"; then
 	    cleanup_and_exit 1 "$DOCKER_TOOL push command failed"
 	fi
@@ -391,7 +395,7 @@ recipe_build_docker() {
     # create sbom if requested
     for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom | sort -u) ; do
 	echo "Generating $format sbom file"
-	generate_sbom --format "$format" --container-archive "$BUILD_ROOT/$TOPDIR/DOCKER/$FILENAME.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.${format/cyclonedx/cdx}.json" || cleanup_and_exit 1 "generate_sbom failed!"
+	generate_sbom --format "$format" --container-${archive_format}-archive "$BUILD_ROOT/$TOPDIR/DOCKER/$FILENAME.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.${format/cyclonedx/cdx}.json" || cleanup_and_exit 1 "generate_sbom failed!"
 	test -s "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.${format/cyclonedx/cdx}.json" || rm -f "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.${format/cyclonedx/cdx}.json"
     done
  

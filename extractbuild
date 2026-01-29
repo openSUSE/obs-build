@@ -145,7 +145,7 @@ my %done;
 while (<S>) {
   chomp;
   last unless length $_;
-  my ($filetype, $file, $filesize, $blksize, @blocks) = split(' ');
+  my ($filetype, $file, $mtime, $filesize, $blksize, @blocks) = split(' ');
   die("invalid input '$_'\n") unless defined($file);
   $file =~ s/%([a-fA-F0-9]{2})/chr(hex($1))/ge;
   die("bad file '$file' (contains \\0)\n") if $file =~ /\0/;
@@ -157,6 +157,7 @@ while (<S>) {
   if ($filetype eq 'd') {	# dir
     print "$file\n" if $opt_verbose && ($opt_verbose > 1 || $file =~ /^KIWI\/[^\/]*$/);
     mkdir($file) || die("mkdir $file: $!\n");
+    utime($mtime, $mtime, $file) || die("utime $file: $!\n");
     $done{$file} = 'd';
     next;
   }
@@ -175,6 +176,8 @@ while (<S>) {
     }
     print "$file\n" if $opt_verbose && !($opt_verbose == 1 && $file =~ /^KIWI\/.*\//);
     symlink($target, $file) || die("symlink $target $file: $!\n");
+# perl is unable to deal with symlink times, utimensat would be required
+#    utime($mtime, $mtime, $file) || die("utime $file: $!\n");
     $done{$file} = 'l';
     next;
   }
@@ -225,4 +228,5 @@ while (<S>) {
   close(O) || die("$file: close error: $!\n");
   # sanity check
   die "$file: invalid file size ($left bytes left)\n" if $left != 0;
+  utime($mtime, $mtime, $file) || die("utime $file: $!\n");
 }
