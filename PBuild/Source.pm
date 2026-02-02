@@ -25,13 +25,30 @@ use Digest::MD5;
 
 use PBuild::Util;
 
-sub find_packages {
+sub find_root_dir {
   my ($dir) = @_;
+  return undef unless $dir =~ /^\//;
+  my $configdir;
+  for my $i (1..3) {
+    last if $dir eq '' || $dir eq '/';
+    return $dir if -e "$dir/.pbuild";
+    return $dir if -e "$dir/_pbuild";
+    return $dir if -e "$dir/_manifest";
+    $configdir = $dir if -e "$dir/_config";
+    last unless $dir =~ s/\/[^\/]*$//;
+  }
+  return $configdir;
+}
+
+sub find_packages {
+  my ($root_dir, $pkgdirs) = @_;
   my @pkgs;
-  for my $pkg (sort(PBuild::Util::ls($dir))) {
+  for my $pkg (sort(PBuild::Util::ls($root_dir))) {
     next if $pkg =~ /^[\._]/;
-    next unless -d "$dir/$pkg";
+    next unless -d "$root_dir/$pkg";
+    next if $pkgdirs->{$pkg};	# only one package please
     push @pkgs, $pkg;
+    $pkgdirs->{$pkg} = "$root_dir/$pkg";
   }
   return @pkgs;
 }
