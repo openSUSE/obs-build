@@ -296,7 +296,7 @@ for my $assetsurl (@{$opts->{'assets'} || []}) {
 print "getting package information\n";
 my %pkgsrc;
 for my $pkg (@pkgs) {
-  my ($files, $source_assets) = PBuild::Source::list_package("$dir/$pkg");
+  my ($files, $source_assets) = PBuild::Source::list_package($pkgdirs{$pkg});
   my $p = {
     'pkg' => $pkg,
     'dir' => $pkgdirs{$pkg},

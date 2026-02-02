@@ -56,7 +56,11 @@ sub find_packages {
       next if !defined($sd) || ref($sd) || $sd eq '' || $sd eq '.' || $sd eq '..' || $sd =~ /^\//;
       next unless -d "$root_dir/$sd";
       push @skippkgs, $1 if $sd =~ /^([^\/]+)/;
-      push @pkgs, find_packages("$root_dir/$sd", $pkg_dirs);
+      if (-e "$root_dir/$sd/_manifest") {
+        push @pkgs, find_packages("$root_dir/$sd", $pkg_dirs);
+      } else {
+        push @pkgs, PBuild::Source::find_packages("$root_dir/$sd", $pkg_dirs);
+      }
     }
   }
   if (!exists($manifest->{'packages'})) {
