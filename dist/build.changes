@@ -1,4 +1,23 @@
 -------------------------------------------------------------------
+Mon Feb  2 14:41:36 UTC 2026 - Adrian Schröter <adrian@suse.de>
+
+- pbuild: support for _manifest files
+- VM builds: fix export of mtime out of the build env
+- config:
+  * tumbleweed syncing
+  * slfo 1.2 updates
+  * Re-create SLE 15 SP7 config
+- oci-archive
+  * Support package list introspection
+  * Support sbom generation
+- Docker.pm: Also handle 'zypper update' 
+- obs-docker-support: Pass --no-refresh to zypper
+- fail if PKGID can not be queried
+- Add a workaround to fix builds on debian aarch64 with old systemd versions
+- Add gzip retry for the sidestore downloads
+- Revert VCS indenting change to fix reproducible builds
+
+-------------------------------------------------------------------
 Fri Nov  7 08:22:30 UTC 2025 - Adrian Schröter <adrian@suse.de>
 
 - Helm: Use bool type for 'deprecated'
