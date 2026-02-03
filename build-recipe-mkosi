@@ -43,15 +43,27 @@ recipe_prepare_mkosi() {
 recipe_build_mkosi() {
     local ARCH DIST
     local mkosi_args=(
-        "--default ${RECIPEFILE}"
-        "--nspawn-keep-unit"
         "--output-dir=$TOPDIR/OTHER"
         "--checksum=yes"
         "--repository-key-check=no"
-        "--with-network=never"
         "--local-mirror=file:///.build.binaries/"
-        "--cache /.build.binaries/"
     )
+
+    if mkosi --help | grep -w -- "--default " >/dev/null 2>&1; then
+        mkosi_args+=("--default=${RECIPEFILE}")
+    fi
+
+    if mkosi --help | grep -w -- "--nspawn-keep-unit " >/dev/null 2>&1; then
+        mkosi_args+=("--nspawn-keep-unit")
+    fi
+
+    if mkosi --help | grep -w -- "--with-network " >/dev/null 2>&1; then
+        mkosi_args+=("--with-network=never")
+    fi
+
+    if mkosi --help | grep -w -- "--cache " >/dev/null 2>&1; then
+        mkosi_args+=("--cache=/.build.binaries/")
+    fi
 
     if [ -x "$BUILD_ROOT/bin/rpm" ]; then
         ARCH=$(chroot "$BUILD_ROOT" sh -c "rpm --eval '%{_target_cpu}'")
