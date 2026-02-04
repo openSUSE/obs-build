@@ -5,8 +5,8 @@ Mon Feb  2 14:41:36 UTC 2026 - Adrian Schröter <adrian@suse.de>
 - VM builds: fix export of mtime out of the build env
 - config:
   * tumbleweed syncing
-  * slfo 1.2 updates (bsc#1251920)
-  * Re-create SLE 15 SP7 config
+  * slfo 1.2 updates
+  * Re-create SLE 15 SP7 config (bsc#1251920)
 - oci-archive
   * Support package list introspection
   * Support sbom generation
