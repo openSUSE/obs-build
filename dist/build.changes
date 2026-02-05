@@ -190,7 +190,7 @@ Thu Nov 14 08:59:54 UTC 2024 - Adrian Schröter <adrian@suse.de>
                                      obs work detection, documention, SBOM)
 - Support slsa v1 in unpack_slsa_provenance
 - generate_sbom: do not clobber spdx supplier
-- Harden export_debian_orig_from_git (boo#1230469)
+- Harden export_debian_orig_from_git (CVE-2024-22038, boo#1230469)
 
 -------------------------------------------------------------------
 Fri Sep 13 08:18:51 UTC 2024 - Adrian Schröter <adrian@suse.de>
