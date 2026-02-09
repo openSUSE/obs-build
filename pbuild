@@ -38,6 +38,7 @@ use Build;
 
 use PBuild::Source;
 use PBuild::Recipe;
+use PBuild::Manifest;
 use PBuild::AssetMgr;
 use PBuild::RepoMgr;
 use PBuild::LocalRepo;
@@ -62,9 +63,12 @@ my $dir = @dirs ? $dirs[0] : '.';
 $dir = Cwd::abs_path($dir) if $dir !~ /^\//;
 $dir =~ s/(.)\/+$/$1/s;
 
-# autodetect single mode
-if (!exists($opts->{'single'}) && PBuild::Recipe::looks_like_packagedir($dir)) {
-  $opts->{'single'} = $1 if $dir =~ s/\/([^\/]+)$//;
+# find root directory and autodetect single mode
+my $root_dir = PBuild::Source::find_root_dir($dir);
+$root_dir = $1 if !$root_dir && PBuild::Recipe::looks_like_packagedir($dir) && $dir =~ /^(.*)\/[^\/]+$/;
+if ($root_dir && $dir ne $root_dir) {
+  $opts->{'single'} = $1 if !exists($opts->{'single'}) && $dir =~ /\/([^\/]+)$/;
+  $dir = $root_dir;
 }
 
 if ($opts->{'list-presets'}) {
@@ -274,7 +278,13 @@ if ($cross && @{$opts->{'hostrepo'} || []}) {
   print "      - $_\n" for @{$opts->{'hostrepo'}};
 }
 print "searching for packages\n";
-my @pkgs = PBuild::Source::find_packages($dir);
+my %pkgdirs;
+my @pkgs;
+if (-s "$dir/_manifest") {
+  @pkgs = PBuild::Manifest::find_packages($dir, \%pkgdirs);
+} else {
+  @pkgs = PBuild::Source::find_packages($dir, \%pkgdirs);
+}
 die("no packages found in '$dir'\n") unless @pkgs || $opts->{'repoquery'} || $opts->{'repoquery-host'};
 print "found ".PBuild::Util::plural(scalar(@pkgs), 'package')."\n";
 
@@ -286,10 +296,10 @@ for my $assetsurl (@{$opts->{'assets'} || []}) {
 print "getting package information\n";
 my %pkgsrc;
 for my $pkg (@pkgs) {
-  my ($files, $source_assets) = PBuild::Source::list_package("$dir/$pkg");
+  my ($files, $source_assets) = PBuild::Source::list_package($pkgdirs{$pkg});
   my $p = {
     'pkg' => $pkg,
-    'dir' => "$dir/$pkg",
+    'dir' => $pkgdirs{$pkg},
     'files' => $files,
     'srcmd5' => PBuild::Source::calc_srcmd5($files),
     'srcmd5' => PBuild::Source::calc_srcmd5($files),

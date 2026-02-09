@@ -377,16 +377,17 @@ recipe_build_docker() {
 	# build did not create packages file, try introspection
 	cp --remove-destination "$BUILD_DIR/create_container_package_list" "$BUILD_ROOT/tmp/create_container_package_list"
 	echo "creating package information"
-	chroot "$BUILD_ROOT" /bin/bash /tmp/create_container_package_list "$TOPDIR/DOCKER/$FILENAME.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.packages"
+	chroot "$BUILD_ROOT" /bin/bash /tmp/create_container_package_list "--$archive_format" "$TOPDIR/DOCKER/$FILENAME.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.packages"
 	if test -e "$BUILD_ROOT/$TOPDIR/SOURCES/repos/.pkgsummaries" ; then
 	    echo "creating package summaries information"
-	    chroot "$BUILD_ROOT" /bin/bash /tmp/create_container_package_list --summaries "$TOPDIR/DOCKER/$FILENAME.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.pkgsummaries"
+	    chroot "$BUILD_ROOT" /bin/bash /tmp/create_container_package_list --summaries "--$archive_format" "$TOPDIR/DOCKER/$FILENAME.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.pkgsummaries"
 	fi
 	local basecontainer=$(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::show -- "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" basecontainer)
 	if test -n "$basecontainer" ; then
 	    echo "creating base package information for base container $basecontainer"
 	    $DOCKER_CMD save --output "/tmp/basecontainer.tar" "$basecontainer"
 	    chroot "$BUILD_ROOT" /bin/bash /tmp/create_container_package_list "/tmp/basecontainer.tar" > "$BUILD_ROOT$TOPDIR/DOCKER/$FILENAME.basepackages"
+	    rm -f "$BUILD_ROOT/tmp/basecontainer.tar"
 	fi
 	rm -f "$BUILD_ROOT/tmp/create_container_package_list"
     fi

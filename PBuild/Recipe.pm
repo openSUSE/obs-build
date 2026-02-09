@@ -206,12 +206,6 @@ sub split_hostdeps {
 
 sub looks_like_packagedir {
   my ($dir) = @_;
-  return 0 if -d "$dir/.pbuild";
-  return 0 if -d "$dir/_pbuild";
-  return 0 if -d "$dir/_config";
-  return 1 if -d "$dir/../.pbuild";
-  return 1 if -d "$dir/../_pbuild";
-  return 1 if -d "$dir/../_config";
   my @files = PBuild::Util::ls($dir);
   return 0 if grep {/^_build\./} @files;
   for my $file (@files) {
