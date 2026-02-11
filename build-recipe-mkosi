@@ -41,7 +41,30 @@ recipe_prepare_mkosi() {
 }
 
 recipe_build_mkosi() {
-    local ARCH DIST RELEASE_ARG
+    local ARCH DIST
+    local mkosi_args=(
+        "--output-dir=$TOPDIR/OTHER"
+        "--checksum=yes"
+        "--repository-key-check=no"
+        "--local-mirror=file:///.build.binaries/"
+    )
+
+    if mkosi --help | grep -w -- "--default " >/dev/null 2>&1; then
+        mkosi_args+=("--default=${RECIPEFILE}")
+    fi
+
+    if mkosi --help | grep -w -- "--nspawn-keep-unit " >/dev/null 2>&1; then
+        mkosi_args+=("--nspawn-keep-unit")
+    fi
+
+    if mkosi --help | grep -w -- "--with-network " >/dev/null 2>&1; then
+        mkosi_args+=("--with-network=never")
+    fi
+
+    if mkosi --help | grep -w -- "--cache " >/dev/null 2>&1; then
+        mkosi_args+=("--cache=/.build.binaries/")
+    fi
+
     if [ -x "$BUILD_ROOT/bin/rpm" ]; then
         ARCH=$(chroot "$BUILD_ROOT" sh -c "rpm --eval '%{_target_cpu}'")
     elif [ -x "$BUILD_ROOT/usr/bin/dpkg-architecture" ]; then
@@ -61,7 +84,7 @@ recipe_build_mkosi() {
         fi
 
         # Pass it to mkosi, so that the configured mirror is the same as the repository created below
-        RELEASE_ARG="--release ${DIST}"
+        mkosi_args+=("--release=${DIST}")
 
         test -z "${ARCH}" -o -z "${DIST}" && cleanup_and_exit 1
     elif [ ! -x "$BUILD_ROOT/usr/bin/repo-add" ]; then
@@ -98,28 +121,16 @@ recipe_build_mkosi() {
         workdir="$d"
         break
     done
+    mkosi_args+=("--directory=${workdir}")
 
-    local image_version=""
     if [ -n "$RELEASE" ]; then
-        image_version="--image-version=${RELEASE}"
+        mkosi_args+=("--image-version=${RELEASE}")
     else
         # Provide some fallback value for %v specifiers
-        image_version="--image-version=0"
+        mkosi_args+=("--image-version=0")
     fi
-    set -- mkosi \
-        --directory "$workdir" \
-        --default \
-        "$RECIPEFILE" \
-        $RELEASE_ARG \
-        $image_version \
-        --nspawn-keep-unit \
-        --output-dir "$TOPDIR/OTHER" \
-        --checksum=yes \
-        --repository-key-check=no \
-        --with-network=never \
-        --local-mirror file:///.build.binaries/ \
-        --cache /.build.binaries/ \
-        build
+
+    set -- mkosi "${mkosi_args[@]}" build
 
     echo "running $*"
     chroot "$BUILD_ROOT" "$@" || cleanup_and_exit 1
