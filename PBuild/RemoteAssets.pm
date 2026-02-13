@@ -67,15 +67,21 @@ sub recipe_parse {
   for my $s (@{$p->{'remoteassets'} || []}) {
     my $url = $s->{'url'};
     my $file = $s->{'file'};
-    if ($url && $url =~ /^git(?:\+https?)?:.*\/([^\/]+?)(?:\#[^\#\/]+)?$/) {
+    if ($url && $url =~ /^git(?:\+https?)?:.*\/([^\/]+?)(?:\#([^\#\/]+))?$/) {
+      my $tag = $2;
       if (!defined($file)) {
 	$file = $1;
 	$file =~ s/\?.*//;
 	$file =~ s/\.git$//;
       }
       next unless defined($file) && $file =~ /^([^\.\/][^\/]+)$/s;
-      next if $p->{'files'}->{$file};
-      push @assets, { 'file' => $file, 'url' => $url, 'type' => 'url', 'isdir' => 1 };
+      next if $p->{'files'}->{$file};	# die() instead?
+      my $asset = { 'file' => $file, 'url' => $url, 'type' => 'url', 'isdir' => 1 };
+      if ($tag =~ /^[0-9a-fA-F]{40,}$/) {
+	$asset->{'immutable'} = 1;
+	$asset->{'assetid'} = Digest::MD5::md5_hex($url);
+      }
+      push @assets, $asset;
       next;
     }
     if (($s->{'type'} || '' eq 'webcache')) {
