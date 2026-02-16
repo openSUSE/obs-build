@@ -25,6 +25,7 @@ use strict;
 our $do_rpmmd;
 our $do_deb;
 our $do_arch;
+our $do_archsrcinfo;
 our $do_susetags;
 our $do_mdk;
 our $do_apk;
@@ -33,12 +34,13 @@ sub import {
   for (@_) {
     $do_rpmmd = 1 if $_ eq ':rpmmd';
     $do_deb = 1 if $_ eq ':deb';
+    $do_archsrcinfo = 1 if $_ eq ':archsrcinfo';
     $do_arch = 1 if $_ eq ':arch';
     $do_susetags = 1 if $_ eq ':susetags';
     $do_mdk = 1 if $_ eq ':mdk';
     $do_apk = 1 if $_ eq ':apk';
   }
-  $do_rpmmd = $do_deb = $do_arch = $do_susetags = $do_mdk = $do_apk = 1 unless $do_rpmmd || $do_deb || $do_arch || $do_susetags || $do_mdk || $do_apk;
+  $do_rpmmd = $do_deb = $do_arch = $do_archsrcinfo = $do_susetags = $do_mdk = $do_apk = 1 unless $do_rpmmd || $do_deb || $do_arch || $do_susetags || $do_mdk || $do_apk;
   if ($do_rpmmd) {
     require Build::Rpmmd;
   }
@@ -49,6 +51,9 @@ sub import {
     require Build::Debrepo;
   }
   if ($do_arch) {
+    require Build::Archrepo;
+  }
+  if ($do_archsrcinfo) {
     require Build::Archrepo;
   }
   if ($do_mdk) {
@@ -64,6 +69,7 @@ sub parse {
   return Build::Rpmmd::parse(@args) if $do_rpmmd && $type eq 'rpmmd';
   return Build::Susetags::parse(@args) if $do_susetags && $type eq 'susetags';
   return Build::Debrepo::parse(@args) if $do_deb && $type eq 'deb';
+  return Build::Archrepo::parse(@args) if $do_archsrcinfo && $type eq 'archsrcinfo';
   return Build::Archrepo::parse(@args) if $do_arch && $type eq 'arch';
   return Build::Mdkrepo::parse(@args) if $do_arch && $type eq 'mdk';
   return Build::Apkrepo::parse(@args) if $do_apk && $type eq 'apk';
