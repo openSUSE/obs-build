@@ -1114,7 +1114,7 @@ run_shell() {
 }
 
 validate_init "$BUILD_CONF"
-
+parse_args() {
 while test -n "$1"; do
     PARAM="$1"
     ARG="$2"
@@ -1446,6 +1446,28 @@ while test -n "$1"; do
 	validate_param "$PARAM" "$ARG"
     fi
 done
+}
+parse_args "$@"
+recipedir=.
+if [[ -n ${RECIPEFILES[0]} ]] ; then
+        recipedir=$(dirname "${RECIPEFILES[0]}")
+fi
+
+buildparams=()
+if [ -e $recipedir/_buildparams ] ; then
+    local n=0
+    while read ARG ; do
+        let n++
+        if ! [[ $ARG =~ ^--jobs=[1-9]$ ]] &&
+           ! [[ $ARG =~ ^--vm-custom-opt=-cpu\ [a-zA-Z0-9=,_+-]+$ ]]
+          then
+            echo "buildparams line $n did not match whitelist in $BASH_SOURCE => skipping"
+            continue
+        fi
+        buildparams+=("$ARG")
+    done < $recipedir/_buildparams
+fi
+parse_args "${buildparams[@]}"
 
 # validate params coming from the environment
 test -n "$BUILD_ARCH" && validate_param "--arch" "$BUILD_ARCH" BUILD_ARCH
