@@ -36,7 +36,7 @@ vm_startup_podman() {
     podman run \
         --runtime=runc \
         --rm --name "$name" --net=none $podman_opts \
-        --mount "type=bind,source=$BUILD_ROOT,destination=/" \
+        --mount "type=bind,relabel=private,source=$BUILD_ROOT,destination=/" \
         "$@" build-scratch:latest "$vm_init_script"
     BUILDSTATUS="$?"
     test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
