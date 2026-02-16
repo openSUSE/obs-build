@@ -346,7 +346,7 @@ Known Parameters:
 
   --vm-type TYPE
               Use virtual machine instead of chroot
-              TYPE is one of xen|kvm|uml|qemu|lxc|zvm|openstack|ec2|docker|pvm|nspawn
+              TYPE is one of xen|kvm|uml|qemu|lxc|zvm|openstack|ec2|docker|pvm|nspawn|podman
 
   --vm-args ARGS
               Pass extra arguments to virtual machine
@@ -425,6 +425,11 @@ Known Parameters:
               KVM only: Attach kvm option
               Available options are -net, -netdev, -device
 	      (This options in kvm can not guarantee reproducible builds)
+
+   --vm-use-container-preinstallimage
+              Use preinstall container image as base image in containers instead of
+              using preinstall image tar file. This option is only available when vm-type
+              is one of podman|docker
 
   --debuginfo
               Enable creation of debuginfo packages

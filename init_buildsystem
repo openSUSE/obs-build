@@ -63,6 +63,7 @@ DLNOSIGNATURE=
 CACHE_DIR=
 OBSURL=
 BUILD_SYSROOT=
+CONTAINER=
 test -z "$CONFIG_DIR" && CONFIG_DIR="$BUILD_DIR/configs"
 
 # default repository type
@@ -132,6 +133,10 @@ while test -n "$1" ; do
 	    OBSURL="$2"
 	    shift 2
 	    ;;
+	--use-container-preinstallimage)
+		CONTAINER="$2"
+		shift 2
+		;;
 	*)
 	    break
 	    ;;
@@ -226,10 +231,21 @@ unsafe_preinstall_check() {
 }
 
 preinstall_image_filter() {
-    for PKG in "$@" ; do
-	test -e "$BUILD_ROOT/.preinstall_image/$PKG" && continue
-	echo $PKG
-    done
+    # If we have preinstall image info file, use it to filter packages
+    if test -n "$PREINSTALL_IMAGE_INFO" -a -f "$PREINSTALL_IMAGE_INFO" ; then
+        for PKG in "$@" ; do
+            if grep -q "$PKG$" "$PREINSTALL_IMAGE_INFO" 2>/dev/null ; then
+                continue
+            fi
+            echo $PKG
+        done
+    else
+        # Check unpacked preinstallimage if no info file available
+        for PKG in "$@" ; do
+            test -e "$BUILD_ROOT/.preinstall_image/$PKG" && continue
+            echo $PKG
+        done
+    fi
 }
 
 # call with cmd [OPTIONS] -- ARGS...
@@ -308,6 +324,27 @@ preinstall_image() {
 	cleanup_and_exit 1
     fi
     preinstall_integrate
+}
+
+preinstall_container_image() {
+	check_exit
+	IMAGE_NAME="${2##*/}"
+	IMAGE_NAME="${IMAGE_NAME%% \[*}"
+	IMAGE_TAG=$(echo "$2" | awk -F'[][]' '{print $2}')
+	echo "Using preinstall image${2:+ $2} as container image"
+	preinstall_setup
+	# Check if the image exists
+	if $CONTAINER images --format "{{.Repository}}:{{.Tag}}" | grep -q "${IMAGE_NAME}:${IMAGE_TAG}"; then
+		echo "Preinstall container image ${IMAGE_NAME}:${IMAGE_TAG} exists for ${CONTAINER}."
+	else
+		echo "Importing preinstall container image ${IMAGE_NAME}:${IMAGE_TAG}"
+		if ! $CONTAINER import "$BUILD_INIT_CACHE/rpms/$1" "${IMAGE_NAME}:${IMAGE_TAG}"; then
+			echo "ERROR: failed to import preinstall container image."
+			cleanup_and_exit 1
+		fi
+	fi
+	export VM_CONTAINER_IMAGE="${IMAGE_NAME}:${IMAGE_TAG}"
+	echo "VM_CONTAINER_IMAGE='$VM_CONTAINER_IMAGE'" >> $BUILD_ROOT/.build/build.data
 }
 
 preinstall() {
@@ -758,6 +795,10 @@ else
 	    PREINSTALL_IMAGE_SOURCE="$SRC"
 	    continue
 	fi
+	if test "$PKG" = "preinstallimageinfo:" ; then
+	    PREINSTALL_IMAGE_INFO="$SRC"
+	    continue
+	fi
 	if test "$PKG" = "runscripts:" ; then
 	    RUNSCRIPTS_SEEN=true
 	    PACKAGES_TO_RUNSCRIPTS=$SRC
@@ -919,7 +960,11 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
     PACKAGES_TO_VMINSTALL_FILTERED="$PACKAGES_TO_VMINSTALL"
     rm -f "$BUILD_ROOT/.preinstall_image"/*
     if test -n "$PREINSTALL_IMAGE" ; then
-	preinstall_image "$PREINSTALL_IMAGE" "$PREINSTALL_IMAGE_SOURCE"
+	if test -n "$CONTAINER"; then
+		preinstall_container_image "$PREINSTALL_IMAGE" "$PREINSTALL_IMAGE_SOURCE"
+	else
+		preinstall_image "$PREINSTALL_IMAGE" "$PREINSTALL_IMAGE_SOURCE"
+	fi
 	PACKAGES_TO_PREINSTALL_FILTERED=`preinstall_image_filter $PACKAGES_TO_PREINSTALL_FILTERED`
 	PACKAGES_TO_VMINSTALL_FILTERED=`preinstall_image_filter $PACKAGES_TO_VMINSTALL_FILTERED`
     fi
@@ -927,21 +972,25 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
     if test -n "$PREPARE_VM" ; then
         PACKAGES_TO_VMINSTALL_FILTERED=`reorder $PACKAGES_TO_VMINSTALL_FILTERED`
     fi
-    progress_setup PACKAGES_TO_PREINSTALL_FILTERED
-    for PKG in $PACKAGES_TO_PREINSTALL_FILTERED ; do
-	progress_step PACKAGES_TO_PREINSTALL_FILTERED
-	preinstall ${PKG##*/}
-    done
-    if test -n "$PREPARE_VM" ; then
-	echo
-	progress_setup PACKAGES_TO_VMINSTALL_FILTERED
-	for PKG in $PACKAGES_TO_VMINSTALL_FILTERED ; do
-	    progress_step PACKAGES_TO_VMINSTALL_FILTERED
-	    preinstall ${PKG##*/}
-	done
+    # no need to preinstall packages if we are importing them in preinstall container image
+    if test -z "$VM_CONTAINER_IMAGE"; then
+	    progress_setup PACKAGES_TO_PREINSTALL_FILTERED
+	    for PKG in $PACKAGES_TO_PREINSTALL_FILTERED ; do
+	        progress_step PACKAGES_TO_PREINSTALL_FILTERED
+	        preinstall ${PKG##*/}
+	    done
+	    if test -n "$PREPARE_VM" ; then
+	        echo
+	        progress_setup PACKAGES_TO_VMINSTALL_FILTERED
+	        for PKG in $PACKAGES_TO_VMINSTALL_FILTERED ; do
+		        progress_step PACKAGES_TO_VMINSTALL_FILTERED
+		        preinstall ${PKG##*/}
+	        done
+	    fi
     fi
     # for reorder
     check_exit
+    mkdir -p "$BUILD_ROOT/etc"
     if test -w /root ; then
 	test -c $BUILD_ROOT/dev/null || create_devs
     fi
@@ -962,6 +1011,10 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
     rm -rf "$BUILD_ROOT/installed-pkg"
     mkdir -p "$BUILD_ROOT/installed-pkg"
 else
+    # we still need preinstall image name even if it was already done once
+    if test -n "$CONTAINER"; then
+        preinstall_container_image "$PREINSTALL_IMAGE" "$PREINSTALL_IMAGE_SOURCE"
+    fi
     # preinstall was already done
     if test -z "$PREPARE_VM" ; then
 	mount_stuff
@@ -1115,7 +1168,19 @@ for PKG in $MAIN_LIST ; do
 	if ! test -e $BUILD_ROOT/.preinstall_image/$PKG ; then
 	    cleanup_and_exit 1 "Package $PKG is missing from the preinstall image"
 	fi
-	read PKG_HDRMD5 PKGID < $BUILD_ROOT/.preinstall_image/$PKG
+
+	# Try to read PKG_HDRMD5 and PKGID from preinstallimage info file first
+	if test -n "$PREINSTALL_IMAGE_INFO" -a -f "$PREINSTALL_IMAGE_INFO" ; then
+	    PKG_INFO=$(grep "$PKG$" "$PREINSTALL_IMAGE_INFO" 2>/dev/null | head -n1)
+	    if test -n "$PKG_INFO" ; then
+	        PKG_HDRMD5=$(echo "$PKG_INFO" | awk '{print $1}')
+	        PKGID=$(echo "$PKG_INFO" | awk '{print $2}')
+	    fi
+	else
+	    # Fallback to reading from unpacked preinstall image
+	    read PKG_HDRMD5 PKGID < $BUILD_ROOT/.preinstall_image/$PKG
+	fi
+
 	echo "preinstalled ${PKGID%% *}"
 	echo "$PKGID" > $BUILD_ROOT/installed-pkg/$PKG
 	continue
