@@ -35,11 +35,31 @@ deb_chroot ()
     # when doing a 'chroot /' call lets subshell and change dir manually
     #
     (
-	cd $1 &&
+	cd "$1" &&
 	    DEBIAN_FRONTEND=noninteractive DEBIAN_PRIORITY=critical \
 			   DEBCONF_NONINTERACTIVE_SEEN=true \
-			   LC_ALL=C LANGUAGE=C LANG=C \
-			   chroot $*
+			   LC_ALL=C.UTF-8 LANGUAGE=C.UTF-8 LANG=C.UTF-8 \
+			   TZ=UTC \
+			   chroot "$@"
+    )
+}
+
+#
+# A wrapper around chroot + su to set the environment correctly for
+# the build process
+#
+su_deb_chroot()
+{
+    dir="$1"
+    command="$2"
+    shift 2
+    (
+	cd "$dir" &&
+			   LC_ALL=C.UTF-8 LANGUAGE=C.UTF-8 LANG=C.UTF-8 \
+			   TZ=UTC \
+			   chroot "$dir" su - "$BUILD_USER" \
+			   -w "LC_ALL,LANGUAGE,LANG,TZ" \
+			   -c "PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/X11; $command" "$@" < /dev/null
     )
 }
 
@@ -81,7 +101,7 @@ pkg_initdb_deb() {
 	cp --remove-destination $BUILD_ROOT/.init_b_cache/rpms/dpkg.deb $BUILD_ROOT/.init_b_cache/dpkg.deb || cleanup_and_exit 1
     fi
     DEB_UNSAFE_IO=
-    chroot $BUILD_ROOT dpkg --force-unsafe-io --version >/dev/null 2>&1 && DEB_UNSAFE_IO="--force-unsafe-io"
+    deb_chroot $BUILD_ROOT dpkg --force-unsafe-io --version >/dev/null 2>&1 && DEB_UNSAFE_IO="--force-unsafe-io"
     deb_chroot $BUILD_ROOT dpkg --install $DEB_UNSAFE_IO --force-depends .init_b_cache/dpkg.deb >/dev/null 2>&1
 }
 
@@ -89,8 +109,8 @@ pkg_prepare_deb() {
     # test if dpkg knows --force-unsafe-io and --no-triggers
     DEB_UNSAFE_IO=
     DEB_NO_TRIGGERS=
-    chroot $BUILD_ROOT dpkg --force-unsafe-io --version >/dev/null 2>&1 && DEB_UNSAFE_IO="--force-unsafe-io"
-    chroot $BUILD_ROOT dpkg --no-triggers --version >/dev/null 2>&1 && DEB_NO_TRIGGERS="--no-triggers"
+    deb_chroot $BUILD_ROOT dpkg --force-unsafe-io --version >/dev/null 2>&1 && DEB_UNSAFE_IO="--force-unsafe-io"
+    deb_chroot $BUILD_ROOT dpkg --no-triggers --version >/dev/null 2>&1 && DEB_NO_TRIGGERS="--no-triggers"
 }
 
 pkg_install_deb() {
@@ -116,7 +136,7 @@ pkg_erase_deb() {
       while read line; do
           case "$line" in
               subprocess\ installed\ *script\ returned\ error\ exit\ status*)
-                 chroot $BUILD_ROOT rm -f /var/lib/dpkg/info/$PKG.{pre,post}rm
+                 deb_chroot $BUILD_ROOT rm -f /var/lib/dpkg/info/$PKG.{pre,post}rm
                  retry=1
               ;;
               *) echo "$line" ;;
