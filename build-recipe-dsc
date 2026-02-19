@@ -75,7 +75,6 @@ recipe_prepare_dsc() {
     DEB_RELEASE=`sed 's/%.*$//' <<< $RELEASE`
     OBS_DCH_RELEASE=""
 
-
     if test "$RECIPEFILE" = debian/control -o "$RECIPEFILE" = debian.control ; then
 	dsc_export_origtar
 	mv $BUILD_ROOT$DEB_SOURCEDIR $BUILD_ROOT$TOPDIR/BUILD
@@ -116,6 +115,13 @@ recipe_prepare_dsc() {
 	DEB_SOURCEDIR=$TOPDIR/SOURCES.DEB
 	for DEB_DSCFILE in $BUILD_ROOT$DEB_SOURCEDIR/*.dsc ; do : ; done 
 	DEB_DSCFILE="${DEB_DSCFILE##*/}"
+    fi
+
+    if test -n "$BUILD_VCSURL" ; then
+        echo "XBS-Obs-Vcs: $BUILD_VCSURL" >> $BUILD_ROOT$TOPDIR/BUILD/debian/control
+    fi
+    if test -n "$DISTURL" ; then
+        echo "XBS-Obs-Disturl: $DISTURL" >> $BUILD_ROOT$TOPDIR/BUILD/debian/control
     fi
 
     # run/copy sources
