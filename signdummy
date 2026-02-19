@@ -65,6 +65,7 @@ $suf = '.p7s' if $mode eq 'cmssign';
 die("only detached mode possible\n") unless $suf;
 die("filter mode not supported\n") unless @ARGV;
 
+my $dummylength = $mode eq 'cmssign' ? 8192 : 2048;	# allow extra space for certs
 
 for my $file (@ARGV) {
   local *F;
@@ -74,9 +75,9 @@ for my $file (@ARGV) {
   close(F) || die("$file: $!\n");
   my $block = "sIGnMe!\n";
   $block .= sprintf("%08x%08x\n", length($buf), unpack("%32C*", $buf));
-  $block .= "\0" x (2048 - length($block));
+  $block .= "\0" x ($dummylength - length($block));
   my $sigfile = "$file$suf";
   open(F, '>', $sigfile) || die("$sigfile: $!\n");
-  (syswrite(F, $block) || 0) == 2048 || die("$sigfile: $!\n");
+  (syswrite(F, $block) || 0) == $dummylength || die("$sigfile: $!\n");
   close(F) || die("$sigfile: $!\n");
 }
