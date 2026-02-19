@@ -24,12 +24,22 @@
 # write a 2048 byte file with a fixed signature.
 # sign is used in kiwi builds to sign repositories
 
-my $mode;
+my $mode = '';
 
 while (@ARGV) {
   if ($ARGV[0] =~ /^-([cdrp])$/) {
     $mode = $1;
     shift @ARGV;
+    next;
+  }
+  if ($ARGV[0] eq '--cmssign') {
+    $mode = 'cmssign';
+    shift @ARGV;
+    splice(@ARGV, 0, 2) if @ARGV >= 2 && $ARGV[0] eq '--cert';
+    next;
+  }
+  if ($ARGV[0] eq '-h' && @ARGV >= 2) {
+    splice(@ARGV, 0, 2);
     next;
   }
   if ($ARGV[0] eq '--') {
@@ -47,8 +57,14 @@ if ($mode eq 'p') {
   (syswrite(STDOUT, $block) || 0) == 8192 || die("pubkey write: $!\n");
   exit 0;
 }
-die("only detached mode possible\n") if !$mode || $mode ne 'd';
+
+my $suf;
+$suf = '.asc' if $mode eq 'd';
+$suf = '.p7s' if $mode eq 'cmssign';
+
+die("only detached mode possible\n") unless $suf;
 die("filter mode not supported\n") unless @ARGV;
+
 
 for my $file (@ARGV) {
   local *F;
@@ -59,7 +75,8 @@ for my $file (@ARGV) {
   my $block = "sIGnMe!\n";
   $block .= sprintf("%08x%08x\n", length($buf), unpack("%32C*", $buf));
   $block .= "\0" x (2048 - length($block));
-  open(F, '>', "$file.asc") || die("$file.asc: $!\n");
-  (syswrite(F, $block) || 0) == 2048 || die("$file.asc: $!\n");
-  close(F) || die("$file.asc: $!\n");
+  my $sigfile = "$file$suf";
+  open(F, '>', $sigfile) || die("$sigfile: $!\n");
+  (syswrite(F, $block) || 0) == 2048 || die("$sigfile: $!\n");
+  close(F) || die("$sigfile: $!\n");
 }
