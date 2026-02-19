@@ -50,19 +50,19 @@ recipe_build_mkosi() {
     )
 
     if mkosi --help | grep -w -- "--default " >/dev/null 2>&1; then
-        mkosi_args+=("--default=${RECIPEFILE}")
+	mkosi_args[${#mkosi_args[@]}]="--default=${RECIPEFILE}"
     fi
 
     if mkosi --help | grep -w -- "--nspawn-keep-unit " >/dev/null 2>&1; then
-        mkosi_args+=("--nspawn-keep-unit")
+	mkosi_args[${#mkosi_args[@]}]="--nspawn-keep-unit"
     fi
 
     if mkosi --help | grep -w -- "--with-network " >/dev/null 2>&1; then
-        mkosi_args+=("--with-network=never")
+	mkosi_args[${#mkosi_args[@]}]="--with-network=never"
     fi
 
     if mkosi --help | grep -w -- "--cache " >/dev/null 2>&1; then
-        mkosi_args+=("--cache=/.build.binaries/")
+	mkosi_args[${#mkosi_args[@]}]="--cache=/.build.binaries/"
     fi
 
     if [ -x "$BUILD_ROOT/bin/rpm" ]; then
@@ -84,7 +84,7 @@ recipe_build_mkosi() {
         fi
 
         # Pass it to mkosi, so that the configured mirror is the same as the repository created below
-        mkosi_args+=("--release=${DIST}")
+	mkosi_args[${#mkosi_args[@]}]="--release=${DIST}"
 
         test -z "${ARCH}" -o -z "${DIST}" && cleanup_and_exit 1
     elif [ ! -x "$BUILD_ROOT/usr/bin/repo-add" ]; then
@@ -121,13 +121,13 @@ recipe_build_mkosi() {
         workdir="$d"
         break
     done
-    mkosi_args+=("--directory=${workdir}")
+    mkosi_args[${#mkosi_args[@]}]="--directory=${workdir}"
 
     if [ -n "$RELEASE" ]; then
-        mkosi_args+=("--image-version=${RELEASE}")
+	mkosi_args[${#mkosi_args[@]}]="--image-version=${RELEASE}"
     else
         # Provide some fallback value for %v specifiers
-        mkosi_args+=("--image-version=0")
+	mkosi_args[${#mkosi_args[@]}]="--image-version=0"
     fi
 
     set -- mkosi "${mkosi_args[@]}" build
