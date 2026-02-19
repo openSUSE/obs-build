@@ -27,6 +27,7 @@ use PBuild::Verify;
 
 my $dtd_multibuild = [
     'multibuild' =>
+      'buildemptyflavor',
           [ 'package' ],        # obsolete
           [ 'flavor' ],
 ];
@@ -73,10 +74,12 @@ sub expand_multibuilds {
     my $mb = getmultibuild_fromfiles($p->{'dir'}, $p->{'files'});
     next unless $mb;
     my @mbp = @{$mb->{'flavor'} || $mb->{'package'} || []};
+    my $buildemptyflavor = !defined($mb->{'buildemptyflavor'}) || $mb->{'buildemptyflavor'} eq 'true' ? 1 : 0;
     for my $flavor (@mbp) {
       my $mpkg = "$pkg:$flavor";
       $pkgs->{$mpkg} = { %$p, 'pkg' => $mpkg, 'flavor' => $flavor, 'originpackage' => $pkg };
     }
+    delete $pkgs->{$pkg} if @mbp && !$buildemptyflavor;
   }
 }
 
