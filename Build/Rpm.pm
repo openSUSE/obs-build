@@ -327,6 +327,67 @@ sub luamacro {
   return '';
 }
 
+sub get_lua_engine {
+  my ($config, $macros) = @_;
+
+  # Return existing engine if available
+  return $config->{_lua_engine} if $config->{_lua_engine};
+
+  # Load LuaEngine module
+  eval {
+    require Build::LuaEngine;
+  };
+  if ($@) {
+    do_warn($config, "Failed to load Build::LuaEngine: $@");
+    return undef;
+  }
+
+  # Create new engine instance
+  my $engine = eval {
+    Build::LuaEngine->new($config);
+  };
+  if ($@) {
+    do_warn($config, "Failed to create LuaEngine: $@");
+    return undef;
+  }
+
+  # Set RPM context - pass reference to actual macros hash for bidirectional updates
+  $engine->set_rpm_context({ macros => $macros, config => $config });
+
+  # Store in config for reuse
+  $config->{_lua_engine} = $engine;
+
+  return $engine;
+}
+
+sub lua_macro_handler {
+  my ($config, $macros, $macname, @args) = @_;
+
+  # Get or create Lua engine
+  my $engine = get_lua_engine($config, $macros);
+  return '' unless $engine;
+
+  # Ensure the LuaEngine has the current context for every call
+  $engine->set_rpm_context({ macros => $macros, config => $config });
+
+  # Combine all arguments as Lua code
+  my $lua_code = join(' ', @args);
+  return '' unless defined $lua_code && $lua_code ne '';
+
+  # Execute Lua code with error handling
+  my $result = eval {
+    $engine->execute_code($lua_code);
+  };
+
+  if ($@) {
+    warn "Lua execution error: $@" if $ENV{BUILD_DEBUG};
+    return '';
+  }
+
+  # Return result or empty string
+  return defined $result ? $result : '';
+}
+
 sub builtinmacro {
   my ($config, $macros, $macros_args, $tries, $macname, @args) = @_;
   push @args, '' unless @args;
@@ -364,6 +425,8 @@ sub builtinmacro {
     initmacros($c, $l->[1], $l->[2]);
     return '';
   }
+  # Handle architecture macros
+  return $config->{'arch'} || 'x86_64' if $macname eq '_arch' || $macname eq 'arch';
   do_warn($config, "unsupported builtin macro %$macname");
   return '';
 }
@@ -423,6 +486,51 @@ sub macroend {
   return $1 if $expr =~ /^(%[?!]*-?[a-zA-Z0-9_]*(?:\*|\*\*|\#)?)/s;
 }
 
+sub execute_shell_command {
+  my ($config, $command, $macros, $macros_args) = @_;
+
+  # First expand any macros in the command
+  $command = expandmacros($config, $command, $macros, $macros_args) if $command =~ /%/;
+
+  # Security: Check for dangerous commands (basic whitelist approach)
+  my @allowed_commands = qw(grep sed cat echo find xargs basename sort paste source);
+  my $first_word = (split(/\s+/, $command))[0];
+  $first_word =~ s/.*\///; # Remove path, just get command name
+
+  # Allow common shell constructs and safe commands
+  unless (grep { $first_word eq $_ } @allowed_commands) {
+    # Check if it's a shell builtin or safe pattern
+    unless ($command =~ /^(source\s+|echo\s+|\$\{|\w+\s*=)/ || $first_word =~ /^(test|\[)$/) {
+      do_warn($config, "shell command not allowed: $first_word");
+      return '';
+    }
+  }
+
+  # Execute the command and capture output
+  my $result = '';
+  eval {
+    local $SIG{ALRM} = sub { die "timeout\n" };
+    alarm(10); # 10 second timeout
+
+    # Use backticks to capture command output
+    $result = `$command 2>/dev/null`;
+    chomp $result if defined $result;
+
+    alarm(0);
+  };
+
+  if ($@) {
+    do_warn($config, "shell command failed: $@");
+    return '';
+  }
+
+  # Clean up the result
+  $result = '' unless defined $result;
+  $result =~ s/^\s+|\s+$//g; # Trim whitespace
+
+  return $result;
+}
+
 sub getmacroargs {
   my ($line, $macdata, $macalt) = @_;
   my @args;
@@ -455,6 +563,10 @@ my %builtin_macros = (
   'suffix' => \&builtinmacro,
   'load' => \&builtinmacro,
   'span' => \&builtinmacro,
+
+  'lua' => \&lua_macro_handler,
+  '_arch' => \&builtinmacro,
+  'arch' => \&builtinmacro,
 
   'gsub' => \&luamacro,
   'len' => \&luamacro,
@@ -516,14 +628,24 @@ reexpand:
     my $mactest = 0;
     if ($macname =~ /^\!\?/s || $macname =~ /^\?\!/s) {
       $mactest = -1;
+    } elsif ($macname =~ /^\!(.+)/s) {
+      # Handle negated option macros like !-m
+      $mactest = -1;
+      $macname = $1;
     } elsif ($macname =~ /^[\-\?]/s) {
       $mactest = 1;
     }
     $macname =~ s/^[\!\?]+//s;
     if ($macname eq '(') {
-      do_warn($config, 'cannot expand %(...)');
-      $line = 'MACRO';
-      last;
+      # Handle shell command expansion %(command)
+      $macalt = macroend("%($line");
+      $line = substr($line, length($macalt) - 2);
+      $macalt =~ s/^%\(//;
+      $macalt =~ s/\)$//;
+
+      # Execute shell command and capture output
+      my $shell_result = execute_shell_command($config, $macalt, $macros, $macros_args);
+      $expandedline .= $shell_result;
     } elsif ($macname eq '[') {
       $macalt = macroend("%[$line");
       $line = substr($line, length($macalt) - 2);
@@ -588,16 +710,26 @@ reexpand:
       # builtin macro or parametric marco, get arguments
       my @args;
       if (defined $macalt) {
-	$macalt = expandmacros($config, $macalt, $macros, $macros_args, $tries);
-	push @args, $macalt;
+        # Special case: lua macro gets raw, unexpanded arguments
+        if ($macname eq 'lua') {
+          push @args, $macalt;
+        } else {
+          $macalt = expandmacros($config, $macalt, $macros, $macros_args, $tries);
+          push @args, $macalt;
+        }
       } else {
-	if (!defined($macdata)) {
-	  $line =~ /^\s*([^\n]*).*$/;
-	  $macdata = $1;
-	  $line = '';
-	}
-	$macdata = expandmacros($config, $macdata, $macros, $macros_args, $tries);
-	push @args, split(' ', $macdata);
+        if (!defined($macdata)) {
+          $line =~ /^\s*([^\n]*).*$/;
+          $macdata = $1;
+          $line = '';
+        }
+        # Special case: lua macro gets raw, unexpanded arguments
+        if ($macname eq 'lua') {
+          push @args, split(' ', $macdata);
+        } else {
+          $macdata = expandmacros($config, $macdata, $macros, $macros_args, $tries);
+          push @args, split(' ', $macdata);
+        }
       }
 
       # handle the macro
@@ -633,7 +765,13 @@ sub splitexpansionresult {
   my ($line, $includelines) = @_;
   my @l = split("\n", $line);
   $line = shift @l;
-  s/%/%%/g for @l;
+  # Escape % characters, but preserve RPM directives like %if, %endif, %else, etc.
+  for (@l) {
+    # Don't escape % for RPM control directives
+    unless (/^\s*%(?:if|endif|else|elif|elifarch|elifos|ifarch|ifnarch|ifos|ifnos|define|global|include|dnl)\b/) {
+      s/%/%%/g;
+    }
+  }
   unshift @$includelines, @l;
   return $line;
 }
@@ -842,7 +980,7 @@ sub parse {
     }
 
     # expand macros unless we are ignoring the line due to an %if
-    if (!$skip && index($line, '%') >= 0) {
+    if (!$skip && index($line, '%') >= 0 && !($line =~ /^\s*#/ && $line !~ /^#!/)) {
       $line = expandmacros($config, $line, \%macros, \%macros_args);
       $line = splitexpansionresult($line, \@includelines) if $line =~ /\n/s;
     }
@@ -1193,6 +1331,11 @@ sub parse {
       $$nfbline = [$$nfbline, undef ];
     }
   }
+
+  # if the name is missing or starts with a '%' (probably caused by an unknown macro),
+  # fall back to the recipename.
+  $ret->{'name'} = $1 if (!$ret->{'name'} || $ret->{'name'} =~ /^\%/) && ($options{'recipename'} || '') =~ /(.*)\.spec$/;
+
   unshift @subpacks, $ret->{'name'} if defined $ret->{'name'};
   $ret->{'subpacks'} = \@subpacks;
   $ret->{'exclarch'} = $exclarch if $exclarch;

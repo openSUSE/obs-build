@@ -125,12 +125,12 @@ sub parse {
   my $d;
   local $bconf->{'buildflavor'} = $p->{'flavor'};
   eval {
-    $d = Build::parse_typed($bconf, "$p->{'dir'}/$recipe", $bt);
+    $d = Build::parse_typed($bconf, "$p->{'dir'}/$recipe", $bt, 'recipename' => $recipe);
     die("can not parse $recipe\n") unless $d;
     if ($bconf_host && $d->{'nativebuild'}) {
       $p->{'native'} = 1;
       local $bconf_host->{'buildflavor'} = $p->{'flavor'};
-      $d = Build::parse_typed($bconf_host, "$p->{'dir'}/$recipe", $bt);
+      $d = Build::parse_typed($bconf_host, "$p->{'dir'}/$recipe", $bt, 'recipename' => $recipe);
       die("can not parse $recipe\n") unless $d;
       $arch = $arch_host;
     }
