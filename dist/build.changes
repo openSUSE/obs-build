@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Tue Mar 10 09:44:26 UTC 2026 - Adrian Schröter <adrian@suse.de>
+
+- Implement cmssign support in signdummy
+- pbuild: mark git assets with a fixed commit as immutable
+- mkosi
+  * check if old parameters are supported before passing them
+  * support old bash version
+- Do not crash on small files that start with the PE magic
+
+-------------------------------------------------------------------
 Mon Feb  2 14:41:36 UTC 2026 - Adrian Schröter <adrian@suse.de>
 
 - pbuild: support for _manifest files
