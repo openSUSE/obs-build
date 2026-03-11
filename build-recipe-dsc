@@ -59,6 +59,18 @@ dsc_export_origtar() {
     rm -rf "$BUILD_ROOT$TOPDIR/SOURCES/build.origtar"
 }
 
+dsc_replace_build_flavor_tokens() {
+    local f
+    local build_flavor="${BUILD_FLAVOR:-}"
+    for f in "$@" ; do
+	test -f "$f" || continue
+    local before_count after_count
+    before_count=$(perl -ne '$c += () = /\@BUILD_FLAVOR\@/g; END { print $c + 0 }' "$f")
+	perl -i -pe 'BEGIN { $v = shift @ARGV } s/\@BUILD_FLAVOR\@/$v/g' "$build_flavor" "$f" || cleanup_and_exit 1 "failed to substitute @BUILD_FLAVOR@ in $f"
+    after_count=$(perl -ne '$c += () = /\@BUILD_FLAVOR\@/g; END { print $c + 0 }' "$f")
+    done
+}
+
 
 recipe_prepare_dsc() {
     rm -rf "$BUILD_ROOT$TOPDIR/BUILD"
@@ -85,12 +97,16 @@ recipe_prepare_dsc() {
 		mv $BUILD_ROOT$TOPDIR/BUILD/$f $BUILD_ROOT$TOPDIR/BUILD/debian/${f#debian.}
 	    done
 	fi
+    dsc_replace_build_flavor_tokens "$BUILD_ROOT$TOPDIR/BUILD/debian/control" "$BUILD_ROOT$TOPDIR/BUILD/debian/rules" "$BUILD_ROOT$TOPDIR/BUILD/debian.control" "$BUILD_ROOT$TOPDIR/BUILD/debian.rules"
 	return
     fi
+
+    dsc_replace_build_flavor_tokens $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE
 
     if test -n "$DEB_TRANSFORM" ; then 
 	CHANGELOGARGS=
 	test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" && CHANGELOGARGS="--changelog $BUILD_ROOT/.build-changelog"
+    dsc_replace_build_flavor_tokens "$BUILD_ROOT$TOPDIR/SOURCES/debian.control" "$BUILD_ROOT$TOPDIR/SOURCES/debian.rules"
 	echo "Found files matching debian.*, running debian transformer..."
         if [ "$RELEASE" ]; then
           echo "release: ($RELEASE), release (DEB) ($DEB_RELEASE)"
@@ -120,6 +136,7 @@ recipe_prepare_dsc() {
 
     # run/copy sources
     chroot $BUILD_ROOT su -c "dpkg-source -x $DEB_SOURCEDIR/$DEB_DSCFILE $TOPDIR/BUILD" - $BUILD_USER
+    dsc_replace_build_flavor_tokens "$BUILD_ROOT$TOPDIR/BUILD/debian/control" "$BUILD_ROOT$TOPDIR/BUILD/debian/rules"
 
     # Alternative to debtransform: apply OBS release number if tag OBS-DCH-RELEASE is set.
     if test -z "$DEB_TRANSFORM" && grep -Eq '^OBS-DCH-RELEASE: 1' $BUILD_ROOT$TOPDIR/SOURCES/$RECIPEFILE; then
