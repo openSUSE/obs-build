@@ -166,9 +166,13 @@ umount_stuff() {
 	buildroot_umount "/proc/sys/fs/binfmt_misc"
 	buildroot_umount "/proc"
 	buildroot_umount "/sys"
-	buildroot_umount "/dev/pts"
-	buildroot_umount "/dev/shm"
 	buildroot_umount "/mnt"
+
+	for f in "$BUILD_ROOT"/dev/*; do
+	    if mountpoint -q "$f"; then
+		buildroot_umount "$f"
+	    fi
+	done
     fi
 }
 
@@ -352,7 +356,12 @@ create_devs() {
 	if test $com = ln ; then
 	    ln -s $arg $BUILD_ROOT/dev/$file
 	elif test $com = mknod ; then
-	    mknod -m $mode $BUILD_ROOT/dev/$file $arg
+	    if test -z "$PREPARE_VM" && test -e /run/.containerenv; then
+		touch $BUILD_ROOT/dev/$file
+		mount --bind /dev/$file $BUILD_ROOT/dev/$file
+	    else
+		mknod -m $mode $BUILD_ROOT/dev/$file $arg
+	    fi
 	fi
     done << DEVLIST
 	mknod null    666 c 1 3
