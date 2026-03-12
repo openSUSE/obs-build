@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Thu Mar 12 13:04:22 UTC 2026 - Adrian Schröter <adrian@suse.de>
+
+- added leap-16.0 and leap-16.1 build configs.
+  (not named sl16.0 anymore, but using same string as the git branch)
+
+-------------------------------------------------------------------
 Tue Mar 10 09:44:26 UTC 2026 - Adrian Schröter <adrian@suse.de>
 
 - Implement cmssign support in signdummy
