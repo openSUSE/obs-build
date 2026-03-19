@@ -34,6 +34,7 @@ use Build::SimpleXML;
 
 my $servicedir = '/usr/lib/obs/service';
 my $buildroot = '';
+my $servicemode = 'buildtime';
 
 sub ls {
   local *D;
@@ -61,7 +62,7 @@ sub run_services {
   # take default version setting
   for my $s (@{$servicexml->{'service'} || []}) {
     # buildtime only is default
-    next unless $s->{'mode'} && $s->{'mode'} eq 'buildtime';
+    next unless $s->{'mode'} && $s->{'mode'} eq $servicemode;
     die("missing name in service\n") unless $s->{'name'};
 
     if (! -x "$buildroot$servicedir/$s->{'name'}") {
@@ -96,12 +97,20 @@ sub run_services {
   }
 }
 
-if (@ARGV > 1 && $ARGV[0] eq '--buildroot') {
-  shift @ARGV;
-  $buildroot = shift @ARGV;
-  $buildroot = '' if $buildroot && $buildroot eq '/';
-  $buildroot =~ s@//+@/@;      # or we may fail with 'bad tempdir' later. 
-  die("bad buildroot\n") unless $buildroot eq '' || $buildroot =~ /^\//;
+while (@ARGV) {
+  if ($ARGV[0] eq '--buildroot') {
+    shift @ARGV;
+    $buildroot = shift @ARGV;
+    $buildroot = '' if $buildroot && $buildroot eq '/';
+    $buildroot =~ s@//+@/@;      # or we may fail with 'bad tempdir' later. 
+    die("bad buildroot\n") unless $buildroot eq '' || $buildroot =~ /^\//;
+    next;
+  } elsif ($ARGV[0] eq '--mode') {
+    shift @ARGV;
+    $servicemode = shift @ARGV;
+    die("unsupported servicemode\n") unless $servicemode eq 'manual' || $servicemode eq 'disabled' || $servicemode eq 'buildtime';
+    next;
+  }
 }
 
 local *F;
