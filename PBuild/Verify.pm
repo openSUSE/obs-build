@@ -82,6 +82,9 @@ sub verify_nevraquery {
 
 sub verify_multibuild {
   my ($mb) = @_;
+  if (defined($mb->{'buildemptyflavor'})) {
+    die("buildemptyflavor must be either 'true' or 'false'\n") unless $mb->{'buildemptyflavor'} eq 'true' || $mb->{'buildemptyflavor'} eq 'false';
+  }
   die("multibuild cannot have both package and flavor elements\n") if $mb->{'package'} && $mb->{'flavor'};
   for my $packid (@{$mb->{'package'} || []}) {
     verify_packid($packid);
