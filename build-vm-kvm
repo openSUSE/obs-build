@@ -360,7 +360,7 @@ vm_startup_kvm() {
         qemu_append="$qemu_append $vm_cmdline"
     else
         # Pick sensible defaults
-        qemu_append="$qemu_append $kvm_qemu_append $vm_linux_kernel_parameter elevator=noop"
+        qemu_append="$qemu_append $kvm_qemu_append $vm_linux_kernel_parameter"
         qemu_append="$qemu_append nmi_watchdog=0 rw rd.driver.pre=binfmt_misc"
     fi
     qemu_append="$qemu_append $vm_linux_always_append console=$kvm_console init=$vm_init_script"
