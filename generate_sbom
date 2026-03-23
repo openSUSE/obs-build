@@ -572,7 +572,9 @@ sub read_pkgs_from_rpmmd {
 
   require Build::Rpmmd;
   my $fh;
-  if ($primaryfile =~ /\.zst$/) {
+  if ($primaryfile =~ /\.zck$/) {
+    open($fh, '-|', 'unzck', '-c', $primaryfile) || die("$primaryfile: $!\n");
+  } elsif ($primaryfile =~ /\.zst$/) {
     open($fh, '-|', 'zstd', '-dc', $primaryfile) || die("$primaryfile: $!\n");
   } elsif ($primaryfile =~ /\.gz$/) {
     open($fh, '-|', 'gunzip', '-dc', $primaryfile) || die("$primaryfile: $!\n");
