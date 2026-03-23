@@ -36,6 +36,7 @@ while (@ARGV) {
     $mode = 'cmssign';
     shift @ARGV;
     splice(@ARGV, 0, 2) if @ARGV >= 2 && $ARGV[0] eq '--cert';
+    shift @ARGV while @ARGV && ($ARGV[0] eq '--cms-nocerts' || $ARGV[0] eq '--cms-keyid');
     next;
   }
   if ($ARGV[0] eq '-h' && @ARGV >= 2) {
