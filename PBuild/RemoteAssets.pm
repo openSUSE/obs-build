@@ -352,6 +352,7 @@ sub fetch_git_asset {
   # get rid of .git directory (need to make this optional)
   PBuild::Util::rm_rf("$tmpdir/$file/.git") unless $keepmeta;
   if ($asset->{'donotpack'}) {
+    utime($t, $t, "$tmpdir/$file") if defined $t;
     rename("$tmpdir/$file", "$adir/$assetid") || die("rename $tmpdir $adir/$assetid: $!\n");
   } else {
     create_asset_from_dir($assetdir, $asset, $tmpdir, $t);

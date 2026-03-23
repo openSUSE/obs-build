@@ -76,6 +76,7 @@ my %known_options = (
   'type' => '::',
 
   'create-cpio' => '',
+  'mtime' => ':',
 
   'show-dir-srcmd5' => '',
   'debugflags' => \&debugflags_special,
@@ -126,10 +127,10 @@ if ($opts->{'create-cpio'}) {
     my $prefix = $dir;
     $prefix =~ s/.*\///;
     $prefix = '' if $prefix eq '.';
-    PBuild::Cpio::cpio_create(\*STDOUT, $dir, 'prefix' => ($prefix ne '' ? "$prefix/" : ''));
+    PBuild::Cpio::cpio_create(\*STDOUT, $dir, 'prefix' => ($prefix ne '' ? "$prefix/" : ''), 'mtime' => $opts->{'mtime'});
   } else {
     s/^\/// for @dirs;
-    PBuild::Cpio::cpio_create(\*STDOUT, $dir, 'dircontent' => \@dirs);
+    PBuild::Cpio::cpio_create(\*STDOUT, $dir, 'dircontent' => \@dirs, 'mtime' => $opts->{'mtime'});
   }
   exit(0);
 }
