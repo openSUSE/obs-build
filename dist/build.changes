@@ -1,4 +1,19 @@
 -------------------------------------------------------------------
+Mon Mar 23 12:58:20 UTC 2026 - Adrian Schröter <adrian@suse.de>
+
+- Support --cms-nocerts and --cms-keyid in the signdummy
+- Support chroot builds inside of containers
+- runservice tool, allow to specify the modes. Can be
+  used on plain git source now also
+- Support --mtime option for cpio creation
+- generate_sbom:
+   * Support also unzck compressed repomd files
+   * Fail when given --product directory is missing
+   * support zstd compressed repomd data
+- build-vm-lxc: support lxc >= 5
+- vc: Hide an annoying error message when not using NIS
+
+-------------------------------------------------------------------
 Thu Mar 12 13:04:22 UTC 2026 - Adrian Schröter <adrian@suse.de>
 
 - added leap-16.0 and leap-16.1 build configs.
