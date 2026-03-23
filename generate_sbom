@@ -556,6 +556,7 @@ sub read_pkgs_from_product_directory {
     my $fn = $File::Find::name;
     push @rpms, read_rpm($fn) if $fn =~ /\.rpm$/;
   };
+  die("product directory is missing: $dir\n") unless -d $dir;
   find({'wanted' => $addrpmfile, 'no_chdir' => 1, 'preprocess' => sub {sort(@_)} }, $dir); 
   # make sure that the packages are unique
   my %seen;
@@ -571,7 +572,11 @@ sub read_pkgs_from_rpmmd {
 
   require Build::Rpmmd;
   my $fh;
-  if ($primaryfile =~ /\.gz$/) {
+  if ($primaryfile =~ /\.zck$/) {
+    open($fh, '-|', 'unzck', '-c', $primaryfile) || die("$primaryfile: $!\n");
+  } elsif ($primaryfile =~ /\.zst$/) {
+    open($fh, '-|', 'zstd', '-dc', $primaryfile) || die("$primaryfile: $!\n");
+  } elsif ($primaryfile =~ /\.gz$/) {
     open($fh, '-|', 'gunzip', '-dc', $primaryfile) || die("$primaryfile: $!\n");
   } else {
     open($fh, '<', $primaryfile) || die("$primaryfile: $!\n");
