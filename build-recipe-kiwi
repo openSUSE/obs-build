@@ -469,6 +469,14 @@ perform_image_build() {
 		build_call="$build_call && LANG=en_US.UTF-8 $kiwi_path system crossprepare --target-arch $target --init /usr/lib/build/initvm.`uname -m` --target-dir $TOPDIR/KIWI-$imgtype"
 	    fi
 	fi
+	# Unless overwritten by packages, set some useful defaults:
+	if ! test -f $BUILD_ROOT/etc/kiwi.yml ; then
+	    # Disable container compression for less overhead, postprocess_kiwi_containers would decompress them anyway.
+	    cat >$BUILD_ROOT/etc/kiwi.yml <<EOF
+container:
+  - compress: false
+EOF
+	fi
 	build_call="$build_call && LANG=en_US.UTF-8 $kiwi_path --debug $KIWI_MAIN_PARAMETERS"
 	test -n "$profile" && build_call="$build_call --profile $profile"
 	if test -n "$ABUILD_TARGET" ; then
