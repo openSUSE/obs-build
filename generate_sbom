@@ -391,9 +391,9 @@ sub dump_rpmdb {
 sub read_rpm {
   my ($rpm) = @_;
   my $sigmd5tag = ref($rpm) ? 'SIGMD5' : 'SIGTAG_MD5';
-  my %r = Build::Rpm::rpmq($rpm, qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL FILENAMES URL VENDOR FILEMODES FILEDIGESTS FILEDIGESTALGO}, $sigmd5tag);
+  my %r = Build::Rpm::rpmq($rpm, qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM VCS DISTURL FILENAMES URL VENDOR FILEMODES FILEDIGESTS FILEDIGESTALGO}, $sigmd5tag);
   delete $r{$_} for qw{BASENAMES DIRNAMES DIRINDEXES};	# save mem
-  for (qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL URL VENDOR FILEDIGESTALGO}, $sigmd5tag) {
+  for (qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL URL VCS VENDOR FILEDIGESTALGO}, $sigmd5tag) {
     next unless $r{$_};
     die("bad rpm entry for $_\n") unless ref($r{$_}) eq 'ARRAY' && @{$r{$_}} == 1;
     $r{$_} = $r{$_}->[0];
@@ -589,7 +589,7 @@ sub read_pkgs_from_rpmmd {
     }
     push @rpms, $r;
   }
-  close($fh);
+  close($fh) || die("close: $primaryfile: $!\n");
   return \@rpms;
 }
 
@@ -739,6 +739,8 @@ sub cyclonedx_encode_pkg {
   }
   my $purlurl = gen_purl($p, $distro, $pkgtype);
   $cyc->{'purl'} = $purlurl if $purlurl;
+  push @{$cyc->{'externalReferences'}}, { 'url' => $p->{'DISTURL'}, 'type' => 'build-meta' } if $p->{'DISTURL'};
+  push @{$cyc->{'externalReferences'}}, { 'url' => $p->{'VCS'}, 'type' => 'vcs' } if $p->{'VCS'};
   if (!$p->{'cyc_id'}) {
     $p->{'cyc_id'} = "$p->{'NAME'}-" . gen_pkg_id($p);
     $p->{'cyc_id'} =~ s/[^a-zA-Z0-9\.\-]/-/g;
@@ -878,7 +880,9 @@ sub spdx_encode_pkg {
   # Let the caller control the presence of external refs
   if(!$p->{'skip_external_refs'}) {
     my $purlurl = gen_purl($p, $distro, $pkgtype);
-    push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator', $purlurl } if $purlurl;
+    push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator' => $purlurl } if $purlurl;
+    push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'OTHER', 'referenceType' => 'vcs', 'referenceLocator' => $p->{'VCS'} } if $p->{'VCS'};
+    push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'OTHER', 'referenceType' => 'obs-disturl', 'referenceLocator' => $p->{'DISTURL'} } if $p->{'DISTURL'};
   }
 
   $spdx->{'primaryPackagePurpose'} = $p->{'primaryPackagePurpose'} if $p->{'primaryPackagePurpose'};
