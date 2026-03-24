@@ -1580,9 +1580,11 @@ if test -n "$LOGFILE" -a -z "$RUN_SHELL" ; then
     touch $LOGFILE
     # set start time, to be substracted for build log timestamps
     STARTTIME=`perl -e 'print time()'`
-
     exec_a_opt=(-a 'build logging')
+    # detect busybox setup which is not supporting tee -a
     (exec -a /bin/false /bin/true) || exec_a_opt=()
+    # ubuntu rust coreutils is failing when exec name is unknown
+    test -L /usr/bin/tee && exec_a_opt=()
     if test -n "$RUN_SHELL_AFTER_FAIL" ; then
         # we may run a shell, so no stdout wrapper
 	:
