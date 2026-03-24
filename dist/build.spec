@@ -190,8 +190,13 @@ ln -s slfo1.2.conf default.conf
 ln -s sl42.${SLE_V:3:1}.conf default.conf
 %endif
 %if 0%{?sle_version} && 0%{?is_opensuse} && %suse_version > 1315
-# this is SUSE Leap 15 and higher
-ln -s sl${SLE_V:0:2}.${SLE_V:3:1}.conf default.conf
+if test "${SLE_V:0:2}.${SLE_V:3:1}" == "15.7"; then
+  # Super special case of 15.7, no openSUSE, but Backports
+  ln -s sles15sp7.conf default.conf
+else
+  # this is SUSE Leap 15 and higher
+  ln -s sl${SLE_V:0:2}.${SLE_V:3:1}.conf default.conf
+fi
 %endif
 %if !0%{?sle_version} && ( 0%{?suse_version} <= 1310 || 0%{?suse_version} == 1320 || 0%{?suse_version} == 1330 )
 # this is old openSUSE releases and Factory
