@@ -842,10 +842,8 @@ sub spdx_encode_pkg {
   $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
   my $evr = $vr;
   $evr = "$p->{'EPOCH'}:$evr" if $p->{'EPOCH'};
-  my $spdx = {
-    'name' => $p->{'NAME'},
-    'versionInfo' => $evr,
-  };
+  my $spdx = { 'name' => $p->{'NAME'} };
+  $spdx->{'versionInfo'} = $evr if defined $evr;
   $spdx->{'supplier'} = 'NOASSERTION';
   if ($p->{'VENDOR'}) {
     $spdx->{'originator'} = "Organization: $p->{'VENDOR'}";
@@ -947,7 +945,7 @@ sub spdx_encode_relations {
 }
 
 sub spdx_encode_header {
-  my ($subjectname) = @_;
+  my ($subjectname, $type) = @_;
   my $spdx = {
     'spdxVersion' => 'SPDX-2.3',
     'dataLicense' => 'CC0-1.0',
@@ -960,6 +958,13 @@ sub spdx_encode_header {
     'licenseListVersion' => $Build::SPDX::licenseListVersion,
   };
   $spdx->{'creationInfo'} = $creationinfo;
+  my $rootspdx = spdx_encode_pkg({
+    NAME => $subjectname,
+    spdx_id => 'SPDXRef-DOCUMENT-ROOT',
+    primaryPackagePurpose => uc($type),
+    skip_external_refs => 1
+  }, undef, undef, {});
+  $spdx->{'packages'} = [ $rootspdx ];
   return $spdx;
 }
 
@@ -1230,9 +1235,13 @@ if ($format eq 'spdx') {
       push @{$doc->{'relationships'}}, spdx_encode_relations($f) unless $f->{'SKIP'};
     }
   }
+  my $rootp = { 'spdx_id' => 'SPDXRef-DOCUMENT-ROOT' };
+  for my $p (@$pkgs) {
+    push @{$doc->{'relationships'}}, spdx_encode_one_relation($rootp, $p, 'CONTAINS');
+  }
   push @{$doc->{'relationships'}}, {
     'spdxElementId' => 'SPDXRef-DOCUMENT',
-    'relatedSpdxElement' => 'SPDXRef-DOCUMENT',
+    'relatedSpdxElement' => 'SPDXRef-DOCUMENT-ROOT',
     'relationshipType', 'DESCRIBES',
   };
   $doc->{'documentNamespace'} = 'http://open-build-service.org/spdx/'.urlencode($subjectname).'-'.gen_uuid($doc);
