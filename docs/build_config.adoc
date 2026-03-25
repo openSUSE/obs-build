@@ -28,7 +28,7 @@ Many keywords like `Require` or `BuildFlags` do not replace existing
 data, but add to it. This means you can have multiple `BuildFlags`
 lines instead of having one line with all the flags you need.
 
-You can prepend an exclamation mark `!` to the argument to remove 
+You can prepend an exclamation mark `!` to the argument to remove
 an existing entry from the data.
 
 === Available Keywords in Project Configuration
@@ -149,8 +149,15 @@ podman engine.
 * container-build-format:FORMAT
 
 For podman container builds, it specifies the container config format. Possible values
-are 'docker' and 'oci'. The default is 'docker'. The 'docker' format allows a few
+are `docker` and `oci`. The default is `docker`. The `docker` format allows a few
 extensions like ONBUILD, SHELL, DOMAINNAME, COMMENT, HEALTHCHECK amongst others.
+
+* container-timestamp:VALUE
+
+For podman container builds, it sets a timestamp for the container build. This can
+be a number (seconds since the epoch), the string `scm` (read time from
+`_scmsync.obsinfo`) or the string `source_date_epoch` (get time from the
+`$SOURCE_DATE_EPOCH` environment variable set in the build environment).
 
 * productcompose-buildoption:OPTION
 
