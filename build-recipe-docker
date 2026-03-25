@@ -288,19 +288,40 @@ recipe_build_docker() {
     squashopt=--squash
     if test -n "$(perl -I$BUILD_DIR -MBuild::Docker -e Build::Docker::show -- "$BUILD_ROOT/$TOPDIR/SOURCES/$RECIPEFILE" nosquash)" ; then
 	squashopt=
-	echo "Building image $ALLTAGS (nosquash)"
+	echo "Building image $ALLTAGS with $DOCKER_TOOL (nosquash)"
     else
-	echo "Building image $ALLTAGS"
+	echo "Building image $ALLTAGS with $DOCKER_TOOL"
     fi
 
     if test "$BUILDENGINE" = podman; then
 	test -n "$squashopt" && squashopt="--layers=false"
+
         buildformat=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags container-build-format)
         formatopt="--format docker"
         if test "$buildformat" = oci; then
             formatopt="--format oci"
         fi
-	if ! $DOCKER_CMD build $formatopt $squashopt -v "$TOPDIR/SOURCES/repos:$TOPDIR/SOURCES/repos" --network=host "${tagargs[@]}" "${buildargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
+
+	local timestamp=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags container-timestamp)
+	local timestampopt=
+	if test "$timestamp" = source_date_epoch ; then
+	    # query SOURCE_DATE_EPOCH from the build environment
+	    local ts=$(chroot $BUILD_ROOT su -c 'echo $SOURCE_DATE_EPOCH' - $BUILD_USER)
+	    test -z "$ts" && echo 'WARNING: container-timestamp is set to source_date_epoch but $SOURCE_DATE_EPOCH is not set'
+	    test -n "$ts" && timestampopt="--timestamp=$ts"
+	elif test "$timestamp" = scm ; then
+	    local ts
+	    if test -f "$BUILD_ROOT/$TOPDIR/SOURCES/_scmsync.obsinfo" ; then
+		ts=$(sed -ne '/^mtime:/{s/^mtime: *//p;q}' < "$BUILD_ROOT/$TOPDIR/SOURCES/_scmsync.obsinfo")
+	    fi
+	    test -z "$ts" && echo 'WARNING: container-timestamp is set to scm but _scmsync.obsinfo does not exist'
+	    test -n "$ts" && timestampopt="--timestamp=$ts"
+	elif test -n "$timestamp" ; then
+	    timestampopt="--timestamp=$timestamp"
+	fi
+	test -n "$timestampopt" && echo "Using ${timestampopt//--/} for building"
+	
+	if ! $DOCKER_CMD build $formatopt $squashopt $timestampopt -v "$TOPDIR/SOURCES/repos:$TOPDIR/SOURCES/repos" --network=host "${tagargs[@]}" "${buildargs[@]}" -f "$TOPDIR/SOURCES/$RECIPEFILE" $TOPDIR/SOURCES/ ; then
 	    cleanup_and_exit 1 "$DOCKER_TOOL build command failed"
 	fi
     else
