@@ -776,7 +776,7 @@ sub cyclonedx_encode_relations {
 }
 
 sub cyclonedx_encode_header {
-  my ($subjectname, $type) = @_;
+  my ($subjectname, $type, $disturl, $vcs) = @_;
   my $cyc = {
     'bomFormat' => 'CycloneDX',
     'specVersion' => '1.5',
@@ -787,6 +787,8 @@ sub cyclonedx_encode_header {
       'component' => { 'bom-ref' => 'root', 'type' => ($type || 'application'), 'name' => $subjectname },
     },
   };
+  push @{$cyc->{'metadata'}->{'component'}->{'externalReferences'}}, { 'url' => $disturl, 'type' => 'build-meta' } if $disturl;
+  push @{$cyc->{'metadata'}->{'component'}->{'externalReferences'}}, { 'url' => $vcs, 'type' => 'vcs' } if $vcs;
   return $cyc;
 }
 
@@ -945,7 +947,7 @@ sub spdx_encode_relations {
 }
 
 sub spdx_encode_header {
-  my ($subjectname, $type) = @_;
+  my ($subjectname, $type, $disturl, $vcs) = @_;
   my $spdx = {
     'spdxVersion' => 'SPDX-2.3',
     'dataLicense' => 'CC0-1.0',
@@ -964,6 +966,8 @@ sub spdx_encode_header {
     primaryPackagePurpose => uc($type),
     skip_external_refs => 1
   }, undef, undef, {});
+  push @{$rootspdx->{'externalRefs'}}, { 'referenceCategory' => 'OTHER', 'referenceType' => 'vcs', 'referenceLocator' => $vcs } if $vcs;
+  push @{$rootspdx->{'externalRefs'}}, { 'referenceCategory' => 'OTHER', 'referenceType' => 'obs-disturl', 'referenceLocator' => $disturl } if $disturl;
   $spdx->{'packages'} = [ $rootspdx ];
   return $spdx;
 }
@@ -1030,6 +1034,8 @@ my $isproduct;
 my $isdir;
 my $iscontainer;
 my $distro;
+my $disturl;
+my $vcs;
 my $rpmmd;
 my $format;
 my $dist_opt;
@@ -1060,6 +1066,10 @@ while (@ARGV && $ARGV[0] =~ /^-/) {
     exit(0);
   } elsif ($opt eq '--dist') {
     $dist_opt = shift @ARGV;
+  } elsif ($opt eq '--vcs') {
+    $vcs = shift @ARGV;
+  } elsif ($opt eq '--disturl') {
+    $disturl = shift @ARGV;
   } elsif ($opt eq '--arch' || $opt eq '--archpath') {
     $arch = shift @ARGV;
   } elsif ($opt eq '--configdir') {
@@ -1205,7 +1215,7 @@ if ($format eq 'spdx') {
   my %unknown_spdx_licenses;
   $json_template = $spdx_json_template;
   $intoto_type = 'https://spdx.dev/Document';
-  $doc = spdx_encode_header($subjectname, $targettype);
+  $doc = spdx_encode_header($subjectname, $targettype, $disturl, $vcs);
   for my $p (@$pkgs) {
     push @{$doc->{'packages'}}, spdx_encode_pkg($p, $distro, $pkgtype, \%unknown_spdx_licenses);
   }
@@ -1248,7 +1258,7 @@ if ($format eq 'spdx') {
 } elsif ($format eq 'cyclonedx') {
   $json_template = $cyclonedx_json_template;
   $intoto_type = 'https://cyclonedx.org/bom';
-  $doc = cyclonedx_encode_header($subjectname, $targettype);
+  $doc = cyclonedx_encode_header($subjectname, $targettype, $disturl, $vcs);
   for my $p (@$pkgs) {
     push @{$doc->{'components'}}, cyclonedx_encode_pkg($p, $distro, $pkgtype);
   }
