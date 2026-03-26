@@ -61,8 +61,10 @@ sub parse_options {
       }
     } else {
       my $arg = 1;
-      if (@args && ref($args[0])) {
-        $arg = getarg($origopt, \@args);
+      if ($ko =~ s/=(.*)$//) {
+	$arg = $1;
+      } elsif (@args && ref($args[0])) {
+	$arg = getarg($origopt, \@args);
 	$arg = 0 if $arg =~ /^(?:0|off|false|no)$/i;
 	$arg = 1 if $arg =~ /^(?:1|on|true|yes)$/i;
 	die("Bad boolean argument for option $origopt: '$arg'\n") unless $arg eq '0' || $arg eq '1';
