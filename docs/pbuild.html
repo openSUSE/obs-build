@@ -1356,8 +1356,19 @@ container-build-format:FORMAT
 </li>
 </ul></div>
 <div class="paragraph"><p>For podman container builds, it specifies the container config format. Possible values
-are <em>docker</em> and <em>oci</em>. The default is <em>docker</em>. The <em>docker</em> format allows a few
+are <code>docker</code> and <code>oci</code>. The default is <code>docker</code>. The <code>docker</code> format allows a few
 extensions like ONBUILD, SHELL, DOMAINNAME, COMMENT, HEALTHCHECK amongst others.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+container-timestamp:VALUE
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>For podman container builds, it sets a timestamp for the container build. This can
+be a number (seconds since the epoch), the string <code>scm</code> (read time from
+<code>_scmsync.obsinfo</code>) or the string <code>source_date_epoch</code> (get time from the
+<code>$SOURCE_DATE_EPOCH</code> environment variable set in the build environment).</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
@@ -1979,7 +1990,7 @@ In this case the base system for the target system can manually get configured v
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2025-03-31 13:38:18 CEST
+ 2025-03-26 14:23:36 CET
 </div>
 </div>
 </body>
