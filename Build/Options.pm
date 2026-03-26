@@ -25,6 +25,7 @@ use strict;
 sub getarg {
   my ($origopt, $args, $optional) = @_;
   return ${shift @$args} if @$args && ref($args->[0]);
+  return undef if $optional && $optional == 2;
   return shift @$args if @$args && $args->[0] !~ /^-/;
   die("Option $origopt needs an argument\n") unless $optional;
   return undef;
