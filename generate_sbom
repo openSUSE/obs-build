@@ -155,7 +155,7 @@ sub uncompress_container {
   } elsif ($container =~ /\.tar\.xz$/) {
     push @decompressor, 'xzdec';
   } else {
-    die("$container: unknown format\n");
+    die("$container: unknown container format\n");
   }
   my $pid = fork();
   die("fork: $!\n") unless defined $pid;
@@ -1216,6 +1216,7 @@ if ($format eq 'spdx') {
   $json_template = $spdx_json_template;
   $intoto_type = 'https://spdx.dev/Document';
   $doc = spdx_encode_header($subjectname, $targettype, $disturl, $vcs);
+  my $rootpkg = { 'spdx_id' => 'SPDXRef-DOCUMENT-ROOT' };
   for my $p (@$pkgs) {
     push @{$doc->{'packages'}}, spdx_encode_pkg($p, $distro, $pkgtype, \%unknown_spdx_licenses);
   }
@@ -1229,7 +1230,10 @@ if ($format eq 'spdx') {
     }
   }
 
-  push @{$doc->{'packages'}}, spdx_encode_dist($dist);
+  if ($dist && %$dist) {
+    push @{$doc->{'packages'}}, spdx_encode_dist($dist);
+    push @$pkgs, { 'spdx_id' => $doc->{'packages'}->[-1]->{'SPDXID'} };
+  }
 
   for (sort keys %unknown_spdx_licenses) {
     push @{$doc->{'hasExtractedLicensingInfos'}}, spdx_encode_extracted_license($unknown_spdx_licenses{$_});
@@ -1245,9 +1249,8 @@ if ($format eq 'spdx') {
       push @{$doc->{'relationships'}}, spdx_encode_relations($f) unless $f->{'SKIP'};
     }
   }
-  my $rootp = { 'spdx_id' => 'SPDXRef-DOCUMENT-ROOT' };
   for my $p (@$pkgs) {
-    push @{$doc->{'relationships'}}, spdx_encode_one_relation($rootp, $p, 'CONTAINS');
+    push @{$doc->{'relationships'}}, spdx_encode_one_relation($rootpkg, $p, 'CONTAINS');
   }
   push @{$doc->{'relationships'}}, {
     'spdxElementId' => 'SPDXRef-DOCUMENT',
