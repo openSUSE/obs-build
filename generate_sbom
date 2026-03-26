@@ -33,6 +33,7 @@ use Digest::SHA;
 use Digest::MD5;
 
 use Build;
+use Build::Options;
 use Build::Rpm;
 use Build::Deb;
 use Build::SimpleJSON;
@@ -990,8 +991,8 @@ sub spdx_encode_dist {
 # Main
 #
 
-sub echo_help {
-    print "\n
+sub print_help {
+    print "
 The Software Bill of Materials (SBOM) generation tool
 =====================================================
 
@@ -1007,8 +1008,8 @@ Output formats
      Generates CycloneDX 1.5 formatted data
 
   --intoto
-     Can be used optional to wrap the generated data into in-toto.io
-     specified format.
+     Can be used to optionally wrap the generated data into an
+     in-toto attestation.
 
 Supported content
 =================
@@ -1023,71 +1024,52 @@ Supported content
   --rpmmd DIRECTORY
      A directory providing rpm-md meta data. A 'repodata/repomd.xml' file is expected.
 
-  --container-archive CONTAINER_ARCHIVE
-     An container providing a system
+  --container-docker-archive CONTAINER_ARCHIVE
+  --container-oci-archive CONTAINER_ARCHIVE
+     An container archive providing a system
 
 ";
 }
 
-my $wrap_intoto;
-my $isproduct;
-my $isdir;
-my $iscontainer;
-my $distro;
-my $disturl;
-my $vcs;
-my $rpmmd;
-my $format;
-my $dist_opt;
-my $arch;
-my $configdir = ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
-my $no_files_generation;
+my $known_options = {
+  'distro' => ':',
+  'subject' => ':',
+  'intoto' => '',
+  'product' => 'type=product',
+  'dir' => 'type=dir',
+  'rpmmd' => 'type=rpmmd',
+  'container-archive' => 'type=docker-archive',
+  'container-docker-archive' => 'type=docker-archive',
+  'container-oci-archive' => 'type=oci-archive',
+  'format' => ':',
+  'help' => '',
+  'h' => 'help',
+  'dist' => ':',
+  'vcs' => ':',
+  'disturl' => ':',
+  'arch' => ':',
+  'archpath' => 'arch:',
+  'configdir' => ':',
+  'no-files-generation' => '',
+};
 
-while (@ARGV && $ARGV[0] =~ /^-/) {
-  my $opt = shift @ARGV;
-  if ($opt eq '--distro') {
-    $distro = shift @ARGV;
-  } elsif ($opt eq '--intoto') {
-    $wrap_intoto = 1;
-  } elsif ($opt eq '--product') {
-    $isproduct = 1;
-  } elsif ($opt eq '--dir') {
-    $isdir = 1;
-  } elsif ($opt eq '--rpmmd') {
-    $rpmmd = 1;
-  } elsif ($opt eq '--container-archive' || $opt eq '--container-docker-archive') {
-    $iscontainer = 'docker-archive';
-  } elsif ($opt eq '--container-oci-archive') {
-    $iscontainer = 'oci-archive';
-  } elsif ($opt eq '--format') {
-    $format = shift @ARGV;
-  } elsif ($opt eq '--help') {
-    echo_help();
-    exit(0);
-  } elsif ($opt eq '--dist') {
-    $dist_opt = shift @ARGV;
-  } elsif ($opt eq '--vcs') {
-    $vcs = shift @ARGV;
-  } elsif ($opt eq '--disturl') {
-    $disturl = shift @ARGV;
-  } elsif ($opt eq '--arch' || $opt eq '--archpath') {
-    $arch = shift @ARGV;
-  } elsif ($opt eq '--configdir') {
-    $configdir = shift @ARGV;
-  } elsif ($opt eq '--no-files-generation') {
-    $no_files_generation = 1;
-  } else {
-    last if $opt eq '--';
-    die("unknown option: $opt\n");
-  }
+my ($opts, @args) = Build::Options::parse_options($known_options, @ARGV);
+
+if ($opts->{'help'}) {
+  print_help();
+  exit(0);
 }
 
-$format ||= 'spdx';
-die("unknown format $format\n") unless $format eq 'spdx' || $format eq 'cyclonedx';
+# set defaults
+$opts->{'configdir'} ||= ($::ENV{'BUILD_DIR'} || '/usr/lib/build') . '/configs';
+$opts->{'type'} ||= 'docker-archive';	# compat
+$opts->{'format'} ||= 'spdx';
+
+die("unknown format $opts->{'format'}\n") unless $opts->{'format'} eq 'spdx' || $opts->{'format'} eq 'cyclonedx';
 
 
-die("usage: generate_sbom [--distro NAME] [--format spdx|cyclonedx] [--intoto] [--dir DIRECTORY]|[--product DIRECTORY]|[--rpmmd DIRECTORY]|[--container-archive CONTAINER_ARCHIVE]\n") unless @ARGV == 1;
-my $toprocess = $ARGV[0];
+die("usage: generate_sbom [--distro NAME] [--format spdx|cyclonedx] [--intoto] [--dir DIRECTORY]|[--product DIRECTORY]|[--rpmmd DIRECTORY]|[--container-archive CONTAINER_ARCHIVE]\n") unless @args == 1;
+my $toprocess = $args[0];
 
 my $tmpdir = File::Temp::tempdir( CLEANUP => 1 );
 
@@ -1097,16 +1079,19 @@ my $pkgs;
 my $dist;
 my $pkgtype = 'rpm';
 
-$config = Build::read_config_dist($dist_opt, $arch || 'noarch', $configdir) if $dist_opt;
+$config = Build::read_config_dist($opts->{'dist'}, $opts->{'arch'} || 'noarch', $opts->{'configdir'}) if $opts->{'dist'};
+
+my $no_files_generation = $opts->{'no-files-generation'};
 $no_files_generation = ($config->{'buildflags:spdx-files-generation'} || '') eq 'no' unless defined $no_files_generation;
+
 my $targettype;
 
-if ($isproduct) {
+if ($opts->{'type'} eq 'product') {
   # product case
   $targettype = 'library';
   #$files = gen_filelist($toprocess);
   $pkgs = read_pkgs_from_product_directory($toprocess);
-} elsif ($rpmmd) {
+} elsif ($opts->{'type'} eq 'rpmmd') {
   $targettype = 'library';
   require Build::Rpmmd;
   my $primary;
@@ -1121,7 +1106,7 @@ if ($isproduct) {
   }
   die("$toprocess: $!\n") unless -e $toprocess;
   $pkgs = read_pkgs_from_rpmmd($toprocess);
-} elsif ($isdir) {
+} elsif ($opts->{'type'} eq 'dir') {
   $targettype = 'application';
   $dist = read_dist($toprocess);
   $pkgtype = pkgtype_from_dist($dist);
@@ -1134,11 +1119,10 @@ if ($isproduct) {
   }
   $files = gen_filelist($toprocess);
   $filepkgs = introspect_filelist($toprocess, $files);
-} else { # no check for $iscontainer to stay backward compatible
+} elsif ($opts->{'type'} eq 'docker-archive' || $opts->{'type'} eq 'oci-archive') {
   # container tar case
-  $iscontainer ||= 'docker-archive';
   $targettype = 'container';
-  my $unpackdir = unpack_container($tmpdir, $toprocess, $iscontainer);
+  my $unpackdir = unpack_container($tmpdir, $toprocess, $opts->{'type'});
   $dist = read_dist($unpackdir);
   $pkgtype = pkgtype_from_dist($dist);
   if ($pkgtype eq 'deb') {
@@ -1149,6 +1133,8 @@ if ($isproduct) {
   }
   $files = gen_filelist($unpackdir);
   $filepkgs = introspect_filelist($unpackdir, $files);
+} else {
+  die("Unsupported content type $opts->{'type'}\n");
 }
 
 # generate relations
@@ -1198,9 +1184,13 @@ if (@{$filepkgs || []}) {
   }
 }
 
-my $subjectname = $toprocess;
-$subjectname =~ s/.*\///;
-
+my $subjectname = $opts->{'subject'};
+if (!$subjectname) {
+  $subjectname = $toprocess;
+  $subjectname =~ s/\/+$//;
+  $subjectname =~ s/.*\///;
+}
+my $distro = $opts->{'distro'};
 if (!$distro && $dist) {
   $distro = $dist->{'id'};
   $distro .= "-$dist->{'version_id'}" if defined($dist->{'version_id'}) && $dist->{'version_id'} ne '';
@@ -1211,11 +1201,11 @@ my $json_template;
 my $intoto_type;
 my $doc;
 
-if ($format eq 'spdx') {
+if ($opts->{'format'} eq 'spdx') {
   my %unknown_spdx_licenses;
   $json_template = $spdx_json_template;
   $intoto_type = 'https://spdx.dev/Document';
-  $doc = spdx_encode_header($subjectname, $targettype, $disturl, $vcs);
+  $doc = spdx_encode_header($subjectname, $targettype, $opts->{'disturl'}, $opts->{'vcs'});
   my $rootpkg = { 'spdx_id' => 'SPDXRef-DOCUMENT-ROOT' };
   for my $p (@$pkgs) {
     push @{$doc->{'packages'}}, spdx_encode_pkg($p, $distro, $pkgtype, \%unknown_spdx_licenses);
@@ -1258,10 +1248,10 @@ if ($format eq 'spdx') {
     'relationshipType', 'DESCRIBES',
   };
   $doc->{'documentNamespace'} = 'http://open-build-service.org/spdx/'.urlencode($subjectname).'-'.gen_uuid($doc);
-} elsif ($format eq 'cyclonedx') {
+} elsif ($opts->{'format'} eq 'cyclonedx') {
   $json_template = $cyclonedx_json_template;
   $intoto_type = 'https://cyclonedx.org/bom';
-  $doc = cyclonedx_encode_header($subjectname, $targettype, $disturl, $vcs);
+  $doc = cyclonedx_encode_header($subjectname, $targettype, $opts->{'disturl'}, $opts->{'vcs'});
   for my $p (@$pkgs) {
     push @{$doc->{'components'}}, cyclonedx_encode_pkg($p, $distro, $pkgtype);
   }
@@ -1279,13 +1269,13 @@ if ($format eq 'spdx') {
   }
   $doc->{'serialNumber'} = 'urn:uuid:'.gen_uuid($doc);
 } else {
-  die("internal error\n");
+  die("internal error, format not supported\n");
 }
 
-if ($wrap_intoto) {
+if ($opts->{'intoto'}) {
   my $subject = { 'name' => $subjectname };
   # no digest for products as it might be a directory. And an iso file would change the checksum later while signing.
-  $subject->{'digest'} = { 'sha256' => sha256file($toprocess) } unless $isproduct || $isdir;
+  $subject->{'digest'} = { 'sha256' => sha256file($toprocess) } unless $opts->{'type'} eq 'product' || $opts->{'type'} eq 'dir';
   $doc = {
     '_type' => 'https://in-toto.io/Statement/v0.1',
     'subject' => [ $subject ],
