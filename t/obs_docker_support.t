@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 17;
+use Test::More tests => 19;
 
 my @t = (
     [ 'zypper', 'rm', 'zypper' ]
@@ -24,6 +24,11 @@ my @t = (
 	=> '/usr/bin/dnf "--setopt=reposdir=/etc/repos_obs_dockersupport.d/" "install" "xterm"',
     [ 'dnf', 'remove', 'systemd' ]
 	=> '/usr/bin/dnf "remove" "systemd"',
+
+    [ 'microdnf', 'install', 'xterm' ]
+	=> '/usr/bin/microdnf "--setopt=reposdir=/etc/repos_obs_dockersupport.d/" "install" "xterm"',
+    [ 'microdnf', 'remove', 'systemd' ]
+	=> '/usr/bin/microdnf "remove" "systemd"',
 
     [ 'apk', 'add', 'bash' ]
 	=> '/sbin/apk "--repositories-file" "../../../..//etc/apkrepos_obs_dockersupport" "--allow-untrusted" "add" "bash"',
