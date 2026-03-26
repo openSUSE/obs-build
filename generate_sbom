@@ -1034,7 +1034,7 @@ Supported content
 my $known_options = {
   'distro' => ':',
   'subject' => ':',
-  'intoto' => '',
+  'intoto' => sub { $_[0]->{'intoto'} = Build::Options::getarg($_[2], $_[3], 2) || 'v0.1' },
   'product' => 'type=product',
   'dir' => 'type=dir',
   'rpmmd' => 'type=rpmmd',
@@ -1066,6 +1066,7 @@ $opts->{'type'} ||= 'docker-archive';	# compat
 $opts->{'format'} ||= 'spdx';
 
 die("unknown format $opts->{'format'}\n") unless $opts->{'format'} eq 'spdx' || $opts->{'format'} eq 'cyclonedx';
+die("unsupported intoto version $opts->{'intoto'}\n") if $opts->{'intoto'} && $opts->{'intoto'} ne 'v0.1' && $opts->{'intoto'} ne 'v1';
 
 
 die("usage: generate_sbom [--distro NAME] [--format spdx|cyclonedx] [--intoto] [--dir DIRECTORY]|[--product DIRECTORY]|[--rpmmd DIRECTORY]|[--container-archive CONTAINER_ARCHIVE]\n") unless @args == 1;
@@ -1277,7 +1278,7 @@ if ($opts->{'intoto'}) {
   # no digest for products as it might be a directory. And an iso file would change the checksum later while signing.
   $subject->{'digest'} = { 'sha256' => sha256file($toprocess) } unless $opts->{'type'} eq 'product' || $opts->{'type'} eq 'dir';
   $doc = {
-    '_type' => 'https://in-toto.io/Statement/v0.1',
+    '_type' => "https://in-toto.io/Statement/$opts->{'intoto'}",
     'subject' => [ $subject ],
     'predicateType' => $intoto_type,
     'predicate' => $doc,
