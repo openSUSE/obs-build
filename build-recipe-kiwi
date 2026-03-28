@@ -469,6 +469,14 @@ perform_image_build() {
 		build_call="$build_call && LANG=en_US.UTF-8 $kiwi_path system crossprepare --target-arch $target --init /usr/lib/build/initvm.`uname -m` --target-dir $TOPDIR/KIWI-$imgtype"
 	    fi
 	fi
+	# Unless overwritten by packages, set some useful defaults:
+	if ! test -f $BUILD_ROOT/etc/kiwi.yml ; then
+	    # Disable container compression for less overhead, postprocess_kiwi_containers would decompress them anyway.
+	    cat >$BUILD_ROOT/etc/kiwi.yml <<EOF
+container:
+  - compress: false
+EOF
+	fi
 	build_call="$build_call && LANG=en_US.UTF-8 $kiwi_path --debug $KIWI_MAIN_PARAMETERS"
 	test -n "$profile" && build_call="$build_call --profile $profile"
 	if test -n "$ABUILD_TARGET" ; then
@@ -514,7 +522,7 @@ perform_image_bundle() {
     echo "$bundle_call"
     if chroot $BUILD_ROOT su -c "$bundle_call" - root < /dev/null; then
         # Hook for creating SBOM data
-        if test "$imgtype" != docker; then	# done in postprocess_kiwi_containers
+        if ! need_postprocess_kiwi_containers; then	# done in postprocess_kiwi_containers
             for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom | sort -u) ; do
                 echo "Generating $format sbom file for KIWIROOT-$imgtype"
                 generate_sbom --format "$format" --dir "$BUILD_ROOT/$TOPDIR/KIWIROOT-$imgtype" > "$BUILD_ROOT/$TOPDIR/OTHER/kiwi-sbom.json" || cleanup_and_exit 1 "generate_sbom failed!"
@@ -685,6 +693,16 @@ build_kiwi_appliance() {
     fi
 }
 
+need_postprocess_kiwi_containers() {
+    for r in $BUILD_ROOT/$TOPDIR/KIWI/*{docker,oci}.tar{,.xz} ; do
+        if test -e "$r"; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 postprocess_kiwi_containers() {
     local r
 
@@ -712,7 +730,9 @@ postprocess_kiwi_containers() {
 	    # create sbom if requested
 	    for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom | sort -u) ; do
 		echo "Generating $format sbom file for ${r##*/}"
-		generate_sbom --format "$format" --container-archive "$r" > "${r%.tar}.${format/cyclonedx/cdx}.json"
+		containerformat="docker"
+		[ "${r%.oci.tar}" != "$r" ] && containerformat="oci"
+		generate_sbom --format "$format" "--container-${containerformat}-archive" "$r" > "${r%.tar}.${format/cyclonedx/cdx}.json"
 		test -s "${r%.tar}.${format/cyclonedx/cdx}.json" || rm -f "${r%.tar}.${format/cyclonedx/cdx}.json"
 	    done
 	else
@@ -729,8 +749,10 @@ postprocess_kiwi_containers() {
 		test -e "$rr" || continue
 		echo "creating package summaries information"
 		rr="${rr%.containerinfo}"
+		containerformat="docker"
+		[ "${rr%.oci}" != "$rr" ] && containerformat="oci"
 		cp --remove-destination "$BUILD_DIR/create_container_package_list" "$BUILD_ROOT/tmp/create_container_package_list"
-		chroot "$BUILD_ROOT" /bin/bash /tmp/create_container_package_list --summaries "${rr#$BUILD_ROOT}.tar" > "$r.pkgsummaries"
+		chroot "$BUILD_ROOT" /bin/bash /tmp/create_container_package_list "--$containerformat" --summaries "${rr#$BUILD_ROOT}.tar" > "$r.pkgsummaries"
 		rm -f "$BUILD_ROOT/tmp/create_container_package_list"
 		break
 	    done
@@ -744,8 +766,10 @@ postprocess_kiwi_containers() {
 	    for rr in $r*.containerinfo ; do
 		test -e "$rr" || continue
 		echo "creating base package information"
+		containerformat="docker"
+		[ "${rr%.oci}" != "$rr" ] && containerformat="oci"
 		cp --remove-destination "$BUILD_DIR/create_container_package_list" "$BUILD_ROOT/tmp/create_container_package_list"
-		chroot "$BUILD_ROOT" /bin/bash /tmp/create_container_package_list "${KIWI_DERIVED_CONTAINER#$BUILD_ROOT}" > "$r.basepackages"
+		chroot "$BUILD_ROOT" /bin/bash /tmp/create_container_package_list "--$containerformat" "${KIWI_DERIVED_CONTAINER#$BUILD_ROOT}" > "$r.basepackages"
 		rm -f "$BUILD_ROOT/tmp/create_container_package_list"
 		break
 	    done
@@ -976,13 +1000,8 @@ recipe_build_kiwi() {
     fi
 
     # postprocess docker images (but not for legacy kiwi)
-    if test -L "$BUILD_ROOT/usr/bin/kiwi" ; then
-	for imgtype in $imagetype ; do
-	    if test "$imgtype" = docker ; then
-		postprocess_kiwi_containers
-		break
-	    fi
-	done
+    if test -L "$BUILD_ROOT/usr/bin/kiwi" && need_postprocess_kiwi_containers; then
+        postprocess_kiwi_containers
     fi
 }
 
