@@ -49,14 +49,14 @@ recipe_build_debootstrap() {
     done
     FULL_PKG_LIST="${FULL_PKG_LIST#,}"
     rm -rf "$BUILD_ROOT/$myroot"
-    if chroot $BUILD_ROOT dpkg --force-unsafe-io --version >/dev/null 2>&1 ; then
+    if deb_chroot $BUILD_ROOT dpkg --force-unsafe-io --version >/dev/null 2>&1 ; then
 	mkdir -p "$BUILD_ROOT/$myroot/etc/dpkg/dpkg.cfg.d"
 	echo force-unsafe-io > "$BUILD_ROOT/$myroot/etc/dpkg/dpkg.cfg.d/force-unsafe-io"
     fi
 
-    set -- chroot $BUILD_ROOT debootstrap --keep-debootstrap-dir --no-check-gpg --variant=buildd --arch="${arch}" --include="$FULL_PKG_LIST" "$dist" "$myroot" file:///.build.binaries
+    set -- deb_chroot $BUILD_ROOT debootstrap --keep-debootstrap-dir --no-check-gpg --variant=buildd --arch="${arch}" --include="$FULL_PKG_LIST" "$dist" "$myroot" file:///.build.binaries
     echo "running debootstrap..."
-    if ! "$@" || ! chroot $BUILD_ROOT dpkg --configure -a; then
+    if ! "$@" || ! deb_chroot $BUILD_ROOT dpkg --configure -a; then
         cat $BUILD_ROOT/$myroot/debootstrap/debootstrap.log
         cleanup_and_exit 1 "Failed to setup debootstrap chroot"
     fi
@@ -82,7 +82,7 @@ recipe_build_debootstrap() {
     mkdir -p $BUILD_ROOT/$myroot/dev/shm
     mount -n -ttmpfs none $BUILD_ROOT/$myroot/dev/shm
 
-    chroot $BUILD_ROOT/$myroot apt-cache gencaches
+    deb_chroot $BUILD_ROOT/$myroot apt-cache gencaches
 
     if ! test -e $BUILD_ROOT/$myroot/etc/hosts ; then
         cp $BUILD_ROOT/etc/hosts $BUILD_ROOT/$myroot/etc/hosts
