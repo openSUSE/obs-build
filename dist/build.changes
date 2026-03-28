@@ -1,4 +1,16 @@
 -------------------------------------------------------------------
+Sat Mar 28 14:03:03 UTC 2026 - Adrian Schröter <adrian@suse.de>
+
+- container:
+  * Add microdnf package manager support
+  * Add experimental support for the container-timestamp build option
+- sbom:
+  * allow to create v1 intoto data
+  * spdx: connect OPERATING-SYSTEM package to the root package
+  * Transfer product vcs and disturl
+- Ubuntu 26.04 hack
+
+-------------------------------------------------------------------
 Mon Mar 23 12:58:20 UTC 2026 - Adrian Schröter <adrian@suse.de>
 
 - Support --cms-nocerts and --cms-keyid in the signdummy
