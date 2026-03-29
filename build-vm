@@ -35,6 +35,8 @@ VM_TYPE=
 declare -a VM_ARGS
 VM_TYPE_PRIVILEGED=
 VM_TYPE_CONTAINER=
+VM_USE_CONTAINER_PREINSTALLIMAGE=false
+VM_CONTAINER_IMAGE=
 VM_ROOT=
 VM_SWAP=
 VM_ROOT_TYPE=
@@ -304,6 +306,13 @@ vm_parse_options() {
         needarg
         VM_OPENSTACK_FLAVOR="$ARG"
         shift
+      ;;
+      -vm-use-container-preinstallimage)
+        if test "$VM_TYPE" == "docker" -o "$VM_TYPE" == "podman"; then
+            VM_USE_CONTAINER_PREINSTALLIMAGE=true
+        else
+            cleanup_and_exit 1 "Option 'vm-use-container-preinstallimage' is not supported"
+        fi
       ;;
       -*)
 	return 1
@@ -995,11 +1004,16 @@ vm_first_stage() {
     if test "$DO_INIT" = true ; then
 	# do first stage of init_buildsystem
 	rm -f $BUILD_ROOT/.build.success
-	set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$RECIPEPATH" $ADDITIONAL_PACKS
+	if test "$VM_USE_CONTAINER_PREINSTALLIMAGE" = "true"; then
+	    set -- init_buildsystem --use-container-preinstallimage "$VM_TYPE" --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$RECIPEPATH" $ADDITIONAL_PACKS
+	else
+	    set -- init_buildsystem --configdir "$CONFIG_DIR" --cachedir "$CACHE_DIR" --prepare "${initbuildsysstuff[@]}" "${definesnstuff[@]}" "${repos[@]}" $CLEAN_BUILD $USEUSEDFORBUILD $RPMLIST "$RECIPEPATH" $ADDITIONAL_PACKS
+	fi
 	echo "$* ..."
 	start_time=$SECONDS
 	"$@" || cleanup_and_exit $?
 	check_exit
+	test -f "$BUILD_ROOT/.build/build.data" && source "$BUILD_ROOT/.build/build.data"
 	TIME_PREINSTALL=$(( $SECONDS - $start_time ))
 	unset start_time
 	if test ! -w /root ; then
@@ -1100,6 +1114,9 @@ vm_first_stage() {
     echo ")" >> $BUILD_ROOT/.build/build.data
     echo "VM_TYPE='$VM_TYPE'" >> $BUILD_ROOT/.build/build.data
     echo "VM_TYPE_CONTAINER='$VM_TYPE_CONTAINER'" >> $BUILD_ROOT/.build/build.data
+    test -n "$CONTAINER_PREINSTALLIMAGE" && echo "CONTAINER_PREINSTALLIMAGE='$CONTAINER_PREINSTALLIMAGE'" >> $BUILD_ROOT/.build/build.data
+    test "$VM_TYPE" = "docker" && echo "CONTAINER_NAME='obsbuild.${BUILD_ROOT##*/}.$(date +%s).${RANDOM}'" >> $BUILD_ROOT/.build/build.data
+    test "$VM_TYPE" = "podman" && echo "CONTAINER_NAME='build_${RECIPEFILE//:/-}.$(date +%s).${RANDOM}'" >> $BUILD_ROOT/.build/build.data
     echo "VM_NETWORK='$VM_NETWORK'" >> $BUILD_ROOT/.build/build.data
     echo "RUN_SHELL='$RUN_SHELL'" >> $BUILD_ROOT/.build/build.data
     echo "RUN_SHELL_AFTER_FAIL='$RUN_SHELL_AFTER_FAIL'" >> $BUILD_ROOT/.build/build.data
@@ -1288,6 +1305,11 @@ vm_save_statistics() {
 # args: resultdirs
 vm_wrapup_build() {
     test "$DO_STATISTICS" = 1 && vm_save_statistics
+    if test "$BUILDTYPE" = "preinstallimage"; then
+        case "$VM_TYPE" in
+            docker|podman) preinstallimage_compress "$BUILD_ROOT/$TOPDIR/OTHER" ;;
+        esac
+    fi
     if test -n "$VM_SWAP"; then
         echo "... saving built packages"
         swapoff "$VM_SWAP"
