@@ -6,6 +6,76 @@
 
 == Goals
 
+pbuild lets you build a set of interdependent packages locally without
+needing a server. It runs on any Linux system and provides:
+
+* Automatic dependency ordering across all packages in a project
+* Incremental rebuilds -- only packages affected by source or dependency
+  changes are rebuilt
+* Parallel build jobs for faster turnaround
+* Isolation via KVM, Xen, or containers to ensure reproducible results
+* Support for RPM, DEB, Arch, kiwi images, Docker containers, and more
+
+== Getting Started
+
+=== Prerequisites
+
+* The `obs-build` package installed (provides both `build` and `pbuild`)
+* For isolated builds (recommended): KVM support on the host, or use
+  `--vm-type=chroot` for simple chroot-based builds
+
+=== Project Layout
+
+pbuild expects a directory structure where each subdirectory is a package
+containing its build recipe (spec file, Dockerfile, etc.):
+
+ my-project/
+   hello/
+     hello.spec
+     hello-1.0.tar.gz
+   goodbye/
+     goodbye.spec
+     goodbye-1.0.tar.gz
+   _pbuild          (optional: preset definitions)
+   _config          (optional: build config overrides)
+
+=== Minimal Example
+
+Build all packages in the current directory for openSUSE Tumbleweed
+using a chroot:
+
+ pbuild --dist tumbleweed --vm-type=chroot
+
+Build using KVM (the default, more isolated):
+
+ pbuild --dist tumbleweed
+
+Build with 4 parallel jobs:
+
+ pbuild --dist tumbleweed --buildjobs 4
+
+=== Checking Results
+
+After a build run, query the status of all packages:
+
+ pbuild --result
+
+Show only failed packages with details:
+
+ pbuild --result failed
+
+Build results are stored in `_build.<reponame>.<arch>/` under the
+project directory.
+
+=== Using Presets
+
+Instead of passing `--dist` and `--repo` every time, define presets in a
+`_pbuild` file (see the Preset Configuration section below):
+
+ pbuild --preset tumbleweed
+ pbuild --preset leap156
+ pbuild --list-presets
+
 == Design
 
 The pbuild tool is a level above "the build script" called "build". "build" handles single build jobs, while
@@ -59,11 +129,51 @@ and many more. See the build config topic for a detailed list.
 
 ==== _pbuild
 
-This file defines one or more presets. A preset defines which 
+This file defines one or more presets in XML format. A preset bundles the distribution configuration,
+repositories, container registries, and target architecture into a named configuration.
 
-* distribution configuration
-* repositories
-* hardware architectures
+The XML schema is:
+
+ <pbuild>
+   <preset name="NAME" [default="true"] [arch="ARCH"]>
+     <config>DIST_CONFIG</config>
+     <repo>REPO_URL</repo>
+     <registry>REGISTRY_URL</registry>
+     <assets>ASSETS_URL</assets>
+     <obs>OBS_URL</obs>
+     <hostrepo>HOST_REPO_URL</hostrepo>
+   </preset>
+ </pbuild>
+
+Elements within a preset:
+
+* `name` (attribute, required) -- the preset name, also used as the default reponame
+* `default` (attribute, optional) -- marks the preset as the default when no `--preset` is given
+* `arch` (attribute, optional) -- target architecture (e.g. `x86_64`, `aarch64`)
+* `config` (repeatable) -- distribution configuration, same as `--dist` (a known dist name, URL, or `obs://` URL)
+* `repo` (repeatable) -- package repository URL, same as `--repo`
+* `registry` (repeatable) -- container registry URL, same as `--registry`
+* `assets` (repeatable) -- asset server URL, same as `--assets`
+* `obs` -- Open Build Service instance URL for resolving `obs://` URLs
+* `hostrepo` (repeatable) -- host repository for cross-architecture builds, same as `--hostrepo`
+
+Example `_pbuild` file with multiple presets:
+
+ <pbuild>
+   <preset name="tumbleweed" default="true" arch="x86_64">
+     <config>tumbleweed</config>
+     <repo>https://download.opensuse.org/tumbleweed/repo/oss/</repo>
+   </preset>
+   <preset name="leap156" arch="x86_64">
+     <config>leap15.6</config>
+     <repo>https://download.opensuse.org/distribution/leap/15.6/repo/oss/</repo>
+     <repo>https://download.opensuse.org/update/leap/15.6/oss/</repo>
+   </preset>
+   <preset name="fedora43" arch="x86_64">
+     <config>fedora43</config>
+     <repo>https://dl.fedoraproject.org/pub/fedora/linux/releases/43/Everything/x86_64/os/</repo>
+   </preset>
+ </pbuild>
 
 ==== _build.<preset>
 
@@ -143,7 +253,106 @@ Package builds are supported for rpm, deb, arch and their variations.
 
 === Image Builds
 
-=== container builds
+pbuild supports building system images via the kiwi image building tool. To build kiwi images,
+place a `.kiwi` file in the package directory. pbuild detects the recipe type automatically
+from the file extension.
+
+Kiwi can produce many output formats including VM images (vmx, qcow2), live USB/CD images (iso),
+OEM installation images, and network deployment images. The output format is determined by the
+kiwi description file.
+
+Packages needed by the image are resolved from the configured repositories. Container images
+referenced in the kiwi description can be provided via `--registry` or `--repo` options.
+
+Remote assets can be specified in kiwi files using XML comments:
+
+ <!-- OBS-RemoteAsset: https://example.com/asset.tar -->
+ <!-- OBS-CopyToImage: asset.tar /opt/asset.tar -->
+
+=== Container Builds
+
+pbuild supports building containers from Dockerfiles. Place a `Dockerfile` in the package
+directory. For packages with multiple build descriptions, use `Dockerfile.<packagename>` to
+match a specific package.
+
+The build engine is `podman` by default. It can be changed to `docker` via the `BuildEngine`
+build config keyword.
+
+==== Base Images
+
+If the Dockerfile references a base image via `FROM`, the image must be available from
+a configured registry (`--registry` option) or as a local build result from another
+package in the project.
+
+==== Build Arguments
+
+Build arguments can be passed via the build configuration using:
+
+ BuildFlags: dockerarg:KEY=VALUE
+
+==== Container Output Format
+
+Container builds produce several output files:
+
+* `<name>.tar` -- the container image tarball
+* `<name>.containerinfo` -- JSON metadata (tags, version, disturl)
+* `<name>.packages` -- list of installed packages
+
+The container format and compression can be controlled via build config flags:
+
+* `container-build-format:docker` or `container-build-format:oci` -- image format (podman only)
+* `container-compression-format:gzip`, `zstd`, or `zstd:chunked` -- layer compression (podman only)
+* `container-timestamp:VALUE` -- set a build timestamp for reproducibility (podman only)
+
+==== Remote Assets in Dockerfiles
+
+Remote assets can be fetched before build using a comment directive:
+
+ #!RemoteAsset: https://example.com/asset.tar
+ COPY asset.tar .
 
 include::cross_arch_build.adoc[]
 
+== Result Codes
+
+When querying build results with `--result`, each package has one of the following status codes:
+
+succeeded::
+  The package built successfully.
+
+failed::
+  The build was attempted but the build process returned an error. Use `--showlog` or
+  check the build log in the result directory to diagnose the failure.
+
+unresolvable::
+  The package's dependencies could not be resolved. The details field shows which
+  dependencies are missing or conflicting. Check that all required repositories are
+  configured.
+
+broken::
+  The package has a structural problem that prevents building, such as a parse error
+  in the recipe file or a missing source file.
+
+blocked::
+  The package is waiting for other packages in the project to finish building first.
+  These are packages it depends on that are not yet in a final state.
+
+scheduled::
+  The package is ready to build and is waiting for a build slot. Increase `--buildjobs`
+  to run more builds in parallel.
+
+waiting::
+  Same as scheduled, but all build slots are currently occupied.
+
+building::
+  The package is currently being built.
+
+excluded::
+  The package is excluded from building, either by `ExclArch`/`ExcludeArch` in the
+  recipe or by `BuildFlags: excludebuild` in the build configuration.
+
+disabled::
+  The package has been explicitly disabled.
+
+locked::
+  The package has been locked and will not be built.
