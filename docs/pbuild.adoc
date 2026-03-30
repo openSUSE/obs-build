@@ -8,31 +8,31 @@
 
 == Design
 
-The pbuild tool is a level above "the build script" called "build". "build" is handling single build jobs, while
-pbuild is managing the dependencies between this build jobs. Both can get executed on any Linux system directly.
+The pbuild tool is a level above "the build script" called "build". "build" handles single build jobs, while
+pbuild manages the dependencies between these build jobs. Both can be executed on any Linux system directly.
 
-pbuild is processing local sources, but may download remote sources and binaries when referenced.
-The local sources can get managed by any source revision management tool (eg. git).
+pbuild processes local sources, but may download remote sources and binaries when referenced.
+The local sources can be managed by any source revision management tool (e.g. git).
 
 The tasks of the build script are:
 
-* Building a defined and reproducable environement for one build job
+* Building a defined and reproducible environment for one build job
 * Calling the build tool for any supported format (rpm, deb, kiwi image, docker, ...)
-* Calling validations as provided by the build environement
-* Extract build results
-* Parse dependencies in binaries and build description files
+* Calling validations as provided by the build environment
+* Extracting build results
+* Parsing dependencies in binaries and build description files
 
 The tasks of pbuild are:
 
-* calculating the dependencies between the build jobs for a build order
-* calculating the need of rebuilds due to changed sources or dependencies
-* manage multiple running build jobs in the background
-* organize build results on the disk
-* download remote assets (sources or binaries)
+* Calculating the dependencies between the build jobs for a build order
+* Calculating the need of rebuilds due to changed sources or dependencies
+* Managing multiple running build jobs in the background
+* Organizing build results on the disk
+* Downloading remote assets (sources or binaries)
 
 === Filesystem Structure
 
-pbuild expects to get call in a directory where it's project configuration files are living. Package sources
+pbuild expects to be called in a directory where its project configuration files live. Package sources
 live in directories inside of this project directory:
 
 * Top directory
@@ -53,7 +53,7 @@ live in directories inside of this project directory:
 
 ==== _config
 
-Can define build configurations. Usually defaults from a distribution are used, but this file can provide
+Defines build configurations. Usually defaults from a distribution are used, but this file can provide
 additional rules. These define which packages need to become available in the build environment, macro definitions
 and many more. See the build config topic for a detailed list.
 
@@ -67,14 +67,14 @@ This file defines one or more presets. A preset defines which
 
 ==== _build.<preset>
 
-contains all binaries for the given preset. These are either downloaded or build local. Additional underscore prefixed 
-files contain informations about the build history and current states of the build.
+Contains all binaries for the given preset. These are either downloaded or built locally. Additional underscore-prefixed
+files contain information about the build history and current states of the build.
 
 === Important Options
 
 pbuild does not need any parameters by default. It will build inside of KVM by default which can work
 as user (non-root) in a proper environment. KVM will also ensure that the correct kernel is running
-during build. However, builds in chroot or containern is also possible via
+during build. However, builds in chroot or containers are also possible via
 
  --vm-type=chroot
  --vm-type=docker
@@ -83,26 +83,26 @@ Define the amount of provided memory in KVM via
 
  --vm-memory=MEGABYTES
 
-The build environment disk space can get defined via
+The build environment disk space can be defined via
 
  --vm-disk-size=MEGABYTES
 
-The KVM is fully isolated by default. This ensures that the build can become fully reproducibile and
+The KVM is fully isolated by default. This ensures that the build can become fully reproducible and
 also that no attack by using untrusted sources or binaries can happen. However, one may want to
-use remote resources during build. In that case network access can get enabled via
+use remote resources during build. In that case network access can be enabled via
 
  --vm-network
 
-Keep in mind that this can get usually avoided by using remote assets instead.
+Keep in mind that this can usually be avoided by using remote assets instead.
 
 === Important Debugging Options
 
 pbuild always creates a consistent state. That means it may not build actually anything, when the
-last build result look current. One can enforce a rebuild by using:
+last build result looks current. One can enforce a rebuild by using:
 
   --rebuild <PACKAGE>
 
-The build log is by default only stored on disk. The live build log can be made available by 
+The build log is by default only stored on disk. The live build log can be made available by
 using the
 
   --showlog
@@ -111,14 +111,14 @@ option. If you want to debug a problem with a single package, you can use the
 
   --single <PACKAGE>
 
-option to make pbuild only look at the specified package. This also triggers an rebuild
+option to make pbuild only look at the specified package. This also triggers a rebuild
 of the package. It often makes sense to use
 
   --single <PACKAGE> --shell-after-fail
 
-to get a shell prompt in case a build failure occurs. 
+to get a shell prompt in case a build failure occurs.
 
-Alternatively, one can reuse last build enviroment or create a new one by using the
+Alternatively, one can reuse the last build environment or create a new one by using the
 
   --shell
 
@@ -128,7 +128,7 @@ Extra packages needed for debugging can be specified with
 
   -x binary_package
 
-(eg. gdb, strace, valgrind or assumed missing dependencies for testing).
+(e.g. gdb, strace, valgrind or assumed missing dependencies for testing).
 
 
 include::source_assets.adoc[]
@@ -137,11 +137,11 @@ include::build_config.adoc[]
 
 == Functionalities
 
-=== package builds
+=== Package Builds
 
 Package builds are supported for rpm, deb, arch and their variations.
 
-=== image builds
+=== Image Builds
 
 === container builds
 
