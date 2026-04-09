@@ -303,10 +303,10 @@ preinstall_image() {
 
     if test -x /usr/bin/bsdtar ; then
 	# Undocumented bsdtar feature: ^ at the beginning anchors
-	TAR=(/usr/bin/bsdtar "${TAR_EXCLUDES[@]/#/"--exclude=^"}" -P --chroot --numeric-owner -x)
+	TAR=(/usr/bin/bsdtar "${TAR_EXCLUDES[@]/#/--exclude=^}" -P --chroot --numeric-owner -x)
     else
 	unsafe_preinstall_check
-	TAR=(tar --anchored "${TAR_EXCLUDES[@]/#/"--exclude="}" -x)
+	TAR=(tar --anchored "${TAR_EXCLUDES[@]/#/--exclude=}" -x)
     fi
     if ! "${TAR[@]}" -f "$BUILD_INIT_CACHE/rpms/$1" ; then
 	echo "ERROR: unpack failed."
