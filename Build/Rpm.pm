@@ -913,7 +913,7 @@ sub parse {
     # do this always?
     $xspec->[-1] = [ $xspec->[-1], $line ] if $doxspec && $config->{'save_expanded'};
 
-    if ($withdescription) {
+    if ($withdescription && !@subpacks) {
       # line matches "%description"
       if ($line =~ /^\s*%description/) {
         $parsing_description = 1;
