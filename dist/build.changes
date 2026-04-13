@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Mon Apr 13 12:26:41 UTC 2026 - Adrian Schröter <adrian@suse.de>
+
+- config: Add slfo-main build configuration
+- drop the inner quotes, not needed on bash 4 and breaks on bash 3
+- build: in the ccache case, after test -e also accept -L
+
+-------------------------------------------------------------------
 Sat Mar 28 14:03:03 UTC 2026 - Adrian Schröter <adrian@suse.de>
 
 - container:
