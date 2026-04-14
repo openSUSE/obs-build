@@ -929,8 +929,8 @@ sub parse {
         } else {
           # still inside %description -> append
           $ret->{'description'} .= "$line\n";
+          next;
         }
-        next;
       }
     }
 

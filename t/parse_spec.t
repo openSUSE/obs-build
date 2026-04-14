@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 15;
+use Test::More tests => 16;
 
 use Build;
 use Build::Rpm;
@@ -408,3 +408,24 @@ $expected = {
 };
 $result = Build::Rpm::parse($conf, [ split("\n", $spec) ]);
 is_deeply($result, $expected, "multiline condition 4");
+
+$spec = q{
+Name: main
+Summary: main summary
+%description
+main description
+
+%package -n subpackage
+Summary: subpackage summary
+%description -n subpackage
+subpackage description
+};
+$expected = {
+  'name' => 'main',
+  'summary' => 'main summary',
+  'description' => 'main description',
+  'deps' => [],
+  'subpacks' => [ 'main', 'subpackage' ],
+};
+$result = Build::Rpm::parse($conf, [ split("\n", $spec) ], withdescription => 1);
+is_deeply($result, $expected, "subpackage summary/description");
