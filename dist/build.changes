@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Wed Apr 15 13:09:08 UTC 2026 - Adrian Schröter <adrian@suse.de>
+
+- Support a new "IgnoreRebuild" config.
+- build-recipe-kiwi:
+  * Add support for oci containers
+  * Avoid needlessly compressing container images
+  * Detect container images based on build result file name
+- Fix queryrecipe to use the summary and the description from the main package
+
+-------------------------------------------------------------------
 Mon Apr 13 12:26:41 UTC 2026 - Adrian Schröter <adrian@suse.de>
 
 - config: Add slfo-main build configuration
