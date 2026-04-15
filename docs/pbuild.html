@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
-<meta name="generator" content="AsciiDoc 10.2.1" />
+<meta name="generator" content="AsciiDoc" />
 <title>pbuild Reference Guide</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
@@ -1502,6 +1502,17 @@ in the project configuration. If those are missing, the dependency results in
 an "unresolvable" state for directly required files or in silent breaking of the
 dependency for indirectly required files. With this option, all file requires are
 honoured by default and lead to "unresolvable" if there are no matching FileProvides defined.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+ignorerebuildforsupport
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Add all support/preinstall packages to the <code>IgnoreRebuild</code> list.
+This is useful so that packages only pulled in by dependencies from
+the support packages will also not trigger a rebuild. This could be
+considered a bug fix and should be used for all new base projects.</p></div>
 </div>
 <div class="sect3">
 <h4 id="_exportfilter_regex_architectures">3.2.10. ExportFilter: REGEX ARCHITECTURES</h4>
@@ -1542,7 +1553,13 @@ originating package as described in the following section.</p></div>
 for more details.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_keep_packages">3.2.15. Keep: PACKAGES</h4>
+<h4 id="_ignorerebuild_package_or_dependency">3.2.15. IgnoreRebuild: PACKAGE_OR_DEPENDENCY</h4>
+<div class="paragraph"><p>Do not trigger a rebuild if the specified packages are changed. The
+difference to the <code>Support</code> keyword is that the packages are not
+automatically installed for builds.</p></div>
+</div>
+<div class="sect3">
+<h4 id="_keep_packages">3.2.16. Keep: PACKAGES</h4>
 <div class="paragraph"><p>To eliminate build cycles the to-be-built packages are not installed by
 default. Keep can be used to overwrite this behavior. It is usually needed
 for packages like <code>make</code> that are used to build itself. Preinstalled
@@ -1550,21 +1567,21 @@ packages are automatically kept, as the package installation program needs
 to work all the time.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_macros">3.2.16. Macros:</h4>
+<h4 id="_macros">3.2.17. Macros:</h4>
 <div class="paragraph"><p>Defines the start of a literal macros block. The block is ended
 by either reaching the end of the config or by a literal
 <code>Macros:</code> line. See the section about macro definitions below for
 more information.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_optflags_target_arch_flags_rpm_only">3.2.17. OptFlags: TARGET_ARCH FLAGS (RPM only)</h4>
+<h4 id="_optflags_target_arch_flags_rpm_only">3.2.18. OptFlags: TARGET_ARCH FLAGS (RPM only)</h4>
 <div class="paragraph"><p>Optflags exports compiler flags to the build by adding lines to rpm&#8217;s
 <code>rpmrc</code> file. They will only have an effect when the spec file is using
 <code>$RPM_OPT_FLAGS</code> or <code>%{optflags}</code>. The target architecture may be set
 to <code>*</code> to affect all architectures.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_order_package_a_package_b">3.2.18. Order: PACKAGE_A:PACKAGE_B</h4>
+<h4 id="_order_package_a_package_b">3.2.19. Order: PACKAGE_A:PACKAGE_B</h4>
 <div class="paragraph"><p>The build script takes care about the installation order if they are
 defined via dependencies inside of the packages. However, there might be
 dependency loops (reported during setup of the build system) or missing
@@ -1574,12 +1591,12 @@ to break the loop.</p></div>
 PACKAGE_B.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_patterntype_type">3.2.19. Patterntype: TYPE</h4>
+<h4 id="_patterntype_type">3.2.20. Patterntype: TYPE</h4>
 <div class="paragraph"><p>Defines the pattern format. Valid values are: <code>none</code> (default), <code>ymp</code>,
 <code>comps</code>. Multiple types can be specified.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_prefer_package">3.2.20. Prefer: PACKAGE</h4>
+<h4 id="_prefer_package">3.2.21. Prefer: PACKAGE</h4>
 <div class="paragraph"><p>In case multiple packages satisfy a dependency, the dependency expansion
 will fail. This is unlike like most package managing tools, which just
 pick one of the package. It is done that way to provide reproducible
@@ -1590,12 +1607,12 @@ When the package name is prefixed with a minus sign, it is treated
 as a de-prefer.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_prefer_origin_package_package">3.2.21. Prefer: ORIGIN_PACKAGE:PACKAGE</h4>
+<h4 id="_prefer_origin_package_package">3.2.22. Prefer: ORIGIN_PACKAGE:PACKAGE</h4>
 <div class="paragraph"><p>It is possible to define the prefer only when the dependency comes
 from the specified originating package.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_preinstall_package">3.2.22. Preinstall: PACKAGE</h4>
+<h4 id="_preinstall_package">3.2.23. Preinstall: PACKAGE</h4>
 <div class="paragraph"><p>This is used to specify packages needed to run the package installation
 program. These packages are unpacked so that the native installation
 program can be used to install the build environment.
@@ -1603,7 +1620,7 @@ Included scripts are not executed during this phase. However, these
 packages will be re-installed later on including script execution.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_publishfilter_regexp_regexp">3.2.23. PublishFilter: REGEXP [REGEXP]</h4>
+<h4 id="_publishfilter_regexp_regexp">3.2.24. PublishFilter: REGEXP [REGEXP]</h4>
 <div class="admonitionblock">
 <table><tr>
 <td class="icon">
@@ -1618,7 +1635,7 @@ that match any REGEXP will not be put into the generated repository.</p></div>
 However, multiple REGEXP can be defined.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_publishflags_flag_value">3.2.24. PublishFlags: FLAG[:VALUE]</h4>
+<h4 id="_publishflags_flag_value">3.2.25. PublishFlags: FLAG[:VALUE]</h4>
 <div class="admonitionblock">
 <table><tr>
 <td class="icon">
@@ -1707,11 +1724,11 @@ be added to the registry repository when pushing a container to
 it.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_registryurl_url">3.2.25. RegistryURL: URL</h4>
+<h4 id="_registryurl_url">3.2.26. RegistryURL: URL</h4>
 <div class="paragraph"><p>Define a url for the downloading of containers.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_repotype_type_options">3.2.26. Repotype: TYPE[:OPTIONS]</h4>
+<h4 id="_repotype_type_options">3.2.27. Repotype: TYPE[:OPTIONS]</h4>
 <div class="paragraph"><p>Defines the repository format for published repositories. Valid values
 are: <code>none</code>, <code>rpm-md</code>, <code>suse</code>, <code>debian</code>, <code>hdlist2</code>, <code>arch</code>, <code>staticlinks</code>
 and vagrant. Multiple types can be specified to generate more than
@@ -1730,30 +1747,30 @@ rsyncable gzip compression.</p></div>
 to the package repository.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_repourl_type_url">3.2.27. RepoURL: [TYPE@]URL</h4>
+<h4 id="_repourl_type_url">3.2.28. RepoURL: [TYPE@]URL</h4>
 <div class="paragraph"><p>Define a url for the downloading of repository packages. Supported types
 are currently <code>arch</code>, <code>debian</code>, <code>hdlist2</code>, <code>rpmmd</code>, <code>suse</code>. If the
 type is not specified, it is guessed from the build type.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_required_package">3.2.28. Required: PACKAGE</h4>
+<h4 id="_required_package">3.2.29. Required: PACKAGE</h4>
 <div class="paragraph"><p>Specify a package that always is installed for package builds.
 A change in one of these packages triggers a new build.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_runscripts_package">3.2.29. Runscripts: PACKAGE</h4>
+<h4 id="_runscripts_package">3.2.30. Runscripts: PACKAGE</h4>
 <div class="paragraph"><p>Execute the scriptlets of the specified preinstalled package. Scriptlet
 execution takes place after the preinstall phase, but before installing
 the remaining packages.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_substitute_old_dependency_new_dependency_8230">3.2.30. Substitute: OLD_DEPENDENCY [NEW_DEPENDENCY&#8230; ]</h4>
+<h4 id="_substitute_old_dependency_new_dependency_8230">3.2.31. Substitute: OLD_DEPENDENCY [NEW_DEPENDENCY&#8230; ]</h4>
 <div class="paragraph"><p>It is possible to replace BuildRequires dependencies with other
 dependencies. This will have only an effect on directly BuildRequired
 packages, not on indirectly required packages.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_support_package">3.2.31. Support: PACKAGE</h4>
+<h4 id="_support_package">3.2.32. Support: PACKAGE</h4>
 <div class="paragraph"><p>Specify a package that always is installed for package builds.
 Unlike <code>Required:</code>, a change in one of these packages does not trigger an
 automatic rebuild.</p></div>
@@ -1761,13 +1778,13 @@ automatic rebuild.</p></div>
 result, for example <code>make</code> or <code>coreutils</code>.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_target_gnu_triplet">3.2.32. Target: GNU_TRIPLET</h4>
+<h4 id="_target_gnu_triplet">3.2.33. Target: GNU_TRIPLET</h4>
 <div class="paragraph"><p>Defines the target architecture via a gnu triplet (not the debian
 architecture!). For example <code>arm-linux-gnueabihf</code> for armv7hl builds,
 or <code>i686</code> for building i686 packages.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_type_type">3.2.33. Type: TYPE</h4>
+<h4 id="_type_type">3.2.34. Type: TYPE</h4>
 <div class="paragraph"><p>Build recipe type. This is the format of the file which provides the
 build description (the "build recipe"). This is usually autodetected from
 the binary type, but in some rare cases it may be needed to manually
@@ -1775,7 +1792,7 @@ configure the type. Currently the following types are understood:
 <code>spec</code>, <code>dsc</code>, <code>arch</code>, <code>kiwi</code>, <code>livebuild</code>, <code>productcompose</code>, <code>preinstallimage</code>.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_vminstall_package">3.2.34. VMInstall: PACKAGE</h4>
+<h4 id="_vminstall_package">3.2.35. VMInstall: PACKAGE</h4>
 <div class="paragraph"><p>Like Preinstall, but these packages get only installed when a virtual
 machine like Xen or KVM is used for building. Usually packages like
 <code>mount</code> are listed here.</p></div>
@@ -1990,7 +2007,7 @@ In this case the base system for the target system can manually get configured v
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2025-03-26 14:23:36 CET
+ 2026-04-02 17:12:42 CEST
 </div>
 </div>
 </body>

@@ -251,6 +251,13 @@ an "unresolvable" state for directly required files or in silent breaking of the
 dependency for indirectly required files. With this option, all file requires are
 honoured by default and lead to "unresolvable" if there are no matching FileProvides defined.
 
+* ignorerebuildforsupport
+
+Add all support/preinstall packages to the `IgnoreRebuild` list.
+This is useful so that packages only pulled in by dependencies from
+the support packages will also not trigger a rebuild. This could be
+considered a bug fix and should be used for all new base projects.
+
 ==== ExportFilter: REGEX ARCHITECTURES
 
 The export filter can be used to export build results from one
@@ -289,6 +296,12 @@ originating package as described in the following section.
 
 Ignore a dependency coming from ORIGIN_PACKAGE. See the previous section
 for more details.
+
+==== IgnoreRebuild: PACKAGE_OR_DEPENDENCY
+
+Do not trigger a rebuild if the specified packages are changed. The
+difference to the `Support` keyword is that the packages are not
+automatically installed for builds.
 
 ==== Keep: PACKAGES
 
