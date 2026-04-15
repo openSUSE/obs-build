@@ -470,7 +470,7 @@ perform_image_build() {
 	    fi
 	fi
 	# Unless overwritten by packages, set some useful defaults:
-	if ! test -f $BUILD_ROOT/etc/kiwi.yml ; then
+	if false && ! test -f $BUILD_ROOT/etc/kiwi.yml ; then
 	    # Disable container compression for less overhead, postprocess_kiwi_containers would decompress them anyway.
 	    cat >$BUILD_ROOT/etc/kiwi.yml <<EOF
 container:
