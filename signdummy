@@ -22,35 +22,22 @@
 
 # simple "sign" replacement that does nothing but
 # write a 2048 byte file with a fixed signature.
-# sign is used in kiwi builds to sign repositories
+# sign is used in product builds to sign repositories
 
 my $mode = '';
 
-while (@ARGV) {
-  if ($ARGV[0] =~ /^-([cdrp])$/) {
+while (@ARGV && $ARGV[0] =~ /^-/) {
+  my $opt = shift @ARGV;
+  last if $opt eq '--';
+  next if $opt eq '--cms-nocerts' || $opt eq '--cms-keyid';
+  if ($opt =~ /^-([cdrp])$/ || $opt =~ /^--(cmssign)$/) {
     $mode = $1;
+  } elsif ($opt eq '--cert' || $opt eq '-h') {
+    die("argument required for option $opt\n") unless @ARGV;
     shift @ARGV;
-    next;
+  } else {
+    die("unsupported option $opt\n");
   }
-  if ($ARGV[0] eq '--cmssign') {
-    $mode = 'cmssign';
-    shift @ARGV;
-    splice(@ARGV, 0, 2) if @ARGV >= 2 && $ARGV[0] eq '--cert';
-    shift @ARGV while @ARGV && ($ARGV[0] eq '--cms-nocerts' || $ARGV[0] eq '--cms-keyid');
-    next;
-  }
-  if ($ARGV[0] eq '-h' && @ARGV >= 2) {
-    splice(@ARGV, 0, 2);
-    next;
-  }
-  if ($ARGV[0] eq '--') {
-    shift @ARGV;
-    last;
-  }
-  if ($ARGV[0] =~ /^-/) {
-    die("unsupported option $ARGV[0]\n");
-  }
-  last;
 }
 if ($mode eq 'p') {
   my $block = "sIGnMeP\n";
