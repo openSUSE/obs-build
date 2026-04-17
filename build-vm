@@ -1089,6 +1089,7 @@ vm_first_stage() {
     case $(uname -m) in
 	ppc|ppcle|s390) PERSONALITY=8 ;;	# ppc/s390 kernel never tells us if a 32bit personality is active, assume we run on 64bit
 	aarch64) test "$BUILD_ARCH" != "${BUILD_ARCH#armv[567]}" && PERSONALITY=8 ;; # workaround, to be removed
+	s390x) test "$BUILD_ARCH" = "s390" && PERSONALITY=8 ;; # 32bit support was dropped in recent kernels so we only have 32bit support possible in the guest
     esac
     echo "PERSONALITY='$PERSONALITY'" >> $BUILD_ROOT/.build/build.data
     echo "VM_HOSTNAME='$HOST'" >> $BUILD_ROOT/.build/build.data
