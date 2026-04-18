@@ -216,10 +216,16 @@ sub getremoteassets {
     @assets = prune_cached_assets($assetmgr, @assets);
   }
   if (@assets) {
-    my @missing = sort(map {$_->{'file'}} @assets);
-    print "missing assets: @missing\n";
-    $p->{'error'} = "missing assets: @missing";
-    return;
+    if (($p->{'buildtype'} || '') eq 'arch') {
+      print "ignoring missing assets for arch repo: @missing\n";
+      for my $asset (@assets) {
+        delete $p->{'asset_files'}->{$asset->{'file'}};
+      }
+    } else {
+      print "missing assets: @missing\n";
+      $p->{'error'} = "missing assets: @missing";
+      return;
+    }
   }
   update_srcmd5($assetmgr, $p) if has_mutable_assets($assetmgr, $p);
 }
