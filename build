@@ -1517,7 +1517,18 @@ fi
 
 if test -z "$RPMLIST" -a -z "$RUNNING_IN_VM" ; then
     if test -z "$repos" -a -z "$BUILD_RPMS" -a "$BUILD_DIST" = "${BUILD_DIST#obs:/}"; then
-	repos=(--repository 'zypp://')
+	if test -z "$BUILD_DIST"; then
+	    # use the local system settings in case we build for our own distribution (default.conf is used)
+	    repos=(--repository 'zypp://')
+	else
+	    # Use the repositories specified in config file by default
+	    repos=()
+	    for repo in `queryconfig repourl --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH"`; do
+		repos[${#repos[@]}]="--repository"
+		repos[${#repos[@]}]="$repo"
+	    done
+	    test -z "$repos" && cleanup_and_exit 1 "No repository defined for distribution $BUILD_DIST"
+	fi
     fi
 else
     repos=()

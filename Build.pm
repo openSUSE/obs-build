@@ -322,10 +322,9 @@ sub find_config_file {
   if ($dist !~ /\//) {
     my $saved = $dist;
     $configdir = '.' unless defined $configdir;
-    $dist =~ s/-.*//;
-    $dist = "sl$dist" if $dist =~ /^\d/;
     $dist = "$configdir/$dist.conf";
     if (! -e $dist) {
+      $dist = $saved;
       $dist =~ s/-.*//;
       $dist = "sl$dist" if $dist =~ /^\d/;
       $dist = "$configdir/$dist.conf";
