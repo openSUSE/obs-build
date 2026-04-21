@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
-<meta name="generator" content="AsciiDoc" />
+<meta name="generator" content="AsciiDoc 10.2.1" />
 <title>pbuild Reference Guide</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
@@ -744,20 +744,133 @@ asciidoc.install(2);
 <div class="sect1">
 <h2 id="_goals">1. Goals</h2>
 <div class="sectionbody">
+<div class="paragraph"><p>pbuild lets you build a set of interdependent packages locally without
+needing a server. It runs on any Linux system and provides:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+Automatic dependency ordering across all packages in a project
+</p>
+</li>
+<li>
+<p>
+Incremental rebuilds&#8201;&#8212;&#8201;only packages affected by source or dependency
+  changes are rebuilt
+</p>
+</li>
+<li>
+<p>
+Parallel build jobs for faster turnaround
+</p>
+</li>
+<li>
+<p>
+Isolation via KVM, Xen, or containers to ensure reproducible results
+</p>
+</li>
+<li>
+<p>
+Support for RPM, DEB, Arch, kiwi images, Docker containers, and more
+</p>
+</li>
+</ul></div>
 </div>
 </div>
 <div class="sect1">
-<h2 id="_design">2. Design</h2>
+<h2 id="_getting_started">2. Getting Started</h2>
 <div class="sectionbody">
-<div class="paragraph"><p>The pbuild tool is a level above "the build script" called "build". "build" is handling single build jobs, while
-pbuild is managing the dependencies between this build jobs. Both can get executed on any Linux system directly.</p></div>
-<div class="paragraph"><p>pbuild is processing local sources, but may download remote sources and binaries when referenced.
-The local sources can get managed by any source revision management tool (eg. git).</p></div>
+<div class="sect2">
+<h3 id="_prerequisites">2.1. Prerequisites</h3>
+<div class="ulist"><ul>
+<li>
+<p>
+The <code>obs-build</code> package installed (provides both <code>build</code> and <code>pbuild</code>)
+</p>
+</li>
+<li>
+<p>
+For isolated builds (recommended): KVM support on the host, or use
+  <code>--vm-type=chroot</code> for simple chroot-based builds
+</p>
+</li>
+</ul></div>
+</div>
+<div class="sect2">
+<h3 id="_project_layout">2.2. Project Layout</h3>
+<div class="paragraph"><p>pbuild expects a directory structure where each subdirectory is a package
+containing its build recipe (spec file, Dockerfile, etc.):</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>my-project/
+  hello/
+    hello.spec
+    hello-1.0.tar.gz
+  goodbye/
+    goodbye.spec
+    goodbye-1.0.tar.gz
+  _pbuild          (optional: preset definitions)
+  _config          (optional: build config overrides)</code></pre>
+</div></div>
+</div>
+<div class="sect2">
+<h3 id="_minimal_example">2.3. Minimal Example</h3>
+<div class="paragraph"><p>Build all packages in the current directory for openSUSE Tumbleweed
+using a chroot:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>pbuild --dist tumbleweed --vm-type=chroot</code></pre>
+</div></div>
+<div class="paragraph"><p>Build using KVM (the default, more isolated):</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>pbuild --dist tumbleweed</code></pre>
+</div></div>
+<div class="paragraph"><p>Build with 4 parallel jobs:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>pbuild --dist tumbleweed --buildjobs 4</code></pre>
+</div></div>
+</div>
+<div class="sect2">
+<h3 id="_checking_results">2.4. Checking Results</h3>
+<div class="paragraph"><p>After a build run, query the status of all packages:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>pbuild --result</code></pre>
+</div></div>
+<div class="paragraph"><p>Show only failed packages with details:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>pbuild --result failed</code></pre>
+</div></div>
+<div class="paragraph"><p>Build results are stored in <code>_build.&lt;reponame&gt;.&lt;arch&gt;/</code> under the
+project directory.</p></div>
+</div>
+<div class="sect2">
+<h3 id="_using_presets">2.5. Using Presets</h3>
+<div class="paragraph"><p>Instead of passing <code>--dist</code> and <code>--repo</code> every time, define presets in a
+<code>_pbuild</code> file (see the Preset Configuration section below):</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>pbuild --preset tumbleweed
+pbuild --preset leap156
+pbuild --list-presets</code></pre>
+</div></div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_design">3. Design</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>The pbuild tool is a level above "the build script" called "build". "build" handles single build jobs, while
+pbuild manages the dependencies between these build jobs. Both can be executed on any Linux system directly.</p></div>
+<div class="paragraph"><p>pbuild processes local sources, but may download remote sources and binaries when referenced.
+The local sources can be managed by any source revision management tool (e.g. git).</p></div>
 <div class="paragraph"><p>The tasks of the build script are:</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
-Building a defined and reproducable environement for one build job
+Building a defined and reproducible environment for one build job
 </p>
 </li>
 <li>
@@ -767,17 +880,17 @@ Calling the build tool for any supported format (rpm, deb, kiwi image, docker, &
 </li>
 <li>
 <p>
-Calling validations as provided by the build environement
+Calling validations as provided by the build environment
 </p>
 </li>
 <li>
 <p>
-Extract build results
+Extracting build results
 </p>
 </li>
 <li>
 <p>
-Parse dependencies in binaries and build description files
+Parsing dependencies in binaries and build description files
 </p>
 </li>
 </ul></div>
@@ -785,33 +898,33 @@ Parse dependencies in binaries and build description files
 <div class="ulist"><ul>
 <li>
 <p>
-calculating the dependencies between the build jobs for a build order
+Calculating the dependencies between the build jobs for a build order
 </p>
 </li>
 <li>
 <p>
-calculating the need of rebuilds due to changed sources or dependencies
+Calculating the need of rebuilds due to changed sources or dependencies
 </p>
 </li>
 <li>
 <p>
-manage multiple running build jobs in the background
+Managing multiple running build jobs in the background
 </p>
 </li>
 <li>
 <p>
-organize build results on the disk
+Organizing build results on the disk
 </p>
 </li>
 <li>
 <p>
-download remote assets (sources or binaries)
+Downloading remote assets (sources or binaries)
 </p>
 </li>
 </ul></div>
 <div class="sect2">
-<h3 id="_filesystem_structure">2.1. Filesystem Structure</h3>
-<div class="paragraph"><p>pbuild expects to get call in a directory where it&#8217;s project configuration files are living. Package sources
+<h3 id="_filesystem_structure">3.1. Filesystem Structure</h3>
+<div class="paragraph"><p>pbuild expects to be called in a directory where its project configuration files live. Package sources
 live in directories inside of this project directory:</p></div>
 <div class="ulist"><ul>
 <li>
@@ -903,43 +1016,108 @@ Build results
 </li>
 </ul></div>
 <div class="sect3">
-<h4 id="_config">2.1.1. _config</h4>
-<div class="paragraph"><p>Can define build configurations. Usually defaults from a distribution are used, but this file can provide
+<h4 id="_config">3.1.1. _config</h4>
+<div class="paragraph"><p>Defines build configurations. Usually defaults from a distribution are used, but this file can provide
 additional rules. These define which packages need to become available in the build environment, macro definitions
 and many more. See the build config topic for a detailed list.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_pbuild">2.1.2. _pbuild</h4>
-<div class="paragraph"><p>This file defines one or more presets. A preset defines which</p></div>
+<h4 id="_pbuild">3.1.2. _pbuild</h4>
+<div class="paragraph"><p>This file defines one or more presets in XML format. A preset bundles the distribution configuration,
+repositories, container registries, and target architecture into a named configuration.</p></div>
+<div class="paragraph"><p>The XML schema is:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>&lt;pbuild&gt;
+  &lt;preset name="NAME" [default="true"] [arch="ARCH"]&gt;
+    &lt;config&gt;DIST_CONFIG&lt;/config&gt;
+    &lt;repo&gt;REPO_URL&lt;/repo&gt;
+    &lt;registry&gt;REGISTRY_URL&lt;/registry&gt;
+    &lt;assets&gt;ASSETS_URL&lt;/assets&gt;
+    &lt;obs&gt;OBS_URL&lt;/obs&gt;
+    &lt;hostrepo&gt;HOST_REPO_URL&lt;/hostrepo&gt;
+  &lt;/preset&gt;
+&lt;/pbuild&gt;</code></pre>
+</div></div>
+<div class="paragraph"><p>Elements within a preset:</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
-distribution configuration
+<code>name</code> (attribute, required)&#8201;&#8212;&#8201;the preset name, also used as the default reponame
 </p>
 </li>
 <li>
 <p>
-repositories
+<code>default</code> (attribute, optional)&#8201;&#8212;&#8201;marks the preset as the default when no <code>--preset</code> is given
 </p>
 </li>
 <li>
 <p>
-hardware architectures
+<code>arch</code> (attribute, optional)&#8201;&#8212;&#8201;target architecture (e.g. <code>x86_64</code>, <code>aarch64</code>)
+</p>
+</li>
+<li>
+<p>
+<code>config</code> (repeatable)&#8201;&#8212;&#8201;distribution configuration, same as <code>--dist</code> (a known dist name, URL, or <code>obs://</code> URL)
+</p>
+</li>
+<li>
+<p>
+<code>repo</code> (repeatable)&#8201;&#8212;&#8201;package repository URL, same as <code>--repo</code>
+</p>
+</li>
+<li>
+<p>
+<code>registry</code> (repeatable)&#8201;&#8212;&#8201;container registry URL, same as <code>--registry</code>
+</p>
+</li>
+<li>
+<p>
+<code>assets</code> (repeatable)&#8201;&#8212;&#8201;asset server URL, same as <code>--assets</code>
+</p>
+</li>
+<li>
+<p>
+<code>obs</code>&#8201;&#8212;&#8201;Open Build Service instance URL for resolving <code>obs://</code> URLs
+</p>
+</li>
+<li>
+<p>
+<code>hostrepo</code> (repeatable)&#8201;&#8212;&#8201;host repository for cross-architecture builds, same as <code>--hostrepo</code>
 </p>
 </li>
 </ul></div>
+<div class="paragraph"><p>Example <code>_pbuild</code> file with multiple presets:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>&lt;pbuild&gt;
+  &lt;preset name="tumbleweed" default="true" arch="x86_64"&gt;
+    &lt;config&gt;tumbleweed&lt;/config&gt;
+    &lt;repo&gt;https://download.opensuse.org/tumbleweed/repo/oss/&lt;/repo&gt;
+  &lt;/preset&gt;
+  &lt;preset name="leap156" arch="x86_64"&gt;
+    &lt;config&gt;leap15.6&lt;/config&gt;
+    &lt;repo&gt;https://download.opensuse.org/distribution/leap/15.6/repo/oss/&lt;/repo&gt;
+    &lt;repo&gt;https://download.opensuse.org/update/leap/15.6/oss/&lt;/repo&gt;
+  &lt;/preset&gt;
+  &lt;preset name="fedora43" arch="x86_64"&gt;
+    &lt;config&gt;fedora43&lt;/config&gt;
+    &lt;repo&gt;https://dl.fedoraproject.org/pub/fedora/linux/releases/43/Everything/x86_64/os/&lt;/repo&gt;
+  &lt;/preset&gt;
+&lt;/pbuild&gt;</code></pre>
+</div></div>
 </div>
 <div class="sect3">
-<h4 id="_build_lt_preset_gt">2.1.3. _build.&lt;preset&gt;</h4>
-<div class="paragraph"><p>contains all binaries for the given preset. These are either downloaded or build local. Additional underscore prefixed
-files contain informations about the build history and current states of the build.</p></div>
+<h4 id="_build_lt_preset_gt">3.1.3. _build.&lt;preset&gt;</h4>
+<div class="paragraph"><p>Contains all binaries for the given preset. These are either downloaded or built locally. Additional underscore-prefixed
+files contain information about the build history and current states of the build.</p></div>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_important_options">2.2. Important Options</h3>
+<h3 id="_important_options">3.2. Important Options</h3>
 <div class="paragraph"><p>pbuild does not need any parameters by default. It will build inside of KVM by default which can work
 as user (non-root) in a proper environment. KVM will also ensure that the correct kernel is running
-during build. However, builds in chroot or containern is also possible via</p></div>
+during build. However, builds in chroot or containers are also possible via</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><code>--vm-type=chroot
@@ -950,24 +1128,24 @@ during build. However, builds in chroot or containern is also possible via</p></
 <div class="content">
 <pre><code>--vm-memory=MEGABYTES</code></pre>
 </div></div>
-<div class="paragraph"><p>The build environment disk space can get defined via</p></div>
+<div class="paragraph"><p>The build environment disk space can be defined via</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><code>--vm-disk-size=MEGABYTES</code></pre>
 </div></div>
-<div class="paragraph"><p>The KVM is fully isolated by default. This ensures that the build can become fully reproducibile and
+<div class="paragraph"><p>The KVM is fully isolated by default. This ensures that the build can become fully reproducible and
 also that no attack by using untrusted sources or binaries can happen. However, one may want to
-use remote resources during build. In that case network access can get enabled via</p></div>
+use remote resources during build. In that case network access can be enabled via</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><code>--vm-network</code></pre>
 </div></div>
-<div class="paragraph"><p>Keep in mind that this can get usually avoided by using remote assets instead.</p></div>
+<div class="paragraph"><p>Keep in mind that this can usually be avoided by using remote assets instead.</p></div>
 </div>
 <div class="sect2">
-<h3 id="_important_debugging_options">2.3. Important Debugging Options</h3>
+<h3 id="_important_debugging_options">3.3. Important Debugging Options</h3>
 <div class="paragraph"><p>pbuild always creates a consistent state. That means it may not build actually anything, when the
-last build result look current. One can enforce a rebuild by using:</p></div>
+last build result looks current. One can enforce a rebuild by using:</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><code>--rebuild &lt;PACKAGE&gt;</code></pre>
@@ -983,14 +1161,14 @@ using the</p></div>
 <div class="content">
 <pre><code>--single &lt;PACKAGE&gt;</code></pre>
 </div></div>
-<div class="paragraph"><p>option to make pbuild only look at the specified package. This also triggers an rebuild
+<div class="paragraph"><p>option to make pbuild only look at the specified package. This also triggers a rebuild
 of the package. It often makes sense to use</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><code>--single &lt;PACKAGE&gt; --shell-after-fail</code></pre>
 </div></div>
 <div class="paragraph"><p>to get a shell prompt in case a build failure occurs.</p></div>
-<div class="paragraph"><p>Alternatively, one can reuse last build enviroment or create a new one by using the</p></div>
+<div class="paragraph"><p>Alternatively, one can reuse the last build environment or create a new one by using the</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><code>--shell</code></pre>
@@ -1001,10 +1179,10 @@ of the package. It often makes sense to use</p></div>
 <div class="content">
 <pre><code>-x binary_package</code></pre>
 </div></div>
-<div class="paragraph"><p>(eg. gdb, strace, valgrind or assumed missing dependencies for testing).</p></div>
+<div class="paragraph"><p>(e.g. gdb, strace, valgrind or assumed missing dependencies for testing).</p></div>
 </div>
 <div class="sect2">
-<h3 id="_remote_assets">2.4. Remote Assets</h3>
+<h3 id="_remote_assets">3.4. Remote Assets</h3>
 <div class="paragraph"><p>Remote Assets can be defined inside of the build descriptions. They are resources from a remote
 servers and will be downloaded and validated by pbuild before the corresponding build is started.</p></div>
 <div class="paragraph"><p>Supported protocols for resources using an url are:</p></div>
@@ -1036,7 +1214,7 @@ The default is not to include the .git directory. If it is needed at build time,
 "withmeta" pseudo query parameter can be added.</p></div>
 <div class="paragraph"><p>This depends on the build description format as described below.</p></div>
 <div class="sect3">
-<h4 id="_rpm_spec_files">2.4.1. rpm spec files</h4>
+<h4 id="_rpm_spec_files">3.4.1. rpm spec files</h4>
 <div class="paragraph"><p>Source lines in spec files can declare remote assets. Rpm is already supporting to use
 an URL as source definition.</p></div>
 <div class="paragraph"><p>A comment before such a line marks the next source definition as remote asset, so that
@@ -1090,7 +1268,7 @@ a RemoteAsset pointing to a remote git repository
 </ul></div>
 </div>
 <div class="sect3">
-<h4 id="_kiwi_build_description">2.4.2. kiwi build description</h4>
+<h4 id="_kiwi_build_description">3.4.2. kiwi build description</h4>
 <div class="paragraph"><p>The kiwi format is not supporting remote source specifications, but they can be
 specified via XML comments.</p></div>
 <div class="literalblock">
@@ -1110,7 +1288,7 @@ disabled via</p></div>
 </div></div>
 </div>
 <div class="sect3">
-<h4 id="_dockerfile_description">2.4.3. Dockerfile description</h4>
+<h4 id="_dockerfile_description">3.4.3. Dockerfile description</h4>
 <div class="paragraph"><p>Remote assets that will be downloaded before the build can be added via the
 comment <code>#!RemoteAsset: https://my.url/asset.tar</code>. <code>pbuild</code> will fetch the
 asset before the build and will make it available in the buildroot so that the
@@ -1125,12 +1303,12 @@ RUN tar -xvzf asset.tar
 </div></div>
 </div>
 <div class="sect3">
-<h4 id="_arch_linux_pkgbuild">2.4.4. Arch Linux PKGBUILD</h4>
+<h4 id="_arch_linux_pkgbuild">3.4.4. Arch Linux PKGBUILD</h4>
 <div class="paragraph"><p>PKGBuild files already contain the needed URLs and Checksums, so no extra
 treatment is needed.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_fedpkg_sources_file">2.4.5. FedPkg "sources" file</h4>
+<h4 id="_fedpkg_sources_file">3.4.5. FedPkg "sources" file</h4>
 <div class="paragraph"><p>The sources file contains a list of file names with checksums. PBuild will
 automatically download the missing files from a FedPkg Server that needs
 to be configured in the project config via the "AssetsURL:" directive or set
@@ -1140,7 +1318,7 @@ with the "--assets" option.</p></div>
 </div>
 </div>
 <div class="sect1">
-<h2 id="_about_the_build_configuration">3. About the Build Configuration</h2>
+<h2 id="_about_the_build_configuration">4. About the Build Configuration</h2>
 <div class="sectionbody">
 <div class="paragraph"><p>The build configuration syntax describes the build environment
 used for building packages. It is used to:</p></div>
@@ -1168,7 +1346,7 @@ Handle user decisions like macro settings
 </li>
 </ul></div>
 <div class="sect2">
-<h3 id="_configuration_file_syntax">3.1. Configuration File Syntax</h3>
+<h3 id="_configuration_file_syntax">4.1. Configuration File Syntax</h3>
 <div class="paragraph"><p>The syntax is basically the same as in RPM spec files. However, it is
 independent of the used packaging format. You can use spec file
 features like macros or conditions in the configuration.</p></div>
@@ -1185,23 +1363,23 @@ lines instead of having one line with all the flags you need.</p></div>
 an existing entry from the data.</p></div>
 </div>
 <div class="sect2">
-<h3 id="_available_keywords_in_project_configuration">3.2. Available Keywords in Project Configuration</h3>
+<h3 id="_available_keywords_in_project_configuration">4.2. Available Keywords in Project Configuration</h3>
 <div class="paragraph"><p>The following list contains all the allowed keywords in the project
 configuration:</p></div>
 <div class="sect3">
-<h4 id="_assetsurl_type_url">3.2.1. AssetsURL: TYPE@URL</h4>
+<h4 id="_assetsurl_type_url">4.2.1. AssetsURL: TYPE@URL</h4>
 <div class="paragraph"><p>Define a url for automatic asset downloading. Supported types
 are currently <code>fedpkg</code> and <code>goproxy</code>.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_binarytype_type">3.2.2. BinaryType: TYPE</h4>
+<h4 id="_binarytype_type">4.2.2. BinaryType: TYPE</h4>
 <div class="paragraph"><p>The binary type is the format of the packages that make up the build
 environment. This is usually set automatically depending on the recipe
 type and preinstall package list.
 Currently understood values are: <code>rpm</code>, <code>deb</code>, and <code>arch</code>.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_buildengine_engine">3.2.3. BuildEngine: ENGINE</h4>
+<h4 id="_buildengine_engine">4.2.3. BuildEngine: ENGINE</h4>
 <div class="paragraph"><p>Use an alternative build engine. Examples are <code>mock</code> (for Fedora and
 Red Hat) and <code>debootstrap</code> (for Debian), <code>debbuild</code> (to build debian
 packages with spec files), <code>podman</code> (container builds).</p></div>
@@ -1216,7 +1394,7 @@ Support: pax debbuild</code></pre>
 </div></div>
 </div>
 <div class="sect3">
-<h4 id="_buildflags_flag_value">3.2.4. BuildFlags: FLAG[:VALUE]</h4>
+<h4 id="_buildflags_flag_value">4.2.4. BuildFlags: FLAG[:VALUE]</h4>
 <div class="paragraph"><p>The BuildFlags keyword defines flags for the build process. The
 following values for FLAG are usable.</p></div>
 <div class="ulist"><ul>
@@ -1381,15 +1559,15 @@ to build reduced products via updateinfo_packages_only for maintenance
 testing.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_conflict_package">3.2.5. Conflict: PACKAGE</h4>
+<h4 id="_conflict_package">4.2.5. Conflict: PACKAGE</h4>
 <div class="paragraph"><p>Specify that a package must not be installed in the build environment.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_conflict_package_a_package_b">3.2.6. Conflict: PACKAGE_A:PACKAGE_B</h4>
+<h4 id="_conflict_package_a_package_b">4.2.6. Conflict: PACKAGE_A:PACKAGE_B</h4>
 <div class="paragraph"><p>Specify a synthetic conflict between to packages.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_constraint_selector_string">3.2.7. Constraint: SELECTOR STRING</h4>
+<h4 id="_constraint_selector_string">4.2.7. Constraint: SELECTOR STRING</h4>
 <div class="admonitionblock">
 <table><tr>
 <td class="icon">
@@ -1403,7 +1581,7 @@ colon-separated list which gets a string assigned. See the build job
 constraints page for details.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_distmacro_name_value">3.2.8. DistMacro: NAME VALUE</h4>
+<h4 id="_distmacro_name_value">4.2.8. DistMacro: NAME VALUE</h4>
 <div class="paragraph"><p>Define a macro to be used when parsing the spec files of packages.
 This is similar to using a <code>Macros:</code> section with the difference
 that the macro will not be written to the .rpmmacros file. It should
@@ -1414,7 +1592,7 @@ parsing, so you have to use <code>%%</code> for a literal percent sign in
 the value.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_expandflags_flag_value">3.2.9. ExpandFlags: FLAG[:VALUE]</h4>
+<h4 id="_expandflags_flag_value">4.2.9. ExpandFlags: FLAG[:VALUE]</h4>
 <div class="paragraph"><p>Flags which modify the behaviour during dependency resolution.</p></div>
 <div class="ulist"><ul>
 <li>
@@ -1515,7 +1693,7 @@ the support packages will also not trigger a rebuild. This could be
 considered a bug fix and should be used for all new base projects.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_exportfilter_regex_architectures">3.2.10. ExportFilter: REGEX ARCHITECTURES</h4>
+<h4 id="_exportfilter_regex_architectures">4.2.10. ExportFilter: REGEX ARCHITECTURES</h4>
 <div class="paragraph"><p>The export filter can be used to export build results from one
 architecture to others. This is required when one architecture needs
 packages from another architecture for building. The REGEX placeholder
@@ -1525,20 +1703,20 @@ used in the built architecture by default, add a <code>.</code> pseudo architect
 to also use them locally.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_fileprovides_file_packages">3.2.11. FileProvides: FILE PACKAGES</h4>
+<h4 id="_fileprovides_file_packages">4.2.11. FileProvides: FILE PACKAGES</h4>
 <div class="paragraph"><p>Due to memory consumption reasons dependencies to files as supported
 by rpm are ignored by default. As a workaround, FileProvides can be
 used to tell the systems which packages contain a file. The file needs
 to have the full path.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_hostarch_host_arch">3.2.12. HostArch: HOST_ARCH</h4>
+<h4 id="_hostarch_host_arch">4.2.12. HostArch: HOST_ARCH</h4>
 <div class="paragraph"><p>This is used for cross builds. It defines the host architecture used for
 building, while the scheduler architecture remains the target
 architecture.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_ignore_package_or_dependency">3.2.13. Ignore: PACKAGE_OR_DEPENDENCY</h4>
+<h4 id="_ignore_package_or_dependency">4.2.13. Ignore: PACKAGE_OR_DEPENDENCY</h4>
 <div class="paragraph"><p>Ignore can be used to break dependencies. This can be useful to reduce
 the number of needed packages or to break cyclic dependencies. If a
 package is specified, all capabilities provided by the package are
@@ -1548,18 +1726,18 @@ results. It is usually better to limit its usage by also specify the
 originating package as described in the following section.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_ignore_origin_package_package_or_dependency">3.2.14. Ignore: ORIGIN_PACKAGE:PACKAGE_OR_DEPENDENCY</h4>
+<h4 id="_ignore_origin_package_package_or_dependency">4.2.14. Ignore: ORIGIN_PACKAGE:PACKAGE_OR_DEPENDENCY</h4>
 <div class="paragraph"><p>Ignore a dependency coming from ORIGIN_PACKAGE. See the previous section
 for more details.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_ignorerebuild_package_or_dependency">3.2.15. IgnoreRebuild: PACKAGE_OR_DEPENDENCY</h4>
+<h4 id="_ignorerebuild_package_or_dependency">4.2.15. IgnoreRebuild: PACKAGE_OR_DEPENDENCY</h4>
 <div class="paragraph"><p>Do not trigger a rebuild if the specified packages are changed. The
 difference to the <code>Support</code> keyword is that the packages are not
 automatically installed for builds.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_keep_packages">3.2.16. Keep: PACKAGES</h4>
+<h4 id="_keep_packages">4.2.16. Keep: PACKAGES</h4>
 <div class="paragraph"><p>To eliminate build cycles the to-be-built packages are not installed by
 default. Keep can be used to overwrite this behavior. It is usually needed
 for packages like <code>make</code> that are used to build itself. Preinstalled
@@ -1567,21 +1745,21 @@ packages are automatically kept, as the package installation program needs
 to work all the time.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_macros">3.2.17. Macros:</h4>
+<h4 id="_macros">4.2.17. Macros:</h4>
 <div class="paragraph"><p>Defines the start of a literal macros block. The block is ended
 by either reaching the end of the config or by a literal
 <code>Macros:</code> line. See the section about macro definitions below for
 more information.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_optflags_target_arch_flags_rpm_only">3.2.18. OptFlags: TARGET_ARCH FLAGS (RPM only)</h4>
+<h4 id="_optflags_target_arch_flags_rpm_only">4.2.18. OptFlags: TARGET_ARCH FLAGS (RPM only)</h4>
 <div class="paragraph"><p>Optflags exports compiler flags to the build by adding lines to rpm&#8217;s
 <code>rpmrc</code> file. They will only have an effect when the spec file is using
 <code>$RPM_OPT_FLAGS</code> or <code>%{optflags}</code>. The target architecture may be set
 to <code>*</code> to affect all architectures.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_order_package_a_package_b">3.2.19. Order: PACKAGE_A:PACKAGE_B</h4>
+<h4 id="_order_package_a_package_b">4.2.19. Order: PACKAGE_A:PACKAGE_B</h4>
 <div class="paragraph"><p>The build script takes care about the installation order if they are
 defined via dependencies inside of the packages. However, there might be
 dependency loops (reported during setup of the build system) or missing
@@ -1591,12 +1769,12 @@ to break the loop.</p></div>
 PACKAGE_B.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_patterntype_type">3.2.20. Patterntype: TYPE</h4>
+<h4 id="_patterntype_type">4.2.20. Patterntype: TYPE</h4>
 <div class="paragraph"><p>Defines the pattern format. Valid values are: <code>none</code> (default), <code>ymp</code>,
 <code>comps</code>. Multiple types can be specified.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_prefer_package">3.2.21. Prefer: PACKAGE</h4>
+<h4 id="_prefer_package">4.2.21. Prefer: PACKAGE</h4>
 <div class="paragraph"><p>In case multiple packages satisfy a dependency, the dependency expansion
 will fail. This is unlike like most package managing tools, which just
 pick one of the package. It is done that way to provide reproducible
@@ -1607,12 +1785,12 @@ When the package name is prefixed with a minus sign, it is treated
 as a de-prefer.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_prefer_origin_package_package">3.2.22. Prefer: ORIGIN_PACKAGE:PACKAGE</h4>
+<h4 id="_prefer_origin_package_package">4.2.22. Prefer: ORIGIN_PACKAGE:PACKAGE</h4>
 <div class="paragraph"><p>It is possible to define the prefer only when the dependency comes
 from the specified originating package.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_preinstall_package">3.2.23. Preinstall: PACKAGE</h4>
+<h4 id="_preinstall_package">4.2.23. Preinstall: PACKAGE</h4>
 <div class="paragraph"><p>This is used to specify packages needed to run the package installation
 program. These packages are unpacked so that the native installation
 program can be used to install the build environment.
@@ -1620,7 +1798,7 @@ Included scripts are not executed during this phase. However, these
 packages will be re-installed later on including script execution.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_publishfilter_regexp_regexp">3.2.24. PublishFilter: REGEXP [REGEXP]</h4>
+<h4 id="_publishfilter_regexp_regexp">4.2.24. PublishFilter: REGEXP [REGEXP]</h4>
 <div class="admonitionblock">
 <table><tr>
 <td class="icon">
@@ -1635,7 +1813,7 @@ that match any REGEXP will not be put into the generated repository.</p></div>
 However, multiple REGEXP can be defined.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_publishflags_flag_value">3.2.25. PublishFlags: FLAG[:VALUE]</h4>
+<h4 id="_publishflags_flag_value">4.2.25. PublishFlags: FLAG[:VALUE]</h4>
 <div class="admonitionblock">
 <table><tr>
 <td class="icon">
@@ -1724,11 +1902,11 @@ be added to the registry repository when pushing a container to
 it.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_registryurl_url">3.2.26. RegistryURL: URL</h4>
+<h4 id="_registryurl_url">4.2.26. RegistryURL: URL</h4>
 <div class="paragraph"><p>Define a url for the downloading of containers.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_repotype_type_options">3.2.27. Repotype: TYPE[:OPTIONS]</h4>
+<h4 id="_repotype_type_options">4.2.27. Repotype: TYPE[:OPTIONS]</h4>
 <div class="paragraph"><p>Defines the repository format for published repositories. Valid values
 are: <code>none</code>, <code>rpm-md</code>, <code>suse</code>, <code>debian</code>, <code>hdlist2</code>, <code>arch</code>, <code>staticlinks</code>
 and vagrant. Multiple types can be specified to generate more than
@@ -1747,30 +1925,30 @@ rsyncable gzip compression.</p></div>
 to the package repository.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_repourl_type_url">3.2.28. RepoURL: [TYPE@]URL</h4>
+<h4 id="_repourl_type_url">4.2.28. RepoURL: [TYPE@]URL</h4>
 <div class="paragraph"><p>Define a url for the downloading of repository packages. Supported types
 are currently <code>arch</code>, <code>debian</code>, <code>hdlist2</code>, <code>rpmmd</code>, <code>suse</code>. If the
 type is not specified, it is guessed from the build type.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_required_package">3.2.29. Required: PACKAGE</h4>
+<h4 id="_required_package">4.2.29. Required: PACKAGE</h4>
 <div class="paragraph"><p>Specify a package that always is installed for package builds.
 A change in one of these packages triggers a new build.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_runscripts_package">3.2.30. Runscripts: PACKAGE</h4>
+<h4 id="_runscripts_package">4.2.30. Runscripts: PACKAGE</h4>
 <div class="paragraph"><p>Execute the scriptlets of the specified preinstalled package. Scriptlet
 execution takes place after the preinstall phase, but before installing
 the remaining packages.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_substitute_old_dependency_new_dependency_8230">3.2.31. Substitute: OLD_DEPENDENCY [NEW_DEPENDENCY&#8230; ]</h4>
+<h4 id="_substitute_old_dependency_new_dependency_8230">4.2.31. Substitute: OLD_DEPENDENCY [NEW_DEPENDENCY&#8230; ]</h4>
 <div class="paragraph"><p>It is possible to replace BuildRequires dependencies with other
 dependencies. This will have only an effect on directly BuildRequired
 packages, not on indirectly required packages.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_support_package">3.2.32. Support: PACKAGE</h4>
+<h4 id="_support_package">4.2.32. Support: PACKAGE</h4>
 <div class="paragraph"><p>Specify a package that always is installed for package builds.
 Unlike <code>Required:</code>, a change in one of these packages does not trigger an
 automatic rebuild.</p></div>
@@ -1778,13 +1956,13 @@ automatic rebuild.</p></div>
 result, for example <code>make</code> or <code>coreutils</code>.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_target_gnu_triplet">3.2.33. Target: GNU_TRIPLET</h4>
+<h4 id="_target_gnu_triplet">4.2.33. Target: GNU_TRIPLET</h4>
 <div class="paragraph"><p>Defines the target architecture via a gnu triplet (not the debian
 architecture!). For example <code>arm-linux-gnueabihf</code> for armv7hl builds,
 or <code>i686</code> for building i686 packages.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_type_type">3.2.34. Type: TYPE</h4>
+<h4 id="_type_type">4.2.34. Type: TYPE</h4>
 <div class="paragraph"><p>Build recipe type. This is the format of the file which provides the
 build description (the "build recipe"). This is usually autodetected from
 the binary type, but in some rare cases it may be needed to manually
@@ -1792,14 +1970,14 @@ configure the type. Currently the following types are understood:
 <code>spec</code>, <code>dsc</code>, <code>arch</code>, <code>kiwi</code>, <code>livebuild</code>, <code>productcompose</code>, <code>preinstallimage</code>.</p></div>
 </div>
 <div class="sect3">
-<h4 id="_vminstall_package">3.2.35. VMInstall: PACKAGE</h4>
+<h4 id="_vminstall_package">4.2.35. VMInstall: PACKAGE</h4>
 <div class="paragraph"><p>Like Preinstall, but these packages get only installed when a virtual
 machine like Xen or KVM is used for building. Usually packages like
 <code>mount</code> are listed here.</p></div>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_macros_definitions_for_the_build_configuration">3.3. Macros Definitions for the build configuration</h3>
+<h3 id="_macros_definitions_for_the_build_configuration">4.3. Macros Definitions for the build configuration</h3>
 <div class="paragraph"><p>You can use rpm macro definitions in the project config to improve
 configurability.
 Macros are defined with <code>%define</code> or <code>%global</code>. They are only known
@@ -1825,7 +2003,7 @@ Support: x86_64_only_package
 </div></div>
 </div>
 <div class="sect2">
-<h3 id="_macro_definitions_for_the_build_process">3.4. Macro Definitions for the build process</h3>
+<h3 id="_macro_definitions_for_the_build_process">4.4. Macro Definitions for the build process</h3>
 <div class="paragraph"><p>To specify macros for the building process, use the <code>Macros:</code>
 keyword. All lines after <code>Macros:</code> up to the end of the config
 or to a <code>:Macros</code> line are used when parsing the spec file and
@@ -1843,7 +2021,7 @@ file in the build root.</p></div>
 does not take place.</p></div>
 </div>
 <div class="sect2">
-<h3 id="_building_with_ccache_or_sccache">3.5. Building with ccache or sccache</h3>
+<h3 id="_building_with_ccache_or_sccache">4.5. Building with ccache or sccache</h3>
 <div class="paragraph"><p>The usage of ccache or sccache can be enabled for each package by
 seting the <code>useccache:PACKAGE</code> build flag.</p></div>
 <div class="paragraph"><p>The ccache package will automatically be installed and configured.
@@ -1876,43 +2054,124 @@ is required.</p></div>
 </div>
 </div>
 <div class="sect1">
-<h2 id="_functionalities">4. Functionalities</h2>
+<h2 id="_functionalities">5. Functionalities</h2>
 <div class="sectionbody">
 <div class="sect2">
-<h3 id="_package_builds">4.1. package builds</h3>
+<h3 id="_package_builds">5.1. Package Builds</h3>
 <div class="paragraph"><p>Package builds are supported for rpm, deb, arch and their variations.</p></div>
 </div>
 <div class="sect2">
-<h3 id="_image_builds">4.2. image builds</h3>
+<h3 id="_image_builds">5.2. Image Builds</h3>
+<div class="paragraph"><p>pbuild supports building system images via the kiwi image building tool. To build kiwi images,
+place a <code>.kiwi</code> file in the package directory. pbuild detects the recipe type automatically
+from the file extension.</p></div>
+<div class="paragraph"><p>Kiwi can produce many output formats including VM images (vmx, qcow2), live USB/CD images (iso),
+OEM installation images, and network deployment images. The output format is determined by the
+kiwi description file.</p></div>
+<div class="paragraph"><p>Packages needed by the image are resolved from the configured repositories. Container images
+referenced in the kiwi description can be provided via <code>--registry</code> or <code>--repo</code> options.</p></div>
+<div class="paragraph"><p>Remote assets can be specified in kiwi files using XML comments:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>&lt;!-- OBS-RemoteAsset: https://example.com/asset.tar --&gt;
+&lt;!-- OBS-CopyToImage: asset.tar /opt/asset.tar --&gt;</code></pre>
+</div></div>
 </div>
 <div class="sect2">
-<h3 id="_container_builds">4.3. container builds</h3>
+<h3 id="_container_builds">5.3. Container Builds</h3>
+<div class="paragraph"><p>pbuild supports building containers from Dockerfiles. Place a <code>Dockerfile</code> in the package
+directory. For packages with multiple build descriptions, use <code>Dockerfile.&lt;packagename&gt;</code> to
+match a specific package.</p></div>
+<div class="paragraph"><p>The build engine is <code>podman</code> by default. It can be changed to <code>docker</code> via the <code>BuildEngine</code>
+build config keyword.</p></div>
+<div class="sect3">
+<h4 id="_base_images">5.3.1. Base Images</h4>
+<div class="paragraph"><p>If the Dockerfile references a base image via <code>FROM</code>, the image must be available from
+a configured registry (<code>--registry</code> option) or as a local build result from another
+package in the project.</p></div>
+</div>
+<div class="sect3">
+<h4 id="_build_arguments">5.3.2. Build Arguments</h4>
+<div class="paragraph"><p>Build arguments can be passed via the build configuration using:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>BuildFlags: dockerarg:KEY=VALUE</code></pre>
+</div></div>
+</div>
+<div class="sect3">
+<h4 id="_container_output_format">5.3.3. Container Output Format</h4>
+<div class="paragraph"><p>Container builds produce several output files:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+<code>&lt;name&gt;.tar</code>&#8201;&#8212;&#8201;the container image tarball
+</p>
+</li>
+<li>
+<p>
+<code>&lt;name&gt;.containerinfo</code>&#8201;&#8212;&#8201;JSON metadata (tags, version, disturl)
+</p>
+</li>
+<li>
+<p>
+<code>&lt;name&gt;.packages</code>&#8201;&#8212;&#8201;list of installed packages
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>The container format and compression can be controlled via build config flags:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+<code>container-build-format:docker</code> or <code>container-build-format:oci</code>&#8201;&#8212;&#8201;image format (podman only)
+</p>
+</li>
+<li>
+<p>
+<code>container-compression-format:gzip</code>, <code>zstd</code>, or <code>zstd:chunked</code>&#8201;&#8212;&#8201;layer compression (podman only)
+</p>
+</li>
+<li>
+<p>
+<code>container-timestamp:VALUE</code>&#8201;&#8212;&#8201;set a build timestamp for reproducibility (podman only)
+</p>
+</li>
+</ul></div>
+</div>
+<div class="sect3">
+<h4 id="_remote_assets_in_dockerfiles">5.3.4. Remote Assets in Dockerfiles</h4>
+<div class="paragraph"><p>Remote assets can be fetched before build using a comment directive:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>#!RemoteAsset: https://example.com/asset.tar
+COPY asset.tar .</code></pre>
+</div></div>
+</div>
 </div>
 <div class="sect2">
-<h3 id="_cross_architecture_build">4.4. Cross Architecture Build</h3>
-<div class="paragraph"><p>Cross architecture builds specify two sets of repositories, one for the build environement
+<h3 id="_cross_architecture_build">5.4. Cross Architecture Build</h3>
+<div class="paragraph"><p>Cross architecture builds specify two sets of repositories, one for the build environment
 and one for the environment for the build result.</p></div>
 <div class="sect3">
-<h4 id="_terminology">4.4.1. Terminology</h4>
-<div class="paragraph"><p>The terminiology for this is unfortunatly not standarised and various tools have conflicting
-defintions.</p></div>
+<h4 id="_terminology">5.4.1. Terminology</h4>
+<div class="paragraph"><p>The terminology for this is unfortunately not standardised and various tools have conflicting
+definitions.</p></div>
 <div class="paragraph"><p>We use the following</p></div>
 <div class="sect4">
-<h5 id="_host_native_the_architecture_build_environment_which_executes_the_for_example_the_compiler">Host Native: The architecture build environment which executes the for example the compiler.</h5>
-<div class="paragraph"><p>cmake is calling this HOST as well (eg. CMAKE_HOST_SYSTEM_PROCESSOR)</p></div>
-<div class="paragraph"><p>GNU tools (esp. the configure scripts generated by autoconf) is using BUILD as abbrevasion here</p></div>
+<h5 id="_host_native_the_architecture_build_environment_which_executes_for_example_the_compiler">Host Native: The architecture build environment which executes for example the compiler.</h5>
+<div class="paragraph"><p>cmake is calling this HOST as well (e.g. CMAKE_HOST_SYSTEM_PROCESSOR)</p></div>
+<div class="paragraph"><p>GNU tools (esp. the configure scripts generated by autoconf) use BUILD as abbreviation here</p></div>
 </div>
 <div class="sect4">
 <h5 id="_target_the_architecture_of_the_resulting_binaries">Target: The architecture of the resulting binaries</h5>
-<div class="paragraph"><p>cmake has this as default without any abbrevasion (eg. CMAKE_SYSTEM_PROCESSOR)</p></div>
-<div class="paragraph"><p>GNU tools (esp. the configure scripts generated by autoconf) is using HOST as abbrevasion here:
-The "TARGET" defintion of them is something else, usually only used for compilers
-where it defines the target architecture a from a cross build compiler.</p></div>
+<div class="paragraph"><p>cmake has this as default without any abbreviation (e.g. CMAKE_SYSTEM_PROCESSOR)</p></div>
+<div class="paragraph"><p>GNU tools (esp. the configure scripts generated by autoconf) use HOST as abbreviation here:
+The "TARGET" definition of them is something else, usually only used for compilers
+where it defines the target architecture of a cross build compiler.</p></div>
 </div>
 <div class="sect4">
 <h5 id="_the_compatible_terms_can_be_found_in_the_following_table">The compatible terms can be found in the following table:</h5>
-<div class="paragraph"><p>Unfortunatly the naming of architecture areas is not consistent via the various build
-tooling. Please find the terminilogy mapping from our "build" script and other toolings
+<div class="paragraph"><p>Unfortunately the naming of architecture areas is not consistent across the various build
+tools. Please find the terminology mapping from our "build" script and other tools
 in the list below.</p></div>
 <div class="tableblock">
 <table rules="all"
@@ -1965,33 +2224,33 @@ another target.</p></div>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_dependency_handling">4.4.2. Dependency handling</h4>
+<h4 id="_dependency_handling">5.4.2. Dependency handling</h4>
 <div class="paragraph"><p>Dependencies need to be resolved always twice during a cross build. One time for the host
 architecture and one time for the target architecture. Build dependencies of a package
 get only installed for the target architecture by default.</p></div>
-<div class="paragraph"><p>However, global rules in the build configuration can get created to modify this behaviour.</p></div>
+<div class="paragraph"><p>However, global rules in the build configuration can be created to modify this behaviour.</p></div>
 <div class="sect4">
 <h5 id="_alsonative_packages">AlsoNative: PACKAGES</h5>
 <div class="paragraph"><p>Can be used to mark a package to get installed into the target and in the host system.</p></div>
 </div>
 <div class="sect4">
 <h5 id="_onlynative_packages">OnlyNative: PACKAGES</h5>
-<div class="paragraph"><p>Can be used to to install a package in the hostsystem, but not in the target system. Eg.
+<div class="paragraph"><p>Can be used to install a package in the host system, but not in the target system. E.g.
 for build tooling or code generators.</p></div>
 </div>
 <div class="sect4">
 <h5 id="_the_target_base_system">The target base system</h5>
-<div class="paragraph"><p>All packages for a host system which are configured as "Requrired" get installed only in
-the host system, but not in the target system. The reason behind is that this packages
+<div class="paragraph"><p>All packages for a host system which are configured as "Required" get installed only in
+the host system, but not in the target system. The reason behind is that these packages
 are only supposed to be able to execute commands and therefore they are not needed in
 the target environment. Only the build dependencies get installed there.</p></div>
 <div class="paragraph"><p>However, some distributions may lack a complete set of dependencies (esp. debian based).
-In this case the base system for the target system can manually get configured via</p></div>
+In this case the base system for the target system can manually be configured via</p></div>
 <div class="paragraph"><p>Substitute: sysroot-packages PACKAGES</p></div>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_example_calls_in_spec_files_for_cross_build">4.4.3. Example Calls in spec files for cross build</h4>
+<h4 id="_example_calls_in_spec_files_for_cross_build">5.4.3. Example Calls in spec files for cross build</h4>
 <div class="paragraph"><p>Note: the basic design of rpm was the GNU style, but it changed in the way that you have to
       specify the host architecture via %target macro on most distributions:</p></div>
 <div class="literalblock">
@@ -2002,12 +2261,115 @@ In this case the base system for the target system can manually get configured v
 </div>
 </div>
 </div>
+<div class="sect1">
+<h2 id="_result_codes">6. Result Codes</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>When querying build results with <code>--result</code>, each package has one of the following status codes:</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+succeeded
+</dt>
+<dd>
+<p>
+  The package built successfully.
+</p>
+</dd>
+<dt class="hdlist1">
+failed
+</dt>
+<dd>
+<p>
+  The build was attempted but the build process returned an error. Use <code>--showlog</code> or
+  check the build log in the result directory to diagnose the failure.
+</p>
+</dd>
+<dt class="hdlist1">
+unresolvable
+</dt>
+<dd>
+<p>
+  The package&#8217;s dependencies could not be resolved. The details field shows which
+  dependencies are missing or conflicting. Check that all required repositories are
+  configured.
+</p>
+</dd>
+<dt class="hdlist1">
+broken
+</dt>
+<dd>
+<p>
+  The package has a structural problem that prevents building, such as a parse error
+  in the recipe file or a missing source file.
+</p>
+</dd>
+<dt class="hdlist1">
+blocked
+</dt>
+<dd>
+<p>
+  The package is waiting for other packages in the project to finish building first.
+  These are packages it depends on that are not yet in a final state.
+</p>
+</dd>
+<dt class="hdlist1">
+scheduled
+</dt>
+<dd>
+<p>
+  The package is ready to build and is waiting for a build slot. Increase <code>--buildjobs</code>
+  to run more builds in parallel.
+</p>
+</dd>
+<dt class="hdlist1">
+waiting
+</dt>
+<dd>
+<p>
+  Same as scheduled, but all build slots are currently occupied.
+</p>
+</dd>
+<dt class="hdlist1">
+building
+</dt>
+<dd>
+<p>
+  The package is currently being built.
+</p>
+</dd>
+<dt class="hdlist1">
+excluded
+</dt>
+<dd>
+<p>
+  The package is excluded from building, either by <code>ExclArch</code>/<code>ExcludeArch</code> in the
+  recipe or by <code>BuildFlags: excludebuild</code> in the build configuration.
+</p>
+</dd>
+<dt class="hdlist1">
+disabled
+</dt>
+<dd>
+<p>
+  The package has been explicitly disabled.
+</p>
+</dd>
+<dt class="hdlist1">
+locked
+</dt>
+<dd>
+<p>
+  The package has been locked and will not be built.
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
 </div>
 <div id="footnotes"><hr /></div>
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2026-04-02 17:12:42 CEST
+ 2026-04-21 15:02:40 CEST
 </div>
 </div>
 </body>
