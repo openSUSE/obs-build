@@ -259,7 +259,7 @@ recipe_build_docker() {
         if test "${BUILD_HOST_ARCH#armv8}" != "$BUILD_HOST_ARCH"; then
             # buildah insists on "v8" variant otherwise
 	    case "$BUILD_ARCH" in
-		armv7*) buildargs[${#buildargs[@]}]='--variant=v7' ;;
+		armv7*) buildargs[${#buildargs[@]}]='--platform=linux/arm/v7' ;;
 		armv6*) buildargs[${#buildargs[@]}]='--arch=arm' ;;	# resets the variant
 	    esac
         fi
