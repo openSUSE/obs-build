@@ -136,6 +136,7 @@ export YAST_IS_RUNNING=instsys
 # https://github.com/systemd/systemd/blob/master/docs/ENVIRONMENT.md
 export SYSTEMD_OFFLINE=1
 
+unset TERM # prevent unexpectedly colorized output from breaking builds
 unset LANGUAGE
 unset LANG
 export LC_ALL=POSIX
