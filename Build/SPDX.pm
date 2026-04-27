@@ -818,9 +818,13 @@ sub normalize_tokenized_license {
     } else {
       my $plusidx = @n && $n[0] eq 'PLUS' ? 2 : 0;
       if (!$unknown_exception_cb && @n > $plusidx + 1 && $n[$plusidx] eq 'WITH' && !$known_license_exceptions{lc($n[$plusidx + 1])}) {
-        # the exception is not known, encode complete license with exception
-        $t .= ($plusidx ? '+' : '') . " WITH $n[$plusidx + 1]";
-        splice(@n, 0, $plusidx + 2);
+	# the exception is not known, encode complete license with exception
+	$t .= ($plusidx ? '+' : '') . " WITH $n[$plusidx + 1]";
+	splice(@n, 0, $plusidx + 2);
+      } elsif ($plusidx && !$known_licenses{lc($t)}) {
+	# we are not allowed to use the + suffix with license references
+	$t .= '+';
+	splice(@n, 0, 2);
       }
       my $nt = $known_licenses{lc($t)};
       $t = $nt ? $nt : $unknown_license_cb ? $unknown_license_cb->($t) : undef;
@@ -837,6 +841,7 @@ sub normalize_license {
   $name =~ s/ and / AND /g;
   $name =~ s/ or / OR /g;
   $name =~ s/ with / WITH /g;
+  $name =~ s/\bLicenseRef-//ig;	# strip away LicenseRef- prefix
   my $n = tokenize_license($name);
   $n = $n ? normalize_tokenized_license($n, $unknown_license_cb, $unknown_exception_cb) : undef;
   return $n if defined $n;

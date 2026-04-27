@@ -827,6 +827,7 @@ sub spdx_encode_unknown_license {
   return $l->{'name'} if $l;
   $l = {'name' => $name};
   $l->{'name'} = "LicenseRef-".lc($name);
+  $l->{'name'} =~ s/\+$/-plus/;
   $l->{'name'} =~ s/[^a-zA-Z0-9\.\-]/-/g;
   $l->{'text'} = $name;
   $unknown_spdx_licenses->{lc($name)} = $l;
