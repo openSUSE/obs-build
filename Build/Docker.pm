@@ -417,7 +417,7 @@ sub parse {
 	$rcmd = shift @args if @args && ($rcmd eq 'then' || $rcmd eq 'else' || $rcmd eq 'elif' || $rcmd eq 'if' || $rcmd eq 'do');
 	if ($rcmd eq 'zypper') {
 	  cmd_zypper($ret, @args);
-	} elsif ($rcmd eq 'yum' || $rcmd eq 'dnf') {
+	} elsif ($rcmd eq 'yum' || $rcmd eq 'dnf' || $rcmd eq 'microdnf') {
 	  cmd_dnf($ret, @args);
 	} elsif ($rcmd eq 'apt-get') {
 	  cmd_apt_get($ret, @args);
