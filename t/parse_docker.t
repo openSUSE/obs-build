@@ -24,6 +24,9 @@ RUN curl -sL --output /usr/bin/example-curl --retry 3 -u "foo:bar" https://local
 RUN wget -O /usr/bin/example-wget -t 3 --user foo --password bar https://localhost:8080/example-wget
 
 FROM opensuse/leap:15.2
+
+RUN microdnf install -y vim
+RUN microdnf -y install tar
 };
 
 $expected = {
@@ -32,6 +35,8 @@ $expected = {
     'container:opensuse/tumbleweed:latest',
     'wget',
     'curl',
+    'vim',
+    'tar',
     'container:opensuse/leap:15.2',
   ],
   'path' => [],
