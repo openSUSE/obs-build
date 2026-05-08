@@ -21,7 +21,7 @@ DESTDIR=
 
 all:
 
-.PHONY:	test test-debtransform doc
+.PHONY:	test test-debtransform doc initvm
 
 test:
 	[ "$(SCM)" != "git" ] || git --no-pager diff --check origin/master..HEAD -- || [ -f /.buildenv ]
@@ -121,8 +121,10 @@ install:
 # is useful because it is distributed as a static binary package (e.g.
 # build-initvm-static) whereas the build scripts package is noarch.
 
-initvm: initvm.c
-	$(CC) -o $@.$(INITVM_ARCH) -static $(CFLAGS) initvm.c
+initvm: initvm.$(INITVM_ARCH) ;
+
+initvm.$(INITVM_ARCH): initvm.c
+	$(CC) -o $@ -static $(CFLAGS) initvm.c
 
 initvm-all: initvm
 
