@@ -62,7 +62,8 @@ sub run_services {
   # take default version setting
   for my $s (@{$servicexml->{'service'} || []}) {
     # buildtime only is default
-    next unless $s->{'mode'} && $s->{'mode'} eq $servicemode;
+    next if $servicemode eq 'default' && $s->{'mode'};
+    next unless $s->{'mode'} && $s->{'mode'} eq $servicemode || $servicemode eq 'default';
     die("missing name in service\n") unless $s->{'name'};
 
     if (! -x "$buildroot$servicedir/$s->{'name'}") {
@@ -107,7 +108,7 @@ while (@ARGV) {
   } elsif ($ARGV[0] eq '--mode') {
     shift @ARGV;
     $servicemode = shift @ARGV;
-    die("unsupported servicemode\n") unless $servicemode eq 'manual' || $servicemode eq 'disabled' || $servicemode eq 'buildtime';
+    die("unsupported servicemode\n") unless $servicemode eq 'manual' || $servicemode eq 'disabled' || $servicemode eq 'buildtime' || $servicemode eq 'default';
   } else {
     last;
   }
