@@ -1086,7 +1086,7 @@ vm_first_stage() {
     PERSONALITY=0
     test -n "$PERSONALITY_SYSCALL" && PERSONALITY=`perl -e 'print syscall('$PERSONALITY_SYSCALL', 0)."\n"'`
     test "$PERSONALITY" = -1 && PERSONALITY=0	# syscall failed?
-    case $(uname -m) in
+    case $BUILD_HOST_ARCH in
 	ppc|ppcle|s390) PERSONALITY=8 ;;	# ppc/s390 kernel never tells us if a 32bit personality is active, assume we run on 64bit
 	aarch64) test "$BUILD_ARCH" != "${BUILD_ARCH#armv[567]}" && PERSONALITY=8 ;; # workaround, to be removed
 	s390x) test "$BUILD_ARCH" = "s390" && PERSONALITY=8 ;; # 32bit support was dropped in recent kernels so we only have 32bit support possible in the guest
