@@ -64,6 +64,10 @@ recipe_resultdirs () {
     recipe_resultdirs_$BUILDTYPE "$@"
 }
 
+recipe_compare_oldpackages () {
+    recipe_compare_oldpackages_$BUILDTYPE "$@"
+}
+
 recipe_cleanup () {
     recipe_cleanup_$BUILDTYPE "$@"
 }

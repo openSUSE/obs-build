@@ -115,6 +115,10 @@ recipe_resultdirs_productcompose() {
     echo PRODUCT
 }
 
+recipe_compare_oldpackages_productcompose() {
+    :
+}
+
 recipe_cleanup_productcompose() {
     :
 }

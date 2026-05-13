@@ -370,7 +370,7 @@ recipe_run_rpmlint() {
     fi   
 }
 
-recipe_compare_oldpackages() {
+recipe_compare_oldpackages_spec() {
     if test -x "$BUILD_ROOT/usr/lib/build/same-build-result.sh" ; then 
 	echo "... comparing built packages with the former built"
 	if chroot $BUILD_ROOT /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/RPMS" "$TOPDIR/SRPMS"; then 

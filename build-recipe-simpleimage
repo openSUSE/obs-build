@@ -111,6 +111,10 @@ recipe_resultdirs_simpleimage() {
     :
 }
 
+recipe_compare_oldpackages_simpleimage() {
+    :
+}
+
 recipe_cleanup_simpleimage() {
     :
 }

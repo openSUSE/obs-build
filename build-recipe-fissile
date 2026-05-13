@@ -133,6 +133,10 @@ recipe_resultdirs_fissile() {
     echo FISSILE
 }
 
+recipe_compare_oldpackages_fissile() {
+    :
+}
+
 recipe_cleanup_fissile() {
     if test -n "$DOCKERD_STARTED" ; then
 	DOCKERD_STARTED=

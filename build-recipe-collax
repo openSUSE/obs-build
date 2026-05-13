@@ -52,6 +52,10 @@ recipe_resultdirs_collax() {
 	echo DEBS
 }
 
+recipe_compare_oldpackages_collax() {
+	:
+}
+
 recipe_cleanup_collax() {
 	:
 }

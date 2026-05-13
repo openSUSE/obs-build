@@ -430,6 +430,10 @@ recipe_resultdirs_docker() {
     echo DOCKER
 }
 
+recipe_compare_oldpackages_docker() {
+    :
+}
+
 recipe_cleanup_docker() {
     if test -n "$DOCKERD_STARTED" ; then
 	test -n "$TOPDIR" && rm -f "$BUILD_ROOT/$TOPDIR/SOURCES/.obs-docker-support"

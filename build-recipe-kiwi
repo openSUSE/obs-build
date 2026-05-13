@@ -1009,6 +1009,10 @@ recipe_resultdirs_kiwi() {
     echo KIWI
 }
 
+recipe_compare_oldpackages_kiwi() {
+    :
+}
+
 recipe_cleanup_kiwi() {
     :
 }

@@ -45,6 +45,10 @@ recipe_resultdirs_podman() {
     recipe_resultdirs_docker "$@"
 }
 
+recipe_compare_oldpackages_podman() {
+    :
+}
+
 recipe_cleanup_podman() {
     recipe_cleanup_docker "$@"
 }

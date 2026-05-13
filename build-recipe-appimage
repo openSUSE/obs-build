@@ -119,6 +119,10 @@ recipe_resultdirs_appimage() {
     :
 }
 
+recipe_compare_oldpackages_appimage() {
+    :
+}
+
 recipe_cleanup_appimage() {
     :
 }

@@ -88,6 +88,10 @@ recipe_resultdirs_helm() {
     echo HELM
 }
 
+recipe_compare_oldpackages_helm() {
+    :
+}
+
 recipe_cleanup_helm() {
     :
 }
