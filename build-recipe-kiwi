@@ -606,7 +606,7 @@ kiwi_translate_parameters() {
     for i in "${add_repo_url[@]}" ; do
 	local repo_prio="${add_repo_priority[$lasti]}"
 	test -z "$repo_prio" && repo_prio=99
-	KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS --add-repo $i,${add_repo_type[$lasti]},${add_repo_alias[$lasti]},$repo_prio"
+	KIWI_BUILD_PARAMETERS="$KIWI_BUILD_PARAMETERS --add-repo $i,${add_repo_type[$lasti]},${add_repo_alias[$lasti]},$repo_prio,false,false,,,,false"
 	let lasti++
     done
     if test -n "$set_repo_url" ; then
