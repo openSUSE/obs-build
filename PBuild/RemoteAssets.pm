@@ -34,6 +34,39 @@ use PBuild::Zip;
 use strict;
 
 #
+# Make sure that an asset will be re-fetched. If there is an
+# etag, just move the asset so that it can be re-instantiated.
+# 
+sub force_update {
+  my ($assetdir, $asset) = @_;
+  my $assetid = $asset->{'assetid'};
+  my $adir = "$assetdir/".substr($assetid, 0, 2);
+  if (-s "$adir/$assetid.etag") {
+    rename("$adir/$assetid", "$adir/$assetid.upd");
+  } else {
+    unlink("$adir/$assetid");
+  }
+}
+
+#
+# Return the etag of an asset. If $renameupd is set, re-instantiate
+# an asset that was moved awat by force_update().
+#
+sub get_etag {
+  my ($fn, $etag, $renameupd) = @_;
+  my $edata = PBuild::Util::retrieve("$fn.etag", 1);
+  if ($edata && $edata->{'etag'} && (!defined($etag) || $edata->{'etag'} eq $etag)) {
+    my @s = stat($fn);
+    return $edata->{'etag'} if @s && ($edata->{'id'} || '') eq "$s[9]/$s[7]/$s[1]";
+    @s = stat("$fn.upd");
+    if (@s && ($edata->{'id'} || '') eq "$s[9]/$s[7]/$s[1]") {
+      return $edata->{'etag'} if !$renameupd || ($renameupd &&  rename("$fn.upd", $fn));
+    }
+  }
+  return undef;
+}
+
+#
 # rename a file unless the target already exists
 #
 sub rename_unless_present {
@@ -44,9 +77,16 @@ sub rename_unless_present {
     } else {
       unlink("$new.etag");
     }
+    unlink("$new.upd");
     unlink($old);
     return;
   }
+  if (-s "$new.etag" && get_etag($new, $etag, 1)) {
+    # no change
+    unlink($old);
+    return;
+  }
+  unlink("$new.upd");
   my @s = stat($old);
   die("$old: $!\n") unless @s;
   unlink("$new.etag");
@@ -310,6 +350,25 @@ sub ipfs_fetch {
 
 # Generic url asset support
 
+sub get_git_commit {
+  my ($url, $branch, $tmpdir) = @_;
+  my %refs;
+  my $fd;
+  print "GIT-LS-REMOTE $url".(defined($branch) ? " branch=$branch" : '')."\n" if $Build::Download::debug;
+  my @patterns;
+  push @patterns, 'HEAD' unless defined $branch;
+  push @patterns, 'refs/tags/*', 'refs/heads/*' if defined $branch;
+  open($fd, '-|', 'git', '-C', "$tmpdir", 'ls-remote', $url, @patterns) || return undef;
+  while (<$fd>) {
+    chomp;
+    my @s = split('\t', $_, 2);
+    $refs{$s[1]} = $s[0] if @s == 2;
+  }
+  close($fd);
+  return $refs{'HEAD'} unless defined $branch;
+  return $refs{"refs/heads/$branch"} || $refs{"refs/tags/$branch^{}"};
+}
+
 sub fetch_git_asset {
   my ($assetdir, $asset) = @_;
   my $assetid = $asset->{'assetid'};
@@ -353,6 +412,15 @@ sub fetch_git_asset {
     @cmd = ('git', '-C', "$tmpdir/$file", 'submodule', 'update', '--recursive');
     system(@cmd) && die("git submodule update failed: $?\n");
   } else {
+    my $etag;
+    $etag = get_etag("$adir/$assetid") if !$asset->{'donotpack'} && -s "$adir/$assetid.etag";
+    if ($etag) {
+      my $remoteetag = get_git_commit($url, $branch, $tmpdir);
+      if ($remoteetag && get_etag("$adir/$assetid", $remoteetag, 1)) {
+        PBuild::Util::rm_rf($tmpdir);
+	return;		# no change
+      }
+    }
     print "GIT-CLONE $url".(defined($branch) ? " branch=$branch" : '')."\n" if $Build::Download::debug;
     my @cmd = ('git', '-c', 'advice.detachedHead=false', 'clone', '-q', '--recurse-submodules');
     push @cmd, '-b', $branch if defined $branch;
@@ -406,9 +474,19 @@ sub url_fetch {
       my $assetid = $asset->{'assetid'};
       my $adir = "$assetdir/".substr($assetid, 0, 2);
       PBuild::Util::mkdir_p($adir);
+      my $etag;
+      $etag = get_etag("$adir/$assetid") if -s "$adir/$assetid.etag";
+      my $headers = $etag ? [ 'If-None-Match' => $etag ] : undef;
       my $rh = {};
-      my $code = eval { Build::Download::download($asset->{'url'}, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1, 'replyheaders' => \$rh) };
+      my $code = eval { Build::Download::download($asset->{'url'}, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1, 'notmodifiedok' => ($etag ? 1 : undef), 'headers' => $headers, 'replyheaders' => \$rh) };
       warn($@) if $@;
+      if ($code && $code == 304) {
+	next if get_etag("$adir/$assetid", $etag, 1);
+	# retry without the If-None-Match header
+	undef $etag;
+	$code = eval { Build::Download::download($asset->{'url'}, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1, 'replyheaders' => \$rh) };
+        warn($@) if $@;
+      }
       rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid", $rh->{'etag'}) if $code;
     }
   }

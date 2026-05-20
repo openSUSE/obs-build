@@ -283,10 +283,21 @@ sub move_assets {
       $file .= ".obscpio" if !$unpack;
     }
     rename("$adir/$assetid", "$srcdir/$file") || die("rename $adir/$assetid $srcdir/$file: $!\n");
+    unlink("$adir/$assetid.etag");
   }
   if (has_mutable_assets($assetmgr, $p) && update_srcmd5($assetmgr, $p)) {
     die("had a race in move_assets\n");
   }
+}
+
+#
+# Make sure that an asset will be re-fetched be either deleting it or
+# moving it away
+#
+sub force_update {
+  my ($assetmgr, $asset) = @_;
+  my $assetdir = $assetmgr->{'asset_dir'};
+  PBuild::RemoteAssets::force_update($assetdir, $asset) unless $asset->{'digest'} || $asset->{'immutable'};
 }
 
 1;
