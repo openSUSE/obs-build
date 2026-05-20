@@ -72,8 +72,8 @@ sub checkdigest {
 #
 sub ua_get {
   my ($ua, $url, $maxsize, @hdrs) = @_;
-  my $res;
   print "GET $url\n" if $debug;
+  my $res;
   if (defined($maxsize)) {
     my $oldmaxsize = $ua->max_size($maxsize);
     $res = $ua->get($url, @hdrs);
@@ -82,13 +82,16 @@ sub ua_get {
   } else {
     $res = $ua->get($url, @hdrs);
   }
+  print "-> ".$res->code."\n" if $debug && ($res->code || 200) != 200;
   return $res;
 }
 
 sub ua_head {
   my ($ua, $url, $maxsize, @hdrs) = @_;
   print "HEAD $url\n" if $debug;
-  return $ua->head($url, @hdrs);
+  my $res = $ua->head($url, @hdrs);
+  print "-> ".$res->code."\n" if $debug && ($res->code || 200) != 200;
+  return $res;
 }
 
 #
@@ -108,6 +111,15 @@ sub ua_mirror {
 }
 
 #
+# Return the headers from a reply as hash reference
+#
+sub get_replyheaders {
+  my ($res) = @_;
+  my %rh = $res->flatten();
+  return { map {lc($_) => $rh{$_}} sort keys %rh };
+}
+
+#
 # Download data from a server
 #
 sub fetch {
@@ -120,7 +132,8 @@ sub fetch {
   while (1) {
     $res = ua_get($ua, $url, $opt{'maxsize'}, @accept, @{$opt{'headers'} || []});
     last if $res->is_success;
-    return undef if $opt{'missingok'} && $res->code == 404;
+    return (undef, undef) if $opt{'missingok'} && $res->code == 404;
+    return (undef, 304) if $opt{'notmodifiedok'} && $res->code == 304;
     my $status = $res->status_line;
     die("download of $url failed: $status\n") unless $retry-- > 0 && $res->previous;
     warn("retrying $url\n");
@@ -128,11 +141,7 @@ sub fetch {
   my $data = $res->decoded_content('charset' => 'none');
   my $ct = $res->header('content_type');
   checkdigest($data, $opt{'digest'}) if $opt{'digest'};
-  if ($opt{'replyheaders'}) {
-    my $data = { $res->flatten() };
-    $data = { map {lc($_) => $data->{$_}} sort keys %$data };
-    ${$opt{'replyheaders'}} = $data;
-  }
+  ${$opt{'replyheaders'}} = get_replyheaders($res) if $opt{'replyheaders'};
   return ($data, $ct);
 }
 
@@ -149,13 +158,13 @@ sub head {
   while (1) {
     $res = ua_head($ua, $url, $opt{'maxsize'}, @accept, @{$opt{'headers'} || []});
     last if $res->is_success;
-    return undef if $opt{'missingok'} && $res->code == 404;
+    return (undef, undef) if $opt{'missingok'} && $res->code == 404;
+    return (undef, 304) if $opt{'notmodifiedok'} && $res->code == 304;
     my $status = $res->status_line;
     die("head request of $url failed: $status\n") unless $retry-- > 0 && $res->previous;
     warn("retrying $url\n");
   }
-  my $data = { $res->flatten() };
-  $data = { map {lc($_) => $data->{$_}} sort keys %$data };
+  my $data = get_replyheaders($res);
   my $ct = $res->header('content_type');
   return ($data, $ct);
 }
@@ -184,15 +193,17 @@ sub download {
   my ($url, $dest, $destfinal, %opt) = @_;
   my $ua = $opt{'ua'} || create_ua();
   my $retry = $opt{'retry'} || 0;
+  my $res;
   while (1) {
     unlink($dest);        # just in case
-    my $res = eval { ua_mirror($ua, $url, $dest, $opt{'maxsize'}, @{$opt{'headers'} || []}) };
+    $res = eval { ua_mirror($ua, $url, $dest, $opt{'maxsize'}, @{$opt{'headers'} || []}) };
     if ($@) {
       unlink($dest);
       die($@);
     }
     last if $res->is_success;
     return undef if $opt{'missingok'} && $res->code == 404;
+    return 304 if $opt{'notmodifiedok'} && $res->code == 304;
     my $status = $res->status_line;
     die("download of $url failed: $status\n") unless $retry-- > 0 && $res->previous;
     warn("retrying $url\n");
@@ -209,6 +220,7 @@ sub download {
   if ($destfinal) {
     rename($dest, $destfinal) || die("rename $dest $destfinal: $!\n");
   }
+  ${$opt{'replyheaders'}} = get_replyheaders($res) if $opt{'replyheaders'};
   return 1;
 }
 
