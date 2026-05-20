@@ -68,6 +68,7 @@ my %known_options = (
   'clean' => '',
   'list' => '',
   'unpack' => '',
+  'update' => '',
 
   'arch' => '::',
   'dist' => ':',
@@ -147,6 +148,7 @@ if ($opts->{'help'}) {
 }
 die("Please specify at least one directory\n") unless @dirs;
 die("The --assetdir option conflicts with --noassetdir\n") if $opts->{'assetdir'} && $opts->{'noassetdir'};
+die("Cannot use both --update and --clean\n") if $opts->{'clean'} && $opts->{'update'};
 
 $Build::Download::debug = 1 if $opts->{'debugflags'}->{'network'};
 
@@ -167,7 +169,7 @@ for my $dir (@dirs) {
   my $assetdir = $opts->{'assetdir'} || "$dir/.assets";
   my $outdir = $opts->{'outdir'} || $dir;
   my $assetmgr = PBuild::AssetMgr::create($assetdir);
-  $assetmgr->{'keep_all_assets'} = 1 if $opts->{'clean'};
+  $assetmgr->{'keep_all_assets'} = 1 if $opts->{'clean'} || $opts->{'update'} || $opts->{'list'};
   $assetmgr->add_assetshandler($_) for @{$opts->{'assets'} || []};
   $assetmgr->add_assetshandler($fedpkg) if !$opts->{'assets'} && $files->{'sources'};
   $assetmgr->merge_assets($p, $source_assets);
@@ -183,18 +185,7 @@ for my $dir (@dirs) {
       }
     }
   }
-  if ($opts->{'clean'}) {
-    my $af = $p->{'asset_files'} || {};
-    for (values %$af) {
-      if ($_->{'isdir'}) {
-        PBuild::Util::rm_rf("$dir/$_->{'file'}") if -d "$dir/$_->{'file'}";
-        unlink "$dir/$_->{'file'}.obscpio" if -e "$dir/$_->{'file'}.obscpio";
-      } else {
-        unlink "$dir/$_->{'file'}" if -e "$dir/$_->{'file'}";
-      }
-    }
-    next;
-  }
+
   if ($opts->{'list'}) {
     my $af = $p->{'asset_files'} || {};
     for my $file (sort keys %$af) {
@@ -207,6 +198,26 @@ for my $dir (@dirs) {
     }
     next;
   }
+  if ($opts->{'clean'}) {
+    my $af = $p->{'asset_files'} || {};
+    for (values %$af) {
+      if ($_->{'isdir'}) {
+        PBuild::Util::rm_rf("$dir/$_->{'file'}") if -d "$dir/$_->{'file'}";
+        unlink "$dir/$_->{'file'}.obscpio" if -e "$dir/$_->{'file'}.obscpio";
+      } else {
+        unlink "$dir/$_->{'file'}" if -e "$dir/$_->{'file'}";
+      }
+    }
+    next;
+  }
+
+  if ($opts->{'update'}) {
+    my $af = $p->{'asset_files'} || {};
+    for my $asset (values %$af) {
+      $assetmgr->force_update($asset);
+    }
+  }
+
   if ($opts->{'unpack'} && $opts->{'noassetdir'}) {
     my $af = $p->{'asset_files'} || {};
     for (values %$af) {
