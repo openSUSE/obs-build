@@ -37,16 +37,29 @@ use strict;
 # rename a file unless the target already exists
 #
 sub rename_unless_present {
-  my ($old, $new) = @_;
-  die("link $old $new: $!\n") if !link($old, $new) && $! != POSIX::EEXIST;
-  unlink($old);
+  my ($old, $new, $etag) = @_;
+  if (!$etag) {
+    if (!link($old, $new)) {
+      die("link $old $new: $!\n") if $! != POSIX::EEXIST;
+    } else {
+      unlink("$new.etag");
+    }
+    unlink($old);
+    return;
+  }
+  my @s = stat($old);
+  die("$old: $!\n") unless @s;
+  unlink("$new.etag");
+  rename($old, $new) || die("rename $old $new: $!\n");
+  my $edata = { 'id' => "$s[9]/$s[7]/$s[1]", 'etag' => $etag };
+  PBuild::Util::store("$new.etag.$$", "$new.etag", $edata);
 }
 
 #
 # create a obscpio asset from a directory
 #
 sub create_asset_from_dir {
-  my ($assetdir, $asset, $dir, $mtime) = @_;
+  my ($assetdir, $asset, $dir, $mtime, $etag) = @_;
   my $assetid = $asset->{'assetid'};
   my $adir = "$assetdir/".substr($assetid, 0, 2);
   PBuild::Util::mkdir_p($adir);
@@ -54,7 +67,7 @@ sub create_asset_from_dir {
   open($fd, '>', "$adir/.$assetid.$$") || die("$adir/.$assetid.$$: $!");
   PBuild::Cpio::cpio_create($fd, $dir, 'mtime' => $mtime);
   close($fd) || die("$adir/.$assetid.$$: $!");
-  rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
+  rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid", $etag);
 }
 
 
@@ -299,9 +312,6 @@ sub ipfs_fetch {
 
 sub fetch_git_asset {
   my ($assetdir, $asset) = @_;
-  my $tmpdir = "$assetdir/.tmpdir.$$";
-  PBuild::Util::rm_rf($tmpdir);
-  PBuild::Util::mkdir_p($tmpdir);
   my $assetid = $asset->{'assetid'};
   my $adir = "$assetdir/".substr($assetid, 0, 2);
   my $file = $asset->{'file'};
@@ -319,7 +329,13 @@ sub fetch_git_asset {
     $urlquery =~ s/^\&/?/;
     $url = "$urlpath$urlquery";
   }
+  my $tmpdir = "$assetdir/.tmpdir.$$";
+  PBuild::Util::rm_rf($tmpdir);
+  PBuild::Util::mkdir_p($tmpdir);
+  my $immutable;
   if ($branch =~ /^[0-9a-fA-F]{40,}$/) {
+    print "GIT-CLONE $url commit=$branch\n" if $Build::Download::debug;
+    $immutable = 1;
     my $objectformat = length($branch) == 64 ? 'sha256' : 'sha1';
     my @cmd = ('git', 'init', '-q', "--object-format=$objectformat", "$tmpdir/$file");
     system(@cmd) && die("git init failed: $?\n");
@@ -337,25 +353,30 @@ sub fetch_git_asset {
     @cmd = ('git', '-C', "$tmpdir/$file", 'submodule', 'update', '--recursive');
     system(@cmd) && die("git submodule update failed: $?\n");
   } else {
-    my @cmd = ('git', 'clone', '-q', '--recurse-submodules');
+    print "GIT-CLONE $url".(defined($branch) ? " branch=$branch" : '')."\n" if $Build::Download::debug;
+    my @cmd = ('git', '-c', 'advice.detachedHead=false', 'clone', '-q', '--recurse-submodules');
     push @cmd, '-b', $branch if defined $branch;
     push @cmd, '--', $url, "$tmpdir/$file";
     system(@cmd) && die("git clone failed: $?\n");
   }
-  # get timestamp of last commit
+  # get timestamp and id of last commit
   my $pfd;
-  open($pfd, '-|', 'git', '-C', "$tmpdir/$file", 'log', '--pretty=format:%ct', '-1') || die("open: $!\n");
+  open($pfd, '-|', 'git', '-C', "$tmpdir/$file", 'log', '--pretty=format:%H %ct', '-1') || die("open: $!\n");
   my $t = <$pfd>;
   close($pfd);
   chomp $t;
-  $t = undef unless $t && $t > 0;
+  my @t = split(' ', $t);
+  my $etag = $t[0] if $t[0] && $t[0] =~ /^[0-9a-fA-F]{40,}$/;
+  my $mtime = $t[1] if $t[1] =~ /^\d+$/;
+  $etag = undef if $immutable;	# no need for an etag
   # get rid of .git directory (need to make this optional)
   PBuild::Util::rm_rf("$tmpdir/$file/.git") unless $keepmeta;
   if ($asset->{'donotpack'}) {
     utime($t, $t, "$tmpdir/$file") if defined $t;
+    unlink("$adir/$assetid.etag");
     rename("$tmpdir/$file", "$adir/$assetid") || die("rename $tmpdir $adir/$assetid: $!\n");
   } else {
-    create_asset_from_dir($assetdir, $asset, $tmpdir, $t);
+    create_asset_from_dir($assetdir, $asset, $tmpdir, $mtime, $etag);
   }
   PBuild::Util::rm_rf($tmpdir);
 }
@@ -385,12 +406,10 @@ sub url_fetch {
       my $assetid = $asset->{'assetid'};
       my $adir = "$assetdir/".substr($assetid, 0, 2);
       PBuild::Util::mkdir_p($adir);
-      eval {
-        if (Build::Download::download($asset->{'url'}, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1)) {
-          rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid");
-	}
-      };
+      my $rh = {};
+      my $code = eval { Build::Download::download($asset->{'url'}, "$adir/.$assetid.$$", undef, 'retry' => 3, 'digest' => $asset->{'digest'}, 'missingok' => 1, 'replyheaders' => \$rh) };
       warn($@) if $@;
+      rename_unless_present("$adir/.$assetid.$$", "$adir/$assetid", $rh->{'etag'}) if $code;
     }
   }
 }
