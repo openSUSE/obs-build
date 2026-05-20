@@ -872,7 +872,7 @@ copy_sources() {
     if test -n "$RUNNING_IN_VM" -o -n "$COPY_SOURCES_ASIS" -o -n "$RPM_BUILD_IN_PLACE" ; then
 	image_mode=
 	( shopt -s nullglob ; cp -pRd "$1/".[^.]* "$1/"..?* "$1"/* "$2" )
-    elif test -e "$1/.git" -o -e "$1/.assets"; then
+    elif test -e "$1/.git" ; then
 	# query recipe for directories to copy
 	local dirassets
 	dirassets=$(query_dirassets "$1/$RECIPEFILE")
