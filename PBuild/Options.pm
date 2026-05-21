@@ -131,6 +131,7 @@ my $pbuild_options = {
   'X' => 'extra-packs::',
   'nochangelog' => '',
   'no-nochangelog' => 'nochangelog',
+  'update-assets' => '',
 };
 
 sub debugflags_special {

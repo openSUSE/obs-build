@@ -291,13 +291,15 @@ sub move_assets {
 }
 
 #
-# Make sure that an asset will be re-fetched be either deleting it or
-# moving it away
+# Make sure that the assets of a package will be re-fetched by either deleting
+# them or moving them away
 #
 sub force_update {
-  my ($assetmgr, $asset) = @_;
+  my ($assetmgr, $p) = @_;
   my $assetdir = $assetmgr->{'asset_dir'};
-  PBuild::RemoteAssets::force_update($assetdir, $asset) unless $asset->{'digest'} || $asset->{'immutable'};
+  for my $asset (values %{$p->{'asset_files'} || {}}) {
+    PBuild::RemoteAssets::force_update($assetdir, $asset) unless $asset->{'digest'} || $asset->{'immutable'};
+  }
 }
 
 1;

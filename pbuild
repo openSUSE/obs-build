@@ -382,6 +382,14 @@ for my $pkg (@pkgs) {
   $assetmgr->find_assets($pkgsrc{$pkg});
 }
 
+# force asset updating if requested
+if ($opts->{'update-assets'}) {
+  for my $pkg (@pkgs) {
+    next if $opts->{'single'} && $pkg ne $opts->{'single'};
+    $assetmgr->force_update($pkgsrc{$pkg});
+  }
+}
+
 # calculate useforbuildenabled flag
 for my $pkg (@pkgs) {
   my $p = $pkgsrc{$pkg};

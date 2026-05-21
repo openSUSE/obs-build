@@ -211,12 +211,7 @@ for my $dir (@dirs) {
     next;
   }
 
-  if ($opts->{'update'}) {
-    my $af = $p->{'asset_files'} || {};
-    for my $asset (values %$af) {
-      $assetmgr->force_update($asset);
-    }
-  }
+  $assetmgr->force_update($p) if $opts->{'update'};
 
   if ($opts->{'unpack'} && $opts->{'noassetdir'}) {
     my $af = $p->{'asset_files'} || {};
