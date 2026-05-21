@@ -21,7 +21,6 @@
 package Build::Mdkrepo;
 
 use strict;
-#use Data::Dumper;
 
 sub addpkg {
   my ($res, $data, $options) = @_;
@@ -92,6 +91,10 @@ sub parse {
       $s->{'obsoletes'} = parsedeps(substr($_, 11));
     } elsif (/^\@conflicts\@/) {
       $s->{'conflicts'} = parsedeps(substr($_, 11));
+    } elsif (/^\@supplements\@/) {
+      $s->{'supplements'} = parsedeps(substr($_, 13));
+    } elsif (/^\@enhances\@/) {
+      $s->{'enhances'} = parsedeps(substr($_, 10));
     } elsif (/^\@info\@/) {
       $s ||= {};
       my @s = split('@', substr($_, 6));
