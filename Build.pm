@@ -545,6 +545,7 @@ sub read_config {
       $config->{'singleexport'} = $l[0]; # avoid to export multiple package container in maintenance_release projects
     } elsif ($l0 eq 'fromscratch:') {
       $config->{'parse_error'} = 'FromScratch directive must come first' if $no_from_scratch;
+      next;
     } elsif ($l0 =~ /^[#%]/) {
       next;
     } else {
