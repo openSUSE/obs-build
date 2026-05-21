@@ -58,6 +58,16 @@ sub readstr {
   return $d;
 }
 
+sub appendstr {
+  my ($fn, $d) = @_;
+  my $f;
+  open($f, '>>', $fn) || die("$fn: $!\n");
+  if (length($d)) {
+    (syswrite($f, $d) || 0) == length($d) || die("$fn write: $!\n");
+  }
+  close($f) || die("$fn close: $!\n");
+}
+
 sub touch($) {
   my ($file) = @_;
   if (-e $file) {
