@@ -889,4 +889,35 @@ sub build {
   return ('building', $job);
 }
 
+#
+# Store the generated buildreq list into the package data
+#
+sub set_genbuildreqs {
+  my ($ctx, $p, $file) = @_;
+  my $pkg = $p->{'pkg'};
+  my $genbuildreqs = ($ctx->{'genbuildreqs'} ||= {});
+  my $filecontent = $file ? PBuild::Util::readstr($file, 1) : undef;
+  if (defined $filecontent) {
+    my $verifymd5 = $p->{'verifymd5'} || $p->{'srcmd5'};
+    $genbuildreqs->{$pkg} = $p->{'genbuildreqs'} = [ Digest::MD5::md5_hex($filecontent), [ split("\n", $filecontent) ], $verifymd5 ]
+  } else {
+    delete $p->{'genbuildreqs'};
+    delete $genbuildreqs->{$pkg};
+  }
+}
+
+#
+# Wait for a building job to finish, return undef if no job is building
+#
+sub waitjob {
+  my ($ctx, $builders) = @_;
+  my @building = map {$_->{'job'}} grep {$_->{'job'}} @$builders;
+  return undef unless @building;
+  my $job = PBuild::Job::waitjob($ctx->{'opts'}, @building);
+  for (@$builders) {
+    delete $_->{'job'} if $_->{'job'} && $_->{'job'} == $job;
+  }
+  return $job;
+}
+
 1;

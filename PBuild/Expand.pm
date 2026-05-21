@@ -126,9 +126,7 @@ sub expand_deps {
     $p->{'dep_expanded'} = \@deps;
     return;
   }
-  if ($p->{'genbuildreqs'}) {
-    push @deps, @{$p->{'genbuildreqs'}};
-  }
+  push @deps, @{$p->{'genbuildreqs'}->[1]} if $p->{'genbuildreqs'};
   my @edeps;
   if ($cross) {
     my @native;

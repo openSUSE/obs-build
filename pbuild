@@ -472,6 +472,17 @@ if (-s "$builddir/.pbuild/_lastcheck") {
   }
 }
 
+# load genbuildreqs cache
+my %genbuildreqs;
+if (-s "$builddir/.pbuild/_genbuildreqs") {
+  my $oldgenbuildreqs = PBuild::Util::retrieve("$builddir/.pbuild/_genbuildreqs", 1) || {};
+  for my $pkg (grep {$oldgenbuildreqs->{$_}} @pkgs) {
+    my $old = $oldgenbuildreqs->{$pkg};
+    my $p = $pkgsrc{$pkg};
+    $genbuildreqs{$pkg} = $p->{'genbuildreqs'} = $old if @$old == 3 && $old->[2] eq ($p->{'verifymd5'} || $p->{'srcmd5'});
+  }
+}
+
 # tweak package list if we're just looking at one package
 if ($opts->{'single'}) {
   my $pkg = $opts->{'single'};
@@ -510,6 +521,7 @@ while (1) {
   # create and setup checker
   if (!$ctx) {
     $ctx = PBuild::Checker::create($bconf, $myarch, $buildtype, \%pkgsrc, $builddir, $opts, $repomgr, $assetmgr);
+    $ctx->{'genbuildreqs'} = \%genbuildreqs;
     $ctx->{'hostarch'} = $hostarch;
     $ctx->{'bconf_host'} = $bconf_host if $cross;
     print "preparing package pool\n" unless $runs;
@@ -538,14 +550,18 @@ while (1) {
   if ($opts->{'extra-packs'}) {
     my $pkg = $opts->{'single'};
     die unless $pkg;
-    my $code = $result->{$pkg}->{'code'};
-    my $details = '';
+    my ($code, $details) = ($result->{$pkg}->{'code'}, $result->{$pkg}->{'details'});
     if ($code eq 'building') {
-      my @building = map {$_->{'job'}} grep {$_->{'job'}} @builders;
-      my $job = PBuild::Job::waitjob($opts, @building);
-      ($code) = PBuild::Job::finishjob($job);
-    } else {
-      $details = ": $result->{$pkg}->{'details'}" if $result->{$pkg}->{'details'};
+      my $job = $ctx->waitjob(\@builders);
+      my $buildresult;
+      ($code, $buildresult) = PBuild::Job::finishjob($job);
+      $details = undef;
+      if ($code eq 'genbuildreqs') {
+	print "$pkg: $code$details\n";
+	$ctx->set_genbuildreqs($job->{'pdata'}, $buildresult->{'_generated_buildreqs'});
+	undef $ctx;
+	next;
+      }
     }
     print "$pkg: $code$details\n";
     exit PBuild::Result::has_failed_code($opts, $code);
@@ -557,10 +573,9 @@ while (1) {
     my $oldresult = PBuild::Util::retrieve("$builddir/.pbuild/_result", 1) || {};
     $oldresult->{$pkg} = $result->{$pkg};
     $result = $oldresult;
-    my $code = $result->{$pkg}->{'code'};
+    my ($code, $details) = ($result->{$pkg}->{'code'}, $result->{$pkg}->{'details'});
     if ($code ne 'failed' && $code ne 'succeeded' && $code ne 'building') {
-      $code .= ": $result->{$pkg}->{'details'}" if $result->{$pkg}->{'details'};
-      print "$pkg: $code\n";
+      print "$pkg: $code".($details ? " ($details)" : '')."\n";
     }
   }
 
@@ -569,15 +584,10 @@ while (1) {
   PBuild::Util::store("$builddir/.pbuild/._result.$$", "$builddir/.pbuild/_result", $result);
   PBuild::Util::store("$builddir/.pbuild/._lastcheck.$$", "$builddir/.pbuild/_lastcheck", \%lastcheck);
 
-  # get list of building jobs
-  my @building = map {$_->{'job'}} grep {$_->{'job'}} @builders;
-  last unless @building;
-
   # wait for one job to finish
-  my $job = PBuild::Job::waitjob($opts, @building);
-  for (@builders) {
-    delete $_->{'job'} if $_->{'job'} && $_->{'job'} == $job;
-  }
+  my $job = $ctx->waitjob(\@builders);
+  last unless $job;
+
   # process finished job
   my ($code, $buildresult) = PBuild::Job::finishjob($job);
   my $p = $job->{'pdata'};
@@ -596,6 +606,13 @@ while (1) {
   my $jobhist = PBuild::BuildResult::makejobhist($p, $code, $job->{'readytime'}, $job->{'starttime'}, $job->{'endtime'}, $job->{'reason'}, $job->{'hostarch'});
   PBuild::BuildResult::addjobhist($builddir, $jobhist);
 
+  if ($code eq 'genbuildreqs') {
+    $ctx->set_genbuildreqs($p, $buildresult->{'_generated_buildreqs'});
+    # write genbuildreqs cache
+    PBuild::Util::store("$builddir/.pbuild/._genbuildreqs.$$", "$builddir/.pbuild/_genbuildreqs", \%genbuildreqs);
+    undef $ctx;		# we need a new checker as we have to expand again
+    next;
+  }
   # integrate build artifacts and extra files
   my $bininfo = PBuild::BuildResult::integrate_job($builddir, $job, $code, $buildresult);
 

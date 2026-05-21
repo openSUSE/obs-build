@@ -80,10 +80,11 @@ sub updatelines {
 }
 
 #
-# Wait for one or more build jobs to finish
+# Wait for a build job to finish
 #
 sub waitjob {
   my ($opts, @jobs) = @_;
+  die("waitjob called with no jobs\n") unless @jobs;
   local $| = 1;
   my $oldmsg;
   while (1) {
@@ -442,9 +443,6 @@ sub finishjob {
     print $ll if $ll;
     die("fatal build error, see $buildroot/.build.log for more information\n");
   }
-  if ($ret == 3) {
-    $ret = 1;	# map badhost to build failure
-  }
 
   rename_build_result($vm, $buildroot) if $ret == 0 || $ret == 9;
 
@@ -454,8 +452,25 @@ sub finishjob {
     $ret = 1;
   }
 
-  if ($ret == 9) {
-    die("XXX: dynamic buildreqs not implemented yet");
+  if ($ret != 3 && -e "$buildroot/.build.packages/OTHER/_generated_buildreqs") {
+    my $genbuildreqs;
+    if (-s "$buildroot/.build.packages/OTHER/_generated_buildreqs" > 100000) {
+      PBuild::Util::appendstr("$buildroot/.build.log", "\n_generated_buildreqs size error\n");
+      $ret = 1;
+    } else {
+      $genbuildreqs = PBuild::Util::readstr("$buildroot/.build.packages/OTHER/_generated_buildreqs");
+      if ($genbuildreqs =~ /[^\n\040-\176]/s) {
+        PBuild::Util::appendstr("$buildroot/.build.log", "\n_generated_buildreqs contains invalid characters\n");
+	$genbuildreqs = undef;
+	$ret = 1;
+      }
+    }
+    if (defined($genbuildreqs) && Digest::MD5::md5_hex($genbuildreqs) ne (($p->{'genbuildreqs'} || [])->[0] || '')) {
+      return ('genbuildreqs', {'_generated_buildreqs' => "$buildroot/.build.packages/OTHER/_generated_buildreqs"});
+    }
+  }
+  if ($ret == 3) {
+    $ret = 1;	# map badhost to build failure
   }
   if ($ret) {
     my $result = { '_log' => "$buildroot/.build.log" };
