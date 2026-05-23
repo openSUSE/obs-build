@@ -123,6 +123,7 @@ recipe_set_buildtype() {
         *.dsc) BUILDTYPE=dsc ;;
         *.kiwi) BUILDTYPE=kiwi ;;
         *.productcompose) BUILDTYPE=productcompose ;;
+        SRCINFO) BUILDTYPE=arch ;;
         PKGBUILD) BUILDTYPE=arch ;;
         APKBUILD) BUILDTYPE=apk ;;
         snapcraft.yaml) BUILDTYPE=snapcraft ;;
