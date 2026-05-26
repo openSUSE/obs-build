@@ -42,8 +42,9 @@ use PBuild::Util;
 use PBuild::Verify;
 use PBuild::OBS;
 use PBuild::Cando;
+use PBuild::Common;
 
-my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst apk};
+my @binsufs = @PBuild::Common::binsufs;
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
 
 sub open_uncompressed {

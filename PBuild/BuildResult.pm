@@ -29,8 +29,9 @@ use PBuild::Util;
 use PBuild::Verify;
 use PBuild::Container;
 use PBuild::Mkosi;
+use PBuild::Common;
 
-my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst apk};
+my @binsufs = @PBuild::Common::binsufs;
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
 
 #

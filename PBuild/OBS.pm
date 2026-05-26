@@ -30,10 +30,11 @@ use PBuild::Verify;
 use PBuild::Cpio;
 use PBuild::Structured;
 use PBuild::SigAuth;
+use PBuild::Common;
 
 my $cookie_jar;
 
-my @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst apk};
+my @binsufs = @PBuild::Common::binsufs;
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
 
 my @dtd_disableenable = (
