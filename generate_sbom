@@ -1096,7 +1096,6 @@ if ($opts->{'type'} eq 'product') {
 } elsif ($opts->{'type'} eq 'rpmmd') {
   $targettype = 'library';
   require Build::Rpmmd;
-  my $primary;
   if (-d $toprocess) {
     $toprocess = "$toprocess/repodata" unless -f "$toprocess/repomd.xml";
     my %d = map {$_->{'type'} => $_} @{Build::Rpmmd::parse_repomd("$toprocess/repomd.xml")};
