@@ -1367,7 +1367,7 @@ sub query {
     $binname = $binname->[0];
   }
   return Build::Rpm::query($handle, %opts) if $do_rpm && $binname =~ /\.d?rpm$/;
-  return Build::Deb::query($handle, %opts) if $do_deb && $binname =~ /\.deb$/;
+  return Build::Deb::query($handle, %opts) if $do_deb && $binname =~ /\.d?deb$/;
   return Build::Kiwi::queryiso($handle, %opts) if $do_kiwi && $binname =~ /\.iso$/;
   return Build::Arch::query($handle, %opts) if $do_arch && $binname =~ /\.pkg\.tar(?:\.gz|\.xz|\.zst)?$/;
   return Build::Arch::query($handle, %opts) if $do_arch && $binname =~ /\.arch$/;
@@ -1396,7 +1396,7 @@ sub showquery {
 sub queryhdrmd5 {
   my ($binname) = @_;
   return Build::Rpm::queryhdrmd5(@_) if $do_rpm && $binname =~ /\.d?rpm$/;
-  return Build::Deb::queryhdrmd5(@_) if $do_deb && $binname =~ /\.deb$/;
+  return Build::Deb::queryhdrmd5(@_) if $do_deb && $binname =~ /\.d?deb$/;
   return Build::Kiwi::queryhdrmd5(@_) if $do_kiwi && $binname =~ /\.iso$/;
   return Build::Kiwi::queryhdrmd5(@_) if $do_kiwi && $binname =~ /\.raw$/;
   return Build::Kiwi::queryhdrmd5(@_) if $do_kiwi && $binname =~ /\.raw.install$/;
