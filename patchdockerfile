@@ -39,6 +39,11 @@ for my $s (@sections) {
     print join('', @$s);
     next;
   }
+  # also check if the user disabled it in the line right after the FROM
+  if (@$s > 1 && $s->[1] =~ /^#!DisableOBSContainerSupport\s*$/) {
+    print join('', @$s);
+    next;
+  }
   my $do_upload_packages = $s == $sections[-1] ? '--upload-packages ' : '';
   # do not install docker support if no RUN is used and we do not want the package list
   if (!$do_upload_packages && !grep {/^\s*RUN/i} @$s) {
