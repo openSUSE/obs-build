@@ -137,7 +137,7 @@ sub systemq {
     die("$_[0]: $!\n");
   }
   waitpid($pid, 0) == $pid || die("waitpid: $!\n");
-  exit($?) if $?;
+  exit(1) if $?;
 }
 
 
@@ -167,7 +167,7 @@ sub uncompress_container {
     die("$decompressor[0]: $!\n");
   }
   waitpid($pid, 0) == $pid || die("waitpid: $!\n");
-  exit($?) if $?;
+  exit(1) if $?;
 }
 
 sub unpack_container {
@@ -343,7 +343,7 @@ sub dump_rpmdb {
         } else {
           system_chroot($root, 'stdout', $outfile, '/usr/bin/rpmdb', '--exportdb');
         }
-        exit($?) if $?;
+        exit(1) if $?;
         return;
       }
     }
