@@ -60,6 +60,12 @@ kvm_check_hugetlb() {
     fi
 }
 
+vm_set_fallback_guest_kvm() {
+	    test -e /boot/kernel.obs.guest && vm_kernel=/boot/kernel.obs.guest
+	    test -e /boot/initrd.obs.guest && vm_initrd=/boot/initrd.obs.guest
+	    test -e /boot/cmdline.obs.guest && vm_cmdline=$(cat /boot/cmdline.obs.guest)
+}
+
 vm_verify_options_kvm() {
     if test -n "$KILL" -o -n "$DO_WIPE" ; then
 	return
@@ -82,8 +88,7 @@ vm_verify_options_kvm() {
 	    kvm_options="-enable-kvm -M virt"
 	    vm_kernel=/boot/zImage
 	    vm_initrd=/boot/initrd
-	    test -e /boot/kernel.obs.guest && vm_kernel=/boot/kernel.obs.guest
-	    test -e /boot/initrd.obs.guest && vm_initrd=/boot/initrd.obs.guest
+	    vm_set_fallback_guest_kvm
 	    # prefer the guest kernel/initrd
 	    test -e /boot/zImage.guest && vm_kernel=/boot/zImage.guest
 	    test -e /boot/initrd.guest && vm_initrd=/boot/initrd.guest
@@ -96,8 +101,7 @@ vm_verify_options_kvm() {
 	    kvm_options="-enable-kvm"
 	    vm_kernel=/boot/Image
 	    vm_initrd=/boot/initrd
-	    test -e /boot/kernel.obs.guest && vm_kernel=/boot/kernel.obs.guest
-	    test -e /boot/initrd.obs.guest && vm_initrd=/boot/initrd.obs.guest
+	    vm_set_fallback_guest_kvm
 	    if test "${BUILD_ARCH#aarch}" != "$BUILD_ARCH" -o "${BUILD_ARCH#armv8}" != "$BUILD_ARCH"; then
 		test -e /boot/Image.guest && vm_kernel=/boot/Image.guest
 		test -e /boot/initrd.guest && vm_initrd=/boot/initrd.guest
@@ -140,8 +144,7 @@ vm_verify_options_kvm() {
 	    grep -q PPC970MP /proc/cpuinfo && kvm_check_ppc970
 	    vm_kernel=/boot/vmlinux
 	    vm_initrd=/boot/initrd
-	    test -e /boot/kernel.obs.guest && vm_kernel=/boot/kernel.obs.guest
-	    test -e /boot/initrd.obs.guest && vm_initrd=/boot/initrd.obs.guest
+	    vm_set_fallback_guest_kvm
 	    if test "$BUILD_ARCH" = ppc64le -a -e /boot/vmlinuxle ; then
 		vm_kernel=/boot/vmlinuxle
 		vm_initrd=/boot/initrdle
@@ -161,8 +164,7 @@ vm_verify_options_kvm() {
 	    kvm_console=hvc0
 	    vm_kernel=/boot/image
 	    vm_initrd=/boot/initrd
-	    test -e /boot/kernel.obs.guest && vm_kernel=/boot/kernel.obs.guest
-	    test -e /boot/initrd.obs.guest && vm_initrd=/boot/initrd.obs.guest
+	    vm_set_fallback_guest_kvm
 	    kvm_device=virtio-blk-ccw
 	    kvm_serial_device=virtio-serial-ccw
 	    kvm_rng_device=virtio-rng-ccw
@@ -182,8 +184,7 @@ vm_verify_options_kvm() {
 	    kvm_options="-M virt,accel=kvm"
 	    vm_kernel=/boot/Image
 	    vm_initrd=/boot/initrd
-	    test -e /boot/kernel.obs.guest && vm_kernel=/boot/kernel.obs.guest
-	    test -e /boot/initrd.obs.guest && vm_initrd=/boot/initrd.obs.guest
+	    vm_set_fallback_guest_kvm
 	    kvm_device=virtio-blk-device
 	    kvm_serial_device=virtio-serial-device,max_ports=2
 	    kvm_console=hvc0
@@ -207,6 +208,9 @@ vm_verify_options_kvm() {
     if test -z "$vm_kernel" ; then
 	vm_kernel=/boot/vmlinuz
 	test -e /boot/kernel.obs.guest && vm_kernel=/boot/kernel.obs.guest
+	if test -z "$vm_cmdline" ; then
+	    test -e /boot/cmdline.obs.guest && vm_cmdline=$(cat /boot/cmdline.obs.guest)
+	fi
     fi
 
     # set initrd
