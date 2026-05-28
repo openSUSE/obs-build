@@ -124,6 +124,7 @@ sub cmd_zypper {
     }
     while (@args) {
       my $d = shift @args;
+      next unless $d =~ /^[a-zA-Z_0-9]/;
       if (@args && $d !~ /^[<=>]/ && $args[0] =~ /^[<=>]/) {
 	$d .= shift @args;
 	$d .= shift @args if @args && $d =~ /[<=>]$/;
