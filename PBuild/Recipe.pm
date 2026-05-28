@@ -106,6 +106,7 @@ sub find_recipe {
 #
 sub parse {
   my ($bconf, $p, $buildtype, $arch, $bconf_host, $arch_host) = @_;
+  return if $p->{'error'};
   if ($p->{'pkg'} eq '_product') {
     $p->{'error'} = 'excluded';
     return;

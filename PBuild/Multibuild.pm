@@ -79,7 +79,9 @@ sub expand_multibuilds {
       my $mpkg = "$pkg:$flavor";
       $pkgs->{$mpkg} = { %$p, 'pkg' => $mpkg, 'flavor' => $flavor, 'originpackage' => $pkg };
     }
-    delete $pkgs->{$pkg} if @mbp && !$buildemptyflavor;
+    if (defined($mb->{'buildemptyflavor'}) && ($mb->{'buildemptyflavor'} eq '0' || $mb->{'buildemptyflavor'} eq 'false')) {
+      $p->{'error'} = 'excluded';
+    }
   }
 }
 
