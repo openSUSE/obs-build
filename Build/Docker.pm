@@ -122,9 +122,15 @@ sub cmd_zypper {
       shift @args if $args[0] =~ /^--(?:from|repo|type)$/ || $args[0] =~ /^-[tr]$/;
       shift @args;
     }
-    my @deps = grep {/^[a-zA-Z_0-9]/} @args;
-    s/^([^<=>]+)([<=>]+)/$1 $2 / for @deps;
-    push @{$ret->{'deps'}}, @deps;
+    while (@args) {
+      my $d = shift @args;
+      if (@args && $d !~ /^[<=>]/ && $args[0] =~ /^[<=>]/) {
+	$d .= shift @args;
+	$d .= shift @args if @args && $d =~ /[<=>]$/;
+      }
+      $d =~ s/^([^<=> ]+) *([<=>]+) */$1 $2 /;
+      push @{$ret->{'deps'}}, $d;
+    }
   } elsif ($args[0] eq 'ar' || $args[0] eq 'addrepo') {
     my $prio;
     shift @args;
