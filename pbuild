@@ -563,7 +563,7 @@ while (1) {
 	next;
       }
     }
-    print "$pkg: $code$details\n";
+    print "$pkg: $code".($details ? " ($details)" : '')."\n";
     exit PBuild::Result::has_failed_code($opts, $code);
   }
 
