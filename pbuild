@@ -67,8 +67,10 @@ $dir =~ s/(.)\/+$/$1/s;
 my $root_dir = PBuild::Source::find_root_dir($dir);
 $root_dir = $1 if !$root_dir && PBuild::Recipe::looks_like_packagedir($dir) && $dir =~ /^(.*)\/[^\/]+$/;
 if ($root_dir && $dir ne $root_dir) {
-  $opts->{'single'} = $1 if !exists($opts->{'single'}) && $dir =~ /\/([^\/]+)$/;
-  $dir = $root_dir;
+  if (!exists($opts->{'single'}) && $dir =~ /\/([^\/]+)$/) {
+    $opts->{'single'} = $1;
+    delete $opts->{'single-flavor'};
+  }
 }
 
 if ($opts->{'list-presets'}) {
@@ -112,6 +114,7 @@ die("Option --extra-packs only works with --single\n") if $opts->{'extra-packs'}
 $opts->{'showlog'} = 1 if $opts->{'shell'} || $opts->{'shell-after-fail'};
 $opts->{'showlog'} = 1 if $opts->{'single'} && !defined($opts->{'showlog'});
 $opts->{'buildjobs'} = 1 if $opts->{'showlog'} || $opts->{'single'};
+$opts->{'single'} .= ":$opts->{'single-flavor'}" if $opts->{'single'} && $opts->{'single-flavor'};
 
 # set defaults
 $opts->{'libbuild'} = $libbuild;
@@ -322,10 +325,7 @@ if ($nmultibuild) {
 }
 
 # make sure that we know the package if --single is used
-if ($opts->{'single'}) {
-  $opts->{'single'} .= ":$opts->{'single-flavor'}" if $opts->{'single-flavor'};
-  die("--single: unknown package $opts->{'single'}\n") if !$pkgsrc{$opts->{'single'}};
-}
+die("--single: unknown package $opts->{'single'}\n") if $opts->{'single'} && !$pkgsrc{$opts->{'single'}};
 
 @pkgs = sort keys %pkgsrc;
 
