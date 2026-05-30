@@ -389,6 +389,14 @@ create_devs() {
 DEVLIST
 }
 
+create_dev_fd_links() {
+    mkdir -m 755 -p -- "$BUILD_ROOT/dev"
+    test -e "$BUILD_ROOT/dev/fd"     || ln -s /proc/self/fd "$BUILD_ROOT/dev/fd"
+    test -e "$BUILD_ROOT/dev/stdin"  || ln -s fd/0 "$BUILD_ROOT/dev/stdin"
+    test -e "$BUILD_ROOT/dev/stdout" || ln -s fd/1 "$BUILD_ROOT/dev/stdout"
+    test -e "$BUILD_ROOT/dev/stderr" || ln -s fd/2 "$BUILD_ROOT/dev/stderr"
+}
+
 # check whether the repo list contains a plain "zypp://". Add all
 # enabled zypp repos in this case
 expand_plain_zypp_repo() {
@@ -957,7 +965,8 @@ if test ! -e $BUILD_ROOT/installed-pkg -a ! -e $BUILD_ROOT/.build/init_buildsyst
     # for reorder
     check_exit
     if test -w /root ; then
-	test -c $BUILD_ROOT/dev/null || create_devs
+	test -c "$BUILD_ROOT/dev/null" || create_devs
+	create_dev_fd_links
     fi
     if ! test -e $BUILD_ROOT/etc/fstab ; then
 	rm -rf $BUILD_ROOT/etc/fstab
@@ -1223,7 +1232,8 @@ if test -n "$PACKAGES_TO_SYSROOTINSTALL" ; then
 fi
 
 # devices can vanish if devs got uninstalled
-test -c $BUILD_ROOT/dev/null || create_devs
+test -c "$BUILD_ROOT/dev/null" || create_devs
+create_dev_fd_links
 
 cd $BUILD_ROOT || cleanup_and_exit 1
 
