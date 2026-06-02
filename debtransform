@@ -558,6 +558,13 @@ if ($tarfile =~ /\.tar\.xz/) {
     print "converting $dir/$old to $tarfile\n";
     system( ( "debtransformxz", "$dir/$old", "$tmptar" )) == 0 || die("cannot transform .tar.xz to .tar.gz");
 }
+if ($tarfile =~ /\.tar\.zst/) {
+    my $old = $tarfile;
+    $tarfile =~ s/\.tar\.zst/\.tar\.gz/;
+    $tmptar = "$out/$tarfile";
+    print "converting $dir/$old to $tarfile\n";
+    system( ( "debtransformzst", "$dir/$old", "$tmptar" )) == 0 || die("cannot transform .tar.zst to .tar.gz");
+}
 if ($tarfile =~ /\.zip/) {
     my $old = $tarfile;
     $tarfile =~ s/\.zip/\.tar\.gz/;
