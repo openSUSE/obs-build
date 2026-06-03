@@ -78,6 +78,9 @@ recipe_prepare_dsc() {
     if test "$RECIPEFILE" = debian/control -o "$RECIPEFILE" = debian.control ; then
 	dsc_export_origtar
 	mv $BUILD_ROOT$DEB_SOURCEDIR $BUILD_ROOT$TOPDIR/BUILD
+	# dpkg-buildpackage will fail if unknown files are in the build directory,
+	# so remove the .obsinfo file that gets added when building scmsync packages
+	rm -f "$BUILD_ROOT$TOPDIR/BUILD/_scmsync.obsinfo"
 	if test -d $BUILD_ROOT$TOPDIR/BUILD/debian ; then
 	    for f in debian.control debian.changelog ; do
 		test -f $BUILD_ROOT$TOPDIR/BUILD/$f || continue
