@@ -182,6 +182,10 @@ recipe_resultdirs_mkosi() {
     :
 }
 
+recipe_compare_oldpackages_mkosi() {
+    :
+}
+
 recipe_cleanup_mkosi() {
     :
 }

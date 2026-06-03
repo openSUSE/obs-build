@@ -290,6 +290,10 @@ recipe_resultdirs_livebuild() {
     :
 }
 
+recipe_compare_oldpackages_livebuild() {
+    :
+}
+
 recipe_cleanup_livebuild() {
     :
 }

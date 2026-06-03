@@ -78,6 +78,10 @@ recipe_resultdirs_preinstallimage() {
     :
 }
 
+recipe_compare_oldpackages_preinstallimage() {
+    :
+}
+
 recipe_cleanup_preinstallimage() {
     :
 }

@@ -51,6 +51,10 @@ recipe_resultdirs_debbuild() {
     echo DEBS SDEBS
 }
 
+recipe_compare_oldpackages_debbuild() {
+    recipe_compare_oldpackages_dsc "$@"
+}
+
 recipe_cleanup_debbuild() {
     :
 }

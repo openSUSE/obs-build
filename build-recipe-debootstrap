@@ -111,6 +111,10 @@ recipe_resultdirs_debootstrap() {
     echo DEBS
 }
 
+recipe_compare_oldpackages_debootstrap() {
+    :
+}
+
 recipe_cleanup_debootstrap() {
     :
 }

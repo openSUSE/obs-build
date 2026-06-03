@@ -58,6 +58,10 @@ recipe_resultdirs_arch() {
     echo ARCHPKGS
 }
 
+recipe_compare_oldpackages_arch() {
+    :
+}
+
 recipe_cleanup_arch() {
     :
 }

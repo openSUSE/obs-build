@@ -61,6 +61,10 @@ recipe_resultdirs_apk() {
     echo APKS
 }
 
+recipe_compare_oldpackages_apk() {
+    :
+}
+
 recipe_cleanup_apk() {
     :
 }

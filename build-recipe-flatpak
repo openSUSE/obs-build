@@ -99,6 +99,10 @@ recipe_resultdirs_flatpak() {
     :
 }
 
+recipe_compare_oldpackages_flatpak() {
+    :
+}
+
 recipe_cleanup_flatpak() {
     :
 }
