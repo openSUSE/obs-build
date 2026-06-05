@@ -21,7 +21,12 @@
 ################################################################
 
 BEGIN {
-  unshift @INC, ($::ENV{'BUILD_DIR'} || '/usr/lib/build');
+  if (!$::ENV{'BUILD_DIR'} && $0 ne '-' && $0 ne '-e' && -e $0 && ! -e '/etc/build.conf') {
+    use Cwd ();
+    my $p = Cwd::abs_path($0);
+    $::ENV{'BUILD_DIR'} = $p if $p =~ s/\/[^\/]+$// && $p ne '/usr/lib/build' && -d "$p/Build";
+  }
+  unshift @INC, ($::ENV{'BUILD_DIR'} && ! -e '/etc/build.conf' ? $::ENV{'BUILD_DIR'} : '/usr/lib/build');
 }
 
 use strict;
