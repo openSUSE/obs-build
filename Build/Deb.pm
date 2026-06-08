@@ -71,6 +71,7 @@ sub obsarch {
 
 sub parse {
   my ($bconf, $fn) = @_;
+  my $buildflavor = defined($bconf->{'buildflavor'}) ? $bconf->{'buildflavor'} : '';
 
   # get arch and os from macros and map to debian names
   my ($arch, $os) = Build::gettargetarchos($bconf);
@@ -86,6 +87,11 @@ sub parse {
     @control = <F>;
     close F;
     chomp @control;
+  }
+  if ($buildflavor ne '') {
+    s/\@BUILD_FLAVOR\@/$buildflavor/g for @control;
+  } else {
+    s/\@BUILD_FLAVOR\@//g for @control;
   }
   splice(@control, 0, 3) if @control > 3 && $control[0] =~ /^-----BEGIN/;
   my $name;

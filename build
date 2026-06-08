@@ -430,8 +430,9 @@ Known Parameters:
               Enable creation of debuginfo packages
 
   --buildflavor FLAVOR
-              Specify the flavor to build. For rpm builds, it replaces 
-              the @BUILD_FLAVOR@ macro in the spec file.
+              Specify the flavor to build. For rpm builds, it replaces
+              @BUILD_FLAVOR@ in the spec file. For Debian dependency
+              parsing, it replaces @BUILD_FLAVOR@ in control metadata.
 
   --changelog
               Append the rpm changelog from a SUSE .changes file to the spec file
