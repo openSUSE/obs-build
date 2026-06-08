@@ -389,3 +389,12 @@ recipe_move_assets() {
     done
 }
 
+recipe_mark_same_result() {
+    chroot $BUILD_ROOT touch /.build/.same_result_marker
+    chroot $BUILD_ROOT touch /.build.packages/same_result_marker
+    # dirty build service hack. return exit status 2 to bs_worker for unchanged builds
+    case "$REASON" in
+	Building\ *\ for\ project\ *\ repository\ *\ srcmd5\ *) exitcode=2 ;;
+    esac
+}
+
