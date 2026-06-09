@@ -274,10 +274,18 @@ sub urldecode {
 }
 
 sub plural {
-  my ($n, $what) = @_;
-  return "$n $what" if $n == 1;
-  return "$n ${what}ies" if $what =~ s/y$//;
-  return "$n ${what}s";
+  my ($n, $what, $nstr) = @_;
+  $nstr = "$n " unless defined $nstr;
+  return "$nstr$what" if $n == 1;
+  return "$nstr${what}ies" if $what =~ s/y$//;
+  return "$nstr${what}s";
+}
+
+sub duration {
+  my ($t) = @_;
+  return sprintf("%ds", $t % 60) if $t < 60;
+  return sprintf("%dm%02ds", int($t/ 60), $t % 60) if $t < 3600;
+  return sprintf("%dh%02dm%02ds", int($t / 3600), int($t / 60) % 60, $t % 60);
 }
 
 1;

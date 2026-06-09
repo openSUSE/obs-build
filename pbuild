@@ -433,7 +433,7 @@ my $repomgr = PBuild::RepoMgr::create();
 my @repos;
 my @hostrepos;
 if (!$opts->{'orphan'}) {
-  print "fetching metadata of the local ".(@pkgs_native ? 'repos' : 'repo')."\n";
+  print "fetching metadata of ".PBuild::Util::plural(1 + scalar(@pkgs_native), 'local repo', 'the ')."\n";
   push @repos, $repomgr->addlocalrepo($bconf, $myarch, $builddir, \%pkgsrc, \@pkgs_target);
   push @hostrepos, $repomgr->addlocalrepo($bconf_host, $hostarch, $builddir, \%pkgsrc, \@pkgs_native) if @pkgs_native;
 }
@@ -599,14 +599,7 @@ while (1) {
   my ($code, $buildresult) = PBuild::Job::finishjob($job);
   my $p = $job->{'pdata'};
   delete $p->{'force_rebuild'};
-  my $duration = $job->{'endtime'} - $job->{'starttime'};
-  if ($duration < 60) {
-    $duration = sprintf("%ds", $duration % 60);
-  } elsif ($duration < 3600) {
-    $duration = sprintf("%dm%02ds", int($duration / 60), $duration % 60);
-  } else {
-    $duration = sprintf("%dh%02dm%02ds", int($duration / 3600), int($duration / 60) % 60, $duration % 60);
-  }
+  my $duration = PBuild::Util::duration($job->{'endtime'} - $job->{'starttime'});
   my $bid = ($job->{'nbuilders'} || 1) > 1 ? "$job->{'name'}: " : '';
   print "${bid}finished $p->{'pkg'}/$p->{'recipe'} after ${duration}: $code\n";
 
