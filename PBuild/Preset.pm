@@ -40,11 +40,33 @@ my $dtd_pbuild = [
      ]],
 ];
 
+sub read_preset_file {
+  my ($dir) = @_;
+  my $pbuild_str = PBuild::Util::readstr("$dir/_pbuild");
+  if ($pbuild_str !~ /^\s*</s) {
+    eval { require YAML::XS; $YAML::XS::LoadBlessed = 0; };
+    die("Need YAML::XS to parse the _pbuild file\n") unless defined &YAML::XS::LoadFile;
+    my $pbuild = eval { YAML::XS::LoadFile("$dir/_pbuild") };
+    die("Could not parse _pbuild file: $@") if $@;
+    die("Bad _pbuild file\n") unless ref($pbuild) eq 'HASH';
+    # tweak elements so that we can call xmlpostprocess
+    for my $preset (@{$pbuild->{'preset'} || []}) {
+      for my $el (qw{config repo registry assets hostrepo obs}) {
+	next unless defined $preset->{$el};
+	$preset->{$el} = [ $preset->{$el} ] unless ref($preset->{$el});
+	$_ = { '_content' => $_ } for @{$preset->{$el}};
+      }
+    }
+    return PBuild::Structured::xmlpostprocess({ 'pbuild' => [ $pbuild ] }, $dtd_pbuild);
+  }
+  return PBuild::Structured::fromxml($pbuild_str, $dtd_pbuild);
+}
+
 # read presets, take default if non given.
 sub read_presets {
   my ($dir, $presetname) = @_;
   if (-f "$dir/_pbuild") {
-    my $pbuild = PBuild::Structured::readxml("$dir/_pbuild", $dtd_pbuild);
+    my $pbuild = read_preset_file($dir);
     for my $preset (@{$pbuild->{'preset'} || []}) {
       next unless $preset->{'name'};
       if (defined($presetname)) {
@@ -65,7 +87,7 @@ sub known_presets {
   my ($dir) = @_;
   my @presetnames;
   if (-f "$dir/_pbuild") {
-    my $pbuild = PBuild::Structured::readxml("$dir/_pbuild", $dtd_pbuild);
+    my $pbuild = read_preset_file($dir);
     for my $d (@{$pbuild->{'preset'} || []}) {
       push @presetnames, $d->{'name'} if defined $d->{'name'};
     }
