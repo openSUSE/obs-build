@@ -24,7 +24,7 @@ use strict;
 use Digest::MD5 ();
 
 use Build;
-use Build::SimpleXML;
+use Build::SimpleJSON;
 use PBuild::Util;
 use PBuild::Verify;
 use PBuild::Container;
@@ -182,11 +182,9 @@ sub integrate_job {
     $reason = PBuild::Util::clone($reason);
     $reason->{'time'} =  $job->{'readytime'};
     $reason->{'_order'} = [ 'explain', 'time', 'oldsource', 'packagechange' ];
-    for (qw{explain time oldsource}) {
-      $reason->{$_} = [ $reason->{$_} ] if exists $reason->{$_};
-    }
-    my $reasonxml = Build::SimpleXML::unparse( { 'reason' => [ $reason ] });
-    PBuild::Util::writestr("$dst/._reason.$$", "$dst/_reason", $reasonxml);
+    $reason->{'_type'} = { 'time' => 'number' };
+    my $reasonjson = Build::SimpleJSON::unparse($reason);
+    PBuild::Util::writestr("$dst/._reason.$$", "$dst/_reason", $reasonjson);
   }
   return $bininfo;
 }
@@ -214,17 +212,10 @@ sub makejobhist {
 #
 sub addjobhist {
   my ($builddir, $jobhist) = @_;
-  my $fd;
   local $jobhist->{'_order'} = [ qw{package rev srcmd5 versrel bcnt readytime starttime endtime code uri workerid hostarch reason verifymd5} ];
-  my $jobhistxml = Build::SimpleXML::unparse({ 'jobhistlist' => [ { 'jobhist' => [ $jobhist ] } ] });
-  if (-s "$builddir/_jobhistory") {
-    open($fd, '+<', "$builddir/_jobhistory") || die("$builddir/_jobhistory: $!\n");
-    seek($fd, -15, 2);
-    print $fd substr($jobhistxml, 14);
-    close($fd);
-  } else {
-    PBuild::Util::writestr("$builddir/_jobhistory", undef, $jobhistxml);
-  }
+  local $jobhist->{'_type'} = { 'readytime' => 'number', 'starttime' => 'number', 'endtime' => 'number' };
+  my $jobhistjson = Build::SimpleJSON::unparse($jobhist, 'ugly' => 1)."\n";
+  PBuild::Util::appendstr("$builddir/_jobhistory", $jobhistjson);
 }
 
 1;
