@@ -116,11 +116,13 @@ sub integrate_build_result {
     next if $file eq '_meta' || $file eq '_meta.success' || $file eq '_meta.fail';
     next if $file eq '_log' || $file eq '_log.success';
     next if $file eq '_repository';
+    next if ($file eq '.pbuild' || $file eq '_jobhistory') && $p->{'pkg'} eq '.';
     unlink("$dst/$file") || PBuild::Util::rm_rf("$dst/$file");
   }
   # copy new stuff over
   for my $file (sort keys %$result) {
     next if $file =~ /\.obsbinlnk$/s;
+    next if ($file eq '.pbuild' || $file eq '_jobhistory') && $p->{'pkg'} eq '.';
     if ($file =~ /(.*)\.containerinfo$/) {
       # create an obsbinlnk file from the containerinfo
       my $prefix = $1;

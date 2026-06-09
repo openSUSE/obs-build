@@ -116,13 +116,14 @@ sub is_subdir_build {
 }
 
 sub list_package {
-  my ($dir) = @_;
+  my ($dir, $orphan_opt) = @_;
   my %files;
   my @assets;
   my $controlled;
   my @all = sort(PBuild::Util::ls($dir));
   for my $file (@all) {
     next if $file eq '_meta' || $file eq '.git';
+    next if $orphan_opt && ($file eq '_config' || $file eq '.pbuild' || $file =~ /^_build\./);
     next if $file =~ /\n/;
     my @s = lstat("$dir/$file");
     die("$dir/$file: $!\n") unless @s;

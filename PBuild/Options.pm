@@ -132,6 +132,7 @@ my $pbuild_options = {
   'nochangelog' => '',
   'no-nochangelog' => 'nochangelog',
   'update-assets' => '',
+  'orphan' => '',
 };
 
 sub debugflags_special {
@@ -220,7 +221,7 @@ EOS
 sub merge_old_options {
   my ($opts, $oldopts) = @_;
   my $newopts = {};
-  for (qw{preset dist repo hostrepo registry assets obs configdir root jobs threads buildjobs}) {
+  for (qw{preset dist repo hostrepo registry assets obs configdir root jobs threads buildjobs orphan}) {
     $opts->{$_} = $oldopts->{$_} if !exists($opts->{$_}) && exists($oldopts->{$_});
     $newopts->{$_} = $opts->{$_} if exists($opts->{$_});
   }

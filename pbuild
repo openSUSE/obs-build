@@ -64,7 +64,7 @@ $dir = Cwd::abs_path($dir) if $dir !~ /^\//;
 $dir =~ s/(.)\/+$/$1/s;
 
 # find root directory and autodetect single mode
-my $root_dir = PBuild::Source::find_root_dir($dir);
+my $root_dir = $opts->{'orphan'} ? $dir : PBuild::Source::find_root_dir($dir);
 $root_dir = $1 if !$root_dir && PBuild::Recipe::looks_like_packagedir($dir) && $dir =~ /^(.*)\/[^\/]+$/;
 if ($root_dir && $dir ne $root_dir) {
   if (!exists($opts->{'single'}) && $dir =~ /\/([^\/]+)$/) {
@@ -111,10 +111,12 @@ my $newlastopts = PBuild::Options::merge_old_options($opts, $oldlastopts);
 die("Option --shell only works with --single\n") if $opts->{'shell'} && !$opts->{'single'};
 die("Option --shell-after-fail only works with --single\n") if $opts->{'shell-after-fail'} && !$opts->{'single'};
 die("Option --extra-packs only works with --single\n") if $opts->{'extra-packs'} && !$opts->{'single'};
+die("Option --orphan conflices with --single\n") if $opts->{'orphan'} && $opts->{'single'};
 $opts->{'showlog'} = 1 if $opts->{'shell'} || $opts->{'shell-after-fail'};
-$opts->{'showlog'} = 1 if $opts->{'single'} && !defined($opts->{'showlog'});
-$opts->{'buildjobs'} = 1 if $opts->{'showlog'} || $opts->{'single'};
+$opts->{'showlog'} = 1 if ($opts->{'single'} || $opts->{'orphan'}) && !defined($opts->{'showlog'});
+$opts->{'buildjobs'} = 1 if $opts->{'showlog'} || $opts->{'single'} || $opts->{'orphan'};
 $opts->{'single'} .= ":$opts->{'single-flavor'}" if $opts->{'single'} && $opts->{'single-flavor'};
+$opts->{'single'} = '.' if $opts->{'orphan'};
 
 # set defaults
 $opts->{'libbuild'} = $libbuild;
@@ -259,7 +261,7 @@ PBuild::RemoteRepo::expand_zypp_repo($opts->{'hostrepo'}) if $cross;
 print "starting project builder\n";
 print "    source directory: $dir\n";
 print "    result directory: $builddir\n";
-print "    single build: $opts->{'single'}\n" if $opts->{'single'};
+print "    single build: $opts->{'single'}\n" if $opts->{'single'} && !$opts->{'orphan'};
 print "    build area: $opts->{'root'}\n";
 print "    architecture: $myarch\n";
 print "    host architecture: $hostarch\n" if $cross;
@@ -280,16 +282,19 @@ if ($cross && @{$opts->{'hostrepo'} || []}) {
   print "    host repositories:\n";
   print "      - $_\n" for @{$opts->{'hostrepo'}};
 }
-print "searching for packages\n";
+print "searching for packages\n" unless $opts->{'orphan'};
 my %pkgdirs;
 my @pkgs;
-if (-s "$dir/_manifest") {
+if ($opts->{'orphan'}) {
+  @pkgs = ('.');
+  $pkgdirs{'.'} = $dir;
+} elsif (-s "$dir/_manifest") {
   @pkgs = PBuild::Manifest::find_packages($dir, \%pkgdirs);
 } else {
   @pkgs = PBuild::Source::find_packages($dir, \%pkgdirs);
 }
 die("no packages found in '$dir'\n") unless @pkgs || $opts->{'repoquery'} || $opts->{'repoquery-host'};
-print "found ".PBuild::Util::plural(scalar(@pkgs), 'package')."\n";
+print "found ".PBuild::Util::plural(scalar(@pkgs), 'package')."\n" unless $opts->{'orphan'};
 
 my $assetmgr = PBuild::AssetMgr::create("$dir/.pbuild/_assets");
 for my $assetsurl (@{$opts->{'assets'} || []}) {
@@ -299,15 +304,15 @@ for my $assetsurl (@{$opts->{'assets'} || []}) {
 print "getting package information\n";
 my %pkgsrc;
 for my $pkg (@pkgs) {
-  my ($files, $source_assets) = PBuild::Source::list_package($pkgdirs{$pkg});
+  my ($files, $source_assets) = PBuild::Source::list_package($pkgdirs{$pkg}, $opts->{'orphan'});
   my $p = {
     'pkg' => $pkg,
     'dir' => $pkgdirs{$pkg},
     'files' => $files,
     'srcmd5' => PBuild::Source::calc_srcmd5($files),
-    'srcmd5' => PBuild::Source::calc_srcmd5($files),
   };
   $p->{'source_assets'} = $source_assets if @{$source_assets || []};
+  $p->{'flavor'} = $opts->{'single-flavor'} if $opts->{'orphan'} && $opts->{'single-flavor'};
   $pkgsrc{$pkg} = $p;
 }
 
@@ -319,7 +324,7 @@ if ($nlink) {
 }
 
 my $nmultibuild = PBuild::Multibuild::count_multibuilds(\%pkgsrc);
-if ($nmultibuild) {
+if ($nmultibuild && !$opts->{'orphan'}) {
   print "expanding ".PBuild::Util::plural($nmultibuild, 'multibuild package')."\n";
   PBuild::Multibuild::expand_multibuilds(\%pkgsrc);
 }
@@ -427,9 +432,11 @@ PBuild::LocalRepo::cleanup_builddir($builddir, \%pkgsrc) unless $opts->{'single'
 my $repomgr = PBuild::RepoMgr::create();
 my @repos;
 my @hostrepos;
-print "fetching metadata of the local ".(@pkgs_native ? 'repos' : 'repo')."\n";
-push @repos, $repomgr->addlocalrepo($bconf, $myarch, $builddir, \%pkgsrc, \@pkgs_target);
-push @hostrepos, $repomgr->addlocalrepo($bconf_host, $hostarch, $builddir, \%pkgsrc, \@pkgs_native) if @pkgs_native;
+if (!$opts->{'orphan'}) {
+  print "fetching metadata of the local ".(@pkgs_native ? 'repos' : 'repo')."\n";
+  push @repos, $repomgr->addlocalrepo($bconf, $myarch, $builddir, \%pkgsrc, \@pkgs_target);
+  push @hostrepos, $repomgr->addlocalrepo($bconf_host, $hostarch, $builddir, \%pkgsrc, \@pkgs_native) if @pkgs_native;
+}
 
 print "fetching metadata of ".PBuild::Util::plural(scalar(@{$opts->{'repo'}}) + ($cross ? scalar(@{$opts->{'hostrepo'}}) : 0), 'remote repo')."\n";
 for my $repourl (@{$opts->{'repo'}}) {
@@ -546,7 +553,7 @@ while (1) {
   # check status of all packages
   my $result = $ctx->pkgcheck(\@builders, @pkgs);
 
-  # finish if extra-packs was used as we cannot use the result
+  # finish if extra-packs was used as we must not integrate the result
   if ($opts->{'extra-packs'}) {
     my $pkg = $opts->{'single'};
     die unless $pkg;
@@ -568,7 +575,7 @@ while (1) {
   }
 
   # mix in old result from other packages if in single package mode
-  if ($opts->{'single'}) {
+  if ($opts->{'single'} && !$opts->{'orphan'}) {
     my $pkg = $opts->{'single'};
     my $oldresult = PBuild::Util::retrieve("$builddir/.pbuild/_result", 1) || {};
     $oldresult->{$pkg} = $result->{$pkg};
@@ -617,7 +624,7 @@ while (1) {
   my $bininfo = PBuild::BuildResult::integrate_job($builddir, $job, $code, $buildresult);
 
   # if the build was successful, update artifact information and the local repo
-  if ($bininfo) {
+  if ($bininfo && !$opts->{'orphan'}) {
     $repomgr->updatelocalgbininfo($myarch, $p->{'pkg'}, $bininfo);
     if ($p->{'useforbuildenabled'}) {
       # update with new local bin information
@@ -632,7 +639,10 @@ while (1) {
   }
 }
 
-exit PBuild::Result::has_failed($opts, $builddir, $opts->{'single'}) ? 1 : 0 if $opts->{'single'};
+if ($opts->{'single'}) {
+  my $pkg = $opts->{'single'};
+  exit PBuild::Result::has_failed($opts, $builddir, $pkg) ? 1 : 0;
+}
 
 # say goodbye
 print "\npbuild is done:\n";
