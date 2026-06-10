@@ -81,11 +81,12 @@ sub _workin {
     if (ref($v) eq '') {
       # attribute
       if (ref($k)) {
-	die("attribute '$x' must be element\n") if @{$known->{$x}} > 1 || ref($known->{$x}->[0]);
-	push @{$out->{$x}}, $v;
-      } else {
+	die("attribute '$x' must be element\n");
+      } elsif (!$k) {
 	die("attribute '$x' must be singleton\n") if exists $out->{$x};
 	$out->{$x} = $v;
+      } else {
+	push @{$out->{$x}}, $v;
       }
       next;
     }
