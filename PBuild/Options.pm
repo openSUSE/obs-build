@@ -131,9 +131,18 @@ my $pbuild_options = {
   'X' => 'extra-packs::',
   'nochangelog' => '',
   'no-nochangelog' => 'nochangelog',
+  'define' => \&definitions_special,
+  'with' => \&definitions_special,
+  'without' => \&definitions_special,
   'update-assets' => '',
   'orphan' => '',
 };
+
+sub definitions_special {
+  my ($opts, $opt, $origopt, $args) = @_;
+  my $arg = Build::Options::getarg($origopt, $args);
+  push @{$opts->{'definitions'}}, "--$opt", $arg;
+}
 
 sub debugflags_special {
   my ($opts, $opt, $origopt, $args) = @_;

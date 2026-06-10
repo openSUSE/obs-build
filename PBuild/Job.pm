@@ -351,6 +351,7 @@ sub createjob {
   push @args, '--release', $opts->{'release'} if $opts->{'release'};
   push @args, '--threads', $opts->{'threads'} if $opts->{'threads'};
   push @args, "--buildflavor=$p->{'flavor'}" if $p->{'flavor'};
+  push @args, @{$opts->{'definitions'} || []};
   push @args, "--obspackage=".($p->{'originpackage'} || $p->{'pkg'}) if $needsobspackage;
   push @args, "--copy-sources-asis" if $copy_sources_asis;
   push @args, "--rpm-recipe-in-subdir" if $p->{'recipe'} =~ /^(?:package|dist)\/.*\.spec$/;
