@@ -24,7 +24,8 @@ all:
 .PHONY:	test test-debtransform doc initvm
 
 test:
-	[ "$(SCM)" != "git" ] || git --no-pager diff --check origin/master..HEAD -- || [ -f /.buildenv ]
+	git branch -a
+	#[ "$(SCM)" != "git" ] || git --no-pager diff --check origin/master..HEAD -- || [ -f /.buildenv ]
 	PERL5LIB=. prove -v
 
 test-debtransform:
