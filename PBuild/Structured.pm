@@ -127,7 +127,7 @@ sub _workin {
 #
 # Postprocess parsed xml data by matching it to a dtd
 #
-sub xmlpostprocess {
+sub postprocess {
   my ($d, $dtd, $allowunknown) = @_;
   my $me = $dtd->[0];
   my $known =  {$me => [ 0, _toknown(@$dtd) ] };
@@ -144,7 +144,7 @@ sub fromxml {
   my ($d, $dtd, $nonfatal, $allowunknown) = @_;
   eval {
     $d = Build::SimpleXML::parse($d, 'notrim' => 1);
-    $d = xmlpostprocess($d, $dtd, $allowunknown);
+    $d = postprocess($d, $dtd, $allowunknown);
   };
   if ($@) {
     return undef if $nonfatal;
@@ -162,7 +162,7 @@ sub readxml {
   return $d unless defined $d;
   eval {
     $d = Build::SimpleXML::parse($d, 'notrim' => 1);
-    $d = xmlpostprocess($d, $dtd, $allowunknown);
+    $d = postprocess($d, $dtd, $allowunknown);
   };
   if ($@) {
     return undef if $nonfatal;

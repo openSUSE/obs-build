@@ -48,7 +48,7 @@ sub read_preset_file {
     die("Need YAML::XS to parse the _pbuild file\n") unless defined &YAML::XS::Load;
     my $pbuild = eval { YAML::XS::Load($pbuild_str) };
     die("Could not parse _pbuild file: $@") if $@;
-    return PBuild::Structured::xmlpostprocess({ 'pbuild' => [ $pbuild ] }, $dtd_pbuild);
+    return PBuild::Structured::postprocess({ 'pbuild' => [ $pbuild ] }, $dtd_pbuild);
   }
   return PBuild::Structured::fromxml($pbuild_str, $dtd_pbuild);
 }
