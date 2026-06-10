@@ -259,6 +259,7 @@ if ($cross) {
 PBuild::RemoteRepo::expand_zypp_repo($opts->{'repo'});
 PBuild::RemoteRepo::expand_zypp_repo($opts->{'hostrepo'}) if $cross;
 
+$| = 1;
 print "starting project builder\n";
 print "    source directory: $dir\n";
 print "    result directory: $builddir\n";
