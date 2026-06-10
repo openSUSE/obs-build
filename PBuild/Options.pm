@@ -151,10 +151,9 @@ sub vm_type_special {
 
 sub ccache_special {
   my ($opts, $opt, $origopt, $args) = @_;
-  my $arg;
-  $arg = Build::Options::getarg($origopt, $args) if @$args && ref($args->[0]);
+  my $arg = Build::Options::getarg($origopt, $args, 2);
   $opts->{'ccache'} = 1;
-  $opts->{'ccache-type'} = $arg if $arg;
+  $opts->{'ccache-type'} = $arg if defined $arg;
 }
 
 my @codes = qw{broken succeeded failed unresolvable blocked scheduled waiting building excluded disabled locked};
