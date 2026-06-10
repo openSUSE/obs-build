@@ -108,15 +108,15 @@ my $oldlastopts = PBuild::Util::retrieve("$oldbuilddir/.pbuild/lastopts", 1) || 
 my $newlastopts = PBuild::Options::merge_old_options($opts, $oldlastopts);
 
 # tweak options
+die("Option --orphan conflictes with --single\n") if $opts->{'orphan'} && $opts->{'single'};
+$opts->{'single'} = '.' if $opts->{'orphan'};
 die("Option --shell only works with --single\n") if $opts->{'shell'} && !$opts->{'single'};
 die("Option --shell-after-fail only works with --single\n") if $opts->{'shell-after-fail'} && !$opts->{'single'};
 die("Option --extra-packs only works with --single\n") if $opts->{'extra-packs'} && !$opts->{'single'};
-die("Option --orphan conflices with --single\n") if $opts->{'orphan'} && $opts->{'single'};
 $opts->{'showlog'} = 1 if $opts->{'shell'} || $opts->{'shell-after-fail'};
-$opts->{'showlog'} = 1 if ($opts->{'single'} || $opts->{'orphan'}) && !defined($opts->{'showlog'});
-$opts->{'buildjobs'} = 1 if $opts->{'showlog'} || $opts->{'single'} || $opts->{'orphan'};
-$opts->{'single'} .= ":$opts->{'single-flavor'}" if $opts->{'single'} && $opts->{'single-flavor'};
-$opts->{'single'} = '.' if $opts->{'orphan'};
+$opts->{'showlog'} = 1 if $opts->{'single'} && !defined($opts->{'showlog'});
+$opts->{'buildjobs'} = 1 if $opts->{'showlog'} || $opts->{'single'};
+$opts->{'single'} .= ":$opts->{'single-flavor'}" if $opts->{'single'} && !$opts->{'orphan'} && $opts->{'single-flavor'};
 
 # set defaults
 $opts->{'libbuild'} = $libbuild;
@@ -521,6 +521,10 @@ for my $no (1..$opts->{'buildjobs'}) {
   };
 }
 
+# do not integrate build result if unclean due to extra packages
+my $no_integrate = $opts->{'extra-packs'} ? 1 : undef;
+die("must be in single package mode if not integrating\n") if $no_integrate && !$opts->{'single'};
+
 my $ctx;
 my $runs = 0;
 # the big loop: while there is something to do
@@ -553,66 +557,61 @@ while (1) {
   # check status of all packages
   my $result = $ctx->pkgcheck(\@builders, @pkgs);
 
-  # finish if extra-packs was used as we must not integrate the result
-  if ($opts->{'extra-packs'}) {
+  # print result in single mode if not done or building
+  if ($opts->{'single'}) {
     my $pkg = $opts->{'single'};
-    die unless $pkg;
-    my ($code, $details) = ($result->{$pkg}->{'code'}, $result->{$pkg}->{'details'});
-    if ($code eq 'building') {
-      my $job = $ctx->waitjob(\@builders);
-      my $buildresult;
-      ($code, $buildresult) = PBuild::Job::finishjob($job);
-      $details = undef;
-      if ($code eq 'genbuildreqs') {
-	print "$pkg: $code$details\n";
-	$ctx->set_genbuildreqs($job->{'pdata'}, $buildresult->{'_generated_buildreqs'});
-	undef $ctx;
-	next;
-      }
-    }
-    print "$pkg: $code".($details ? " ($details)" : '')."\n";
-    exit PBuild::Result::has_failed_code($opts, $code);
-  }
-
-  # mix in old result from other packages if in single package mode
-  if ($opts->{'single'} && !$opts->{'orphan'}) {
-    my $pkg = $opts->{'single'};
-    my $oldresult = PBuild::Util::retrieve("$builddir/.pbuild/_result", 1) || {};
-    $oldresult->{$pkg} = $result->{$pkg};
-    $result = $oldresult;
     my ($code, $details) = ($result->{$pkg}->{'code'}, $result->{$pkg}->{'details'});
     if ($code ne 'failed' && $code ne 'succeeded' && $code ne 'building') {
       print "$pkg: $code".($details ? " ($details)" : '')."\n";
     }
   }
 
-  # update on-disk data
-  PBuild::Util::mkdir_p("$builddir/.pbuild");
-  PBuild::Util::store("$builddir/.pbuild/._result.$$", "$builddir/.pbuild/_result", $result);
-  PBuild::Util::store("$builddir/.pbuild/._lastcheck.$$", "$builddir/.pbuild/_lastcheck", \%lastcheck);
+  # mix in old result from other packages if in single package mode
+  if ($opts->{'single'} && !$opts->{'orphan'} && !$no_integrate) {
+    my $pkg = $opts->{'single'};
+    my $oldresult = PBuild::Util::retrieve("$builddir/.pbuild/_result", 1) || {};
+    $oldresult->{$pkg} = $result->{$pkg};
+    $result = $oldresult;
+  }
 
-  # wait for one job to finish
+  # update on-disk data unless this is an unclean build
+  if (!$no_integrate) {
+    PBuild::Util::mkdir_p("$builddir/.pbuild");
+    PBuild::Util::store("$builddir/.pbuild/._result.$$", "$builddir/.pbuild/_result", $result);
+    PBuild::Util::store("$builddir/.pbuild/._lastcheck.$$", "$builddir/.pbuild/_lastcheck", \%lastcheck);
+  }
+
+  # wait for one job to finish, exit if there is none
   my $job = $ctx->waitjob(\@builders);
-  last unless $job;
+  if (!$job) {
+    if ($opts->{'single'}) {
+      my $pkg = $opts->{'single'};
+      exit PBuild::Result::has_failed_code($opts, $result->{$pkg}->{'code'}) ? 1 : 0;
+    }
+    last;
+  }
 
   # process finished job
   my ($code, $buildresult) = PBuild::Job::finishjob($job);
   my $p = $job->{'pdata'};
-  delete $p->{'force_rebuild'};
   my $duration = PBuild::Util::duration($job->{'endtime'} - $job->{'starttime'});
   my $bid = ($job->{'nbuilders'} || 1) > 1 ? "$job->{'name'}: " : '';
   print "${bid}finished $p->{'pkg'}/$p->{'recipe'} after ${duration}: $code\n";
 
   my $jobhist = PBuild::BuildResult::makejobhist($p, $code, $job->{'readytime'}, $job->{'starttime'}, $job->{'endtime'}, $job->{'reason'}, $job->{'hostarch'});
-  PBuild::BuildResult::addjobhist($builddir, $jobhist);
+  PBuild::BuildResult::addjobhist($builddir, $jobhist) unless $no_integrate;
 
   if ($code eq 'genbuildreqs') {
     $ctx->set_genbuildreqs($p, $buildresult->{'_generated_buildreqs'});
     # write genbuildreqs cache
-    PBuild::Util::store("$builddir/.pbuild/._genbuildreqs.$$", "$builddir/.pbuild/_genbuildreqs", \%genbuildreqs);
+    PBuild::Util::store("$builddir/.pbuild/._genbuildreqs.$$", "$builddir/.pbuild/_genbuildreqs", \%genbuildreqs) unless $no_integrate;
     undef $ctx;		# we need a new checker as we have to expand again
     next;
   }
+
+  # exit right away if we are not integrating, otherwise we will rebuild forever
+  exit PBuild::Result::has_failed_code($opts, $code) ? 1 : 0 if $no_integrate;
+
   # integrate build artifacts and extra files
   my $bininfo = PBuild::BuildResult::integrate_job($builddir, $job, $code, $buildresult);
 
@@ -630,11 +629,8 @@ while (1) {
       undef $ctx;
     }
   }
-}
 
-if ($opts->{'single'}) {
-  my $pkg = $opts->{'single'};
-  exit PBuild::Result::has_failed($opts, $builddir, $pkg) ? 1 : 0;
+  delete $p->{'force_rebuild'};
 }
 
 # say goodbye
