@@ -119,6 +119,7 @@ sub recipe_parse {
   my @assets;
   for my $s (@{$p->{'remoteassets'} || []}) {
     my $url = $s->{'url'};
+    my $digest = $s->{'digest'};
     my $file = $s->{'file'};
     if ($url && $url =~ /^git(?:\+https?)?:.*\/([^\/]+?)(?:\#([^\#\/]+))?$/) {
       my $tag = $2;
@@ -134,6 +135,7 @@ sub recipe_parse {
 	$asset->{'immutable'} = 1;
 	$asset->{'assetid'} = Digest::MD5::md5_hex($url);
       }
+      $asset->{'digest'} = $digest if $digest;
       push @assets, $asset;
       next;
     }
@@ -147,7 +149,6 @@ sub recipe_parse {
       $file =~ s/\?.*// if $url =~ /^https?:\/\//;
     }
     undef $url unless $url =~ /^https?:\/\/.*\/([^\.\/][^\/]+)$/s;
-    my $digest = $s->{'digest'};
     next unless $digest || $url;
     next unless defined($file) && $file =~ /^([^\.\/][^\/]+)$/s;
     my $asset = { 'file' => $file };
@@ -436,6 +437,14 @@ sub fetch_git_asset {
   my @t = split(' ', $t);
   my $etag = $t[0] if $t[0] && $t[0] =~ /^[0-9a-fA-F]{40,}$/;
   my $mtime = $t[1] if $t[1] =~ /^\d+$/;
+  if ($asset->{'digest'}) {
+    die("could not query git commit\n") unless $etag;
+    my $commit;
+    $commit = "sha1:$etag" if length($etag) == 40;
+    $commit = "sha256:$etag" if length($etag) == 64;
+    die("unsupported commit algo ($etag)\n") unless $commit;
+    die("digest mismatch: $asset->{'digest'}, got $etag\n") unless lc($commit) eq lc($asset->{'digest'});
+  }
   $etag = undef if $immutable;	# no need for an etag
   # get rid of .git directory (need to make this optional)
   PBuild::Util::rm_rf("$tmpdir/$file/.git") unless $keepmeta;
