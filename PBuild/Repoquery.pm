@@ -114,7 +114,7 @@ sub repoquery {
   my @query = @{$query || []};
   die("Please specify a query\n") unless @query;
   for (@query) {
-    if (/^(name|requires|provides|conflicts|recommends|supplements|obsoletes):(.*)$/) {
+    if (/^(name|requires|provides|conflicts|obsoletes|recommends|supplements|suggests|enhances):(.*)$/) {
       $_ = [ $1, $2 ];
     } else {
       $_ = [ 'provides', $_ ];
