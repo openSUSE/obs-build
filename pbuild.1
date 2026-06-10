@@ -152,6 +152,15 @@ Do not show detailed information about the package state.
 
 .SH REPOQUERY OPTIONS
 .TP
+.BI "\-\-repoquery " \fR[\fPdeptype:\fR]\fPdep
+Query the repositories for packages matching a dependency. The dependency
+can be prefixed with a type, the default is "provides:". The special "name:"
+prefix just matches the package name/version.
+.TP
+.BI "\-\-repoquery-host " \fR[\fPdeptype:\fR]\fPdep
+Like --repoquery, but the "host" repositories used for cross building are
+queried.
+.TP
 .B "\-\-details"
 Show detailed information about the packages.
 
@@ -164,11 +173,18 @@ Assume the specified host architecture instead of using "uname -m".
 Specify a different directory containing distribution configurations.
 .TP
 .B "\-\-no-repo-refresh"
-Do not check if the cached repository metadata is up to date.
+Do not check if cached repository metadata is up to date.
+.TP
+.B "\-\-update-assets"
+Force a refetch of all assets that are not immutable.
 .TP
 .BI "\-\-debugflags " types
 Enable debug output. Multipe debug types can be concatenanted with a comma.
-Use "expansion" to debug the dependency expansion.
+Use "expansion" to debug the dependency expansion. Use "network" to debug
+network access.
+.TP
+.BI "\-\-orphan"
+Treat the directory as a single package directory with no project.
 .TP
 .BI "\-\-help"
 Print a short help text.
