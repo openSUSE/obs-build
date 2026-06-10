@@ -90,21 +90,26 @@ sub _workin {
       }
       next;
     }
+    $v = [ $v ] if ref($v) eq 'HASH';
     die("bad input\n") unless ref($v) eq 'ARRAY';
-    for (@$v) {
-      die("bad element '$x'\n") if ref($_) ne 'HASH';
-    }
     if (!ref($k)) {
-      for (@$v) {
-        die("element '$x' has subelements\n") if %$_ && (!exists($_->{'_content'}) || keys(%$_) != 1);
+      my @vv = @$v;
+      for (@vv) {
+	next if ref($_) eq '';
+	die("bad element '$x'\n") if ref($_) ne 'HASH';
+	die("element '$x' has subelements\n") if %$_ && (!exists($_->{'_content'}) || keys(%$_) != 1);
+	$_ = $_->{'_content'};
       }
       if (!$k) {
-	die("element '$x' must be singleton\n") unless @$v == 1 && !exists($out->{$x});
-	$out->{$x} = $v->[0]->{'_content'};
+	die("element '$x' must be singleton\n") unless @vv == 1 && !exists($out->{$x});
+	$out->{$x} = $vv[0];
       } else {
-	push @{$out->{$x}}, map {$_->{'_content'}} @$v;
+	push @{$out->{$x}}, @vv;
       }
     } else {
+      for (@$v) {
+        die("bad element '$x'\n") if ref($_) ne 'HASH';
+      }
       if (!$k->[0]) {
 	die("element '$x' must be singleton\n") unless @$v == 1 && !exists($out->{$x});
 	$out->{$x} = {};

@@ -45,18 +45,9 @@ sub read_preset_file {
   my $pbuild_str = PBuild::Util::readstr("$dir/_pbuild");
   if ($pbuild_str !~ /^\s*</s) {
     eval { require YAML::XS; $YAML::XS::LoadBlessed = 0; };
-    die("Need YAML::XS to parse the _pbuild file\n") unless defined &YAML::XS::LoadFile;
-    my $pbuild = eval { YAML::XS::LoadFile("$dir/_pbuild") };
+    die("Need YAML::XS to parse the _pbuild file\n") unless defined &YAML::XS::Load;
+    my $pbuild = eval { YAML::XS::Load($pbuild_str) };
     die("Could not parse _pbuild file: $@") if $@;
-    die("Bad _pbuild file\n") unless ref($pbuild) eq 'HASH';
-    # tweak elements so that we can call xmlpostprocess
-    for my $preset (@{$pbuild->{'preset'} || []}) {
-      for my $el (qw{config repo registry assets hostrepo obs}) {
-	next unless defined $preset->{$el};
-	$preset->{$el} = [ $preset->{$el} ] unless ref($preset->{$el});
-	$_ = { '_content' => $_ } for @{$preset->{$el}};
-      }
-    }
     return PBuild::Structured::xmlpostprocess({ 'pbuild' => [ $pbuild ] }, $dtd_pbuild);
   }
   return PBuild::Structured::fromxml($pbuild_str, $dtd_pbuild);
