@@ -10,7 +10,6 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v3
         with:
@@ -28,6 +27,21 @@ jobs:
         run: |
           sudo apt-get install devscripts
 
-      - name: Test
+      - name: Install dependencies for pbuild run
         run: |
+          sudo apt-get install perl tar psmisc libwww-perl libxml-parser-perl libarchive-tools zstd
+
+      - name: Test debtransform
+        run: |
+          export LC_ALL=C
           make test test-debtransform
+
+      - name: Test pbuild myself
+        run: |
+          export BUILD_DIR=$PWD
+          export PATH=$PWD:$PATH
+          cd dist
+          # always use latest branch during CI
+          sed -i 's,#%{version},,' build.spec
+          # --no-checks since chroot build inside of docker is not working
+          pbuild --dist=tumbleweed --orphan --vm-type=docker --no-checks

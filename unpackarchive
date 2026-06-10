@@ -448,7 +448,6 @@ sub apkv3_readhead {
   return ($ent, $ent->{'size'}, $datapad);
 }
 
-
 #
 # Path resolving
 #
