@@ -1274,7 +1274,7 @@ while test -n "$1"; do
       ;;
       -ccache)
 	CCACHE=true
-	if test "$1" != "${1#--noarg=}" ; then
+	if test "$1" != "${1#----noarg=}" ; then
 	    needarg
 	    CCACHE_TYPE="$ARG"
 	    shift
