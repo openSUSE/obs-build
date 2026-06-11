@@ -8,10 +8,13 @@ Standards-Version: 3.7.2
 Package: obs-build
 Architecture: all
 Depends: ${perl:Depends}, rpm, findutils, libarchive-tools | bsdtar
-Recommends: rpm2cpio
+Recommends: rpm2cpio, libwww-perl, libxml-parser-perl
 Conflicts: build
 Replaces: build
 Provides: build
-Description: A script to build SUSE RPMs
- This package provides a script for building RPMs for SUSE
- in a chroot environment.
+Description: A script to build various package formats
+ This package provides a script for building various packages or
+ entire package sets in an own environment.
+ Primarly used by openSUSE, but also supporting many other distributions,
+ including RedHat, Debian and Ubuntu. Also multiplte package formats like
+ rpm, deb, container or kiwi image builds are supported.
