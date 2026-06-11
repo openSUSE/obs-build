@@ -1,7 +1,7 @@
 /*
  * NAME
  *	initvm - init for qemu, setup binfmt_misc launch build
- *	
+ *
  * SYNOPSIS
  *	initvm
  *

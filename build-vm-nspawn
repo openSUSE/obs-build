@@ -36,7 +36,7 @@ vm_startup_nspawn() {
         pipe_opt=--pipe
     fi
     if test -n "$VM_TYPE_PRIVILEGED"; then
-       privileged_opt=--privileged 
+       privileged_opt=--privileged
     fi
     systemd-nspawn -D "$BUILD_ROOT" -M "$name" --private-network $pipe_opt $privileged_opt "$@" "$vm_init_script"
     BUILDSTATUS="$?"
