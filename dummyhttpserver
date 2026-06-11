@@ -57,7 +57,7 @@ sub reply {
   my $data = join("\r\n", @hdrs)."\r\n\r\n";
   $data .= $str if defined $str;
   fcntl($sock, F_SETFL, O_NONBLOCK);
-  my $dummy = ''; 
+  my $dummy = '';
   1 while sysread($sock, $dummy, 1024, 0);
   fcntl($sock, F_SETFL, 0);
   replyraw($data);
@@ -123,12 +123,12 @@ sub readrequest {
 }
 
 sub escape {
-  my ($d) = @_; 
+  my ($d) = @_;
   $d =~ s/&/&amp;/sg;
   $d =~ s/</&lt;/sg;
   $d =~ s/>/&gt;/sg;
   $d =~ s/"/&quot;/sg;
-  return $d; 
+  return $d;
 }
 
 while (1) {

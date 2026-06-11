@@ -60,7 +60,7 @@ sub expandFallBackArchs {
 # sles10 perl does not have the version.pm
 # implement own hack
 sub versionstring {
-  my ($str) = @_; 
+  my ($str) = @_;
   my $result = 0;
   $result = $result * 100 + $_ for split (/\./, $str, 2);
   return $result;
@@ -191,7 +191,7 @@ sub kiwiparse_product {
   push @requiredarch, "i586" if grep {/^x86_64/} @requiredarch;
   push @requiredarch, "ppc" if grep {/^ppc64/} @requiredarch;
   push @requiredarch, "s390" if grep {/^s390x/} @requiredarch;
-  
+
   @requiredarch = expandFallBackArchs($instsource->{'architectures'}->[0], @requiredarch);
 
   push @packages, "kiwi-packagemanager:instsource";

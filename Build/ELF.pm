@@ -143,11 +143,11 @@ sub getsymbols {
     my $oth  = elf64($s, $is64 ? 5 : 13, $le, 1);
     push @syms, {
       'name' => $nm ? unpack("\@${nm}Z*", $elf->{'strtab'}) : undef,
-      'value' => $va, 
-      'size' => $sz, 
-      'section' => $sidx, 
-      'info' => $info, 
-      'other' => $oth, 
+      'value' => $va,
+      'size' => $sz,
+      'section' => $sidx,
+      'info' => $info,
+      'other' => $oth,
     };
   }
   return \@syms;

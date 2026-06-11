@@ -364,7 +364,7 @@ sub parserepodata {
 }
 
 sub queryinstalled {
-  my ($root, %opts) = @_; 
+  my ($root, %opts) = @_;
 
   $root = '' if !defined($root) || $root eq '/';
   local *D;

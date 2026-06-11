@@ -24,7 +24,7 @@ use strict;
 use Build::Rpm;
 
 # This implements reading and writing of build's internal repo format.
-# 
+#
 # The format looks like this:
 #
 # P:bash.x86_64-1526160002/1526160023/0: bash = 4.4-lp150.7.8
@@ -85,7 +85,7 @@ sub parse {
     my $s = shift @s;
     next unless $s && $s =~ /^([a-zA-Z]):(.+):$/s;
     my ($tag, $pkgid) = ($1, $2);
-    
+
     if ($lastpkgid && $pkgid ne $lastpkgid) {
       addpkg($res, $pkg, $lastpkgid, \%options) if %$pkg;
       $pkg = {};

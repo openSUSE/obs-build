@@ -61,7 +61,7 @@ sub parse {
     chomp $@;
     return {'error' => "Failed to parse yml file: $err"};
   }
-  
+
   my $res = {};
   $res->{'name'} = $d->{'name'};
   $res->{'version'} = $d->{'version'};
@@ -91,16 +91,16 @@ sub show {
   my ($release, $disturl, $chart, $origrecipe);
   while (@ARGV) {
     if (@ARGV > 2 && $ARGV[0] eq '--release') {
-      (undef, $release) = splice(@ARGV, 0, 2); 
+      (undef, $release) = splice(@ARGV, 0, 2);
     } elsif (@ARGV > 2 && $ARGV[0] eq '--disturl') {
       (undef, $disturl) = splice(@ARGV, 0, 2);
     } elsif (@ARGV > 2 && $ARGV[0] eq '--chart') {
-      (undef, $chart) = splice(@ARGV, 0, 2); 
+      (undef, $chart) = splice(@ARGV, 0, 2);
     } elsif (@ARGV > 2 && $ARGV[0] eq '--origrecipe') {
-      (undef, $origrecipe) = splice(@ARGV, 0, 2); 
+      (undef, $origrecipe) = splice(@ARGV, 0, 2);
     } else {
       last;
-    }   
+    }
   }
   my ($fn, $field) = @ARGV;
   my $d = {};

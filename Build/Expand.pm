@@ -263,7 +263,7 @@ sub normalizerich {
 sub check_conddeps_inst {
   my ($p, $n, $error, $installed, $aconflicts, $todo, $todo_cond) = @_;
   for my $c (@$n) {
-    my ($r, $rtype, $cond, @q) = @$c; 
+    my ($r, $rtype, $cond, @q) = @$c;
     next unless defined $cond;			# already handled?
     next if grep {$installed->{$_}} @q;         # already fulfilled
     my @cx = grep {!$installed->{$_}} @$cond;   # open conditions
@@ -286,9 +286,9 @@ sub check_conddeps_inst {
 	} else {
 	  push @$error, map {"conflicts with $_"} sort(@$cond);
 	}
-      }    
+      }
     } else {
-      if (!@q && @cx == 1) { 
+      if (!@q && @cx == 1) {
 	next if $rtype == 2;
 	if (!$rtype) {
 	  if (defined($p)) {
@@ -316,7 +316,7 @@ sub check_conddeps_notinst {
   my ($p, $n, $eq, $installed) = @_;
   my $ret = 0;
   for my $c (@$n) {
-    my ($r, $rtype, $cond, @q) = @$c; 
+    my ($r, $rtype, $cond, @q) = @$c;
     next if @q || !@$cond || grep {!$installed->{$_}} @$cond;
     push @$eq, map {"(provider $p conflicts with $_)"} sort(@$cond);
     $ret = 1;
@@ -583,7 +583,7 @@ sub expand {
       return undef, @error if @error;
       @todo_inst = ();
     }
- 
+
     for my $pass (0, 1, 2, 3, 4, 5, 6) {
       next if $pass == 5 && !$usesupplementsforchoices;
       my @todo_next;

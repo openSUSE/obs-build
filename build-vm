@@ -747,7 +747,7 @@ vm_detect_2nd_stage() {
 vm_set_filesystem_type() {
     local vmfstype
     local vmfsoptions
-    if test -n "$BUILD_DIST" ; then 
+    if test -n "$BUILD_DIST" ; then
         # testing for build specific filesystem, which are more important then worker defaults
         vmfstype=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags vmfstype`
         vmfsoptions=`queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags vmfsoptions`
@@ -1326,19 +1326,19 @@ vm_setup_network() {
        fi
        ip a
     fi
-    if test -n "$VM_TELNET"; then 
+    if test -n "$VM_TELNET"; then
 	VM_TELNET_DEVICE=$( cd /sys/class/net/; echo * )
 	VM_TELNET_DEVICE=${VM_TELNET_DEVICE#lo }
 	VM_TELNET_DEVICE=${VM_TELNET_DEVICE%% *}
-	if test -z "$VM_TELNET_DEVICE" ; then 
+	if test -z "$VM_TELNET_DEVICE" ; then
 	    cleanup_and_exit 1 "ERROR: no network device found for telnet server"
 	fi
-	if test -x /sbin/ip ; then 
+	if test -x /sbin/ip ; then
 	    # these IPs are the built-in adresses in qemu
 	    ip addr add 10.0.2.15/8 dev ${VM_TELNET_DEVICE}
 	    ip addr add ::1/24 dev ${VM_TELNET_DEVICE}
 	    ip link set ${VM_TELNET_DEVICE} up
-	elif test -x /sbin/ifconfig ; then 
+	elif test -x /sbin/ifconfig ; then
 	    ifconfig ${VM_TELNET_DEVICE} 10.0.2.15 up
 	    ifconfig ${VM_TELNET_DEVICE} add ::1/24
 	else
@@ -1352,9 +1352,9 @@ vm_setup_network() {
 	    echo "$VM_HOSTNAME" > /proc/sys/kernel/hostname
 	fi
     fi
-    if test -n "$VM_TELNET"; then 
+    if test -n "$VM_TELNET"; then
 	echo WARNING: telnet option used, setting up telnet server ${VM_TELNET_DEVICE}
-	if test -x /usr/sbin/in.telnetd; then 
+	if test -x /usr/sbin/in.telnetd; then
 	    ( /usr/sbin/in.telnetd -L /.build/telnet_login_wrapper -debug 23 & )
 	else
 	    cleanup_and_exit 1 "ERROR: /usr/sbin/in.telnetd is not installed, please specify correct package via -x option"

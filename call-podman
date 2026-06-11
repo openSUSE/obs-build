@@ -7,13 +7,13 @@ IS_UNSHARED=
 
 cleanup_and_exit() {
     test -z "$1" && set 0
-    if test -n "$2" ; then 
-	if test "$1" -ne 0 ; then 
+    if test -n "$2" ; then
+	if test "$1" -ne 0 ; then
 	    echo "$2" >&2
 	else
 	    echo "$2"
 	fi
-    fi   
+    fi
     exit $1
 }
 
@@ -52,7 +52,7 @@ if test -n "$IS_UNSHARED" ; then
     elif test -x /sbin/ifconfig ; then
         ifconfig lo 127.0.0.1 up
         ifconfig lo add ::1/128
-    fi   
+    fi
 fi
 
 # setup cgroups

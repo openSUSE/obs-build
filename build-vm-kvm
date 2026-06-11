@@ -37,7 +37,7 @@ kvm_qemu_append="no-kvmclock"
 kvm_cpu="-cpu host"
 
 kvm_check_ppc970() {
-    if ! grep -q -E '(kvm_rma_count.*kvm_hpt_count)|(kvm_hpt_count.*kvm_rma_count)' /proc/cmdline ; then 
+    if ! grep -q -E '(kvm_rma_count.*kvm_hpt_count)|(kvm_hpt_count.*kvm_rma_count)' /proc/cmdline ; then
 	cleanup_and_exit 3 "put kvm_rma_count=<VM number> or kvm_hpt_count=<> to your boot options"
     fi
 }
@@ -69,12 +69,12 @@ vm_set_fallback_guest_kvm() {
 vm_verify_options_kvm() {
     if test -n "$KILL" -o -n "$DO_WIPE" ; then
 	return
-    fi  
+    fi
 
     vm_kernel=
     vm_initrd=
     vm_cmdline=
-    
+
     # newer Ubuntu versions have only kvm executable
     if test -x "/usr/bin/kvm" -a ! -x "$kvm_bin"; then
 	kvm_bin="/usr/bin/kvm"
@@ -479,7 +479,7 @@ vm_cleanup_kvm() {
 }
 
 vm_sysrq_kvm() {
-    perl -e 'use Socket; socket(SOCK, PF_UNIX, SOCK_STREAM, 0) || die("socket: $!\n"); 
+    perl -e 'use Socket; socket(SOCK, PF_UNIX, SOCK_STREAM, 0) || die("socket: $!\n");
              connect(SOCK, sockaddr_un($ARGV[0])) || die("connect: $!\n");
              syswrite(SOCK, "$ARGV[1]\n");
              shutdown(SOCK, 1);

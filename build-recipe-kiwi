@@ -117,17 +117,17 @@ kiwi_post_vmx() {
 	SHAFILES=""
 	for suffix in "ovf" "qcow2" "ova" "tar" "vhdfixed" "vhd"; do
 	    if [ -e "$imageout.\$suffix" ]; then
-		if [ "\$suffix" == "vhd" -o "\$suffix" == "vhdfixed" ]; then 
+		if [ "\$suffix" == "vhd" -o "\$suffix" == "vhdfixed" ]; then
 		    mv "$imageout.\$suffix" "/$TOPDIR/KIWI/$imageout$buildnum.\$suffix"
 		    pushd /$TOPDIR/KIWI
 		    echo "\$compress_tool \$suffix file..."
 		    \$compress_tool "$imageout$buildnum.\$suffix"
 		    SHAFILES="\$SHAFILES $imageout$buildnum.\$suffix.\${compress_suffix}"
 		    popd
-		elif [ "\$suffix" == "ovf" ]; then 
+		elif [ "\$suffix" == "ovf" ]; then
 		    mv "$imageout.\${suffix}/$imageout.\$suffix" "/$TOPDIR/KIWI/$imageout$buildnum.\$suffix"
 		    SHAFILES="\$SHAFILES $imageout$buildnum.\$suffix"
-		else 
+		else
 		    mv "$imageout.\$suffix" "/$TOPDIR/KIWI/$imageout$buildnum.\$suffix"
 		    SHAFILES="\$SHAFILES $imageout$buildnum.\$suffix"
 		fi
@@ -311,11 +311,11 @@ recipe_setup_kiwi() {
     mkdir -p "$BUILD_ROOT$TOPDIR/BUILD"
     mkdir -p "$BUILD_ROOT$TOPDIR/RPMS"
     mkdir -p "$BUILD_ROOT$TOPDIR/SRPMS"
-    
-    if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then 
+
+    if test "$MYSRCDIR" = $BUILD_ROOT/.build-srcdir ; then
 	mv "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/
     else
-	if test -z "$LINKSOURCES" ; then 
+	if test -z "$LINKSOURCES" ; then
 	    cp -pdLR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/ || cleanup_and_exit 1 "source copy failed"
 	else
 	    cp -plR "$MYSRCDIR"/* $BUILD_ROOT$TOPDIR/SOURCES/ || cleanup_and_exit 1 "source copy failed"
@@ -326,7 +326,7 @@ recipe_setup_kiwi() {
     if test -z "$ABUILD_TARGET"; then
         ABUILD_TARGET=$(queryconfig target --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" )
         test -z "$ABUILD_TARGET" || echo "build target is $ABUILD_TARGET"
-    fi  
+    fi
 }
 
 recipe_prepare_kiwi() {
@@ -739,7 +739,7 @@ postprocess_kiwi_containers() {
 	    rm -f "${r%.tar}.containerinfo"
 	fi
     done
-    
+
     # create package summaries file if requested
     if test -e "$BUILD_ROOT/$TOPDIR/SOURCES/repos/.pkgsummaries" ; then
 	for r in $BUILD_ROOT/$TOPDIR/KIWI/*.packages ; do
@@ -873,12 +873,12 @@ recipe_build_kiwi() {
     if test -z "$imagetype" ; then
 	cleanup_and_exit 1 "no imagetype set for this architecture/profile"
     fi
-   
+
     # prepare rpms as source and createrepo on the repositories
     ln -sf $TOPDIR/SOURCES/repos $BUILD_ROOT/repos
     test -d $BUILD_ROOT/$TOPDIR/SOURCES/containers && ln -sf $TOPDIR/SOURCES/containers $BUILD_ROOT/containers
     cd $BUILD_ROOT/$TOPDIR/SOURCES/repos
-    
+
     local binarytype
     if test -s "$BUILD_ROOT/var/lib/dpkg/status" -o -x "$BUILD_ROOT/usr/sbin/debootstrap" ; then
 	binarytype=deb

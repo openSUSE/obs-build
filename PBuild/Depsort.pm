@@ -113,7 +113,7 @@ sub depsort {
       my $v = shift @todo;
       if (ref($v)) {
         $notdone{$$v} = 0;      # finished this one
-        next;   
+        next;
       }
       my $s = $notdone{$v};
       next unless $s;
@@ -174,11 +174,11 @@ sub depsort2 {
     push @{$src2pkg{$pkg2src->{$_}}}, $_ for @dups;
     for my $pkg (keys %$deps) {
       $pkgdeps{$pkg} = [ map {ref($_) ? @$_ : $_} map { $src2pkg{$dep2src->{$_} || $_} || $dep2src->{$_} || $_} @{$deps->{$pkg}} ];
-    }    
+    }
   } else {
     for my $pkg (keys %$deps) {
       $pkgdeps{$pkg} = [ map { $src2pkg{$dep2src->{$_} || $_} || $dep2src->{$_} || $_} @{$deps->{$pkg}} ];
-    }    
+    }
   }
   return depsort(\%pkgdeps, undef, $cycles, $sccs, @packs);
 }

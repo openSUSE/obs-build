@@ -66,7 +66,7 @@ vm_startup_xen() {
        cleanup_and_exit 3
     fi
     XEN_CONF_FILE=`mktemp /var/tmp/build.xen.conf-XXXXXXXXXX` || cleanup_and_exit 3
-    
+
     echo "kernel = \"$vm_kernel\""                                           >  $XEN_CONF_FILE
     echo "ramdisk = \"$vm_initrd\""                                          >> $XEN_CONF_FILE
     echo "memory = ${VM_MEMSIZE:-64}"                                        >> $XEN_CONF_FILE
@@ -95,8 +95,8 @@ vm_startup_xen() {
 
 vm_kill_xen() {
     xen_set_xenid_xmcmd
-    if $XMCMD list "build_$XENID" >/dev/null 2>&1 ; then 
-	if ! $XMCMD destroy "build_$XENID" ; then 
+    if $XMCMD list "build_$XENID" >/dev/null 2>&1 ; then
+	if ! $XMCMD destroy "build_$XENID" ; then
 	    cleanup_and_exit 1 "could not kill xen build $XENID"
 	fi
     fi

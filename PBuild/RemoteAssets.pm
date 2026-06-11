@@ -36,7 +36,7 @@ use strict;
 #
 # Make sure that an asset will be re-fetched. If there is an
 # etag, just move the asset so that it can be re-instantiated.
-# 
+#
 sub force_update {
   my ($assetdir, $asset) = @_;
   my $assetid = $asset->{'assetid'};

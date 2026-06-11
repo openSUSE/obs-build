@@ -32,7 +32,7 @@ if (!defined &Archive::Tar::iter) {
     my $handle = $class->_get_handle($filename, 1, 'rb') or return undef;
     my @data;
     return sub {
-      return shift(@data) if !$handle || @data; 
+      return shift(@data) if !$handle || @data;
       my $files = $class->_read_tar($handle, { limit => 1 });
       @data = @$files if (ref($files) || '') eq 'ARRAY';
       undef $handle unless @data;
@@ -66,7 +66,7 @@ sub addpkg {
     for (qw {md5 sha1 sha256}) {
       my $c = delete($data->{"checksum_$_"});
       $data->{'checksum'} = "$_:$c" if $c;
-    }     
+    }
   } else {
     delete $data->{"checksum_$_"} for qw {md5 sha1 sha256};
   }

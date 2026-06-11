@@ -85,7 +85,7 @@ rpm_init_cumulate() {
     else
 	# compatibility: auto-set cumulate for newer suse distros
 	typeset -ri suse_version=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" eval '%{?suse_version}')
-	if ((suse_version > 1220)) ; then 
+	if ((suse_version > 1220)) ; then
 	    DO_CUMULATE=true
 	fi
     fi

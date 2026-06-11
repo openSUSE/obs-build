@@ -64,7 +64,7 @@ if (@ARGV && $ARGV[0] eq 'cachecheck') {
 	  next if $buildid2 ne $buildid;
 	} else {
 	  next if $bid ne $buildid;
- 	}
+	}
       }
       symlink($cpkg, $dst);
       $dst = undef;	# first hit wins

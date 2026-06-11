@@ -149,7 +149,7 @@ sub unquotesplit {
   my ($str, $vars, $unbalanced) = @_;
   $str =~ s/%/%25/g;
   $str =~ s/^[ \t]+//;
-  my $re = $unbalanced ? qr{([\"\'\#])} : qr{([\"\'])}; 
+  my $re = $unbalanced ? qr{([\"\'\#])} : qr{([\"\'])};
   while ($str =~ /$re/) {
     last if $1 eq '#';
     my $q = $1;
@@ -178,7 +178,7 @@ sub get_assets {
   }
   my @sources = split(' ', $vars->{'source'} || '');;
   return unless @sources;
-  my @assets; 
+  my @assets;
   for my $s (@sources) {
     my $url = $s;
     my $file;
@@ -297,7 +297,7 @@ sub parse {
       $inloop = undef;
       next;
     }
-    
+
     if (defined $incase) {
       if (/^esac/) {
 	undef $incase;
@@ -586,7 +586,7 @@ sub queryinstalled {
 }
 
 sub queryhdrmd5 {
-  my ($handle) = @_; 
+  my ($handle) = @_;
   if (is_apkv3($handle)) {
     require Build::Apkv3 unless defined &Build::Apkv3::calcapkchksum;
     return Build::Apkv3::calcapkchksum($handle, 'md5', 'ctrl');
@@ -601,7 +601,7 @@ sub queryhdrmd5 {
 
 # this calculates the checksum of a compressed section.
 sub calcapkchksum {
-  my ($handle, $type, $section, $toeof) = @_; 
+  my ($handle, $type, $section, $toeof) = @_;
   if (is_apkv3($handle)) {
     require Build::Apkv3 unless defined &Build::Apkv3::querypkginfo;
     return Build::Apkv3::calcapkchksum(@_);
@@ -671,7 +671,7 @@ sub trunc_apkchksum {
 }
 
 sub verifyapkchksum {
-  my ($handle, $chksum) = @_; 
+  my ($handle, $chksum) = @_;
   die("unsupported apk checksum $chksum\n") unless $chksum =~ /^([QX][12])/;
   return 1 if calcapkchksum($handle, $1) eq $chksum;
    # also check for a truncated sha256 sum
@@ -680,7 +680,7 @@ sub verifyapkchksum {
 }
 
 sub verifyapkdatachksum {
-  my ($handle, $chksum) = @_; 
+  my ($handle, $chksum) = @_;
   die("unsupported apk data checksum $chksum\n") unless $chksum =~ /^([QX][12])/;
   return 1 if calcapkchksum($handle, $1, 'data', 1) eq $chksum;
   return 0;

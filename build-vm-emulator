@@ -78,7 +78,7 @@ vm_attach_root_emulator() {
 }
 vm_attach_swap_emulator() {
     :
-} 
+}
 vm_detach_root_emulator() {
     :
 }

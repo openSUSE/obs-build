@@ -54,12 +54,12 @@ sub query {
 }
 
 sub lsrpms {
-    local *D; 
+    local *D;
     if (-f "$_[0]") {
       return ($_[0]) if $_[0] =~ /\.rpm$/;
       return ();
     }
-    opendir(D, $_[0]) || return (); 
+    opendir(D, $_[0]) || return ();
     my @r = grep {$_ ne '.' && $_ ne '..'} readdir(D);
     closedir D;
     return map {"$_[0]/$_"} grep {/\.rpm$/} sort(@r);
@@ -99,7 +99,7 @@ for my $dir (@ARGV) {
 	next if $q->{'arch'} eq 'src' || $q->{'arch'} eq 'nosrc';
 	next if $q->{'name'} =~  /-debug(:?info|source)/;	# no debug deltas
 	my $n = $q->{'name'}.'.'.$q->{'arch'};
-        
+
 	for my $oq (@{$oldpkgs{$n} || []}) {
 	    my $v = $oq->{'version'};
 	    my $r = $oq->{'release'};

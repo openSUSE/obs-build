@@ -53,7 +53,7 @@ my $tool_version = '1.1';
 my $config = {};
 
 sub unify {
-  my %h = map {$_ => 1} @_; 
+  my %h = map {$_ => 1} @_;
   return grep(delete($h{$_}), @_);
 }
 
@@ -563,7 +563,7 @@ sub read_pkgs_from_product_directory {
     push @rpms, read_rpm($fn) if $fn =~ /\.rpm$/;
   };
   die("product directory is missing: $dir\n") unless -d $dir;
-  find({'wanted' => $addrpmfile, 'no_chdir' => 1, 'preprocess' => sub {sort(@_)} }, $dir); 
+  find({'wanted' => $addrpmfile, 'no_chdir' => 1, 'preprocess' => sub {sort(@_)} }, $dir);
   # make sure that the packages are unique
   my %seen;
   for my $r (splice @rpms) {

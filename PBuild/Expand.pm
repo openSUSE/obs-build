@@ -36,7 +36,7 @@ sub configure_repos {
 
   my $binarytype = $bconf->{'binarytype'} || '';
   my $verscmp = $binarytype eq 'deb' ? \&Build::Deb::verscmp : \&Build::Rpm::verscmp;
-  
+
   # this is what perl-BSSolv does. It is different to the
   # code in expanddeps!
   for my $repo (@$repos) {

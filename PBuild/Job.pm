@@ -321,7 +321,7 @@ sub createjob {
     }
   } else {
     push @args, "--root=$buildroot";
-    push @args, "--vm-type=$vm" if $vm; 
+    push @args, "--vm-type=$vm" if $vm;
   }
 
   push @args, '--clean' unless $opts->{'noclean'};
@@ -407,7 +407,7 @@ sub rename_build_result {
 sub get_last_lines {
   my ($logfile) = @_;
   my $fd;
-  open($fd, '<', $logfile) || return '';  
+  open($fd, '<', $logfile) || return '';
   if (-s $fd > 8192) {
     defined(sysseek($fd, -8192, 2)) || return '';
   }

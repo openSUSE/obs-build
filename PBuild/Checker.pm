@@ -521,7 +521,7 @@ sub check_product {
         next if $fn =~ /^::import::(.*?)::(.*)$/ && $seen_fn{$2};
         my $b = $bininfo->{$fn};
         push @rpms, { %{$bininfo->{$fn}}, 'package' => $apackid, 'fn' => $fn };
-        $seen_fn{$fn} = 1; 
+        $seen_fn{$fn} = 1;
         push @next_unneeded_na, $na unless $ba eq 'src' || $ba eq 'nosrc';
       }
       for my $fn (@bi) {

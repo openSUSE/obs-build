@@ -355,7 +355,7 @@ recipe_run_rpmlint() {
 	-o -name "*-x86-*" -o -name "*-ia32-*" \) -prune \
 	-o -type f -name '*.rpm' -print))
     SRPM_FILE_LIST=($(find $BUILD_ROOT/$TOPDIR/SRPMS -type f -name "*.rpm"))
-    echo 
+    echo
     echo "RPMLINT report:"
     echo "==============="
     rpmlint_logfile=$TOPDIR/OTHER/rpmlint.log
@@ -365,18 +365,18 @@ recipe_run_rpmlint() {
 	    --info ${LINT_RPM_FILE_LIST[*]#$BUILD_ROOT} \
 	    ${SRPM_FILE_LIST[*]#$BUILD_ROOT} > >(tee "$BUILD_ROOT$rpmlint_logfile") 2>&1 || ret=1
     echo
-    if test "$ret" = 1 ; then 
+    if test "$ret" = 1 ; then
 	cleanup_and_exit 1
-    fi   
+    fi
 }
 
 recipe_compare_oldpackages_spec() {
-    if test -x "$BUILD_ROOT/usr/lib/build/same-build-result.sh" ; then 
+    if test -x "$BUILD_ROOT/usr/lib/build/same-build-result.sh" ; then
 	echo "... comparing built packages with the former built"
-	if chroot $BUILD_ROOT /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/RPMS" "$TOPDIR/SRPMS"; then 
+	if chroot $BUILD_ROOT /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/RPMS" "$TOPDIR/SRPMS"; then
 	    recipe_mark_same_result
 	fi
-    fi   
+    fi
 }
 
 recipe_create_deltarpms() {

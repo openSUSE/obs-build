@@ -447,7 +447,7 @@ sub apkv3_readhead {
   die("mismatched data block\n") unless $diridx == $ent->{'diridx'} && $fileidx == $ent->{'fileidx'};
   return ($ent, $ent->{'size'}, $datapad);
 }
-  
+
 
 #
 # Path resolving

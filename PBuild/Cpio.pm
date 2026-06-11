@@ -153,7 +153,7 @@ sub cpio_read {
 }
 
 sub cpio_parse {
-  my ($cpiohead) = @_; 
+  my ($cpiohead) = @_;
   die("not a 'SVR4 no CRC ascii' cpio\n") unless substr($cpiohead, 0, 6) eq '070701';
   my $mode = hex(substr($cpiohead, 14, 8));
   my $mtime = hex(substr($cpiohead, 46, 8));

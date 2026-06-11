@@ -30,7 +30,6 @@ use URI;
 eval { require JSON::XS };
 *JSON::XS::decode_json = sub {die("JSON::XS is not available\n")} unless defined &JSON::XS::decode_json;
 
-# 
 sub bearer_authenticate {
   my($class, $ua, $proxy, $auth_param, $response, $request, $arg, $size) = @_;
   return $response if $ua->{'bearer_authenticate_norecurse'};

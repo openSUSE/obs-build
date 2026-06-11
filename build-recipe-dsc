@@ -67,7 +67,7 @@ recipe_prepare_dsc() {
     DEB_TRANSFORM=
     DEB_SOURCEDIR="$TOPDIR/SOURCES"
     DEB_DSCFILE="$RECIPEFILE"
-    for f in $BUILD_ROOT$TOPDIR/SOURCES/debian.* ; do 
+    for f in $BUILD_ROOT$TOPDIR/SOURCES/debian.* ; do
 	test -f $f && DEB_TRANSFORM=true
     done
     # remove rpm macros (everything after "%")
@@ -90,7 +90,7 @@ recipe_prepare_dsc() {
 	return
     fi
 
-    if test -n "$DEB_TRANSFORM" ; then 
+    if test -n "$DEB_TRANSFORM" ; then
 	CHANGELOGARGS=
 	test -n "$CHANGELOG" -a -f "$BUILD_ROOT/.build-changelog" && CHANGELOGARGS="--changelog $BUILD_ROOT/.build-changelog"
 	echo "Found files matching debian.*, running debian transformer..."
@@ -116,7 +116,7 @@ recipe_prepare_dsc() {
 	    cleanup_and_exit 1 "debian transforming failed."
 	fi
 	DEB_SOURCEDIR=$TOPDIR/SOURCES.DEB
-	for DEB_DSCFILE in $BUILD_ROOT$DEB_SOURCEDIR/*.dsc ; do : ; done 
+	for DEB_DSCFILE in $BUILD_ROOT$DEB_SOURCEDIR/*.dsc ; do : ; done
 	DEB_DSCFILE="${DEB_DSCFILE##*/}"
     fi
 

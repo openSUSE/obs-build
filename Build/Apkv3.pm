@@ -124,8 +124,8 @@ my $pkg_info_schema = [
   [ 'b', 'url' ],
   [ 'b', 'commit', undef, \&hash_postprocess ],
   [ 'i', 'builddate' ],
-  [ 'i', 'size' ], 
-  [ 'i', 'filesize' ], 
+  [ 'i', 'size' ],
+  [ 'i', 'filesize' ],
   [ 'i', 'provider_priority'],
   [ 'o*', 'depend', $dep_schema, \&dep_postprocess ],
   [ 'o*', 'provides', $dep_schema, \&dep_postprocess ],
@@ -194,7 +194,7 @@ my $apkdatachksum_dir_schema = [
 ];
 
 my $apkdatachksum_schema = [
-  undef, 
+  undef,
   [ 'o*', 'dirs', $apkdatachksum_dir_schema ],
 ];
 
@@ -203,7 +203,7 @@ my $index_schema = [
   [ 'o*', 'packages', $pkg_info_schema ],
 ];
 
-my $installed_schema = [ 
+my $installed_schema = [
   [ 'b*', 'packages', undef, \&installed_postprocess ],
 ];
 
@@ -218,7 +218,7 @@ my $pkg_schema_zerochksum = [
 ];
 
 sub installed_postprocess {
-  my ($v) = @_; 
+  my ($v) = @_;
   substr($v, 0, 4, '');
   return walk_root($v, $pkg_schema);
 }

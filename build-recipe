@@ -277,7 +277,7 @@ recipe_create_changelog() {
     fi
     BUILD_CHANGELOG_TIMESTAMP=
     if test -s "$BUILD_ROOT/.build-changelog-timestamp" ; then
-	read BUILD_CHANGELOG_TIMESTAMP < "$BUILD_ROOT/.build-changelog-timestamp" 
+	read BUILD_CHANGELOG_TIMESTAMP < "$BUILD_ROOT/.build-changelog-timestamp"
     fi
     rm -f $BUILD_ROOT/.build-changelog-timestamp
 }

@@ -51,7 +51,7 @@ while (@ARGV)  {
     $configdir = shift @ARGV;
     next;
   } elsif (defined($type)) {
-    $argument = shift @ARGV; 
+    $argument = shift @ARGV;
   } else {
     $type = shift @ARGV;
   }

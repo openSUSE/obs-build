@@ -110,7 +110,7 @@ cloud_volume_detach_openstack() {
     if test "$state" = "available" ; then
         return 0
     fi
-    
+
     if ! $NOVACLIENT volume-detach "$VM_SERVER" "$VM_VOL_ID" ; then
 	cleanup_and_exit 3 "ERROR: nova detach of $VM_VOL_ID failed."
     fi
@@ -251,7 +251,7 @@ openstack_wait_for_delete_instance() {
 }
 
 vm_startup_openstack() {
-    local VM_VOL_ROOT_ID=`openstack_cinder_volume2id ${VM_ROOT}`    
+    local VM_VOL_ROOT_ID=`openstack_cinder_volume2id ${VM_ROOT}`
     local VM_VOL_SWAP_ID=`openstack_cinder_volume2id ${VM_SWAP}`
     local VM_VOL_BOOT_ID=`openstack_cinder_volume2id ${OPENSTACK_VOLUME_GRUB}`
 

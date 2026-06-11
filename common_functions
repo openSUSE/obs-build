@@ -135,7 +135,7 @@ set_initvm_name_for_emulator_in() {
 # progress_setup LIST
 # for I in $LIST; do
 #    progress_step LIST
-#    action $I 
+#    action $I
 # done
 
 # $1 name of a textual list

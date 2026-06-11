@@ -144,7 +144,7 @@ die("unsupported query type '$qtype'\n") unless $qtype eq 'intrepo';
 
 #
 # handle local repositories
-# 
+#
 
 if ($url !~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/) {
   my $dir = $url;
@@ -205,7 +205,7 @@ if ($url !~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/) {
 
 #
 # handle remote repositories
-# 
+#
 
 
 my $ua = Build::Download::create_ua();

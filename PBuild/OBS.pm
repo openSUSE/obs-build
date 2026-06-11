@@ -49,7 +49,7 @@ my @dtd_disableenable = (
 );
 
 my $dtd_repo = [
-   'repository' => 
+   'repository' =>
         'name',
         'rebuild',
         'block',
@@ -215,7 +215,7 @@ sub fetch_all_configs {
 #
 # parse a dependency in libsolv's testcase style
 #
-my %testcaseops  = (  
+my %testcaseops  = (
   '&'       => 1,
   '|'       => 2,
   '<IF>'    => 3,
@@ -249,18 +249,18 @@ sub parse_testcasedep_rec {
   return ($d, $r) if $d eq '' || $d =~ /^\)/;
   return ($d, undef) unless $d =~ s/([^\s\)]+)//;
   my $op = $testcaseops{$1};
-  return ($d, undef) unless $op; 
+  return ($d, undef) unless $op;
   return ($d, undef) if $op == 5 && $chainop != 3 && $chainop != 4;
   $chainop = 0 if $op == 5;
   return ($d, undef) if $chainop && (($chainop != 1 && $chainop != 2 && $chainop != 6) || $op != $chainop);
   ($d, $r2) = parse_testcasedep_rec($d, $op);
-  return ($d, undef) unless $r2; 
-  if (($op == 3 || $op == 4) && $r2->[0] == 5) { 
+  return ($d, undef) unless $r2;
+  if (($op == 3 || $op == 4) && $r2->[0] == 5) {
     $r = [$op, $r, $r2->[1], $r2->[2]];
   } else {
     $r = [$op, $r, $r2];
   }
-  return ($d, $r); 
+  return ($d, $r);
 }
 
 #

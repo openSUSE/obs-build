@@ -262,14 +262,14 @@ enum okfail binfmt_register(char *datafile, char *regfile)
 		ret=access(path, X_OK);
 		if (ret == 0) {
 #ifdef DEBUG
-			fprintf(stderr, 
+			fprintf(stderr,
 				"interpreter for '%s' already registered, ignoring\n",
 				f[name]);
 #endif /* DEBUG */
 			continue;
 		}
 #ifdef DEBUG
-		fprintf(stderr, 
+		fprintf(stderr,
 			"registering interpreter for '%s'...\n",
 			f[name]);
 #endif /* DEBUG */
@@ -289,7 +289,7 @@ enum okfail binfmt_register(char *datafile, char *regfile)
 		}
 		if (ret != 0) {
 #ifdef DEBUG
-			fprintf(stderr, 
+			fprintf(stderr,
 				"%s: line %d: interpreter '%s' not found,"
 				" ignoring, return %d\n", datafile, line, f[interpreter], ret);
 #endif /* DEBUG */
@@ -307,7 +307,7 @@ enum okfail binfmt_register(char *datafile, char *regfile)
 		snprintf(path, sizeof(path), SYSFS_BINFMT_MISC "/%s", f[name]);
 
 		if (access(path, R_OK) != 0) {
-			fprintf(stderr, 
+			fprintf(stderr,
 				"%s: line %d: binfmt path not created, content '%s'\n",
 				path, line, buf);
 			(void)fclose(fp);

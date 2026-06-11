@@ -42,7 +42,7 @@ sub parse {
       open(FD, '-|', "gzip", "-dc", $in) || die("$in: $!\n");
     } else {
       open(FD, '<', $in) || die("$in: $!\n");
-    }   
+    }
   }
   my %mods;
   my @mod = YAML::XS::LoadFile(\*FD);

@@ -23,5 +23,5 @@ package PBuild::Common;
 use strict;
 
 our @binsufs = qw{rpm deb pkg.tar.gz pkg.tar.xz pkg.tar.zst apk};
- 
+
 1;

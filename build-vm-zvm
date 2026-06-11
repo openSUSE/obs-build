@@ -117,10 +117,10 @@ zvm_get_local_devnr() {
     if test "$2" -ge 100 ; then
         zvm_fatal "Not more than 100 workers supported by one controlling guest."
     fi
-    if test "$1" = "${ZVM_VOLUME_ROOT}" ; then 
+    if test "$1" = "${ZVM_VOLUME_ROOT}" ; then
         DEVNR=$((300+$2))
     else
-        if test "$1" = "${ZVM_VOLUME_SWAP}" ; then 
+        if test "$1" = "${ZVM_VOLUME_SWAP}" ; then
             DEVNR=$((400+$2))
         else
             zvm_fatal "The disk devices for root and swap must be ${ZVM_VOLUME_ROOT} and ${ZVM_VOLUME_SWAP} respectively."
@@ -130,7 +130,7 @@ zvm_get_local_devnr() {
 }
 
 zvm_volume_link_local() {
-    # attach worker disk to local system as preparation for 
+    # attach worker disk to local system as preparation for
     # a) prepare worker for build
     # b) get rpms of the swap disk after build finished
     # disk must be detached from worker first
@@ -153,7 +153,7 @@ zvm_volume_link_local() {
         echo "${DEVICE}1"
     else
         zvm_fatal "Not enough arguments given to volume_link_local."
-    fi 
+    fi
 }
 
 zvm_volume_detach_local() {
@@ -171,7 +171,7 @@ zvm_volume_detach_local() {
 }
 
 zvm_volume_attach() {
-    # link the local disk of the worker 
+    # link the local disk of the worker
     # $1: user name
     # $2: disk device number
     # send link * nr nr
@@ -179,7 +179,7 @@ zvm_volume_attach() {
     sleep 1
     if ! vmcp send $1 cp link \* $2 $2 ; then
         zvm_fatal "Could not link worker disk number $2 for user $1"
-    fi 
+    fi
 }
 
 zvm_volume_detach() {
@@ -196,12 +196,12 @@ zvm_worker_init() {
     # 2. Worker root device number
     # 3. Worker swap device number
     # 4. Worker number to generate a uniq local device number
-    # Check for: 
+    # Check for:
     # - still mounted dasd
     # - configured dasd
     # - linked dasd
-    # - reset worker with force and autolog 
-    DEVNR_ROOT=$(zvm_get_local_devnr $2 $4) 
+    # - reset worker with force and autolog
+    DEVNR_ROOT=$(zvm_get_local_devnr $2 $4)
     DEVNR_SWAP=$(zvm_get_local_devnr $3 $4)
     # First, check for mounts:
     for DEVNR in $DEVNR_ROOT $DEVNR_SWAP ; do
@@ -228,7 +228,7 @@ zvm_worker_init() {
 
 zvm_cp() {
     if test -n "$1" ; then
-        case "$1" in 
+        case "$1" in
             start)                shift ; zvm_logon "$@"         ;;
             ipl)                  shift ; zvm_ipl "$@"           ;;
             destroy)              shift ; zvm_destroy "$@"       ;;
@@ -262,7 +262,7 @@ vm_verify_options_zvm() {
 
     if test -n "$KILL" -o -n "$DO_WIPE" ; then
         return
-    fi  
+    fi
 
     # z/VM guest name that is already defined in z/VM
     if test -z "$VM_WORKER" ; then
@@ -324,7 +324,7 @@ vm_initrd_obs_modules_zvm() {
     # This function is needed to add the required kernel modules that are
     # installed to the build system to the initrd that starts the worker.
     # Note, that calling mkinitrd directly for the initrd within the worker
-    # currently causes segfaults, which might be a result from not having 
+    # currently causes segfaults, which might be a result from not having
     # all needed binaries within the build system.
     # In order to keep the initrd small, only those kernel modules are
     # copied that already exist in the initrd created by obsworker.

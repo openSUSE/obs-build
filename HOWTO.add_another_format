@@ -15,7 +15,7 @@ this code must be implemented with security in mind. Special crafted
 build descriptions or binary files must not be able to exploit this code.
 What makes it even more interessting is that this code can also run
 on all kind of old or obscure systems. So any external dependency should
-be avoided as well. 
+be avoided as well.
 This means in short:
  - code must be as simple as possible.
  - code must not allow to execute random commands or to access random files.
@@ -46,7 +46,7 @@ Build code running inside of environment.
        name, epoch, version, release, arch, description,
        provides, requires, hdrmd5
 
-   hdrmd5 is some unique identifier of the package built, it might be 
+   hdrmd5 is some unique identifier of the package built, it might be
    just a md5 over the entire file.
 
    Must be a SAFE implementation.
@@ -88,7 +88,7 @@ Special notes for non-OSS systems
 
 Systems like MS-Windows, MacOSX or SunOS could be support as well. However, these
 systems can not be installed by packages from scratch. So using preinstallimages
-would be mandatory here. Support for that exists in general already inside of 
+would be mandatory here. Support for that exists in general already inside of
 the code.
 
 Special notes for image formats

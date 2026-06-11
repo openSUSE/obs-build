@@ -90,7 +90,7 @@ sub manifest2obsbinlnk {
   };
   eval { PBuild::Verify::verify_nevraquery($lnk) };
   return undef if $@;
-  
+
   $lnk->{'hdrmd5'} = $md5->hexdigest();
   $lnk->{'lnk'} = $image;
   return $lnk;
