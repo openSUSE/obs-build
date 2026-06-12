@@ -44,4 +44,4 @@ jobs:
           # always use latest branch during CI
           sed -i 's,#%{version},,' build.spec
           # --no-checks since chroot build inside of docker is not working
-          pbuild --dist=tumbleweed --orphan --vm-type=docker --no-checks
+          pbuild --dist=tumbleweed --orphan --vm-type=podman --no-checks
