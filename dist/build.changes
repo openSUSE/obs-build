@@ -29,6 +29,7 @@ Thu Jun 11 09:26:29 UTC 2026 - Adrian Schröter <adrian@suse.de>
 - build-vm:
   * Set personality for cross builds using --vm-type=qemu as well
   * also use cmdline.obs.guest
+  * Fixing --vm-type=podman support again
 - Download: Add support for the 'notmodifiedok' option
 - Mdkrepo: also parse supplements/enhances
 - Implement zyppers capability parse magic
