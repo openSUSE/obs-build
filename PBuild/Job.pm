@@ -328,6 +328,7 @@ sub createjob {
   push @args, '--checks' if $opts->{'checks'};
   push @args, '--nochecks' if $opts->{'nochecks'};
   push @args, '--shell' if $opts->{'shell'};
+  push @args, '--shell-cmd', $opts->{'shell-cmd'} if $opts->{'shell-cmd'};
   push @args, '--shell-after-fail' if $opts->{'shell-after-fail'};
   push @args, '--no-timestamps' if $opts->{'no-timestamps'};
   push @args, '--skip-bundle';

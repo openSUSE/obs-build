@@ -361,7 +361,7 @@ create_devs() {
 	if test $com = ln ; then
 	    ln -s $arg $BUILD_ROOT/dev/$file
 	elif test $com = mknod ; then
-	    if test -z "$PREPARE_VM" && test -e /run/.containerenv ; then
+	    if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / -a -z "$PREPARE_VM" && test -e /run/.containerenv ; then
 		touch $BUILD_ROOT/dev/$file
 		mount --bind /dev/$file $BUILD_ROOT/dev/$file
 	    else

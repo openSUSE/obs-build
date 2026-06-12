@@ -614,10 +614,12 @@ vm_detect_2nd_stage() {
 
     test -n "$VM_WATCHDOG" -a -z "$PERSONALITY_SET" && echo "### VM INTERACTION END ###"
     echo "2nd stage started in virtual machine"
-    # fedora packages sometimes do not have the needed links
-    ldconfig
     BUILD_ROOT=/
     BUILD_DIR=/.build
+    test -e /dev/null || ( umask 0 ; mknod /dev/null c 1 3 )
+    test -e /dev/null || cleanup_and_exit 1 "no /dev/null character device"
+    # fedora packages sometimes do not have the needed links
+    ldconfig
     echo "machine type: `uname -m`"
     echo "Linux version: `uname -rv`"
     echo "Time: `date`"
@@ -718,11 +720,12 @@ vm_detect_2nd_stage() {
     # start a process monitoring max filesystem usage during build
     vm_start_statistics
 
-    if test ! -e /dev/.udev ; then
-        echo "WARNING: udev not running, creating extra device nodes"
-        test -e /dev/fd || ln -sf /proc/self/fd /dev/fd
-        test -e /etc/mtab || ln -sf /proc/mounts /etc/mtab
-    fi
+    # make sure we have the needed symlinks
+    test -e /dev/fd || ln -sf /proc/self/fd /dev/fd
+    test -e /dev/stdin || ln -sf /proc/self/fd/0 /dev/stdin
+    test -e /dev/stdout || ln -sf /proc/self/fd/1 /dev/stdout
+    test -e /dev/stderr || ln -sf /proc/self/fd/1 /dev/stderr
+    test -e /etc/mtab || ln -sf /proc/mounts /etc/mtab
 
     if test -z "$VM_TYPE_CONTAINER" ; then
         # set date to build start on broken systems (now < build start)

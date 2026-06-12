@@ -33,13 +33,53 @@ vm_startup_podman() {
     local podman_opts=
     test -n "$VM_TYPE_PRIVILEGED" && podman_opts="--privileged --cap-add=SYS_ADMIN --cap-add=MKNOD"
     test -n "$RUN_SHELL" -o -n "$RUN_SHELL_AFTER_FAIL" && podman_opts="$podman_opts -it"
-    podman run \
+    mkdir -p "$BUILD_ROOT/home"
+    local mounts=()
+    local non_mounts=()
+    local d
+    for d in $BUILD_ROOT/* $BUILD_ROOT/.??*; do
+	d="${d##*/}"
+	test "$d" = proc && continue
+	test "$d" = dev && continue
+	test "$d" = sys && continue
+	test "$d" = installed-pkg && continue
+	if test -d "$BUILD_ROOT/$d" -a ! -L "$BUILD_ROOT/$d" ; then
+	    mounts[${#mounts[@]}]="--mount"
+	    mounts[${#mounts[@]}]="type=bind,source=$BUILD_ROOT/$d,destination=/$d"
+	else
+	    test "$d" = .build.log && continue
+	    non_mounts[${#non_mounts[@]}]="$d"
+	fi
+    done
+    rm -f "$BUILD_ROOT/.build/.toextract.tar"
+    mkdir -p "$BUILD_ROOT/.build/podman-oci-hooks"
+    rm -f "$BUILD_ROOT/.build/podman-oci-hooks/create.json"
+    if test -n "${non_mounts[*]}" ; then
+	tar -C "$BUILD_ROOT" -cf - -- "${non_mounts[@]}" > "$BUILD_ROOT/.build/.podman-toextract.tar"
+	cat > "$BUILD_ROOT/.build/podman-oci-hooks/create.sh" << EOF
+#!/bin/sh
+exec "$BUILD_ROOT/.build/unpackarchive" --tar < "$BUILD_ROOT/.build/.podman-toextract.tar"
+EOF
+	chmod 755 "$BUILD_ROOT/.build/podman-oci-hooks/create.sh"
+	cat > "$BUILD_ROOT/.build/podman-oci-hooks/create.json" << EOF
+{
+    "version": "1.0.0",
+    "hook": { "path": "$BUILD_ROOT/.build/podman-oci-hooks/create.sh" },
+    "when": { "always": true },
+    "stages": [ "createContainer" ]
+}
+EOF
+    fi
+    podman --hooks-dir="$BUILD_ROOT/.build/podman-oci-hooks" run \
         --runtime=runc \
         --rm --name "$name" --net=none $podman_opts \
-        --mount "type=bind,source=$BUILD_ROOT,destination=/" \
+        "${mounts[@]}" \
         "$@" build-scratch:latest "$vm_init_script"
     BUILDSTATUS="$?"
     test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
+    # copyout the .build.packages link
+    rm -f "$BUILD_ROOT/.build.packages"
+    test -L "$BUILD_ROOT/.build/.build.packages" && cp -a "$BUILD_ROOT/.build/.build.packages" "$BUILD_ROOT/.build.packages"
     cleanup_and_exit "$BUILDSTATUS"
 }
 

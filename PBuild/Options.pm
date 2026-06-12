@@ -120,6 +120,7 @@ my $pbuild_options = {
   'single' => ':',
   'buildflavor' => ':',
   'shell' => '',
+  'shell-cmd' => ':',
   'shell-after-fail' => '',
   'no-timestamps' => '',
   'showlog' => '',

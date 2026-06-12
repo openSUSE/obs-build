@@ -1895,6 +1895,10 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
     # create .build.packages link
     rm -f $BUILD_ROOT/.build.packages
     ln -s ${TOPDIR#/} $BUILD_ROOT/.build.packages
+    # save a backup for podman vm
+    if test "$VM_TYPE" = podman -a -n "$RUNNING_IN_VM" ; then
+	ln -sf ${TOPDIR#/} $BUILD_ROOT/.build/.build.packages
+    fi
 
     # nasty hack to prevent rpath on known paths
     # FIXME: do this only for suse
