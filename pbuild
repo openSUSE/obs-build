@@ -122,7 +122,15 @@ $opts->{'single'} .= ":$opts->{'buildflavor'}" if $opts->{'single'} && !$opts->{
 # set defaults
 $opts->{'libbuild'} = $libbuild;
 if ($<) {
-  $opts->{'vm-type'} ||= 'kvm';
+  if (!$opts->{'vm-type'}) {
+    if (-e '/dev/kvm') {
+      $opts->{'vm-type'} = 'kvm';
+    } elsif (-x '/usr/bin/podman') {
+      $opts->{'vm-type'} = 'podman';
+    } elsif (-x '/usr/bin/docker') {
+      $opts->{'vm-type'} = 'docker';
+    }
+  }
   if (!$opts->{'root'}) {
     my $username = $ENV{LOGNAME} || $ENV{USER} || getpwuid($<) || sprintf("%u", $<);
     $opts->{'root'} = "/var/tmp/build-root-$username";
@@ -464,14 +472,13 @@ if (@{$opts->{'registry'} || []} && @containertags) {
 if ($opts->{'repoquery'}) {
   PBuild::Repoquery::repoquery($bconf, $myarch, \@repos, $opts->{'repoquery'}, $opts);
   exit;
-}
-if ($opts->{'repoquery-host'}) {
+} elsif ($opts->{'repoquery-host'}) {
   die("No cross building configured\n") unless $cross;
   PBuild::Repoquery::repoquery($bconf_host, $hostarch, \@hostrepos, $opts->{'repoquery-host'}, $opts);
   exit;
 }
 
-# load lastcheck cache
+# load lastcheck and genbuildreqs caches
 my %lastcheck;
 if (-s "$builddir/.pbuild/_lastcheck") {
   my $oldlastcheck = PBuild::Util::retrieve("$builddir/.pbuild/_lastcheck", 1) || {};
@@ -480,8 +487,6 @@ if (-s "$builddir/.pbuild/_lastcheck") {
     $lastcheck{$pkg} = $old if $old && length($old) > 96;
   }
 }
-
-# load genbuildreqs cache
 my %genbuildreqs;
 if (-s "$builddir/.pbuild/_genbuildreqs") {
   my $oldgenbuildreqs = PBuild::Util::retrieve("$builddir/.pbuild/_genbuildreqs", 1) || {};
