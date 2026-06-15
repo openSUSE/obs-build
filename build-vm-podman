@@ -22,6 +22,25 @@
 #
 ################################################################
 
+
+podmanvm_create_extract_hook() {
+    local hook_dir="$1"
+    local extract_tar="$2"
+    cat > "$hook_dir/create.sh" << EOF
+#!/bin/sh
+exec "$BUILD_ROOT/.build/unpackarchive" --tar --try-chroot < "$extract_tar"
+EOF
+    chmod 755 "$hook_dir/create.sh"
+    cat > "$hook_dir/create.json" << EOF
+{
+    "version": "1.0.0",
+    "hook": { "path": "$hook_dir/create.sh" },
+    "when": { "always": true },
+    "stages": [ "createContainer" ]
+}
+EOF
+}
+
 vm_verify_options_podman() {
     VM_ROOT=
     VM_SWAP=
@@ -39,45 +58,34 @@ vm_startup_podman() {
     local d
     for d in $BUILD_ROOT/* $BUILD_ROOT/.??*; do
 	d="${d##*/}"
-	test "$d" = proc && continue
-	test "$d" = dev && continue
-	test "$d" = sys && continue
-	test "$d" = installed-pkg && continue
+	case $d in
+	    proc | dev | sys | installed-pkg) continue ;;
+	    .build.log | .build.podman-oci-hooks) continue ;;
+	    *,*) continue ;;
+	esac
 	if test -d "$BUILD_ROOT/$d" -a ! -L "$BUILD_ROOT/$d" ; then
 	    mounts[${#mounts[@]}]="--mount"
 	    mounts[${#mounts[@]}]="type=bind,source=$BUILD_ROOT/$d,destination=/$d"
 	else
-	    test "$d" = .build.log && continue
 	    non_mounts[${#non_mounts[@]}]="$d"
 	fi
     done
     rm -f "$BUILD_ROOT/.build/.toextract.tar"
-    mkdir -p "$BUILD_ROOT/.build/podman-oci-hooks"
-    rm -f "$BUILD_ROOT/.build/podman-oci-hooks/create.json"
+    rm -rf "$BUILD_ROOT/.build.podman-oci-hooks"
+    mkdir -p "$BUILD_ROOT/.build.podman-oci-hooks"
     if test -n "${non_mounts[*]}" ; then
 	tar -C "$BUILD_ROOT" -cf - -- "${non_mounts[@]}" > "$BUILD_ROOT/.build/.podman-toextract.tar"
-	cat > "$BUILD_ROOT/.build/podman-oci-hooks/create.sh" << EOF
-#!/bin/sh
-exec "$BUILD_ROOT/.build/unpackarchive" --tar < "$BUILD_ROOT/.build/.podman-toextract.tar"
-EOF
-	chmod 755 "$BUILD_ROOT/.build/podman-oci-hooks/create.sh"
-	cat > "$BUILD_ROOT/.build/podman-oci-hooks/create.json" << EOF
-{
-    "version": "1.0.0",
-    "hook": { "path": "$BUILD_ROOT/.build/podman-oci-hooks/create.sh" },
-    "when": { "always": true },
-    "stages": [ "createContainer" ]
-}
-EOF
+	podmanvm_create_extract_hook "$BUILD_ROOT/.build.podman-oci-hooks" "$BUILD_ROOT/.build/.podman-toextract.tar"
     fi
-    podman --hooks-dir="$BUILD_ROOT/.build/podman-oci-hooks" run \
+    podman --hooks-dir="$BUILD_ROOT/.build.podman-oci-hooks" run \
         --runtime=runc \
         --rm --name "$name" --net=none $podman_opts \
         "${mounts[@]}" \
         "$@" build-scratch:latest "$vm_init_script"
     BUILDSTATUS="$?"
     test "$BUILDSTATUS" != 255 || BUILDSTATUS=3
-    # copyout the .build.packages link
+    # clean up and copyout the .build.packages link
+    rm -rf "$BUILD_ROOT/.build.podman-oci-hooks"
     rm -f "$BUILD_ROOT/.build.packages"
     test -L "$BUILD_ROOT/.build/.build.packages" && cp -a "$BUILD_ROOT/.build/.build.packages" "$BUILD_ROOT/.build.packages"
     cleanup_and_exit "$BUILDSTATUS"
