@@ -169,15 +169,34 @@ umount_stuff() {
 	buildroot_umount "/dev/pts"
 	buildroot_umount "/dev/shm"
 	buildroot_umount "/mnt"
+    fi
+}
 
-	# see code in create_devs
-	if test -z "$PREPARE_VM" && test -e /run/.containerenv ; then
-	    for f in "$BUILD_ROOT"/dev/*; do
-		if mountpoint -q "$f" ; then
-		    buildroot_umount "$f"
-		fi
-	    done
-	fi
+# we cannot do mknod calls in a container, so we do bind mounts instead
+create_dev_binds() {
+    local f
+    if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
+	test -L "$BUILD_ROOT/dev" && return
+	for f in null zero full random urandom tty ptmx loop-control loop0 loop1 loop2 loop3 fuse ; do
+	    test -e /dev/$f || continue
+	    rm -f "$BUILD_ROOT/dev/$f"
+	    touch "$BUILD_ROOT/dev/$f"
+	    mount --bind /dev/$f "$BUILD_ROOT/dev/$f"
+	done
+    fi
+}
+
+remove_dev_binds() {
+    local f
+    if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
+	test -L "$BUILD_ROOT/dev" && return
+	for f in null zero full random urandom tty ptmx loop-control loop0 loop1 loop2 loop3 fuse ; do
+	    test -e "$BUILD_ROOT/dev/$f" || continue
+	    test -L "$BUILD_ROOT/dev/$f" && continue
+	    mountpoint -q "$BUILD_ROOT/dev/$f" || continue
+	    umount "$BUILD_ROOT/dev/$f"
+	    test -f "$BUILD_ROOT/dev/$f" && rm -f "$BUILD_ROOT/dev/$f"
+	done
     fi
 }
 
@@ -202,6 +221,8 @@ cleanup_and_exit() {
 clean_build_root() {
     if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
 	umount_stuff
+	# see code in create_devs
+	test -e /run/.containerenv && remove_dev_binds
 	rm -rf -- "$BUILD_ROOT"/* 2> /dev/null || true
 	chattr -a -A -i -R -- "$BUILD_ROOT" 2> /dev/null || true    # does not follow symlinks
 	# For rootless podman switch to subuid root
@@ -361,12 +382,8 @@ create_devs() {
 	if test $com = ln ; then
 	    ln -s $arg $BUILD_ROOT/dev/$file
 	elif test $com = mknod ; then
-	    if test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / -a -z "$PREPARE_VM" && test -e /run/.containerenv ; then
-		touch $BUILD_ROOT/dev/$file
-		mount --bind /dev/$file $BUILD_ROOT/dev/$file
-	    else
-		mknod -m $mode $BUILD_ROOT/dev/$file $arg
-	    fi
+	    test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / -a -z "$PREPARE_VM" && test -e /run/.containerenv && continue
+	    mknod -m $mode $BUILD_ROOT/dev/$file $arg
 	fi
     done << DEVLIST
 	mknod null    666 c 1 3
@@ -387,6 +404,7 @@ create_devs() {
 	ln    stdout  777 fd/1
 	ln    stderr  777 fd/2
 DEVLIST
+    test -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / -a -z "$PREPARE_VM" && test -e /run/.containerenv && create_dev_binds
 }
 
 # check whether the repo list contains a plain "zypp://". Add all
