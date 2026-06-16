@@ -25,7 +25,7 @@
 %endif
 
 Name:           %{__pkg_name}
-Summary:        A Script to Build SUSE Linux RPMs
+Summary:        Build packages in a reproducible way
 License:        GPL-2.0-only OR GPL-3.0-only
 Group:          Development/Tools/Building
 Version:        20260612
@@ -109,8 +109,9 @@ BuildRequires:  perl(POSIX)
 Requires:       perl(POSIX)
 
 %description
-This package provides a script for building RPMs for SUSE Linux in a
-chroot environment.
+This package provides tools to build binary packages in a safe and
+reproducible way.  The default is to build in a chroot sandbox, but
+building in a virtual machine is also supported for better security.
 
 
 %if 0%{?suse_version} > 1120 || ! 0%{?suse_version}

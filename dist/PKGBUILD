@@ -1,7 +1,7 @@
 pkgname=build
-pkgver=20230215
+pkgver=20260612
 pkgrel=0
-pkgdesc="Build packages in sandbox"
+pkgdesc="Build packages in a reproducible way"
 arch=('i686' 'x86_64')
 url="https://www.github.com/openSUSE/obs-build"
 license=('GPL-2.0+' 'GPL-2.0')
