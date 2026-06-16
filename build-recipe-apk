@@ -36,6 +36,13 @@ recipe_setup_apk() {
 recipe_prepare_apk() {
     echo "creating ephemeral signing key"
     chroot $BUILD_ROOT su -lc "cd $TOPDIR/SOURCES && PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin abuild-keygen -a -n" $BUILD_USER
+    # install the key (ABUILD_APK_INDEX_OPTS is no longer supported)
+    mkdir -p $BUILD_ROOT/etc/apk/keys
+    if test $BUILD_USER = abuild ; then
+	cp -a $BUILD_ROOT/home/abuild/.abuild/abuild-*.pub $BUILD_ROOT/etc/apk/keys/.
+    else
+	cp -a $BUILD_ROOT/root/.abuild/abuild-*.pub $BUILD_ROOT/etc/apk/keys/.
+    fi
     mkdir -p $BUILD_ROOT/root/.abuild
     echo "DISTFILES_MIRROR=$TOPDIR/SOURCES" >> $BUILD_ROOT/root/.abuild/abuild.conf
     echo "SRCDEST=$TOPDIR/BUILD" >> $BUILD_ROOT/root/.abuild/abuild.conf
