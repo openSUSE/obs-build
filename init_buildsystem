@@ -1010,7 +1010,7 @@ if test -n "$PREPARE_VM" ; then
         ln_args[${#ln_args[@]}]="../$PKG.$PSUF"
     done
     run_cmd_with_xargs cp --remove-destination -t $BUILD_INIT_CACHE -- "${cp_args[@]}" || cleanup_and_exit 1
-    run_cmd_with_xargs ln -s -f -t $BUILD_INIT_CACHE/rpms -- "${ln_args[@]}"
+    (cd $BUILD_INIT_CACHE/rpms && run_cmd_with_xargs cp -s --remove-destination -t . -- "${ln_args[@]}")
     check_exit
     # alreadyinstalled check will not work, but we have to live with that...
     echo -n 'reordering...'
