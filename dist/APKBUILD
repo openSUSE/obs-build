@@ -1,12 +1,15 @@
 maintainer="Adrian Schroeter <adrian@suse.de>"
 pkgname=obs-build
-pkgver=20260612
+pkgver=20260616
 pkgrel=0
 pkgdesc="A Script to Build SUSE Linux RPMs"
 url="https://github.com/openSUSE/obs-build"
 arch="noarch"
 license="GPL-2.0-only OR GPL-3.0-only"
-source="obs-build-20260612.tar.gz"
+depends="bash perl perl-libwww perl-xml-parser perl-lwp-protocol-https zstd"
+subpackages="$pkgname-doc"
+source="obs-build-20260616.tar.gz"
+options="!check"  # For now
 
 prepare() {
         default_prepare
@@ -17,5 +20,5 @@ package() {
 }
 
 sha512sums="
-53a9df4139fafd74e2332effe136acad393fb950f2f4e87719a528897545cc06  obs-build-20260612.tar.gz
+6a3f102eb6e7ed516993b8f505f2a900526bda135fdc54cb7548afb68bb9c7ed2cf053caf0ee538108744074b867cc82ce8464c1bb73261550541431d460bfa0  obs-build-20260616.tar.gz
 "
