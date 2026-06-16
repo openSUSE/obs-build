@@ -136,6 +136,7 @@ sub recipe_parse {
 	$asset->{'assetid'} = Digest::MD5::md5_hex($url);
       }
       $asset->{'digest'} = $digest if $digest;
+      $asset->{'finalfile'} = $s->{'finalfile'} if $s->{'finalfile'} && $s->{'finalfile'} =~ /^([^\.\/][^\/]+)$/s;
       push @assets, $asset;
       next;
     }
@@ -155,6 +156,7 @@ sub recipe_parse {
     $asset->{'digest'} = $digest if $digest;
     $asset->{'url'} = $url if $url;
     $asset->{'type'} = 'url' if $url;
+    $asset->{'finalfile'} = $s->{'finalfile'} if $s->{'finalfile'} && $s->{'finalfile'} =~ /^([^\.\/][^\/]+)$/s;
     push @assets, $asset;
   }
   return @assets;

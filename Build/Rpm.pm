@@ -1182,6 +1182,7 @@ sub parse {
 	    $gfn =~ s/\.git$//;
 	    $moveassets{$gfn} = $fn if $fn ne $gfn;
 	    $dirassets{$gfn} = 1;
+	    $remoteasset->{'finalfile'} = $fn if $fn ne $gfn;
 	  } else {
 	    $remoteasset->{'file'} = $fn;
 	  }
@@ -1197,6 +1198,7 @@ sub parse {
 	  if ($fn && $gfn) {
 	    $dirassets{$gfn} = 1;
 	    $moveassets{$gfn} = $fn if $fn ne $gfn;
+	    $remoteasset->{'finalfile'} = $fn if $remoteasset && $fn ne $gfn;
 	  }
 	}
       }

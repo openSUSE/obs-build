@@ -126,7 +126,14 @@ sub merge_assets {
     my $file = $asset->{'file'};
     if (!$assetmgr->{'keep_all_assets'}) {
       # ignore asset if present in source list
-      next if $files->{$file} || $files->{"$file/"};
+      my $finalfile = $asset->{'finalfile'};
+      if ($asset->{'isdir'}) {
+        next if $files->{"$file/"} || $files->{"$file.obscpio"};
+        next if $finalfile && ($files->{$finalfile} || $files->{"$finalfile/"});
+      } else {
+        next if $files->{$file};
+        next if $finalfile && $files->{$finalfile};
+      }
     }
     $asset->{'assetid'} ||= get_assetid($file, $asset);
     $p->{'asset_files'}->{$file} = $asset;
