@@ -314,13 +314,10 @@ for my $assetsurl (@{$opts->{'assets'} || []}) {
 print "getting package information\n";
 my %pkgsrc;
 for my $pkg (@pkgs) {
+  my $p = { 'pkg' => $pkg, 'dir' => $pkgdirs{$pkg} };
   my ($files, $source_assets) = PBuild::Source::list_package($pkgdirs{$pkg}, $opts->{'orphan'});
-  my $p = {
-    'pkg' => $pkg,
-    'dir' => $pkgdirs{$pkg},
-    'files' => $files,
-    'srcmd5' => PBuild::Source::calc_srcmd5($files),
-  };
+  $p->{'files'} = $files;
+  $p->{'srcmd5'} = PBuild::Source::calc_srcmd5($files);
   $p->{'source_assets'} = $source_assets if @{$source_assets || []};
   $p->{'flavor'} = $opts->{'buildflavor'} if $opts->{'orphan'} && $opts->{'buildflavor'};
   $pkgsrc{$pkg} = $p;

@@ -159,20 +159,16 @@ $btfilter = {map {$_ => 1} @{$opts->{'type'}}} if $opts->{'type'};
 delete $btfilter->{'none'} if $btfilter;
 
 for my $dir (@dirs) {
+  my $p = { 'pkg' => "_me", 'dir' => $dir };
   my ($files, $source_assets) = PBuild::Source::list_package($dir);
-  my $p = {
-    'pkg' => "_me",
-    'dir' => $dir,
-    'files' => $files,
-  };
-
+  $p->{'files'} = $files;
   my $assetdir = $opts->{'assetdir'} || "$dir/.assets";
   my $outdir = $opts->{'outdir'} || $dir;
   my $assetmgr = PBuild::AssetMgr::create($assetdir);
   $assetmgr->{'keep_all_assets'} = 1 if $opts->{'clean'} || $opts->{'update'} || $opts->{'list'};
   $assetmgr->add_assetshandler($_) for @{$opts->{'assets'} || []};
   $assetmgr->add_assetshandler($fedpkg) if !$opts->{'assets'} && $files->{'sources'};
-  $assetmgr->merge_assets($p, $source_assets);
+  $assetmgr->merge_assets($p, $source_assets) if $source_assets;
 
   for my $arch (@arch) {
     my $bconf = read_config($opts->{'dist'}, $arch, $opts->{'configdir'});
