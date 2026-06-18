@@ -38,6 +38,7 @@ sub readbytes {
 sub quadit {
   die("quad overflow\n") if $_[1] >= 65536;
   $_[0] = $_[0] + $_[1] * 65536 * 65536;
+  $_[1] = 0;
 }
 
 sub extract_stored {
@@ -52,7 +53,7 @@ sub extract_stored {
 sub extract_inflate {
   my ($handle, $size, $csize, $writer) = @_;
   return unless $size > 0;
-  require Compress::Raw::Zlib unless defined &Compress::Raw::Zlib::Inflate;
+  require Compress::Raw::Zlib unless defined &Compress::Raw::Zlib::Inflate::new;
   my ($decomp, $status) = Compress::Raw::Zlib::Inflate->new('-WindowBits' => -Compress::Raw::Zlib::MAX_WBITS(), '-Bufsize' => 65536);
   die("Compress::Raw::Zlib::Inflate::new failed\n") unless $decomp && $status == Compress::Raw::Zlib::Z_OK();
   while ($size > 0 || $csize > 0) {
@@ -81,6 +82,12 @@ sub zip_extract {
   my $lfh = readbytes($handle, 30, $ent->{'lhdroffset'});
   my ($lfh_magic, $lfh_vneed, $lfh_bits, $lfh_comp, $lfh_time, $lfh_date, $lfh_crc, $lfh_csize, $lfh_size, $lfh_fnsize, $lfh_extrasize) = unpack('VvvvvvVVVvv', $lfh);
   die("missing local file header\n") unless $lfh_magic == 0x04034b50;
+  if ($lfh_bits & 1) {
+    die("$ent->{'name'}: cannot extract encrypted files\n") unless $opts{'encrypted_ok'};
+    readbytes($handle, $lfh_fnsize + $lfh_extrasize);  # verify file name?
+    extract_stored($handle, $ent->{'csize'}, $ent->{'csize'}, $writer);
+    return $data;
+  }
   readbytes($handle, $lfh_fnsize + $lfh_extrasize);	# verify file name?
   # can't use lfh size values because they may be in the trailing data descriptor
   if ($lfh_comp == 8) {
