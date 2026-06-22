@@ -162,6 +162,12 @@ my $myarch = $opts->{'arch'};
 
 my $builddir = $reponame && $reponame ne $myarch ? "$dir/_build.$reponame.$myarch" : "$dir/_build.$myarch";
 
+# die early if we have no dist/config so that we do not create the buildir
+if (!$opts->{'dist'} && !(-e "$dir/_config" || -e "$dir/_pbuild")) {
+  print("Please specify a distribution!\n\n");
+  PBuild::Options::usage(1);
+}
+
 # update lastdata and lastopts
 my $newlastdata = { 'builddir' => $builddir };
 eval { PBuild::Util::mkdir_p("$dir/.pbuild") ; PBuild::Util::store_unless_identical("$dir/.pbuild/.lastdata.$$", "$dir/.pbuild/lastdata", $newlastdata, $oldlastdata) };
