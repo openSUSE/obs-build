@@ -133,7 +133,7 @@ sub postprocess {
   my $known =  {$me => [ 0, _toknown(@$dtd) ] };
   my $out = {};
   _workin($known, $out, $d, $allowunknown);
-  die("xml is not a '$me' element\n") unless defined $out->{$me};
+  die("not a '$me' element\n") unless defined $out->{$me};
   return $out->{$me};
 }
 

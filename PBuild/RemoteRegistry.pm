@@ -134,7 +134,7 @@ sub queryremotecontainer {
     return undef unless $manifest;
     $digest = $manifest->{'digest'};
     @accept = ($mt_docker_manifest, $mt_oci_manifest);
-    ($data, $ct) = fetch_manifest($repodir, $registry, "$registry/v2/$repository/manifests/$manifest->{'digest'}",
+    ($data, $ct) = fetch_manifest($repodir, $registry, "$registry/v2/$repository/manifests/$digest",
 	'ua' => $ua, 'accept' => \@accept);
     die("no content type set in answer\n") unless $ct;
   }
@@ -269,7 +269,7 @@ sub maketarhead {
 }
 
 #
-# reconstruct a container from blobs
+# reconstruct a container archive from blobs
 #
 sub construct_containertar {
   my ($meta, $q, $dst) = @_;
