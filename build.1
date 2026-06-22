@@ -53,6 +53,9 @@ A dsc file used to generate Debian binary packages.
 .B PKGBUILD
 A file used to generate Arch Linux binary packages.
 .TP
+.B APKBUILD
+A file used to generate Alpine Linux binary packages.
+.TP
 .B build.collax
 A shell script used to generate a Collax binary package.
 .P
@@ -70,6 +73,14 @@ Don't run checks during build.
 .B --no-init
 Skip the build system initialization and start with build immediately.
 .TP
+.BI "\-\-dist " distribution
+Set the distribution. If this option is not given, build tries to
+guess the distribution by looking at the packages available in the
+repositories.
+The specified distribution can either be a string
+like "11.2" or "sles9", "debian7", or the pathname of the build
+configuration to use.
+.TP
 .BI "\-\-repo " dir_or_url
 Either a directory containing binary packages (optionally with repository
 metadata), or a url pointing to some remote repository. Multiple
@@ -79,15 +90,11 @@ order, i.e. the first repository containing a package with a specific
 name wins regardless of the version.
 As a special form, 'zypp://reponame' can be used to specify
 a system repository. 'zypp://' selects all enabled system
-repositories. This is also the default if BUILD_RPMS is not
-set and no \fB--rpms\fP or \fB--repo\fP option is used.
-.TP
-.BI "\-\-dist " distribution
-Set the distribution. If this option is not given, build tries to
-guess the distribution by looking at the available packages.
-The specified distribution can either be a string
-like "11.2" or "sles9", "debian7", or the pathname of the build
-configuration to use.
+repositories.
+If no repositories are specified (neither via BUILD_RPMS nor via the
+\fB--rpms\fP or \fB--repo\fP option), the repositories configured
+for the specified distribution are used, or 'zypp://' if no distribution
+was selected.
 .TP
 .BI "\-\-root " buildroot
 Specifies where the build system is set up. Overrides the
@@ -104,11 +111,6 @@ to use.
 .B --list-state
 list packages that would be used to create a fresh build root.
 Does not create the build root or perform a build.
-.TP
-.BI "\-\-rpms " path1 : path2 : path3\fR...\fP
-Where build can find the packages needed to create the
-build system. This option overrides the BUILD_RPMS environment
-variable. This option is deprecated, use \fB--repo\fP instead.
 .TP
 .BI "\-\-arch " arch1 : arch2 : arch3\fR...\fP
 What architectures to select from the RPMs.
@@ -203,13 +205,21 @@ and force-set the build user to
 .I abuild
 and
 .I root
-.RI "(for " "#\ norootforbuild" " and " "#\ needsrootforbuild" " respectively."
+.RI "(for " "#\ norootforbuild" " and " "#\ needsrootforbuild" " respectively)."
 .TP
 .B # needsbinariesforbuild
 provide the binary rpms that have been used to set up the build root
 in
 .I /.build.binaries
 within the build root.
+
+.SH DEPRECATED OPTIONS
+.TP
+.BI "\-\-rpms " path1 : path2 : path3\fR...\fP
+Where build can find the packages needed to create the
+build system. This option overrides the BUILD_RPMS environment
+variable. This option is deprecated, use \fB--repo\fP instead.
+
 .SH ENVIRONMENT
 .TP
 .B BUILD_ROOT
