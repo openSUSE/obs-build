@@ -8,6 +8,7 @@ Tue Jun 23 11:29:43 UTC 2026 - Adrian Schröter <adrian@suse.de>
 - Add zstd support for debtransform
 - busybox: Use 'cp -s' instead of 'ln -s' to create the package symlinks
 - various minor cleanups and documention updates
+- update tumbleweed.conf
 
 -------------------------------------------------------------------
 Thu Jun 11 09:26:29 UTC 2026 - Adrian Schröter <adrian@suse.de>
