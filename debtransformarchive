@@ -46,7 +46,7 @@ case $from in
 	rm -rf "$tmp"
 	;;
     *)
-	echo "unsupported inpur file name: $from" 1>&2
+	echo "unsupported input file name: $from" 1>&2
 	exit 1
 	;;
 esac
