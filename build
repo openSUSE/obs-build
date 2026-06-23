@@ -645,6 +645,7 @@ sccache_setup() {
         echo 'export RUSTC_WRAPPER=sccache' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
         echo 'export CC="sccache cc"' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
         echo 'export CXX="sccache c++"' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
+        echo 'export SCCACHE_SERVER_UDS="/tmp/sccache.sock"' >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
 	if test "$CCACHE_ARCHIVE" != "${CCACHE_ARCHIVE#redis://}" ; then
             echo "export SCCACHE_REDIS=${CCACHE_ARCHIVE}" >> "$BUILD_ROOT"/etc/profile.d/build_sccache.sh
 	else
