@@ -38,7 +38,7 @@ vm_verify_options_qemu() {
 vm_startup_qemu() {
     # overwrite some options for specific build architectures
     case $BUILD_HOST_ARCH in
-        armv6l|armv7l)
+        armv6l|armv7l|armv7hl)
             qemu_bin="/usr/bin/qemu-system-arm"
             qemu_console=${qemu_console:-ttyAMA0}
             qemu_options="-M virt"
@@ -232,7 +232,7 @@ vm_kill_qemu() {
 vm_fixup_qemu() {
     vm_fixup_kvm
     case $BUILD_HOST_ARCH in
-        armv6l|armv7l|armv8l|aarch32|aarch64|aarch64_ilp32|ppc|ppcle|ppc64|ppc64le|riscv64|s390|s390x|x86_64)
+        armv6l|armv7l|armv7hl|armv8l|aarch32|aarch64|aarch64_ilp32|ppc|ppcle|ppc64|ppc64le|riscv64|s390|s390x|x86_64)
             VM_ROOTDEV=/dev/disk/by-id/virtio-0
             VM_SWAPDEV=/dev/disk/by-id/virtio-1
             ;;
