@@ -59,10 +59,7 @@ install:
 	    init_buildsystem \
 	    substitutedeps \
 	    debtransform \
-	    debtransformbz2 \
-	    debtransformxz \
-	    debtransformzip \
-	    debtransformzst \
+	    debtransformarchive \
 	    mkbaselibs \
 	    mkdrpms \
 	    listinstalled \
