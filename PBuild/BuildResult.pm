@@ -35,37 +35,24 @@ my @binsufs = @PBuild::Common::binsufs;
 my $binsufsre = join('|', map {"\Q$_\E"} @binsufs);
 
 #
-# create the .bininfo file that contains information about all binaries
+# create the bininfo data that contains information about all binaries
 # in the build artifacts
 #
-sub read_bininfo {
-  my ($dir, $withid) = @_;
-  my $bininfo;
+sub create_bininfo {
+  my ($dir) = @_;
+  my $bininfo = {};
   my @bininfo_s;
-  local *BI;
-  if (open(BI, '<', "$dir/.bininfo")) {
-    @bininfo_s = stat(BI);
-    $bininfo = PBuild::Util::retrieve(\*BI, 1) if @bininfo_s && $bininfo_s[7];
-    close BI;
-    if ($bininfo) {
-      $bininfo->{'.bininfo'} = {'id' => "$bininfo_s[9]/$bininfo_s[7]/$bininfo_s[1]"} if $withid;
-      return $bininfo;
-    }
-  }
-  $bininfo = {};
-  @bininfo_s = ();
   for my $file (PBuild::Util::ls($dir)) {
     $bininfo->{'.nosourceaccess'} = {} if $file eq '.nosourceaccess';
     if ($file !~ /\.(?:$binsufsre)$/) {
-      if ($file eq '.channelinfo' || $file eq 'updateinfo.xml') {
-        $bininfo->{'.nouseforbuild'} = {};
-      } elsif ($file =~ /\.obsbinlnk$/) {
+      $bininfo->{'.nouseforbuild'} = {} if $file eq '.channelinfo' || $file eq 'updateinfo.xml' || $file eq '.updateinfodata' || $file eq '.nouseforbuild';
+      if ($file =~ /\.obsbinlnk$/) {
         my @s = stat("$dir/$file");
         my $d = PBuild::Util::retrieve("$dir/$file", 1);
         next unless @s && $d;
         my $r = {%$d, 'filename' => $file, 'id' => "$s[9]/$s[7]/$s[1]"};
         $bininfo->{$file} = $r;
-      } elsif ($file =~ /[-.]appdata\.xml$/) {
+      } elsif ($file =~ /[-.]appdata\.xml$/ || $file eq '_modulemd.yaml' || $file =~ /slsa_provenance\.json$/ || $file eq 'updateinfo.xml') {
         local *F;
         open(F, '<', "$dir/$file") || next;
         my @s = stat(F);
@@ -97,9 +84,29 @@ sub read_bininfo {
     $data->{'id'} = $id;
     $bininfo->{$file} = $data;
   }
+  return $bininfo;
+}
+
+#
+# read the bininfo file if it exists or generate it
+#
+sub read_bininfo {
+  my ($dir, $withid) = @_;
+  my $bininfo;
+  local *BI;
+  if (open(BI, '<', "$dir/.bininfo")) {
+    my @bininfo_s = stat(BI);
+    $bininfo = PBuild::Util::retrieve(\*BI, 1) if @bininfo_s && $bininfo_s[7];
+    close BI;
+    if ($bininfo) {
+      $bininfo->{'.bininfo'} = {'id' => "$bininfo_s[9]/$bininfo_s[7]/$bininfo_s[1]"} if $withid;
+      return $bininfo;
+    }
+  }
+  $bininfo = create_bininfo($dir, $withid);
   eval {
     PBuild::Util::store("$dir/.bininfo.new", "$dir/.bininfo", $bininfo);
-    @bininfo_s = stat("$dir/.bininfo");
+    my @bininfo_s = stat("$dir/.bininfo");
     $bininfo->{'.bininfo'} = {'id' => "$bininfo_s[9]/$bininfo_s[7]/$bininfo_s[1]"} if @bininfo_s && $withid;
   };
   warn($@) if $@;
