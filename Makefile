@@ -62,6 +62,7 @@ install:
 	    debtransformbz2 \
 	    debtransformxz \
 	    debtransformzip \
+	    debtransformzst \
 	    mkbaselibs \
 	    mkdrpms \
 	    listinstalled \
