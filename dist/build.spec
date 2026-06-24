@@ -36,14 +36,16 @@ Source:         obs-build-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildArch:      noarch
 #!BuildIgnore:  build-mkbaselibs build-mkbaselibs-sle
+
 # Keep the following dependencies in sync with obs-worker package
 Requires:       bash
 Requires:       binutils
+Requires:       diffutils
 Requires:       findutils
 Requires:       perl
 Requires:       tar
-# needed for fuser
 Requires:       psmisc
+
 # just to verify existence of packages
 BuildRequires:  bash
 BuildRequires:  binutils
