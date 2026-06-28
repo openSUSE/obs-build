@@ -542,6 +542,32 @@ Example:
 Note that the macro lines are copied verbatim, i.e. macro expansion
 does not take place.
 
+=== Setting DEB_BUILD_OPTIONS and DEB_BUILD_PROFILES for Debian builds
+
+When building Debian source packages (`dsc` recipes), the project config
+can influence `dpkg-buildpackage` by defining the `%deb_build_options`
+and `%deb_build_profiles` macros. Their values are passed to the build as
+the `DEB_BUILD_OPTIONS` and `DEB_BUILD_PROFILES` environment variables,
+which is the Debian equivalent of tuning an rpm build through its build
+options.
+
+Example:
+
+    Macros:
+    %deb_build_options nocheck nodoc
+    %deb_build_profiles nodoc
+    :Macros
+
+The build profiles set via `%deb_build_profiles` are also honored when
+resolving the build dependencies, so the restriction formulas (for
+example `<!nocheck>` or `<stage1>`) in the `Build-Depends` are evaluated
+against the active profiles and the same set of packages is pulled in
+that the build will use.
+
+The values are merged with the options and profiles that the build adds
+on its own, for example the `nocheck` option and the `cross` and
+`nocheck` profiles used for cross builds.
+
 === Building with ccache or sccache
 
 The usage of ccache or sccache can be enabled for each package by

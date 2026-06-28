@@ -77,6 +77,11 @@ sub parse {
   $os = 'linux' unless defined $os;
   $arch = basearch($arch);
 
+  # the active build profiles (DEB_BUILD_PROFILES) are needed to evaluate the
+  # restriction formulas of the build dependencies, so that the resolver pulls
+  # in the same set of dependencies that the build will use
+  my @build_profiles = split(' ', Build::Rpm::expandmacros($bconf, '%{?deb_build_profiles}'));
+
   my @control;
   if (ref($fn) eq 'ARRAY') {
     @control = @$fn;
@@ -124,14 +129,13 @@ sub parse {
         my @needed;
         for my $c (@alts) {
           if ($c =~ /\s+<[^>]+>$/) {
-            my @build_profiles;  # Empty for now
             my $bad = 1;
             while ($c =~ s/\s+<([^>]+)>$//) {
               next if (!$bad);
               my $list_valid = 1;
               for my $term (split(/\s+/, $1)) {
                 my $isneg = ($term =~ s/^\!//);
-                my $profile_match = grep(/^$term$/, @build_profiles);
+                my $profile_match = grep { $_ eq $term } @build_profiles;
                 if (( $profile_match &&  $isneg) ||
                     (!$profile_match && !$isneg)) {
                   $list_valid = 0;
