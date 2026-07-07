@@ -291,7 +291,7 @@ curl() {
     done
     shift
     if test -n "$coopt" -a -n "$fname" ; then
-	set "$@" "-o" "$fname"
+	set -- "$@" "-o" "$fname"
     fi
     $testmode exec /usr/bin/curl "$@"
 }
@@ -324,7 +324,7 @@ wget() {
     done
     shift
     if test -z "$oopt" -a -n "$fname" ; then
-	set "$@" "-O" "$fname"
+	set -- "$@" "-O" "$fname"
     fi
     $testmode exec /usr/bin/wget "$@"
 }
