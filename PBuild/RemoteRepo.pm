@@ -227,9 +227,11 @@ sub fetchrepo_zypp {
   if($type eq 'rpm-md') {
     die("zypp repo $url is not up to date, please refresh first\n") unless -s "$zyppcachedir/repodata/repomd.xml";
     return fetchrepo_rpmmd("zypp://$repo->{'name'}", "$zyppcachedir/repodata", %opts, 'iszypp' => 1);
-  } else {
+  } elsif ($type eq 'yast2' || $type eq 'susetags') {
     die("zypp repo $url is not up to date, please refresh first\n") unless -s "$zyppcachedir/suse/setup/descr/packages.gz";
     return fetchrepo_susetags("zypp://$repo->{'name'}", "$zyppcachedir/suse/setup/descr", %opts, 'iszypp' => 1);
+  } else {
+    die("zypp repo $url is of unsupported type '$type'\n");
   }
 }
 
@@ -375,7 +377,7 @@ sub fetchrepo {
   $repotype = 'zypp' if $url =~ /^zypp:/;
   $repotype = 'obs' if $url =~ /^obs:/;
   my $archfilter;
-  if ($url =~ /^(arch|debian|hdlist2|rpmmd|rpm-md|suse|apk)(?:\+archfilter=([^\@\/]+))?\@(.*)$/) {
+  if ($url =~ /^(arch|debian|hdlist2|rpmmd|rpm-md|yast2|suse|susetags|apk)(?:\+archfilter=([^\@\/]+))?\@(.*)$/) {
     $repotype = $1;
     $archfilter = [ split(',', $2) ] if $2;
     $url = $3;
@@ -417,7 +419,7 @@ sub fetchrepo {
     $repo = fetchrepo_arch($url, $tmpdir, %opts);
   } elsif ($repotype eq 'apk') {
     $repo = fetchrepo_apk($url, $tmpdir, %opts);
-  } elsif ($repotype eq 'suse') {
+  } elsif ($repotype eq 'yast2' || $repotype eq 'suse' || $repotype eq 'susetags') {
     $repo = fetchrepo_susetags($url, $tmpdir, %opts);
   } elsif ($repotype eq 'zypp') {
     $repo = fetchrepo_zypp($url, $tmpdir, %opts);
