@@ -482,7 +482,12 @@ sub parse {
     s/<VERSION>/$version/g if defined $version;
     s/<RELEASE>/$release/g if defined $release;
   }
-  $ret->{'name'} = 'docker' if !defined($ret->{'name'}) && !$cf->{'__dockernoname'};
+  if (!defined($ret->{'name'}) && !$cf->{'__dockernoname'}) {
+    $ret->{'name'} = ($ret->{'containertags'} || [])->[0] || 'docker';
+    $ret->{'name'} =~ s/:.*//;
+    $ret->{'name'} =~ s/\//-/g;
+    $ret->{'name'} ||= 'docker';
+  }
   $ret->{'path'} = [ { 'project' => '_obsrepositories', 'repository' => '' } ] if $useobsrepositories;
   $ret->{'nosquash'} = 1 if $nosquash;
   $ret->{'basecontainer'} = $basecontainer if $basecontainer;
