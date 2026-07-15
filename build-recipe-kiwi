@@ -460,13 +460,34 @@ perform_image_build() {
 	# new kiwi, do a "system build" call
 	mkdir -p $BUILD_ROOT/$TOPDIR/KIWI-$imgtype
 	local build_call
+	local kiwi_env="LANG=en_US.UTF-8"
 	echo "running kiwi system build for $imgtype${profile:+, profile $profile}..."
 	build_call="cd $TOPDIR/SOURCES && rm -rf $TOPDIR/KIWI-$imgtype"
         # cross prepare needed?
 	if test -n "$ABUILD_TARGET" ; then
 	    local target="${ABUILD_TARGET%%-*}"
 	    if test -n "$target" && ! check_native_arch "$target" ; then
-		build_call="$build_call && LANG=en_US.UTF-8 $kiwi_path system crossprepare --target-arch $target --init /usr/lib/build/initvm.`uname -m` --target-dir $TOPDIR/KIWI-$imgtype"
+		build_call="$build_call && $kiwi_env $kiwi_path system crossprepare --target-arch $target --init /usr/lib/build/initvm.`uname -m` --target-dir $TOPDIR/KIWI-$imgtype"
+	    fi
+	fi
+	if test "$imgtype" = docker ; then
+	    local timestamp=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags container-timestamp)
+	    local ts
+	    if test "$timestamp" = source_date_epoch ; then
+		# query SOURCE_DATE_EPOCH from the build environment
+		ts=$(chroot $BUILD_ROOT su -c 'echo $SOURCE_DATE_EPOCH' - $BUILD_USER)
+		test -z "$ts" && echo 'WARNING: container-timestamp is set to source_date_epoch but $SOURCE_DATE_EPOCH is not set'
+	    elif test "$timestamp" = scm ; then
+		if test -f "$BUILD_ROOT/$TOPDIR/SOURCES/_scmsync.obsinfo" ; then
+		    ts=$(sed -ne '/^mtime:/{s/^mtime: *//p;q}' < "$BUILD_ROOT/$TOPDIR/SOURCES/_scmsync.obsinfo")
+		fi
+		test -z "$ts" && echo 'WARNING: container-timestamp is set to scm but _scmsync.obsinfo does not exist'
+	    elif test -n "$timestamp" ; then
+		ts="$timestamp"
+	    fi
+	    if test -n "$ts" -a -z "${ts//[0-9]/}" ; then
+		echo "Using timestamp $ts for building"
+		kiwi_env="$kiwi_env SOURCE_DATE_EPOCH=$ts"
 	    fi
 	fi
 	# Unless overwritten by packages, set some useful defaults:
@@ -477,7 +498,7 @@ container:
   - compress: false
 EOF
 	fi
-	build_call="$build_call && LANG=en_US.UTF-8 $kiwi_path --debug $KIWI_MAIN_PARAMETERS"
+	build_call="$build_call && $kiwi_env $kiwi_path --debug $KIWI_MAIN_PARAMETERS"
 	test -n "$profile" && build_call="$build_call --profile $profile"
 	if test -n "$ABUILD_TARGET" ; then
 	    local target="${ABUILD_TARGET%%-*}"

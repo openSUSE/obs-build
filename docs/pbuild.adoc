@@ -302,7 +302,7 @@ The container format and compression can be controlled via build config flags:
 
 * `container-build-format:docker` or `container-build-format:oci` -- image format (podman only)
 * `container-compression-format:gzip`, `zstd`, or `zstd:chunked` -- layer compression (podman only)
-* `container-timestamp:VALUE` -- set a build timestamp for reproducibility (podman only)
+* `container-timestamp:VALUE` -- set a build timestamp for reproducibility
 
 ==== Remote Assets in Dockerfiles
 

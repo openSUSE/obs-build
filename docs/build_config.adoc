@@ -154,8 +154,8 @@ extensions like ONBUILD, SHELL, DOMAINNAME, COMMENT, HEALTHCHECK amongst others.
 
 * container-timestamp:VALUE
 
-For podman container builds, it sets a timestamp for the container build. This can
-be a number (seconds since the epoch), the string `scm` (read time from
+For podman and kiwi container builds, it sets a timestamp for the container build.
+This can be a number (seconds since the epoch), the string `scm` (read time from
 `_scmsync.obsinfo`) or the string `source_date_epoch` (get time from the
 `$SOURCE_DATE_EPOCH` environment variable set in the build environment).
 

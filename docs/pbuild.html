@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
-<meta name="generator" content="AsciiDoc 10.2.1" />
+<meta name="generator" content="AsciiDoc" />
 <title>pbuild Reference Guide</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
@@ -1543,8 +1543,8 @@ container-timestamp:VALUE
 </p>
 </li>
 </ul></div>
-<div class="paragraph"><p>For podman container builds, it sets a timestamp for the container build. This can
-be a number (seconds since the epoch), the string <code>scm</code> (read time from
+<div class="paragraph"><p>For podman and kiwi container builds, it sets a timestamp for the container build.
+This can be a number (seconds since the epoch), the string <code>scm</code> (read time from
 <code>_scmsync.obsinfo</code>) or the string <code>source_date_epoch</code> (get time from the
 <code>$SOURCE_DATE_EPOCH</code> environment variable set in the build environment).</p></div>
 <div class="ulist"><ul>
@@ -2021,7 +2021,32 @@ file in the build root.</p></div>
 does not take place.</p></div>
 </div>
 <div class="sect2">
-<h3 id="_building_with_ccache_or_sccache">4.5. Building with ccache or sccache</h3>
+<h3 id="_setting_deb_build_options_and_deb_build_profiles_for_debian_builds">4.5. Setting DEB_BUILD_OPTIONS and DEB_BUILD_PROFILES for Debian builds</h3>
+<div class="paragraph"><p>When building Debian source packages (<code>dsc</code> recipes), the project config
+can influence <code>dpkg-buildpackage</code> by defining the <code>%deb_build_options</code>
+and <code>%deb_build_profiles</code> macros. Their values are passed to the build as
+the <code>DEB_BUILD_OPTIONS</code> and <code>DEB_BUILD_PROFILES</code> environment variables,
+which is the Debian equivalent of tuning an rpm build through its build
+options.</p></div>
+<div class="paragraph"><p>Example:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>Macros:
+%deb_build_options nocheck nodoc
+%deb_build_profiles nodoc
+:Macros</code></pre>
+</div></div>
+<div class="paragraph"><p>The build profiles set via <code>%deb_build_profiles</code> are also honored when
+resolving the build dependencies, so the restriction formulas (for
+example <code>&lt;!nocheck&gt;</code> or <code>&lt;stage1&gt;</code>) in the <code>Build-Depends</code> are evaluated
+against the active profiles and the same set of packages is pulled in
+that the build will use.</p></div>
+<div class="paragraph"><p>The values are merged with the options and profiles that the build adds
+on its own, for example the <code>nocheck</code> option and the <code>cross</code> and
+<code>nocheck</code> profiles used for cross builds.</p></div>
+</div>
+<div class="sect2">
+<h3 id="_building_with_ccache_or_sccache">4.6. Building with ccache or sccache</h3>
 <div class="paragraph"><p>The usage of ccache or sccache can be enabled for each package by
 seting the <code>useccache:PACKAGE</code> build flag.</p></div>
 <div class="paragraph"><p>The ccache package will automatically be installed and configured.
@@ -2132,7 +2157,7 @@ package in the project.</p></div>
 </li>
 <li>
 <p>
-<code>container-timestamp:VALUE</code>&#8201;&#8212;&#8201;set a build timestamp for reproducibility (podman only)
+<code>container-timestamp:VALUE</code>&#8201;&#8212;&#8201;set a build timestamp for reproducibility
 </p>
 </li>
 </ul></div>
@@ -2369,7 +2394,7 @@ locked
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2026-04-21 15:02:40 CEST
+ 2026-07-15 12:55:28 CEST
 </div>
 </div>
 </body>
