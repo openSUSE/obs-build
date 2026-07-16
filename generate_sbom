@@ -1121,7 +1121,6 @@ if ($opts->{'type'} eq 'product') {
   $targettype = 'application';
   $dist = read_dist($toprocess);
   $pkgtype = pkgtype_from_dist($dist);
-  $files = gen_filelist($toprocess);
   #if it is a ubuntu id_like contains debian
   if ($pkgtype eq 'deb') {
     $pkgs = read_pkgs_deb($toprocess);
@@ -1129,6 +1128,7 @@ if ($opts->{'type'} eq 'product') {
     dump_rpmdb($toprocess, "$tmpdir/rpmdb");
     $pkgs = read_pkgs_rpmdb("$tmpdir/rpmdb");
   }
+  $files = gen_filelist($toprocess);
   $filepkgs = introspect_filelist($toprocess, $files);
 } elsif ($opts->{'type'} eq 'docker-archive' || $opts->{'type'} eq 'oci-archive') {
   # container tar case
