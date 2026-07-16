@@ -1121,6 +1121,7 @@ if ($opts->{'type'} eq 'product') {
   $targettype = 'application';
   $dist = read_dist($toprocess);
   $pkgtype = pkgtype_from_dist($dist);
+  $files = gen_filelist($toprocess);
   #if it is a ubuntu id_like contains debian
   if ($pkgtype eq 'deb') {
     $pkgs = read_pkgs_deb($toprocess);
@@ -1128,7 +1129,6 @@ if ($opts->{'type'} eq 'product') {
     dump_rpmdb($toprocess, "$tmpdir/rpmdb");
     $pkgs = read_pkgs_rpmdb("$tmpdir/rpmdb");
   }
-  $files = gen_filelist($toprocess);
   $filepkgs = introspect_filelist($toprocess, $files);
 } elsif ($opts->{'type'} eq 'docker-archive' || $opts->{'type'} eq 'oci-archive') {
   # container tar case
@@ -1136,13 +1136,13 @@ if ($opts->{'type'} eq 'product') {
   my $unpackdir = unpack_container($tmpdir, $toprocess, $opts->{'type'});
   $dist = read_dist($unpackdir);
   $pkgtype = pkgtype_from_dist($dist);
+  $files = gen_filelist($unpackdir);
   if ($pkgtype eq 'deb') {
     $pkgs = read_pkgs_deb($unpackdir);
   } elsif ($pkgtype eq 'rpm') {
     dump_rpmdb($unpackdir, "$tmpdir/rpmdb");
     $pkgs = read_pkgs_rpmdb("$tmpdir/rpmdb");
   }
-  $files = gen_filelist($unpackdir);
   $filepkgs = introspect_filelist($unpackdir, $files);
 } else {
   die("Unsupported content type $opts->{'type'}\n");
