@@ -80,6 +80,7 @@ RECIPEPATH=
 SRCDIR=
 BUILD_JOBS=
 BUILD_THREADS=
+BUILD_BUILDTIME=
 ABUILD_TARGET=
 CREATE_BASELIBS=
 USEUSEDFORBUILD=
@@ -1187,6 +1188,11 @@ while test -n "$1"; do
 	BUILD_THREADS="$ARG"
 	shift
       ;;
+      -buildtime)
+	needarg
+	BUILD_BUILDTIME="$ARG"
+	shift
+      ;;
       -extrapacks|-extra-packs|-X)
 	needarg
 	BUILD_EXTRA_PACKS="$BUILD_EXTRA_PACKS $ARG"
@@ -1749,6 +1755,7 @@ for RECIPEPATH in "${RECIPEFILES[@]}" ; do
     test -n "$DISTURL" && echo "BUILD_DISTURL='${DISTURL//"'"/$Q}'" >> $BUILD_ROOT/.buildenv
     test -n "$RELEASE" && echo "BUILD_RELEASE='${RELEASE//"'"/$Q}'" >> $BUILD_ROOT/.buildenv
     test -n "$BUILD_CHANGELOG_TIMESTAMP" && echo "BUILD_CHANGELOG_TIMESTAMP=$BUILD_CHANGELOG_TIMESTAMP" >> $BUILD_ROOT/.buildenv
+    test -n "$BUILD_BUILDTIME" && echo "BUILD_BUILDTIME=$BUILD_BUILDTIME" >> $BUILD_ROOT/.buildenv
 
     #
     # install the build environment

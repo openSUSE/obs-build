@@ -546,7 +546,7 @@ perform_image_bundle() {
         if ! contains_kiwi_containers "$BUILD_ROOT/$TOPDIR/KIWI.bundle" ; then
             for format in $(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ sbom | sort -u) ; do
                 echo "Generating $format sbom file for KIWIROOT-$imgtype"
-                generate_sbom --format "$format" --dir "$BUILD_ROOT/$TOPDIR/KIWIROOT-$imgtype" > "$BUILD_ROOT/$TOPDIR/OTHER/kiwi-sbom.json" || cleanup_and_exit 1 "generate_sbom failed!"
+                generate_sbom --format "$format" ${BUILD_BUILDTIME:+--buildtime=$BUILD_BUILDTIME} --dir "$BUILD_ROOT/$TOPDIR/KIWIROOT-$imgtype" > "$BUILD_ROOT/$TOPDIR/OTHER/kiwi-sbom.json" || cleanup_and_exit 1 "generate_sbom failed!"
                 for packages in "$BUILD_ROOT/$TOPDIR/KIWI.bundle/"*.packages; do
                     cp "$BUILD_ROOT/$TOPDIR/OTHER/kiwi-sbom.json" "${packages%.packages}.${format/cyclonedx/cdx}.json"
                 done
@@ -753,7 +753,7 @@ postprocess_kiwi_containers() {
 		echo "Generating $format sbom file for ${r##*/}"
 		containerformat="docker"
 		test "${r%.oci.tar}" != "$r" && containerformat="oci"
-		generate_sbom --format "$format" "--container-${containerformat}-archive" "$r" > "${r%.tar}.${format/cyclonedx/cdx}.json"
+		generate_sbom --format "$format" ${BUILD_BUILDTIME:+--buildtime=$BUILD_BUILDTIME} "--container-${containerformat}-archive" "$r" > "${r%.tar}.${format/cyclonedx/cdx}.json"
 		test -s "${r%.tar}.${format/cyclonedx/cdx}.json" || rm -f "${r%.tar}.${format/cyclonedx/cdx}.json"
 	    done
 	else

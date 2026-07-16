@@ -50,6 +50,8 @@ use Build::IntrospectRust;
 my $tool_name = 'obs_build_generate_sbom';
 my $tool_version = '1.1';
 
+my $buildtime;
+
 my $config = {};
 
 sub unify {
@@ -788,7 +790,7 @@ sub cyclonedx_encode_header {
     'specVersion' => '1.5',
     'version' => 1,
     'metadata' => {
-      'timestamp' => rfc3339time(time()),
+      'timestamp' => rfc3339time($buildtime),
       'tools' => [ {'name' => $tool_name, 'version' => $tool_version } ],
       'component' => { 'bom-ref' => 'root', 'type' => ($type || 'application'), 'name' => $subjectname },
     },
@@ -962,7 +964,7 @@ sub spdx_encode_header {
     'name' => $subjectname,
   };
   my $creationinfo = {
-    'created' => rfc3339time(time()),
+    'created' => rfc3339time($buildtime),
     'creators' => [ "Tool: $tool_name-$tool_version" ],
     'licenseListVersion' => $Build::SPDX::licenseListVersion,
   };
@@ -1057,6 +1059,7 @@ my $known_options = {
   'archpath' => 'arch:',
   'configdir' => ':',
   'no-files-generation' => '',
+  'buildtime' => ':',
 };
 
 my ($opts, @args) = Build::Options::parse_options($known_options, @ARGV);
@@ -1090,6 +1093,8 @@ $config = Build::read_config_dist($opts->{'dist'}, $opts->{'arch'} || 'noarch', 
 
 my $no_files_generation = $opts->{'no-files-generation'};
 $no_files_generation = ($config->{'buildflags:spdx-files-generation'} || '') eq 'no' unless defined $no_files_generation;
+
+$buildtime = $opts->{'buildtime'} || time();
 
 my $targettype;
 
