@@ -51,10 +51,10 @@ sub find_recipe {
   # try again without last components
   return $files{"$1.$type"} if $pkg =~ /^(.*?)\./ && $files{"$1.$type"};
   my @files = grep {/\.$type$/} keys %files;
-  @files = grep {/^\Q$pkg\E/i} @files if @files > 1;
+  @files = grep {/^\Q$pkg\E/i} @files if $pkg ne '.' && @files > 1;
   return $files{$files[0]} if @files == 1;
   if (@files > 1) {
-    @files = sort @files;
+    @files = sort {length($a) <=> length($b) || $a cmp $b} @files;
     return $files{$files[0]};
   }
   return $files{'debian.control'} if $type eq 'dsc' && $files{'debian.control'};
@@ -218,6 +218,17 @@ sub looks_like_packagedir {
     return 1 if $file eq 'APKBUILD';
   }
   return 0;
+}
+
+sub guess_package_name {
+  my ($p, $bconf) = @_;
+  my $buildtype = $bconf->{'type'} || '';
+  $buildtype = 'spec' if !$buildtype || $buildtype eq 'UNDEFINED';
+  my $recipe = find_recipe($p, $buildtype);
+  return undef unless $recipe;
+  my $d = eval { Build::parse_typed($bconf, "$p->{'dir'}/$recipe",  Build::recipe2buildtype($recipe)) };
+  return $d->{'name'} if $d->{'name'} && $d->{'name'} =~ /^[^\.\/_][^\/]+$/;
+  return undef;
 }
 
 1;

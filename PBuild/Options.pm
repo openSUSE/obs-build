@@ -138,6 +138,7 @@ my $pbuild_options = {
   'without' => \&definitions_special,
   'update-assets' => '',
   'orphan' => '',
+  'orphan-multi' => '',
 };
 
 sub definitions_special {
@@ -231,7 +232,7 @@ EOS
 sub merge_old_options {
   my ($opts, $oldopts) = @_;
   my $newopts = {};
-  for (qw{preset dist repo hostrepo registry assets obs configdir root jobs threads buildjobs orphan}) {
+  for (qw{preset dist repo hostrepo registry assets obs configdir root jobs threads buildjobs orphan orphan-multi}) {
     $opts->{$_} = $oldopts->{$_} if !exists($opts->{$_}) && exists($oldopts->{$_});
     $newopts->{$_} = $opts->{$_} if exists($opts->{$_});
   }
