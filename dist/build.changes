@@ -1,4 +1,19 @@
 -------------------------------------------------------------------
+Tue Jul 21 09:21:49 UTC 2026 - Adrian Schröter <adrian@suse.de>
+
+- Add diffutils dependency for cmp command
+- RemoteRepo: support more repotype aliases
+- Fix curl/wget option setting
+- Fold debtransformbz2/xz/zip/zstd into debtransformarchive
+- Refactor bininfo generation
+- Add support for DEB_BUILD_OPTIONS/PROFILES via prjconf
+- Improve default name generation for containers
+- Sync TW config 20260703 - No more py3.11
+- Add a --buildtime option to set the build time for reproducible builds
+- Pass BUILD_BUILDTIME to the vm
+- Do not process the creatarchive flag twice
+
+-------------------------------------------------------------------
 Tue Jun 23 11:29:43 UTC 2026 - Adrian Schröter <adrian@suse.de>
 
 - pbuild:
