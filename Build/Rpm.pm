@@ -1174,6 +1174,7 @@ sub parse {
       $macros{uc($tagtype) . "URL$num"} = $val;
       $ret->{$tag} = $val;
       if ($remoteasset) {
+	$remoteasset->{'url'} ||= $val if $val =~ /\/\//;
 	if ($remoteasset->{'url'} && !defined($remoteasset->{'file'}) && $val =~ /([^\/\.][^\/]+$)/) {
 	  my $fn = $1;
 	  if ($remoteasset->{'url'} =~ /^git(?:\+https?)?:.*\/([^\/]+?)(?:\#[^\#\/]+)?$/) {
@@ -1187,10 +1188,8 @@ sub parse {
 	    $remoteasset->{'file'} = $fn;
 	  }
 	}
-        $remoteasset->{'url'} ||= $val;
         push @{$ret->{'remoteassets'}}, $remoteasset if %$remoteasset;
-      }
-      if ($createarchive) {
+      } elsif ($createarchive) {
 	if ($val =~ /([^\/\.][^\/]+$)/) {
 	  my $fn = $1;
 	  my $gfn = $createarchive->{'dir'};
@@ -1198,7 +1197,6 @@ sub parse {
 	  if ($fn && $gfn) {
 	    $dirassets{$gfn} = 1;
 	    $moveassets{$gfn} = $fn if $fn ne $gfn;
-	    $remoteasset->{'finalfile'} = $fn if $remoteasset && $fn ne $gfn;
 	  }
 	}
       }
