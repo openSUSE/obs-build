@@ -503,8 +503,7 @@ sub parse {
 }
 
 sub showcontainerinfo {
-  my ($disturl, $release, $annotationfile);
-  my $buildtime;
+  my ($disturl, $release, $annotationfile, $buildtime);
   while (@ARGV) {
     if (@ARGV > 2 && $ARGV[0] eq '--disturl') {
       (undef, $disturl) = splice(@ARGV, 0, 2);

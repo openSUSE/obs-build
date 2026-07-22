@@ -655,7 +655,7 @@ sub show {
 }
 
 sub showcontainerinfo {
-  my ($disturl, $arch, $buildflavor, $release, $annotationfile);
+  my ($disturl, $arch, $buildflavor, $release, $annotationfile, $buildtime);
   while (@ARGV) {
     if (@ARGV > 2 && $ARGV[0] eq '--disturl') {
       (undef, $disturl) = splice(@ARGV, 0, 2);
@@ -667,6 +667,8 @@ sub showcontainerinfo {
       (undef, $release) = splice(@ARGV, 0, 2);
     } elsif (@ARGV > 2 && $ARGV[0] eq '--annotationfile') {
       (undef, $annotationfile) = splice(@ARGV, 0, 2);
+    } elsif (@ARGV > 2 && $ARGV[0] eq '--buildtime') {
+      (undef, $buildtime) = splice(@ARGV, 0, 2);
     } else {
       last;
     }
@@ -709,7 +711,7 @@ sub showcontainerinfo {
     push @repos, { 'url' => $repo->{'url'}, '_type' => {'priority' => 'number'} };
     $repos[-1]->{'priority'} = $repo->{'priority'} if defined $repo->{'priority'};
   }
-  my $buildtime = time();
+  $buildtime = time() unless defined $buildtime;
   my $containerinfo = {
     'name' => $d->{'name'},
     'buildtime' => $buildtime,
