@@ -504,6 +504,7 @@ sub parse {
 
 sub showcontainerinfo {
   my ($disturl, $release, $annotationfile);
+  my $buildtime;
   while (@ARGV) {
     if (@ARGV > 2 && $ARGV[0] eq '--disturl') {
       (undef, $disturl) = splice(@ARGV, 0, 2);
@@ -511,6 +512,8 @@ sub showcontainerinfo {
       (undef, $release) = splice(@ARGV, 0, 2);
     } elsif (@ARGV > 2 && $ARGV[0] eq '--annotationfile') {
       (undef, $annotationfile) = splice(@ARGV, 0, 2);
+    } elsif (@ARGV > 2 && $ARGV[0] eq '--buildtime') {
+      (undef, $buildtime) = splice(@ARGV, 0, 2);
     } else {
       last;
     }
@@ -552,7 +555,7 @@ sub showcontainerinfo {
       $repos[-1]->{'priority'} = $annorepo->{'priority'} if defined $annorepo->{'priority'};
     }
   }
-  my $buildtime = time();
+  $buildtime = time() unless defined $buildtime;
   my $containerinfo = {
     'buildtime' => $buildtime,
     '_type' => {'buildtime' => 'number'},
