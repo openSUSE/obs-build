@@ -313,7 +313,7 @@ if ($opts->{'orphan'} || $opts->{'orphan-multi'}) {
   @pkgs = PBuild::Source::find_packages($dir, \%pkgdirs);
 }
 die("no packages found in '$dir'\n") unless @pkgs || $opts->{'repoquery'} || $opts->{'repoquery-host'};
-print "found ".PBuild::Util::plural(scalar(@pkgs), 'package')."\n" unless $opts->{'orphan'};
+print "found ".PBuild::Util::plural(scalar(@pkgs), 'package')."\n" unless $opts->{'orphan'} || $opts->{'orphan-multi'};
 
 my $assetmgr = PBuild::AssetMgr::create("$dir/.pbuild/_assets");
 for my $assetsurl (@{$opts->{'assets'} || []}) {
