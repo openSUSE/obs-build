@@ -37,6 +37,10 @@ sub bearer_authenticate {
   my $realm = $auth_param->{'realm'};
   die("bearer auth did not provide a realm\n") unless $realm;
   die("bearer realm is not http/https\n") unless $realm =~ /^https?:\/\//i;
+  my $url = $proxy ? $request->{proxy} : $request->uri_canonical;
+  my $host_port = $url->host_port;
+  # Remove previously installed handler for an old token
+  $ua->set_my_handler("request_prepare", undef, 'm_host_port' => $host_port);
   my $auri = URI->new($realm);
   my @afields;
   for ('service', 'scope') {
@@ -49,9 +53,7 @@ sub bearer_authenticate {
   my $reply = JSON::XS::decode_json($ares->decoded_content);
   my $token = $reply->{'token'} || $reply->{'access_token'};
   return $response unless $token;
-  my $url = $proxy ? $request->{proxy} : $request->uri_canonical;
-  my $host_port = $url->host_port;
-  my $h = $ua->get_my_handler('request_prepare', 'm_host_port' => $host_port, sub {
+  $ua->get_my_handler('request_prepare', 'm_host_port' => $host_port, sub {
     $_[0]{callback} = sub { $_[0]->header('Authorization' => "Bearer $token") };
   });
   return $ua->request($request->clone, $arg, $size, $response);
