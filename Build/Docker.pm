@@ -78,6 +78,17 @@ sub quote {
   return $str;
 }
 
+sub quoteline {
+  my ($line, $vars) = @_;
+  $line =~ s/%/%25/g;
+  $line =~ s/\\(.)/sprintf("%%%02X", ord($1))/ge;
+  while ($line =~ /([\"\'])/) {
+    my $q = $1;
+    last unless $line =~ s/$q(.*?)$q/quote($1, $q, $vars)/e;
+  }
+  return $line;
+}
+
 sub addrepo {
   my ($ret, $url, $prio) = @_;
 
@@ -372,12 +383,7 @@ sub parse {
     ($cmd, $line) = split(' ', $line, 2);
     $cmd = uc($cmd);
     # escape and unquote
-    $line =~ s/%/%25/g;
-    $line =~ s/\\(.)/sprintf("%%%02X", ord($1))/ge;
-    while ($line =~ /([\"\'])/) {
-      my $q = $1;
-      last unless $line =~ s/$q(.*?)$q/quote($1, $q, $vars)/e;
-    }
+    $line = quoteline($line, $vars) if $line =~ /[%\\\"\']/;
     if ($cmd eq 'FROM') {
       $vars = { %$vars_meta };		# reset vars
     }
@@ -413,29 +419,48 @@ sub parse {
       $from_seen = 1;
     } elsif ($cmd eq 'RUN') {
       $line =~ s/#.*//;	# get rid of comments
-      for my $l (split(/(?:\||\|\||\&|\&\&|;|\)|\()/, $line)) {
-	$l =~ s/^\s+//;
-	$l =~ s/\s+$//;
-	$l = expandvars($l, $vars) if $l =~ /\$/;
-	@args = split(/[ \t]+/, $l);
-	s/%([a-fA-F0-9]{2})/chr(hex($1))/ge for @args;
-	next unless @args;
-	my $rcmd = shift @args;
-	$rcmd = shift @args if @args && ($rcmd eq 'then' || $rcmd eq 'else' || $rcmd eq 'elif' || $rcmd eq 'if' || $rcmd eq 'do');
-	if ($rcmd eq 'zypper') {
-	  cmd_zypper($ret, @args);
-	} elsif ($rcmd eq 'yum' || $rcmd eq 'dnf' || $rcmd eq 'microdnf') {
-	  cmd_dnf($ret, @args);
-	} elsif ($rcmd eq 'apt-get') {
-	  cmd_apt_get($ret, @args);
-	} elsif ($rcmd eq 'apk') {
-	  cmd_apk($ret, @args);
-	} elsif ($rcmd eq 'curl') {
-	  cmd_curl($ret, @args);
-	} elsif ($rcmd eq 'wget') {
-	  cmd_wget($ret, @args);
-	} elsif ($rcmd eq 'obs_pkg_mgr') {
-	  cmd_obs_pkg_mgr($ret, @args);
+      my @runlines = ($line);
+      if ($line =~ /^<<(\S+)/) {
+	my $delim = $1;
+	@runlines = ();
+	while (@lines) {
+	  my $line = shift @lines;
+	  last if $line =~ /^\Q$delim\E(?:\s|$)/;
+	  while (@lines && $line =~ s/\\[ \t]*$//) {
+	    shift @lines while @lines && $lines[0] =~ /^\s*#/;
+	    $line .= shift(@lines) if @lines;
+	  }
+	  $line =~ s/^\s+//;
+	  $line =~ s/\s+$//;
+	  $line = quoteline($line, $vars) if $line =~ /[%\\\"\']/;
+	  push @runlines, $line;
+	}
+      }
+      for my $runline (@runlines) {
+	for my $l (split(/(?:\||\|\||\&|\&\&|;|\)|\()/, $runline)) {
+	  $l =~ s/^\s+//;
+	  $l =~ s/\s+$//;
+	  $l = expandvars($l, $vars) if $l =~ /\$/;
+	  @args = split(/[ \t]+/, $l);
+	  s/%([a-fA-F0-9]{2})/chr(hex($1))/ge for @args;
+	  next unless @args;
+	  my $rcmd = shift @args;
+	  $rcmd = shift @args if @args && ($rcmd eq 'then' || $rcmd eq 'else' || $rcmd eq 'elif' || $rcmd eq 'if' || $rcmd eq 'do');
+	  if ($rcmd eq 'zypper') {
+	    cmd_zypper($ret, @args);
+	  } elsif ($rcmd eq 'yum' || $rcmd eq 'dnf' || $rcmd eq 'microdnf') {
+	    cmd_dnf($ret, @args);
+	  } elsif ($rcmd eq 'apt-get') {
+	    cmd_apt_get($ret, @args);
+	  } elsif ($rcmd eq 'apk') {
+	    cmd_apk($ret, @args);
+	  } elsif ($rcmd eq 'curl') {
+	    cmd_curl($ret, @args);
+	  } elsif ($rcmd eq 'wget') {
+	    cmd_wget($ret, @args);
+	  } elsif ($rcmd eq 'obs_pkg_mgr') {
+	    cmd_obs_pkg_mgr($ret, @args);
+	  }
 	}
       }
     } elsif ($cmd eq 'ENV') {
