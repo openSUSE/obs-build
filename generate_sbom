@@ -1213,8 +1213,16 @@ sub spdx3_encode_pkg {
   if(!$p->{'skip_external_refs'}) {
     my $purlurl = gen_purl($p, $distro, $pkgtype);
     $spdx->{'software_packageUrl'} = $purlurl if $purlurl;
-###    push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'OTHER', 'referenceType' => 'vcs', 'referenceLocator' => $p->{'VCS'} } if $p->{'VCS'};
-###    push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'OTHER', 'referenceType' => 'obs-disturl', 'referenceLocator' => $p->{'DISTURL'} } if $p->{'DISTURL'};
+    push @{$spdx->{'externalRef'}}, {
+      'type'            => 'ExternalRef',
+      'externalRefType' => 'vcs',
+      'locator'         => [ $p->{'VCS'} ]
+    } if $p->{'VCS'};
+    push @{$spdx->{'externalRef'}}, {
+      'type'            => 'ExternalRef',
+      'externalRefType' => 'obs-disturl',
+      'locator'         => [ $p->{'DISTURL'} ]
+    } if $p->{'DISTURL'};
   }
 
   $spdx->{'software_primaryPurpose'} = $p->{'primaryPackagePurpose'} if $p->{'primaryPackagePurpose'};
@@ -1307,6 +1315,16 @@ sub spdx3_encode_header {
   $document->{'spdxId'} = 'document0';
   push @{$doc->[0]->[1]}, \$document->{'spdxId'};
   push @$doc, $document;
+  push @{$rootspdx->{'externalRef'}}, {
+    'type'            => 'ExternalRef',
+    'externalRefType' => 'vcs',
+    'locator'         => [ $vcs ]
+  } if $vcs;
+  push @{$rootspdx->{'externalRef'}}, {
+    'type'            => 'ExternalRef',
+    'externalRefType' => 'obs-disturl',
+    'locator'         => [ $disturl ]
+  } if $disturl;
   spdx3_encode_pkg($doc, $rootp, undef, '');
   spdx3_encode_one_relation($doc, {'spdx_id' => 'document0'}, $rootp, 'DESCRIBES');
   return $doc;
