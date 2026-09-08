@@ -1433,7 +1433,7 @@ $config = Build::read_config_dist($opts->{'dist'}, $opts->{'arch'} || 'noarch', 
 my $no_files_generation = $opts->{'no-files-generation'};
 $no_files_generation = ($config->{'buildflags:spdx-files-generation'} || '') eq 'no' unless defined $no_files_generation;
 
-my $use_ugly_output = $opts->{'no-pretty'} || (!$no_files_generation ? 'yes' : '');
+my $use_no_pretty_output = $opts->{'no-pretty'} || (!$no_files_generation ? 'yes' : '');
 
 $buildtime = $opts->{'buildtime'} || time();
 
@@ -1699,5 +1699,5 @@ if ($opts->{'intoto'}) {
   };
 }
 
-print Build::SimpleJSON::unparse($doc, 'template' => $json_template, 'keepspecial' => 1, 'ugly' => ($use_ugly_output ? 1 : 0))."\n";
+print Build::SimpleJSON::unparse($doc, 'template' => $json_template, 'keepspecial' => 1, 'no_pretty' => ($use_no_pretty_output ? 1 : 0))."\n";
 
