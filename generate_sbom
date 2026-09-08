@@ -1103,11 +1103,11 @@ sub spdx3_encode_disjunctive_license {
 sub spdx3_encode_tokenized_license {
   my ($doc, $n) = @_;
   my @n = ('START', @$n);
-  my $l = ''; 
+  my $l = '';
   my $lastop;
   my @members;
   while (@n) {
-    my ($op, $t) = splice(@n, 0, 2); 
+    my ($op, $t) = splice(@n, 0, 2);
     if ($op ne 'START' && $op ne 'PLUS') {
       $l .= " $op ";
       return undef if $lastop && $op ne $lastop;
@@ -1180,7 +1180,7 @@ sub spdx3_encode_pkg {
   $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
   my $evr = $vr;
   $evr = "$p->{'EPOCH'}:$evr" if $p->{'EPOCH'};
-  
+
   my $spdx = { 'type' => 'software_Package', 'name' => $p->{'NAME'}, 'creationInfo' => '_:creationInfo_0' };
   $spdx->{'software_packageVersion'} = $evr if defined $evr;
   if ($p->{'VENDOR'}) {
@@ -1384,6 +1384,14 @@ Supported content
   --container-oci-archive CONTAINER_ARCHIVE
      An container archive providing a system
 
+Supported options for generation
+================================
+
+  --no-files-generation
+     Skip generation of filelists
+
+  --no-pretty
+     Reduce size by stripping white-spaces in JSON output. Default when file lists are generated.
 ";
 }
 
@@ -1407,6 +1415,7 @@ my $known_options = {
   'archpath' => 'arch:',
   'configdir' => ':',
   'no-files-generation' => '',
+  'no-pretty' => '',
   'buildtime' => ':',
 };
 
@@ -1441,6 +1450,8 @@ $config = Build::read_config_dist($opts->{'dist'}, $opts->{'arch'} || 'noarch', 
 
 my $no_files_generation = $opts->{'no-files-generation'};
 $no_files_generation = ($config->{'buildflags:spdx-files-generation'} || '') eq 'no' unless defined $no_files_generation;
+
+my $use_no_pretty_output = $opts->{'no-pretty'} || (!$no_files_generation ? 'yes' : '');
 
 $buildtime = $opts->{'buildtime'} || time();
 
@@ -1706,5 +1717,5 @@ if ($opts->{'intoto'}) {
   };
 }
 
-print Build::SimpleJSON::unparse($doc, 'template' => $json_template, 'keepspecial' => 1)."\n";
+print Build::SimpleJSON::unparse($doc, 'template' => $json_template, 'keepspecial' => 1, 'no_pretty' => ($use_no_pretty_output ? 1 : 0))."\n";
 

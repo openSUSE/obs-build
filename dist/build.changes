@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Tue Sep  8 08:53:23 UTC 2026 - Adrian Schröter <adrian@suse.de>
+
+- SBOM:
+  * Allow to create reduced SBOM of containers via 
+    #!SbomNoFilesGeneration
+  * --no-pretty switch for stripping whitespace
+
+-------------------------------------------------------------------
 Tue Sep  1 08:56:40 UTC 2026 - Adrian Schröter <adrian@suse.de>
 
 - generate_sbom:
