@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Thu Sep 10 09:46:56 UTC 2026 - Adrian Schröter <adrian@suse.de>
+
+- SBOM:
+  * fix SPDXv3 format
+  * export VCS and DISTURL also to SBOMs of kiwi and docker builds
+
+-------------------------------------------------------------------
 Tue Sep  8 08:53:23 UTC 2026 - Adrian Schröter <adrian@suse.de>
 
 - SBOM:
