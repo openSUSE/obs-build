@@ -1319,8 +1319,8 @@ sub spdx3_encode_header {
   push @{$document->{'externalRef'}}, {
     'type'            => 'ExternalRef',
     'externalRefType' => 'vcs',
-    'locator'         => [ $vcs ]
-  } if $vcs;
+    'locator'         => [ $_ ]
+  } for grep {defined $_ && $_ ne ''} @{$vcss || []};
   push @{$document->{'externalRef'}}, {
     'type'            => 'ExternalRef',
     'externalRefType' => 'obs-disturl',
@@ -1328,16 +1328,6 @@ sub spdx3_encode_header {
   } if $disturl;
   push @{$doc->[0]->[1]}, \$document->{'spdxId'};
   push @$doc, $document;
-  push @{$rootp->{'externalRef'}}, {
-    'type'            => 'ExternalRef',
-    'externalRefType' => 'vcs',
-    'locator'         => [ $_ ]
-  } for grep {defined $_ && $_ ne ''} @{$vcss || []};
-  push @{$rootp->{'externalRef'}}, {
-    'type'            => 'ExternalRef',
-    'externalRefType' => 'obs-disturl',
-    'locator'         => [ $disturl ]
-  } if $disturl;
   spdx3_encode_pkg($doc, $rootp, undef, '');
   spdx3_encode_one_relation($doc, {'spdx_id' => 'document0'}, $rootp, 'DESCRIBES');
   return $doc;
