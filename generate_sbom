@@ -790,7 +790,7 @@ sub cyclonedx_encode_relations {
 }
 
 sub cyclonedx_encode_header {
-  my ($subjectname, $type, $disturl, $vcs) = @_;
+  my ($subjectname, $type, $disturl, $vcss) = @_;
   my $cyc = {
     'bomFormat' => 'CycloneDX',
     'specVersion' => '1.5',
@@ -802,7 +802,7 @@ sub cyclonedx_encode_header {
     },
   };
   push @{$cyc->{'metadata'}->{'component'}->{'externalReferences'}}, { 'url' => $disturl, 'type' => 'build-meta' } if $disturl;
-  push @{$cyc->{'metadata'}->{'component'}->{'externalReferences'}}, { 'url' => $vcs, 'type' => 'vcs' } if $vcs;
+  push @{$cyc->{'metadata'}->{'component'}->{'externalReferences'}}, { 'url' => $_, 'type' => 'vcs' } for grep {defined $_ && $_ ne ''} @{$vcss || []};
   return $cyc;
 }
 
@@ -962,7 +962,7 @@ sub spdx_encode_relations {
 }
 
 sub spdx_encode_header {
-  my ($subjectname, $type, $disturl, $vcs) = @_;
+  my ($subjectname, $type, $disturl, $vcss) = @_;
   my $spdx = {
     'spdxVersion' => 'SPDX-2.3',
     'dataLicense' => 'CC0-1.0',
@@ -981,7 +981,7 @@ sub spdx_encode_header {
     primaryPackagePurpose => uc($type),
     skip_external_refs => 1
   }, undef, undef, {});
-  push @{$rootspdx->{'externalRefs'}}, { 'referenceCategory' => 'OTHER', 'referenceType' => 'vcs', 'referenceLocator' => $vcs } if $vcs;
+  push @{$rootspdx->{'externalRefs'}}, { 'referenceCategory' => 'OTHER', 'referenceType' => 'vcs', 'referenceLocator' => $_ } for grep {defined $_ && $_ ne ''} @{$vcss || []};
   push @{$rootspdx->{'externalRefs'}}, { 'referenceCategory' => 'OTHER', 'referenceType' => 'obs-disturl', 'referenceLocator' => $disturl } if $disturl;
   $spdx->{'packages'} = [ $rootspdx ];
   return $spdx;
@@ -1224,6 +1224,7 @@ sub spdx3_encode_pkg {
       'locator'         => [ $p->{'DISTURL'} ]
     } if $p->{'DISTURL'};
   }
+  push @{$spdx->{'externalRef'}}, @{$p->{'externalRef'}} if @{$p->{'externalRef'} || []};
 
   $spdx->{'software_primaryPurpose'} = $p->{'primaryPackagePurpose'} if $p->{'primaryPackagePurpose'};
   if ($p->{'spdx_id'}) {
@@ -1303,14 +1304,16 @@ sub spdx3_gen_spdxid {
 }
 
 sub spdx3_encode_header {
-  my ($subjectname, $type, $disturl, $vcs, $rootp) = @_;
+  my ($subjectname, $type, $disturl, $vcss, $rootp, $agentname, $agentspdxid) = @_;
   my $doc = [];
   push @$doc, [ '1', [], {}, {}];
   my $tool = { 'type' => 'Tool', 'name' => "$tool_name-$tool_version", 'creationInfo' => '_:creationInfo_0' };
   spdx3_gen_spdxid($doc, $tool);
-  my $ci = { '@id' => '_:creationInfo_0', 'type' => 'CreationInfo', 'specVersion' => '3.0.1', 'createdUsing' => [ $tool->{'spdxId'} ], 'created' => rfc3339time($buildtime) };
+  my $agent = { 'type' => 'SoftwareAgent', 'name' => $agentname, 'creationInfo' => '_:creationInfo_0' };
+  $agent->{'spdxId'} = $agentspdxid;
+  my $ci = { '@id' => '_:creationInfo_0', 'type' => 'CreationInfo', 'specVersion' => '3.0.1', 'createdBy' => [ $agent->{'spdxId'} ], 'createdUsing' => [ $tool->{'spdxId'} ], 'created' => rfc3339time($buildtime) };
   push @{$doc->[0]->[1]}, \$ci->{'createdUsing'}->[0];
-  push @$doc, $ci, $tool;
+  push @$doc, $ci, $tool, $agent;
   my $document = { 'type' => 'SpdxDocument', 'dataLicense' => 'http://spdx.org/licenses/CC0-1.0', 'creationInfo' => '_:creationInfo_0' };
   $document->{'spdxId'} = 'document0';
   push @{$document->{'externalRef'}}, {
@@ -1325,6 +1328,16 @@ sub spdx3_encode_header {
   } if $disturl;
   push @{$doc->[0]->[1]}, \$document->{'spdxId'};
   push @$doc, $document;
+  push @{$rootp->{'externalRef'}}, {
+    'type'            => 'ExternalRef',
+    'externalRefType' => 'vcs',
+    'locator'         => [ $_ ]
+  } for grep {defined $_ && $_ ne ''} @{$vcss || []};
+  push @{$rootp->{'externalRef'}}, {
+    'type'            => 'ExternalRef',
+    'externalRefType' => 'obs-disturl',
+    'locator'         => [ $disturl ]
+  } if $disturl;
   spdx3_encode_pkg($doc, $rootp, undef, '');
   spdx3_encode_one_relation($doc, {'spdx_id' => 'document0'}, $rootp, 'DESCRIBES');
   return $doc;
@@ -1380,9 +1393,28 @@ Supported content
   --rpmmd DIRECTORY
      A directory providing rpm-md meta data. A 'repodata/repomd.xml' file is expected.
 
-  --container-docker-archive CONTAINER_ARCHIVE
-  --container-oci-archive CONTAINER_ARCHIVE
-     An container archive providing a system
+   --container-docker-archive CONTAINER_ARCHIVE
+   --container-oci-archive CONTAINER_ARCHIVE
+      An container archive providing a system
+
+Additional metadata
+===================
+
+  --vcs URL
+     Add a version control system URL to the root component of the SBOM.
+     This option can be given multiple times to reference multiple
+     source repositories.
+
+createdBy agent
+===============
+
+   The createdBy field of the SBOM creationInfo references a SoftwareAgent.
+   By default a SoftwareAgent named 'build' with the spdxId
+   https://www.openSUSE.org/Agent/build is used.
+
+  --obsname NAME
+     Use the name 'Open Build Service' and use
+     https://NAME/Agent/OBS-Service as the agent's spdxId instead.
 
 Supported options for generation
 ================================
@@ -1409,7 +1441,7 @@ my $known_options = {
   'help' => '',
   'h' => 'help',
   'dist' => ':',
-  'vcs' => ':',
+  'vcs' => '::',
   'disturl' => ':',
   'arch' => ':',
   'archpath' => 'arch:',
@@ -1417,6 +1449,7 @@ my $known_options = {
   'no-files-generation' => '',
   'no-pretty' => '',
   'buildtime' => ':',
+  'obsname' => ':',
 };
 
 my ($opts, @args) = Build::Options::parse_options($known_options, @ARGV);
@@ -1454,6 +1487,13 @@ $no_files_generation = ($config->{'buildflags:spdx-files-generation'} || '') eq 
 my $use_no_pretty_output = $opts->{'no-pretty'} || (!$no_files_generation ? 'yes' : '');
 
 $buildtime = $opts->{'buildtime'} || time();
+
+my $agent_name = 'build';
+my $agent_spdxid = 'https://www.openSUSE.org/Agent/build';
+if ($opts->{'obsname'}) {
+  $agent_name = 'Open Build Service';
+  $agent_spdxid = "https://$opts->{'obsname'}/Agent/OBS-Service";
+}
 
 my $targettype;
 my $unpackdir;
@@ -1638,7 +1678,7 @@ if ($opts->{'format'} eq 'spdx') {
     primaryPackagePurpose => $targettype,
     skip_external_refs => 1
   };
-  $doc = spdx3_encode_header($subjectname, $targettype, $opts->{'disturl'}, $opts->{'vcs'}, $rootpkg);
+  $doc = spdx3_encode_header($subjectname, $targettype, $opts->{'disturl'}, $opts->{'vcs'}, $rootpkg, $agent_name, $agent_spdxid);
   for my $p (@$pkgs) {
     spdx3_encode_pkg($doc, $p, $distro, $pkgtype);
   }
