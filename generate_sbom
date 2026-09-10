@@ -1313,18 +1313,18 @@ sub spdx3_encode_header {
   push @$doc, $ci, $tool;
   my $document = { 'type' => 'SpdxDocument', 'dataLicense' => 'http://spdx.org/licenses/CC0-1.0', 'creationInfo' => '_:creationInfo_0' };
   $document->{'spdxId'} = 'document0';
-  push @{$doc->[0]->[1]}, \$document->{'spdxId'};
-  push @$doc, $document;
-  push @{$rootspdx->{'externalRef'}}, {
+  push @{$document->{'externalRef'}}, {
     'type'            => 'ExternalRef',
     'externalRefType' => 'vcs',
     'locator'         => [ $vcs ]
   } if $vcs;
-  push @{$rootspdx->{'externalRef'}}, {
+  push @{$document->{'externalRef'}}, {
     'type'            => 'ExternalRef',
     'externalRefType' => 'obs-disturl',
     'locator'         => [ $disturl ]
   } if $disturl;
+  push @{$doc->[0]->[1]}, \$document->{'spdxId'};
+  push @$doc, $document;
   spdx3_encode_pkg($doc, $rootp, undef, '');
   spdx3_encode_one_relation($doc, {'spdx_id' => 'document0'}, $rootp, 'DESCRIBES');
   return $doc;
