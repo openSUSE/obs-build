@@ -709,8 +709,13 @@ my $cyclonedx_json_template_supplier = {
 };
 
 my $cyclonedx_json_template_component = {
-  '_order' => [ qw{bom-ref type supplier manufacturer authors name version description cpe purl externalReferences properties } ],
+  '_order' => [ qw{bom-ref type supplier manufacturer authors name version description cpe purl externalReferences hashes mime-type licenses properties } ],
   'externalReferences' => { '_order' => [ qw{url comment type} ] },
+  'hashes' => { '_order' => [ qw{alg content} ] },
+  'licenses' => {
+    '_order' => [ qw{expression license} ],
+    'license' => { '_order' => [ qw{id name} ] },
+  },
   'supplier' => $cyclonedx_json_template_supplier,
   'manufacturer' => $cyclonedx_json_template_supplier,
 };
@@ -764,6 +769,28 @@ sub cyclonedx_encode_pkg {
   return $cyc;
 }
 
+sub cyclonedx_encode_file {
+  my ($f) = @_;
+  my $cyc = { 'type' => 'file', 'name' => $f->{'name'} };
+  $cyc->{'mime-type'} = $f->{'mime'} if $f->{'mime'};
+  push @{$cyc->{'hashes'}}, { 'alg' => 'SHA-256', 'content' => $f->{'sha256sum'} } if $f->{'sha256sum'};
+  if (!$f->{'cyc_id'}) {
+    my $fn = $f->{'name'};
+    $fn =~ s/\A\/+//s;
+    $fn =~ s/\/+\z//s;
+    $fn = 'root' if $fn eq '';
+    if (length($fn) > 42) {
+      1 while length($fn) > 42 && $fn =~ s/.*?\///;
+      $fn = "...".substr($fn, -42);
+    }
+    my $id = "$fn-".Digest::MD5::md5_hex($f->{'name'}.($f->{'sha256sum'} || ''));
+    $id =~ s/[^a-zA-Z0-9\.\-]/-/g;
+    $f->{'cyc_id'} = "file:$id";
+  }
+  $cyc->{'bom-ref'} = $f->{'cyc_id'};
+  return $cyc;
+}
+
 sub cyclonedx_encode_dist {
   my ($dist) = @_;
   my $cyc = {
@@ -780,11 +807,11 @@ sub cyclonedx_encode_dist {
 sub cyclonedx_encode_relations {
   my ($p) = @_;
   return unless $p->{'cyc_id'};
-  my @r = grep {$_->[0]->{'cyc_id'} && $_->[1] eq 'DEPENDS_ON'} @{$p->{'RELATION'} || []};
+  my @r = grep {$_->[0]->{'cyc_id'} && ($_->[1] eq 'DEPENDS_ON' || $_->[1] eq 'CONTAINS')} @{$p->{'RELATION'} || []};
   return unless @r;
   my $cyc = {
     'ref' => $p->{'cyc_id'},
-    'dependsOn' => [ map {$_->[0]->{'cyc_id'}} @r ],
+    'dependsOn' => [ unify(map {$_->[0]->{'cyc_id'}} @r) ],
   };
   return $cyc;
 }
@@ -1716,6 +1743,12 @@ if ($opts->{'format'} eq 'spdx') {
   for my $p (@{$filepkgs || []}) {
     push @{$doc->{'components'}}, cyclonedx_encode_pkg($p, undef, $p->{'pkgtype'});
   }
+  if (!$no_files_generation) {
+    for my $f (@{$files || []}) {
+      next if $f->{'SKIP'};
+      push @{$doc->{'components'}}, cyclonedx_encode_file($f);
+    }
+  }
   if ($dist && %$dist) {
     push @{$doc->{'components'}}, cyclonedx_encode_dist($dist);
   }
@@ -1724,6 +1757,11 @@ if ($opts->{'format'} eq 'spdx') {
   }
   for my $p (@{$filepkgs || []}) {
     push @{$doc->{'dependencies'}}, cyclonedx_encode_relations($p);
+  }
+  if (!$no_files_generation) {
+    for my $f (@{$files || []}) {
+      push @{$doc->{'dependencies'}}, cyclonedx_encode_relations($f) unless $f->{'SKIP'};
+    }
   }
   $doc->{'serialNumber'} = 'urn:uuid:'.gen_uuid($doc);
 } else {
