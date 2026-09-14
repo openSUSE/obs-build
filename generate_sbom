@@ -1308,6 +1308,7 @@ sub spdx3_encode_header {
   spdx3_gen_spdxid($doc, $agent);
   my $ci = { '@id' => '_:creationInfo_0', 'type' => 'CreationInfo', 'specVersion' => '3.0.1', 'createdBy' => [ $agent->{'spdxId'} ], 'createdUsing' => [ $tool->{'spdxId'} ], 'created' => rfc3339time($buildtime) };
   push @{$doc->[0]->[1]}, \$ci->{'createdUsing'}->[0];
+  push @{$doc->[0]->[1]}, \$ci->{'createdBy'}->[0];
   push @$doc, $ci, $tool, $agent;
   my $document = { 'type' => 'SpdxDocument', 'dataLicense' => 'http://spdx.org/licenses/CC0-1.0', 'creationInfo' => '_:creationInfo_0' };
   $document->{'spdxId'} = 'document0';
@@ -1413,7 +1414,8 @@ my $known_options = {
   'no-files-generation' => '',
   'no-pretty' => '',
   'buildtime' => ':',
-  'obsname' => ':',
+  'agent' => ':',
+  'obsname' => sub { $_[0]->{'agent'} = "Open Build Service ".Build::Options::getarg($_[2], $_[3]) },
 };
 
 my ($opts, @args) = Build::Options::parse_options($known_options, @ARGV);
@@ -1451,8 +1453,7 @@ $no_files_generation = ($config->{'buildflags:spdx-files-generation'} || '') eq 
 my $use_no_pretty_output = $opts->{'no-pretty'} || (!$no_files_generation ? 'yes' : '');
 
 $buildtime = $opts->{'buildtime'} || time();
-
-$agent_name = "Open Build Service https://$opts->{'obsname'}" if $opts->{'obsname'};
+$agent_name = $opts->{'agent'};
 
 my $targettype;
 my $unpackdir;
