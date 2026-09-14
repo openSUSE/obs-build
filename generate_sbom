@@ -1290,13 +1290,13 @@ sub spdx3_gen_spdxid {
 }
 
 sub spdx3_encode_header {
-  my ($subjectname, $type, $disturl, $vcss, $rootp, $agentname, $agentspdxid) = @_;
+  my ($subjectname, $type, $disturl, $vcss, $rootp, $agentname) = @_;
   my $doc = [];
   push @$doc, [ '1', [], {}, {}];
   my $tool = { 'type' => 'Tool', 'name' => "$tool_name-$tool_version", 'creationInfo' => '_:creationInfo_0' };
   spdx3_gen_spdxid($doc, $tool);
   my $agent = { 'type' => 'SoftwareAgent', 'name' => $agentname, 'creationInfo' => '_:creationInfo_0' };
-  $agent->{'spdxId'} = $agentspdxid;
+  spdx3_gen_spdxid($doc, $agent);
   my $ci = { '@id' => '_:creationInfo_0', 'type' => 'CreationInfo', 'specVersion' => '3.0.1', 'createdBy' => [ $agent->{'spdxId'} ], 'createdUsing' => [ $tool->{'spdxId'} ], 'created' => rfc3339time($buildtime) };
   push @{$doc->[0]->[1]}, \$ci->{'createdUsing'}->[0];
   push @$doc, $ci, $tool, $agent;
@@ -1465,11 +1465,7 @@ my $use_no_pretty_output = $opts->{'no-pretty'} || (!$no_files_generation ? 'yes
 $buildtime = $opts->{'buildtime'} || time();
 
 my $agent_name = 'build';
-my $agent_spdxid = 'https://www.openSUSE.org/Agent/build';
-if ($opts->{'obsname'}) {
-  $agent_name = 'Open Build Service';
-  $agent_spdxid = "https://$opts->{'obsname'}/Agent/OBS-Service";
-}
+$agent_name = "Open Build Service https://$opts->{'obsname'}" if $opts->{'obsname'};
 
 my $targettype;
 my $unpackdir;
@@ -1659,7 +1655,7 @@ if ($opts->{'format'} eq 'spdx') {
     primaryPackagePurpose => $targettype,
     skip_purl => 1
   };
-  $doc = spdx3_encode_header($subjectname, $targettype, $opts->{'disturl'}, $opts->{'vcs'}, $rootpkg, $agent_name, $agent_spdxid);
+  $doc = spdx3_encode_header($subjectname, $targettype, $opts->{'disturl'}, $opts->{'vcs'}, $rootpkg, $agent_name);
   for my $p (@$pkgs) {
     spdx3_encode_pkg($doc, $p, $distro, $pkgtype);
   }
