@@ -1209,17 +1209,8 @@ sub spdx3_encode_pkg {
     my $purlurl = gen_purl($p, $distro, $pkgtype);
     $spdx->{'software_packageUrl'} = $purlurl if $purlurl;
   }
-  push @{$spdx->{'externalRef'}}, {
-    'type'            => 'ExternalRef',
-    'externalRefType' => 'vcs',
-    'locator'         => [ $p->{'VCS'} ]
-  } if $p->{'VCS'};
-  push @{$spdx->{'externalRef'}}, {
-    'type'            => 'ExternalRef',
-    'externalRefType' => 'obs-disturl',
-    'locator'         => [ $p->{'DISTURL'} ]
-  } if $p->{'DISTURL'};
-  push @{$spdx->{'externalRef'}}, @{$p->{'externalRef'}} if @{$p->{'externalRef'} || []};
+  push @{$spdx->{'externalRef'}}, { 'type' => 'ExternalRef', 'externalRefType' => 'vcs', 'locator' => [ $p->{'VCS'} ] } if $p->{'VCS'};
+  push @{$spdx->{'externalRef'}}, { 'type' => 'ExternalRef', 'externalRefType' => 'other', 'comment' => 'obs-disturl', 'locator' => [ $p->{'DISTURL'} ] } if $p->{'DISTURL'};
 
   $spdx->{'software_primaryPurpose'} = $p->{'primaryPackagePurpose'} if $p->{'primaryPackagePurpose'};
   if ($p->{'spdx_id'}) {
