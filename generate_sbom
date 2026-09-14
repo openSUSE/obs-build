@@ -892,13 +892,13 @@ sub spdx_encode_pkg {
   $spdx->{'copyrightText'} = $p->{'COPYRIGHTTEXT'} ? $p->{'COPYRIGHTTEXT'} : 'NOASSERTION';
   $spdx->{'homepage'} = $p->{'URL'} if $p->{'URL'};
 
-  # Let the caller control the presence of external refs
-  if(!$p->{'skip_external_refs'}) {
+  # Let the caller control the presence of the purl reference
+  if(!$p->{'skip_purl'}) {
     my $purlurl = gen_purl($p, $distro, $pkgtype);
     push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator' => $purlurl } if $purlurl;
-    push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'OTHER', 'referenceType' => 'vcs', 'referenceLocator' => $p->{'VCS'} } if $p->{'VCS'};
-    push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'OTHER', 'referenceType' => 'obs-disturl', 'referenceLocator' => $p->{'DISTURL'} } if $p->{'DISTURL'};
   }
+  push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'OTHER', 'referenceType' => 'vcs', 'referenceLocator' => $p->{'VCS'} } if $p->{'VCS'};
+  push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'OTHER', 'referenceType' => 'obs-disturl', 'referenceLocator' => $p->{'DISTURL'} } if $p->{'DISTURL'};
 
   $spdx->{'primaryPackagePurpose'} = $p->{'primaryPackagePurpose'} if $p->{'primaryPackagePurpose'};
 
@@ -990,7 +990,7 @@ sub spdx_encode_dist {
     VERSION => $dist->{version_id},
     spdx_id => sprintf('SPDXRef-OperatingSystem-%s', gen_pkg_id($dist)),
     primaryPackagePurpose => 'OPERATING-SYSTEM',
-    skip_external_refs => 1
+    skip_purl => 1
   }, undef, undef, {});
 
 }
@@ -1205,20 +1205,20 @@ sub spdx3_encode_pkg {
   $spdx->{'software_homePage'} = $p->{'URL'} if $p->{'URL'};
 
   # Let the caller control the presence of external refs
-  if(!$p->{'skip_external_refs'}) {
+  if(!$p->{'skip_purl'}) {
     my $purlurl = gen_purl($p, $distro, $pkgtype);
     $spdx->{'software_packageUrl'} = $purlurl if $purlurl;
-    push @{$spdx->{'externalRef'}}, {
-      'type'            => 'ExternalRef',
-      'externalRefType' => 'vcs',
-      'locator'         => [ $p->{'VCS'} ]
-    } if $p->{'VCS'};
-    push @{$spdx->{'externalRef'}}, {
-      'type'            => 'ExternalRef',
-      'externalRefType' => 'obs-disturl',
-      'locator'         => [ $p->{'DISTURL'} ]
-    } if $p->{'DISTURL'};
   }
+  push @{$spdx->{'externalRef'}}, {
+    'type'            => 'ExternalRef',
+    'externalRefType' => 'vcs',
+    'locator'         => [ $p->{'VCS'} ]
+  } if $p->{'VCS'};
+  push @{$spdx->{'externalRef'}}, {
+    'type'            => 'ExternalRef',
+    'externalRefType' => 'obs-disturl',
+    'locator'         => [ $p->{'DISTURL'} ]
+  } if $p->{'DISTURL'};
   push @{$spdx->{'externalRef'}}, @{$p->{'externalRef'}} if @{$p->{'externalRef'} || []};
 
   $spdx->{'software_primaryPurpose'} = $p->{'primaryPackagePurpose'} if $p->{'primaryPackagePurpose'};
@@ -1334,7 +1334,7 @@ sub spdx3_encode_dist {
     NAME => $dist->{id},
     VERSION => $dist->{version_id},
     primaryPackagePurpose => 'operatingSystem',
-    skip_external_refs => 1
+    skip_purl => 1
   };
   spdx3_encode_pkg($doc, $distp, undef, '');
   return $distp->{'spdx_id'};
@@ -1616,7 +1616,7 @@ if ($opts->{'format'} eq 'spdx') {
     NAME => $subjectname,
     spdx_id => 'SPDXRef-DOCUMENT-ROOT',
     primaryPackagePurpose => uc($targettype),
-    skip_external_refs => 1
+    skip_purl => 1
   };
   $doc = spdx_encode_header($subjectname, $targettype, $opts->{'disturl'}, $opts->{'vcs'}, $rootpkg);
   for my $p (@$pkgs) {
@@ -1666,7 +1666,7 @@ if ($opts->{'format'} eq 'spdx') {
   my $rootpkg = {
     NAME => $subjectname,
     primaryPackagePurpose => $targettype,
-    skip_external_refs => 1
+    skip_purl => 1
   };
   $doc = spdx3_encode_header($subjectname, $targettype, $opts->{'disturl'}, $opts->{'vcs'}, $rootpkg, $agent_name, $agent_spdxid);
   for my $p (@$pkgs) {
@@ -1709,7 +1709,9 @@ if ($opts->{'format'} eq 'spdx') {
 } elsif ($opts->{'format'} eq 'cyclonedx') {
   $json_template = $cyclonedx_json_template;
   $intoto_type = 'https://cyclonedx.org/bom';
-  my $rootpkg = {};
+  my $rootpkg = {
+    skip_purl => 1
+  };
   $doc = cyclonedx_encode_header($subjectname, $targettype, $opts->{'disturl'}, $opts->{'vcs'}, $rootpkg);
   for my $p (@$pkgs) {
     push @{$doc->{'components'}}, cyclonedx_encode_pkg($p, $distro, $pkgtype);
