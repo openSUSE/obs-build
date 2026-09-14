@@ -50,6 +50,8 @@ use Build::IntrospectRust;
 my $tool_name = 'obs_build_generate_sbom';
 my $tool_version = '1.1';
 
+my $agent_name;
+
 my $buildtime;
 
 my $config = {};
@@ -1292,12 +1294,17 @@ sub spdx3_gen_spdxid {
 }
 
 sub spdx3_encode_header {
-  my ($subjectname, $type, $rootp, $agentname) = @_;
+  my ($subjectname, $type, $rootp) = @_;
   my $doc = [];
   push @$doc, [ '1', [], {}, {}];
   my $tool = { 'type' => 'Tool', 'name' => "$tool_name-$tool_version", 'creationInfo' => '_:creationInfo_0' };
   spdx3_gen_spdxid($doc, $tool);
-  my $agent = { 'type' => 'SoftwareAgent', 'name' => $agentname, 'creationInfo' => '_:creationInfo_0' };
+  my $agent;
+  if ($agent_name) {
+    $agent = { 'type' => 'SoftwareAgent', 'name' => $agent_name, 'creationInfo' => '_:creationInfo_0' };
+  } else {
+    $agent = { 'type' => 'Person', 'creationInfo' => '_:creationInfo_0' };
+  }
   spdx3_gen_spdxid($doc, $agent);
   my $ci = { '@id' => '_:creationInfo_0', 'type' => 'CreationInfo', 'specVersion' => '3.0.1', 'createdBy' => [ $agent->{'spdxId'} ], 'createdUsing' => [ $tool->{'spdxId'} ], 'created' => rfc3339time($buildtime) };
   push @{$doc->[0]->[1]}, \$ci->{'createdUsing'}->[0];
@@ -1373,17 +1380,6 @@ Additional metadata
      This option can be given multiple times to reference multiple
      source repositories.
 
-createdBy agent
-===============
-
-   The createdBy field of the SBOM creationInfo references a SoftwareAgent.
-   By default a SoftwareAgent named 'build' with the spdxId
-   https://www.openSUSE.org/Agent/build is used.
-
-  --obsname NAME
-     Use the name 'Open Build Service' and use
-     https://NAME/Agent/OBS-Service as the agent's spdxId instead.
-
 Supported options for generation
 ================================
 
@@ -1456,7 +1452,6 @@ my $use_no_pretty_output = $opts->{'no-pretty'} || (!$no_files_generation ? 'yes
 
 $buildtime = $opts->{'buildtime'} || time();
 
-my $agent_name = 'build';
 $agent_name = "Open Build Service https://$opts->{'obsname'}" if $opts->{'obsname'};
 
 my $targettype;
@@ -1646,7 +1641,7 @@ if ($opts->{'format'} eq 'spdx') {
   $json_template = $spdx3_json_template;
   $intoto_type = 'https://spdx.dev/Document/v3';
   $rootpkg->{'primaryPackagePurpose'} = $targettype;
-  $doc = spdx3_encode_header($subjectname, $targettype, $rootpkg, $agent_name);
+  $doc = spdx3_encode_header($subjectname, $targettype, $rootpkg);
   for my $p (@$pkgs) {
     spdx3_encode_pkg($doc, $p, $distro, $pkgtype);
   }
