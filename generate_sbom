@@ -812,6 +812,11 @@ sub cyclonedx_encode_header {
   return $cyc;
 }
 
+sub cyclonedx_finish {
+  my ($doc, $subjectname) = @_;
+  $doc->{'serialNumber'} = 'urn:uuid:'.gen_uuid($doc);
+  return $doc;
+}
 
 ##################################################################################################
 #
@@ -997,6 +1002,12 @@ sub spdx_encode_dist {
     skip_purl => 1
   }, undef, undef, {});
 
+}
+
+sub spdx_finish {
+  my ($doc, $subjectname) = @_;
+  $doc->{'documentNamespace'} = 'http://open-build-service.org/spdx/'.urlencode($subjectname).'-'.gen_uuid($doc);
+  return $doc;
 }
 
 ##################################################################################################
@@ -1331,6 +1342,18 @@ sub spdx3_encode_dist {
   return $distp->{'spdx_id'};
 }
 
+sub spdx3_finish {
+  my ($doc, $subjectname) = @_;
+  my $ids = shift @$doc;
+  my $idprefix = 'http://open-build-service.org/spdx/'.urlencode($subjectname).'-'.gen_uuid($doc).'-specv3/';
+  $$_ = "$idprefix$$_" for @{$ids->[1]};
+  $doc = {
+    '@context' => 'https://spdx.org/rdf/3.0.1/spdx-context.jsonld',
+    '@graph' => $doc,
+  };
+  return $doc;
+}
+
 ##################################################################################################
 #
 # Main
@@ -1634,10 +1657,10 @@ if ($opts->{'format'} eq 'spdx') {
   }
   push @{$doc->{'relationships'}}, {
     'spdxElementId' => 'SPDXRef-DOCUMENT',
-    'relatedSpdxElement' => 'SPDXRef-DOCUMENT-ROOT',
+    'relatedSpdxElement' => $rootpkg->{'spdx_id'},
     'relationshipType', 'DESCRIBES',
   };
-  $doc->{'documentNamespace'} = 'http://open-build-service.org/spdx/'.urlencode($subjectname).'-'.gen_uuid($doc);
+  $doc = spdx_finish($doc, $subjectname);
 } elsif ($opts->{'format'} eq 'spdx3') {
   $json_template = $spdx3_json_template;
   $intoto_type = 'https://spdx.dev/Document/v3';
@@ -1673,13 +1696,7 @@ if ($opts->{'format'} eq 'spdx') {
   for my $p (@$pkgs) {
     spdx3_encode_one_relation($doc, $rootpkg, $p, 'CONTAINS');
   }
-  my $ids = shift @$doc;
-  my $idprefix = 'http://open-build-service.org/spdx/'.urlencode($subjectname).'-'.gen_uuid($doc).'-specv3/';
-  $$_ = "$idprefix$$_" for @{$ids->[1]};
-  $doc = {
-    '@context' => 'https://spdx.org/rdf/3.0.1/spdx-context.jsonld',
-    '@graph' => $doc,
-  };
+  $doc = spdx3_finish($doc, $subjectname);
 } elsif ($opts->{'format'} eq 'cyclonedx') {
   $json_template = $cyclonedx_json_template;
   $intoto_type = 'https://cyclonedx.org/bom';
@@ -1699,7 +1716,7 @@ if ($opts->{'format'} eq 'spdx') {
   for my $p (@{$filepkgs || []}) {
     push @{$doc->{'dependencies'}}, cyclonedx_encode_relations($p);
   }
-  $doc->{'serialNumber'} = 'urn:uuid:'.gen_uuid($doc);
+  $doc = cyclonedx_finish($doc, $subjectname);
 } else {
   die("internal error, format not supported\n");
 }
