@@ -761,42 +761,81 @@ our $license_exceptions = [
 my %known_licenses = map { lc($_) => $_} @$licenses;
 my %known_license_exceptions = map { lc($_) => $_} @$license_exceptions;
 
+sub _remove_mixed_junctions {
+  my (@tok) = @_;
+  my (@and, @or);
+  my $haveand;
+  push @tok, 'OR';	# simplify code below
+  while (@tok) {
+    my ($l, $op) = splice(@tok, 0, 2);
+    push @and, $l;
+    @and = [ @and ] if $haveand && $op eq 'OR';
+    push @and, $op;
+    if ($op eq 'OR') {
+      push @or, splice(@and);
+      $haveand = 0;
+    } elsif ($op eq 'AND') {
+      $haveand = 1;
+    }
+  }
+  return splice(@or, 0, -1);	# remove trailing OR again
+}
+
 sub _tokenize_license_r {
-  my ($name) = @_;
+  my ($name, $no_unknown_exception, $no_mixed_junction) = @_;
   $name =~ s/^\s+//;
+  my $mixed = 0;
   my @ret;
   while (1) {
     if ($name =~ s/^\(//) {
       my $t;
-      ($t, $name) = _tokenize_license_r($name);
+      ($t, $name) = _tokenize_license_r($name, $no_unknown_exception, $no_mixed_junction);
       return unless $t && defined($name) && $name =~ s/^\s*\)//;
       push @ret, $t;
     } else {
       return unless $name =~ /^([^\s\+\(\)]+)/;
       push @ret, $1;
       $name = substr($name, length($1));
-      push @ret, 'PLUS', '+' if $name =~ s/^\+//;
+      # the SPDX grammar only allows PLUS for known licenses
+      if ($name =~ s/^\+//) {
+        if ($known_licenses{lc($ret[-1]) }) {
+          push @ret, 'PLUS', '+';
+        } else {
+	  $ret[-1] .= '+';
+	}
+      }
       $name =~ s/^\s+//;
       if ($name =~ s/^WITH\s+//i) {
 	return unless $name =~ /^([^\s\+\(\)]+)/;
-	push @ret, 'WITH', $1;
+	my $exception = $1;
 	$name = substr($name, length($1));
+	if (!$no_unknown_exception || $known_license_exceptions{lc($exception)}) {
+	  push @ret, 'WITH', $exception;
+	} else {
+	  splice(@ret, -3, 3, "$ret[-3]+") if @ret >= 3 && $ret[-2] eq 'PLUS';
+	  $ret[-1] .= " WITH $exception";
+	}
       }
     }
     $name =~ s/^\s+//;
-    return \@ret, $name if $name eq '' || $name =~ /^\)/;
+    last if $name eq '' || $name =~ /^\)/;
     if ($name =~ s/^AND(?:\s+|(?=\())//i) {
       push @ret, 'AND';
+      $mixed |= 1;
     } elsif ($name =~ s/^OR(?:\s+|(?=\())//i) {
       push @ret, 'OR';
+      $mixed |= 2;
     } else {
       return;
     }
   }
+  @ret = _remove_mixed_junctions(@ret) if $no_mixed_junction && $mixed == 3;
+  return \@ret, $name;
 }
 
 sub tokenize_license {
-  my ($ret, $rest) = _tokenize_license_r($_[0]);
+  my ($l, %opts) = @_;
+  my ($ret, $rest) = _tokenize_license_r($l, $opts{'no_unknown_exception'}, $opts{'no_mixed_junction'});
   return $ret && defined($rest) && $rest eq '' ? $ret : undef;
 }
 
@@ -816,16 +855,6 @@ sub normalize_tokenized_license {
       $t = normalize_tokenized_license($t, $unknown_license_cb, $unknown_exception_cb);
       $t = "($t)" if defined $t;
     } else {
-      my $plusidx = @n && $n[0] eq 'PLUS' ? 2 : 0;
-      if (!$unknown_exception_cb && @n > $plusidx + 1 && $n[$plusidx] eq 'WITH' && !$known_license_exceptions{lc($n[$plusidx + 1])}) {
-	# the exception is not known, encode complete license with exception
-	$t .= ($plusidx ? '+' : '') . " WITH $n[$plusidx + 1]";
-	splice(@n, 0, $plusidx + 2);
-      } elsif ($plusidx && !$known_licenses{lc($t)}) {
-	# we are not allowed to use the + suffix with license references
-	$t .= '+';
-	splice(@n, 0, 2);
-      }
       my $nt = $known_licenses{lc($t)};
       $t = $nt ? $nt : $unknown_license_cb ? $unknown_license_cb->($t) : undef;
     }
@@ -835,14 +864,20 @@ sub normalize_tokenized_license {
   return $l;
 }
 
-sub normalize_license {
-  my ($name, $unknown_license_cb, $unknown_exception_cb) = @_;
+sub preprocess_license {
+  my ($name) = @_;
   $name =~ s/\s+/ /g;
   $name =~ s/ and / AND /g;
   $name =~ s/ or / OR /g;
   $name =~ s/ with / WITH /g;
   $name =~ s/\bLicenseRef-//ig;	# strip away LicenseRef- prefix
-  my $n = tokenize_license($name);
+  return $name;
+}
+
+sub normalize_license {
+  my ($name, $unknown_license_cb, $unknown_exception_cb, %opts) = @_;
+  $name = preprocess_license($name);
+  my $n = tokenize_license($name, 'no_unknown_exception' => ($unknown_exception_cb ? 0 : 1), %opts);
   $n = $n ? normalize_tokenized_license($n, $unknown_license_cb, $unknown_exception_cb) : undef;
   return $n if defined $n;
   # parse/normalization error, encode complete string as new license
