@@ -1035,13 +1035,32 @@ comment creationInfo} ],
   },
 };
 
+sub spdx3_gen_spdxid {
+  my ($doc, $element) = @_;
+  $element->{'spdxId'} = 'SPDXRef-gnrtd'.$doc->[0]->[0]++;
+  push @{$doc->[0]->[1]}, \$element->{'spdxId'};
+}
+
+sub spdx3_encode_element {
+  my ($doc, $type, @elements) = @_;
+  my $spdx = { 'type' => $type, 'creationInfo' => '_:creationInfo_0', @elements };
+  if ($spdx->{'spdxId'}) {
+    push @{$doc->[0]->[1]}, \$spdx->{'spdxId'} unless $spdx->{'spdxId'} =~ /^https?:\/\//;
+  } elsif (defined $spdx->{'spdxId'}) {
+    delete $spdx->{'spdxId'};
+  } else {
+    spdx3_gen_spdxid($doc, $spdx);
+  }
+  return $spdx;
+}
+
 sub spdx3_encode_organization {
   my ($doc, $organization) = @_;
   return $doc->[0]->[2]->{$organization} if $doc->[0]->[2]->{$organization};
-  my $spdx = { 'type' => 'Organization', 'name' => $organization, 'creationInfo' => '_:creationInfo_0' };
-  spdx3_gen_spdxid($doc, $spdx);
-  $doc->[0]->[2]->{$organization} = $spdx->{'spdxId'};
+  my $spdx = spdx3_encode_element($doc, 'Organization', 'name' => $organization);
   push @$doc, $spdx;
+  $doc->[0]->[2]->{$organization} = $spdx->{'spdxId'};
+  return $spdx->{'spdxId'};
 }
 
 my %known_licenses = map { lc($_) => $_} @$Build::SPDX::licenses;
@@ -1051,8 +1070,17 @@ sub spdx3_encode_custom_license {
   my ($doc, $license) = @_;
   my $idstr = $license;
   return $doc->[0]->[3]->{$idstr} if $doc->[0]->[3]->{$idstr};
-  my $spdx = { 'type' => 'expandedlicensing_CustomLicense', 'simplelicensing_licenseText' => $license, 'name' => '', 'comment' => '', 'creationInfo' => '_:creationInfo_0' };
-  spdx3_gen_spdxid($doc, $spdx);
+  my $spdx = spdx3_encode_element($doc, 'expandedlicensing_CustomLicense', 'simplelicensing_licenseText' => $license, 'name' => '', 'comment' => '');
+  push @$doc, $spdx;
+  $doc->[0]->[3]->{$idstr} = $spdx->{'spdxId'};
+  return $spdx->{'spdxId'};
+}
+
+sub spdx3_encode_custom_license_addition {
+  my ($doc, $addition) = @_;
+  my $idstr = "WITH $addition";
+  return $doc->[0]->[3]->{$idstr} if $doc->[0]->[3]->{$idstr};
+  my $spdx = spdx3_encode_element($doc, 'expandedlicensing_CustomLicenseAddition', 'expandedlicensing_additionText' => $addition, 'name' => '', 'comment' => '');
   push @$doc, $spdx;
   $doc->[0]->[3]->{$idstr} = $spdx->{'spdxId'};
   return $spdx->{'spdxId'};
@@ -1062,9 +1090,8 @@ sub spdx3_encode_orlater_license {
   my ($doc, $spdxid) = @_;
   my $idstr = "$spdxid PLUS";
   return $doc->[0]->[3]->{$idstr} if $doc->[0]->[3]->{$idstr};
-  my $spdx = { 'type' => 'expandedlicensing_OrLaterOperator', 'expandedlicensing_subjectLicense' => $spdxid, 'creationInfo' => '_:creationInfo_0' };
+  my $spdx = spdx3_encode_element($doc, 'expandedlicensing_OrLaterOperator', 'expandedlicensing_subjectLicense' => $spdxid);
   push @{$doc->[0]->[1]}, \$spdx->{'expandedlicensing_subjectLicense'} unless $spdxid =~ /^https?:\/\//;
-  spdx3_gen_spdxid($doc, $spdx);
   push @$doc, $spdx;
   $doc->[0]->[3]->{$idstr} = $spdx->{'spdxId'};
   return $spdx->{'spdxId'};
@@ -1074,37 +1101,23 @@ sub spdx3_encode_withaddition_license {
   my ($doc, $spdxid, $exception) = @_;
   my $idstr = "$spdxid WITH $exception";
   return $doc->[0]->[3]->{$idstr} if $doc->[0]->[3]->{$idstr};
-  my $spdx = { 'type' => 'expandedlicensing_WithAdditionOperator', 'expandedlicensing_subjectExtendableLicense' => $spdxid, 'expandedlicensing_subjectAddition' => "http://spdx.org/licenses/$exception", 'creationInfo' => '_:creationInfo_0' };
+  my $spdx = spdx3_encode_element($doc, 'expandedlicensing_WithAdditionOperator', 'expandedlicensing_subjectExtendableLicense' => $spdxid, 'expandedlicensing_subjectAddition' => "http://spdx.org/licenses/$exception");
   push @{$doc->[0]->[1]}, \$spdx->{'expandedlicensing_subjectExtendableLicense'} unless $spdxid =~ /^https?:\/\//;
-  spdx3_gen_spdxid($doc, $spdx);
   push @$doc, $spdx;
   $doc->[0]->[3]->{$idstr} = $spdx->{'spdxId'};
   return $spdx->{'spdxId'};
 }
 
-sub spdx3_encode_conjunctive_license {
-  my ($doc, @members) = @_;
-  my $idstr = join(' AND ', @members);
+sub spdx3_encode_junctive_license {
+  my ($doc, $op, @members) = @_;
+  die("spdx3_encode_junctive_license: bad op $op\n") unless $op eq 'AND' || $op eq 'OR';
+  my $idstr = join(" $op ", @members);
   return $doc->[0]->[3]->{$idstr} if $doc->[0]->[3]->{$idstr};
-  my $spdx = { 'type' => 'expandedlicensing_ConjunctiveLicenseSet', 'expandedlicensing_member' => [ @members ], 'creationInfo' => '_:creationInfo_0' };
+  my $type = $op eq 'AND' ? 'expandedlicensing_ConjunctiveLicenseSet' : 'expandedlicensing_DisjunctiveLicenseSet';
+  my $spdx = spdx3_encode_element($doc, $type, 'expandedlicensing_member' => [ @members ]);
   for (@{$spdx->{'expandedlicensing_member'}}) {
     push @{$doc->[0]->[1]}, \$_ unless /^https?:\/\//;
   }
-  spdx3_gen_spdxid($doc, $spdx);
-  push @$doc, $spdx;
-  $doc->[0]->[3]->{$idstr} = $spdx->{'spdxId'};
-  return $spdx->{'spdxId'};
-}
-
-sub spdx3_encode_disjunctive_license {
-  my ($doc, @members) = @_;
-  my $idstr = join(' OR ', @members);
-  return $doc->[0]->[3]->{$idstr} if $doc->[0]->[3]->{$idstr};
-  my $spdx = { 'type' => 'expandedlicensing_DisjunctiveLicenseSet', 'expandedlicensing_member' => [ @members ], 'creationInfo' => '_:creationInfo_0' };
-  for (@{$spdx->{'expandedlicensing_member'}}) {
-    push @{$doc->[0]->[1]}, \$_ unless /^https?:\/\//;
-  }
-  spdx3_gen_spdxid($doc, $spdx);
   push @$doc, $spdx;
   $doc->[0]->[3]->{$idstr} = $spdx->{'spdxId'};
   return $spdx->{'spdxId'};
@@ -1112,6 +1125,7 @@ sub spdx3_encode_disjunctive_license {
 
 sub spdx3_encode_tokenized_license {
   my ($doc, $n) = @_;
+  return undef unless defined $n;
   my @n = ('START', @$n);
   my $l = '';
   my $lastop;
@@ -1164,24 +1178,18 @@ sub spdx3_encode_tokenized_license {
     $l .= $t;
   }
   return ($l, $members[0]) if @members == 1;
-  return undef unless @members > 1 && $lastop;
-  if ($lastop eq 'AND') {
-    my $id = spdx3_encode_conjunctive_license($doc, @members);
-    return ($l, $id);
-  } elsif ($lastop eq 'OR') {
-    my $id = spdx3_encode_disjunctive_license($doc, @members);
-    return ($l, $id);
-  }
-  return undef;
+  return undef unless @members > 1 && $lastop && ($lastop eq 'AND' || $lastop eq 'OR');
+  my $id = spdx3_encode_junctive_license($doc, $lastop, @members);
+  return ($l, $id);
 }
 
 sub spdx3_encode_one_license_relation {
   my ($doc, $from, $to, $type) = @_;
-  my $rel = { 'type' => 'Relationship', 'relationshipType' => $type, 'to' => [ $to ], 'from' => $from, 'creationInfo' => '_:creationInfo_0' };
+  my $rel = spdx3_encode_element($doc, 'Relationship', 'relationshipType' => $type, 'to' => [ $to ], 'from' => $from);
   push @{$doc->[0]->[1]}, \$rel->{'from'};
   push @{$doc->[0]->[1]}, \$rel->{'to'}->[0] unless $rel->{'to'}->[0] =~ /^https?:\/\//;
-  spdx3_gen_spdxid($doc, $rel);
   push @$doc, $rel;
+  return $rel->{'spdxId'};
 }
 
 sub spdx3_encode_pkg {
@@ -1191,7 +1199,7 @@ sub spdx3_encode_pkg {
   my $evr = $vr;
   $evr = "$p->{'EPOCH'}:$evr" if $p->{'EPOCH'};
 
-  my $spdx = { 'type' => 'software_Package', 'name' => $p->{'NAME'}, 'creationInfo' => '_:creationInfo_0' };
+  my $spdx = spdx3_encode_element($doc, 'software_Package', 'spdxId' => $p->{'spdx_id'}, 'name' => $p->{'NAME'});
   $spdx->{'software_packageVersion'} = $evr if defined $evr;
   if ($p->{'VENDOR'}) {
     my $vendor = $p->{'VENDOR'};
@@ -1228,13 +1236,7 @@ sub spdx3_encode_pkg {
   push @{$spdx->{'externalRef'}}, { 'type' => 'ExternalRef', 'externalRefType' => 'other', 'comment' => 'obs-disturl', 'locator' => [ $p->{'DISTURL'} ] } if $p->{'DISTURL'};
 
   $spdx->{'software_primaryPurpose'} = $p->{'primaryPackagePurpose'} if $p->{'primaryPackagePurpose'};
-  if ($p->{'spdx_id'}) {
-    $spdx->{'spdxId'} = $p->{'spdx_id'};
-    push @{$doc->[0]->[1]}, \$spdx->{'spdxId'};
-  } else {
-    spdx3_gen_spdxid($doc, $spdx);
-    $p->{'spdx_id'} = $spdx->{'spdxId'};
-  }
+  $p->{'spdx_id'} = $spdx->{'spdxId'};
   push @$doc, $spdx;
   my $license = $p->{'LICENSE'};
   my $license_spdxid = $spdx3_no_assertion_license;
@@ -1252,31 +1254,27 @@ sub spdx3_encode_pkg {
   spdx3_encode_one_license_relation($doc, $spdx->{'spdxId'}, $license_spdxid, 'hasConcludedLicense');
   $license_spdxid = $spdx3_no_assertion_license if ($config->{'buildflags:spdx-declared-license'} || '') eq 'NOASSERTION';
   spdx3_encode_one_license_relation($doc, $spdx->{'spdxId'}, $license_spdxid, 'hasDeclaredLicense');
+  return $spdx->{'spdxId'};
 }
 
 sub spdx3_encode_file {
   my ($doc, $f) = @_;
-  my $spdx = { 'type' => 'software_File', 'name' => $f->{'name'}, 'software_copyrightText' => '', 'creationInfo' => '_:creationInfo_0' };
+  my $spdx = spdx3_encode_element($doc, 'software_File', 'spdxId' => $f->{'spdx_id'}, 'name' => $f->{'name'}, 'software_copyrightText' => '');
   my $mime = $f->{'mime'};
   $spdx->{'contentType'} = $mime || 'application/octet-stream';
   if ($f->{'sha256sum'}) {
     $spdx->{'verifiedUsing'} = [ { 'type' => 'Hash', 'algorithm' => 'sha256', 'hashValue' => $f->{'sha256sum'} } ];
   }
-  if ($f->{'spdx_id'}) {
-    $spdx->{'spdxId'} = $f->{'spdx_id'};
-    push @{$doc->[0]->[1]}, \$spdx->{'spdxId'};
-  } else {
-    spdx3_gen_spdxid($doc, $spdx);
-    $f->{'spdx_id'} = $spdx->{'spdxId'};
-  }
+  $f->{'spdx_id'} = $spdx->{'spdxId'};
   push @$doc, $spdx;
+  return $spdx->{'spdxId'};
 }
 
 sub spdx3_encode_one_relation {
   my ($doc, $p, $op, $type) = @_;
   return unless $p->{'spdx_id'} && $op->{'spdx_id'};
   return if $type eq 'DEPENDENCY_OF';
-  my $spdx = { 'type' => 'Relationship', 'creationInfo' => '_:creationInfo_0'  };
+  my $spdx = spdx3_encode_element($doc, 'Relationship');
   $spdx->{'relationshipType'} = 'describes' if $type eq 'DESCRIBES';
   $spdx->{'relationshipType'} = 'contains' if $type eq 'CONTAINS';
   $spdx->{'relationshipType'} = 'dependsOn' if $type eq 'DEPENDS_ON';
@@ -1288,8 +1286,8 @@ sub spdx3_encode_one_relation {
   $spdx->{'to'} = [ $op->{'spdx_id'} ];
   push @{$doc->[0]->[1]}, \$spdx->{'from'};
   push @{$doc->[0]->[1]}, \$spdx->{'to'}->[0];
-  spdx3_gen_spdxid($doc, $spdx);
   push @$doc, $spdx;
+  return $spdx->{'spdxId'};
 }
 
 sub spdx3_encode_relations {
@@ -1298,35 +1296,25 @@ sub spdx3_encode_relations {
   return map {spdx3_encode_one_relation($doc, $p, $_->[0], $_->[1])} @{$p->{'RELATION'} || []};
 }
 
-sub spdx3_gen_spdxid {
-  my ($doc, $element) = @_;
-  $element->{'spdxId'} = 'SPDXRef-gnrtd'.$doc->[0]->[0]++;
-  push @{$doc->[0]->[1]}, \$element->{'spdxId'};
-}
-
 sub spdx3_encode_header {
   my ($subjectname, $type, $rootp) = @_;
   my $doc = [];
   push @$doc, [ '1', [], {}, {}];
-  my $tool = { 'type' => 'Tool', 'name' => "$tool_name-$tool_version", 'creationInfo' => '_:creationInfo_0' };
-  spdx3_gen_spdxid($doc, $tool);
+  my $tool = spdx3_encode_element($doc, 'Tool', 'name' => "$tool_name-$tool_version");
   my $agent;
   if ($agent_name) {
-    $agent = { 'type' => 'SoftwareAgent', 'name' => $agent_name, 'creationInfo' => '_:creationInfo_0' };
+    $agent = spdx3_encode_element($doc, 'SoftwareAgent', 'name' => $agent_name);
   } else {
-    $agent = { 'type' => 'Person', 'creationInfo' => '_:creationInfo_0' };
+    $agent = spdx3_encode_element($doc, 'Person');
   }
-  spdx3_gen_spdxid($doc, $agent);
   my $ci = { '@id' => '_:creationInfo_0', 'type' => 'CreationInfo', 'specVersion' => '3.0.1', 'createdBy' => [ $agent->{'spdxId'} ], 'createdUsing' => [ $tool->{'spdxId'} ], 'created' => rfc3339time($buildtime) };
   push @{$doc->[0]->[1]}, \$ci->{'createdUsing'}->[0];
   push @{$doc->[0]->[1]}, \$ci->{'createdBy'}->[0];
   push @$doc, $ci, $tool, $agent;
-  my $document = { 'type' => 'SpdxDocument', 'dataLicense' => 'http://spdx.org/licenses/CC0-1.0', 'creationInfo' => '_:creationInfo_0' };
-  $document->{'spdxId'} = 'document0';
-  push @{$doc->[0]->[1]}, \$document->{'spdxId'};
+  my $document = spdx3_encode_element($doc, 'SpdxDocument', 'spdxId' => 'document0', 'dataLicense' => 'http://spdx.org/licenses/CC0-1.0');
   push @$doc, $document;
   spdx3_encode_pkg($doc, $rootp, undef, '');
-  spdx3_encode_one_relation($doc, {'spdx_id' => 'document0'}, $rootp, 'DESCRIBES');
+  spdx3_encode_one_relation($doc, {'spdx_id' => $document->{'spdxId'}}, $rootp, 'DESCRIBES');
   return $doc;
 }
 
@@ -1338,8 +1326,7 @@ sub spdx3_encode_dist {
     primaryPackagePurpose => 'operatingSystem',
     skip_purl => 1
   };
-  spdx3_encode_pkg($doc, $distp, undef, '');
-  return $distp->{'spdx_id'};
+  return spdx3_encode_pkg($doc, $distp, undef, '');
 }
 
 sub spdx3_finish {
