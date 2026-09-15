@@ -346,10 +346,15 @@ upload_packages() {
     local n=$1
     local ans
     if test -x /usr/bin/rpm -o -x /bin/rpm ; then
+	local dbpath
+	local no_pkg_idx
+	dbpath=$(rpm --eval '%_dbpath')
+	test -z "$dbpath" || test -e "$dbpath/Index.db" || no_pkg_idx=true
 	case $n in
 	   *pkgsummaries) rpm -qa --qf '%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}|%{SUMMARY}\n' > /tmp/packages ;;
 	   *) rpm -qa --qf '%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}|%{DISTURL}|%{LICENSE}\n' > /tmp/packages ;;
 	esac
+	test -n "$no_pkg_idx" && rm -f "$dbpath/Index.db"
 	if test -n "$DATA_DIR" ; then
 	    cp /tmp/packages "$DATA_DIR/UPLOAD/$n"
 	elif test -x /usr/bin/curl ; then
