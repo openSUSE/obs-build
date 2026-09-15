@@ -365,6 +365,10 @@ program can be used to install the build environment.
 Included scripts are not executed during this phase. However, these
 packages will be re-installed later on including script execution.
 
+If a preinstalled package ships /usr/lib/build/rpmdb-source-date-epoch,
+the build environment is installed with SOURCE_DATE_EPOCH set to the file
+content (empty means 0), so rpm >= 4.18 creates a reproducible rpm database.
+
 ==== PublishFilter: REGEXP [REGEXP]
 
 CAUTION: OBS only
