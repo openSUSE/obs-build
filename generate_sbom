@@ -569,12 +569,28 @@ sub read_pkgs_deb {
 # Product support
 #
 
+sub read_product_repository {
+  my ($fn) = @_;
+
+  require Build::Rpmmd;
+  my %d = map {$_->{'type'} => $_} @{Build::Rpmmd::parse_repomd($fn)};
+  my $primary = $d{'primary'};
+  return unless $primary && $primary->{'checksum'};
+  my $checksum = $primary->{'checksum'};
+  $checksum =~ s/.*://;
+  my $pkg = { 'NAME' => 'repository', 'VERSION' => $checksum, 'primaryPackagePurpose' => 'install', 'pkgtype' => 'rpmmd', 'sourceInfo' => 'acquired package info from repomd.xml', 'skip_purl' => 1 };
+  return $pkg;
+}
+
 sub read_pkgs_from_product_directory {
   my ($dir) = @_;
+
   my @rpms;
+  my @repos;
   my $addrpmfile = sub {
     my $fn = $File::Find::name;
     push @rpms, read_rpm($fn) if $fn =~ /\.rpm$/;
+    push @repos, read_product_repository($fn) if $fn =~ /\/repomd\.xml$/;
   };
   die("product directory is missing: $dir\n") unless -d $dir;
   find({'wanted' => $addrpmfile, 'no_chdir' => 1, 'preprocess' => sub {sort(@_)} }, $dir);
@@ -584,6 +600,7 @@ sub read_pkgs_from_product_directory {
     my $sigmd5 = $r->{'SIGMD5'};
     push @rpms, $r unless $sigmd5 && $seen{$sigmd5}++;;
   }
+  push @rpms, grep {$_} @repos;
   return \@rpms;
 }
 
@@ -750,13 +767,16 @@ sub cyclonedx_encode_license {
 
 sub cyclonedx_encode_pkg {
   my ($p, $distro, $pkgtype) = @_;
+  $pkgtype = $p->{'pkgtype'} if $p->{'pkgtype'};
   my $vr = $p->{'VERSION'};
   $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
   my $cyc = { 'type' => 'library', 'name' => $p->{'NAME'}, 'version' => $vr };
   $cyc->{'publisher'} = $p->{'VENDOR'} if $p->{'VENDOR'};
   push @{$cyc->{'licenses'}}, cyclonedx_encode_license($p->{'LICENSE'}) if $p->{'LICENSE'};
-  my $purlurl = gen_purl($p, $distro, $pkgtype);
-  $cyc->{'purl'} = $purlurl if $purlurl;
+  if(!$p->{'skip_purl'}) {
+    my $purlurl = gen_purl($p, $distro, $pkgtype);
+    $cyc->{'purl'} = $purlurl if $purlurl;
+  }
   push @{$cyc->{'externalReferences'}}, { 'url' => $p->{'DISTURL'}, 'type' => 'build-meta' } if $p->{'DISTURL'};
   push @{$cyc->{'externalReferences'}}, { 'url' => $_, 'type' => 'vcs' } for @{$p->{'VCS'} || []};
   if (!$p->{'cyc_id'}) {
@@ -877,6 +897,7 @@ sub spdx_encode_pkg {
   }
   $spdx->{'downloadLocation'} = 'NOASSERTION';
 
+  $pkgtype = $p->{'pkgtype'} if $p->{'pkgtype'};
   if ($pkgtype eq 'deb') {
     $spdx->{'sourceInfo'} = 'acquired package info from DPKG DB';
   } elsif ($pkgtype eq 'rpm') {
@@ -889,6 +910,7 @@ sub spdx_encode_pkg {
   if (($pkgtype eq 'golang' || $pkgtype eq 'rust') && @{$p->{'filenames'} || []}) {
     $spdx->{'sourceInfo'} .= ': '.join(', ', @{$p->{'filenames'}});
   }
+  $spdx->{'sourceInfo'} = $p->{'sourceInfo'} if $p->{'sourceInfo'};
 
   $spdx->{'licenseConcluded'} = 'NOASSERTION';
   $spdx->{'licenseDeclared'} = 'NOASSERTION';
@@ -910,7 +932,7 @@ sub spdx_encode_pkg {
   push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'OTHER', 'referenceType' => 'vcs', 'referenceLocator' => $_ } for @{$p->{'VCS'} || []};
   push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'OTHER', 'referenceType' => 'obs-disturl', 'referenceLocator' => $p->{'DISTURL'} } if $p->{'DISTURL'};
 
-  $spdx->{'primaryPackagePurpose'} = $p->{'primaryPackagePurpose'} if $p->{'primaryPackagePurpose'};
+  $spdx->{'primaryPackagePurpose'} = uc($p->{'primaryPackagePurpose'}) if $p->{'primaryPackagePurpose'};
 
   if (!$p->{'spdx_id'}) {
     my $spdxtype = "Package-$pkgtype";
@@ -985,7 +1007,7 @@ sub spdx_encode_header {
     'licenseListVersion' => $Build::SPDX::licenseListVersion,
   };
   $spdx->{'creationInfo'} = $creationinfo;
-  my $rootspdx = spdx_encode_pkg($rootpkg, undef, undef, {});
+  my $rootspdx = spdx_encode_pkg($rootpkg, undef, '', {});
   $spdx->{'packages'} = [ $rootspdx ];
   return $spdx;
 }
@@ -993,14 +1015,14 @@ sub spdx_encode_header {
 sub spdx_encode_dist {
   my ($dist) = @_;
 
-  return spdx_encode_pkg({
+  my $distp = {
     NAME => $dist->{id},
     VERSION => $dist->{version_id},
     spdx_id => sprintf('SPDXRef-OperatingSystem-%s', gen_pkg_id($dist)),
     primaryPackagePurpose => 'OPERATING-SYSTEM',
     skip_purl => 1
-  }, undef, undef, {});
-
+  };
+  return spdx_encode_pkg($distp, undef, '', {});
 }
 
 sub spdx_finish {
@@ -1186,6 +1208,7 @@ sub spdx3_encode_pkg {
   }
   $spdx->{'software_downloadLocation'} = 'NOASSERTION';
 
+  $pkgtype = $p->{'pkgtype'} if $p->{'pkgtype'};
   if ($pkgtype eq 'deb') {
     $spdx->{'software_sourceInfo'} = 'acquired package info from DPKG DB';
   } elsif ($pkgtype eq 'rpm') {
@@ -1198,6 +1221,7 @@ sub spdx3_encode_pkg {
   if (($pkgtype eq 'golang' || $pkgtype eq 'rust') && @{$p->{'filenames'} || []}) {
     $spdx->{'software_sourceInfo'} .= ': '.join(', ', @{$p->{'filenames'}});
   }
+  $spdx->{'software_sourceInfo'} = $p->{'sourceInfo'} if $p->{'sourceInfo'};
 
   $spdx->{'software_copyrightText'} = $p->{'COPYRIGHTTEXT'} ? $p->{'COPYRIGHTTEXT'} : 'NOASSERTION';
   $spdx->{'software_homePage'} = $p->{'URL'} if $p->{'URL'};
@@ -1559,6 +1583,7 @@ my $doc;
 
 my $rootpkg = {
   NAME => $subjectname,
+  primaryPackagePurpose => $targettype,
   skip_purl => 1
 };
 $rootpkg->{'VCS'} = $opts->{'vcs'} if $opts->{'vcs'};
@@ -1569,7 +1594,6 @@ if ($opts->{'format'} eq 'spdx') {
   $json_template = $spdx_json_template;
   $intoto_type = 'https://spdx.dev/Document';
   $rootpkg->{'spdx_id'} = 'SPDXRef-DOCUMENT-ROOT';
-  $rootpkg->{'primaryPackagePurpose'} = uc($targettype);
   $doc = spdx_encode_header($subjectname, $targettype, $rootpkg);
   for my $p (@$pkgs) {
     push @{$doc->{'packages'}}, spdx_encode_pkg($p, $distro, $pkgtype, \%unknown_spdx_licenses);
@@ -1615,7 +1639,6 @@ if ($opts->{'format'} eq 'spdx') {
 } elsif ($opts->{'format'} eq 'spdx3') {
   $json_template = $spdx3_json_template;
   $intoto_type = 'https://spdx.dev/Document/v3';
-  $rootpkg->{'primaryPackagePurpose'} = $targettype;
   $doc = spdx3_encode_header($subjectname, $targettype, $rootpkg);
   for my $p (@$pkgs) {
     spdx3_encode_pkg($doc, $p, $distro, $pkgtype);
@@ -1653,6 +1676,7 @@ if ($opts->{'format'} eq 'spdx') {
   $intoto_type = 'https://cyclonedx.org/bom';
   $doc = cyclonedx_encode_header($subjectname, $targettype, $rootpkg);
   for my $p (@$pkgs) {
+    next if $p->{'primaryPackagePurpose'} && $p->{'primaryPackagePurpose'} eq 'install';
     push @{$doc->{'components'}}, cyclonedx_encode_pkg($p, $distro, $pkgtype);
   }
   for my $p (@{$filepkgs || []}) {
