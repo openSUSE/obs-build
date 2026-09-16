@@ -1063,9 +1063,6 @@ sub spdx3_encode_organization {
   return $spdx->{'spdxId'};
 }
 
-my %known_licenses = map { lc($_) => $_} @$Build::SPDX::licenses;
-my %known_license_exceptions = map { lc($_) => $_} @$Build::SPDX::license_exceptions;
-
 sub spdx3_encode_custom_license {
   my ($doc, $license) = @_;
   my $idstr = $license;
@@ -1101,7 +1098,7 @@ sub spdx3_encode_withaddition_license {
   my ($doc, $spdxid, $exception) = @_;
   my $idstr = "$spdxid WITH $exception";
   return $doc->[0]->[3]->{$idstr} if $doc->[0]->[3]->{$idstr};
-  my $spdx = spdx3_encode_element($doc, 'expandedlicensing_WithAdditionOperator', 'expandedlicensing_subjectExtendableLicense' => $spdxid, 'expandedlicensing_subjectAddition' => "http://spdx.org/licenses/$exception");
+  my $spdx = spdx3_encode_element($doc, 'expandedlicensing_WithAdditionOperator', 'expandedlicensing_subjectExtendableLicense' => $spdxid, 'expandedlicensing_subjectAddition' => $exception);
   push @{$doc->[0]->[1]}, \$spdx->{'expandedlicensing_subjectExtendableLicense'} unless $spdxid =~ /^https?:\/\//;
   push @$doc, $spdx;
   $doc->[0]->[3]->{$idstr} = $spdx->{'spdxId'};
@@ -1127,60 +1124,39 @@ sub spdx3_encode_tokenized_license {
   my ($doc, $n) = @_;
   return undef unless defined $n;
   my @n = ('START', @$n);
-  my $l = '';
   my $lastop;
   my @members;
   while (@n) {
     my ($op, $t) = splice(@n, 0, 2);
-    if ($op ne 'START' && $op ne 'PLUS') {
-      $l .= " $op ";
-      return undef if $lastop && $op ne $lastop;
-      $lastop = $op;
-    }
+    return undef if $op ne 'START' && !@members;
+    $lastop = $op if $op eq 'AND' || $op eq 'OR';
+    my $id;
     if ($op eq 'PLUS') {
-      return undef unless @members;
-      my $id = spdx3_encode_orlater_license($doc, $members[-1]);
-      $members[-1] = $id;
-      $t = '+';
+      $id = spdx3_encode_orlater_license($doc, pop(@members));
     } elsif ($op eq 'WITH') {
-      return undef unless @members;
-      my $nt = $known_license_exceptions{lc($t)};
-      return undef unless $nt;
-      my $id = spdx3_encode_withaddition_license($doc, $members[-1], $nt);
-      $members[-1] = $id;
+      my $nt = Build::SPDX::canonicalize_known_license_exception($t);
+      my $id = $nt ? "http://spdx.org/licenses/$nt" : spdx3_encode_custom_license_addition($doc, $t);
+      $id = spdx3_encode_withaddition_license($doc, pop(@members), $id);
     } elsif (ref $t) {
-      my $id;
-      ($t, $id) = spdx3_encode_tokenized_license($doc, $t);
-      return undef unless defined $t;
-      push @members, $id;
-      $t = "($t)";
+      $id = spdx3_encode_tokenized_license($doc, $t);
+      return undef unless defined $id;
     } else {
-      my $plusidx = @n && $n[0] eq 'PLUS' ? 2 : 0;
-      if (@n > $plusidx + 1 && $n[$plusidx] eq 'WITH' && !$known_license_exceptions{lc($n[$plusidx + 1])}) {
-        # the exception is not known, encode complete license with exception
-        $t .= ($plusidx ? '+' : '') . " WITH $n[$plusidx + 1]";
-        splice(@n, 0, $plusidx + 2);
-      } elsif ($plusidx && !$known_licenses{lc($t)}) {
-        # we are not allowed to use the + suffix with license references
-        $t .= '+';
-        splice(@n, 0, 2);
-      }
-      my $nt = $known_licenses{lc($t)};
-      if ($nt) {
-	my $id = "http://spdx.org/licenses/$nt";
-	push @members, $id;
-	$t = $nt;
-      } else {
-	my $id = spdx3_encode_custom_license($doc, $t);
-	push @members, $id;
-      }
+      my $nt = Build::SPDX::canonicalize_known_license($t);
+      $id = $nt ? "http://spdx.org/licenses/$nt" : spdx3_encode_custom_license($doc, $t);
     }
-    $l .= $t;
+    push @members, $id;
   }
-  return ($l, $members[0]) if @members == 1;
-  return undef unless @members > 1 && $lastop && ($lastop eq 'AND' || $lastop eq 'OR');
-  my $id = spdx3_encode_junctive_license($doc, $lastop, @members);
-  return ($l, $id);
+  return $members[0] if @members == 1;
+  return undef unless @members > 1 && $lastop;
+  return spdx3_encode_junctive_license($doc, $lastop, @members);
+}
+
+sub spdx3_encode_license {
+  my ($doc, $license) = @_;
+  $license = Build::SPDX::preprocess_license($license);
+  my $n = Build::SPDX::tokenize_license($license, 'no_mixed_junction' => 1);
+  my $id = $n ? spdx3_encode_tokenized_license($doc, $n) : undef;
+  return $id || spdx3_encode_custom_license($doc, $license);
 }
 
 sub spdx3_encode_one_license_relation {
@@ -1239,18 +1215,7 @@ sub spdx3_encode_pkg {
   $p->{'spdx_id'} = $spdx->{'spdxId'};
   push @$doc, $spdx;
   my $license = $p->{'LICENSE'};
-  my $license_spdxid = $spdx3_no_assertion_license;
-  if ($license) {
-    $license =~ s/\s+/ /g;
-    $license =~ s/ and / AND /g;
-    $license =~ s/ or / OR /g;
-    $license =~ s/ with / WITH /g;
-    $license =~ s/\bLicenseRef-//ig;
-    my $n = Build::SPDX::tokenize_license($license);
-    my ($l, $id) = spdx3_encode_tokenized_license($doc, $n);
-    $id = spdx3_encode_custom_license($doc, $license) unless defined $l;
-    $license_spdxid = $id;
-  }
+  my $license_spdxid = $license ? spdx3_encode_license($doc, $license) : $spdx3_no_assertion_license;
   spdx3_encode_one_license_relation($doc, $spdx->{'spdxId'}, $license_spdxid, 'hasConcludedLicense');
   $license_spdxid = $spdx3_no_assertion_license if ($config->{'buildflags:spdx-declared-license'} || '') eq 'NOASSERTION';
   spdx3_encode_one_license_relation($doc, $spdx->{'spdxId'}, $license_spdxid, 'hasDeclaredLicense');
