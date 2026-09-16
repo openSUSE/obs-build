@@ -1265,7 +1265,9 @@ sub spdx3_encode_file {
 
 sub spdx3_encode_one_relation {
   my ($doc, $p, $op, $type) = @_;
-  return unless $p->{'spdx_id'} && $op->{'spdx_id'};
+  $op = [ $op ] unless ref($op) eq 'ARRAY';
+  my @op = grep {$_->{'spdx_id'}} @$op;
+  return unless $p->{'spdx_id'} && @op;
   return if $type eq 'DEPENDENCY_OF';
   my $spdx = spdx3_encode_element($doc, 'Relationship');
   $spdx->{'relationshipType'} = 'describes' if $type eq 'DESCRIBES';
@@ -1276,9 +1278,9 @@ sub spdx3_encode_one_relation {
     $spdx->{'comment'} = $type;
   }
   $spdx->{'from'} = $p->{'spdx_id'};
-  $spdx->{'to'} = [ $op->{'spdx_id'} ];
+  $spdx->{'to'} = [ map {$_->{'spdx_id'}} @op ];
   push @{$doc->[0]->[1]}, \$spdx->{'from'};
-  push @{$doc->[0]->[1]}, \$spdx->{'to'}->[0];
+  push @{$doc->[0]->[1]}, \$spdx->{'to'}->[$_] for 0 .. $#op;
   push @$doc, $spdx;
   return $spdx->{'spdxId'};
 }
@@ -1286,7 +1288,19 @@ sub spdx3_encode_one_relation {
 sub spdx3_encode_relations {
   my ($doc, $p) = @_;
   return unless $p->{'spdx_id'};
-  return map {spdx3_encode_one_relation($doc, $p, $_->[0], $_->[1])} @{$p->{'RELATION'} || []};
+  # pull out file relations and create just one relation for them
+  my (@relations, @file_relations);
+  for my $r (@{$p->{'RELATION'} || []}) {
+    if ($r->[1] eq 'CONTAINS' && $r->[0]->{'sha256sum'}) {
+      push @file_relations, $r->[0];
+    } else {
+      push @relations, $r;
+    }
+  }
+  my @ret;
+  push @ret, map {spdx3_encode_one_relation($doc, $p, $_->[0], $_->[1])} @relations;
+  push @ret, spdx3_encode_one_relation($doc, $p, \@file_relations, 'CONTAINS');
+  return @ret;
 }
 
 sub spdx3_encode_header {
@@ -1681,8 +1695,8 @@ if ($opts->{'format'} eq 'spdx') {
     my $dist_spdxid = spdx3_encode_dist($doc, $dist);
     push @$pkgs, { 'spdx_id' => $dist_spdxid };
   }
-  for my $p (@$pkgs) {
-    spdx3_encode_one_relation($doc, $rootpkg, $p, 'CONTAINS');
+  if (@$pkgs) {
+    spdx3_encode_one_relation($doc, $rootpkg, $pkgs, 'CONTAINS');
   }
   $doc = spdx3_finish($doc, $subjectname);
 } elsif ($opts->{'format'} eq 'cyclonedx') {
