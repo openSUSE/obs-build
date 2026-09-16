@@ -735,6 +735,17 @@ my $cyclonedx_json_template = {
   'dependencies' => { '_order' => [ qw{ref dependsOn} ] }
 };
 
+sub cyclonedx_encode_license {
+  my ($license) = @_;
+  my $nlicense = Build::SPDX::normalize_license($license);
+  if (!defined($nlicense)) {
+    # non-standard (sub-)license found, normalize and encode as name
+    $nlicense = Build::SPDX::normalize_license($license, sub { $_[0] }, sub { $_[0] });
+    return { 'license' => {'name' => $nlicense } };
+  }
+  return { 'expression' => $nlicense } if $nlicense =~ /\s+/;
+  return { 'license' => {'id' => $nlicense } };
+}
 
 sub cyclonedx_encode_pkg {
   my ($p, $distro, $pkgtype) = @_;
@@ -742,21 +753,7 @@ sub cyclonedx_encode_pkg {
   $vr = "$vr-$p->{'RELEASE'}" if defined $p->{'RELEASE'};
   my $cyc = { 'type' => 'library', 'name' => $p->{'NAME'}, 'version' => $vr };
   $cyc->{'publisher'} = $p->{'VENDOR'} if $p->{'VENDOR'};
-  my $license = $p->{'LICENSE'};
-  if ($license) {
-    $license = Build::SPDX::normalize_license($license);
-    if (defined $license) {
-      if ($license =~ /\s+/) {
-        push @{$cyc->{'licenses'}}, { 'expression' => $license };
-      } else {
-        push @{$cyc->{'licenses'}}, { 'license' => {'id' => $license } };
-      }
-    } else {
-      # non-standard (sub-)license found, normalize and encode as name
-      $license = Build::SPDX::normalize_license($p->{'LICENSE'}, sub { $_[0] }, sub { $_[0] });
-      push @{$cyc->{'licenses'}}, { 'license' => {'name' => $license } };
-    }
-  }
+  push @{$cyc->{'licenses'}}, cyclonedx_encode_license($p->{'LICENSE'}) if $p->{'LICENSE'};
   my $purlurl = gen_purl($p, $distro, $pkgtype);
   $cyc->{'purl'} = $purlurl if $purlurl;
   push @{$cyc->{'externalReferences'}}, { 'url' => $p->{'DISTURL'}, 'type' => 'build-meta' } if $p->{'DISTURL'};
