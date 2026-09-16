@@ -740,7 +740,8 @@ sub cyclonedx_encode_license {
   my $nlicense = Build::SPDX::normalize_license($license);
   if (!defined($nlicense)) {
     # non-standard (sub-)license found, normalize and encode as name
-    $nlicense = Build::SPDX::normalize_license($license, sub { $_[0] }, sub { $_[0] });
+    my $dummy_cb = sub { $_[0] };
+    $nlicense = Build::SPDX::normalize_license($license, 'unknown_license_cb' => $dummy_cb, 'unknown_exception_cb' => $dummy_cb);
     return { 'license' => {'name' => $nlicense } };
   }
   return { 'expression' => $nlicense } if $nlicense =~ /\s+/;
@@ -893,7 +894,8 @@ sub spdx_encode_pkg {
   $spdx->{'licenseDeclared'} = 'NOASSERTION';
   my $license = $p->{'LICENSE'};
   if ($license) {
-    $license = Build::SPDX::normalize_license($license , sub { spdx_encode_unknown_license($_[0], $unknown_spdx_licenses) }, undef);
+    my $unknown_license_cb = sub { spdx_encode_unknown_license($_[0], $unknown_spdx_licenses) };
+    $license = Build::SPDX::normalize_license($license , 'unknown_license_cb' => $unknown_license_cb);
     $spdx->{'licenseConcluded'} = $license;
     $spdx->{'licenseDeclared'} = $license unless ($config->{'buildflags:spdx-declared-license'} || '') eq 'NOASSERTION';
   }

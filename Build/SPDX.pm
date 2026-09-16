@@ -833,13 +833,8 @@ sub _tokenize_license_r {
   return \@ret, $name;
 }
 
-sub tokenize_license {
-  my ($l, %opts) = @_;
-  my ($ret, $rest) = _tokenize_license_r($l, $opts{'no_unknown_exception'}, $opts{'no_mixed_junction'});
-  return $ret && defined($rest) && $rest eq '' ? $ret : undef;
-}
 
-sub normalize_tokenized_license {
+sub _normalize_tokenized_license_r {
   my ($n, $unknown_license_cb, $unknown_exception_cb) = @_;
   my @n = ('START', @$n);
   my $l = '';
@@ -852,7 +847,7 @@ sub normalize_tokenized_license {
       my $nt = $known_license_exceptions{lc($t)};
       $t = $nt ? $nt : $unknown_exception_cb ? $unknown_exception_cb->($t) : undef;
     } elsif (ref $t) {
-      $t = normalize_tokenized_license($t, $unknown_license_cb, $unknown_exception_cb);
+      $t = _normalize_tokenized_license_r($t, $unknown_license_cb, $unknown_exception_cb);
       $t = "($t)" if defined $t;
     } else {
       my $nt = $known_licenses{lc($t)};
@@ -874,11 +869,26 @@ sub preprocess_license {
   return $name;
 }
 
+sub tokenize_license {
+  my ($l, %opts) = @_;
+  my ($ret, $rest) = _tokenize_license_r($l, $opts{'no_unknown_exception'}, $opts{'no_mixed_junction'});
+  return $ret && defined($rest) && $rest eq '' ? $ret : undef;
+}
+
+sub normalize_tokenized_license {
+  my ($n, %opts) = @_;
+  my $unknown_license_cb = $opts{'unknown_license_cb'};
+  my $unknown_exception_cb = $opts{'unknown_exception_cb'};
+  return _normalize_tokenized_license_r($n, $unknown_license_cb, $unknown_exception_cb);
+}
+
 sub normalize_license {
-  my ($name, $unknown_license_cb, $unknown_exception_cb, %opts) = @_;
+  my ($name, %opts) = @_;
+  my $unknown_license_cb = $opts{'unknown_license_cb'};
+  my $unknown_exception_cb = $opts{'unknown_exception_cb'};
   $name = preprocess_license($name);
   my $n = tokenize_license($name, 'no_unknown_exception' => ($unknown_exception_cb ? 0 : 1), %opts);
-  $n = $n ? normalize_tokenized_license($n, $unknown_license_cb, $unknown_exception_cb) : undef;
+  $n = $n ? normalize_tokenized_license($n, %opts) : undef;
   return $n if defined $n;
   # parse/normalization error, encode complete string as new license
   return $unknown_license_cb ? $unknown_license_cb->($name) : undef;
