@@ -31,7 +31,6 @@ use File::Path ();
 
 use Build ':none';
 use Build::Options;
-use Build::Download;
 
 my $cachedir = "/var/cache/build";
 
@@ -59,7 +58,11 @@ sub rpmmd_open_primary {
   open($fh, '<', $fn) or die "Error opening $fn: $!\n";
   if ($fn =~ /\.gz$/) {
     require IO::Uncompress::Gunzip;
-    $fh = new IO::Uncompress::Gunzip $fh or die "Error opening $fn: $IO::Uncompress::Gunzip::GunzipError\n";
+    $fh = new IO::Uncompress::Gunzip $fh;
+    if (!$fh) {
+      my $error = $IO::Uncompress::Gunzip::GunzipError ? $IO::Uncompress::Gunzip::GunzipError : 'Unknown error';
+      die "Error opening $fn: $error\n";
+    }
   } elsif ($fn =~ /\.zst$/) {
     close($fh);
     $fh = undef;
@@ -85,6 +88,7 @@ my ($opts, @args) = Build::Options::parse_options($options, @ARGV);
 my $type = $opts->{'type'};
 my $archpath = $opts->{'archpath'};
 $cachedir = $opts->{'cachedir'} if $opts->{'cachedir'};
+my $zyppcachedir;
 
 my $url = $args[0];
 my $qtype = $args[1];
@@ -114,20 +118,24 @@ if ($qtype eq 'baseurl') {
   exit(0);
 }
 
-my $zyppcachedir;
+if ($qtype eq 'repos') {
+  die("need type zypp for repos query\n") unless $type && $type eq 'zypp';
+  require Build::Zypp;
+  die("need 'zypp:' url for repos query\n") unless $url eq 'zypp:';
+  for my $r (Build::Zypp::parseallrepos()) {
+    print "$r->{'name'}\n" if $r->{'enabled'};
+  }
+  exit(0);
+}
+
+# rest of the file is intrepo querying
+die("unsupported query type '$qtype'\n") unless $qtype eq 'intrepo';
+die("need a type for intrepo queries\n") unless $type;
 
 # zypp repotype hack
 if ($type eq 'zypp') {
-  require Build::Zypp;
-  if ($qtype eq 'repos') {
-    die("need 'zypp:' url for repos query\n") unless $url eq 'zypp:';
-    for my $r (Build::Zypp::parseallrepos()) {
-      print "$r->{'name'}\n" if $r->{'enabled'};
-    }
-    exit(0);
-  }
-  die("unsupported query type '$qtype'\n") unless $qtype eq 'intrepo';
   die("zypp url must start with 'zypp://'\n") unless $url =~ /^zypp:\/\/([^\/]*)/;
+  require Build::Zypp;
   my $repo = Build::Zypp::parserepo($1);
   $type = $repo->{'type'};
   $zyppcachedir = "/var/cache/zypp/raw/$repo->{'name'}";
@@ -139,8 +147,6 @@ if ($type eq 'zypp') {
   $type = 'suse' if $type eq 'yast2';
   die("could not determine repo type for '$repo->{'name'}'\n") unless $type;
 }
-
-die("unsupported query type '$qtype'\n") unless $qtype eq 'intrepo';
 
 #
 # handle local repositories
@@ -208,9 +214,10 @@ if ($url !~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/) {
 #
 
 
+require Build::Download;
 my $ua = Build::Download::create_ua();
 
-die("$url: not an remote repository") unless $url =~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/;
+die("$url: not a remote repository") unless $url =~ /^(:?ftps?|https?):\/\/([^\/]*)\/?/;
 my $repoid = Digest::MD5::md5_hex($url);
 my $dir = "$cachedir/$repoid";
 
