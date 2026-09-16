@@ -884,4 +884,12 @@ sub normalize_license {
   return $unknown_license_cb ? $unknown_license_cb->($name) : undef;
 }
 
+sub canonicalize_known_license {
+  return $known_licenses{lc($_[0])};
+}
+
+sub canonicalize_known_license_exception {
+  return $known_license_exceptions{lc($_[0])};
+}
+
 1;
