@@ -578,7 +578,7 @@ sub read_product_repository {
   return unless $primary && $primary->{'checksum'};
   my $checksum = $primary->{'checksum'};
   $checksum =~ s/.*://;
-  my $pkg = { 'NAME' => 'repository', 'VERSION' => $checksum, 'primaryPackagePurpose' => 'install', 'pkgtype' => 'rpmmd', 'sourceInfo' => 'acquired package info from repomd.xml', 'skip_purl' => 1 };
+  my $pkg = { 'NAME' => 'repository', 'VERSION' => $checksum, 'primaryPackagePurpose' => 'install', 'pkgtype' => 'rpmmd', 'skip_purl' => 1 };
   return $pkg;
 }
 
@@ -815,6 +815,7 @@ sub cyclonedx_encode_relations {
 
 sub cyclonedx_encode_header {
   my ($subjectname, $type, $rootpkg) = @_;
+  $type = 'library' if $type eq 'install';
   my $cyc = {
     'bomFormat' => 'CycloneDX',
     'specVersion' => '1.5',
@@ -906,6 +907,8 @@ sub spdx_encode_pkg {
     $spdx->{'sourceInfo'} = 'acquired package info from go module information';
   } elsif ($pkgtype eq 'rust') {
     $spdx->{'sourceInfo'} = 'acquired package info from rust cargo manifest';
+  } elsif ($pkgtype eq 'rpmmd') {
+    $spdx->{'sourceInfo'} = 'acquired package info from repomd.xml';
   }
   if (($pkgtype eq 'golang' || $pkgtype eq 'rust') && @{$p->{'filenames'} || []}) {
     $spdx->{'sourceInfo'} .= ': '.join(', ', @{$p->{'filenames'}});
@@ -1217,6 +1220,8 @@ sub spdx3_encode_pkg {
     $spdx->{'software_sourceInfo'} = 'acquired package info from go module information';
   } elsif ($pkgtype eq 'rust') {
     $spdx->{'software_sourceInfo'} = 'acquired package info from rust cargo manifest';
+  } elsif ($pkgtype eq 'rpmmd') {
+    $spdx->{'sourceInfo'} = 'acquired package info from repomd.xml';
   }
   if (($pkgtype eq 'golang' || $pkgtype eq 'rust') && @{$p->{'filenames'} || []}) {
     $spdx->{'software_sourceInfo'} .= ': '.join(', ', @{$p->{'filenames'}});
@@ -1455,6 +1460,7 @@ $agent_name = $opts->{'agent'};
 
 my $targettype;
 my $unpackdir;
+my $rootpkg_version;
 
 # unpack into a directory if the argument is a file
 if (($opts->{'type'} eq 'product' || $opts->{'type'} eq 'dir') && $toprocess =~ /\.iso$/ && -f $toprocess) {
@@ -1475,6 +1481,7 @@ if ($opts->{'type'} eq 'product') {
   my $primaryfile;
   require Build::Rpmmd;
   if (-d $unpackdir) {
+    $targettype = 'install';
     my $repodatadir = -f "$unpackdir/repomd.xml" ? $unpackdir : "$unpackdir/repodata";
     my %d = map {$_->{'type'} => $_} @{Build::Rpmmd::parse_repomd("$repodatadir/repomd.xml")};
     my $primary = $d{'primary'};
@@ -1482,6 +1489,11 @@ if ($opts->{'type'} eq 'product') {
     my $loc = $primary->{'location'};
     $loc =~ s/.*\///;
     $primaryfile = "$repodatadir/$loc";
+    my $checksum = $primary->{'checksum'};
+    if ($checksum) {
+      $checksum =~ s/.*://;
+      $rootpkg_version = $checksum;
+    }
   } else {
     $primaryfile = $unpackdir;
   }
@@ -1586,8 +1598,10 @@ my $rootpkg = {
   primaryPackagePurpose => $targettype,
   skip_purl => 1
 };
+$rootpkg->{'VERSION'} = $rootpkg_version if $rootpkg_version;
 $rootpkg->{'VCS'} = $opts->{'vcs'} if $opts->{'vcs'};
 $rootpkg->{'DISTURL'} = $opts->{'disturl'} if $opts->{'disturl'};
+$rootpkg->{'pkgtype'} = 'rpmmd' if $opts->{'type'} eq 'rpmmd';
 
 if ($opts->{'format'} eq 'spdx') {
   my %unknown_spdx_licenses;
