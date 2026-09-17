@@ -134,8 +134,8 @@ die("need a type for intrepo queries\n") unless $type;
 
 # zypp repotype hack
 if ($type eq 'zypp') {
-  die("zypp url must start with 'zypp://'\n") unless $url =~ /^zypp:\/\/([^\/]*)/;
   require Build::Zypp;
+  die("zypp url must start with 'zypp://'\n") unless $url =~ /^zypp:\/\/([^\/]*)/;
   my $repo = Build::Zypp::parserepo($1);
   $type = $repo->{'type'};
   $zyppcachedir = "/var/cache/zypp/raw/$repo->{'name'}";
