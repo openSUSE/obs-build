@@ -1475,7 +1475,7 @@ my $pkgtype = 'rpm';
 $config = Build::read_config_dist($opts->{'dist'}, $opts->{'arch'} || 'noarch', $opts->{'configdir'}) if $opts->{'dist'};
 
 my $no_files_generation = $opts->{'no-files-generation'};
-$no_files_generation = ($config->{'buildflags:spdx-files-generation'} || '') eq 'no' unless defined $no_files_generation;
+$no_files_generation = 1 if !defined($no_files_generation) && ($config->{'buildflags:spdx-files-generation'} || '') eq 'no';
 
 $buildtime = $opts->{'buildtime'} || time();
 $agent_name = $opts->{'agent'};
@@ -1496,8 +1496,8 @@ if (($opts->{'type'} eq 'product' || $opts->{'type'} eq 'dir') && $toprocess =~ 
 if ($opts->{'type'} eq 'product') {
   # product case
   $targettype = 'library';
-  $no_files_generation = 1;
-  #$files = gen_filelist($unpackdir);
+  $no_files_generation = 1 unless defined $no_files_generation;
+  $files = gen_filelist($unpackdir) unless $no_files_generation;
   $pkgs = read_pkgs_from_product_directory($unpackdir);
 } elsif ($opts->{'type'} eq 'rpmmd') {
   $targettype = 'library';
@@ -1517,12 +1517,15 @@ if ($opts->{'type'} eq 'product') {
       $checksum =~ s/.*://;
       $rootpkg_version = $checksum;
     }
+    $no_files_generation = 1 if $repodatadir eq $unpackdir;
   } else {
     $primaryfile = $unpackdir;
+    $no_files_generation = 1;
   }
   die("$primaryfile: $!\n") unless -e $primaryfile;
+  $no_files_generation = 1 unless defined $no_files_generation;
+  $files = gen_filelist($unpackdir) unless $no_files_generation;
   $pkgs = read_pkgs_from_rpmmd($primaryfile);
-  $no_files_generation = 1;
 } elsif ($opts->{'type'} eq 'dir') {
   $targettype = 'application';
   $dist = read_dist($unpackdir);
