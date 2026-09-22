@@ -36,7 +36,8 @@ testmode=
 
 setup_repos() {
     local data_url="$1"
-    mkdir -p "$LOCAL_REPOS_D"
+    # Empty directory for zypper --servicesd-dir
+    mkdir -p "$LOCAL_REPOS_D" "$LOCAL_REPOS_D"/services
     cat >$LOCAL_REPOS_D/obs_repository.repo <<EOF
 [obs_repository]
 name=obs_repository
@@ -115,7 +116,7 @@ zypper_ar() {
 }
 
 zypper() {
-    local cmd skip i
+    local cmd skip i extraargs
     # try to find the command
     for i ; do
 	case "$skip$i" in
@@ -126,7 +127,11 @@ zypper() {
     done
     case $cmd in
     in|install|rm|remove|up|update|if|info)
-	$testmode /usr/bin/zypper --no-refresh -D $LOCAL_REPOS_D "$@"
+	if zypper --help | grep -qw -- --servicesd-dir; then
+	    extraargs="--servicesd-dir ${LOCAL_REPOS_D}/services"
+	fi
+
+	$testmode /usr/bin/zypper --no-refresh -D $LOCAL_REPOS_D $extraargs "$@"
 	setup_links_and_exit $?
 	;;
     ar|addrepo)
@@ -143,10 +148,14 @@ zypper() {
 }
 
 obs_pkg_mgr() {
+    local extraargs
     case "$1" in
     install|remove)
 	shift
-	$testmode /usr/bin/zypper --no-refresh -D $LOCAL_REPOS_D --no-gpg-checks -n in "$@"
+	if zypper --help | grep -qw -- --servicesd-dir; then
+	    extraargs="--servicesd-dir ${LOCAL_REPOS_D}/services"
+	fi
+	$testmode /usr/bin/zypper --no-refresh -D $LOCAL_REPOS_D $extraargs --no-gpg-checks -n in "$@"
 	setup_links_and_exit $?
 	;;
     add_repo)
