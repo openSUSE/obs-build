@@ -729,6 +729,28 @@ sub gen_pkg_id {
   return Digest::MD5::md5_hex(Build::SimpleJSON::unparse(\%p));
 }
 
+sub gen_source_info {
+  my ($p, $pkgtype) = @_;
+  return $p->{'sourceInfo'} if $p->{'sourceInfo'};
+  my $si;
+  $pkgtype = $p->{'pkgtype'} if $p->{'pkgtype'};
+  if ($pkgtype eq 'deb') {
+    $si = 'acquired package info from DPKG DB';
+  } elsif ($pkgtype eq 'rpm') {
+    $si = 'acquired package info from RPM DB';
+  } elsif ($pkgtype eq 'golang') {
+    $si = 'acquired package info from go module information';
+  } elsif ($pkgtype eq 'rust') {
+    $si = 'acquired package info from rust cargo manifest';
+  } elsif ($pkgtype eq 'rpmmd') {
+    $si = 'acquired package info from repomd.xml';
+  }
+  if (($pkgtype eq 'golang' || $pkgtype eq 'rust') && @{$p->{'filenames'} || []}) {
+    $si .= ': '.join(', ', @{$p->{'filenames'}});
+  }
+  return $si;
+}
+
 
 ##################################################################################################
 #
@@ -782,10 +804,8 @@ sub cyclonedx_encode_pkg {
   my $cyc = { 'type' => 'library', 'name' => $p->{'NAME'}, 'version' => $vr };
   $cyc->{'publisher'} = $p->{'VENDOR'} if $p->{'VENDOR'};
   push @{$cyc->{'licenses'}}, cyclonedx_encode_license($p->{'LICENSE'}) if $p->{'LICENSE'};
-  if(!$p->{'skip_purl'}) {
-    my $purlurl = gen_purl($p, $distro, $pkgtype);
-    $cyc->{'purl'} = $purlurl if $purlurl;
-  }
+  my $purlurl = $p->{'skip_purl'} ? undef : gen_purl($p, $distro, $pkgtype);
+  $cyc->{'purl'} = $purlurl if $purlurl;
   push @{$cyc->{'externalReferences'}}, { 'url' => $p->{'DISTURL'}, 'type' => 'build-meta' } if $p->{'DISTURL'};
   push @{$cyc->{'externalReferences'}}, { 'url' => $_, 'type' => 'vcs' } for @{$p->{'VCS'} || []};
   if (!$p->{'cyc_id'}) {
@@ -908,21 +928,8 @@ sub spdx_encode_pkg {
   $spdx->{'downloadLocation'} = 'NOASSERTION';
 
   $pkgtype = $p->{'pkgtype'} if $p->{'pkgtype'};
-  if ($pkgtype eq 'deb') {
-    $spdx->{'sourceInfo'} = 'acquired package info from DPKG DB';
-  } elsif ($pkgtype eq 'rpm') {
-    $spdx->{'sourceInfo'} = 'acquired package info from RPM DB';
-  } elsif ($pkgtype eq 'golang') {
-    $spdx->{'sourceInfo'} = 'acquired package info from go module information';
-  } elsif ($pkgtype eq 'rust') {
-    $spdx->{'sourceInfo'} = 'acquired package info from rust cargo manifest';
-  } elsif ($pkgtype eq 'rpmmd') {
-    $spdx->{'sourceInfo'} = 'acquired package info from repomd.xml';
-  }
-  if (($pkgtype eq 'golang' || $pkgtype eq 'rust') && @{$p->{'filenames'} || []}) {
-    $spdx->{'sourceInfo'} .= ': '.join(', ', @{$p->{'filenames'}});
-  }
-  $spdx->{'sourceInfo'} = $p->{'sourceInfo'} if $p->{'sourceInfo'};
+  my $si = gen_source_info($p, $pkgtype);
+  $spdx->{'sourceInfo'} = $si if $si;
 
   $spdx->{'licenseConcluded'} = 'NOASSERTION';
   $spdx->{'licenseDeclared'} = 'NOASSERTION';
@@ -936,11 +943,8 @@ sub spdx_encode_pkg {
   $spdx->{'copyrightText'} = $p->{'COPYRIGHTTEXT'} ? $p->{'COPYRIGHTTEXT'} : 'NOASSERTION';
   $spdx->{'homepage'} = $p->{'URL'} if $p->{'URL'};
 
-  # Let the caller control the presence of the purl reference
-  if(!$p->{'skip_purl'}) {
-    my $purlurl = gen_purl($p, $distro, $pkgtype);
-    push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator' => $purlurl } if $purlurl;
-  }
+  my $purlurl = $p->{'skip_purl'} ? undef : gen_purl($p, $distro, $pkgtype);
+  push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'PACKAGE-MANAGER', 'referenceType' => 'purl', 'referenceLocator' => $purlurl } if $purlurl;
   push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'OTHER', 'referenceType' => 'vcs', 'referenceLocator' => $_ } for @{$p->{'VCS'} || []};
   push @{$spdx->{'externalRefs'}}, { 'referenceCategory' => 'OTHER', 'referenceType' => 'obs-disturl', 'referenceLocator' => $p->{'DISTURL'} } if $p->{'DISTURL'};
 
@@ -1156,7 +1160,6 @@ sub spdx3_encode_junctive_license {
 
 sub spdx3_encode_tokenized_license {
   my ($doc, $n) = @_;
-  return undef unless defined $n;
   my @n = ('START', @$n);
   my $lastop;
   my @members;
@@ -1170,14 +1173,14 @@ sub spdx3_encode_tokenized_license {
     } elsif ($op eq 'WITH') {
       my $nt = Build::SPDX::canonicalize_known_license_exception($t);
       my $id = $nt ? "http://spdx.org/licenses/$nt" : spdx3_encode_custom_license_addition($doc, $t);
-      $id = spdx3_encode_withaddition_license($doc, pop(@members), $id);
+      $id = spdx3_encode_withaddition_license($doc, pop(@members), $id) if defined $id;
     } elsif (ref $t) {
       $id = spdx3_encode_tokenized_license($doc, $t);
-      return undef unless defined $id;
     } else {
       my $nt = Build::SPDX::canonicalize_known_license($t);
       $id = $nt ? "http://spdx.org/licenses/$nt" : spdx3_encode_custom_license($doc, $t);
     }
+    return undef unless defined $id;
     push @members, $id;
   }
   return $members[0] if @members == 1;
@@ -1222,30 +1225,13 @@ sub spdx3_encode_pkg {
   $spdx->{'software_downloadLocation'} = 'NOASSERTION';
 
   $pkgtype = $p->{'pkgtype'} if $p->{'pkgtype'};
-  if ($pkgtype eq 'deb') {
-    $spdx->{'software_sourceInfo'} = 'acquired package info from DPKG DB';
-  } elsif ($pkgtype eq 'rpm') {
-    $spdx->{'software_sourceInfo'} = 'acquired package info from RPM DB';
-  } elsif ($pkgtype eq 'golang') {
-    $spdx->{'software_sourceInfo'} = 'acquired package info from go module information';
-  } elsif ($pkgtype eq 'rust') {
-    $spdx->{'software_sourceInfo'} = 'acquired package info from rust cargo manifest';
-  } elsif ($pkgtype eq 'rpmmd') {
-    $spdx->{'sourceInfo'} = 'acquired package info from repomd.xml';
-  }
-  if (($pkgtype eq 'golang' || $pkgtype eq 'rust') && @{$p->{'filenames'} || []}) {
-    $spdx->{'software_sourceInfo'} .= ': '.join(', ', @{$p->{'filenames'}});
-  }
-  $spdx->{'software_sourceInfo'} = $p->{'sourceInfo'} if $p->{'sourceInfo'};
-
+  my $si = gen_source_info($p, $pkgtype);
+  $spdx->{'software_sourceInfo'} = $si if $si;
   $spdx->{'software_copyrightText'} = $p->{'COPYRIGHTTEXT'} ? $p->{'COPYRIGHTTEXT'} : 'NOASSERTION';
   $spdx->{'software_homePage'} = $p->{'URL'} if $p->{'URL'};
 
-  # Let the caller control the presence of external refs
-  if(!$p->{'skip_purl'}) {
-    my $purlurl = gen_purl($p, $distro, $pkgtype);
-    $spdx->{'software_packageUrl'} = $purlurl if $purlurl;
-  }
+  my $purlurl = $p->{'skip_purl'} ? undef : gen_purl($p, $distro, $pkgtype);
+  $spdx->{'software_packageUrl'} = $purlurl if $purlurl;
   push @{$spdx->{'externalRef'}}, { 'type' => 'ExternalRef', 'externalRefType' => 'vcs', 'locator' => [ $_ ] } for @{$p->{'VCS'} || []};
   push @{$spdx->{'externalRef'}}, { 'type' => 'ExternalRef', 'externalRefType' => 'other', 'comment' => 'obs-disturl', 'locator' => [ $p->{'DISTURL'} ] } if $p->{'DISTURL'};
 
