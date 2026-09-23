@@ -53,6 +53,7 @@ my $tool_version = '1.1';
 my $agent_name;
 
 my $buildtime;
+my $with_dependencies;
 
 my $config = {};
 
@@ -407,7 +408,9 @@ sub dump_rpmdb {
 sub read_rpm {
   my ($rpm) = @_;
   my $sigmd5tag = ref($rpm) ? 'SIGMD5' : 'SIGTAG_MD5';
-  my %r = Build::Rpm::rpmq($rpm, qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM VCS DISTURL FILENAMES URL VENDOR FILEMODES FILEDIGESTS FILEDIGESTALGO}, $sigmd5tag);
+  my @t = (qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM VCS DISTURL FILENAMES URL VENDOR FILEMODES FILEDIGESTS FILEDIGESTALGO}, $sigmd5tag);
+  push @t, qw{PROVIDENAME PROVIDEFLAGS PROVIDEVERSION REQUIRENAME REQUIREFLAGS REQUIREVERSION} if $with_dependencies;
+  my %r = Build::Rpm::rpmq($rpm, @t);
   delete $r{$_} for qw{BASENAMES DIRNAMES DIRINDEXES};	# save mem
   for (qw{NAME VERSION RELEASE EPOCH ARCH LICENSE SOURCERPM DISTURL URL VENDOR FILEDIGESTALGO}, $sigmd5tag) {
     next unless $r{$_};
@@ -420,6 +423,13 @@ sub read_rpm {
   }
   $r{'SIGMD5'} = delete $r{$sigmd5tag} if $sigmd5tag eq 'SIGTAG_MD5' && exists($r{$sigmd5tag});
   delete $r{'LICENSE'} if $r{'NAME'} eq 'gpg-pubkey' && ($r{'LICENSE'} || '') eq 'pubkey';
+  if ($with_dependencies) {
+    Build::Rpm::add_flagsvers(\%r, 'PROVIDENAME', 'PROVIDEFLAGS', 'PROVIDEVERSION');
+    Build::Rpm::add_flagsvers(\%r, 'REQUIRENAME', 'REQUIREFLAGS', 'REQUIREVERSION');
+    $r{'RAW_PROVIDES'} = $r{'PROVIDENAME'} if $r{'PROVIDENAME'};
+    $r{'RAW_REQUIRES'} = $r{'REQUIRENAME'} if $r{'REQUIRENAME'};
+    delete $r{$_} for qw{PROVIDENAME PROVIDEFLAGS PROVIDEVERSION REQUIRENAME REQUIREFLAGS REQUIREVERSION};
+  }
   return \%r;
 }
 
@@ -505,6 +515,19 @@ sub read_deb {
     $data{'BUILT_USING'} = [ split /,\s*/, $res{'STATIC-BUILT-USING'} ];
   } elsif ($res{'BUILT-USING'}) {
     $data{'BUILT_USING'} = [ split /,\s*/, $res{'BUILT-USING'} ];
+  }
+  if ($with_dependencies) {
+    my @provides = split(',\s*', $res{'PROVIDES'} || '');
+    push @provides, "$res{'PACKAGE'} (= $res{'VERSION'})";
+    my @depends = split(',\s*', $res{'DEPENDS'} || '');
+    push @depends, split(',\s*', $res{'PRE-DEPENDS'} || '');
+    for (@provides, @depends) {
+      s/ \(([^\)]*)\)/ $1/g;
+      s/<</</g;
+      s/>>/>/g;
+    }
+    $data{'RAW_PROVIDES'} = \@provides;
+    $data{'RAW_REQUIRES'} = \@depends if @depends;
   }
   return \%data;
 }
@@ -639,6 +662,83 @@ sub read_pkgs_from_rpmmd {
   return \@rpms;
 }
 
+
+##################################################################################################
+#
+# Dependency solving support
+#
+
+# this returns "potential" matches, i.e. AND is handled like OR, the IF part is ignored
+sub _handle_rich_req {
+  my ($config, $r) = @_;
+  if ($r->[0] == 0) {
+    my @rq = Build::whatprovides($config, $r->[1]);
+    push @rq, @{$config->{'f2p'}->{$r->[1]} || []} if $config->{'f2p'} && $r->[1] =~ /^\//;
+    return @rq;
+  }
+  if ($r->[0] == 1 || $r->[0] == 2) {
+    return (_handle_rich_req($config, $r->[1]), _handle_rich_req($config, $r->[2]));
+  }
+  if ($r->[0] == 3 || $r->[0] == 4) {
+    my @rq = _handle_rich_req($config, $r->[1]);
+    push @rq, _handle_rich_req($config, $r->[3]) if @$r == 4;
+    return @rq;
+  }
+  if ($r->[0] == 6) {
+    my %s = map {$_ => 1} _handle_rich_req($config, $r->[2]);
+    return grep {$s{$_}} _handle_rich_req($config, $r->[1]);
+  }
+  if ($r->[0] == 7) {
+    my %s = map {$_ => 1} _handle_rich_req($config, $r->[2]);
+    return grep {!$s{$_}} _handle_rich_req($config, $r->[1]);
+  }
+  return ()
+}
+
+sub setup_provides_whatprovides {
+  my ($config, @pprov) = @_;
+  my %provides;
+  my %whatprovides;
+  while (@pprov) {
+    my ($p, $pp) = splice(@pprov, 0, 2);
+    $provides{$p} = $pp if $pp;
+    my @pp = @{$pp || []};
+    s/[ <=>].*// for @pp;
+    push @{$whatprovides{$_}}, $p for Build::unify(@pp);
+  }
+  $config->{'providesh'} = \%provides;
+  $config->{'whatprovidesh'} = \%whatprovides;
+}
+
+sub generate_pkg_dependencies {
+  my ($pkgs, $pkgtype) = @_;
+  return if $pkgtype ne 'rpm' && $pkgtype ne 'deb';
+  my $config = { 'binarytype' => $pkgtype };
+  setup_provides_whatprovides($config, map {$_ => ($_->{'RAW_PROVIDES'} || [])} @$pkgs);
+  my %f2p;
+  if ($pkgtype eq 'rpm') {
+    for my $p (@$pkgs) {
+      push @{$f2p{$_}}, $p for @{$p->{'FILENAMES'} || []};
+    }
+  }
+  $config->{'f2p'} = \%f2p if %f2p;
+  for my $p (@$pkgs) {
+    my @rp;
+    for my $req (@{$p->{'RAW_REQUIRES'} || []}) {
+      if ($pkgtype eq 'rpm') {
+        if ($req =~ /^\(/) {
+	  my $r = Build::Rpm::parse_rich_dep($req);
+	  push @rp, _handle_rich_req($config, $r) if $r;
+	  next;
+        }
+        push @rp, @{$f2p{$req} || []} if $req =~ /^\//;
+      }
+      push @rp, Build::whatprovides($config, $req);
+    }
+    @rp = grep {$_ != $p} Build::unify(@rp);
+    push @{$p->{'deps'}}, @rp if @rp;
+  }
+}
 
 ##################################################################################################
 #
@@ -1426,6 +1526,7 @@ my $known_options = {
   'configdir' => ':',
   'no-files-generation' => '',
   'no-pretty' => '',
+  'with-dependencies' => '',
   'buildtime' => ':',
   'agent' => ':',
   'obsname' => sub { $_[0]->{'agent'} = "Open Build Service ".Build::Options::getarg($_[2], $_[3]) },
@@ -1461,6 +1562,9 @@ my $pkgtype = 'rpm';
 $config = Build::read_config_dist($opts->{'dist'}, $opts->{'arch'} || 'noarch', $opts->{'configdir'}) if $opts->{'dist'};
 
 my $no_files_generation = $opts->{'no-files-generation'};
+$with_dependencies = $opts->{'with-dependencies'};
+
+# set defaults
 $no_files_generation = 1 if !defined($no_files_generation) && ($config->{'buildflags:spdx-files-generation'} || '') eq 'no';
 
 $buildtime = $opts->{'buildtime'} || time();
@@ -1525,6 +1629,7 @@ if ($opts->{'type'} eq 'product') {
   }
   $files = gen_filelist($unpackdir);
   $filepkgs = introspect_filelist($unpackdir, $files);
+  $with_dependencies = 1 unless defined $with_dependencies;
 } elsif ($opts->{'type'} eq 'docker-archive' || $opts->{'type'} eq 'oci-archive') {
   # container archive case
   $targettype = 'container';
@@ -1538,8 +1643,20 @@ if ($opts->{'type'} eq 'product') {
     $pkgs = read_pkgs_rpmdb("$tmpdir/rpmdb");
   }
   $filepkgs = introspect_filelist($unpackdir, $files);
+  $with_dependencies = 1 unless defined $with_dependencies;
 } else {
   die("Unsupported content type $opts->{'type'}\n");
+}
+
+# generate inter-package dependencies
+if ($with_dependencies) {
+  generate_pkg_dependencies($pkgs, $pkgtype);
+  for my $p (@$pkgs) {
+    for my $p2 (@{$p->{'deps'} || []}) {
+      push @{$p2->{'RELATION'}}, [ $p, 'DEPENDENCY_OF' ];
+      push @{$p->{'RELATION'}}, [ $p2, 'DEPENDS_ON' ];
+    }
+  }
 }
 
 # generate file relations
