@@ -27,6 +27,7 @@
 
 
 LOCAL_REPOS_D="/etc/repos_obs_dockersupport.d/"
+LOCAL_SERVICES_D="/etc/repos_obs_dockersupport.d/services"
 LOCAL_APTREPOS_D="/etc/aptrepos_obs_dockersupport.d/"
 LOCAL_APKREPOS="/etc/apkrepos_obs_dockersupport"
 DATA_DIR=
@@ -37,7 +38,7 @@ testmode=
 setup_repos() {
     local data_url="$1"
     # Empty directory for zypper --servicesd-dir
-    mkdir -p "$LOCAL_REPOS_D" "$LOCAL_REPOS_D"/services
+    mkdir -p "$LOCAL_REPOS_D" "$LOCAL_SERVICES_D"
     cat >$LOCAL_REPOS_D/obs_repository.repo <<EOF
 [obs_repository]
 name=obs_repository
@@ -127,8 +128,8 @@ zypper() {
     done
     case $cmd in
     in|install|rm|remove|up|update|if|info)
-	if zypper --help | grep -qw -- --servicesd-dir; then
-	    extraargs="--servicesd-dir ${LOCAL_REPOS_D}/services"
+	if /usr/bin/zypper --version --servicesd-dir / >/dev/null 2>&1 ; then
+	    extraargs="--servicesd-dir $LOCAL_SERVICES_D"
 	fi
 
 	$testmode /usr/bin/zypper --no-refresh -D $LOCAL_REPOS_D $extraargs "$@"
@@ -152,8 +153,8 @@ obs_pkg_mgr() {
     case "$1" in
     install|remove)
 	shift
-	if zypper --help | grep -qw -- --servicesd-dir; then
-	    extraargs="--servicesd-dir ${LOCAL_REPOS_D}/services"
+	if /usr/bin/zypper --version --servicesd-dir / >/dev/null 2>&1 ; then
+	    extraargs="--servicesd-dir $LOCAL_SERVICES_D"
 	fi
 	$testmode /usr/bin/zypper --no-refresh -D $LOCAL_REPOS_D $extraargs --no-gpg-checks -n in "$@"
 	setup_links_and_exit $?
