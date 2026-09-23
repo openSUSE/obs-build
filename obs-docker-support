@@ -128,7 +128,7 @@ zypper() {
     done
     case $cmd in
     in|install|rm|remove|up|update|if|info)
-	if /usr/bin/zypper --version --servicesd-dir / >/dev/null 2>&1 ; then
+	if test -z "$testmode" && /usr/bin/zypper --version --servicesd-dir / >/dev/null 2>&1 ; then
 	    extraargs="--servicesd-dir $LOCAL_SERVICES_D"
 	fi
 
@@ -153,7 +153,7 @@ obs_pkg_mgr() {
     case "$1" in
     install|remove)
 	shift
-	if /usr/bin/zypper --version --servicesd-dir / >/dev/null 2>&1 ; then
+	if test -z "$testmode" && /usr/bin/zypper --version --servicesd-dir / >/dev/null 2>&1 ; then
 	    extraargs="--servicesd-dir $LOCAL_SERVICES_D"
 	fi
 	$testmode /usr/bin/zypper --no-refresh -D $LOCAL_REPOS_D $extraargs --no-gpg-checks -n in "$@"
