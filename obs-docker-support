@@ -48,6 +48,7 @@ baseurl=$data_url
 type=rpm-md
 gpgcheck=0
 EOF
+    test -x /usr/bin/zypper && /usr/bin/zypper -D $LOCAL_REPOS_D ref
 }
 
 finish_repos() {
