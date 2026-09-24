@@ -48,10 +48,11 @@ baseurl=$data_url
 type=rpm-md
 gpgcheck=0
 EOF
-    test -x /usr/bin/zypper && /usr/bin/zypper -D $LOCAL_REPOS_D ref
+    rm -rf /var/cache/zypp/raw/obs_repository /var/cache/zypp/solv/obs_repository
 }
 
 finish_repos() {
+    rm -rf /var/cache/zypp/raw/obs_repository /var/cache/zypp/solv/obs_repository
     rm -rf "$LOCAL_REPOS_D"
 }
 
