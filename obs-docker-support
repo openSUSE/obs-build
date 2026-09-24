@@ -36,7 +36,7 @@ sentinel="oBs-d--s--"
 testmode=
 
 setup_repos() {
-    local data_url="$1"
+    local data_url="$1" extraargs
     # Empty directory for zypper --servicesd-dir
     mkdir -p "$LOCAL_REPOS_D" "$LOCAL_SERVICES_D"
     cat >$LOCAL_REPOS_D/obs_repository.repo <<EOF
@@ -48,7 +48,11 @@ baseurl=$data_url
 type=rpm-md
 gpgcheck=0
 EOF
-    test -x /usr/bin/zypper && /usr/bin/zypper -D $LOCAL_REPOS_D ref
+    if test -z "$testmode" && /usr/bin/zypper --version --servicesd-dir / >/dev/null 2>&1 ; then
+	extraargs="--servicesd-dir $LOCAL_SERVICES_D"
+    fi
+
+    test -x /usr/bin/zypper && /usr/bin/zypper -D $LOCAL_REPOS_D $extraargs ref
 }
 
 finish_repos() {
