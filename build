@@ -946,6 +946,8 @@ copy_sources() {
 	fi
     fi
     test -n "$RPM_BUILD_IN_PLACE" -a -z "$RUNNING_IN_VM" && cp -f "$RECIPEPATH" "$2"
+    # normalize permissions so that checkout modes do not leak into the result
+    chmod -R a=rX,u+w "$2"
 }
 
 mkdir_build_root() {
