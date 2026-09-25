@@ -42,6 +42,7 @@ pkg_initdb_rpm() {
 
 pkg_prepare_rpm() {
     rpm_set_checkopts
+    rpm_set_installenv
     rpm_init_cumulate
 }
 
@@ -71,6 +72,24 @@ rpm_set_checkopts() {
     # on Fedora 10 rpmbuild is in a separate package so we need something else to
     # detect rpm4
     test -x $BUILD_ROOT/usr/bin/rpmquery && RPMCHECKOPTS="--nodigest --nosignature"
+}
+
+# BuildFlags: rpmdb-source-date-epoch[:EPOCH]
+rpm_set_installenv() {
+    RPMINSTALLENV=
+    local flag=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags rpmdb-source-date-epoch)
+    test -n "$flag" || return 0
+    local last=$(queryconfig --dist "$BUILD_DIST" --configdir "$CONFIG_DIR" --archpath "$BUILD_ARCH" buildflags+ rpmdb-source-date-epoch | tail -n 1)
+    local sde=0
+    test "$flag" = "$last" && sde=$last
+    case "$sde" in
+	*[!0-9]*)
+	    echo "WARNING: ignoring BuildFlags: rpmdb-source-date-epoch: bad value '$sde'"
+	    return 0
+	    ;;
+    esac
+    echo "installing packages with SOURCE_DATE_EPOCH=$sde"
+    RPMINSTALLENV="SOURCE_DATE_EPOCH=$sde"
 }
 
 rpm_init_cumulate() {
@@ -125,7 +144,7 @@ pkg_install_rpm() {
 	    test -e "$i" && ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --justdb"
 	done
     fi
-    ( cd $BUILD_ROOT && chroot $BUILD_ROOT rpm --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
+    ( cd $BUILD_ROOT && env $RPMINSTALLENV chroot $BUILD_ROOT rpm --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
 		$ADDITIONAL_PARAMS .init_b_cache/$PKG.rpm 2>&1 || \
 	  touch $BUILD_ROOT/exit ) | \
 	      grep -v "^warning:.*saved as.*rpmorig$"
@@ -166,7 +185,7 @@ pkg_sysrootinstall_rpm() {
     if test "$USE_FORCE" = true ; then
 	export ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --force"
     fi
-    ( cd $BUILD_ROOT && chroot $BUILD_ROOT rpm --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
+    ( cd $BUILD_ROOT && env $RPMINSTALLENV chroot $BUILD_ROOT rpm --ignorearch --nodeps -U --oldpackage --ignoresize $RPMCHECKOPTS \
 		$ADDITIONAL_PARAMS --noscripts --root "$BUILD_SYSROOT" .init_b_cache/$PKG.rpm 2>&1 || \
 	  touch $BUILD_ROOT/exit ) | \
 	      grep -v "^warning:.*saved as.*rpmorig$"
@@ -181,7 +200,7 @@ pkg_finalize_rpm() {
 	    test "$BUILD_ROOT/.init_b_cache/rpms/$PKG" -ef "$BUILD_ROOT/${CUMULATED_LIST[$num]}" && continue
 	    cp --remove-destination $BUILD_ROOT/.init_b_cache/rpms/$PKG $BUILD_ROOT/${CUMULATED_LIST[$num]} || cleanup_and_exit 1
 	done > $BUILD_ROOT/.init_b_cache/manifest
-	( cd $BUILD_ROOT && chroot $BUILD_ROOT rpm --ignorearch --nodeps -Uh --oldpackage --ignoresize --verbose $RPMCHECKOPTS \
+	( cd $BUILD_ROOT && env $RPMINSTALLENV chroot $BUILD_ROOT rpm --ignorearch --nodeps -Uh --oldpackage --ignoresize --verbose $RPMCHECKOPTS \
 		$ADDITIONAL_PARAMS .init_b_cache/manifest 2>&1 || touch $BUILD_ROOT/exit )
 	for ((num=0; num<=cumulate; num++)) ; do
 	    rm -f $BUILD_ROOT/${CUMULATED_LIST[$num]}
