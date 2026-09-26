@@ -165,6 +165,13 @@ To enable build options during productcompose builds. For example
 to build reduced products via updateinfo_packages_only for maintenance
 testing.
 
+* rpmdb-source-date-epoch[:EPOCH]
+
+Installs the build environment with the `$SOURCE_DATE_EPOCH` environment
+variable set for rpm to override INSTALLTIME and INSTALLTID tags in the rpm
+datbase. This makes the rpm database of the build environment reproducible.
+EPOCH is a number (seconds since the epoch) and defaults to 0.
+
 ==== Conflict: PACKAGE
 
 Specify that a package must not be installed in the build environment.
