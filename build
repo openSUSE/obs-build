@@ -601,6 +601,9 @@ ccache_setup() {
 		echo 'export PATH=/usr/lib/icecc/bin:/opt/icecream/bin:/usr/bin:$PATH' >> $BUILD_ROOT/var/lib/build/ccache/bin/$i
 		echo "ccache $i \"\$@\"" >> $BUILD_ROOT/var/lib/build/ccache/bin/$i
 		chmod 755 $BUILD_ROOT/var/lib/build/ccache/bin/$i
+		# for mtime check in ccache
+		# (in case build tooling itself calls ccache it will use the mtime from this script)
+		touch --reference="/usr/bin/$i" "$BUILD_ROOT/var/lib/build/ccache/bin/$i"
 		echo "Installed ccache wrapper as $BUILD_ROOT/var/lib/build/ccache/bin/$i"
 	    done
 	fi
