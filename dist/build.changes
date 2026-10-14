@@ -1,4 +1,21 @@
 -------------------------------------------------------------------
+Wed Oct 14 12:35:58 UTC 2026 - Adrian Schröter <adrian@suse.de>
+
+- ccache: fix caching when tooling calls ccache itself
+- chroot: set the max data size as soft limit
+- Add BuildFlags: rpm-installtime for reproducible rpmdb
+- obs-docker-support: clean old repository data of our obs_repository
+- generate_sbom:
+  * add support for package dependencies
+  * support filelist generation for --product and --rpmmd
+  * cummulate CONTAINS relations for spdx3
+  * generate a pseudo package for installation repositories
+  * use 'install' as package purpose for --rpmmd
+  * pass the vcs and disturl via the rootpkg
+- obs-docker-support: remove the Index.db datebase if it did not exist before
+- general refactoring of code
+
+-------------------------------------------------------------------
 Thu Sep 10 09:46:56 UTC 2026 - Adrian Schröter <adrian@suse.de>
 
 - SBOM:
