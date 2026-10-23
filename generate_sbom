@@ -947,7 +947,7 @@ sub cyclonedx_encode_header {
   $type = 'library' if $type eq 'install';
   my $cyc = {
     'bomFormat' => 'CycloneDX',
-    'specVersion' => '1.5',
+    'specVersion' => '1.6', # output is valid for 1.5, 1.6 and 1.7
     'version' => 1,
     'metadata' => {
       'timestamp' => rfc3339time($buildtime),
