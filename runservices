@@ -36,6 +36,24 @@ my $servicedir = '/usr/lib/obs/service';
 my $buildroot = '';
 my $servicemode = 'buildtime';
 
+sub usage {
+  my ($exitcode) = @_;
+  my $fh = $exitcode ? \*STDERR : \*STDOUT;
+  print $fh <<'EOF';
+Usage: runservices [--buildroot <dir>] [--mode <mode>]
+
+Run the services configured in the _service file of the current directory
+and move the generated files into it.
+
+Options:
+  --buildroot <dir>  run the services chrooted into <dir>
+  --mode <mode>      run the services of this mode: buildtime (default),
+                     manual, disabled, or default (services without a mode)
+  -h, --help         show this help and exit
+EOF
+  exit($exitcode);
+}
+
 sub ls {
   local *D;
   opendir(D, $_[0]) || return ();
@@ -109,6 +127,11 @@ while (@ARGV) {
     shift @ARGV;
     $servicemode = shift @ARGV;
     die("unsupported servicemode\n") unless $servicemode eq 'manual' || $servicemode eq 'disabled' || $servicemode eq 'buildtime' || $servicemode eq 'default';
+  } elsif ($ARGV[0] eq '-h' || $ARGV[0] eq '--help') {
+    usage(0);
+  } elsif ($ARGV[0] =~ /^-/) {
+    print STDERR "runservices: unknown option '$ARGV[0]'\n";
+    usage(1);
   } else {
     last;
   }
