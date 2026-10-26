@@ -278,7 +278,6 @@ vm_parse_options() {
         VM_NETWORK=true
         VM_NETDEVOPT=("${VM_NETDEVOPT[@]}" user,id=u1,host=10.0.2.2,net=10.0.2.0/24)
         VM_DEVICEOPT=("${VM_DEVICEOPT[@]}" e1000,netdev=u1)
-        shift
       ;;
       -vm-net)
         needarg
