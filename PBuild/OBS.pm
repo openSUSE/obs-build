@@ -23,7 +23,6 @@ package PBuild::OBS;
 use strict;
 
 use Build::Download;
-use Build::Rpm;
 
 use PBuild::Util;
 use PBuild::Verify;
