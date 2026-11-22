@@ -59,7 +59,12 @@ recipe_resultdirs_arch() {
 }
 
 recipe_compare_oldpackages_arch() {
-    :
+    if test -x "$BUILD_ROOT/usr/lib/build/same-build-result.sh" ; then
+	echo "... comparing built packages with the former built"
+	if chroot "$BUILD_ROOT" /usr/lib/build/same-build-result.sh /.build.oldpackages "$TOPDIR/ARCHPKGS"; then
+	    recipe_mark_same_result
+	fi
+    fi
 }
 
 recipe_cleanup_arch() {
