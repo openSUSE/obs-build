@@ -267,6 +267,37 @@ sub unpack_obscpio_asset {
   }, 'postpone_symlinks' => 1, 'set_mode' => 1, 'set_mtime' => 1);
 }
 
+sub create_archive_from_asset {
+  my ($assetmgr, $obscpio, $archivefile) = @_;
+  my $tmpdir = "$assetmgr->{'asset_dir'}/.createarchive$$";
+  PBuild::Util::mkdir_p($tmpdir);
+  PBuild::Cpio::cpio_extract($obscpio, "$tmpdir/$_[0]->{'name'}", 'postpone_symlinks' => 1, 'set_mode' => 1, 'set_mtime' => 1);
+  my @dirs = PBuild::Util::ls($tmpdir);
+  if (!@dirs) {
+    mkdir("$tmpdir/empty");
+    push @dirs, 'empty';
+  }
+  die("asset contains multiple directories, cannot create single archive\n") unless @dirs == 1;
+  my $name = $archivefile;
+  $archivefile =~ s/.*\///;
+  die("unsupported archive format $archivefile\n") unless $archivefile =~ /^([^\.\-].*)\.tar(?:(\.xz|\.gz|\.zstd))?$/;
+  my $dirname = $1;
+  my $compressor = $2 || '';
+  if ($dirname ne $dirs[0]) {
+    rename("$tmpdir/$dirs[0]", "$tmpdir/$dirname") || die("rename $tmpdir/$dirs[0] $tmpdir/$dirname: $!\n");
+  }
+  # check if our tar supports the --sort command
+  system("/bin/sh", "-c", 'tar --sort=name --version >/dev/null 2>&1');
+  die("need tar with --sort support\n") if $?;
+  system('tar', '-C', $tmpdir, '-cf', "$tmpdir/$dirname.tar", '--owner=root:0', '--group=root:0', '--exclude=.git', '--sort=name', '--pax-option=exthdr.name=%d/PaxHeaders/%f,delete=atime,delete=ctime', '--', $dirname) && die("tar failed: $?\n");
+  system('xz', '--threads=2', '--', "$tmpdir/$dirname.tar") if $compressor eq '.xz';
+  system('gzip', '-n', '--rsyncable', '--', "$tmpdir/$dirname.tar") if $compressor eq '.gz';
+  system('zstd', '--rsyncable', '-15', '--threads=0', '--', "$tmpdir/$dirname.tar") if $compressor eq '.zst';
+  die("archive creation failed\n") unless -e "$tmpdir/$dirname.tar$compressor";
+  rename("$tmpdir/$dirname.tar$compressor", $archivefile) || die("rename $tmpdir/$dirname.tar$compressor $archivefile: $!\n");
+  PBuild::Util::rm_rf($tmpdir);
+}
+
 #
 # Copy the assets from our cache to the build root
 #
@@ -279,6 +310,11 @@ sub copy_assets {
     my $assetid = $asset->{'assetid'};
     my $adir = "$assetdir/".substr($assetid, 0, 2);
     die("asset $assetid is gone\n") unless -e "$adir/$assetid";
+    if ($asset->{'isdir'} && $asset->{'createarchive'}) {
+      unlink("$srcdir/$asset->{'createarchive'}");
+      create_archive_from_asset($assetmgr, "$adir/$assetid", "$srcdir/$asset->{'createarchive'}");
+      next;
+    }
     if ($asset->{'isdir'} && $unpack) {
       for my $unpackfile (@{$asset->{'filelist'} || [ $file ]}) {
         PBuild::Util::rm_rf("$srcdir/$unpackfile");
@@ -307,6 +343,11 @@ sub move_assets {
     my $adir = "$assetdir/".substr($assetid, 0, 2);
     die("asset $assetid is gone\n") unless -e "$adir/$assetid";
     if ($asset->{'isdir'}) {
+      if ($asset->{'createarchive'}) {
+        unlink("$srcdir/$asset->{'createarchive'}");
+	create_archive_from_asset($assetmgr, "$adir/$assetid", "$srcdir/$asset->{'createarchive'}");
+	next;
+      }
       if ($unpack && ! -d "$adir/$assetid") {
 	PBuild::Util::rm_rf("$srcdir/$file");
 	unpack_obscpio_asset($assetmgr, "$adir/$assetid", $srcdir, $file);

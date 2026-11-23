@@ -69,6 +69,7 @@ my %known_options = (
   'list' => '',
   'unpack' => '',
   'update' => '',
+  'createarchive' => '',
 
   'arch' => '::',
   'dist' => ':',
@@ -205,6 +206,15 @@ for my $dir (@dirs) {
       }
     }
     next;
+  }
+
+  if ($opts->{'createarchive'}) {
+    my $af = $p->{'asset_files'} || {};
+    for (values %$af) {
+      if ($_->{'isdir'}) {
+	$_->{'createarchive'} = $_->{'finalfile'} if $_->{'finalfile'} && $_->{'finalfile'} =~ /\.tar(?:\.xz|gz|zstd)?/;
+      }
+    }
   }
 
   $assetmgr->force_update($p) if $opts->{'update'};
