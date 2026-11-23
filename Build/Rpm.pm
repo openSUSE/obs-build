@@ -1033,7 +1033,7 @@ sub parse {
 	}
 	if ($keyword ne '#!remoteasset') {
           push @{$ret->{'remoteassets'}}, $remoteasset if %$remoteasset;
-	  if ($remoteasset->{'url'} && $remoteasset->{'url'} =~ /^git(?:\+https?)?:.*\/([^\/]+?)(?:\#[^\#\/]+)?$/) {
+	  if ($remoteasset->{'url'} && $remoteasset->{'url'} =~ /^git(?:\+https?)?:.*?\/([^\/]+?)(?:\#[^\#]+)?$/) {
 	    my $gfn = $1;
 	    $gfn =~ s/\?.*//;
 	    $gfn =~ s/\.git$//;
@@ -1177,7 +1177,7 @@ sub parse {
 	$remoteasset->{'url'} ||= $val if $val =~ /\/\//;
 	if ($remoteasset->{'url'} && !defined($remoteasset->{'file'}) && $val =~ /([^\/\.][^\/]+$)/) {
 	  my $fn = $1;
-	  if ($remoteasset->{'url'} =~ /^git(?:\+https?)?:.*\/([^\/]+?)(?:\#[^\#\/]+)?$/) {
+	  if ($remoteasset->{'url'} =~ /^git(?:\+https?)?:.*?\/([^\/]+?)(?:\#[^\#]+)?$/) {
 	    my $gfn = $1;
 	    $gfn =~ s/\?.*//;
 	    $gfn =~ s/\.git$//;

@@ -121,7 +121,7 @@ sub recipe_parse {
     my $url = $s->{'url'};
     my $digest = $s->{'digest'};
     my $file = $s->{'file'};
-    if ($url && $url =~ /^git(?:\+https?)?:.*\/([^\/]+?)(?:\#([^\#\/]+))?$/) {
+    if ($url && $url =~ /^git(?:\+https?)?:.*?\/([^\/]+?)(?:\#([^\#]+))?$/) {
       my $tag = $2;
       if (!defined($file)) {
 	$file = $1;
