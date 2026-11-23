@@ -215,14 +215,6 @@ for my $dir (@dirs) {
       $_->{'donotpack'} = 1 if $_->{'isdir'};
     }
   }
-  # remove directory assets that we already have
-  if ($opts->{'unpack'}) {
-    my $af = $p->{'asset_files'} || {};
-    # delete directory assets that we already have
-    for (keys %$af) {
-      delete $af->{$_} if $af->{$_}->{'isdir'} && -d "$dir/$_";
-    }
-  }
   $assetmgr->getremoteassets($p);
   if ($opts->{'noassetdir'}) {
     $assetmgr->move_assets($p, $outdir, $opts->{'unpack'});
