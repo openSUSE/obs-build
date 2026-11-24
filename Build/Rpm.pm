@@ -242,7 +242,7 @@ sub do_warn {
   if ($config->{'parsing_config'}) {
     $config->{'parse_error'} ||= $err;
   } elsif ($config->{'warnings'}) {
-    warn("$err\n");
+    warn("warning: $err\n");
   }
 }
 
