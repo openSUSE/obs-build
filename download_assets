@@ -150,6 +150,7 @@ if ($opts->{'help'}) {
 die("Please specify at least one directory\n") unless @dirs;
 die("The --assetdir option conflicts with --noassetdir\n") if $opts->{'assetdir'} && $opts->{'noassetdir'};
 die("Cannot use both --update and --clean\n") if $opts->{'clean'} && $opts->{'update'};
+die("Cannot use both --unpack and --createarchive\n") if $opts->{'unpack'} && $opts->{'createarchive'};
 
 $Build::Download::debug = 1 if $opts->{'debugflags'}->{'network'};
 
@@ -191,6 +192,7 @@ for my $dir (@dirs) {
       print " $asset->{'type'}";
       print " $asset->{'url'}" if $asset->{'url'};
       print " $asset->{'digest'}" if $asset->{'digest'};
+      print " -> $asset->{'finalfile'}" if $asset->{'finalfile'};
       print "\n";
     }
     next;
@@ -204,17 +206,9 @@ for my $dir (@dirs) {
       } else {
         unlink "$dir/$_->{'file'}" if -e "$dir/$_->{'file'}";
       }
+      unlink "$dir/$_->{'finalfile'}" if $_->{'finalfile'} && -e "$dir/$_->{'finalfile'}";
     }
     next;
-  }
-
-  if ($opts->{'createarchive'}) {
-    my $af = $p->{'asset_files'} || {};
-    for (values %$af) {
-      if ($_->{'isdir'}) {
-	$_->{'createarchive'} = $_->{'finalfile'} if $_->{'finalfile'} && $_->{'finalfile'} =~ /\.tar(?:\.xz|gz|zstd)?/;
-      }
-    }
   }
 
   $assetmgr->force_update($p) if $opts->{'update'};
@@ -226,11 +220,14 @@ for my $dir (@dirs) {
     }
   }
   $assetmgr->getremoteassets($p);
+  my $dirmode = 0;
+  $dirmode = 1 if $opts->{'unpack'};
+  $dirmode = 2 if $opts->{'createarchive'};
   if ($opts->{'noassetdir'}) {
-    $assetmgr->move_assets($p, $outdir, $opts->{'unpack'});
+    $assetmgr->move_assets($p, $outdir, $dirmode);
     PBuild::Util::rm_rf($assetdir);
   } else {
-    $assetmgr->copy_assets($p, $outdir, $opts->{'unpack'});
+    $assetmgr->copy_assets($p, $outdir, $dirmode);
   }
   # mark directories as assets for the build script
   if ($opts->{'unpack'}) {
