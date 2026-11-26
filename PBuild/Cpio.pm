@@ -100,6 +100,11 @@ sub skipin {
   }
 }
 
+sub cpio_write_trailer {
+  my ($outfd) = @_;
+  print $outfd cpio_make() or die("cpio_write_trailer: $!\n");
+}
+
 sub cpio_create {
   my ($fd, $dir, %opts) = @_;
   my @todo;
@@ -109,7 +114,6 @@ sub cpio_create {
     $prefixdir = $1;
     my @s = stat("$dir/.");
     die("$dir: $!\n") unless @s;
-    $s[7] = 0;
     unshift @todo, [ '', @s ];
   }
   if ($opts{'dircontent'}) {
@@ -144,6 +148,7 @@ sub cpio_create {
     }
     $ent->{'mode'} = $s[2] & 0xfff;
     $ent->{'name'} = $name eq '' ? $prefixdir : "$prefix$name";
+    $ent->{'name'} = $opts{'_name'} if defined $opts{'_name'};	# see cpio_write_file
     $ent->{'mtime'} = $opts{'mtime'} if defined $opts{'mtime'};
     $ent->{'inode'} = $ino++;
     my ($h, $pad) = cpio_make($ent, \@s);
@@ -152,7 +157,7 @@ sub cpio_create {
     copyout($fd, "$dir/$name", $ent->{'size'}) if $ent->{'cpiotype'} == 8 && $ent->{'size'};
     print $fd $pad or die("cpio write: $!\n");
   }
-  print $fd cpio_make() or die("cpio write: $!\n");
+  cpio_write_trailer($fd) unless $opts{'notrailer'};
 }
 
 sub cpio_read {
@@ -256,6 +261,42 @@ sub cpio_extract {
     symlink($symlinks{$outfile}, $outfile) || die("symlink $symlinks{$outfile} $outfile: $!\n");
   }
   close($fd);
+}
+
+sub cpio_write_cpio {
+  my ($outfd, $cpiofile, %opts) = @_;
+  my $fd;
+  open($fd, '<', $cpiofile) || die("$cpiofile: $!\n");
+  while (1) {
+    my $cpiohead = cpio_read($fd, 110);
+    my ($ent, $namesize, $namepad, $size, $pad) = cpio_parse($cpiohead);
+    my $namedata = cpio_read($fd, $namesize + $namepad);
+    my $name = substr($namedata, 0, $namesize);
+    $name =~ s/\0.*//s;
+    last if !$size && $name eq 'TRAILER!!!';
+    print $outfd "$cpiohead$namedata" or die("cpio_write_cpio: $!\n");
+    $size += $pad;
+    while ($size > 0) {
+      my $chunk = $size > 65536 ? 65536 : $size;
+      print $outfd cpio_read($fd, $chunk) or die("cpio_write_cpio: $!\n");
+      $size -= $chunk;
+    }
+  }
+  close($fd);
+  cpio_write_trailer($outfd) unless $opts{'notrailer'};
+}
+
+sub cpio_write_file {
+  my ($outfd, $dir, $file, %opts) = @_;
+  die("$dir/$file: not a plain file\n") unless lstat("$dir/$file") && -f _;
+  PBuild::Cpio::cpio_create($outfd, $dir, 'dircontent' => [ $file ], %opts, '_name' => $opts{'name'});
+}
+
+sub cpio_write_dir {
+  my ($outfd, $dir, $file, %opts) = @_;
+  my @s = lstat("$dir/$file");
+  die("$dir/$file: not a directory\n") unless @s && -d _;
+  PBuild::Cpio::cpio_create($outfd, $dir, 'dircontent' => [ [ $file, @s ] ], %opts, '_name' => $opts{'name'});
 }
 
 1;
