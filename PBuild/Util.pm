@@ -68,17 +68,17 @@ sub appendstr {
   close($f) || die("$fn close: $!\n");
 }
 
-sub touch($) {
-  my ($file) = @_;
-  if (-e $file) {
-    my $t = time();
-    utime($t, $t, $file);
-  } else {
-    # create new file, mtime is anyway current
+sub touch {
+  my ($file, $t) = @_;
+  if (!lstat($file)) {
+    # create new file
     my $f;
     open($f, '>>', $file) || die("$file: $!\n");
     close($f) || die("$file close: $!\n");
+    return unless defined $t;	# mtime is current as we created the file
   }
+  $t = time() unless defined $t;
+  utime($t, $t, $file);
 }
 
 sub ls {
