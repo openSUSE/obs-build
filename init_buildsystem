@@ -156,8 +156,12 @@ BUILD_INIT_CACHE="$BUILD_ROOT/.init_b_cache"
 mount_stuff() {
     if test "$UID" = 0 -a -n "$BUILD_ROOT" -a "$BUILD_ROOT" != / ; then
 	mount -n -tproc none "$BUILD_ROOT/proc"
+	# A fresh proc mount fails in a rootless container: bind the
+	# container's own /proc instead, like the /dev binds.
+	test -e "$BUILD_ROOT/proc/self" || mount -n --bind /proc "$BUILD_ROOT/proc"
 	test -e "$BUILD_ROOT/proc/self" || cleanup_and_exit 1 "Could not mount /proc, is this a container with missing capabilities?"
 	mount -n -tdevpts -omode=0620,ptmxmode=0666,gid=5 none "$BUILD_ROOT/dev/pts"
+	test -e "$BUILD_ROOT/dev/pts/ptmx" || mount -n --bind /dev/pts "$BUILD_ROOT/dev/pts"
     fi
 }
 
