@@ -1071,8 +1071,14 @@ mount_stuff() {
 	mkdir -p $BUILD_ROOT/dev/pts
 	mkdir -p $BUILD_ROOT/dev/shm
 	mount -n -tproc none $BUILD_ROOT/proc
+	# A fresh proc or sysfs mount fails in a rootless container:
+	# sysfs cannot be mounted from a user namespace. Bind the
+	# container's own mounts instead, like the /dev binds.
+	test -e $BUILD_ROOT/proc/self || mount -n --bind /proc $BUILD_ROOT/proc
 	mount -n -tsysfs none $BUILD_ROOT/sys
+	test -e $BUILD_ROOT/sys/kernel || mount -n --bind /sys $BUILD_ROOT/sys
 	mount -n -tdevpts -omode=0620,ptmxmode=0666,gid=5 none $BUILD_ROOT/dev/pts
+	test -e $BUILD_ROOT/dev/pts/ptmx || mount -n --bind /dev/pts $BUILD_ROOT/dev/pts
 	mount -n -ttmpfs none $BUILD_ROOT/dev/shm
     fi
 }
