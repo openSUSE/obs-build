@@ -194,9 +194,11 @@ recipe_build_docker() {
     mkdir -p "$BUILD_ROOT/$TOPDIR/SOURCES/repos/UPLOAD"
 
     # Prepare the webcache
-    mkdir -p "$BUILD_ROOT/$TOPDIR/SOURCES/repos/build-webcache"
     for i in "$BUILD_ROOT/$TOPDIR/SOURCES/build-webcache"-* ; do
-	test -e "$i" && ln -f "$i" "$BUILD_ROOT/$TOPDIR/SOURCES/repos/build-webcache/${i##*/build-webcache-}"
+	test "$i" = "${i%.obscpio}" || continue
+	test -e "$i" || continue
+	mkdir -p "$BUILD_ROOT/$TOPDIR/SOURCES/repos/build-webcache"
+	ln -f "$i" "$BUILD_ROOT/$TOPDIR/SOURCES/repos/build-webcache/${i##*/build-webcache-}"
     done
 
     # exclude repos/containers directory
