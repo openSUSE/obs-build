@@ -70,6 +70,7 @@ my %known_options = (
   'unpack' => '',
   'update' => '',
   'createarchive' => '',
+  'bundle' => '',
 
   'arch' => '::',
   'dist' => ':',
@@ -227,15 +228,16 @@ for my $dir (@dirs) {
     $assetmgr->move_assets($p, $outdir, $dirmode);
     PBuild::Util::rm_rf($assetdir);
   } else {
-    $assetmgr->copy_assets($p, $outdir, $dirmode);
+    $assetmgr->copy_assets($p, $outdir, $dirmode, $opts->{'bundle'});
   }
   # mark directories as assets for the build script
   if ($opts->{'unpack'}) {
     my $af = $p->{'asset_files'} || {};
-    for my $file (grep {$af->{$_}->{'isdir'}} keys %$af) {
+    for my $file (sort keys %$af) {
       my $asset = $af->{$file};
+      next unless $asset->{'isdir'} || ($asset->{'unpackfile'} && $asset->{'unpackfile'} =~ /\//);
       for my $unpackfile (@{$asset->{'filelist'} || [ $file ]}) {
-	my $dir = $unpackfile;
+	my $dir = $asset->{'unpackfile'} || $unpackfile;
 	$dir =~ s/\/.*//;
 	next if -l "$outdir/$dir" || ! -d _;
         PBuild::Util::touch("$outdir/$dir/.build.asset") unless -l "$outdir/$dir/.build.asset" || -e _;

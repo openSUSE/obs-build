@@ -291,7 +291,7 @@ sub create_archive_from_obscpio {
     @dirs = ($dirname);
   } else {
     my %dirs = map {$_ => 1} @dirs;
-    die("asset contains invalid directories\n") if $dirs{"$dirname.tar"} || $dirs{"$dirname.filelist"} || $dirs{"$dirname.tar$compressor"};
+    die("asset contains invalid directories\n") if $dirs{"$dirname.tar"} || $dirs{"$dirname.tar.filelist"} || $dirs{"$dirname.tar$compressor"};
   }
   # check if our tar supports the --sort command
   system("/bin/sh", "-c", 'tar --sort=name --version >/dev/null 2>&1');
@@ -324,20 +324,65 @@ sub create_archive_from_asset {
   create_archive_from_obscpio($assetmgr, "$adir/$assetid", "$srcdir/$archivefile", $asset->{'finalfile'} ? 1 : 0);
 }
 
+sub copy_bundle_asset {
+  my ($assetmgr, $bundle, $srcdir, $bundlefile, $dirmode) = @_;
+
+  die("copy_bundle_asset: unknown dirmode $dirmode\n") if $dirmode && $dirmode != 1 && $dirmode != 2;
+  my $assetdir = $assetmgr->{'asset_dir'};
+  my $bundlecpio = "$assetdir/.bundle$$.obscpio";
+  my $fd;
+  open($fd, '>', $bundlecpio) || die("$bundlecpio: $!\n");
+  for my $basset (@$bundle) {
+    my ($file, $asset) = @$basset;
+    my $assetid = $asset->{'assetid'};
+    my $adir = "$assetdir/".substr($assetid, 0, 2);
+    if ($asset->{'isdir'}) {
+      die("packing of assets is not supported\n") if $asset->{'donotpack'} && -d "$adir/$assetid";
+      PBuild::Cpio::cpio_write_cpio($fd, "$adir/$assetid", 'notrailer' => 1);
+    } else {
+      $file = $asset->{'unpackfile'} if $asset->{'unpackfile'};
+      PBuild::Cpio::cpio_write_file($fd, $adir, $assetid, 'name' => $file, 'mtime' => 0, 'notrailer' => 1);
+    }
+  }
+  PBuild::Cpio::cpio_write_dir($fd, $assetdir, '.', 'name' => 'build-webcache', 'mtime' => 0, 'notrailer' => 1) if $bundlefile eq 'build-webcache';
+  PBuild::Cpio::cpio_write_trailer($fd);
+  close($fd);
+  if ($dirmode) {
+    die("unpack not supported for asset bundles\n") if $dirmode == 1;
+    if ($dirmode == 2) {
+      unlink("$srcdir/$bundlefile.tar.gz");
+      create_archive_from_obscpio($assetmgr, $bundlecpio, "$srcdir/$bundlefile.tar.gz", 0);
+    }
+  } else {
+    unlink("$srcdir/$bundlefile.obscpio");
+    PBuild::Util::cp($bundlecpio, "$srcdir/$bundlefile.obscpio");
+  }
+  unlink($bundlecpio);
+}
+
 #
 # Copy the assets from our cache to the build root
 # dirmode: 0=obscpio 1=unpack 2=archive
 #
 sub copy_assets {
-  my ($assetmgr, $p, $srcdir, $dirmode) = @_;
+  my ($assetmgr, $p, $srcdir, $dirmode, $dobundle) = @_;
   my $assetdir = $assetmgr->{'asset_dir'};
   my $asset_files = $p->{'asset_files'};
   die("copy_assets: unknown dirmode $dirmode\n") if $dirmode && $dirmode != 1 && $dirmode != 2;
+  my %bundles;
   for my $file (sort keys %{$asset_files || {}}) {
     my $asset = $asset_files->{$file};
     my $assetid = $asset->{'assetid'};
     my $adir = "$assetdir/".substr($assetid, 0, 2);
-    die("asset $assetid is gone\n") unless -e "$adir/$assetid";
+    die("asset $assetid is missing\n") unless -e "$adir/$assetid";
+    if ($dobundle && $asset->{'bundlefile'}) {
+      push @{$bundles{$asset->{'bundlefile'}}}, [ $file, $asset ];
+      next;
+    }
+    if ($dirmode && $dirmode == 1 && $asset->{'unpackfile'}) {
+      $file = $asset->{'unpackfile'};
+      PBuild::Util::mkdir_p("$srcdir/$1") if $file =~ /(.*)\//;
+    }
     if ($asset->{'isdir'}) {
       if ($dirmode) {
         unpack_asset($assetmgr, $asset, $srcdir, $file) if $dirmode == 1;
@@ -349,6 +394,7 @@ sub copy_assets {
     unlink("$srcdir/$file");
     PBuild::Util::cp("$adir/$assetid", "$srcdir/$file");
   }
+  copy_bundle_asset($assetmgr, $bundles{$_}, $srcdir, $_, $dirmode) for sort keys %bundles;
   if (has_mutable_assets($assetmgr, $p) && update_srcmd5($assetmgr, $p)) {
     copy_assets($assetmgr, $p, $srcdir);	# had a race, copy again
   }
@@ -367,7 +413,7 @@ sub move_assets {
     my $asset = $asset_files->{$file};
     my $assetid = $asset->{'assetid'};
     my $adir = "$assetdir/".substr($assetid, 0, 2);
-    die("asset $assetid is gone\n") unless -e "$adir/$assetid";
+    die("asset $assetid is missing\n") unless -e "$adir/$assetid";
     if ($asset->{'isdir'}) {
       if ($asset->{'donotpack'} && -d "$adir/$assetid") {
 	# asset created with donotpack option, just rename
@@ -381,6 +427,10 @@ sub move_assets {
         }
 	$file .= ".obscpio";
       }
+    }
+    if ($dirmode && $dirmode == 1 && $asset->{'unpackfile'}) {
+      $file = $asset->{'unpackfile'};
+      mkdir_p("$srcdir/$1") if $file =~ /(.*)\//;
     }
     rename("$adir/$assetid", "$srcdir/$file") || die("rename $adir/$assetid $srcdir/$file: $!\n");
     unlink("$adir/$assetid.etag");

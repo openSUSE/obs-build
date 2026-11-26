@@ -140,7 +140,7 @@ sub recipe_parse {
       push @assets, $asset;
       next;
     }
-    if (($s->{'type'} || '' eq 'webcache')) {
+    if (($s->{'type'} || '') eq 'webcache') {
       next unless $url;
       $file = 'build-webcache-'.Digest::SHA::sha256_hex($url);
     }
@@ -157,6 +157,10 @@ sub recipe_parse {
     $asset->{'url'} = $url if $url;
     $asset->{'type'} = 'url' if $url;
     $asset->{'finalfile'} = $s->{'finalfile'} if $s->{'finalfile'} && $s->{'finalfile'} =~ /^([^\.\/][^\/]+)$/s;
+    if (($s->{'type'} || '') eq 'webcache') {
+      $asset->{'bundlefile'} = 'build-webcache';
+      $asset->{'unpackfile'} = "build-webcache/$1" if $file =~ /^build-webcache-(.*)/;
+    }
     push @assets, $asset;
   }
   return @assets;
@@ -191,7 +195,7 @@ sub golang_parse {
     my $l = $mods{$mod};
     next unless $l->{'mod'};	# need at least the go.mod file
     my $k = "$mod";
-    $k .= " $_ $mods{$mod}->{$_}" for sort keys %{$mods{$mod}};
+    $k .= " $_ $l->{$_}" for sort keys %$l;
     my $cname = "build-gomodcache";
     my $file = "$cname/$mod";
     $file =~ s/\//:/g;
@@ -203,7 +207,7 @@ sub golang_parse {
     $vers =~ s/([A-Z])/'!'.lc($1)/ge;
     my @filelist = map {"$cname/$moddir/\@v/$vers.$_"} sort keys %$l;
     my $assetid = Digest::MD5::md5_hex($k);
-    my $asset = { 'type' => 'golang', 'file' => $file, 'mod' => $mod, 'modprefix' => "$moddir/\@v/$vers.", 'filelist' => \@filelist, 'parts' => $mods{$mod}, 'isdir' => 1, 'immutable' => 1, 'assetid' => $assetid };
+    my $asset = { 'type' => 'golang', 'file' => $file, 'mod' => $mod, 'modprefix' => "$moddir/\@v/$vers.", 'filelist' => \@filelist, 'parts' => $mods{$mod}, 'isdir' => 1, 'immutable' => 1, 'assetid' => $assetid, 'bundlefile' => 'build-gomodcache' };
     push @assets, $asset;
   }
   close $fd;
