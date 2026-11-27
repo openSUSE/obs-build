@@ -77,7 +77,7 @@ vm_startup_xen() {
     echo "on_reboot = \"destroy\""                                           >> $XEN_CONF_FILE
     echo "on_crash = \"destroy\""                                            >> $XEN_CONF_FILE
     if test "$XMCMD" = xm ; then
-	set -- xm create -c $XEN_CONF_FILE name="build_$XENID" $XMROOT $XMSWAP extra="panic=1 quiet init="$vm_init_script" rd.driver.pre=binfmt_misc elevator=noop console=$VM_CONSOLE"
+	set -- xm create -c $XEN_CONF_FILE name="build_$XENID" $XMROOT $XMSWAP extra="panic=1 quiet init="$vm_init_script" rd.driver.pre=binfmt_misc console=$VM_CONSOLE"
     else
 	XLDISK=
 	XLDISK="\"${XMROOT#disk=}\""
