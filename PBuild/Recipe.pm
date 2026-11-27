@@ -57,6 +57,7 @@ sub find_recipe {
     @files = sort {length($a) <=> length($b) || $a cmp $b} @files;
     return $files{$files[0]};
   }
+  return $files{'Dockerfile.dapper'} if $type eq 'docker' && $files{'Dockerfile.dapper'};
   return $files{'debian.control'} if $type eq 'dsc' && $files{'debian.control'};
   return $files{'debian/control'} if $type eq 'dsc' && $files{'debian/control'};
   # as last resort ignore the type for image/container building
